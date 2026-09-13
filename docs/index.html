@@ -38,9 +38,16 @@ body{
   font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--texte-doux);
 }
+#pause{
+  font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;background:none;border:0;padding:6px 0;cursor:pointer;
+  transition:color .3s ease;
+}
+#pause:hover,#pause:focus-visible{color:var(--or);outline:none}
 .scene{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
 .stage{position:relative;width:100%;height:clamp(300px,62svh,780px)}
-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab;transition:opacity 2.4s ease}
+.doux canvas{opacity:0}
+.doux.go canvas{opacity:1}
 canvas.drag{cursor:grabbing}
 .titre{text-align:center;margin-top:clamp(4px,1.5vh,20px)}
 h1{
@@ -60,7 +67,7 @@ h1{
 
 @media (max-width:560px){
   .haut span:last-child,.bas span:last-child{display:none}
-  .haut,.bas{justify-content:center}
+  .haut,.bas{justify-content:center;gap:28px}
   .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));height:min(58svh,125vw)}
   .titre{margin-top:0}
   h1{letter-spacing:.12em;padding-left:.12em}
@@ -86,7 +93,7 @@ h1{
       <div class="bientot fade" style="--d:6.1s">Bientôt</div>
     </div>
   </main>
-  <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><span>© 2026</span></footer>
+  <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><button id="pause" type="button" aria-pressed="false">Pause</button><span>© 2026</span></footer>
 </div>
 
 <script>
@@ -239,7 +246,6 @@ h1{
     cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
     S = Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
     CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
-    if (reduit) dessiner(1e3, TH0);
   }
   function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + S*q[1]] }
 
@@ -325,28 +331,38 @@ h1{
   window.addEventListener("resize", taille);
   taille();
 
-  if (reduit){ page.classList.add("static", "go"); dessiner(1e3, TH0); return; }
+  // Mouvements réduits demandés par le système : pas de construction ni de scintillement,
+  // le bâtiment apparaît en fondu, déjà dessiné, et tourne deux fois plus lentement
+  if (reduit) page.classList.add("doux", "static");
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ page.classList.add("go"); }); });
 
   // ---------- Animation : construction, puis rotation lente ----------
   var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 75;
-  var VITESSE = Math.PI*2/parTour;          // un tour en 75 s (?tour=N pour tester)
-  var DEBUT_ROT = loggiaFin - 1.5;
-  var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
-  var glisse = false, gx = 0, gt = 0, gv = 0;
+  var VITESSE = Math.PI*2/(parTour * (reduit ? 2 : 1));   // un tour en 75 s (?tour=N pour tester)
+  var AVANCE = reduit ? 1e3 : 0;
+  var DEBUT_ROT = reduit ? 1.5 : loggiaFin - 1.5;
+  var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = reduit ? Infinity : DEBUT_ROT + 1;
+  var glisse = false, gx = 0, gt = 0, gv = 0, enPause = false;
+
+  var bouton = document.getElementById("pause");
+  bouton.addEventListener("click", function(){
+    enPause = !enPause;
+    bouton.textContent = enPause ? "Lecture" : "Pause";
+    bouton.setAttribute("aria-pressed", enPause);
+  });
 
   function frame(now){
     if (t0 === null) t0 = now;
     var T = (now - t0)/1000, dt = Math.min(.05, T - prec); prec = T;
 
     if (!glisse){
-      var cible = T > DEBUT_ROT ? VITESSE : 0;
+      var cible = T > DEBUT_ROT && !enPause ? VITESSE : 0;
       omega += (cible - omega) * Math.min(1, dt*(T - DEBUT_ROT < 6 ? .35 : 1.2));
       th += omega*dt;
     }
 
     // après la construction, une loggia s'allume ou s'éteint de temps en temps
-    if (T > prochaine){
+    if (T > prochaine && !enPause){
       prochaine = T + .7;
       var q = loggias[Math.floor(Math.random()*loggias.length)];
       q.o = q.o > .3 ? .02 + Math.random()*.03 : .45 + Math.random()*.4;
@@ -356,7 +372,7 @@ h1{
       lq.cur = Math.abs(d) <= pas ? lq.o : lq.cur + Math.sign(d)*pas;
     }
 
-    dessiner(T, th);
+    dessiner(T + AVANCE, th);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
