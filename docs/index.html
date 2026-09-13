@@ -45,9 +45,7 @@ body{
 #pause:hover,#pause:focus-visible{color:var(--or);outline:none}
 .scene{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
 .stage{position:relative;width:100%;height:clamp(300px,62svh,780px)}
-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab;transition:opacity 2.4s ease}
-.doux canvas{opacity:0}
-.doux.go canvas{opacity:1}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
 canvas.drag{cursor:grabbing}
 .titre{text-align:center;margin-top:clamp(4px,1.5vh,20px)}
 h1{
@@ -63,7 +61,6 @@ h1{
 
 .fade{opacity:0;transform:translateY(8px);transition:opacity 1.6s ease var(--d,0s),transform 1.6s ease var(--d,0s)}
 .go .fade{opacity:1;transform:none}
-.static .fade{transition:none}
 
 @media (max-width:560px){
   .haut span:last-child,.bas span:last-child{display:none}
@@ -100,8 +97,8 @@ h1{
 (function(){
   var cv = document.getElementById("bat"), ctx = cv.getContext("2d");
   var page = document.getElementById("page");
-  // ?anim force l'animation, même si le système demande de réduire les mouvements
-  var reduit = !/[?&]anim\b/.test(location.search) && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Choix assumé : l'animation complète est jouée même si le système demande de réduire
+  // les mouvements ; le bouton Pause permet de l'arrêter.
 
   function norm(a){var l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]}
   function clamp(x){return x<0?0:x>1?1:x}
@@ -331,17 +328,13 @@ h1{
   window.addEventListener("resize", taille);
   taille();
 
-  // Mouvements réduits demandés par le système : pas de construction ni de scintillement,
-  // le bâtiment apparaît en fondu, déjà dessiné, et tourne deux fois plus lentement
-  if (reduit) page.classList.add("doux", "static");
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ page.classList.add("go"); }); });
 
   // ---------- Animation : construction, puis rotation lente ----------
   var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 75;
-  var VITESSE = Math.PI*2/(parTour * (reduit ? 2 : 1));   // un tour en 75 s (?tour=N pour tester)
-  var AVANCE = reduit ? 1e3 : 0;
-  var DEBUT_ROT = reduit ? 1.5 : loggiaFin - 1.5;
-  var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = reduit ? Infinity : DEBUT_ROT + 1;
+  var VITESSE = Math.PI*2/parTour;          // un tour en 75 s (?tour=N pour tester)
+  var DEBUT_ROT = loggiaFin - 1.5;
+  var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
   var glisse = false, gx = 0, gt = 0, gv = 0, enPause = false;
 
   var bouton = document.getElementById("pause");
@@ -372,7 +365,7 @@ h1{
       lq.cur = Math.abs(d) <= pas ? lq.o : lq.cur + Math.sign(d)*pas;
     }
 
-    dessiner(T + AVANCE, th);
+    dessiner(T, th);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
