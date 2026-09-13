@@ -1,0 +1,32 @@
+# Copie de travail de la page : la version publiée est docs/index.html
+/index.html
+
+# Python / IronPython
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# pyRevit
+*.log
+pyRevit_config.ini
+.pyrevit_cache/
+
+# Revit
+*.rvt.bak
+*.[0-9][0-9][0-9][0-9].rvt
+*.[0-9][0-9][0-9][0-9].rfa
+*_backup/
+*.dat
+*.slog
+
+# Archives de livraison
+*.zip
+
+# Éditeurs et système
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
