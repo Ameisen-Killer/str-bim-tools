@@ -53,6 +53,7 @@ a{color:inherit}
 .hero-texte{padding-bottom:clamp(28px,6vh,64px)}
 .surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
 .hero h1{margin:14px 0 0;font-weight:200;font-size:clamp(56px,11vw,150px);line-height:.9;letter-spacing:.04em}
+.hero .auteur{margin:10px 0 0;font-weight:200;font-size:clamp(18px,2.4vw,30px);letter-spacing:.06em;color:var(--texte)}
 .hero .chapeau{margin:22px 0 0;max-width:40em;font-size:clamp(16px,1.9vw,21px);color:var(--texte-doux)}
 .hero-bas{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-top:clamp(32px,5vh,52px)}
 .axes{display:flex;gap:clamp(18px,3vw,40px);list-style:none;margin:0;padding:0}
@@ -239,6 +240,7 @@ footer a:hover{color:var(--or)}
   <div class="hero-texte">
     <div class="surtitre rv" style="--d:.2s">STR Bim Tools · Outil</div>
     <h1 class="rv" style="--d:.4s">CAN 241</h1>
+    <p class="auteur rv" style="--d:1.7s">by Tony Varin</p>
     <p class="chapeau rv" style="--d:.7s">Le métré du béton coulé sur place, tiré directement de la maquette Revit : coffrage, béton et armature, article par article.</p>
     <div class="hero-bas">
       <ul class="axes rv" style="--d:1s">
@@ -258,7 +260,7 @@ footer a:hover{color:var(--or)}
   <div class="wrap" data-vu>
     <div class="num rv">01 — Trois axes</div>
     <h2 class="rv" style="--d:.1s">Trois métrés distincts, un seul export.</h2>
-    <p class="intro rv" style="--d:.2s">Le CAN 241 facture séparément le coffrage, le béton et l'armature. L'outil sort les trois d'un coup, chacun avec son numéro d'article et sa quantité.</p>
+    <p class="intro rv" style="--d:.2s">Le CAN 241 facture séparément le coffrage, l'armature et le béton. L'outil sort les trois d'un coup, chacun avec son numéro d'article et sa quantité.</p>
     <div class="trois">
       <div class="axe rv" style="--d:.1s">
         <svg class="ill" id="ill-coffrage" aria-hidden="true"></svg>
@@ -267,16 +269,16 @@ footer a:hover{color:var(--or)}
         <p>Surface de béton coffrée, mesurée sur la géométrie réelle : faces de murs, sous-faces, rives et abouts.</p>
       </div>
       <div class="axe rv" style="--d:.25s">
-        <svg class="ill" id="ill-beton" aria-hidden="true"></svg>
-        <div class="tete"><h3>Béton</h3><span class="unite">m³</span></div>
-        <div class="chap">Chapitre 600</div>
-        <p>Volume selon plans, classé par type de béton NPK puis par plage de hauteur, d'épaisseur ou de section.</p>
-      </div>
-      <div class="axe rv" style="--d:.4s">
         <svg class="ill" id="ill-armature" aria-hidden="true"></svg>
         <div class="tete"><h3>Armature</h3><span class="unite">kg</span></div>
         <div class="chap">Chapitre 500</div>
         <p>Estimée par un ratio en kg/m³ propre à chaque élément, en acier B500B tous diamètres.</p>
+      </div>
+      <div class="axe rv" style="--d:.4s">
+        <svg class="ill" id="ill-beton" aria-hidden="true"></svg>
+        <div class="tete"><h3>Béton</h3><span class="unite">m³</span></div>
+        <div class="chap">Chapitre 600</div>
+        <p>Volume selon plans, classé par type de béton NPK puis par plage de hauteur, d'épaisseur ou de section.</p>
       </div>
     </div>
   </div>
