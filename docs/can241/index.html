@@ -117,18 +117,15 @@ svg.ill{display:block;width:100%;height:auto;overflow:visible}
 .carte .droite li{color:var(--texte)}
 .carte .droite li span{font-family:var(--mono);font-size:11px;color:var(--or);letter-spacing:.06em}
 .carte svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-.carte-m{display:none;margin-top:40px}
-.groupe{padding:20px 0;border-bottom:1px solid var(--ligne)}
-.groupe .cat{display:flex;align-items:center;gap:14px;font-size:16px;color:var(--texte)}
-.groupe .cat::after{content:"";flex:1;height:1px;background:rgba(214,168,92,.65);transform:scaleX(0);transform-origin:left;transition:transform 1.2s cubic-bezier(.55,.05,.25,1) var(--d,0s)}
-.vu .groupe .cat::after{transform:scaleX(1)}
-.groupe .genres{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-.groupe .genres span{
-  font-size:14px;padding:7px 11px;border:1px solid rgba(236,232,224,.16);color:var(--texte-doux);
-  opacity:0;transform:translateY(6px);transition:opacity .8s ease var(--d,0s),transform .8s ease var(--d,0s);
-}
-.vu .groupe .genres span{opacity:1;transform:none}
-.groupe .genres i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--or);margin-left:8px}
+/* mise en avant d'une catégorie à la fois */
+.carte svg path.l{transition:stroke-dashoffset var(--t,1.4s) cubic-bezier(.55,.05,.25,1) var(--d,0s), stroke .7s ease, stroke-width .7s ease}
+.carte li{transition:opacity .7s ease,color .7s ease}
+.carte .gauche li{cursor:pointer}
+.carte.cycle svg path.l{stroke:rgba(236,232,224,.1)}
+.carte.cycle svg path.l.actif{stroke:rgba(214,168,92,.95);stroke-width:1.6}
+.carte.cycle li{opacity:.38}
+.carte.cycle li.actif{opacity:1}
+.carte.cycle .gauche li.actif{color:var(--or)}
 .note{display:flex;gap:clamp(24px,5vw,72px);flex-wrap:wrap;margin-top:clamp(40px,6vh,64px)}
 .note div{max-width:22em}
 .note b{display:block;font-weight:200;font-size:clamp(40px,5vw,60px);line-height:1;color:var(--texte)}
@@ -226,8 +223,15 @@ footer a:hover{color:var(--or)}
   .plus{grid-template-columns:1fr}
 }
 @media (max-width:640px){
-  .carte{display:none}
-  .carte-m{display:block}
+  .carte{grid-template-columns:auto minmax(96px,1fr) auto;margin-top:44px}
+  .carte li{font-size:13.5px;padding:9px 0}
+  .carte .gauche li{padding-right:2px}
+  .carte .gauche li span{display:none}
+  .carte .droite li{gap:8px}
+  .carte .droite li span{font-size:10px}
+}
+@media (max-width:400px){
+  .carte .droite li span{display:none}
 }
 @media (max-width:560px){
   .barre span{display:none}
@@ -325,7 +329,6 @@ footer a:hover{color:var(--or)}
       </ul>
       <svg id="liens" aria-hidden="true"></svg>
     </div>
-    <div class="carte-m" id="carte-m"></div>
     <div class="note">
       <div class="rv" style="--d:.1s"><b>18</b><span>genres CAN reconnus, dont « Ne pas compter » pour exclure un élément du métré.</span></div>
       <div class="rv" style="--d:.2s"><b>1,50 m</b><span>au-delà, un parapet devient un mur et change d'article, comme le prévoit le catalogue.</span></div>
@@ -758,36 +761,36 @@ footer a:hover{color:var(--or)}
         var x0 = a.right - rc.left + 8, y0 = a.top + a.height/2 - rc.top;
         var x1 = b.left - rc.left - 8, y1 = b.top + b.height/2 - rc.top;
         var mx = (x0 + x1)/2;
-        var p = el(svgL, "path", {d:"M"+x0.toFixed(1)+" "+y0.toFixed(1)+" C"+mx.toFixed(1)+" "+y0.toFixed(1)+" "+mx.toFixed(1)+" "+y1.toFixed(1)+" "+x1.toFixed(1)+" "+y1.toFixed(1), class:"l draw " + (src === "sols" ? "o" : ""), pathLength:1});
+        var p = el(svgL, "path", {d:"M"+x0.toFixed(1)+" "+y0.toFixed(1)+" C"+mx.toFixed(1)+" "+y0.toFixed(1)+" "+mx.toFixed(1)+" "+y1.toFixed(1)+" "+x1.toFixed(1)+" "+y1.toFixed(1), class:"l draw " + (src === "sols" ? "o" : ""), pathLength:1, "data-src":src});
         p.style.setProperty("--d", (.5 + i*.18 + n*.04).toFixed(2)+"s");
         p.style.setProperty("--t", "1.3s");
         n++;
       });
     });
+    marquer();
   }
-  liens();
 
-  // Sur smartphone : une catégorie, puis ses genres en étiquettes, triés par article
-  (function(){
-    var boite = document.getElementById("carte-m"), n = 0;
-    Object.keys(LIENS).forEach(function(src, i){
-      var g = document.createElement("div"); g.className = "groupe";
-      var cat = document.createElement("div"); cat.className = "cat";
-      cat.textContent = carte.querySelector('.gauche [data-k="'+src+'"]').firstChild.textContent.trim();
-      cat.style.setProperty("--d", (.2 + i*.35).toFixed(2)+"s");
-      var gs = document.createElement("div"); gs.className = "genres";
-      LIENS[src].map(function(k){
-        var li = carte.querySelector('.droite [data-k="'+k+'"]');
-        return {nom: li.firstChild.textContent.trim(), art: li.querySelector("span").textContent};
-      }).sort(function(a,b){ return a.art - b.art }).forEach(function(x, j){
-        var s = document.createElement("span"); s.textContent = x.nom;
-        var art = document.createElement("i"); art.textContent = x.art; s.appendChild(art);
-        s.style.setProperty("--d", (.5 + i*.35 + j*.12).toFixed(2)+"s");
-        gs.appendChild(s); n++;
-      });
-      g.appendChild(cat); g.appendChild(gs); boite.appendChild(g);
-    });
-  })();
+  // Une catégorie mise en avant à la fois : ses liens en or, ses genres en clair
+  var CATS = Object.keys(LIENS), actif = null, cycleTimer = null;
+  function marquer(){
+    [].forEach.call(svgL.querySelectorAll("path"), function(p){ p.classList.toggle("actif", p.getAttribute("data-src") === actif) });
+    [].forEach.call(carte.querySelectorAll(".gauche li"), function(li){ li.classList.toggle("actif", li.getAttribute("data-k") === actif) });
+    var cibles = actif ? LIENS[actif] : [];
+    [].forEach.call(carte.querySelectorAll(".droite li"), function(li){ li.classList.toggle("actif", cibles.indexOf(li.getAttribute("data-k")) >= 0) });
+  }
+  function choisir(cat){ actif = cat; carte.classList.add("cycle"); marquer(); }
+  function relancerCycle(){
+    clearInterval(cycleTimer);
+    cycleTimer = setInterval(function(){ choisir(CATS[(CATS.indexOf(actif) + 1) % CATS.length]) }, 2600);
+  }
+  function lancerCycle(){ choisir(CATS[0]); relancerCycle(); }
+  [].forEach.call(carte.querySelectorAll(".gauche li"), function(li){
+    function prendre(){ if (!carte.classList.contains("cycle")) return; choisir(li.getAttribute("data-k")); relancerCycle(); }
+    li.addEventListener("click", prendre);
+    li.addEventListener("mouseenter", prendre);
+  });
+
+  liens();
   var liensTimer; window.addEventListener("resize", function(){ clearTimeout(liensTimer); liensTimer = setTimeout(liens, 120); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(liens);
 
@@ -844,6 +847,7 @@ footer a:hover{color:var(--or)}
   function montrer(cible){
     cible.classList.add("vu");
     if (cible.contains(codeEl) && !decodeurLance){ decodeurLance = true; afficher(0); setInterval(suivant, 5200); }
+    if (cible.contains(carte) && !cycleTimer) cycleTimer = setTimeout(lancerCycle, 3600);
     [].forEach.call(cible.querySelectorAll("[data-n]"), compter);
   }
   var observes = document.querySelectorAll("[data-vu]");
