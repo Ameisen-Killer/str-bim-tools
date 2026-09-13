@@ -38,11 +38,6 @@ body{
   font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--texte-doux);
 }
-#pause{
-  font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;background:none;border:0;padding:6px 0;cursor:pointer;
-  transition:color .3s ease;
-}
-#pause:hover,#pause:focus-visible{color:var(--or);outline:none}
 .scene{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
 .stage{position:relative;width:100%;height:clamp(300px,62svh,780px)}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
@@ -90,15 +85,14 @@ h1{
       <div class="bientot fade" style="--d:6.1s">Bientôt</div>
     </div>
   </main>
-  <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><button id="pause" type="button" aria-pressed="false">Pause</button><span>© 2026</span></footer>
+  <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><span>© 2026</span></footer>
 </div>
 
 <script>
 (function(){
   var cv = document.getElementById("bat"), ctx = cv.getContext("2d");
   var page = document.getElementById("page");
-  // Choix assumé : l'animation complète est jouée même si le système demande de réduire
-  // les mouvements ; le bouton Pause permet de l'arrêter.
+  // Choix assumé : l'animation complète est jouée même si le système demande de réduire les mouvements
 
   function norm(a){var l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]}
   function clamp(x){return x<0?0:x>1?1:x}
@@ -236,12 +230,13 @@ h1{
   })();
 
   var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0;
+  var RECUL = .8;                           // < 1 : caméra plus éloignée, bâtiment plus petit dans le cadre
   function taille(){
     var r = cv.getBoundingClientRect();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = r.width; H = r.height;
     cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
-    S = Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
+    S = RECUL * Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
     CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
   }
   function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + S*q[1]] }
@@ -335,27 +330,20 @@ h1{
   var VITESSE = Math.PI*2/parTour;          // un tour en 75 s (?tour=N pour tester)
   var DEBUT_ROT = loggiaFin - 1.5;
   var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
-  var glisse = false, gx = 0, gt = 0, gv = 0, enPause = false;
-
-  var bouton = document.getElementById("pause");
-  bouton.addEventListener("click", function(){
-    enPause = !enPause;
-    bouton.textContent = enPause ? "Lecture" : "Pause";
-    bouton.setAttribute("aria-pressed", enPause);
-  });
+  var glisse = false, gx = 0, gt = 0, gv = 0;
 
   function frame(now){
     if (t0 === null) t0 = now;
     var T = (now - t0)/1000, dt = Math.min(.05, T - prec); prec = T;
 
     if (!glisse){
-      var cible = T > DEBUT_ROT && !enPause ? VITESSE : 0;
+      var cible = T > DEBUT_ROT ? VITESSE : 0;
       omega += (cible - omega) * Math.min(1, dt*(T - DEBUT_ROT < 6 ? .35 : 1.2));
       th += omega*dt;
     }
 
     // après la construction, une loggia s'allume ou s'éteint de temps en temps
-    if (T > prochaine && !enPause){
+    if (T > prochaine){
       prochaine = T + .7;
       var q = loggias[Math.floor(Math.random()*loggias.length)];
       q.o = q.o > .3 ? .02 + Math.random()*.03 : .45 + Math.random()*.4;
