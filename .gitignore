@@ -25,6 +25,7 @@ pyRevit_config.ini
 *.zip
 
 # Éditeurs et système
+.claude/
 .vscode/
 .idea/
 Thumbs.db

@@ -2,451 +2,384 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STR Bim Tools — boîte à outils pyRevit pour le BIM structure</title>
-<meta name="description" content="Extension pyRevit pour ingénieurs structure : métré CAN 241, quantification, export IFC et nomenclatures, gestion des réservations. 52 outils pour Revit 2024 et plus.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STR Bim Tools</title>
+<meta name="description" content="STR Bim Tools, extension pyRevit pour le BIM structure. Bientôt.">
+<meta name="theme-color" content="#050505">
+<meta property="og:title" content="STR Bim Tools">
+<meta property="og:description" content="Extension pyRevit pour le BIM structure. Bientôt.">
+<meta property="og:url" content="https://str-bim-tools.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root{
-  --beton:#E4E2DD;
-  --beton-clair:#EEEDE9;
-  --beton-fonce:#CFCCC5;
-  --encre:#1F2428;
-  --encre-doux:#4A5259;
-  --trait:#A8A69F;
-  --jaune:#F0B429;
-  --rouge:#C3372B;
-  --marge:clamp(20px,5vw,64px);
+  --noir:#050505;
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(236,232,224,.5);
+  --g:clamp(18px,4vw,56px);
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+*{box-sizing:border-box}
+html,body{height:100%}
 body{
-  background:var(--beton);
-  color:var(--encre);
-  font-family:'Archivo',system-ui,sans-serif;
-  font-size:17px;
-  line-height:1.6;
-  -webkit-font-smoothing:antialiased;
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
 }
-.wrap{max-width:1120px;margin:0 auto;padding:0 var(--marge)}
-a{color:inherit}
-mono,code,.mono{font-family:'IBM Plex Mono',monospace;font-size:.88em;letter-spacing:-.01em}
-
-/* ---------- ruban ---------- */
-.ruban{background:var(--beton-clair);border-bottom:1px solid var(--trait);position:relative;z-index:5}
-.ruban-onglets{display:flex;gap:2px;padding:0 var(--marge);border-bottom:1px solid var(--beton-fonce)}
-.onglet{padding:9px 15px;font-size:13px;font-weight:500;color:var(--encre-doux);border:1px solid transparent;border-bottom:none}
-.onglet.actif{background:var(--beton);color:var(--encre);border-color:var(--beton-fonce);font-weight:600;position:relative;top:1px}
-.ruban-panneau{padding:14px var(--marge) 10px;display:flex;align-items:flex-start;gap:26px;overflow-x:auto}
-.grp{display:flex;flex-direction:column;gap:8px;flex:0 0 auto}
-.grp-titre{font-size:11px;color:var(--encre-doux);letter-spacing:.02em}
-.grp-boutons{display:flex;gap:4px}
-.btn-ruban{
-  background:none;border:1px solid transparent;border-radius:2px;cursor:pointer;
-  font-family:inherit;font-size:11.5px;color:var(--encre);
-  display:flex;flex-direction:column;align-items:center;gap:5px;
-  padding:6px 9px;min-width:66px;line-height:1.25;
+.page{
+  min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;
+  padding-block:max(clamp(18px,3vw,36px),env(safe-area-inset-top)) max(clamp(18px,3vw,36px),env(safe-area-inset-bottom));
+  padding-inline:var(--g);
 }
-.btn-ruban:hover{background:var(--beton-fonce)}
-.btn-ruban:focus-visible{outline:2px solid var(--encre);outline-offset:1px}
-.btn-ruban[aria-expanded="true"]{background:var(--beton-fonce);border-color:var(--trait)}
-.ico{width:26px;height:26px;display:block}
-.chev{font-size:8px;color:var(--encre-doux);line-height:1}
-.menu{
-  position:absolute;top:100%;left:var(--marge);
-  background:var(--beton-clair);border:1px solid var(--trait);
-  min-width:250px;padding:4px 0;
-  box-shadow:3px 4px 0 rgba(31,36,40,.11);
-  display:none;
+.haut,.bas{
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--texte-doux);
 }
-.menu.ouvert{display:block}
-.menu li{list-style:none;padding:6px 16px;font-size:13.5px}
-.menu li:hover{background:var(--jaune)}
-.menu .sep{border-top:1px solid var(--beton-fonce);margin:4px 0;padding:0;height:0}
-
-/* ---------- hero ---------- */
-.hero{padding:clamp(52px,9vw,96px) 0 clamp(44px,7vw,72px)}
+.scene{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
+.stage{position:relative;width:100%;height:clamp(300px,62svh,780px)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+canvas.drag{cursor:grabbing}
+.titre{text-align:center;margin-top:clamp(4px,1.5vh,20px)}
 h1{
-  font-size:clamp(38px,7.2vw,74px);font-weight:700;line-height:.99;
-  letter-spacing:-.03em;max-width:15ch;
+  margin:0;font-weight:200;font-size:clamp(30px,5.4vw,64px);letter-spacing:.16em;text-transform:uppercase;
+  padding-left:.16em;
 }
-.chapo{margin-top:26px;max-width:52ch;font-size:clamp(17px,2vw,20px);color:var(--encre-doux)}
-.actions{margin-top:34px;display:flex;flex-wrap:wrap;gap:12px}
-.cta{
-  display:inline-block;padding:13px 24px;font-weight:600;font-size:15.5px;
-  text-decoration:none;border:1.5px solid var(--encre);
+.sous{margin:12px 0 0;font-size:clamp(13px,1.5vw,16px);color:var(--texte-doux);letter-spacing:.04em}
+.bientot{
+  display:inline-flex;align-items:center;gap:14px;margin-top:20px;
+  font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--or);
 }
-.cta.plein{background:var(--jaune);border-color:var(--jaune)}
-.cta.plein:hover{background:var(--encre);border-color:var(--encre);color:var(--beton)}
-.cta.vide:hover{background:var(--encre);color:var(--beton)}
-.cta:focus-visible{outline:2px solid var(--rouge);outline-offset:3px}
+.bientot::before,.bientot::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5}
 
-/* ---------- sections ---------- */
-section{padding:clamp(48px,7vw,84px) 0;border-top:1px solid var(--beton-fonce)}
-h2{font-size:clamp(26px,4vw,40px);font-weight:600;letter-spacing:-.022em;line-height:1.08;max-width:20ch}
-h3{font-size:20px;font-weight:600;letter-spacing:-.012em}
-.intro{margin-top:20px;max-width:62ch;color:var(--encre-doux)}
-.intro p+p{margin-top:15px}
+.fade{opacity:0;transform:translateY(8px);transition:opacity 1.6s ease var(--d,0s),transform 1.6s ease var(--d,0s)}
+.go .fade{opacity:1;transform:none}
+.static .fade{transition:none}
 
-/* trois axes */
-.axes{margin-top:44px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--encre)}
-.axe{padding:22px 26px 26px 0;border-right:1px solid var(--beton-fonce)}
-.axe:last-child{border-right:none}
-.axe-unite{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1}
-.axe h3{margin-top:10px}
-.axe p{margin-top:9px;font-size:15px;color:var(--encre-doux);line-height:1.5}
-.axe .chap{margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--encre-doux)}
-@media(max-width:720px){
-  .axes{grid-template-columns:1fr}
-  .axe{border-right:none;border-bottom:1px solid var(--beton-fonce);padding-right:0}
-  .axe:last-child{border-bottom:none}
+@media (max-width:560px){
+  .haut span:last-child,.bas span:last-child{display:none}
+  .haut,.bas{justify-content:center}
+  .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));height:min(58svh,125vw)}
+  .titre{margin-top:0}
+  h1{letter-spacing:.12em;padding-left:.12em}
 }
-
-/* nomenclature */
-.nomen{margin-top:40px;width:100%;border-collapse:collapse;font-size:15.5px}
-.nomen caption{text-align:left;padding-bottom:14px;color:var(--encre-doux);font-size:15px}
-.nomen th{
-  text-align:left;font-weight:600;font-size:14px;padding:9px 12px 9px 0;
-  border-top:2px solid var(--encre);border-bottom:1px solid var(--encre);
-}
-.nomen th.num{text-align:right;padding-right:0;width:56px}
-.grp-row td{
-  padding:22px 0 7px;font-weight:600;font-size:16px;
-  border-bottom:1px solid var(--encre);
-}
-.grp-row .cpt{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:13.5px;color:var(--encre-doux)}
-.nomen tbody tr:not(.grp-row) td{
-  padding:8px 12px 8px 0;border-bottom:1px solid var(--beton-fonce);vertical-align:top;
-}
-.nomen tbody tr:not(.grp-row):hover td{background:var(--beton-clair)}
-.nomen td.outil{font-weight:500;width:32%}
-.nomen td.desc{color:var(--encre-doux);font-size:15px}
-@media(max-width:640px){
-  .nomen,.nomen tbody,.nomen tr,.nomen td{display:block;width:auto}
-  .nomen thead{display:none}
-  .nomen td.outil{width:auto;padding-bottom:2px}
-  .nomen tbody tr:not(.grp-row) td{border-bottom:none;padding-right:0}
-  .nomen tbody tr:not(.grp-row){border-bottom:1px solid var(--beton-fonce);padding-bottom:10px;display:block}
-}
-
-/* install */
-.install{margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:44px}
-@media(max-width:720px){.install{grid-template-columns:1fr;gap:32px}}
-.etapes{counter-reset:e;list-style:none}
-.etapes li{
-  counter-increment:e;padding:14px 0 14px 44px;position:relative;
-  border-bottom:1px solid var(--beton-fonce);font-size:15.5px;
-}
-.etapes li::before{
-  content:counter(e);position:absolute;left:0;top:14px;
-  font-family:'IBM Plex Mono',monospace;font-size:13px;
-  width:26px;height:26px;border:1px solid var(--encre);
-  display:grid;place-items:center;
-}
-.specs dt{font-weight:600;font-size:14px;margin-top:16px}
-.specs dt:first-child{margin-top:0}
-.specs dd{color:var(--encre-doux);font-size:15px}
-
-/* contact */
-.contact-bloc{margin-top:26px;font-size:clamp(19px,3vw,26px);font-weight:500;letter-spacing:-.015em}
-.contact-bloc a{text-decoration:none;border-bottom:3px solid var(--jaune);padding-bottom:1px}
-.contact-bloc a:hover{border-color:var(--rouge)}
-
-footer{
-  border-top:1px solid var(--beton-fonce);padding:30px 0 44px;
-  font-size:13.5px;color:var(--encre-doux);
-  display:flex;flex-wrap:wrap;gap:8px 26px;justify-content:space-between;
+@media (max-height:520px) and (orientation:landscape){
+  .stage{height:60svh}
+  h1{font-size:clamp(22px,8svh,40px)}
+  .sous{display:none}
+  .bientot{margin-top:6px}
 }
 </style>
 </head>
 <body>
-
-<!-- ================= RUBAN ================= -->
-<div class="ruban">
-  <div class="ruban-onglets" role="tablist" aria-label="Onglets Revit">
-    <div class="onglet">Architecture</div>
-    <div class="onglet">Structure</div>
-    <div class="onglet">Annoter</div>
-    <div class="onglet actif" role="tab" aria-selected="true">STR Bim Tools</div>
-    <div class="onglet">Gérer</div>
-  </div>
-
-  <div class="ruban-panneau">
-    <div class="grp">
-      <div class="grp-boutons">
-        <button class="btn-ruban" id="btn-can" aria-expanded="false" aria-controls="menu-can">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M9 9v11"/>
-            <path d="M12 12h6M12 15h6" stroke="#C3372B"/>
-          </svg>
-          CAN 241 <span class="chev">▼</span>
-        </button>
-        <button class="btn-ruban">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <path d="M4 20V9M9.5 20V4M15 20v-8M20.5 20v-5"/><path d="M2 20h20"/>
-          </svg>
-          Data <span class="chev">▼</span>
-        </button>
-        <button class="btn-ruban">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <path d="M12 3v11"/><path d="M8 10l4 4 4-4"/><path d="M4 17v3h16v-3"/>
-          </svg>
-          Export <span class="chev">▼</span>
-        </button>
-        <button class="btn-ruban">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <path d="M12 2.5l8.5 5v9l-8.5 5-8.5-5v-9z"/><path d="M12 12.5l8.5-5M12 12.5v9M12 12.5l-8.5-5"/>
-          </svg>
-          Modélisation <span class="chev">▼</span>
-        </button>
-        <button class="btn-ruban">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <rect x="3" y="5" width="18" height="14"/><circle cx="12" cy="12" r="3.2"/>
-          </svg>
-          Vue <span class="chev">▼</span>
-        </button>
-        <button class="btn-ruban">
-          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#1F2428" stroke-width="1.4">
-            <rect x="3" y="4" width="18" height="16"/>
-            <rect x="8" y="9" width="8" height="6" stroke="#F0B429" fill="#F0B429" fill-opacity=".5"/>
-          </svg>
-          Réservations <span class="chev">▼</span>
-        </button>
-      </div>
+<div class="page" id="page">
+  <header class="haut fade" style="--d:4.8s"><span>STR Bim Tools</span><span>pyRevit · Revit 2024+</span></header>
+  <main class="scene">
+    <div class="stage">
+      <canvas id="bat" role="img" aria-label="Maquette filaire d'un bâtiment qui tourne lentement : un socle de logements aux loggias éclairées et une tour de verre"></canvas>
     </div>
-  </div>
-
-  <ul class="menu" id="menu-can" role="menu" aria-labelledby="btn-can">
-    <li role="menuitem">Configuration</li>
-    <li role="menuitem">Init paramètres</li>
-    <li class="sep"></li>
-    <li role="menuitem">Classer les éléments</li>
-    <li role="menuitem">Mapper types existants</li>
-    <li role="menuitem">Type de béton</li>
-    <li role="menuitem">Type de coffrage</li>
-    <li role="menuitem">Abouts de murs</li>
-    <li role="menuitem">Étayage dalles</li>
-    <li class="sep"></li>
-    <li role="menuitem">Dashboard CAN 241</li>
-    <li role="menuitem">Export soumission</li>
-  </ul>
+    <div class="titre">
+      <h1 class="fade" style="--d:5.2s">STR Bim Tools</h1>
+      <p class="sous fade" style="--d:5.6s">Outils pyRevit pour le BIM structure</p>
+      <div class="bientot fade" style="--d:6.1s">Bientôt</div>
+    </div>
+  </main>
+  <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><span>© 2026</span></footer>
 </div>
-
-<!-- ================= HERO ================= -->
-<header class="hero">
-  <div class="wrap">
-    <h1>Le métré suisse, calculé depuis la maquette.</h1>
-    <p class="chapo">
-      STR Bim Tools est une extension pyRevit pour les ingénieurs structure. Elle sort
-      les quantités de coffrage, de béton et d'armature d'un modèle Revit, les rattache
-      aux articles du catalogue CAN 241, et produit la soumission. Avec 51 autres outils
-      autour, pour le travail qui remplit les journées.
-    </p>
-    <div class="actions">
-      <a class="cta plein" href="#outils">Voir les 52 outils</a>
-      <a class="cta vide" href="#installer">Installer l'extension</a>
-    </div>
-  </div>
-</header>
-
-<!-- ================= CAN 241 ================= -->
-<section id="can241">
-  <div class="wrap">
-    <h2>CAN 241 : trois axes de facturation, une seule maquette</h2>
-    <div class="intro">
-      <p>
-        Le catalogue CAN 241 facture le coffrage, le béton et l'armature séparément, et le
-        numéro d'article dépend du genre CAN de l'élément — qui ne correspond jamais
-        directement à sa catégorie Revit. Un sommier en retombée et un sommier renversé sont
-        deux articles différents pour le même profil.
-      </p>
-      <p>
-        Les dix outils du pulldown CAN 241 prennent ce travail en charge : classement des
-        éléments par genre, saisie des types de béton et de coffrage, calcul des abouts et
-        des rives, hauteurs d'étayage, contrôle avant export, puis génération du fichier de
-        soumission.
-      </p>
-    </div>
-
-    <div class="axes">
-      <div class="axe">
-        <div class="axe-unite">m²</div>
-        <h3>Coffrage</h3>
-        <p>Surfaces relevées face par face, mitoyennetés déduites, abouts et rives traités à part.</p>
-        <div class="chap">chapitres 200 / 300</div>
-      </div>
-      <div class="axe">
-        <div class="axe-unite">m³</div>
-        <h3>Béton</h3>
-        <p>Volumes nets par genre CAN et par type NPK, avec les plages de dimensions du catalogue.</p>
-        <div class="chap">chapitres 600 / 700</div>
-      </div>
-      <div class="axe">
-        <div class="axe-unite">kg</div>
-        <h3>Armature</h3>
-        <p>Masses reprises depuis le modèle ou depuis les ratios saisis, ventilées par élément.</p>
-        <div class="chap">chapitre 500</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= OUTILS ================= -->
-<section id="outils">
-  <div class="wrap">
-    <h2>La boîte à outils</h2>
-    <div class="intro">
-      <p>
-        Tout est regroupé dans un seul onglet Revit, organisé comme le travail : le métré,
-        la donnée, l'export, la modélisation, les vues, les réservations, les gabarits.
-      </p>
-    </div>
-
-    <table class="nomen">
-      <caption>Extension STR Bim Tools — onglet unique, huit groupes.</caption>
-      <thead>
-        <tr><th>Outil</th><th>Ce qu'il fait</th></tr>
-      </thead>
-      <tbody>
-
-        <tr class="grp-row"><td>CAN 241 — métré béton</td><td class="cpt">10 outils</td></tr>
-        <tr><td class="outil">Configuration</td><td class="desc">Règles de classement, chapitres actifs et options de calcul du projet.</td></tr>
-        <tr><td class="outil">Init paramètres</td><td class="desc">Crée et rattache les paramètres partagés <code>#STR_*</code> nécessaires au métré.</td></tr>
-        <tr><td class="outil">Classer les éléments</td><td class="desc">Attribue le genre CAN à chaque élément, indépendamment de sa catégorie Revit.</td></tr>
-        <tr><td class="outil">Mapper types existants</td><td class="desc">Reprend les types déjà présents dans la maquette et les associe aux articles.</td></tr>
-        <tr><td class="outil">Type de béton</td><td class="desc">Saisie en masse des NPK, avec application à la sélection puis écriture en une transaction.</td></tr>
-        <tr><td class="outil">Type de coffrage</td><td class="desc">Affectation des types 1 à 4-4 sur les faces coffrées.</td></tr>
-        <tr><td class="outil">Abouts de murs</td><td class="desc">Détecte et quantifie les abouts, article 237, avec gestion des mitoyennetés.</td></tr>
-        <tr><td class="outil">Étayage dalles</td><td class="desc">Calcule les hauteurs d'étayage sous dalles et les reporte sur les éléments.</td></tr>
-        <tr><td class="outil">Dashboard CAN 241</td><td class="desc">Vue d'ensemble des quantités par chapitre et repérage des éléments non classés.</td></tr>
-        <tr><td class="outil">Export soumission</td><td class="desc">Génère le fichier de soumission, articles agrégés par sous-article.</td></tr>
-
-        <tr class="grp-row"><td>Data — quantification</td><td class="cpt">8 outils</td></tr>
-        <tr><td class="outil">Rapport matériaux</td><td class="desc">Bilan des matériaux du modèle, volumes et masses par famille.</td></tr>
-        <tr><td class="outil">Quantification ossatures</td><td class="desc">Métré des ossatures métalliques et bois, longueurs et sections.</td></tr>
-        <tr><td class="outil">Quantification platines</td><td class="desc">Relevé des platines et de leur boulonnerie.</td></tr>
-        <tr><td class="outil">Quantification escaliers</td><td class="desc">Volumes et surfaces des escaliers et paliers, non couverts par le métré automatique.</td></tr>
-        <tr><td class="outil">Surfaces de pochages</td><td class="desc">Mesure les surfaces de pochage par vue et par type.</td></tr>
-        <tr><td class="outil">Classification CAN étayage</td><td class="desc">Range les éléments d'étayage selon leur article CAN.</td></tr>
-        <tr><td class="outil">Hauteur étayage global</td><td class="desc">Applique une hauteur d'étayage à l'ensemble d'un niveau.</td></tr>
-        <tr><td class="outil">Hauteur étayage individuel</td><td class="desc">Ajuste la hauteur élément par élément quand le global ne suffit pas.</td></tr>
-
-        <tr class="grp-row"><td>Export</td><td class="cpt">4 outils</td></tr>
-        <tr><td class="outil">Export IFC</td><td class="desc">Export paramétré, conforme aux exigences ISO 19650 du projet.</td></tr>
-        <tr><td class="outil">Export nomenclatures Excel</td><td class="desc">Sort les nomenclatures Revit sélectionnées vers un classeur unique.</td></tr>
-        <tr><td class="outil">Export PDF-DWG multiple</td><td class="desc">Traite un lot de feuilles en une passe, nommage automatique.</td></tr>
-        <tr><td class="outil">Export PDF-DWG vue active</td><td class="desc">Sortie rapide de la vue courante, sans passer par la boîte de dialogue Revit.</td></tr>
-
-        <tr class="grp-row"><td>Modélisation</td><td class="cpt">9 outils</td></tr>
-        <tr><td class="outil">Découpage des murs par niveau</td><td class="desc">Scinde les murs traversants étage par étage, pour un métré juste.</td></tr>
-        <tr><td class="outil">Éditeur de contraintes multiples</td><td class="desc">Modifie les attaches haut et bas sur une sélection entière.</td></tr>
-        <tr><td class="outil">Éditeur de contraintes unique</td><td class="desc">Même travail, élément par élément, avec aperçu.</td></tr>
-        <tr><td class="outil">Convertir géométrie en famille</td><td class="desc">Transforme une géométrie importée en famille Revit éditable.</td></tr>
-        <tr><td class="outil">IFC vers famille RFA</td><td class="desc">Reprend un élément IFC lié et en fait une famille utilisable.</td></tr>
-        <tr><td class="outil">Détacher géométrie</td><td class="desc">Rompt les jonctions entre éléments sans toucher à leur position.</td></tr>
-        <tr><td class="outil">Copie au même emplacement</td><td class="desc">Duplique une sélection en conservant les coordonnées exactes.</td></tr>
-        <tr><td class="outil">Paramètres familles</td><td class="desc">Consulte et modifie les paramètres de plusieurs familles d'un coup.</td></tr>
-        <tr><td class="outil">Bissectrice</td><td class="desc">Trace la bissectrice entre deux références pour caler la modélisation.</td></tr>
-
-        <tr class="grp-row"><td>Vue</td><td class="cpt">3 outils</td></tr>
-        <tr><td class="outil">Coupe sur mur</td><td class="desc">Crée une coupe cadrée sur le mur sélectionné, orientation comprise.</td></tr>
-        <tr><td class="outil">Élévation sur mur</td><td class="desc">Génère l'élévation d'un mur avec la profondeur de vue ajustée.</td></tr>
-        <tr><td class="outil">Copier élévations</td><td class="desc">Reproduit un jeu d'élévations sur d'autres murs de même type.</td></tr>
-
-        <tr class="grp-row"><td>Réservations</td><td class="cpt">9 outils</td></tr>
-        <tr><td class="outil">Rechercher réservation</td><td class="desc">Retrouve une réservation par identifiant et zoome dessus.</td></tr>
-        <tr><td class="outil">Doublons réservations</td><td class="desc">Repère les réservations superposées ou dupliquées entre lots.</td></tr>
-        <tr><td class="outil">Transfert réservations</td><td class="desc">Reporte les réservations d'une maquette liée vers la maquette structure.</td></tr>
-        <tr><td class="outil">Percer réservation</td><td class="desc">Applique la percée dans l'élément porteur à partir de la réservation validée.</td></tr>
-        <tr><td class="outil">Purge réservations</td><td class="desc">Supprime les réservations obsolètes après validation du lot.</td></tr>
-        <tr><td class="outil">Ne pas toucher</td><td class="desc">Marque les réservations gelées pour qu'aucun traitement ne les reprenne.</td></tr>
-        <tr><td class="outil">Contrôle BEP</td><td class="desc">Vérifie la maquette contre les exigences du BEP avant livraison.</td></tr>
-        <tr><td class="outil">Résa jaune</td><td class="desc">Filtre de vue : réservations en attente de validation.</td></tr>
-        <tr><td class="outil">Résa rouge</td><td class="desc">Filtre de vue : réservations en conflit.</td></tr>
-
-        <tr class="grp-row"><td>Gabarit</td><td class="cpt">2 outils</td></tr>
-        <tr><td class="outil">Renommage des familles</td><td class="desc">Applique la convention de nommage du bureau à toutes les familles.</td></tr>
-        <tr><td class="outil">Renommage des paramètres</td><td class="desc">Uniformise les noms de paramètres entre projets.</td></tr>
-
-        <tr class="grp-row"><td>Affichage et utilitaires</td><td class="cpt">7 outils</td></tr>
-        <tr><td class="outil">Masquer</td><td class="desc">Isole ou masque la sélection en un clic depuis le ruban.</td></tr>
-        <tr><td class="outil">Réafficher</td><td class="desc">Rétablit tout ce qui a été masqué dans la vue.</td></tr>
-        <tr><td class="outil">Demi-teinte</td><td class="desc">Bascule la sélection en demi-teinte pour la mettre en arrière-plan.</td></tr>
-        <tr><td class="outil">Transparence</td><td class="desc">Règle la transparence des éléments sélectionnés dans la vue courante.</td></tr>
-        <tr><td class="outil">Lamelles carbone</td><td class="desc">Pose et quantifie les lamelles de renforcement carbone.</td></tr>
-        <tr><td class="outil">Console Python</td><td class="desc">Console interactive pour tester du code contre le modèle ouvert.</td></tr>
-        <tr><td class="outil">Reload pyRevit</td><td class="desc">Recharge l'extension sans redémarrer Revit.</td></tr>
-
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- ================= INSTALLATION ================= -->
-<section id="installer">
-  <div class="wrap">
-    <h2>Installer</h2>
-    <div class="install">
-      <ol class="etapes">
-        <li>Installer pyRevit, si ce n'est pas déjà fait.</li>
-        <li>Cloner le dépôt dans le dossier des extensions pyRevit.</li>
-        <li>Lancer Revit : l'onglet <strong>STR Bim Tools</strong> apparaît dans le ruban.</li>
-        <li>Ouvrir <strong>Init paramètres</strong> une fois par projet pour créer les paramètres partagés.</li>
-      </ol>
-      <dl class="specs">
-        <dt>Revit</dt><dd>2024 et versions suivantes</dd>
-        <dt>pyRevit</dt><dd>branche master, moteur IronPython</dd>
-        <dt>Référentiels</dt><dd>CAN 241 (CRB), CFC, eCCC-Bât, phases SIA, ISO 19650</dd>
-        <dt>Langue</dt><dd>interface en français</dd>
-      </dl>
-    </div>
-  </div>
-</section>
-
-<!-- ================= CONTACT ================= -->
-<section id="contact">
-  <div class="wrap">
-    <h2>Une question, un besoin particulier ?</h2>
-    <p class="contact-bloc">
-      Écrire à <a href="mailto:contact@str-bim-tools.com">contact@str-bim-tools.com</a>
-    </p>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap" style="display:flex;flex-wrap:wrap;gap:8px 26px;justify-content:space-between;width:100%">
-    <span>STR Bim Tools — outils pyRevit pour le BIM structure</span>
-    <span>Développé en Haute-Savoie, utilisé sur des projets suisses</span>
-  </div>
-</footer>
 
 <script>
 (function(){
-  var btn = document.getElementById('btn-can');
-  var menu = document.getElementById('menu-can');
-  function ouvrir(v){
-    menu.classList.toggle('ouvert', v);
-    btn.setAttribute('aria-expanded', v ? 'true' : 'false');
+  var cv = document.getElementById("bat"), ctx = cv.getContext("2d");
+  var page = document.getElementById("page");
+  // ?anim force l'animation, même si le système demande de réduire les mouvements
+  var reduit = !/[?&]anim\b/.test(location.search) && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function norm(a){var l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]}
+  function clamp(x){return x<0?0:x>1?1:x}
+  function ease(p){return p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2}
+  function rnd(i){var x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x)}
+  var graine = 1;
+
+  // ---------- Maquette ----------
+  var RDC = 5.2, ETAGE = 3.0, NIV = 9, HAUT = RDC + NIV*ETAGE, ACRO = HAUT + .8;
+  var T_NIV = 18, T_ETAGE = 3.9, T_HAUT = T_NIV*T_ETAGE + 1.2;
+  var faces = [], loggias = [];
+
+  function Face(O, a, n, W, H, glass){
+    var f = {O:O, a:a, n:n, W:W, H:H, glass:!!glass, lines:[], quads:[], dep:0};
+    f.P = function(s,t){return [O[0]+a[0]*s, t, O[2]+a[2]*s]};
+    f.c = [O[0]+a[0]*W/2, H/2, O[2]+a[2]*W/2];
+    faces.push(f); return f;
   }
-  btn.addEventListener('click', function(e){
-    e.stopPropagation();
-    ouvrir(!menu.classList.contains('ouvert'));
-  });
-  document.addEventListener('click', function(){ ouvrir(false); });
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape') ouvrir(false);
-  });
-  // Un seul moment orchestré : le pulldown s'ouvre puis se referme au chargement.
-  var reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(!reduit){
-    setTimeout(function(){ ouvrir(true); }, 700);
-    setTimeout(function(){ ouvrir(false); }, 2900);
+  function L(f, s0, t0, s1, t1, cls, d, t){ f.lines.push({a:f.P(s0,t0), b:f.P(s1,t1), c:cls, d:d, t:t}) }
+  function Q(f, s0, s1, t0, t1, o, d, t, twinkle){
+    var q = {p:[f.P(s0,t0),f.P(s1,t0),f.P(s1,t1),f.P(s0,t1)], o:o, cur:o, d:d, t:t||1.4};
+    f.quads.push(q); if (twinkle) loggias.push(q); return q;
   }
+
+  // Façade du socle, découpée en segments : loggias, atrium, fente dorée, mur-rideau
+  function socle(O, a, n, W, dep, segs){
+    var f = Face(O, a, n, W, ACRO); f.dep = dep;
+    segs = segs || [[0, W, "log"]];
+    L(f, 0,0, W,0, "", dep, 1.4);
+    L(f, 0,0, 0,ACRO, "", dep, 2.6);
+    L(f, W,0, W,ACRO, "", dep, 2.6);
+    for (var j=0;j<=NIV;j++){
+      var t = RDC + j*ETAGE;
+      L(f, 0,t, W,t, (j===0||j===NIV) ? "" : "f", dep + .25 + j*.24, 1.1);
+    }
+    L(f, 0,ACRO, W,ACRO, "", dep + .25 + NIV*.24 + .2, 1.2);
+    segs.forEach(function(sg){
+      var s0 = sg[0], s1 = sg[1], w = s1 - s0, type = sg[2];
+      if (s0 > 0) L(f, s0,0, s0,ACRO, "", dep + .1, 2.6);
+      if (type === "log"){
+        var nb = Math.max(1, Math.round(w/3.6)), bw = w/nb;
+        for (var k=1;k<nb;k++) L(f, s0+k*bw,RDC, s0+k*bw,HAUT, "", dep + k*.035, 2.6);
+        for (var k2=2;k2<nb;k2+=2) L(f, s0+k2*bw,0, s0+k2*bw,RDC, "", dep + k2*.035, 1.2);
+        for (var j2=0;j2<NIV;j2++){
+          var tt = RDC + j2*ETAGE;
+          L(f, s0,tt+.5, s1,tt+.5, "f", dep + .45 + j2*.24, 1.1);
+          for (var k3=0;k3<nb;k3++){
+            var r = rnd(graine++), r2 = rnd(graine++);
+            Q(f, s0+k3*bw+.7, s0+(k3+1)*bw-.7, tt+.8, tt+ETAGE-.25,
+              r < .34 ? .45 + r2*.4 : .02 + r2*.03, dep + 1.1 + j2*.24 + r2*1.6, 1.4, true);
+          }
+        }
+      } else if (type === "atr"){
+        Q(f, s0+.6, s1-.6, RDC, HAUT-.4, .14, dep + 1.8, 2);
+      } else if (type === "fente"){
+        Q(f, s0+.15, s1-.15, RDC, HAUT, .45, dep + 1.8, 2);
+      } else if (type === "verre"){
+        var nv = Math.max(1, Math.round(w/1.275));
+        for (var v=1;v<nv;v++) L(f, s0+v*w/nv,RDC, s0+v*w/nv,HAUT, v%2 ? "vf" : "v", dep + v*.05, 2.6);
+      }
+    });
+    return f;
+  }
+
+  // Façade de la tour : verre, meneaux fins, bandeau marqué tous les quatre niveaux
+  function tour(O, a, n, W, dep){
+    var f = Face(O, a, n, W, T_HAUT, true); f.dep = dep;
+    var nm = Math.round(W/1.5), mw = W/nm;
+    for (var k=0;k<=nm;k++) L(f, k*mw,0, k*mw,T_HAUT, (k===0||k===nm||k%4===0) ? "v" : "vf", dep + k*.025, 3.6);
+    for (var j=0;j<=T_NIV;j++){
+      var t = j*T_ETAGE, fort = (j%4===0 || j===T_NIV);
+      L(f, 0,t, W,t, fort ? "v" : "vf", dep + .3 + j*.2, 1.2);
+      if (fort && j>0) L(f, 0,t-.6, W,t-.6, "vf", dep + .4 + j*.2, 1.2);
+    }
+    L(f, 0,T_HAUT, W,T_HAUT, "v", dep + .3 + T_NIV*.2 + .2, 1.4);
+    return f;
+  }
+
+  // Boîte : quatre façades orientées vers l'extérieur (sud, est, nord, ouest)
+  function boite(x0, z0, x1, z1, fn, opts){
+    opts = opts || {};
+    if (!opts.sansSud)   fn([x0,0,z0], [1,0,0],  [0,0,-1], x1-x0, "s");
+    if (!opts.sansEst)   fn([x1,0,z0], [0,0,1],  [1,0,0],  z1-z0, "e");
+    if (!opts.sansNord)  fn([x1,0,z1], [-1,0,0], [0,0,1],  x1-x0, "n");
+    if (!opts.sansOuest) fn([x0,0,z1], [0,0,-1], [-1,0,0], z1-z0, "o");
+  }
+
+  // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
+  boite(40,0, 70,42, function(O,a,n,W,cote){
+    if (cote === "s") socle(O,a,n,W, .2);
+    else if (cote === "e") socle(O,a,n,W, .35, [[0,28,"log"],[28,29.6,"fente"],[29.6,W,"verre"]]);
+    else if (cote === "n") socle(O,a,n,W, .6);
+    else socle([40,0,42], a, n, 28, .6);
+  });
+  // Aile gauche, fendue par l'atrium ; sa façade est est collée au corps principal
+  boite(0,0, 40,14, function(O,a,n,W,cote){
+    if (cote === "s") socle(O,a,n,W, .5, [[0,33,"log"],[33,40,"atr"]]);
+    else if (cote === "n") socle(O,a,n,W, .6, [[0,7,"atr"],[7,40,"log"]]);
+    else socle(O,a,n,W, .6);
+  }, {sansEst:true});
+  // Tour en retrait
+  boite(6,22, 32,48, function(O,a,n,W){ tour(O,a,n,W, 2.6) });
+
+  var CENTRE = [35, 0, 24];
+  var loggiaFin = 0;
+  faces.forEach(function(f){
+    f.lines.forEach(function(l){ loggiaFin = Math.max(loggiaFin, l.d + l.t) });
+    f.quads.forEach(function(q){ loggiaFin = Math.max(loggiaFin, q.d + q.t) });
+  });
+
+  // ---------- Caméra en orbite ----------
+  var R = 205, EH = 6, TH0 = Math.atan2(93, 174);
+  var LUM = norm([.8, 0, -.6]);
+  var cam = {};
+  function camera(th){
+    cam.eye = [CENTRE[0] + R*Math.sin(th), EH, CENTRE[2] - R*Math.cos(th)];
+    cam.fw = norm([CENTRE[0]-cam.eye[0], 0, CENTRE[2]-cam.eye[2]]);
+    cam.rt = [cam.fw[2], 0, -cam.fw[0]];
+  }
+  function proj(p){
+    var dx = p[0]-cam.eye[0], dz = p[2]-cam.eye[2];
+    var z = dx*cam.fw[0] + dz*cam.fw[2];
+    return [(dx*cam.rt[0] + dz*cam.rt[2])/z, -(p[1]-EH)/z];
+  }
+
+  // Cadrage valable pour tous les angles : le bâtiment ne sort jamais du cadre
+  var ext = {x:0, y0:1e9, y1:-1e9};
+  (function(){
+    var pts = [];
+    faces.forEach(function(f){ pts.push(f.P(0,0), f.P(0,f.H), f.P(f.W,0), f.P(f.W,f.H)) });
+    for (var i=0;i<72;i++){
+      camera(i/72*Math.PI*2);
+      pts.forEach(function(p){ var q = proj(p); ext.x = Math.max(ext.x, Math.abs(q[0])); ext.y0 = Math.min(ext.y0, q[1]); ext.y1 = Math.max(ext.y1, q[1]); });
+    }
+  })();
+
+  var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0;
+  function taille(){
+    var r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    S = Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
+    CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
+    if (reduit) dessiner(1e3, TH0);
+  }
+  function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + S*q[1]] }
+
+  var COUL = {"":"236,232,224", f:"236,232,224", v:"170,192,214", vf:"170,192,214"};
+  var ALPHA = {"":.62, f:.2, v:.5, vf:.16};
+
+  function dessiner(T, th){
+    camera(th);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle = "#050505"; ctx.fillRect(0,0,W,H);
+    ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+
+    // ligne de sol : cercle d'implantation
+    var ps = ease(clamp((T-.1)/2.4));
+    if (ps > 0){
+      ctx.beginPath();
+      for (var i=0;i<=96*ps;i++){
+        var an = TH0 - Math.PI/2 + i/96*Math.PI*2;
+        var e = ecran([CENTRE[0] + 52*Math.cos(an), 0, CENTRE[2] + 52*Math.sin(an)]);
+        i ? ctx.lineTo(e[0],e[1]) : ctx.moveTo(e[0],e[1]);
+      }
+      ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
+    }
+
+    // faces visibles, de la plus lointaine à la plus proche
+    var vis = [];
+    for (var k=0;k<faces.length;k++){
+      var f = faces[k];
+      var vx = cam.eye[0]-f.c[0], vz = cam.eye[2]-f.c[2];
+      if (f.n[0]*vx + f.n[2]*vz <= 0) continue;
+      f.z = (f.c[0]-cam.eye[0])*cam.fw[0] + (f.c[2]-cam.eye[2])*cam.fw[2];
+      vis.push(f);
+    }
+    vis.sort(function(a,b){ return b.z - a.z });
+
+    for (var m=0;m<vis.length;m++){
+      var f = vis[m];
+      var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,f.H)), c3 = ecran(f.P(0,f.H));
+      ctx.beginPath(); ctx.moveTo(c0[0],c0[1]); ctx.lineTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.closePath();
+      ctx.fillStyle = "#050505"; ctx.fill();
+
+      var lam = Math.max(0, f.n[0]*LUM[0] + f.n[2]*LUM[2]);
+      var eclat = .72 + .4*lam;
+
+      if (f.glass){
+        var ap = ease(clamp((T - f.dep - 3.2)/2.4));
+        if (ap > 0){
+          var vv = norm([cam.eye[0]-f.c[0], 0, cam.eye[2]-f.c[2]]);
+          var hv = norm([LUM[0]+vv[0], 0, LUM[2]+vv[2]]);
+          var spec = Math.pow(Math.max(0, f.n[0]*hv[0] + f.n[2]*hv[2]), 10);
+          var g = ctx.createLinearGradient(0, c3[1], 0, c0[1]);
+          g.addColorStop(0, "rgba(200,216,232," + ((.05 + .2*spec)*ap).toFixed(3) + ")");
+          g.addColorStop(1, "rgba(159,182,204," + ((.01 + .04*spec)*ap).toFixed(3) + ")");
+          ctx.fillStyle = g; ctx.fill();
+        }
+      }
+
+      for (var qi=0;qi<f.quads.length;qi++){
+        var q = f.quads[qi];
+        var a = clamp((T - q.d)/q.t) * q.cur;
+        if (a < .01) continue;
+        var p0 = ecran(q.p[0]), p1 = ecran(q.p[1]), p2 = ecran(q.p[2]), p3 = ecran(q.p[3]);
+        ctx.globalAlpha = a*(.8 + .25*lam);
+        ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.lineTo(p3[0],p3[1]); ctx.closePath();
+        ctx.fillStyle = "#D6A85C"; ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      for (var cls in COUL){
+        ctx.beginPath(); var n = 0;
+        for (var li=0;li<f.lines.length;li++){
+          var l = f.lines[li]; if (l.c !== cls) continue;
+          var p = ease(clamp((T - l.d)/l.t)); if (p <= 0) continue;
+          var b = [l.a[0]+(l.b[0]-l.a[0])*p, l.a[1]+(l.b[1]-l.a[1])*p, l.a[2]+(l.b[2]-l.a[2])*p];
+          var e0 = ecran(l.a), e1 = ecran(b);
+          ctx.moveTo(e0[0],e0[1]); ctx.lineTo(e1[0],e1[1]); n++;
+        }
+        if (n){ ctx.strokeStyle = "rgba(" + COUL[cls] + "," + Math.min(1, ALPHA[cls]*eclat).toFixed(3) + ")"; ctx.stroke(); }
+      }
+    }
+  }
+
+  window.addEventListener("resize", taille);
+  taille();
+
+  if (reduit){ page.classList.add("static", "go"); dessiner(1e3, TH0); return; }
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ page.classList.add("go"); }); });
+
+  // ---------- Animation : construction, puis rotation lente ----------
+  var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 75;
+  var VITESSE = Math.PI*2/parTour;          // un tour en 75 s (?tour=N pour tester)
+  var DEBUT_ROT = loggiaFin - 1.5;
+  var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
+  var glisse = false, gx = 0, gt = 0, gv = 0;
+
+  function frame(now){
+    if (t0 === null) t0 = now;
+    var T = (now - t0)/1000, dt = Math.min(.05, T - prec); prec = T;
+
+    if (!glisse){
+      var cible = T > DEBUT_ROT ? VITESSE : 0;
+      omega += (cible - omega) * Math.min(1, dt*(T - DEBUT_ROT < 6 ? .35 : 1.2));
+      th += omega*dt;
+    }
+
+    // après la construction, une loggia s'allume ou s'éteint de temps en temps
+    if (T > prochaine){
+      prochaine = T + .7;
+      var q = loggias[Math.floor(Math.random()*loggias.length)];
+      q.o = q.o > .3 ? .02 + Math.random()*.03 : .45 + Math.random()*.4;
+    }
+    if (T > DEBUT_ROT) for (var i=0;i<loggias.length;i++){
+      var lq = loggias[i], d = lq.o - lq.cur, pas = dt/2.8;
+      lq.cur = Math.abs(d) <= pas ? lq.o : lq.cur + Math.sign(d)*pas;
+    }
+
+    dessiner(T, th);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // On peut aussi faire tourner le bâtiment à la main, puis il reprend sa course
+  cv.addEventListener("pointerdown", function(e){
+    glisse = true; gx = e.clientX; gt = performance.now(); gv = 0;
+    cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", function(e){
+    if (!glisse) return;
+    var now = performance.now(), dth = -(e.clientX - gx) * 3.2 / Math.max(W, 320);
+    th += dth; gv = dth / Math.max(.008, (now - gt)/1000);
+    gx = e.clientX; gt = now;
+  });
+  function relacher(){
+    if (!glisse) return;
+    glisse = false; cv.classList.remove("drag");
+    omega = Math.max(-2.5, Math.min(2.5, gv));
+  }
+  cv.addEventListener("pointerup", relacher);
+  cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-
 </body>
 </html>
