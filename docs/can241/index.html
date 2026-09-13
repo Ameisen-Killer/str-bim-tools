@@ -82,7 +82,8 @@ p{margin:0}
 .vu .rv,.rv.vu{opacity:1;transform:none}
 
 /* illustrations filaires */
-svg.ill{display:block;width:100%;height:auto;overflow:visible}
+svg.ill{display:block;width:100%;height:auto;overflow:visible;touch-action:pan-y;cursor:grab;-webkit-user-select:none;user-select:none}
+svg.ill.drag{cursor:grabbing}
 .l{fill:none;stroke:rgba(236,232,224,.62);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .l.f{stroke:rgba(236,232,224,.18)}
 .l.o{stroke:rgba(214,168,92,.85)}
@@ -641,26 +642,82 @@ footer a:hover{color:var(--or)}
   cv.addEventListener("pointerup", relacher); cv.addEventListener("pointercancel", relacher);
 
   // =====================================================================
-  //  Illustrations filaires en SVG, tracées à l'apparition
+  //  Illustrations filaires en SVG : tracées à l'apparition, puis orientables
+  //  au doigt ou à la souris (rotation autour de la verticale, élan au lâcher)
   // =====================================================================
-  var ISO = function(p){ return [(p[0]-p[1])*.866*40, ((p[0]+p[1])*.5 - p[2])*40] };
-  var PLAN = function(p){ return [p[0]*40, p[1]*40] };
-  function tracer(svg, items, projeter, marge){
-    var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  function tracer(svg, items, pre, marge){
+    pre = pre || function(p){ return p };
+    var bx0=1e9, by0=1e9, bx1=-1e9, by1=-1e9;
     items.forEach(function(it){
-      var pts = it.p.map(projeter);
-      pts.forEach(function(q){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); });
-      var dstr = "M" + pts.map(function(q){return q[0].toFixed(1)+" "+q[1].toFixed(1)}).join(" L") + (it.ferme ? "Z" : "");
+      it.q = it.p.map(pre);
+      it.q.forEach(function(q){ bx0=Math.min(bx0,q[0]); bx1=Math.max(bx1,q[0]); by0=Math.min(by0,q[1]); by1=Math.max(by1,q[1]); });
+    });
+    var cx = (bx0+bx1)/2, cy = (by0+by1)/2;
+    function proj(q, th){
+      var dx = q[0]-cx, dy = q[1]-cy, c = Math.cos(th), s = Math.sin(th);
+      var rx = dx*c - dy*s, ry = dx*s + dy*c;
+      return [(rx-ry)*.866*40, ((rx+ry)*.5 - q[2])*40];
+    }
+    function chemin(it, th){
+      return "M" + it.q.map(function(q){ var r = proj(q, th); return r[0].toFixed(1)+" "+r[1].toFixed(1) }).join(" L") + (it.ferme ? "Z" : "");
+    }
+    items.forEach(function(it){
       var e;
-      if (it.zone) e = el(svg, "path", {d:dstr, class:"zf fz " + (it.c||"")});
-      else if (it.pointille) e = el(svg, "path", {d:dstr, class:"pt fz " + (it.c||"")});
-      else e = el(svg, "path", {d:dstr, class:"l draw " + (it.c||""), pathLength:1});
+      if (it.zone) e = el(svg, "path", {class:"zf fz " + (it.c||"")});
+      else if (it.pointille) e = el(svg, "path", {class:"pt fz " + (it.c||"")});
+      else e = el(svg, "path", {class:"l draw " + (it.c||""), pathLength:1});
       e.style.setProperty("--d", (it.d||0).toFixed(2)+"s");
       if (it.t) e.style.setProperty("--t", it.t.toFixed(2)+"s");
+      it.e = e;
     });
+    // cadre valable pour toutes les orientations : rien ne sort pendant la rotation
+    var x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
+    for (var i=0;i<36;i++) items.forEach(function(it){ it.q.forEach(function(q){
+      var r = proj(q, i/36*Math.PI*2); x0=Math.min(x0,r[0]); x1=Math.max(x1,r[0]); y0=Math.min(y0,r[1]); y1=Math.max(y1,r[1]);
+    }) });
     var m = marge || 12;
     svg.setAttribute("viewBox", [x0-m, y0-m, x1-x0+2*m, y1-y0+2*m].map(function(v){return v.toFixed(1)}).join(" "));
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+    var th = 0, omega = 0, glisse = false, touche = false, gx = 0, gt = 0, boucle = false;
+    function maj(){ items.forEach(function(it){ it.e.setAttribute("d", chemin(it, th)) }) }
+    maj();
+    function animer(){
+      if (boucle) return; boucle = true;
+      var prec = performance.now();
+      requestAnimationFrame(function pas(now){
+        var dt = Math.min(.05, (now - prec)/1000); prec = now;
+        if (!glisse){ th += omega*dt; omega *= Math.exp(-dt*2.2); }
+        maj();
+        if (glisse || Math.abs(omega) > .02) requestAnimationFrame(pas); else boucle = false;
+      });
+    }
+    svg.addEventListener("pointerdown", function(e){
+      glisse = true; touche = true; omega = 0; gx = e.clientX; gt = performance.now();
+      svg.classList.add("drag"); svg.setPointerCapture(e.pointerId); animer();
+    });
+    svg.addEventListener("pointermove", function(e){
+      if (!glisse) return;
+      var now = performance.now(), dth = (e.clientX - gx) * 2.4 / Math.max(svg.getBoundingClientRect().width, 160);
+      th += dth; omega = dth / Math.max(.008, (now - gt)/1000); gx = e.clientX; gt = now;
+    });
+    function relacher(){ if (!glisse) return; glisse = false; svg.classList.remove("drag"); omega = Math.max(-9, Math.min(9, omega)); animer(); }
+    svg.addEventListener("pointerup", relacher);
+    svg.addEventListener("pointercancel", relacher);
+
+    // petit balancement une fois dessiné, pour montrer qu'on peut la faire tourner
+    svg.__balancer = function(){
+      if (touche) return;
+      var t0 = null, base = th;
+      requestAnimationFrame(function pas(now){
+        if (touche) return;
+        if (t0 === null) t0 = now;
+        var t = (now - t0)/1000, D = 2.6;
+        th = base + .45*Math.sin(t/D*Math.PI*2)*(1 - t/D);
+        maj();
+        if (t < D) requestAnimationFrame(pas); else { th = base; maj(); }
+      });
+    };
   }
   function aretes(items, x0,x1,y0,y1,z0,z1, c, d, pas){
     var P = [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
@@ -675,7 +732,7 @@ footer a:hover{color:var(--or)}
     it.push({p:[[0,-.02,1.4],[4,-.02,1.4]], c:"f", d:.9});
     for (var x2=.4;x2<4;x2+=.8) for (var z=.7;z<2.8;z+=1.4) it.push({p:[[x2,-.02,z-.06],[x2,-.02,z+.06]], c:"o", d:1.2+x2*.08, t:.4});
     it.push({zone:true, p:[[0,0,0],[4,0,0],[4,0,2.8],[0,0,2.8]], d:1.4, t:1.6});
-    tracer(document.getElementById("ill-coffrage"), it, ISO);
+    tracer(document.getElementById("ill-coffrage"), it);
   })();
   // 01 — béton : un volume
   (function(){
@@ -684,7 +741,7 @@ footer a:hover{color:var(--or)}
     it.push({zone:true, p:[[0,0,2.6],[2.6,0,2.6],[2.6,2.6,2.6],[0,2.6,2.6]], d:1.1, t:1.6});
     it.push({zone:true, p:[[0,0,0],[2.6,0,0],[2.6,0,2.6],[0,0,2.6]], d:1.3, t:1.6});
     it.push({zone:true, p:[[0,0,0],[0,2.6,0],[0,2.6,2.6],[0,0,2.6]], d:1.5, t:1.6});
-    tracer(document.getElementById("ill-beton"), it, ISO);
+    tracer(document.getElementById("ill-beton"), it);
   })();
   // 01 — armature : deux nappes et des épingles
   (function(){
@@ -694,7 +751,7 @@ footer a:hover{color:var(--or)}
       for (x=0;x<=3.2;x+=.4) it.push({p:[[x,0,z],[x,3,z]], c:"o", d:.25 + n*.5 + x*.05});
     });
     [[0,0],[3.2,0],[3.2,3],[0,3],[1.6,1.5]].forEach(function(c,i){ it.push({p:[[c[0],c[1],0],[c[0],c[1],.9]], c:"", d:1.3+i*.08, t:.6}) });
-    tracer(document.getElementById("ill-armature"), it, ISO);
+    tracer(document.getElementById("ill-armature"), it);
   })();
 
   // 04 — étayage : une dalle au-dessus de deux niveaux décalés, et un mur porteur
@@ -709,7 +766,7 @@ footer a:hover{color:var(--or)}
       var bas = y < 3.9 ? 3.25 : 2.5;
       it.push({pointille:true, c: y < 3.9 ? "" : "o", p:[[x,y,6],[x,y,bas]], d:1.2 + y*.12 + x*.05, t:.8});
     }
-    tracer(document.getElementById("ill-etayage"), it, function(p){ return ISO([p[1], -p[0], p[2]]) });
+    tracer(document.getElementById("ill-etayage"), it, function(p){ return [p[1], -p[0], p[2]] });
   })();
 
   // 04 — rives : deux dalles d'épaisseurs différentes, affleurantes en dessus
@@ -720,22 +777,30 @@ footer a:hover{color:var(--or)}
     it.push({zone:true, c:"plein", p:[[0,4,0],[6,4,0],[6,4,.1*ez],[0,4,.1*ez]], d:1.4, t:1});
     it.push({p:[[0,4,0],[6,4,0],[6,4,.1*ez],[0,4,.1*ez],[0,4,0]], c:"o", d:1.3, t:1.2});
     it.push({pointille:true, c:"", p:[[0,4,.2*ez],[6,4,.2*ez]], d:1.6, t:1});
-    tracer(document.getElementById("ill-rive"), it, function(p){ return ISO([p[1], -p[0]*.62, p[2]]) });
+    tracer(document.getElementById("ill-rive"), it, function(p){ return [p[1], -p[0]*.62, p[2]] });
   })();
 
-  // 04 — abouts : un angle en L et une jonction en T, en plan
+  // 04 — abouts : un angle en L et une jonction en T, en murs bas
   (function(){
-    var it = [], e = .3;
-    it.push({p:[[0,0],[5,0],[5,e],[e,e],[e,4],[0,4],[0,0]], c:"", d:0, t:1.6});
-    it.push({p:[[6.5,0],[13,0],[13,e],[9.9,e],[9.9,4],[9.6,4],[9.6,e],[6.5,e],[6.5,0]], c:"", d:.3, t:1.8});
-    it.push({zone:true, c:"plein", p:[[0,0],[e,0],[e,e],[0,e]], d:1.4, t:.8});
-    it.push({zone:true, c:"plein", p:[[9.6,0],[9.9,0],[9.9,e],[9.6,e]], d:1.6, t:.8});
-    it.push({p:[[-.35,-.35],[e+.35,-.35],[e+.35,e+.35],[-.35,e+.35],[-.35,-.35]], c:"o", d:1.5, t:.8});
-    it.push({p:[[9.25,-.35],[10.25,-.35],[10.25,e+.35],[9.25,e+.35],[9.25,-.35]], c:"o", d:1.7, t:.8});
-    [[[5,0],[5,e]], [[0,4],[e,4]], [[6.5,0],[6.5,e]], [[13,0],[13,e]], [[9.6,4],[9.9,4]]].forEach(function(s,i){
-      it.push({p:s, c:"fort", d:1.9 + i*.12, t:.5});
+    var it = [], e = .3, h = 1.4;
+    function mur(contour, d){
+      var bas = contour.map(function(p){ return [p[0], p[1], 0] }), haut = contour.map(function(p){ return [p[0], p[1], h] });
+      it.push({p:bas, c:"f", d:d, t:1.6});
+      it.push({p:haut, c:"", d:d + .2, t:1.8});
+      contour.slice(0, -1).forEach(function(p, i){ it.push({p:[[p[0],p[1],0],[p[0],p[1],h]], c:"f", d:d + .6 + i*.05, t:.6}) });
+    }
+    mur([[0,0],[5,0],[5,e],[e,e],[e,4],[0,4],[0,0]], 0);
+    mur([[0,5.5],[6.5,5.5],[6.5,5.5+e],[3.4,5.5+e],[3.4,9.5],[3.1,9.5],[3.1,5.5+e],[0,5.5+e],[0,5.5]], .3);
+    // jonctions : joint de reprise armé, en or
+    [[0,0],[3.1,5.5]].forEach(function(o, i){
+      it.push({zone:true, c:"plein", p:[[o[0],o[1],h],[o[0]+e,o[1],h],[o[0]+e,o[1]+e,h],[o[0],o[1]+e,h]], d:1.4 + i*.2, t:.8});
+      it.push({p:[[o[0]-.35,o[1]-.35,h],[o[0]+e+.35,o[1]-.35,h],[o[0]+e+.35,o[1]+e+.35,h],[o[0]-.35,o[1]+e+.35,h],[o[0]-.35,o[1]-.35,h]], c:"o", d:1.5 + i*.2, t:.8});
     });
-    tracer(document.getElementById("ill-abouts"), it, PLAN, 18);
+    // abouts libres : la face d'extrémité, soulignée
+    [[[5,0],[5,e]], [[0,4],[e,4]], [[0,5.5],[0,5.5+e]], [[6.5,5.5],[6.5,5.5+e]], [[3.1,9.5],[3.4,9.5]]].forEach(function(s, i){
+      it.push({p:[[s[0][0],s[0][1],0],[s[0][0],s[0][1],h],[s[1][0],s[1][1],h],[s[1][0],s[1][1],0],[s[0][0],s[0][1],0]], c:"fort", d:1.9 + i*.12, t:.6});
+    });
+    tracer(document.getElementById("ill-abouts"), it, null, 16);
   })();
 
   // =====================================================================
@@ -848,6 +913,7 @@ footer a:hover{color:var(--or)}
     cible.classList.add("vu");
     if (cible.contains(codeEl) && !decodeurLance){ decodeurLance = true; afficher(0); setInterval(suivant, 5200); }
     if (cible.contains(carte) && !cycleTimer) cycleTimer = setTimeout(lancerCycle, 3600);
+    [].forEach.call(cible.querySelectorAll("svg.ill"), function(s, i){ if (s.__balancer) setTimeout(s.__balancer, 2700 + i*350) });
     [].forEach.call(cible.querySelectorAll("[data-n]"), compter);
   }
   var observes = document.querySelectorAll("[data-vu]");
