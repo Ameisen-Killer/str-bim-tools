@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CAN 241 · STR Bim Tools</title>
+<meta name="description" content="Métré CAN 241 du béton coulé sur place, tiré directement de la maquette Revit : coffrage, béton et armature, article par article.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --noir:#050505;
+  --noir-2:#0c0c0b;
+  --ligne:rgba(236,232,224,.12);
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(236,232,224,.56);
+  --texte-faible:rgba(236,232,224,.34);
+  --g:clamp(18px,4vw,56px);
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.55;
+}
+a{color:inherit}
+.wrap{max-width:1160px;margin-inline:auto;padding-inline:var(--g)}
+
+/* ---------- en-tête ---------- */
+.barre{
+  position:fixed;inset:0 0 auto 0;z-index:10;
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding:max(18px,env(safe-area-inset-top)) var(--g) 18px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
+  background:rgba(5,5,5,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(236,232,224,.06);
+}
+.barre a{text-decoration:none;transition:color .3s}
+.barre a:hover{color:var(--or)}
+
+/* ---------- hero ---------- */
+.hero{min-height:100svh;display:grid;grid-template-rows:1fr auto;padding-top:64px;position:relative}
+.hero-scene{position:relative;min-height:0}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.hero canvas.drag{cursor:grabbing}
+.hero-texte{padding-bottom:clamp(28px,6vh,64px)}
+.surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.hero h1{margin:14px 0 0;font-weight:200;font-size:clamp(56px,11vw,150px);line-height:.9;letter-spacing:.04em}
+.hero .chapeau{margin:22px 0 0;max-width:40em;font-size:clamp(16px,1.9vw,21px);color:var(--texte-doux)}
+.hero-bas{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-top:clamp(32px,5vh,52px)}
+.axes{display:flex;gap:clamp(18px,3vw,40px);list-style:none;margin:0;padding:0}
+.axes li{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);
+  padding-top:12px;position:relative;transition:color 1s ease;
+}
+.axes li::before{content:"";position:absolute;left:0;top:0;height:1px;width:100%;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform 1.2s cubic-bezier(.55,.05,.25,1)}
+.axes li b{display:block;font-weight:400;font-size:13px;letter-spacing:.1em;margin-bottom:2px}
+.axes li.on{color:var(--texte)}
+.axes li.on::before{transform:scaleX(1)}
+.axes li.on.a{color:var(--or)}
+.defiler{font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--texte-faible);text-decoration:none}
+
+/* ---------- sections ---------- */
+section{padding-block:clamp(88px,15vh,170px);border-top:1px solid var(--ligne)}
+.num{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:1.05;letter-spacing:.01em;max-width:16em}
+.intro{margin:24px 0 0;max-width:40em;font-size:clamp(16px,1.6vw,19px);color:var(--texte-doux)}
+h3{margin:0;font-weight:300;font-size:clamp(20px,2vw,24px);letter-spacing:.01em}
+p{margin:0}
+.p-doux{color:var(--texte-doux)}
+.mono{font-family:var(--mono)}
+
+.rv{opacity:0;transform:translateY(18px);transition:opacity 1.2s ease var(--d,0s),transform 1.2s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+.vu .rv,.rv.vu{opacity:1;transform:none}
+
+/* illustrations filaires */
+svg.ill{display:block;width:100%;height:auto;overflow:visible}
+.l{fill:none;stroke:rgba(236,232,224,.62);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.l.f{stroke:rgba(236,232,224,.18)}
+.l.o{stroke:rgba(214,168,92,.85)}
+.l.fort{stroke:rgba(236,232,224,.95);stroke-width:2.5}
+.draw{stroke-dasharray:1 1;stroke-dashoffset:1;transition:stroke-dashoffset var(--t,1.4s) cubic-bezier(.55,.05,.25,1) var(--d,0s)}
+.vu .draw{stroke-dashoffset:0}
+.fz{opacity:0;transition:opacity var(--t,1.4s) ease var(--d,0s)}
+.vu .fz{opacity:1}
+.zf{fill:rgba(214,168,92,.22);stroke:none}
+.zf.plein{fill:rgba(214,168,92,.9)}
+.pt{fill:none;stroke:rgba(236,232,224,.45);stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:2 3}
+.pt.o{stroke:rgba(214,168,92,.8)}
+
+/* 01 — trois axes */
+.trois{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(16px,2.4vw,32px);margin-top:clamp(48px,8vh,88px)}
+.axe{border-top:1px solid var(--ligne);padding-top:28px}
+.axe .ill{max-width:240px;height:170px;margin:0 0 28px}
+.axe .tete{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.axe .chap{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--texte-faible)}
+.axe .unite{font-family:var(--mono);font-size:13px;color:var(--or);letter-spacing:.08em}
+.axe p{margin-top:12px;color:var(--texte-doux)}
+
+/* 02 — genres */
+.carte{position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(56px,14vw,220px) minmax(0,1.15fr);margin-top:clamp(48px,8vh,88px);max-width:880px}
+.carte ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.carte li{
+  font-size:clamp(13px,1.5vw,16px);padding:10px 0;border-bottom:1px solid var(--ligne);
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+}
+.carte .gauche li{color:var(--texte-doux)}
+.carte .gauche li span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--texte-faible);text-transform:uppercase}
+.carte .droite li{color:var(--texte)}
+.carte .droite li span{font-family:var(--mono);font-size:11px;color:var(--or);letter-spacing:.06em}
+.carte svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.note{display:flex;gap:clamp(24px,5vw,72px);flex-wrap:wrap;margin-top:clamp(40px,6vh,64px)}
+.note div{max-width:22em}
+.note b{display:block;font-weight:200;font-size:clamp(40px,5vw,60px);line-height:1;color:var(--texte)}
+.note span{display:block;margin-top:8px;color:var(--texte-doux);font-size:15px}
+
+/* 03 — décodeur */
+.decodeur{margin-top:clamp(48px,8vh,88px);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(32px,6vw,96px);align-items:center}
+.code{font-family:var(--mono);font-weight:300;font-size:clamp(52px,9vw,124px);line-height:1;letter-spacing:.02em;white-space:nowrap;transition:opacity .6s ease}
+.code .g{position:relative;display:inline-block;color:var(--texte-faible);transition:color .8s ease}
+.code .g::after{content:"";position:absolute;left:4%;right:4%;bottom:-.14em;height:1px;background:var(--or);transform:scaleX(0);transform-origin:left;transition:transform .9s cubic-bezier(.55,.05,.25,1)}
+.code .g.on{color:var(--texte)}
+.code .g.on::after{transform:scaleX(1)}
+.code .g.pt-sep{color:var(--texte-faible)}
+.code .g.pt-sep::after{display:none}
+.legende{list-style:none;margin:0;padding:0;transition:opacity .6s ease}
+.legende li{display:grid;grid-template-columns:4.2em 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--ligne);opacity:.25;transition:opacity .8s ease}
+.legende li.on{opacity:1}
+.legende b{font-family:var(--mono);font-weight:400;color:var(--or)}
+.legende span{color:var(--texte-doux)}
+.sortie{opacity:0}
+.points{display:flex;gap:8px;margin-top:28px}
+.points i{width:22px;height:1px;background:var(--texte-faible);transition:background .4s}
+.points i.on{background:var(--or)}
+.verif{margin-top:clamp(40px,6vh,64px);max-width:44em;color:var(--texte-doux)}
+
+/* 04 — géométrie */
+.geo{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,3vw,40px);margin-top:clamp(48px,8vh,88px)}
+.geo article{border-top:1px solid var(--ligne);padding-top:28px;display:flex;flex-direction:column}
+.geo .ill{height:210px;margin-bottom:24px}
+.geo p{margin-top:12px;color:var(--texte-doux)}
+.geo .leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--texte-faible)}
+.geo .leg i{display:inline-block;width:14px;height:0;border-top:1px solid rgba(236,232,224,.6);vertical-align:middle;margin-right:6px}
+.geo .leg i.o{border-color:var(--or)}
+.geo .leg i.pt{border-top-style:dashed}
+.geo .leg i.fort{border-top-width:3px;border-color:rgba(236,232,224,.95)}
+.plus{list-style:none;margin:clamp(48px,7vh,72px) 0 0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:0 clamp(24px,4vw,56px)}
+.plus li{padding:16px 0;border-bottom:1px solid var(--ligne);color:var(--texte-doux);display:flex;gap:16px}
+.plus li::before{content:"";flex:none;width:6px;height:6px;margin-top:.62em;border:1px solid var(--or);transform:rotate(45deg)}
+
+/* 05 — outils */
+.temps{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,3vw,40px);margin-top:clamp(48px,8vh,88px)}
+.temps article{position:relative;padding-top:28px}
+.temps article::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--or);transform:scaleX(0);transform-origin:left;transition:transform 1.4s cubic-bezier(.55,.05,.25,1) var(--d,0s)}
+.temps.vu article::before{transform:scaleX(1)}
+.temps .etape{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.temps h3{margin-top:10px}
+.temps ol{list-style:none;margin:20px 0 0;padding:0;counter-reset:o var(--depart,0)}
+.temps li{counter-increment:o;display:grid;grid-template-columns:2.2em 1fr;padding:12px 0;border-bottom:1px solid var(--ligne)}
+.temps li::before{content:counter(o,decimal-leading-zero);font-family:var(--mono);font-size:12px;color:var(--texte-faible);padding-top:.2em}
+.temps li b{font-weight:400}
+.temps li span{display:block;font-size:14px;color:var(--texte-doux)}
+.deux-temps{margin-top:clamp(40px,6vh,64px);max-width:44em;color:var(--texte-doux)}
+
+/* 06 — livrables */
+.livre{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(32px,6vw,96px);margin-top:clamp(48px,8vh,88px);align-items:start}
+.livre ul{list-style:none;margin:0;padding:0}
+.livre li{padding:20px 0;border-bottom:1px solid var(--ligne)}
+.livre li b{display:block;font-weight:400}
+.livre li span{display:block;margin-top:4px;color:var(--texte-doux);font-size:15px}
+.chiffres{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(28px,4vw,48px) clamp(20px,3vw,40px)}
+.chiffres div b{display:block;font-weight:200;font-size:clamp(48px,6.5vw,84px);line-height:1;font-variant-numeric:tabular-nums}
+.chiffres div span{display:block;margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible)}
+.chiffres div.or b{color:var(--or)}
+
+/* 07 — périmètre */
+.perimetre{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(24px,4vw,56px);margin-top:clamp(48px,8vh,88px)}
+.perimetre > div{border-top:1px solid var(--ligne);padding-top:24px}
+.perimetre .etiq{font-family:var(--mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--texte-faible)}
+.perimetre .etiq.o{color:var(--or)}
+.perimetre p{margin-top:14px;color:var(--texte-doux)}
+.perimetre .articles{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+.perimetre .articles span{font-family:var(--mono);font-size:12px;padding:5px 10px;border:1px solid var(--ligne);color:var(--texte-doux)}
+.perimetre .articles.o span{border-color:rgba(214,168,92,.4);color:var(--texte)}
+
+/* fin */
+.fin{text-align:center;padding-block:clamp(110px,20vh,220px)}
+.fin h2{margin-inline:auto;max-width:none}
+.fin .bientot{display:inline-flex;align-items:center;gap:14px;margin-top:28px;font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--or)}
+.fin .bientot::before,.fin .bientot::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5}
+footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
+footer a{text-decoration:none}
+footer a:hover{color:var(--or)}
+
+@media (min-width:1000px){
+  .hero{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);grid-template-rows:1fr;column-gap:24px;max-width:1360px}
+  .hero-scene{grid-column:2;grid-row:1;margin-block:24px}
+  .hero-texte{grid-column:1;grid-row:1;align-self:end}
+  .hero h1{font-size:clamp(64px,8vw,124px)}
+  .hero-bas{flex-direction:column;align-items:flex-start;gap:28px}
+}
+@media (max-width:860px){
+  .trois,.geo,.temps{grid-template-columns:1fr}
+  .axe .ill{height:150px}
+  .decodeur,.livre,.perimetre{grid-template-columns:1fr}
+  .plus{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .barre span{display:none}
+  .hero-bas{flex-direction:column;align-items:flex-start;gap:20px}
+  .defiler{display:none}
+  .axes{gap:18px}
+  .axes li{font-size:10px;letter-spacing:.12em}
+  .carte{grid-template-columns:minmax(0,1fr) 40px minmax(0,1.2fr)}
+  .carte .gauche li span{display:none}
+  .carte .droite li span{display:none}
+  .code{font-size:clamp(46px,15vw,72px)}
+  .legende li{grid-template-columns:3.6em 1fr}
+  footer span:last-child{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="barre">
+  <a href="/">STR Bim Tools</a>
+  <span>Outil · CAN 241</span>
+</header>
+
+<div class="hero wrap" id="haut">
+  <div class="hero-scene"><canvas id="scene" role="img" aria-label="Maquette filaire d'une travée de structure : radier, mur, piliers, sommier, dalle et parapet, avec son coffrage, son béton et son armature"></canvas></div>
+  <div class="hero-texte">
+    <div class="surtitre rv" style="--d:.2s">STR Bim Tools · Outil</div>
+    <h1 class="rv" style="--d:.4s">CAN 241</h1>
+    <p class="chapeau rv" style="--d:.7s">Le métré du béton coulé sur place, tiré directement de la maquette Revit : coffrage, béton et armature, article par article.</p>
+    <div class="hero-bas">
+      <ul class="axes rv" style="--d:1s">
+        <li id="ax-c"><b>200</b>Coffrage · m²</li>
+        <li id="ax-b"><b>600</b>Béton · m³</li>
+        <li id="ax-a" class="a"><b>500</b>Armature · kg</li>
+      </ul>
+      <a class="defiler rv" style="--d:1.3s" href="#axes">Découvrir ↓</a>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- 01 -->
+<section id="axes">
+  <div class="wrap" data-vu>
+    <div class="num rv">01 — Trois axes</div>
+    <h2 class="rv" style="--d:.1s">Trois métrés distincts, un seul export.</h2>
+    <p class="intro rv" style="--d:.2s">Le CAN 241 facture séparément le coffrage, le béton et l'armature. L'outil sort les trois d'un coup, chacun avec son numéro d'article et sa quantité.</p>
+    <div class="trois">
+      <div class="axe rv" style="--d:.1s">
+        <svg class="ill" id="ill-coffrage" aria-hidden="true"></svg>
+        <div class="tete"><h3>Coffrage</h3><span class="unite">m²</span></div>
+        <div class="chap">Chapitre 200</div>
+        <p>Surface de béton coffrée, mesurée sur la géométrie réelle : faces de murs, sous-faces, rives et abouts.</p>
+      </div>
+      <div class="axe rv" style="--d:.25s">
+        <svg class="ill" id="ill-beton" aria-hidden="true"></svg>
+        <div class="tete"><h3>Béton</h3><span class="unite">m³</span></div>
+        <div class="chap">Chapitre 600</div>
+        <p>Volume selon plans, classé par type de béton NPK puis par plage de hauteur, d'épaisseur ou de section.</p>
+      </div>
+      <div class="axe rv" style="--d:.4s">
+        <svg class="ill" id="ill-armature" aria-hidden="true"></svg>
+        <div class="tete"><h3>Armature</h3><span class="unite">kg</span></div>
+        <div class="chap">Chapitre 500</div>
+        <p>Estimée par un ratio en kg/m³ propre à chaque élément, en acier B500B tous diamètres.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">02 — Le genre CAN</div>
+    <h2 class="rv" style="--d:.1s">Ce que l'élément est, pas l'outil qui l'a dessiné.</h2>
+    <p class="intro rv" style="--d:.2s">Un sol Revit peut être une dalle, un radier, un sommier ou un parapet. Chaque élément reçoit son genre CAN, proposé automatiquement à partir de sa catégorie et de ses proportions, puis contrôlé dans une vue 3D colorée.</p>
+    <div class="carte rv" id="carte" style="--d:.3s">
+      <ul class="gauche">
+        <li data-k="sols">Sols <span>OST_Floors</span></li>
+        <li data-k="murs">Murs <span>OST_Walls</span></li>
+        <li data-k="ossature">Ossature <span>Framing</span></li>
+        <li data-k="poteaux">Poteaux <span>Columns</span></li>
+        <li data-k="fondations">Fondations <span>Foundation</span></li>
+      </ul>
+      <div></div>
+      <ul class="droite">
+        <li data-k="dalle">Dalle sur appuis <span>661</span></li>
+        <li data-k="paf">Dalle en porte-à-faux <span>662</span></li>
+        <li data-k="radier">Radier <span>613</span></li>
+        <li data-k="mur">Paroi, mur <span>631</span></li>
+        <li data-k="parapet">Parapet <span>671</span></li>
+        <li data-k="sommier">Sommier <span>645</span></li>
+        <li data-k="renverse">Sommier renversé <span>671</span></li>
+        <li data-k="pilier">Pilier <span>641</span></li>
+        <li data-k="semelle">Semelle <span>611</span></li>
+      </ul>
+      <svg id="liens" aria-hidden="true"></svg>
+    </div>
+    <div class="note">
+      <div class="rv" style="--d:.1s"><b>18</b><span>genres CAN reconnus, dont « Ne pas compter » pour exclure un élément du métré.</span></div>
+      <div class="rv" style="--d:.2s"><b>1,50 m</b><span>au-delà, un parapet devient un mur et change d'article, comme le prévoit le catalogue.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">03 — L'article</div>
+    <h2 class="rv" style="--d:.1s">Un numéro qui se lit chiffre par chiffre.</h2>
+    <p class="intro rv" style="--d:.2s">Genre, type de béton ou de coffrage, puis plages de dimensions : chaque chiffre de l'article est déduit de la maquette.</p>
+    <div class="decodeur rv" style="--d:.3s">
+      <div>
+        <div class="code" id="code" aria-live="polite"></div>
+        <div class="points" id="points"></div>
+      </div>
+      <ul class="legende" id="legende"></ul>
+    </div>
+    <p class="verif rv" style="--d:.1s">Chaque règle a été confrontée au catalogue, cas par cas : <span style="color:var(--texte)">plus de 240 combinaisons vérifiées</span>. Quand un type n'est pas énuméré, l'article <em>Divers</em> est retenu ; quand une dimension dépasse toutes les plages, la <em>Spécification</em>. La quantité, elle, reste juste.</p>
+  </div>
+</section>
+
+<!-- 04 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">04 — La géométrie réelle</div>
+    <h2 class="rv" style="--d:.1s">Mesuré sur les triangles, jamais sur la boîte englobante.</h2>
+    <p class="intro rv" style="--d:.2s">Formes modifiées, plans en L, rampes : les surfaces sont calculées sur la géométrie triangulée de chaque élément, et chaque contact avec un voisin est examiné.</p>
+    <div class="geo">
+      <article class="rv" style="--d:.1s">
+        <svg class="ill" id="ill-etayage" aria-hidden="true"></svg>
+        <h3>Étayage ventilé</h3>
+        <p>La sous-face est parcourue point par point. Chaque zone est classée selon sa hauteur réelle jusqu'au support. Au droit d'un mur porteur, rien n'est coffré ; sans support, une alerte, jamais un classement inventé.</p>
+        <div class="leg"><span><i class="pt"></i>2,00 – 2,99 m</span><span><i class="pt o"></i>3,00 – 4,00 m</span><span><i></i>sur appuis</span></div>
+      </article>
+      <article class="rv" style="--d:.25s">
+        <svg class="ill" id="ill-rive" aria-hidden="true"></svg>
+        <h3>Rives mitoyennes</h3>
+        <p>Entre deux dalles accolées, la voisine tient lieu de coffrage : seul le redent est compté. Une dalle de 30 cm contre une dalle de 20 cm, sur 6 m : 0,60 m² au lieu de 1,80.</p>
+        <div class="leg"><span><i class="o"></i>redent coffré</span><span><i></i>contact, non compté</span></div>
+      </article>
+      <article class="rv" style="--d:.4s">
+        <svg class="ill" id="ill-abouts" aria-hidden="true"></svg>
+        <h3>Abouts de murs</h3>
+        <p>Chaque extrémité est reconnue : about libre, angle ou jonction en T. Les reprises armées et les abouts libres partent dans leur famille d'article ; un angle n'est compté qu'une fois pour la paire.</p>
+        <div class="leg"><span><i class="o"></i>angle, jonction · avec armature</span><span><i class="fort"></i>about libre</span></div>
+      </article>
+    </div>
+    <ul class="plus">
+      <li class="rv">Pente détectée automatiquement, sur un ou plusieurs côtés.</li>
+      <li class="rv" style="--d:.08s">Trémies de 2 m² au plus comptées à la pièce, en réservations.</li>
+      <li class="rv" style="--d:.16s">Petites ouvertures de murs non déduites de la surface coffrée.</li>
+      <li class="rv" style="--d:.24s">Faces contre terrain et fondations en pleine fouille sans coffrage.</li>
+      <li class="rv" style="--d:.32s">Seuls les éléments neufs de la phase et des zones choisies.</li>
+      <li class="rv" style="--d:.4s">Épaisseur de métré forçable élément par élément.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 05 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">05 — Le déroulé</div>
+    <h2 class="rv" style="--d:.1s">Neuf outils, trois temps.</h2>
+    <div class="temps" id="temps" data-vu>
+      <article class="rv" style="--d:.1s">
+        <div class="etape">Une fois</div>
+        <h3>Préparer</h3>
+        <ol style="--depart:0">
+          <li><div><b>Configuration</b><span>Phase et zones à analyser.</span></div></li>
+          <li><div><b>Init paramètres</b><span>Les 24 paramètres partagés, liés en un clic.</span></div></li>
+        </ol>
+      </article>
+      <article class="rv" style="--d:.3s">
+        <div class="etape">Autant que nécessaire</div>
+        <h3>Renseigner</h3>
+        <ol style="--depart:2">
+          <li><div><b>Classer les éléments</b><span>Genre CAN proposé, vérifié en 3D.</span></div></li>
+          <li><div><b>Mapper les types existants</b><span>Reprendre le travail d'une autre maquette.</span></div></li>
+          <li><div><b>Type de béton</b><span>NPK par type Revit.</span></div></li>
+          <li><div><b>Type de coffrage</b><span>Type 1 à 4-4, ou « Sans ».</span></div></li>
+          <li><div><b>Étayage dalles</b><span>Ventilation des dalles et des sommiers.</span></div></li>
+        </ol>
+      </article>
+      <article class="rv" style="--d:.5s">
+        <div class="etape">À chaque rendu</div>
+        <h3>Produire</h3>
+        <ol style="--depart:7">
+          <li><div><b>Export soumission</b><span>Articles, quantités, classeur Excel.</span></div></li>
+          <li><div><b>Dashboard</b><span>Contrôle de conformité du classement.</span></div></li>
+        </ol>
+      </article>
+    </div>
+    <p class="deux-temps rv">Toute saisie se fait en deux temps : on prépare le tableau à l'écran, puis on enregistre dans la maquette en une seule transaction. Rien n'est écrit par surprise.</p>
+  </div>
+</section>
+
+<!-- 06 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">06 — Ce qui sort</div>
+    <h2 class="rv" style="--d:.1s">Une soumission prête, et sa traçabilité.</h2>
+    <div class="livre">
+      <ul>
+        <li class="rv"><b>Classeur Excel de soumission</b><span>Six onglets, quantités agrégées par article.</span></li>
+        <li class="rv" style="--d:.08s"><b>Dashboard métré dans Revit</b><span>Coffrage, armature et béton, article par article, avec la phase et les zones analysées.</span></li>
+        <li class="rv" style="--d:.16s"><b>Dashboard de contrôle</b><span>Éléments conformes, incomplets ou non renseignés, avant de livrer.</span></li>
+        <li class="rv" style="--d:.24s"><b>Vues 3D colorées</b><span>Par genre, par type de béton, par type de coffrage.</span></li>
+        <li class="rv" style="--d:.32s"><b>Sur chaque élément</b><span>Articles et quantités écrits dans ses paramètres, consultables à tout moment.</span></li>
+      </ul>
+      <div class="chiffres">
+        <div class="rv"><b data-n="9">0</b><span>outils</span></div>
+        <div class="rv" style="--d:.1s"><b data-n="25">0</b><span>résolveurs d'articles</span></div>
+        <div class="rv" style="--d:.2s"><b data-n="24">0</b><span>paramètres partagés</span></div>
+        <div class="rv or" style="--d:.3s"><b data-n="240" data-plus="1">0</b><span>cas vérifiés au catalogue</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">07 — Périmètre</div>
+    <h2 class="rv" style="--d:.1s">Le bâtiment, en structure neuve.</h2>
+    <div class="perimetre">
+      <div class="rv" style="--d:.1s">
+        <div class="etiq o">Couvert</div>
+        <p>Fondations, murs, piliers, sommiers, poutres, dalles, sommiers renversés et parapets ; réservations ; armature en barres.</p>
+        <div class="articles o"><span>212 – 271</span><span>411</span><span>511</span><span>611 – 671</span></div>
+      </div>
+      <div class="rv" style="--d:.25s">
+        <div class="etiq">Pas encore</div>
+        <p>Coffrage des escaliers, paliers, consoles et nervures ; treillis et fibres ; génie civil. Le béton des escaliers et des consoles est déjà métré.</p>
+        <div class="articles"><span>235</span><span>251 – 252</span><span>521 – 540</span><span>300 · 700</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="fin">
+  <div class="wrap" data-vu>
+    <div class="num rv">STR Bim Tools</div>
+    <h2 class="rv" style="--d:.1s">CAN 241</h2>
+    <div class="bientot rv" style="--d:.3s">Bientôt</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <a href="/">← str-bim-tools.com</a>
+  <span>pyRevit · Revit 2024+</span>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  function clamp(x){return x<0?0:x>1?1:x}
+  function ease(p){return p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2}
+  function norm(a){var l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l]}
+  function sub(a,b){return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]}
+  function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}
+  function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}
+  var NS = "http://www.w3.org/2000/svg";
+  function el(parent, name, attrs){ var e=document.createElementNS(NS,name); for (var k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+
+  // =====================================================================
+  //  Scène d'ouverture : une travée de structure en fil de fer, transparente
+  //  (coordonnées en mètres, y vers le haut)
+  // =====================================================================
+  var cv = document.getElementById("scene"), ctx = cv.getContext("2d");
+  var lignes = [], faces = [];
+  function L(a, b, c, d, t){ lignes.push({a:a, b:b, c:c, d:d, t:t||1.2}) }
+  function F(pts, d){ faces.push({p:pts, d:d}) }
+  function boite(x0,x1,y0,y1,z0,z1,d){
+    var P = [[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1],[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]];
+    [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(function(e,i){ L(P[e[0]], P[e[1]], "b", d + i*.04, 1.3) });
+    var DF = 4.6 + Math.random()*.6;
+    [[0,1,2,3],[4,5,6,7],[0,1,5,4],[3,2,6,7],[0,3,7,4],[1,2,6,5]].forEach(function(f){ F(f.map(function(i){return P[i]}), DF) });
+  }
+
+  // béton : la structure
+  boite(-7,7, -.35,0, -5,5, .1);                 // radier
+  boite(-6,6, 0,3, 3.55,3.8, .35);               // mur
+  boite(-4.65,-4.35, 0,2.5, -2.65,-2.35, .6);    // piliers
+  boite(1.35,1.65, 0,2.5, -2.65,-2.35, .7);
+  boite(-6,6, 2.5,3, -2.65,-2.35, .9);           // sommier en retombée
+  boite(-6,6, 3,3.25, -4,4, 1.15);               // dalle
+  boite(5.8,6, 3.25,4.25, -4,4, 1.5);            // parapet
+
+  // coffrage : panneaux de sous-face et de murs
+  var k, d0 = 2.6;
+  for (k=-5;k<=5;k++) L([k,2.999,-4],[k,2.999,3.55], "c", d0 + (k+5)*.05, 1.2);
+  for (k=-4;k<=3;k++) L([-6,2.999,k+.5],[6,2.999,k+.5], "c", d0 + .3 + (k+4)*.05, 1.2);
+  for (k=-6;k<=6;k+=1.2) L([k,0,3.549],[k,3,3.549], "c", d0 + .5 + (k+6)*.04, 1);
+  L([-6,1.5,3.549],[6,1.5,3.549], "c", d0 + .9, 1.4);
+  for (k=-6;k<=6;k+=1) { L([k,2.5,-2.66],[k,3,-2.66], "c", d0 + .6 + (k+6)*.03, .8); L([k,2.5,-2.34],[k,3,-2.34], "c", d0 + .6 + (k+6)*.03, .8); }
+
+  // armature : nappes de la dalle, barres du mur, des piliers et du sommier
+  var d1 = 6.2;
+  [3.06, 3.19].forEach(function(y, n){
+    for (k=-3.75;k<=3.75;k+=.5) L([-5.95,y,k],[5.95,y,k], "a", d1 + n*.4 + (k+4)*.04, 1);
+    for (k=-5.75;k<=5.75;k+=.5) L([k,y,-3.95],[k,y,3.95], "a", d1 + .2 + n*.4 + (k+6)*.03, 1);
+  });
+  for (k=-5.75;k<=5.75;k+=.5) L([k,.05,3.675],[k,3.2,3.675], "a", d1 + .5 + (k+6)*.03, 1.1);
+  for (k=.5;k<3;k+=.5) L([-5.95,k,3.675],[5.95,k,3.675], "a", d1 + .8 + k*.08, 1);
+  [[-4.5,-2.5],[1.5,-2.5]].forEach(function(c, n){
+    [[-.08,-.08],[.08,-.08],[.08,.08],[-.08,.08]].forEach(function(o){ L([c[0]+o[0],.05,c[1]+o[1]],[c[0]+o[0],3.2,c[1]+o[1]], "a", d1 + .6 + n*.2, 1.2) });
+  });
+  [[2.58,-2.58],[2.58,-2.42],[2.92,-2.58],[2.92,-2.42]].forEach(function(b){ L([-5.95,b[0],b[1]],[5.95,b[0],b[1]], "a", d1 + 1, 1.2) });
+  for (k=-5.8;k<=5.8;k+=.4) { var e=d1 + 1.2 + (k+6)*.03; L([k,2.56,-2.6],[k,2.94,-2.6],"a",e,.5); L([k,2.56,-2.4],[k,2.94,-2.4],"a",e,.5); L([k,2.56,-2.6],[k,2.56,-2.4],"a",e,.5); }
+
+  var FIN_ARMATURE = 0;
+  lignes.forEach(function(l){ FIN_ARMATURE = Math.max(FIN_ARMATURE, l.d + l.t) });
+
+  // caméra en orbite, légèrement plongeante
+  var C = [0, 1.6, 0], R = 40, PHI = .34, TH0 = -.62;
+  var cam = {};
+  function camera(th){
+    cam.eye = [C[0] + R*Math.cos(PHI)*Math.sin(th), C[1] + R*Math.sin(PHI), C[2] - R*Math.cos(PHI)*Math.cos(th)];
+    cam.fw = norm(sub(C, cam.eye));
+    cam.rt = norm(cross([0,1,0], cam.fw));
+    cam.up = cross(cam.fw, cam.rt);
+  }
+  function proj(p){
+    var d = sub(p, cam.eye), z = dot(d, cam.fw);
+    return [dot(d, cam.rt)/z, -dot(d, cam.up)/z, z];
+  }
+  var ext = {x:0, y0:1e9, y1:-1e9};
+  for (var i=0;i<48;i++){
+    camera(i/48*Math.PI*2);
+    lignes.forEach(function(l){ [l.a,l.b].forEach(function(p){ var q=proj(p); ext.x=Math.max(ext.x,Math.abs(q[0])); ext.y0=Math.min(ext.y0,q[1]); ext.y1=Math.max(ext.y1,q[1]); }) });
+  }
+  var W=0,H=0,dpr=1,S=1,CX=0,CY=0;
+  function taille(){
+    var r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2); W = r.width; H = r.height;
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    S = .92 * Math.min(W/(2*ext.x), H/(ext.y1-ext.y0));
+    CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
+  }
+  window.addEventListener("resize", taille); taille();
+
+  var COUL = {b:"236,232,224", c:"236,232,224", a:"214,168,92"};
+  var ALPHA = {b:.8, c:.26, a:.62};
+  function dessiner(T, th){
+    camera(th);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    ctx.lineWidth = 1;
+    var fa = ease(clamp((T - 4.6)/1.8));
+    if (fa > 0){
+      ctx.fillStyle = "rgba(214,168,92," + (.045*fa).toFixed(3) + ")";
+      for (var f=0; f<faces.length; f++){
+        ctx.beginPath();
+        for (var j=0;j<4;j++){ var q = proj(faces[f].p[j]); var X = CX + S*q[0], Y = CY + S*q[1]; j ? ctx.lineTo(X,Y) : ctx.moveTo(X,Y); }
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    // brume : les lignes lointaines s'estompent
+    var buckets = {};
+    for (var n=0;n<lignes.length;n++){
+      var l = lignes[n], p = ease(clamp((T - l.d)/l.t)); if (p <= 0) continue;
+      var b = [l.a[0]+(l.b[0]-l.a[0])*p, l.a[1]+(l.b[1]-l.a[1])*p, l.a[2]+(l.b[2]-l.a[2])*p];
+      var qa = proj(l.a), qb = proj(b);
+      var zn = clamp(((qa[2]+qb[2])/2 - (R-11))/22), niv = Math.min(3, Math.floor(zn*4));
+      var key = l.c + niv;
+      (buckets[key] = buckets[key] || []).push(CX+S*qa[0], CY+S*qa[1], CX+S*qb[0], CY+S*qb[1]);
+    }
+    for (var key in buckets){
+      var arr = buckets[key], c = key.charAt(0), niv2 = +key.charAt(1);
+      ctx.beginPath();
+      for (var m=0;m<arr.length;m+=4){ ctx.moveTo(arr[m],arr[m+1]); ctx.lineTo(arr[m+2],arr[m+3]); }
+      ctx.strokeStyle = "rgba(" + COUL[c] + "," + (ALPHA[c]*(1 - niv2*.17)).toFixed(3) + ")";
+      ctx.stroke();
+    }
+  }
+
+  var t0=null, prec=0, th=TH0, omega=0, visible=true;
+  var DEBUT_ROT = FIN_ARMATURE - .8, VITESSE = Math.PI*2/60;
+  var glisse=false, gx=0, gt=0, gv=0;
+  var etapes = [[2.6,"ax-c"],[4.6,"ax-b"],[6.2,"ax-a"]];
+  function frame(now){
+    if (t0 === null) t0 = now;
+    var T = (now - t0)/1000, dt = Math.min(.05, T - prec); prec = T;
+    etapes = etapes.filter(function(e){ if (T >= e[0]){ document.getElementById(e[1]).classList.add("on"); return false; } return true; });
+    if (!glisse){
+      var cible = T > DEBUT_ROT ? VITESSE : 0;
+      omega += (cible - omega) * Math.min(1, dt*(T - DEBUT_ROT < 6 ? .35 : 1.2));
+      th += omega*dt;
+    }
+    if (visible) dessiner(T, th);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  if ("IntersectionObserver" in window) new IntersectionObserver(function(e){ visible = e[0].isIntersecting }).observe(cv);
+
+  cv.addEventListener("pointerdown", function(e){ glisse=true; gx=e.clientX; gt=performance.now(); gv=0; cv.classList.add("drag"); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", function(e){
+    if (!glisse) return;
+    var now=performance.now(), dth=-(e.clientX-gx)*3.2/Math.max(W,320);
+    th+=dth; gv=dth/Math.max(.008,(now-gt)/1000); gx=e.clientX; gt=now;
+  });
+  function relacher(){ if(!glisse) return; glisse=false; cv.classList.remove("drag"); omega=Math.max(-2.5,Math.min(2.5,gv)); }
+  cv.addEventListener("pointerup", relacher); cv.addEventListener("pointercancel", relacher);
+
+  // =====================================================================
+  //  Illustrations filaires en SVG, tracées à l'apparition
+  // =====================================================================
+  var ISO = function(p){ return [(p[0]-p[1])*.866*40, ((p[0]+p[1])*.5 - p[2])*40] };
+  var PLAN = function(p){ return [p[0]*40, p[1]*40] };
+  function tracer(svg, items, projeter, marge){
+    var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    items.forEach(function(it){
+      var pts = it.p.map(projeter);
+      pts.forEach(function(q){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); });
+      var dstr = "M" + pts.map(function(q){return q[0].toFixed(1)+" "+q[1].toFixed(1)}).join(" L") + (it.ferme ? "Z" : "");
+      var e;
+      if (it.zone) e = el(svg, "path", {d:dstr, class:"zf fz " + (it.c||"")});
+      else if (it.pointille) e = el(svg, "path", {d:dstr, class:"pt fz " + (it.c||"")});
+      else e = el(svg, "path", {d:dstr, class:"l draw " + (it.c||""), pathLength:1});
+      e.style.setProperty("--d", (it.d||0).toFixed(2)+"s");
+      if (it.t) e.style.setProperty("--t", it.t.toFixed(2)+"s");
+    });
+    var m = marge || 12;
+    svg.setAttribute("viewBox", [x0-m, y0-m, x1-x0+2*m, y1-y0+2*m].map(function(v){return v.toFixed(1)}).join(" "));
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  }
+  function aretes(items, x0,x1,y0,y1,z0,z1, c, d, pas){
+    var P = [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0],[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]];
+    [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(function(e,i){ items.push({p:[P[e[0]],P[e[1]]], c:c, d:d + i*(pas||.05)}) });
+  }
+
+  // 01 — coffrage : un mur et ses panneaux
+  (function(){
+    var it = [];
+    aretes(it, 0,4, 0,.3, 0,2.8, "", 0);
+    for (var x=.8;x<4;x+=.8) it.push({p:[[x,-.02,0],[x,-.02,2.8]], c:"f", d:.6+x*.1});
+    it.push({p:[[0,-.02,1.4],[4,-.02,1.4]], c:"f", d:.9});
+    for (var x2=.4;x2<4;x2+=.8) for (var z=.7;z<2.8;z+=1.4) it.push({p:[[x2,-.02,z-.06],[x2,-.02,z+.06]], c:"o", d:1.2+x2*.08, t:.4});
+    it.push({zone:true, p:[[0,0,0],[4,0,0],[4,0,2.8],[0,0,2.8]], d:1.4, t:1.6});
+    tracer(document.getElementById("ill-coffrage"), it, ISO);
+  })();
+  // 01 — béton : un volume
+  (function(){
+    var it = [];
+    aretes(it, 0,2.6, 0,2.6, 0,2.6, "", 0, .08);
+    it.push({zone:true, p:[[0,0,2.6],[2.6,0,2.6],[2.6,2.6,2.6],[0,2.6,2.6]], d:1.1, t:1.6});
+    it.push({zone:true, p:[[0,0,0],[2.6,0,0],[2.6,0,2.6],[0,0,2.6]], d:1.3, t:1.6});
+    it.push({zone:true, p:[[0,0,0],[0,2.6,0],[0,2.6,2.6],[0,0,2.6]], d:1.5, t:1.6});
+    tracer(document.getElementById("ill-beton"), it, ISO);
+  })();
+  // 01 — armature : deux nappes et des épingles
+  (function(){
+    var it = [], y, x;
+    [0, .9].forEach(function(z, n){
+      for (y=0;y<=3;y+=.5) it.push({p:[[0,y,z],[3.2,y,z]], c:"o", d:n*.5 + y*.06});
+      for (x=0;x<=3.2;x+=.4) it.push({p:[[x,0,z],[x,3,z]], c:"o", d:.25 + n*.5 + x*.05});
+    });
+    [[0,0],[3.2,0],[3.2,3],[0,3],[1.6,1.5]].forEach(function(c,i){ it.push({p:[[c[0],c[1],0],[c[0],c[1],.9]], c:"", d:1.3+i*.08, t:.6}) });
+    tracer(document.getElementById("ill-armature"), it, ISO);
+  })();
+
+  // 04 — étayage : une dalle au-dessus de deux niveaux décalés, et un mur porteur
+  (function(){
+    var it = [];
+    aretes(it, 0,4, 0,3.9, 3,3.25, "f", .2, .02);
+    aretes(it, 0,4, 4.1,8, 2.25,2.5, "f", .3, .02);
+    aretes(it, 0,4, 3.9,4.1, 2.25,6, "", .5, .04);
+    aretes(it, 0,4, 0,8, 6,6.3, "", 0, .05);
+    for (var x=.5;x<4;x+=1) for (var y=.5;y<8;y+=1){
+      if (y > 3.6 && y < 4.4) continue;
+      var bas = y < 3.9 ? 3.25 : 2.5;
+      it.push({pointille:true, c: y < 3.9 ? "" : "o", p:[[x,y,6],[x,y,bas]], d:1.2 + y*.12 + x*.05, t:.8});
+    }
+    tracer(document.getElementById("ill-etayage"), it, function(p){ return ISO([p[1], -p[0], p[2]]) });
+  })();
+
+  // 04 — rives : deux dalles d'épaisseurs différentes, affleurantes en dessus
+  (function(){
+    var it = [], ez = 5;
+    aretes(it, 0,6, 0,4, 0,.3*ez, "", 0, .05);
+    aretes(it, 0,6, 4,8, .1*ez,.3*ez, "", .4, .05);
+    it.push({zone:true, c:"plein", p:[[0,4,0],[6,4,0],[6,4,.1*ez],[0,4,.1*ez]], d:1.4, t:1});
+    it.push({p:[[0,4,0],[6,4,0],[6,4,.1*ez],[0,4,.1*ez],[0,4,0]], c:"o", d:1.3, t:1.2});
+    it.push({pointille:true, c:"", p:[[0,4,.2*ez],[6,4,.2*ez]], d:1.6, t:1});
+    tracer(document.getElementById("ill-rive"), it, function(p){ return ISO([p[1], -p[0]*.62, p[2]]) });
+  })();
+
+  // 04 — abouts : un angle en L et une jonction en T, en plan
+  (function(){
+    var it = [], e = .3;
+    it.push({p:[[0,0],[5,0],[5,e],[e,e],[e,4],[0,4],[0,0]], c:"", d:0, t:1.6});
+    it.push({p:[[6.5,0],[13,0],[13,e],[9.9,e],[9.9,4],[9.6,4],[9.6,e],[6.5,e],[6.5,0]], c:"", d:.3, t:1.8});
+    it.push({zone:true, c:"plein", p:[[0,0],[e,0],[e,e],[0,e]], d:1.4, t:.8});
+    it.push({zone:true, c:"plein", p:[[9.6,0],[9.9,0],[9.9,e],[9.6,e]], d:1.6, t:.8});
+    it.push({p:[[-.35,-.35],[e+.35,-.35],[e+.35,e+.35],[-.35,e+.35],[-.35,-.35]], c:"o", d:1.5, t:.8});
+    it.push({p:[[9.25,-.35],[10.25,-.35],[10.25,e+.35],[9.25,e+.35],[9.25,-.35]], c:"o", d:1.7, t:.8});
+    [[[5,0],[5,e]], [[0,4],[e,4]], [[6.5,0],[6.5,e]], [[13,0],[13,e]], [[9.6,4],[9.9,4]]].forEach(function(s,i){
+      it.push({p:s, c:"fort", d:1.9 + i*.12, t:.5});
+    });
+    tracer(document.getElementById("ill-abouts"), it, PLAN, 18);
+  })();
+
+  // =====================================================================
+  //  02 — liens entre catégories Revit et genres CAN
+  // =====================================================================
+  var LIENS = {
+    sols:["dalle","paf","radier","sommier","renverse"],
+    murs:["mur","parapet","sommier"],
+    ossature:["sommier","renverse"],
+    poteaux:["pilier","mur"],
+    fondations:["radier","semelle"]
+  };
+  var carte = document.getElementById("carte"), svgL = document.getElementById("liens");
+  function liens(){
+    while (svgL.firstChild) svgL.removeChild(svgL.firstChild);
+    var rc = carte.getBoundingClientRect();
+    svgL.setAttribute("viewBox", "0 0 " + rc.width.toFixed(1) + " " + rc.height.toFixed(1));
+    var n = 0;
+    Object.keys(LIENS).forEach(function(src, i){
+      var a = carte.querySelector('.gauche [data-k="'+src+'"]').getBoundingClientRect();
+      LIENS[src].forEach(function(dst){
+        var b = carte.querySelector('.droite [data-k="'+dst+'"]').getBoundingClientRect();
+        var x0 = a.right - rc.left + 8, y0 = a.top + a.height/2 - rc.top;
+        var x1 = b.left - rc.left - 8, y1 = b.top + b.height/2 - rc.top;
+        var mx = (x0 + x1)/2;
+        var p = el(svgL, "path", {d:"M"+x0.toFixed(1)+" "+y0.toFixed(1)+" C"+mx.toFixed(1)+" "+y0.toFixed(1)+" "+mx.toFixed(1)+" "+y1.toFixed(1)+" "+x1.toFixed(1)+" "+y1.toFixed(1), class:"l draw " + (src === "sols" ? "o" : ""), pathLength:1});
+        p.style.setProperty("--d", (.5 + i*.18 + n*.04).toFixed(2)+"s");
+        p.style.setProperty("--t", "1.3s");
+        n++;
+      });
+    });
+  }
+  liens();
+  var liensTimer; window.addEventListener("resize", function(){ clearTimeout(liensTimer); liensTimer = setTimeout(liens, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(liens);
+
+  // =====================================================================
+  //  03 — décodeur d'articles
+  // =====================================================================
+  var ARTICLES = [
+    [["631","Béton · parois et murs"],["3","béton NPK C"],["3","hauteur 2,00 – 2,99 m"],["2","épaisseur 0,21 – 0,25 m"]],
+    [["245","Coffrage · sommiers"],["1","type 2, horizontal"],["3","étayage 2,00 – 2,99 m"],["2","section 0,101 – 0,250 m²"]],
+    [["661","Béton · dalles sur appuis"],["2","béton NPK B"],["1","horizontale"],["2","épaisseur 0,21 – 0,30 m"]],
+    [["271","Coffrage · sommiers renversés, parapets"],["1","type 2"],["0","—"],["2","hauteur 0,51 – 1,00 m"]]
+  ];
+  var codeEl = document.getElementById("code"), legEl = document.getElementById("legende"), ptsEl = document.getElementById("points");
+  ARTICLES.forEach(function(){ ptsEl.appendChild(document.createElement("i")) });
+  var idx = 0, decodeurLance = false;
+  function afficher(n){
+    var a = ARTICLES[n];
+    codeEl.innerHTML = ""; legEl.innerHTML = "";
+    a.forEach(function(g, i){
+      if (i === 1){ var s = document.createElement("span"); s.className = "g pt-sep"; s.textContent = "."; codeEl.appendChild(s); }
+      var sp = document.createElement("span"); sp.className = "g"; sp.textContent = g[0]; codeEl.appendChild(sp);
+      var li = document.createElement("li"); li.innerHTML = "<b></b><span></span>"; li.firstChild.textContent = g[0]; li.lastChild.textContent = g[1]; legEl.appendChild(li);
+    });
+    [].forEach.call(ptsEl.children, function(p, i){ p.classList.toggle("on", i === n) });
+    var groupes = codeEl.querySelectorAll(".g:not(.pt-sep)"), lis = legEl.children;
+    for (var i=0;i<groupes.length;i++) (function(i){
+      setTimeout(function(){ groupes[i].classList.add("on"); lis[i].classList.add("on"); }, 250 + i*520);
+    })(i);
+  }
+  function suivant(){
+    codeEl.classList.add("sortie"); legEl.classList.add("sortie");
+    setTimeout(function(){
+      idx = (idx + 1) % ARTICLES.length; afficher(idx);
+      codeEl.classList.remove("sortie"); legEl.classList.remove("sortie");
+    }, 650);
+  }
+  afficher(0);
+  [].forEach.call(codeEl.children, function(g){ g.classList.remove("on") });
+  [].forEach.call(legEl.children, function(g){ g.classList.remove("on") });
+
+  // =====================================================================
+  //  Apparitions au défilement
+  // =====================================================================
+  function compter(b){
+    var n = +b.getAttribute("data-n"), plus = b.hasAttribute("data-plus"), t0 = null;
+    function pas(now){
+      if (t0 === null) t0 = now;
+      var p = ease(clamp((now - t0)/1600));
+      b.textContent = Math.round(n*p) + (plus && p === 1 ? "+" : "");
+      if (p < 1) requestAnimationFrame(pas);
+    }
+    requestAnimationFrame(pas);
+  }
+  function montrer(cible){
+    cible.classList.add("vu");
+    if (cible.contains(codeEl) && !decodeurLance){ decodeurLance = true; afficher(0); setInterval(suivant, 5200); }
+    [].forEach.call(cible.querySelectorAll("[data-n]"), compter);
+  }
+  var observes = document.querySelectorAll("[data-vu]");
+  if ("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if (e.isIntersecting){ montrer(e.target); io.unobserve(e.target); } });
+    }, {threshold:.12, rootMargin:"0px 0px -8% 0px"});
+    [].forEach.call(observes, function(o){ io.observe(o) });
+  } else {
+    [].forEach.call(observes, montrer);
+  }
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ document.getElementById("haut").classList.add("vu"); }); });
+})();
+</script>
+</body>
+</html>
