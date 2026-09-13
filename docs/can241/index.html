@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CAN 241 · STR Bim Tools</title>
-<meta name="description" content="Métré CAN 241 du béton coulé sur place, tiré directement de la maquette Revit : coffrage, béton et armature, article par article.">
+<meta name="description" content="Métré CAN 241 du béton coulé sur place, tiré directement de la maquette Revit : coffrage, armature et béton, article par article.">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#050505">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
@@ -236,17 +236,17 @@ footer a:hover{color:var(--or)}
 </header>
 
 <div class="hero wrap" id="haut">
-  <div class="hero-scene"><canvas id="scene" role="img" aria-label="Maquette filaire d'une travée de structure : radier, mur, piliers, sommier, dalle et parapet, avec son coffrage, son béton et son armature"></canvas></div>
+  <div class="hero-scene"><canvas id="scene" role="img" aria-label="Maquette filaire d'une travée de structure : radier, mur, piliers, sommier, dalle et parapet, avec son coffrage, son armature et son béton"></canvas></div>
   <div class="hero-texte">
     <div class="surtitre rv" style="--d:.2s">STR Bim Tools · Outil</div>
     <h1 class="rv" style="--d:.4s">CAN 241</h1>
     <p class="auteur rv" style="--d:1.7s">by Tony Varin</p>
-    <p class="chapeau rv" style="--d:.7s">Le métré du béton coulé sur place, tiré directement de la maquette Revit : coffrage, béton et armature, article par article.</p>
+    <p class="chapeau rv" style="--d:.7s">Le métré du béton coulé sur place, tiré directement de la maquette Revit : coffrage, armature et béton, article par article.</p>
     <div class="hero-bas">
       <ul class="axes rv" style="--d:1s">
         <li id="ax-c"><b>200</b>Coffrage · m²</li>
-        <li id="ax-b"><b>600</b>Béton · m³</li>
         <li id="ax-a" class="a"><b>500</b>Armature · kg</li>
+        <li id="ax-b"><b>600</b>Béton · m³</li>
       </ul>
       <a class="defiler rv" style="--d:1.3s" href="#axes">Découvrir ↓</a>
     </div>
@@ -300,15 +300,15 @@ footer a:hover{color:var(--or)}
       </ul>
       <div></div>
       <ul class="droite">
-        <li data-k="dalle">Dalle sur appuis <span>661</span></li>
-        <li data-k="paf">Dalle en porte-à-faux <span>662</span></li>
+        <li data-k="semelle">Semelle <span>611</span></li>
         <li data-k="radier">Radier <span>613</span></li>
         <li data-k="mur">Paroi, mur <span>631</span></li>
-        <li data-k="parapet">Parapet <span>671</span></li>
-        <li data-k="sommier">Sommier <span>645</span></li>
-        <li data-k="renverse">Sommier renversé <span>671</span></li>
         <li data-k="pilier">Pilier <span>641</span></li>
-        <li data-k="semelle">Semelle <span>611</span></li>
+        <li data-k="sommier">Sommier <span>645</span></li>
+        <li data-k="dalle">Dalle sur appuis <span>661</span></li>
+        <li data-k="paf">Dalle en porte-à-faux <span>662</span></li>
+        <li data-k="renverse">Sommier renversé <span>671</span></li>
+        <li data-k="parapet">Parapet <span>671</span></li>
       </ul>
       <svg id="liens" aria-hidden="true"></svg>
     </div>
@@ -324,7 +324,7 @@ footer a:hover{color:var(--or)}
   <div class="wrap" data-vu>
     <div class="num rv">03 — L'article</div>
     <h2 class="rv" style="--d:.1s">Un numéro qui se lit chiffre par chiffre.</h2>
-    <p class="intro rv" style="--d:.2s">Genre, type de béton ou de coffrage, puis plages de dimensions : chaque chiffre de l'article est déduit de la maquette.</p>
+    <p class="intro rv" style="--d:.2s">Genre, type de coffrage ou de béton, puis plages de dimensions : chaque chiffre de l'article est déduit de la maquette.</p>
     <div class="decodeur rv" style="--d:.3s">
       <div>
         <div class="code" id="code" aria-live="polite"></div>
@@ -421,7 +421,7 @@ footer a:hover{color:var(--or)}
         <li class="rv"><b>Classeur Excel de soumission</b><span>Six onglets, quantités agrégées par article.</span></li>
         <li class="rv" style="--d:.08s"><b>Dashboard métré dans Revit</b><span>Coffrage, armature et béton, article par article, avec la phase et les zones analysées.</span></li>
         <li class="rv" style="--d:.16s"><b>Dashboard de contrôle</b><span>Éléments conformes, incomplets ou non renseignés, avant de livrer.</span></li>
-        <li class="rv" style="--d:.24s"><b>Vues 3D colorées</b><span>Par genre, par type de béton, par type de coffrage.</span></li>
+        <li class="rv" style="--d:.24s"><b>Vues 3D colorées</b><span>Par genre, par type de coffrage, par type de béton.</span></li>
         <li class="rv" style="--d:.32s"><b>Sur chaque élément</b><span>Articles et quantités écrits dans ses paramètres, consultables à tout moment.</span></li>
       </ul>
       <div class="chiffres">
@@ -492,11 +492,13 @@ footer a:hover{color:var(--or)}
   function boite(x0,x1,y0,y1,z0,z1,d){
     var P = [[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1],[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]];
     [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]].forEach(function(e,i){ L(P[e[0]], P[e[1]], "b", d + i*.04, 1.3) });
-    var DF = 4.6 + Math.random()*.6;
-    [[0,1,2,3],[4,5,6,7],[0,1,5,4],[3,2,6,7],[0,3,7,4],[1,2,6,5]].forEach(function(f){ F(f.map(function(i){return P[i]}), DF) });
+    [[0,1,2,3],[4,5,6,7],[0,1,5,4],[3,2,6,7],[0,3,7,4],[1,2,6,5]].forEach(function(f){ F(f.map(function(i){return P[i]})) });
   }
 
-  // béton : la structure
+  // Ordre du chantier et des articles : coffrage (200), armature (500), béton (600)
+  var T_COFFRAGE = 2.6, T_ARMATURE = 4.4, T_BETON = 6.6, DUREE_BETON = 1.8;
+
+  // géométrie de la structure
   boite(-7,7, -.35,0, -5,5, .1);                 // radier
   boite(-6,6, 0,3, 3.55,3.8, .35);               // mur
   boite(-4.65,-4.35, 0,2.5, -2.65,-2.35, .6);    // piliers
@@ -506,7 +508,7 @@ footer a:hover{color:var(--or)}
   boite(5.8,6, 3.25,4.25, -4,4, 1.5);            // parapet
 
   // coffrage : panneaux de sous-face et de murs
-  var k, d0 = 2.6;
+  var k, d0 = T_COFFRAGE;
   for (k=-5;k<=5;k++) L([k,2.999,-4],[k,2.999,3.55], "c", d0 + (k+5)*.05, 1.2);
   for (k=-4;k<=3;k++) L([-6,2.999,k+.5],[6,2.999,k+.5], "c", d0 + .3 + (k+4)*.05, 1.2);
   for (k=-6;k<=6;k+=1.2) L([k,0,3.549],[k,3,3.549], "c", d0 + .5 + (k+6)*.04, 1);
@@ -514,7 +516,7 @@ footer a:hover{color:var(--or)}
   for (k=-6;k<=6;k+=1) { L([k,2.5,-2.66],[k,3,-2.66], "c", d0 + .6 + (k+6)*.03, .8); L([k,2.5,-2.34],[k,3,-2.34], "c", d0 + .6 + (k+6)*.03, .8); }
 
   // armature : nappes de la dalle, barres du mur, des piliers et du sommier
-  var d1 = 6.2;
+  var d1 = T_ARMATURE;
   [3.06, 3.19].forEach(function(y, n){
     for (k=-3.75;k<=3.75;k+=.5) L([-5.95,y,k],[5.95,y,k], "a", d1 + n*.4 + (k+4)*.04, 1);
     for (k=-5.75;k<=5.75;k+=.5) L([k,y,-3.95],[k,y,3.95], "a", d1 + .2 + n*.4 + (k+6)*.03, 1);
@@ -527,8 +529,8 @@ footer a:hover{color:var(--or)}
   [[2.58,-2.58],[2.58,-2.42],[2.92,-2.58],[2.92,-2.42]].forEach(function(b){ L([-5.95,b[0],b[1]],[5.95,b[0],b[1]], "a", d1 + 1, 1.2) });
   for (k=-5.8;k<=5.8;k+=.4) { var e=d1 + 1.2 + (k+6)*.03; L([k,2.56,-2.6],[k,2.94,-2.6],"a",e,.5); L([k,2.56,-2.4],[k,2.94,-2.4],"a",e,.5); L([k,2.56,-2.6],[k,2.56,-2.4],"a",e,.5); }
 
-  var FIN_ARMATURE = 0;
-  lignes.forEach(function(l){ FIN_ARMATURE = Math.max(FIN_ARMATURE, l.d + l.t) });
+  var FIN_CONSTRUCTION = T_BETON + DUREE_BETON;
+  lignes.forEach(function(l){ FIN_CONSTRUCTION = Math.max(FIN_CONSTRUCTION, l.d + l.t) });
 
   // caméra en orbite, légèrement plongeante
   var C = [0, 1.6, 0], R = 40, PHI = .34, TH0 = -.62;
@@ -565,7 +567,7 @@ footer a:hover{color:var(--or)}
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,W,H);
     ctx.lineWidth = 1;
-    var fa = ease(clamp((T - 4.6)/1.8));
+    var fa = ease(clamp((T - T_BETON)/DUREE_BETON));
     if (fa > 0){
       ctx.fillStyle = "rgba(214,168,92," + (.045*fa).toFixed(3) + ")";
       for (var f=0; f<faces.length; f++){
@@ -594,9 +596,9 @@ footer a:hover{color:var(--or)}
   }
 
   var t0=null, prec=0, th=TH0, omega=0, visible=true;
-  var DEBUT_ROT = FIN_ARMATURE - .8, VITESSE = Math.PI*2/60;
+  var DEBUT_ROT = FIN_CONSTRUCTION - .8, VITESSE = Math.PI*2/60;
   var glisse=false, gx=0, gt=0, gv=0;
-  var etapes = [[2.6,"ax-c"],[4.6,"ax-b"],[6.2,"ax-a"]];
+  var etapes = [[T_COFFRAGE,"ax-c"],[T_ARMATURE,"ax-a"],[T_BETON,"ax-b"]];
   function frame(now){
     if (t0 === null) t0 = now;
     var T = (now - t0)/1000, dt = Math.min(.05, T - prec); prec = T;
@@ -757,10 +759,10 @@ footer a:hover{color:var(--or)}
   //  03 — décodeur d'articles
   // =====================================================================
   var ARTICLES = [
-    [["631","Béton · parois et murs"],["3","béton NPK C"],["3","hauteur 2,00 – 2,99 m"],["2","épaisseur 0,21 – 0,25 m"]],
     [["245","Coffrage · sommiers"],["1","type 2, horizontal"],["3","étayage 2,00 – 2,99 m"],["2","section 0,101 – 0,250 m²"]],
-    [["661","Béton · dalles sur appuis"],["2","béton NPK B"],["1","horizontale"],["2","épaisseur 0,21 – 0,30 m"]],
-    [["271","Coffrage · sommiers renversés, parapets"],["1","type 2"],["0","—"],["2","hauteur 0,51 – 1,00 m"]]
+    [["271","Coffrage · sommiers renversés, parapets"],["1","type 2"],["0","—"],["2","hauteur 0,51 – 1,00 m"]],
+    [["631","Béton · parois et murs"],["3","béton NPK C"],["3","hauteur 2,00 – 2,99 m"],["2","épaisseur 0,21 – 0,25 m"]],
+    [["661","Béton · dalles sur appuis"],["2","béton NPK B"],["1","horizontale"],["2","épaisseur 0,21 – 0,30 m"]]
   ];
   var codeEl = document.getElementById("code"), legEl = document.getElementById("legende"), ptsEl = document.getElementById("points");
   ARTICLES.forEach(function(){ ptsEl.appendChild(document.createElement("i")) });
