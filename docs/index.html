@@ -103,7 +103,7 @@ h1{
   var graine = 1;
 
   // ---------- Maquettes : bâtiments inventés, l'un d'eux est tiré au sort à chaque visite ----------
-  // (?batiment=1 ou 2 force un modèle, pour les tests)
+  // (?batiment=1, 2 ou 3 force un modèle, pour les tests)
   var faces = [], loggias = [];
 
   function Face(O, a, n, W, H){
@@ -186,6 +186,86 @@ h1{
         boite(0,0, 20,20, 0,84,   function(f){ percee(f, 4, 3.3, .9, .28) });
         boite(34,12, 54,32, 0,64, function(f){ percee(f, 4, 3.3, .9, .28) });
         boite(20,12, 34,18, 52,8, function(f){ murRideau(f, 4, 1.2, .35, .6) }, "eo");
+      }},
+    { aria: "un socle de logements en L aux loggias éclairées et une haute tour de verre de 28 niveaux", th0: Math.atan2(93, 174), construire: function(){
+        // Première maquette du site, tour portée de 18 à 28 niveaux
+        var RDC = 5.2, ETAGE = 3.0, NIV = 9, HAUT = RDC + NIV*ETAGE, ACRO = HAUT + .8;
+        var T_NIV = 28, T_ETAGE = 3.9, T_HAUT = T_NIV*T_ETAGE + 1.2;
+
+        // Façade du socle, découpée en segments : loggias, atrium, fente dorée, mur-rideau
+        function socle(O, a, n, W, dep, segs){
+          var f = Face(O, a, n, W, ACRO); f.dep = dep;
+          segs = segs || [[0, W, "log"]];
+          L(f, 0,0, W,0, "", dep, 1.4);
+          L(f, 0,0, 0,ACRO, "", dep, 2.6);
+          L(f, W,0, W,ACRO, "", dep, 2.6);
+          for (var j=0;j<=NIV;j++){
+            var t = RDC + j*ETAGE;
+            L(f, 0,t, W,t, (j===0||j===NIV) ? "" : "f", dep + .25 + j*.24, 1.1);
+          }
+          L(f, 0,ACRO, W,ACRO, "", dep + .25 + NIV*.24 + .2, 1.2);
+          segs.forEach(function(sg){
+            var s0 = sg[0], s1 = sg[1], w = s1 - s0, type = sg[2];
+            if (s0 > 0) L(f, s0,0, s0,ACRO, "", dep + .1, 2.6);
+            if (type === "log"){
+              var nb = Math.max(1, Math.round(w/3.6)), bw = w/nb;
+              for (var k=1;k<nb;k++) L(f, s0+k*bw,RDC, s0+k*bw,HAUT, "", dep + k*.035, 2.6);
+              for (var k2=2;k2<nb;k2+=2) L(f, s0+k2*bw,0, s0+k2*bw,RDC, "", dep + k2*.035, 1.2);
+              for (var j2=0;j2<NIV;j2++){
+                var tt = RDC + j2*ETAGE;
+                L(f, s0,tt+.5, s1,tt+.5, "f", dep + .45 + j2*.24, 1.1);
+                for (var k3=0;k3<nb;k3++){
+                  var r = rnd(graine++), r2 = rnd(graine++);
+                  Q(f, s0+k3*bw+.7, s0+(k3+1)*bw-.7, tt+.8, tt+ETAGE-.25,
+                    r < .34 ? .45 + r2*.4 : .02 + r2*.03, dep + 1.1 + j2*.24 + r2*1.6, 1.4, true);
+                }
+              }
+            } else if (type === "atr"){
+              Q(f, s0+.6, s1-.6, RDC, HAUT-.4, .14, dep + 1.8, 2);
+            } else if (type === "fente"){
+              Q(f, s0+.15, s1-.15, RDC, HAUT, .45, dep + 1.8, 2);
+            } else if (type === "verre"){
+              var nv = Math.max(1, Math.round(w/1.275));
+              for (var v=1;v<nv;v++) L(f, s0+v*w/nv,RDC, s0+v*w/nv,HAUT, v%2 ? "vf" : "v", dep + v*.05, 2.6);
+            }
+          });
+        }
+        // Façade de la tour : verre, meneaux fins, bandeau marqué tous les quatre niveaux
+        function tourVerre(O, a, n, W, dep){
+          var f = Face(O, a, n, W, T_HAUT); f.glass = true; f.dep = dep;
+          var nm = Math.round(W/1.5), mw = W/nm, montee = 3.6*T_HAUT/71.4;
+          for (var k=0;k<=nm;k++) L(f, k*mw,0, k*mw,T_HAUT, (k===0||k===nm||k%4===0) ? "v" : "vf", dep + k*.025, montee);
+          for (var j=0;j<=T_NIV;j++){
+            var t = j*T_ETAGE, fort = (j%4===0 || j===T_NIV);
+            L(f, 0,t, W,t, fort ? "v" : "vf", dep + .3 + j*.2, 1.2);
+            if (fort && j>0) L(f, 0,t-.6, W,t-.6, "vf", dep + .4 + j*.2, 1.2);
+          }
+          L(f, 0,T_HAUT, W,T_HAUT, "v", dep + .3 + T_NIV*.2 + .2, 1.4);
+        }
+        // Boîte au sol : quatre façades orientées vers l'extérieur (sud, est, nord, ouest)
+        function volume(x0, z0, x1, z1, fn, sauf){
+          sauf = sauf || "";
+          if (sauf.indexOf("s") < 0) fn([x0,0,z0], [1,0,0],  [0,0,-1], x1-x0, "s");
+          if (sauf.indexOf("e") < 0) fn([x1,0,z0], [0,0,1],  [1,0,0],  z1-z0, "e");
+          if (sauf.indexOf("n") < 0) fn([x1,0,z1], [-1,0,0], [0,0,1],  x1-x0, "n");
+          if (sauf.indexOf("o") < 0) fn([x0,0,z1], [0,0,-1], [-1,0,0], z1-z0, "o");
+        }
+
+        // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
+        volume(40,0, 70,42, function(O,a,n,W,cote){
+          if (cote === "s") socle(O,a,n,W, .2);
+          else if (cote === "e") socle(O,a,n,W, .35, [[0,28,"log"],[28,29.6,"fente"],[29.6,W,"verre"]]);
+          else if (cote === "n") socle(O,a,n,W, .6);
+          else socle([40,0,42], a, n, 28, .6);
+        });
+        // Aile gauche, fendue par l'atrium ; sa façade est est collée au corps principal
+        volume(0,0, 40,14, function(O,a,n,W,cote){
+          if (cote === "s") socle(O,a,n,W, .5, [[0,33,"log"],[33,40,"atr"]]);
+          else if (cote === "n") socle(O,a,n,W, .6, [[0,7,"atr"],[7,40,"log"]]);
+          else socle(O,a,n,W, .6);
+        }, "e");
+        // Tour en retrait
+        volume(6,22, 32,48, function(O,a,n,W){ tourVerre(O,a,n,W, 2.6) });
       }}
   ];
 
