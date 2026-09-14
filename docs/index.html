@@ -103,7 +103,7 @@ h1{
   var graine = 1;
 
   // ---------- Maquettes : bâtiments inventés, l'un d'eux est tiré au sort à chaque visite ----------
-  // (?batiment=1 à 4 force un modèle, pour les tests)
+  // (?batiment=1 ou 2 force un modèle, pour les tests)
   var faces = [], loggias = [];
 
   function Face(O, a, n, W, H){
@@ -161,14 +161,6 @@ h1{
     for (var k=1;k<n;k++) vert(f, k*f.W/n, 0, f.H, k%2 ? "vf" : "v");
     horiz(f, f.H - 1.2, "v");
   }
-  // Bandeaux filants : allèges et linteaux continus, fenêtres éclairées par travée
-  function bandeaux(f, etage, trame, proba){
-    contour(f, "");
-    var ne = Math.max(1, Math.round(f.H/etage)), eh = f.H/ne, nt = Math.max(1, Math.round(f.W/trame)), tw = f.W/nt;
-    for (var j=0;j<ne;j++){ horiz(f, j*eh + eh*.36, ""); horiz(f, j*eh + eh*.9, "f"); }
-    for (var k=1;k<nt;k++) vert(f, k*tw, 0, f.H, "f");
-    for (var j2=0;j2<ne;j2++) for (var k2=0;k2<nt;k2++) allume(f, k2*tw+.3, (k2+1)*tw-.3, j2*eh+eh*.42, j2*eh+eh*.85, proba, .85);
-  }
   // Fenêtres percées étroites
   function percee(f, etage, trame, largeur, proba){
     contour(f, "");
@@ -180,19 +172,6 @@ h1{
       allume(f, s0+.1, s1-.1, t0+.1, t1-.1, proba, .85);
     }
   }
-  // Pignon ou façade arrière : joints de niveaux discrets
-  function pignon(f, etage){
-    contour(f, "");
-    if (etage) for (var t=etage; t<f.H-.1; t+=etage) horiz(f, t, "f");
-  }
-  // Façade vitrée d'un gradin : toute hauteur, garde-corps de la terrasse, lumières
-  function gradin(f, trame, proba){
-    f.glass = true; contour(f, "");
-    horiz(f, 1.05, "f");
-    var nt = Math.max(1, Math.round(f.W/trame)), tw = f.W/nt;
-    for (var k=1;k<nt;k++) vert(f, k*tw, 0, f.H, k%2 ? "vf" : "v");
-    for (var k2=0;k2<nt;k2++) allume(f, k2*tw+.25, (k2+1)*tw-.25, 1.3, f.H-.35, proba, .8);
-  }
 
   var BATIMENTS = [
     { aria: "une tour de bureaux vitrée à redans, posée sur un socle", th0: .55, construire: function(){
@@ -202,25 +181,11 @@ h1{
         boite(8,8, 28,28, 48,28, function(f){ murRideau(f, 4, 1.4, .18, .5) });
         boite(12,12, 24,24, 76,12, function(f){ ailettes(f, .8) });
       }},
-    { aria: "une longue barre de logements sur pilotis, à fenêtres en bandeaux", th0: .32, construire: function(){
-        KM = 4/34;
-        for (var x=4.5; x<90; x+=9) [3, 13].forEach(function(z){
-          boite(x-.4,z-.4, x+.4,z+.4, 0,6, function(f){ contour(f, "") });
-        });
-        boite(0,0, 90,16, 6,24, function(f, cote){ if (cote === "s" || cote === "n") bandeaux(f, 3, 4.5, .32); else pignon(f, 3) });
-        boite(30,4, 60,12, 30,4, function(f){ murRideau(f, 4, 2, .15, .4) });
-      }},
     { aria: "deux tours jumelles reliées en hauteur par une passerelle vitrée", th0: -.45, construire: function(){
         KM = 4.6/84;
         boite(0,0, 20,20, 0,84,   function(f){ percee(f, 4, 3.3, .9, .28) });
         boite(34,12, 54,32, 0,64, function(f){ percee(f, 4, 3.3, .9, .28) });
         boite(20,12, 34,18, 52,8, function(f){ murRideau(f, 4, 1.2, .35, .6) }, "eo");
-      }},
-    { aria: "un immeuble en gradins dont chaque niveau recule sur une terrasse éclairée", th0: .62, construire: function(){
-        KM = 4.2/27;
-        for (var k=0;k<8;k++){
-          boite(0,k*4.5, 60,40, k*3.4,3.4, function(f, cote){ if (cote === "s") gradin(f, 3, .42); else percee(f, 3.4, 3.2, 1.1, .3) });
-        }
       }}
   ];
 
