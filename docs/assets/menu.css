@@ -86,7 +86,16 @@
 .pied a:hover,.pied a:focus-visible{color:#D6A85C;outline:none}
 .pied-droite{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:8px 28px}
 .courriel{text-transform:none;letter-spacing:.06em}
+.pied .courriel .court{display:none}
+/* Smartphone : deux lignes centrées — « Contact · Mentions légales », puis la date */
 @media (max-width:640px){
-  .pied{flex-direction:column;align-items:center!important;text-align:center;gap:10px!important}
-  .pied-droite{flex-direction:column;align-items:center;gap:8px}
+  .pied{flex-direction:column;align-items:center!important;justify-content:center!important;text-align:center;gap:0!important}
+  .pied .pied-site{display:none}
+  .pied-droite{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:baseline;column-gap:0;row-gap:10px}
+  .pied-droite > a{padding:4px 0}
+  .pied .courriel{text-transform:uppercase;letter-spacing:inherit}
+  .pied .courriel .long{display:none}
+  .pied .courriel .court{display:inline}
+  .pied .courriel::after{content:"·";display:inline-block;margin:0 16px;color:rgba(236,232,224,.3)}
+  .pied-maj{grid-column:1 / -1;font-size:10px;letter-spacing:.14em;opacity:.75}
 }

@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/polices/polices.css">
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <style>
 :root{
   --noir:#050505;
@@ -73,7 +73,7 @@ footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g)
   .article{grid-template-columns:1fr;gap:14px}
 }
 </style>
-<link rel="stylesheet" href="/assets/menu.css">
+<link rel="stylesheet" href="/assets/menu.css?v=2">
 </head>
 <body>
 
@@ -142,11 +142,11 @@ footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g)
 </main>
 
 <footer class="pied">
-  <a href="/">← str-bim-tools.com</a>
+  <a class="pied-site" href="/">← str-bim-tools.com</a>
   <div class="pied-droite">
-    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc">contact (arobase) str-bim-tools.com</a>
+    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
     <a href="/mentions-legales/">Mentions légales</a>
-    <span>Dernière mise à jour : <span data-maj>14.09.2026</span></span>
+    <span class="pied-maj">Dernière mise à jour : <span data-maj>14.09.2026</span></span>
   </div>
 </footer>
 
@@ -163,6 +163,6 @@ footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g)
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ document.getElementById("haut").classList.add("vu") }) });
 })();
 </script>
-<script src="/assets/menu.js"></script>
+<script src="/assets/menu.js?v=2"></script>
 </body>
 </html>

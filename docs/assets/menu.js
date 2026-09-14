@@ -24,7 +24,9 @@
   // « contact (arobase) str-bim-tools.com » reste lisible par un humain.
   [].forEach.call(document.querySelectorAll("a[data-courriel]"), function(a){
     var adresse = a.getAttribute("data-courriel").split("").reverse().join("").replace("|", "@");
-    a.textContent = adresse;
+    var long = a.querySelector(".long");   // pied de page : adresse complète sur ordinateur, « Contact » sur smartphone
+    if (long){ long.textContent = adresse; a.setAttribute("aria-label", "Écrire à " + adresse); }
+    else a.textContent = adresse;
     a.href = "mai" + "lto:" + adresse;
     a.removeAttribute("data-courriel");
   });
