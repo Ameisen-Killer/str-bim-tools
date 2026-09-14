@@ -1,13 +1,35 @@
-// Menu commun à toutes les pages de str-bim-tools.com
-// Pour ajouter une page, il suffit de l'ajouter à PAGES.
+// Menu et pied de page communs à toutes les pages de str-bim-tools.com
+// - Pour ajouter une page au menu : l'ajouter à PAGES.
+// - À chaque publication : mettre MISE_A_JOUR à la date du jour (AAAA-MM-JJ).
 (function(){
   "use strict";
+  var MISE_A_JOUR = "2026-09-14";
+
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
     {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
-    {href:"/a-propos/", nom:"À propos", desc:"by Tony Varin"}
+    {href:"/a-propos/", nom:"À propos", desc:"by Tony Varin"},
+    {href:"/mentions-legales/", nom:"Mentions légales", desc:"Éditeur, hébergeur, données"}
   ];
 
+  // ---------- Pied de page : date de mise à jour ----------
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(MISE_A_JOUR);
+  [].forEach.call(document.querySelectorAll("[data-maj]"), function(el){
+    if (m) el.textContent = m[3] + "." + m[2] + "." + m[1];
+  });
+
+  // ---------- Adresse de contact protégée des robots de collecte ----------
+  // L'adresse n'apparaît jamais en clair dans le HTML : elle est stockée à l'envers
+  // dans data-courriel et reconstituée ici. Sans JavaScript, le texte de repli
+  // « contact (arobase) str-bim-tools.com » reste lisible par un humain.
+  [].forEach.call(document.querySelectorAll("a[data-courriel]"), function(a){
+    var adresse = a.getAttribute("data-courriel").split("").reverse().join("").replace("|", "@");
+    a.textContent = adresse;
+    a.href = "mai" + "lto:" + adresse;
+    a.removeAttribute("data-courriel");
+  });
+
+  // ---------- Menu ----------
   var bouton = document.querySelector(".menu-btn");
   if (!bouton) return;
 

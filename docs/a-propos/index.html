@@ -7,9 +7,9 @@
 <meta name="description" content="Plus de 25 ans en bureaux d'études structure, un constat, et une chaîne d'outils pour Revit. By Tony Varin.">
 <meta name="theme-color" content="#050505">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css">
 <style>
 :root{
   --noir:#050505;
@@ -149,6 +149,10 @@ section{padding-block:clamp(88px,15vh,170px);border-top:1px solid var(--ligne)}
 .fin .lien{display:inline-flex;align-items:center;gap:14px;margin-top:44px;font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or);text-decoration:none}
 .fin .lien::before,.fin .lien::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5;transition:width .6s cubic-bezier(.76,0,.24,1)}
 .fin .lien:hover::before,.fin .lien:hover::after{width:56px}
+.fin .contact{margin:clamp(64px,10vh,110px) auto 0;padding-top:28px;border-top:1px solid var(--ligne);max-width:420px}
+.fin .contact .etiq{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--texte-faible)}
+.fin .contact .courriel{display:inline-block;margin-top:12px;font-weight:200;font-size:clamp(20px,2.6vw,30px);letter-spacing:.02em;text-decoration:none;border-bottom:1px solid rgba(214,168,92,.35);padding-bottom:4px;transition:border-color .4s ease,color .4s ease}
+.fin .contact .courriel:hover,.fin .contact .courriel:focus-visible{color:var(--or);border-color:var(--or);outline:none}
 
 footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
 footer a{text-decoration:none}
@@ -167,7 +171,6 @@ footer a:hover{color:var(--or)}
   .maillon p{max-width:none}
 }
 @media (max-width:560px){
-  footer span:last-child{display:none}
 }
 </style>
 <link rel="stylesheet" href="/assets/menu.css">
@@ -256,16 +259,23 @@ footer a:hover{color:var(--or)}
     <h2 class="rv" style="--d:.2s">La limite reste l'imagination<span class="points"><i style="--d:1.2s">.</i><i style="--d:1.6s">.</i><i style="--d:2s">.</i></span></h2>
     <p class="signature rv" style="--d:.5s">by Tony Varin</p>
     <a class="lien rv" style="--d:.9s" href="/can241/">Découvrir CAN 241</a>
+    <div class="contact rv" style="--d:1.2s">
+      <span class="etiq">Contact</span>
+      <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc">contact (arobase) str-bim-tools.com</a>
+    </div>
   </div>
 </section>
 
 </main>
 
-<footer>
+<footer class="pied">
   <a href="/">← str-bim-tools.com</a>
-  <span>© 2026</span>
+  <div class="pied-droite">
+    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc">contact (arobase) str-bim-tools.com</a>
+    <a href="/mentions-legales/">Mentions légales</a>
+    <span>Dernière mise à jour : <span data-maj>14.09.2026</span></span>
+  </div>
 </footer>
-
 <script>
 (function(){
   "use strict";
