@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>STR Bim Tools</title>
-<meta name="description" content="STR Bim Tools, extension pyRevit pour le BIM structure. Bientôt.">
+<meta name="description" content="STR Bim Tools by Tony Varin : outils pour le BIM structure.">
 <meta name="theme-color" content="#050505">
 <meta property="og:title" content="STR Bim Tools">
-<meta property="og:description" content="Extension pyRevit pour le BIM structure. Bientôt.">
+<meta property="og:description" content="Outils pour le BIM structure, by Tony Varin.">
 <meta property="og:url" content="https://str-bim-tools.com/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,18 +49,13 @@ h1{
 }
 .auteur{margin:6px 0 0;font-weight:200;font-size:clamp(15px,2vw,24px);letter-spacing:.16em;padding-left:.16em;color:var(--texte)}
 .sous{margin:12px 0 0;font-size:clamp(13px,1.5vw,16px);color:var(--texte-doux);letter-spacing:.04em}
-.bientot{
-  display:inline-flex;align-items:center;gap:14px;margin-top:20px;
-  font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--or);
-}
-.bientot::before,.bientot::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5}
 
 .fade{opacity:0;transform:translateY(8px);transition:opacity 1.6s ease var(--d,0s),transform 1.6s ease var(--d,0s)}
 .go .fade{opacity:1;transform:none}
 
 @media (max-width:560px){
-  .haut span:last-child,.bas span:last-child{display:none}
-  .haut,.bas{justify-content:center;gap:28px}
+  .bas span:last-child{display:none}
+  .bas{justify-content:center}
   .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));height:min(58svh,125vw)}
   .titre{margin-top:0}
   h1{letter-spacing:.12em;padding-left:.12em}
@@ -70,13 +65,13 @@ h1{
   .stage{height:60svh}
   h1{font-size:clamp(22px,8svh,40px)}
   .sous{display:none}
-  .bientot{margin-top:6px}
 }
 </style>
+<link rel="stylesheet" href="/assets/menu.css">
 </head>
 <body>
 <div class="page" id="page">
-  <header class="haut fade" style="--d:4.8s"><span>STR Bim Tools</span><span>pyRevit · Revit 2024+</span></header>
+  <header class="haut fade" style="--d:4.8s" data-menu-hote><span>STR Bim Tools</span><button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button></header>
   <main class="scene">
     <div class="stage">
       <canvas id="bat" role="img" aria-label="Maquette filaire d'un bâtiment qui tourne lentement : un socle de logements aux loggias éclairées et une tour de verre"></canvas>
@@ -84,8 +79,7 @@ h1{
     <div class="titre">
       <h1 class="fade" style="--d:5.2s">STR Bim Tools</h1>
       <p class="auteur fade" style="--d:7s">by Tony Varin</p>
-      <p class="sous fade" style="--d:5.6s">Outils pyRevit pour le BIM structure</p>
-      <div class="bientot fade" style="--d:6.1s">Bientôt</div>
+      <p class="sous fade" style="--d:5.6s">Outils pour le BIM Structure</p>
     </div>
   </main>
   <footer class="bas fade" style="--d:6.4s"><span>str-bim-tools.com</span><span>© 2026</span></footer>
@@ -381,5 +375,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
+<script src="/assets/menu.js"></script>
 </body>
 </html>

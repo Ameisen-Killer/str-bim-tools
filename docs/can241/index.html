@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CAN 241 · STR Bim Tools</title>
 <meta name="description" content="Métré CAN 241 du béton coulé sur place, tiré directement de la maquette Revit : coffrage, armature et béton, article par article.">
-<meta name="robots" content="noindex">
 <meta name="theme-color" content="#050505">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -204,8 +203,7 @@ svg.ill.drag{cursor:grabbing}
 /* fin */
 .fin{text-align:center;padding-block:clamp(110px,20vh,220px)}
 .fin h2{margin-inline:auto;max-width:none}
-.fin .bientot{display:inline-flex;align-items:center;gap:14px;margin-top:28px;font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--or)}
-.fin .bientot::before,.fin .bientot::after{content:"";width:36px;height:1px;background:currentColor;opacity:.5}
+.fin .signature{margin-top:14px;font-weight:200;font-size:clamp(18px,2.4vw,30px);letter-spacing:.06em;color:var(--texte)}
 footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
 footer a{text-decoration:none}
 footer a:hover{color:var(--or)}
@@ -235,7 +233,6 @@ footer a:hover{color:var(--or)}
   .carte .droite li span{display:none}
 }
 @media (max-width:560px){
-  .barre span{display:none}
   .hero-bas{flex-direction:column;align-items:flex-start;gap:20px}
   .defiler{display:none}
   .axes{gap:18px}
@@ -245,12 +242,13 @@ footer a:hover{color:var(--or)}
   footer span:last-child{display:none}
 }
 </style>
+<link rel="stylesheet" href="/assets/menu.css">
 </head>
 <body>
 
-<header class="barre">
+<header class="barre" data-menu-hote>
   <a href="/">STR Bim Tools</a>
-  <span>Outil · CAN 241</span>
+  <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
 </header>
 
 <div class="hero wrap" id="haut">
@@ -476,7 +474,7 @@ footer a:hover{color:var(--or)}
   <div class="wrap" data-vu>
     <div class="num rv">STR Bim Tools</div>
     <h2 class="rv" style="--d:.1s">CAN 241</h2>
-    <div class="bientot rv" style="--d:.3s">Bientôt</div>
+    <p class="signature rv" style="--d:.3s">by Tony Varin</p>
   </div>
 </section>
 
@@ -484,7 +482,7 @@ footer a:hover{color:var(--or)}
 
 <footer>
   <a href="/">← str-bim-tools.com</a>
-  <span>pyRevit · Revit 2024+</span>
+  <span>© 2026</span>
 </footer>
 
 <script>
@@ -928,5 +926,6 @@ footer a:hover{color:var(--or)}
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ document.getElementById("haut").classList.add("vu"); }); });
 })();
 </script>
+<script src="/assets/menu.js"></script>
 </body>
 </html>
