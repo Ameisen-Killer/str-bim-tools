@@ -4,7 +4,8 @@
   "use strict";
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
-    {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"}
+    {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
+    {href:"/a-propos/", nom:"À propos", desc:"by Tony Varin"}
   ];
 
   var bouton = document.querySelector(".menu-btn");
