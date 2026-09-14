@@ -72,7 +72,7 @@ h1{
   <header class="haut fade" style="--d:4.8s" data-menu-hote><span>STR Bim Tools</span><button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button></header>
   <main class="scene">
     <div class="stage">
-      <canvas id="bat" role="img" aria-label="Maquette filaire d'un bâtiment qui tourne lentement : un socle de logements aux loggias éclairées et une tour de verre"></canvas>
+      <canvas id="bat" role="img" aria-label="Maquette filaire d'un bâtiment inventé qui se construit puis tourne lentement"></canvas>
     </div>
     <div class="titre">
       <h1 class="fade" style="--d:5.2s">STR Bim Tools</h1>
@@ -102,15 +102,14 @@ h1{
   function rnd(i){var x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x)}
   var graine = 1;
 
-  // ---------- Maquette ----------
-  var RDC = 5.2, ETAGE = 3.0, NIV = 9, HAUT = RDC + NIV*ETAGE, ACRO = HAUT + .8;
-  var T_NIV = 18, T_ETAGE = 3.9, T_HAUT = T_NIV*T_ETAGE + 1.2;
+  // ---------- Maquettes : bâtiments inventés, l'un d'eux est tiré au sort à chaque visite ----------
+  // (?batiment=1 à 4 force un modèle, pour les tests)
   var faces = [], loggias = [];
 
-  function Face(O, a, n, W, H, glass){
-    var f = {O:O, a:a, n:n, W:W, H:H, glass:!!glass, lines:[], quads:[], dep:0};
-    f.P = function(s,t){return [O[0]+a[0]*s, t, O[2]+a[2]*s]};
-    f.c = [O[0]+a[0]*W/2, H/2, O[2]+a[2]*W/2];
+  function Face(O, a, n, W, H){
+    var f = {O:O, a:a, n:n, W:W, H:H, glass:false, lines:[], quads:[], dep:D(O[1])};   // le reflet du verre suit la montée
+    f.P = function(s,t){return [O[0]+a[0]*s, O[1]+t, O[2]+a[2]*s]};
+    f.c = [O[0]+a[0]*W/2, O[1]+H/2, O[2]+a[2]*W/2];
     faces.push(f); return f;
   }
   function L(f, s0, t0, s1, t1, cls, d, t){ f.lines.push({a:f.P(s0,t0), b:f.P(s1,t1), c:cls, d:d, t:t}) }
@@ -119,86 +118,127 @@ h1{
     f.quads.push(q); if (twinkle) loggias.push(q); return q;
   }
 
-  // Façade du socle, découpée en segments : loggias, atrium, fente dorée, mur-rideau
-  function socle(O, a, n, W, dep, segs){
-    var f = Face(O, a, n, W, ACRO); f.dep = dep;
-    segs = segs || [[0, W, "log"]];
-    L(f, 0,0, W,0, "", dep, 1.4);
-    L(f, 0,0, 0,ACRO, "", dep, 2.6);
-    L(f, W,0, W,ACRO, "", dep, 2.6);
-    for (var j=0;j<=NIV;j++){
-      var t = RDC + j*ETAGE;
-      L(f, 0,t, W,t, (j===0||j===NIV) ? "" : "f", dep + .25 + j*.24, 1.1);
-    }
-    L(f, 0,ACRO, W,ACRO, "", dep + .25 + NIV*.24 + .2, 1.2);
-    segs.forEach(function(sg){
-      var s0 = sg[0], s1 = sg[1], w = s1 - s0, type = sg[2];
-      if (s0 > 0) L(f, s0,0, s0,ACRO, "", dep + .1, 2.6);
-      if (type === "log"){
-        var nb = Math.max(1, Math.round(w/3.6)), bw = w/nb;
-        for (var k=1;k<nb;k++) L(f, s0+k*bw,RDC, s0+k*bw,HAUT, "", dep + k*.035, 2.6);
-        for (var k2=2;k2<nb;k2+=2) L(f, s0+k2*bw,0, s0+k2*bw,RDC, "", dep + k2*.035, 1.2);
-        for (var j2=0;j2<NIV;j2++){
-          var tt = RDC + j2*ETAGE;
-          L(f, s0,tt+.5, s1,tt+.5, "f", dep + .45 + j2*.24, 1.1);
-          for (var k3=0;k3<nb;k3++){
-            var r = rnd(graine++), r2 = rnd(graine++);
-            Q(f, s0+k3*bw+.7, s0+(k3+1)*bw-.7, tt+.8, tt+ETAGE-.25,
-              r < .34 ? .45 + r2*.4 : .02 + r2*.03, dep + 1.1 + j2*.24 + r2*1.6, 1.4, true);
-          }
-        }
-      } else if (type === "atr"){
-        Q(f, s0+.6, s1-.6, RDC, HAUT-.4, .14, dep + 1.8, 2);
-      } else if (type === "fente"){
-        Q(f, s0+.15, s1-.15, RDC, HAUT, .45, dep + 1.8, 2);
-      } else if (type === "verre"){
-        var nv = Math.max(1, Math.round(w/1.275));
-        for (var v=1;v<nv;v++) L(f, s0+v*w/nv,RDC, s0+v*w/nv,HAUT, v%2 ? "vf" : "v", dep + v*.05, 2.6);
+  // Boîte posée à la cote y0, de hauteur h : quatre façades orientées vers l'extérieur.
+  // « sauf » liste les façades à ne pas créer (s, e, n, o), par exemple celles collées à un autre volume.
+  function boite(x0, z0, x1, z1, y0, h, fn, sauf){
+    sauf = sauf || "";
+    if (sauf.indexOf("s") < 0) fn(Face([x0,y0,z0], [1,0,0],  [0,0,-1], x1-x0, h), "s");
+    if (sauf.indexOf("e") < 0) fn(Face([x1,y0,z0], [0,0,1],  [1,0,0],  z1-z0, h), "e");
+    if (sauf.indexOf("n") < 0) fn(Face([x1,y0,z1], [-1,0,0], [0,0,1],  x1-x0, h), "n");
+    if (sauf.indexOf("o") < 0) fn(Face([x0,y0,z1], [0,0,-1], [-1,0,0], z1-z0, h), "o");
+  }
+
+  // La construction monte du sol vers le sommet : délai proportionnel à la hauteur
+  var KM = .05;
+  function D(y){ return .3 + y*KM }
+  function vert(f, s, t0, t1, cls){ L(f, s,t0, s,t1, cls, D(f.O[1]+t0), Math.max(.6, (t1-t0)*KM*1.25)) }
+  function horiz(f, t, cls, s0, s1){ L(f, s0 == null ? 0 : s0, t, s1 == null ? f.W : s1, t, cls, D(f.O[1]+t) + .15, 1.1) }
+  function contour(f, cls){ horiz(f, 0, cls); horiz(f, f.H, cls); vert(f, 0, 0, f.H, cls); vert(f, f.W, 0, f.H, cls) }
+  function allume(f, s0, s1, t0, t1, proba, amax){
+    var r = rnd(graine++), r2 = rnd(graine++);
+    Q(f, s0, s1, t0, t1, r < proba ? amax*(.55 + .45*r2) : .02 + r2*.03, D(f.O[1]+t0) + .9 + r2*1.2, 1.4, true);
+  }
+
+  // Mur-rideau de bureaux : meneaux fins, planchers, plateaux éclairés par tronçons
+  function murRideau(f, etage, meneau, proba, amax){
+    f.glass = true; contour(f, "v");
+    var nm = Math.max(1, Math.round(f.W/meneau)), mw = f.W/nm, ne = Math.max(1, Math.round(f.H/etage)), eh = f.H/ne;
+    for (var k=1;k<nm;k++) vert(f, k*mw, 0, f.H, k%3 === 0 ? "v" : "vf");
+    for (var j=1;j<ne;j++) horiz(f, j*eh, "vf");
+    for (var j2=0;j2<ne;j2++){
+      var s = 0;
+      while (s < f.W - .1){
+        var fin = Math.min(f.W, s + mw*(2 + Math.floor(rnd(graine++)*4)));
+        allume(f, s+.2, fin-.2, j2*eh+.4, (j2+1)*eh-.6, proba, amax);
+        s = fin;
       }
-    });
-    return f;
-  }
-
-  // Façade de la tour : verre, meneaux fins, bandeau marqué tous les quatre niveaux
-  function tour(O, a, n, W, dep){
-    var f = Face(O, a, n, W, T_HAUT, true); f.dep = dep;
-    var nm = Math.round(W/1.5), mw = W/nm;
-    for (var k=0;k<=nm;k++) L(f, k*mw,0, k*mw,T_HAUT, (k===0||k===nm||k%4===0) ? "v" : "vf", dep + k*.025, 3.6);
-    for (var j=0;j<=T_NIV;j++){
-      var t = j*T_ETAGE, fort = (j%4===0 || j===T_NIV);
-      L(f, 0,t, W,t, fort ? "v" : "vf", dep + .3 + j*.2, 1.2);
-      if (fort && j>0) L(f, 0,t-.6, W,t-.6, "vf", dep + .4 + j*.2, 1.2);
     }
-    L(f, 0,T_HAUT, W,T_HAUT, "v", dep + .3 + T_NIV*.2 + .2, 1.4);
-    return f;
+  }
+  // Couronnement à ailettes verticales
+  function ailettes(f, pas){
+    f.glass = true; contour(f, "v");
+    var n = Math.max(1, Math.round(f.W/pas));
+    for (var k=1;k<n;k++) vert(f, k*f.W/n, 0, f.H, k%2 ? "vf" : "v");
+    horiz(f, f.H - 1.2, "v");
+  }
+  // Bandeaux filants : allèges et linteaux continus, fenêtres éclairées par travée
+  function bandeaux(f, etage, trame, proba){
+    contour(f, "");
+    var ne = Math.max(1, Math.round(f.H/etage)), eh = f.H/ne, nt = Math.max(1, Math.round(f.W/trame)), tw = f.W/nt;
+    for (var j=0;j<ne;j++){ horiz(f, j*eh + eh*.36, ""); horiz(f, j*eh + eh*.9, "f"); }
+    for (var k=1;k<nt;k++) vert(f, k*tw, 0, f.H, "f");
+    for (var j2=0;j2<ne;j2++) for (var k2=0;k2<nt;k2++) allume(f, k2*tw+.3, (k2+1)*tw-.3, j2*eh+eh*.42, j2*eh+eh*.85, proba, .85);
+  }
+  // Fenêtres percées étroites
+  function percee(f, etage, trame, largeur, proba){
+    contour(f, "");
+    var ne = Math.max(1, Math.round(f.H/etage)), eh = f.H/ne, nt = Math.max(1, Math.round(f.W/trame)), tw = f.W/nt;
+    for (var j=1;j<ne;j++) horiz(f, j*eh, "f");
+    for (var j2=0;j2<ne;j2++) for (var k=0;k<nt;k++){
+      var c = (k+.5)*tw, s0 = c - largeur/2, s1 = c + largeur/2, t0 = j2*eh + .7, t1 = (j2+1)*eh - .5, d = D(f.O[1]+t0) + .3;
+      L(f, s0,t0, s0,t1, "f", d, .6); L(f, s1,t0, s1,t1, "f", d, .6);
+      allume(f, s0+.1, s1-.1, t0+.1, t1-.1, proba, .85);
+    }
+  }
+  // Pignon ou façade arrière : joints de niveaux discrets
+  function pignon(f, etage){
+    contour(f, "");
+    if (etage) for (var t=etage; t<f.H-.1; t+=etage) horiz(f, t, "f");
+  }
+  // Façade vitrée d'un gradin : toute hauteur, garde-corps de la terrasse, lumières
+  function gradin(f, trame, proba){
+    f.glass = true; contour(f, "");
+    horiz(f, 1.05, "f");
+    var nt = Math.max(1, Math.round(f.W/trame)), tw = f.W/nt;
+    for (var k=1;k<nt;k++) vert(f, k*tw, 0, f.H, k%2 ? "vf" : "v");
+    for (var k2=0;k2<nt;k2++) allume(f, k2*tw+.25, (k2+1)*tw-.25, 1.3, f.H-.35, proba, .8);
   }
 
-  // Boîte : quatre façades orientées vers l'extérieur (sud, est, nord, ouest)
-  function boite(x0, z0, x1, z1, fn, opts){
-    opts = opts || {};
-    if (!opts.sansSud)   fn([x0,0,z0], [1,0,0],  [0,0,-1], x1-x0, "s");
-    if (!opts.sansEst)   fn([x1,0,z0], [0,0,1],  [1,0,0],  z1-z0, "e");
-    if (!opts.sansNord)  fn([x1,0,z1], [-1,0,0], [0,0,1],  x1-x0, "n");
-    if (!opts.sansOuest) fn([x0,0,z1], [0,0,-1], [-1,0,0], z1-z0, "o");
-  }
+  var BATIMENTS = [
+    { aria: "une tour de bureaux vitrée à redans, posée sur un socle", th0: .55, construire: function(){
+        KM = 4.6/88;
+        boite(0,0, 36,36, 0,12,  function(f){ murRideau(f, 4, 3, .3, .5) });
+        boite(4,4, 32,32, 12,36, function(f){ murRideau(f, 4, 1.4, .2, .5) });
+        boite(8,8, 28,28, 48,28, function(f){ murRideau(f, 4, 1.4, .18, .5) });
+        boite(12,12, 24,24, 76,12, function(f){ ailettes(f, .8) });
+      }},
+    { aria: "une longue barre de logements sur pilotis, à fenêtres en bandeaux", th0: .32, construire: function(){
+        KM = 4/34;
+        for (var x=4.5; x<90; x+=9) [3, 13].forEach(function(z){
+          boite(x-.4,z-.4, x+.4,z+.4, 0,6, function(f){ contour(f, "") });
+        });
+        boite(0,0, 90,16, 6,24, function(f, cote){ if (cote === "s" || cote === "n") bandeaux(f, 3, 4.5, .32); else pignon(f, 3) });
+        boite(30,4, 60,12, 30,4, function(f){ murRideau(f, 4, 2, .15, .4) });
+      }},
+    { aria: "deux tours jumelles reliées en hauteur par une passerelle vitrée", th0: -.45, construire: function(){
+        KM = 4.6/84;
+        boite(0,0, 20,20, 0,84,   function(f){ percee(f, 4, 3.3, .9, .28) });
+        boite(34,12, 54,32, 0,64, function(f){ percee(f, 4, 3.3, .9, .28) });
+        boite(20,12, 34,18, 52,8, function(f){ murRideau(f, 4, 1.2, .35, .6) }, "eo");
+      }},
+    { aria: "un immeuble en gradins dont chaque niveau recule sur une terrasse éclairée", th0: .62, construire: function(){
+        KM = 4.2/27;
+        for (var k=0;k<8;k++){
+          boite(0,k*4.5, 60,40, k*3.4,3.4, function(f, cote){ if (cote === "s") gradin(f, 3, .42); else percee(f, 3.4, 3.2, 1.1, .3) });
+        }
+      }}
+  ];
 
-  // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
-  boite(40,0, 70,42, function(O,a,n,W,cote){
-    if (cote === "s") socle(O,a,n,W, .2);
-    else if (cote === "e") socle(O,a,n,W, .35, [[0,28,"log"],[28,29.6,"fente"],[29.6,W,"verre"]]);
-    else if (cote === "n") socle(O,a,n,W, .6);
-    else socle([40,0,42], a, n, 28, .6);
+  var choix = +(location.search.match(/[?&]batiment=(\d)/) || [])[1];
+  var numero = (choix >= 1 && choix <= BATIMENTS.length) ? choix - 1 : Math.floor(Math.random()*BATIMENTS.length);
+  var BAT = BATIMENTS[numero];
+  BAT.construire();
+  cv.setAttribute("aria-label", "Maquette filaire qui se construit puis tourne lentement : " + BAT.aria);
+
+  // Centre, taille et cercle d'implantation déduits de la maquette tirée
+  var bx0=1e9, bz0=1e9, bx1=-1e9, bz1=-1e9, hmax=0;
+  faces.forEach(function(f){
+    [f.P(0,0), f.P(f.W,0)].forEach(function(p){ bx0=Math.min(bx0,p[0]); bx1=Math.max(bx1,p[0]); bz0=Math.min(bz0,p[2]); bz1=Math.max(bz1,p[2]); });
+    hmax = Math.max(hmax, f.O[1] + f.H);
   });
-  // Aile gauche, fendue par l'atrium ; sa façade est est collée au corps principal
-  boite(0,0, 40,14, function(O,a,n,W,cote){
-    if (cote === "s") socle(O,a,n,W, .5, [[0,33,"log"],[33,40,"atr"]]);
-    else if (cote === "n") socle(O,a,n,W, .6, [[0,7,"atr"],[7,40,"log"]]);
-    else socle(O,a,n,W, .6);
-  }, {sansEst:true});
-  // Tour en retrait
-  boite(6,22, 32,48, function(O,a,n,W){ tour(O,a,n,W, 2.6) });
-
-  var CENTRE = [35, 0, 24];
+  var CENTRE = [(bx0+bx1)/2, 0, (bz0+bz1)/2];
+  var TAILLE = Math.max(bx1-bx0, bz1-bz0, hmax);
+  var RAYON = .74*Math.max(bx1-bx0, bz1-bz0);
   var loggiaFin = 0;
   faces.forEach(function(f){
     f.lines.forEach(function(l){ loggiaFin = Math.max(loggiaFin, l.d + l.t) });
@@ -206,7 +246,8 @@ h1{
   });
 
   // ---------- Caméra en orbite ----------
-  var R = 205, EH = 6, TH0 = Math.atan2(93, 174);
+  var angleTest = (location.search.match(/[?&]angle=(-?\d+)/) || [])[1];   // ?angle=90 : vue figée pour les tests
+  var R = 2.9*TAILLE, EH = 6, TH0 = angleTest != null ? +angleTest*Math.PI/180 : BAT.th0;
   var LUM = norm([.8, 0, -.6]);
   var cam = {};
   function camera(th){
@@ -258,7 +299,7 @@ h1{
       ctx.beginPath();
       for (var i=0;i<=96*ps;i++){
         var an = TH0 - Math.PI/2 + i/96*Math.PI*2;
-        var e = ecran([CENTRE[0] + 52*Math.cos(an), 0, CENTRE[2] + 52*Math.sin(an)]);
+        var e = ecran([CENTRE[0] + RAYON*Math.cos(an), 0, CENTRE[2] + RAYON*Math.sin(an)]);
         i ? ctx.lineTo(e[0],e[1]) : ctx.moveTo(e[0],e[1]);
       }
       ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
@@ -329,7 +370,7 @@ h1{
 
   // ---------- Animation : construction, puis rotation lente ----------
   var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 75;
-  var VITESSE = Math.PI*2/parTour;          // un tour en 75 s (?tour=N pour tester)
+  var VITESSE = angleTest != null ? 0 : Math.PI*2/parTour;   // un tour en 75 s (?tour=N pour tester)
   var DEBUT_ROT = loggiaFin - 1.5;
   var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
   var glisse = false, gx = 0, gt = 0, gv = 0;
