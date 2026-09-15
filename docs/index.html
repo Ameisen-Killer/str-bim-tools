@@ -414,7 +414,7 @@ h1{
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ page.classList.add("go"); }); });
 
   // ---------- Animation : construction, puis rotation lente ----------
-  var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 75;
+  var parTour = +(location.search.match(/[?&]tour=(\d+)/) || [])[1] || 50;
   var VITESSE = angleTest != null ? 0 : Math.PI*2/parTour;   // un tour en 75 s (?tour=N pour tester)
   var DEBUT_ROT = loggiaFin - 1.5;
   var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
