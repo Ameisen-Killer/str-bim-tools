@@ -38,8 +38,20 @@
       rafraichissement: j.refresh_token,
       expire: Date.now() + (j.expires_in || 3600) * 1000,
       email: (j.user && j.user.email) || (session && session.email) || "",
-      userId: (j.user && j.user.id) || null
+      userId: (j.user && j.user.id) || null,
+      // Préférences d'affichage (thème…) : rangées dans le compte, elles suivent l'utilisateur d'un appareil à l'autre
+      preferences: (j.user && j.user.user_metadata) || (session && session.preferences) || {}
     };
+  }
+
+  /** Recopie localement le thème du compte, pour qu'il soit posé dès le premier rendu. */
+  function cacheTheme(s) {
+    var t = s && s.preferences && s.preferences.theme;
+    if (!t) return;
+    try {
+      global.localStorage.setItem("planif.theme:" + s.email, t);
+      global.localStorage.setItem("planif.theme", t);
+    } catch (e) {}
   }
 
   function appelAuth(chemin, corps) {
@@ -70,7 +82,7 @@
 
   function connexion(email, motDePasse) {
     return appelAuth("token?grant_type=password", { email: email, password: motDePasse })
-      .then(function (j) { return poseSession(depuisJeton(j)); });
+      .then(function (j) { var s = poseSession(depuisJeton(j)); cacheTheme(s); return s; });
   }
 
   function inscription(email, motDePasse) {
@@ -96,6 +108,34 @@
       method: "POST",
       headers: { apikey: CLE, Authorization: "Bearer " + s.jeton }
     }).catch(function () {}).then(function () {});
+  }
+
+  /** Relit le compte (préférences à jour, par exemple changées depuis un autre appareil). */
+  function utilisateur() {
+    return jeton().then(function (t) {
+      return fetch(URL_BASE + "/auth/v1/user", { headers: { apikey: CLE, Authorization: "Bearer " + t } });
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (u) {
+        if (u && session) { session.preferences = u.user_metadata || {}; poseSession(session); }
+        return u;
+      });
+  }
+
+  /** Fusionne des préférences dans le compte ({ theme: "clair" }…). */
+  function enregistrePreferences(p) {
+    return jeton().then(function (t) {
+      return fetch(URL_BASE + "/auth/v1/user", {
+        method: "PUT",
+        headers: { apikey: CLE, Authorization: "Bearer " + t, "Content-Type": "application/json" },
+        body: JSON.stringify({ data: p })
+      });
+    }).then(function (r) {
+      if (!r.ok) throw erreur("Préférence non enregistrée sur le compte.");
+      return r.json();
+    }).then(function (u) {
+      if (session) { session.preferences = (u && u.user_metadata) || p; poseSession(session); }
+      return u;
+    });
   }
 
   /** Jeton valide, rafraîchi si besoin. */
@@ -327,6 +367,8 @@
     inscription: inscription,
     deconnexion: deconnexion,
     rafraichis: rafraichis,
+    utilisateur: utilisateur,
+    enregistrePreferences: enregistrePreferences,
     requete: requete,
     ADAPT: {
       nom: "supabase",

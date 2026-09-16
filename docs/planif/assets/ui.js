@@ -217,6 +217,108 @@
       });
   }
 
+  /* ---------------------------------------------------------------- thème
+     Trois choix : sombre (la charte d'origine), clair, ou celui du système.
+     Le choix est mémorisé par utilisateur :
+       - dans le navigateur, sous une clé propre à l'adresse connectée, pour
+         être posé dès le premier rendu (script en tête de page) ;
+       - dans le compte Supabase (métadonnées), pour suivre l'utilisateur sur
+         un autre appareil. À l'ouverture, le compte fait foi. */
+
+  var THEMES = [
+    { v: "sombre", l: "Sombre" },
+    { v: "clair", l: "Clair" },
+    { v: "systeme", l: "Système" }
+  ];
+  var mediaClair = global.matchMedia ? global.matchMedia("(prefers-color-scheme: light)") : null;
+
+  function cleTheme() { return "planif.theme:" + (avecBase && SB.connecte() ? SB.email() : ""); }
+
+  function themeChoisi() {
+    try { return global.localStorage.getItem(cleTheme()) || global.localStorage.getItem("planif.theme") || "sombre"; }
+    catch (e) { return "sombre"; }
+  }
+
+  function appliqueTheme(choix) {
+    var effectif = choix === "systeme" ? (mediaClair && mediaClair.matches ? "clair" : "sombre") : choix;
+    document.documentElement.setAttribute("data-theme", effectif);
+    var meta = document.querySelector("meta[name=theme-color]");
+    if (meta) meta.setAttribute("content", effectif === "clair" ? "#F3F0E8" : "#050505");
+    [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function (b) {
+      b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === choix));
+    });
+  }
+
+  function memoriseTheme(choix) {
+    try {
+      global.localStorage.setItem(cleTheme(), choix);
+      global.localStorage.setItem("planif.theme", choix);
+    } catch (e) {}
+  }
+
+  function choisitTheme(choix) {
+    memoriseTheme(choix);
+    appliqueTheme(choix);
+    if (avecBase && SB.connecte()) {
+      SB.enregistrePreferences({ theme: choix }).catch(function () {
+        toast("Thème appliqué sur cet appareil, mais pas enregistré sur ton compte.");
+      });
+    }
+  }
+
+  /** Le compte fait foi : un choix fait sur un autre appareil est repris ici. */
+  function synchroniseTheme() {
+    if (!avecBase || !SB.connecte()) return;
+    SB.utilisateur().then(function (u) {
+      var t = u && u.user_metadata && u.user_metadata.theme;
+      if (t && t !== themeChoisi()) { memoriseTheme(t); appliqueTheme(t); }
+    }).catch(function () {});
+  }
+
+  // « Système » suit le réglage de l'appareil en direct (passage jour / nuit)
+  if (mediaClair) {
+    var suitSysteme = function () { if (themeChoisi() === "systeme") appliqueTheme("systeme"); };
+    if (mediaClair.addEventListener) mediaClair.addEventListener("change", suitSysteme);
+    else if (mediaClair.addListener) mediaClair.addListener(suitSysteme);
+  }
+  appliqueTheme(themeChoisi());
+
+  /** Bouton « Thème » et son menu, pour la ligne du haut. */
+  function menuTheme() {
+    var bouton = el("button", {
+      type: "button", class: "theme-btn", "aria-haspopup": "menu", "aria-expanded": "false", title: "Thème d'affichage"
+    }, [
+      el("span", { class: "theme-ico", "aria-hidden": "true", text: "◐" }),
+      el("span", { class: "theme-lib", text: "Thème" })
+    ]);
+    var menu = el("div", { class: "menu-theme", role: "menu", hidden: true });
+    var actuel = themeChoisi();
+    THEMES.forEach(function (t) {
+      menu.appendChild(el("button", {
+        type: "button", role: "menuitemradio", "data-choix-theme": t.v, "aria-checked": String(t.v === actuel),
+        onclick: function () { choisitTheme(t.v); ouvre(false); bouton.focus(); }
+      }, [el("span", { class: "coche", "aria-hidden": "true" }), t.l]));
+    });
+
+    function ouvre(etat) {
+      menu.hidden = !etat;
+      bouton.setAttribute("aria-expanded", String(etat));
+      if (etat) { var c = menu.querySelector("[aria-checked=true]") || menu.firstChild; c.focus(); }
+    }
+    bouton.addEventListener("click", function (e) { e.stopPropagation(); ouvre(menu.hidden); });
+    document.addEventListener("click", function (e) { if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });
+    document.addEventListener("keydown", function (e) {
+      if (menu.hidden) return;
+      if (e.key === "Escape") { ouvre(false); bouton.focus(); }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        var items = [].slice.call(menu.children), i = items.indexOf(document.activeElement);
+        items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+      }
+    });
+    return el("div", { class: "theme" }, [bouton, menu]);
+  }
+
   /* --------------------------------------------------------- barre et menu */
 
   var PAGES = [
@@ -255,6 +357,7 @@
 
     var outilsHaut = el("div", { class: "barre-outils" }, [
       el("span", { class: "maj", text: etiquette }),
+      menuTheme(),
       el("button", { type: "button", onclick: ouvreDonnees, text: "Données" }),
       avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
     ]);
@@ -272,6 +375,8 @@
       ]),
       nav
     ]));
+
+    synchroniseTheme();
 
     var ancien = document.querySelector(".fab");
     if (ancien) ancien.remove();
