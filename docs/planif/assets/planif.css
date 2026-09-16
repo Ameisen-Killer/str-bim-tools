@@ -43,8 +43,12 @@ p{margin:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ---------------------------------------------------------------- barre */
+/* Le collage se fait sur le conteneur [data-chrome], enfant direct de body :
+   collée à l'intérieur de ce conteneur, qui a sa hauteur exacte, la barre
+   n'avait aucune marge pour rester accrochée et partait avec le défilement. */
+[data-chrome]{position:sticky;top:0;z-index:30}
 .barre{
-  position:sticky;top:0;z-index:30;
+  position:relative;
   background:rgba(5,5,5,.9);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--ligne-faible);
 }
@@ -340,6 +344,11 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 @media (max-width:860px){
   .plan{--wnom:140px}
   .modale-boite{margin-top:0;min-height:100dvh;max-height:none;width:100%}
+}
+@media (max-width:560px){
+  /* barre toujours visible : sur téléphone, elle doit rester compacte */
+  .barre-h .maj{display:none}
+  .barre-h{padding-bottom:8px}
 }
 @media (max-width:640px){
   .entete{padding-top:26px}
