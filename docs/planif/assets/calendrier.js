@@ -30,10 +30,19 @@
   function isoAuj() { return iso(aujourdhui()); }
 
   /** Décale une date ISO de n jours. */
+  // Mémoire des pas d'un jour : les calculs de charge avancent ou reculent jour
+  // par jour des milliers de fois sur les mêmes dates. Relire et réécrire une
+  // date à chaque pas coûtait plus que le calcul lui-même.
+  var memoPas = { "1": Object.create(null), "-1": Object.create(null) };
+
   function ajoute(s, n) {
+    var memo = memoPas[n];
+    if (memo && memo[s] !== undefined) return memo[s];
     var d = dt(s); if (!d) return null;
     d.setDate(d.getDate() + n);
-    return iso(d);
+    var r = iso(d);
+    if (memo) memo[s] = r;
+    return r;
   }
 
   /** Nombre de jours calendaires de a à b (b - a). */
@@ -220,12 +229,16 @@
   }
 
   /** Motif de chômage du jour : « Samedi », « Noël »… ou null si ouvrable. */
+  var memoChome = Object.create(null);
+
   function chome(s, canton) {
+    var cle = (canton || "CH") + "|" + s;
+    if (memoChome[cle] !== undefined) return memoChome[cle];
     var d = dt(s); if (!d) return null;
     var j = d.getDay();
-    if (j === 0) return "Dimanche";
-    if (j === 6) return "Samedi";
-    return ferie(s, canton);
+    var r = j === 0 ? "Dimanche" : j === 6 ? "Samedi" : ferie(s, canton);
+    memoChome[cle] = r;
+    return r;
   }
 
   function estOuvre(s, canton) { return !chome(s, canton); }

@@ -155,6 +155,7 @@
         "Content-Type": "application/json"
       };
       if (options.prefer) entetes.Prefer = options.prefer;
+      if (options.plage) { entetes["Range-Unit"] = "items"; entetes.Range = options.plage; }
       return fetch(URL_BASE + "/rest/v1/" + chemin, {
         method: options.methode || "GET",
         headers: entetes,
@@ -165,7 +166,11 @@
       return r.text().then(function (txt) {
         var j = null;
         try { j = txt ? JSON.parse(txt) : null; } catch (e) { j = null; }
-        if (r.ok) return j;
+        if (r.ok) {
+          if (!options.avecTotal) return j;
+          var total = parseInt(((r.headers.get("Content-Range") || "").split("/")[1]), 10);
+          return { lignes: j || [], total: isNaN(total) ? null : total };
+        }
         if (r.status === 401 || r.status === 403) {
           throw erreur("Accès refusé. Ton adresse est-elle bien dans la liste des accès ?");
         }
@@ -174,7 +179,40 @@
     });
   }
 
-  var lit    = function (t, q) { return requete(t + "?" + (q || "select=*")); };
+  /*
+   * Lecture complète d'une table, par pages.
+   * Supabase plafonne chaque réponse (1 000 lignes par défaut) : une lecture en
+   * un seul appel tronquerait silencieusement les grosses tables. La première
+   * page donne le total ; les suivantes partent ensuite en parallèle. La taille
+   * de page réelle est lue sur la première réponse, au cas où le plafond du
+   * projet serait plus bas que prévu. Le tri garantit des pages sans trou ni doublon.
+   */
+  var PAGE = 1000;
+
+  function litTout(table, ordre) {
+    var base = table + "?select=*&order=" + ordre;
+    return requete(base, { plage: "0-" + (PAGE - 1), prefer: "count=exact", avecTotal: true }).then(function (p) {
+      var lignes = p.lignes, total = p.total;
+      if (total === null) return lignes.length ? suiteSequentielle(base, lignes, lignes.length) : lignes;
+      if (lignes.length >= total) return lignes;
+      var pas = Math.max(1, lignes.length);
+      var pages = [];
+      for (var debut = pas; debut < total; debut += pas) {
+        pages.push(requete(base, { plage: debut + "-" + Math.min(total - 1, debut + pas - 1) }));
+      }
+      return Promise.all(pages).then(function (suites) {
+        return suites.reduce(function (acc, l) { return acc.concat(l || []); }, lignes);
+      });
+    });
+  }
+
+  /** Total inconnu (en-tête absent) : on enchaîne tant que les pages reviennent pleines. */
+  function suiteSequentielle(base, acc, pas) {
+    return requete(base, { plage: acc.length + "-" + (acc.length + pas - 1) }).then(function (l) {
+      acc = acc.concat(l || []);
+      return (l && l.length === pas) ? suiteSequentielle(base, acc, pas) : acc;
+    });
+  }
   var insere = function (t, l) { return requete(t, { methode: "POST", corps: l, prefer: "return=minimal" }); };
   var modifie = function (t, id, v) { return requete(t + "?id=eq." + encodeURIComponent(id), { methode: "PATCH", corps: v, prefer: "return=minimal" }); };
   var efface = function (t, id) { return requete(t + "?id=eq." + encodeURIComponent(id), { methode: "DELETE", prefer: "return=minimal" }); };
@@ -205,12 +243,12 @@
 
   function charge() {
     return Promise.all([
-      lit("membres", "select=*"),
-      lit("absences", "select=*"),
-      lit("affaires", "select=*"),
-      lit("affaire_membres", "select=*"),
-      lit("taches", "select=*"),
-      lit("reglages", "select=*")
+      litTout("membres", "id"),
+      litTout("absences", "id"),
+      litTout("affaires", "id"),
+      litTout("affaire_membres", "affaire_id,membre_id"),
+      litTout("taches", "id"),
+      litTout("reglages", "id")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {};

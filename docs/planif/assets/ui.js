@@ -407,8 +407,51 @@
   /** Vrai si chaque mot se trouve dans au moins un des champs. */
   function correspond(champs, mots) {
     if (!mots.length) return true;
-    var foin = plie(champs.filter(Boolean).join("   "));
-    return mots.every(function (m) { return foin.indexOf(m) >= 0; });
+    return contient(foin(champs), mots);
+  }
+
+  /** Texte de recherche d'une ligne, déjà plié : à calculer une fois, pas à chaque frappe. */
+  function foin(champs) { return plie(champs.filter(Boolean).join(" | ")); }
+  function contient(foinPlie, mots) {
+    for (var i = 0; i < mots.length; i++) if (foinPlie.indexOf(mots[i]) < 0) return false;
+    return true;
+  }
+
+  /**
+   * Liste longue affichée par paquets : les premières lignes tout de suite,
+   * les suivantes quand on approche du bas. Taper une recherche ne reconstruit
+   * donc que le premier paquet, quelle que soit la taille de la liste.
+   * paquets({ elements, taille, ajoute(element), hote })
+   */
+  function paquets(o) {
+    var rang = 0, taille = o.taille || 150, observateur = null;
+    var bouton = el("button", { type: "button", class: "btn suite-liste" });
+    var pied = el("div", { class: "suite-liste-pied" }, [bouton]);
+
+    function suite() {
+      var fin = Math.min(o.elements.length, rang + taille);
+      for (; rang < fin; rang++) o.ajoute(o.elements[rang]);
+      var reste = o.elements.length - rang;
+      if (reste <= 0) {
+        if (observateur) observateur.disconnect();
+        if (pied.parentNode) pied.parentNode.removeChild(pied);
+        return;
+      }
+      bouton.textContent = "Afficher " + Math.min(reste, taille) + " de plus · " + reste + " restantes";
+    }
+
+    bouton.addEventListener("click", suite);
+    suite();
+    if (rang < o.elements.length) {
+      o.hote.appendChild(pied);
+      if (global.IntersectionObserver) {
+        observateur = new IntersectionObserver(function (entrees) {
+          if (entrees.some(function (e) { return e.isIntersecting; })) suite();
+        }, { rootMargin: "800px 0px" });
+        observateur.observe(pied);
+      }
+    }
+    return { fin: function () { if (observateur) observateur.disconnect(); } };
   }
 
   /**
@@ -561,10 +604,13 @@
      L'en-tête disparaît : chaque cellule reçoit donc le libellé de sa colonne,
      affiché devant sa valeur. Posé automatiquement sur tout tableau inséré. */
 
+  // Seules les lignes pas encore étiquetées sont traitées : les listes longues
+  // s'allongent par paquets, et les lignes déjà posées ne sont pas reparcourues.
   function etiquetteTableau(table) {
-    var titres = [].map.call(table.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); });
+    var titres = table._titres || (table._titres = [].map.call(table.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); }));
     if (!titres.length) return;
-    [].forEach.call(table.querySelectorAll("tbody tr"), function (tr) {
+    [].forEach.call(table.querySelectorAll("tbody tr:not([data-etiq])"), function (tr) {
+      tr.setAttribute("data-etiq", "");
       [].forEach.call(tr.children, function (td, i) {
         if (i > 0 && titres[i] && !td.classList.contains("actions")) td.setAttribute("data-l", titres[i]);
       });
@@ -573,10 +619,7 @@
 
   if (global.MutationObserver) {
     new MutationObserver(function () {
-      [].forEach.call(document.querySelectorAll("table.liste:not([data-etiq])"), function (t) {
-        t.setAttribute("data-etiq", "");
-        etiquetteTableau(t);
-      });
+      [].forEach.call(document.querySelectorAll("table.liste"), etiquetteTableau);
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
@@ -731,6 +774,7 @@
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
+    foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions
   };
 })(window);

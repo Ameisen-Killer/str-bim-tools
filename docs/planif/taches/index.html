@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=10">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=11">
 </head>
 <body>
 
@@ -55,12 +55,12 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=2"></script>
+<script src="/planif/assets/calendrier.js?v=3"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=2"></script>
-<script src="/planif/assets/donnees.js?v=3"></script>
+<script src="/planif/assets/supabase.js?v=3"></script>
+<script src="/planif/assets/donnees.js?v=4"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=6"></script>
+<script src="/planif/assets/ui.js?v=7"></script>
 <script>
 (function () {
   "use strict";
@@ -149,6 +149,14 @@
     ];
   }
 
+  // Texte de recherche de chaque tâche, plié une fois par version des données
+  // plutôt qu'à chaque frappe : sur des milliers de tâches, c'est ce qui coûtait.
+  var foins = { v: -1, parId: {} };
+  function foinDe(t) {
+    if (foins.v !== D.version()) foins = { v: D.version(), parId: {} };
+    return foins.parId[t.id] || (foins.parId[t.id] = UI.foin(champsCherches(t)));
+  }
+
   /**
    * opts.sansTexte : ignore la recherche (pour le total du compteur)
    * opts.terminees : force l'inclusion des tâches terminées
@@ -160,16 +168,19 @@
       .filter(function (t) {
         if (filtres.masqueTerminees && !opts.terminees && t.statut === "termine") return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
-        return UI.correspond(champsCherches(t), mots);
+        return !mots.length || UI.contient(foinDe(t), mots);
       });
   }
 
   /* ------------------------------------------------------------- affichage */
 
+  var affichage = null;                             // paquets en cours, à arrêter au prochain rendu
+
   function dessine() {
     var taches = selection();
     var mots = barre ? barre.termes() : [];
     var hote = document.getElementById("liste");
+    if (affichage) affichage.fin();
     UI.vide(hote);
     suivi.debut();
     if (barre) barre.compte(taches.length, selection({ sansTexte: true }).length);
@@ -189,7 +200,23 @@
 
     var auj = C.isoAuj();
     var corps = el("tbody");
-    taches.forEach(function (t) {
+
+    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { text: "Tâche" }),
+        el("th", { text: "Affectations" }),
+        el("th", { text: "Charge" }),
+        el("th", { text: "Période" }),
+        el("th", { text: "Avancement" }),
+        el("th", { text: "" })
+      ])]),
+      corps
+    ]));
+
+    // 150 lignes tout de suite, la suite en approchant du bas de la page
+    affichage = UI.paquets({ elements: taches, taille: 150, hote: hote, ajoute: function (t) { corps.appendChild(ligne(t)); } });
+
+    function ligne(t) {
       var a = D.affaire(t.affaireId);
       var teinte = UI.teinte(a ? a.teinte : 1);
       var debut = Calc.debutEffectif(t, D.canton());
@@ -210,7 +237,7 @@
         ]));
       }
 
-      corps.appendChild(suivi.marque(el("tr", {}, [
+      return suivi.marque(el("tr", {}, [
         el("td", {}, [
           el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
           // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
@@ -239,20 +266,8 @@
           el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(t.id); } }),
           el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(t); } })
         ])
-      ]), t.id));
-    });
-
-    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
-      el("thead", {}, [el("tr", {}, [
-        el("th", { text: "Tâche" }),
-        el("th", { text: "Affectations" }),
-        el("th", { text: "Charge" }),
-        el("th", { text: "Période" }),
-        el("th", { text: "Avancement" }),
-        el("th", { text: "" })
-      ])]),
-      corps
-    ]));
+      ]), t.id);
+    }
   }
 
   /** Aucun résultat : dire pourquoi, et proposer la sortie la plus probable. */

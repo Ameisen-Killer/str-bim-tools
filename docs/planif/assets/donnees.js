@@ -81,11 +81,46 @@
   /* Enregistre, puis seulement alors met à jour la référence : si l'écriture
      échoue, l'écart reste à rejouer au prochain essai plutôt que d'être perdu. */
   function sauve() {
+    version++;                                     // l'état a bougé : index et calculs mis en cache sont périmés
     return ADAPTATEUR.ecrire(etat, precedent).then(function () {
       precedent = copie(etat);
+      version++;
       previens();
       return etat;
     });
+  }
+
+  /* ------------------------------------------------------------- index
+     Avec des milliers de tâches, retrouver une affaire ou un membre en
+     parcourant toute la liste, à chaque ligne affichée, coûtait des centaines
+     de millisecondes par frappe. L'index est reconstruit à la demande quand
+     l'état a changé : version, ou tableau remplacé ou rallongé. */
+
+  var version = 0;
+  var index = null;
+
+  function idx() {
+    if (index && index.v === version &&
+        index.m === etat.membres && index.nm === etat.membres.length &&
+        index.a === etat.affaires && index.na === etat.affaires.length &&
+        index.t === etat.taches && index.nt === etat.taches.length) return index;
+
+    var membres = Object.create(null), affaires = Object.create(null), taches = Object.create(null), parAffaire = Object.create(null);
+    etat.membres.forEach(function (m) { membres[m.id] = m; });
+    etat.affaires.forEach(function (a) { affaires[a.id] = a; });
+    etat.taches.forEach(function (t) {
+      taches[t.id] = t;
+      (parAffaire[t.affaireId] || (parAffaire[t.affaireId] = [])).push(t);
+    });
+    var triees = etat.taches.slice().sort(function (a, b) {
+      return (a.echeance || "9999") < (b.echeance || "9999") ? -1 : 1;
+    });
+    index = {
+      v: version, m: etat.membres, nm: etat.membres.length, a: etat.affaires, na: etat.affaires.length,
+      t: etat.taches, nt: etat.taches.length,
+      membres: membres, affaires: affaires, taches: taches, parAffaire: parAffaire, triees: triees
+    };
+    return index;
   }
 
   /** Complète un état lu du stockage : champs manquants, migrations. */
@@ -296,7 +331,7 @@
           return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr");
         });
     },
-    membre: function (i) { return etat.membres.find(function (m) { return m.id === i; }) || null; },
+    membre: function (i) { return idx().membres[i] || null; },
     nomMembre: function (i) { var m = D.membre(i); return m ? m.prenom + " " + m.nom : "—"; },
 
     ajouteMembre: function (o) {
@@ -355,7 +390,7 @@
       return etat.affaires.filter(function (a) { return opts.tous ? true : a.statut !== "terminee"; })
         .slice().sort(function (a, b) { return a.code.localeCompare(b.code, "fr", { numeric: true }); });
     },
-    affaire: function (i) { return etat.affaires.find(function (a) { return a.id === i; }) || null; },
+    affaire: function (i) { return idx().affaires[i] || null; },
 
     ajouteAffaire: function (o) {
       return Promise.resolve().then(function () {
@@ -382,18 +417,24 @@
     },
 
     /* ---------------------------------------------------------- tâches */
+    /** Tâches triées par échéance. Liste neuve à chaque appel : l'appelant peut la modifier. */
     taches: function (opts) {
       opts = opts || {};
-      return etat.taches.filter(function (t) {
-        if (opts.affaireId && t.affaireId !== opts.affaireId) return false;
+      var ix = idx();
+      var source = opts.affaireId
+        ? (ix.parAffaire[opts.affaireId] || []).slice().sort(function (a, b) {
+            return (a.echeance || "9999") < (b.echeance || "9999") ? -1 : 1;
+          })
+        : ix.triees;
+      return source.filter(function (t) {
         if (opts.membreId && t.ingenieurId !== opts.membreId && t.dessinateurId !== opts.membreId) return false;
         if (opts.sansTerminees && t.statut === "termine") return false;
         return true;
-      }).slice().sort(function (a, b) {
-        return (a.echeance || "9999") < (b.echeance || "9999") ? -1 : 1;
       });
     },
-    tache: function (i) { return etat.taches.find(function (t) { return t.id === i; }) || null; },
+    tache: function (i) { return idx().taches[i] || null; },
+    /** Numéro de version de l'état : change à chaque enregistrement. Sert de clé aux calculs mis en cache. */
+    version: function () { return version; },
 
     ajouteTache: function (o) {
       return Promise.resolve().then(function () {

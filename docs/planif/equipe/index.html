@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=10">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=11">
 </head>
 <body>
 
@@ -62,12 +62,12 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=2"></script>
+<script src="/planif/assets/calendrier.js?v=3"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=2"></script>
-<script src="/planif/assets/donnees.js?v=3"></script>
+<script src="/planif/assets/supabase.js?v=3"></script>
+<script src="/planif/assets/donnees.js?v=4"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=6"></script>
+<script src="/planif/assets/ui.js?v=7"></script>
 <script>
 (function () {
   "use strict";
@@ -108,6 +108,16 @@
       .filter(function (m) { return UI.correspond(champsCherches(m), mots); });
   }
 
+  // Répartition de la charge : calculée une fois par version des données, et non
+  // deux fois à chaque frappe (une par section). Sur 6 000 tâches, c'était l'essentiel du temps.
+  var cacheRep = { v: -1, rep: null };
+  function repartitionCourante() {
+    if (cacheRep.v !== D.version()) {
+      cacheRep = { v: D.version(), rep: Calc.repartition(D.taches({ sansTerminees: true }), D.membres({ tous: true }), D.canton()) };
+    }
+    return cacheRep.rep;
+  }
+
   function dessine() {
     suivi.debut();
     if (barre) barre.compte(selection().length, selection(null, true).length);
@@ -135,7 +145,7 @@
 
     // Charge de la semaine en cours, pour situer chacun d'un coup d'œil
     var jours = C.serie(C.lundi(C.isoAuj()), 7);
-    var rep = Calc.repartition(D.taches({ sansTerminees: true }), D.membres({ tous: true }), D.canton());
+    var rep = repartitionCourante();
 
     var corps = el("tbody");
     membres.forEach(function (m) {
