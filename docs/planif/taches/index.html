@@ -212,13 +212,13 @@
 
       corps.appendChild(suivi.marque(el("tr", {}, [
         el("td", {}, [
-          el("div", { style: "display:flex;align-items:center;gap:8px" }, [
-            el("span", { class: "pastille", style: "color:" + teinte, "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + teinte + ";font-size:11px;letter-spacing:.1em" }, [UI.surligne(a ? a.code : "—", mots)])
+          el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
+          // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
+          el("div", { class: "affaire-ligne", style: "display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [
+            el("span", { class: "pastille", style: "color:" + teinte + ";align-self:center", "aria-hidden": "true" }),
+            el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne(a ? a.code : "—", mots)]),
+            a ? el("span", {}, [UI.surligne(a.nom, mots)]) : null
           ]),
-          el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(t.titre, mots)]),
-          // Affaire concernée, sous le libellé : le numéro seul ne suffit pas à la reconnaître
-          a ? el("div", { class: "affaire-ligne", style: "margin-top:3px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [UI.surligne(a.nom, mots)]) : null,
           t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
         ]),
         el("td", {}, [gens]),
