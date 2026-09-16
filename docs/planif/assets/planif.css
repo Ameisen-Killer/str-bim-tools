@@ -396,6 +396,54 @@ body.glisse-en-cours{user-select:none;-webkit-user-select:none}
 .legende-plan .ret{width:14px;height:10px;border:1px solid rgba(var(--alerte-rvb),.75)}
 .legende-plan .dash{width:14px;height:10px;border:1px solid var(--ligne);border-top-style:dashed}
 
+/* ------------------------------------------------- calendrier des absences
+   Reprend la grille du planning : une ligne par membre, une colonne par jour.
+   Les mois coiffent les semaines, les absences sont des barres hachurées. */
+.pl-mois{
+  grid-column:span var(--span);border-left:1px solid var(--ligne);
+  font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--or);padding:4px 0 6px 8px;white-space:nowrap;overflow:hidden;
+}
+.plan.dense .pl-jour{font-size:9.5px;letter-spacing:0}
+.plan.dense .pl-jour b{font-size:10px}
+
+.bt.conge{
+  --tt:var(--bleu);cursor:pointer;
+  border-color:rgba(var(--verre-rvb),.5);border-left:2px solid var(--bleu);
+  background:
+    repeating-linear-gradient(135deg,rgba(var(--verre-rvb),.24) 0 4px,transparent 4px 9px),
+    rgba(var(--verre-rvb),.08);
+}
+.bt.conge:hover{background:rgba(var(--verre-rvb),.24)}
+.bt.conge .mot{overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* période plus longue que la fenêtre affichée : le bord devient pointillé */
+.bt.conge.deb-g{border-left-style:dotted}
+.bt.conge.deb-d{border-right-style:dotted}
+
+.legende-plan .cg{
+  width:14px;height:10px;border:1px solid rgba(var(--verre-rvb),.5);border-left:2px solid var(--bleu);
+  background:repeating-linear-gradient(135deg,rgba(var(--verre-rvb),.24) 0 4px,transparent 4px 9px);
+}
+.legende-plan .ch{width:14px;height:10px;border:1px solid var(--ligne-faible);background:rgba(var(--encre),.035)}
+.legende-plan .au{width:14px;height:10px;border:1px solid rgba(var(--or-rvb),.4);background:rgba(var(--or-rvb),.08)}
+
+/* ligne du bas : combien d'absents chaque jour */
+.cal-compte{display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)))}
+.cal-compte i{
+  border-left:1px solid var(--ligne-faible);padding:6px 0;text-align:center;font-style:normal;
+  font-family:var(--mono);font-size:11px;color:var(--texte-doux);font-variant-numeric:tabular-nums;
+}
+.cal-compte i.vide{color:rgba(var(--encre),.28)}
+.cal-compte i.chome{background:rgba(var(--encre),.035);color:rgba(var(--encre),.28)}
+.cal-compte i.fort{color:var(--alerte)}
+
+/* période en cours de modification dans la fenêtre des absences */
+tr.en-edition td{background:rgba(var(--or-rvb),.07)}
+tr.en-edition td:first-child{box-shadow:inset 2px 0 0 var(--or)}
+
+/* en-tête réservé au papier : le titre, la période, la date du tirage */
+.entete-impression{display:none}
+
 /* liste d'alertes */
 .alertes{display:grid;gap:10px}
 .al{display:flex;gap:12px;align-items:flex-start;border-left:2px solid var(--ligne);padding:9px 0 9px 14px;font-size:14px;color:var(--texte-doux)}
@@ -584,9 +632,92 @@ mark.trouve{
   .al{flex-direction:column;gap:2px}
 }
 
+/* =====================================================================
+   Impression et export PDF
+   Aucune bibliothèque : le PDF sort de l'impression du navigateur, et
+   c'est cette feuille qui en fait la mise en page.
+   Paysage : un calendrier tient en largeur, jamais en hauteur.
+   La palette claire est forcée, thème sombre ou non — on n'imprime pas une
+   page noire — et les fonds doivent sortir à l'impression, d'où print-color-adjust.
+   ===================================================================== */
+@page{size:A4 landscape;margin:9mm 8mm}
+
 @media print{
-  .barre,.nav-outil,.outils,.plan-barre,footer.pied-outil,.modale{display:none!important}
-  body{background:#fff;color:#111}
-  .plan-defile{overflow:visible}
-  .plan{min-width:0}
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"]{
+    --encre:22,19,15;
+    --fond-rvb:255,255,255;
+    --or-rvb:122,83,18;
+    --alerte-rvb:152,54,30;
+    --verre-rvb:40,72,104;
+    --noir:#fff;--noir-2:#fff;--texte:#16130F;--or:#7A5312;--alerte:#98361E;--bleu:#284868;
+    --ligne:rgba(var(--encre),.4);--ligne-faible:rgba(var(--encre),.22);
+    --or-doux:rgba(var(--or-rvb),.8);
+    --texte-doux:rgba(var(--encre),.88);--texte-faible:rgba(var(--encre),.7);
+    --t1:#7A5312;--t2:#284868;--t3:#3A5A40;--t4:#834424;
+    --t5:#4E4588;--t6:#39525D;--t7:#665619;--t8:#77403A;
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;color:#16130F;font-size:9pt;overflow-x:visible}
+
+  [data-chrome],.fab,.toast,.modale,.bandeau,.plan-barre,.recherche,.outils,
+  .suite-liste-pied,footer.pied-outil,.sans-impression{display:none!important}
+  body.avec-fab main{padding-bottom:0}
+  .wrap{max-width:none;padding-inline:0}
+  a{text-decoration:none;color:inherit}
+
+  /* l'en-tête d'écran laisse la place à celui du papier */
+  .entete{display:none}
+  .entete-impression{display:block;margin-bottom:10px;border-bottom:1px solid var(--ligne);padding-bottom:6px}
+  .entete-impression h1{font-size:15pt;font-weight:200;line-height:1.1}
+  .entete-impression .surtitre{font-size:7pt;letter-spacing:.28em}
+  .entete-impression .ligne{
+    display:flex;justify-content:space-between;gap:16px;margin-top:5px;
+    font-family:var(--mono);font-size:7.5pt;letter-spacing:.06em;color:var(--texte-doux);
+  }
+
+  .section{padding-block:8px;border-top:1px solid var(--ligne-faible)}
+  .tete-section{margin-bottom:10px;break-after:avoid}
+  .tete-section h2{font-size:12pt}
+  .num-section{font-size:7pt}
+
+  .cles{border-color:var(--ligne-faible);break-inside:avoid}
+  .cle{padding:8px 10px}
+  .cle .v{font-size:16pt}
+  .cle .l{font-size:6.5pt;margin-top:3px}
+
+  /* la grille : plus de défilement latéral, tout rentre dans la largeur */
+  .defile,.plan-defile{overflow:visible!important}
+  .plan{min-width:0!important;--wnom:118px}
+  .pl-nom{position:static;background:none;padding:5px 8px 5px 0}
+  .pl-nom,.pl-zone{break-inside:avoid}
+  .pl-membre .n{font-size:8.5pt;line-height:1.2}
+  .pl-membre .r,.pl-membre .c{font-size:6pt;letter-spacing:.1em}
+  .pl-mois,.pl-sem{font-size:6.5pt;letter-spacing:.12em;padding:3px 0 4px 4px}
+  .pl-jour{font-size:6pt;padding:2px 0 3px;line-height:1.2}
+  .pl-jour b{font-size:6.5pt}
+  /* 2 mois et plus : 90 quantièmes ne tiennent pas en largeur d'A4.
+     Seuls les lundis restent, et les semaines au-dessus font le reste. */
+  .plan.dense .pl-jour .j{display:none}
+  .plan.dense .pl-jour:not(.lu) b{visibility:hidden}
+  .plan.dense .pl-jour.lu b{color:var(--texte)}
+  .pl-piste{grid-auto-rows:17px;row-gap:3px;padding:4px 0;min-height:26px}
+  .bt{font-size:7pt;padding:0 4px;gap:4px;margin:0 1px}
+
+  /* Aplats à la place des hachures : le navigateur ne sait pas vectoriser un
+     dégradé répété et rasterise alors toute la page — un calendrier de trois
+     mois passait de 0,3 à 8 Mo. Sur papier, l'aplat se lit aussi bien. */
+  .bt.conge{background:rgba(var(--verre-rvb),.16)}
+  .pl-fond i.abs{background:rgba(var(--encre),.07)}
+  .legende-plan .cg{background:rgba(var(--verre-rvb),.16)}
+  .cal-compte i{font-size:6.5pt;padding:3px 0}
+  .legende-plan{font-size:6.5pt;margin-top:10px;gap:8px 16px}
+
+  table.liste{min-width:0!important;font-size:8pt}
+  table.liste thead{display:table-header-group}
+  table.liste th{font-size:6.5pt}
+  table.liste td,table.liste th{padding:4px 10px 4px 0}
+  table.liste tr{break-inside:avoid}
+  table.liste td.actions{display:none}
+  .alertes{break-inside:auto}
+  .al{break-inside:avoid}
 }

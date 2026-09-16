@@ -325,7 +325,8 @@
     { cle: "tableau", href: "/planif/", nom: "Tableau de bord", court: "Planning" },
     { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
     { cle: "affaires", href: "/planif/affaires/", nom: "Affaires", court: "Affaires" },
-    { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" }
+    { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" },
+    { cle: "absences", href: "/planif/absences/", nom: "Absences", court: "Absences" }
   ];
 
   /**
@@ -375,6 +376,14 @@
       ]),
       nav
     ]));
+
+    /* Cinq sections ne tiennent pas dans la largeur d'un téléphone : la barre
+       défile, et la page ouverte est amenée sous les yeux plutôt que laissée
+       hors champ. */
+    var courant = nav.querySelector("[aria-current]");
+    if (courant && nav.scrollWidth > nav.clientWidth + 4) {
+      nav.scrollLeft = Math.max(0, courant.offsetLeft - (nav.clientWidth - courant.offsetWidth) / 2);
+    }
 
     synchroniseTheme();
 
@@ -735,6 +744,162 @@
     });
   }
 
+  /* ---------------------------------------------------------- absences
+     Une seule fenêtre pour les absences, partagée par la page Équipe et le
+     calendrier : la liste des périodes d'un membre, et dessous un formulaire
+     qui sert aussi bien à ajouter qu'à modifier la période choisie. */
+
+  /** absences(idMembre, surChangement) — surChangement() suit chaque écriture. */
+  function absences(idMembre, surChangement) {
+    var m = D.membre(idMembre);
+    if (!m) return toast("Membre introuvable.");
+    var previent = surChangement || function () {};
+
+    var liste = el("div", { style: "margin-bottom:26px" });
+    var champs = el("div", { class: "grille-champs" });
+    var libelleForm = el("span", {});
+    var annuler = el("button", {
+      class: "btn btn-nu", type: "button", text: "Annuler la modification", hidden: true,
+      onclick: function () { edite(null); }
+    });
+    var enCours = null;                       // période en cours de modification, sinon ajout
+    var valider = null;                       // bouton principal, relu après ouverture
+
+    function edite(a) {
+      enCours = a;
+      vide(champs);
+      champs.appendChild(champ({ nom: "debut", label: "Du", type: "date", valeur: a ? a.debut : "" }));
+      champs.appendChild(champ({ nom: "fin", label: "Au", type: "date", valeur: a ? a.fin : "", aide: "Laisser vide pour un seul jour." }));
+      champs.appendChild(champ({ nom: "motif", label: "Motif", valeur: a ? a.motif : "Vacances", exemple: "Vacances, service, formation…" }));
+      libelleForm.textContent = a ? "Modifier la période" : "Ajouter une période";
+      annuler.hidden = !a;
+      if (valider) valider.textContent = a ? "Enregistrer" : "Ajouter";
+      rend();
+    }
+
+    function rend() {
+      vide(liste);
+      if (!m.absences.length) {
+        liste.appendChild(el("div", { class: "vide", style: "padding:22px 0", text: "Aucune absence enregistrée" }));
+        return;
+      }
+      var corps = el("tbody");
+      m.absences.forEach(function (a) {
+        var n = C.nbOuvres(a.debut, a.fin, D.canton());
+        corps.appendChild(el("tr", { class: enCours && enCours.id === a.id ? "en-edition" : "" }, [
+          el("td", {}, [
+            el("div", { class: "principal", text: a.motif }),
+            el("div", { class: "secondaire", text: C.fmtCH(a.debut) + " → " + C.fmtCH(a.fin) })
+          ]),
+          el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
+          el("td", { class: "actions" }, [
+            el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { edite(a); } }),
+            el("button", {
+              class: "btn btn-nu btn-rouge", type: "button", text: "Retirer",
+              onclick: function () {
+                D.suppAbsence(m.id, a.id).then(function () {
+                  if (enCours && enCours.id === a.id) edite(null); else rend();
+                  previent();
+                  toast("Absence retirée.");
+                }).catch(function (e) { toast(e.message); });
+              }
+            })
+          ])
+        ]));
+      });
+      liste.appendChild(el("table", { class: "liste", style: "min-width:0" }, [corps]));
+    }
+
+    var corps = el("div", {}, [
+      el("p", { class: "aide", style: "margin-bottom:20px;font-size:14px;color:var(--texte-doux)", text: "Les jours d'absence sortent de la capacité disponible, apparaissent hachurés au tableau de bord et en barre au calendrier des absences." }),
+      liste,
+      el("div", { class: "legende", style: "display:flex;align-items:baseline;gap:12px;margin-bottom:10px" }, [libelleForm, annuler]),
+      champs
+    ]);
+
+    var boite = ouvre({
+      surtitre: "Absences",
+      titre: m.prenom + " " + m.nom,
+      corps: corps,
+      boutons: [
+        { label: "Fermer" },
+        {
+          label: "Ajouter", or: true, action: function () {
+            var v = lit(champs);
+            var p = enCours ? D.majAbsence(m.id, enCours.id, v) : D.ajouteAbsence(m.id, v);
+            return p.then(function () {
+              toast(enCours ? "Absence modifiée." : "Absence enregistrée.");
+              edite(null);
+              previent();
+              return false;                   // la fenêtre reste ouverte : on enchaîne les périodes
+            }).catch(function (e) { toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+    valider = boite.querySelector(".modale-pied .btn-or");
+    edite(null);
+  }
+
+  /** Nouvelle absence sans passer par la fiche d'un membre : le membre se choisit dans la fenêtre. */
+  function nouvelleAbsence(o) {
+    o = o || {};
+    var previent = o.surChangement || function () {};
+    var membres = D.membres({});
+    if (!membres.length) return toast("Aucun membre à l'effectif : commence par l'équipe.");
+
+    var corps = el("div", { class: "grille-champs" }, [
+      champ({
+        nom: "membre", label: "Membre", type: "select", large: true, valeur: o.membreId || membres[0].id,
+        options: membres.map(function (m) {
+          return { valeur: m.id, label: m.prenom + " " + m.nom + " · " + D.ROLES[m.role] };
+        })
+      }),
+      champ({ nom: "debut", label: "Du", type: "date", valeur: o.debut || "" }),
+      champ({ nom: "fin", label: "Au", type: "date", valeur: o.fin || "", aide: "Laisser vide pour un seul jour." }),
+      champ({ nom: "motif", label: "Motif", valeur: "Vacances", exemple: "Vacances, service, formation…" })
+    ]);
+
+    ouvre({
+      surtitre: "Nouvelle absence",
+      titre: "Période d'absence",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            var v = lit(corps);
+            return D.ajouteAbsence(v.membre, v).then(function () {
+              toast("Absence enregistrée.");
+              previent();
+            }).catch(function (e) { toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  /* ------------------------------------------------------------ impression
+     Pas de bibliothèque PDF : l'export passe par l'impression du navigateur,
+     où « Enregistrer au format PDF » est proposé partout, y compris sur
+     téléphone. Le titre du document donne le nom de fichier proposé. */
+
+  function imprime(nom) {
+    var avant = document.title, remis = false;
+    function remet() {
+      if (remis) return;
+      remis = true;
+      document.title = avant;
+      global.removeEventListener("afterprint", remet);
+    }
+    if (nom) document.title = nom;
+    global.addEventListener("afterprint", remet);
+    // Le rendu doit être posé avant l'ouverture de la fenêtre d'impression
+    setTimeout(function () {
+      try { global.print(); } finally { setTimeout(remet, 1500); }
+    }, 60);
+  }
+
   /** Bandeau affiché tant que le jeu de démonstration n'a pas été effacé. */
   function bandeauDemo(hote) {
     if (!D.estDemo() || !hote) return;
@@ -771,6 +936,7 @@
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
+    absences: absences, nouvelleAbsence: nouvelleAbsence, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,

@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=11">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=12">
 </head>
 <body>
 
@@ -62,12 +62,12 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=3"></script>
+<script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=3"></script>
-<script src="/planif/assets/donnees.js?v=4"></script>
+<script src="/planif/assets/donnees.js?v=5"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=7"></script>
+<script src="/planif/assets/ui.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -172,7 +172,7 @@
             : el("span", { class: "secondaire", text: "—" })
         ]),
         el("td", { class: "actions" }, [
-          el("button", { class: "btn btn-nu", type: "button", text: "Absences", onclick: function () { absences(m.id); } }),
+          el("button", { class: "btn btn-nu", type: "button", text: "Absences", onclick: function () { UI.absences(m.id, dessine); } }),
           el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(m.id); } }),
           el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(m); } })
         ])
@@ -227,74 +227,6 @@
             var p = m ? D.majMembre(m.id, v) : D.ajouteMembre(v);
             return p.then(function () { dessine(); UI.toast(m ? "Membre modifié." : "Membre ajouté."); })
               .catch(function (e) { UI.toast(e.message); return false; });
-          }
-        }
-      ]
-    });
-  }
-
-  /* -------------------------------------------------------------- absences */
-
-  function absences(idMembre) {
-    var m = D.membre(idMembre);
-    var liste = el("div", { style: "margin-bottom:26px" });
-
-    function rend() {
-      UI.vide(liste);
-      if (!m.absences.length) {
-        liste.appendChild(el("div", { class: "vide", style: "padding:22px 0", text: "Aucune absence enregistrée" }));
-        return;
-      }
-      var corps = el("tbody");
-      m.absences.forEach(function (a) {
-        var n = C.nbOuvres(a.debut, a.fin, D.canton());
-        corps.appendChild(el("tr", {}, [
-          el("td", {}, [
-            el("div", { class: "principal", text: a.motif }),
-            el("div", { class: "secondaire", text: C.fmtCH(a.debut) + " → " + C.fmtCH(a.fin) })
-          ]),
-          el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
-          el("td", { class: "actions" }, [
-            el("button", {
-              class: "btn btn-nu btn-rouge", type: "button", text: "Retirer",
-              onclick: function () { D.suppAbsence(m.id, a.id).then(function () { rend(); dessine(); }); }
-            })
-          ])
-        ]));
-      });
-      liste.appendChild(el("table", { class: "liste", style: "min-width:0" }, [corps]));
-    }
-    rend();
-
-    var ajout = el("div", { class: "grille-champs" }, [
-      UI.champ({ nom: "debut", label: "Du", type: "date" }),
-      UI.champ({ nom: "fin", label: "Au", type: "date", aide: "Laisser vide pour un seul jour." }),
-      UI.champ({ nom: "motif", label: "Motif", valeur: "Vacances", exemple: "Vacances, service, formation…" })
-    ]);
-
-    var corps = el("div", {}, [
-      el("p", { class: "aide", style: "margin-bottom:20px;font-size:14px;color:var(--texte-doux)", text: "Les jours d'absence sortent de la capacité disponible et apparaissent hachurés au tableau de bord." }),
-      liste,
-      el("div", { class: "legende", style: "display:block;margin-bottom:10px", text: "Ajouter une période" }),
-      ajout
-    ]);
-
-    UI.ouvre({
-      surtitre: "Absences",
-      titre: m.prenom + " " + m.nom,
-      corps: corps,
-      boutons: [
-        { label: "Fermer" },
-        {
-          label: "Ajouter", or: true, action: function () {
-            var v = UI.lit(ajout);
-            return D.ajouteAbsence(m.id, v).then(function () {
-              rend(); dessine();
-              ajout.querySelector("[name=debut]").value = "";
-              ajout.querySelector("[name=fin]").value = "";
-              UI.toast("Absence enregistrée.");
-              return false;
-            }).catch(function (e) { UI.toast(e.message); return false; });
           }
         }
       ]

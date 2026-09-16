@@ -243,6 +243,23 @@
     };
   }
 
+  /* Une absence est une période pleine : pas de demi-journée, et pas deux
+     périodes sur le même jour — sinon les jours d'absence seraient comptés
+     deux fois dans le calendrier, et la capacité, elle, ne tomberait qu'une. */
+  function valideAbsence(m, o, idExistant) {
+    var debut = texte(o.debut), fin = texte(o.fin) || debut;
+    if (!debut) throw erreur("Indique la date de début de l'absence.");
+    if (global.Cal.diff(debut, fin) < 0) throw erreur("La fin de l'absence précède son début.");
+    var chevauche = m.absences.filter(function (a) {
+      return a.id !== idExistant && a.debut <= fin && debut <= (a.fin || a.debut);
+    })[0];
+    if (chevauche) {
+      throw erreur("Cette période en recouvre une autre : « " + chevauche.motif + " » du " +
+        global.Cal.fmtCH(chevauche.debut) + " au " + global.Cal.fmtCH(chevauche.fin) + ".");
+    }
+    return { debut: debut, fin: fin, motif: texte(o.motif) || "Absence" };
+  }
+
   function valideAffaire(o, idExistant) {
     if (!texte(o.code)) throw erreur("Le numéro d'affaire est obligatoire.");
     if (!texte(o.nom)) throw erreur("Le libellé de l'affaire est obligatoire.");
@@ -365,14 +382,47 @@
       });
     },
 
+    /**
+     * Les absences croisant une fenêtre, la plus proche d'abord :
+     * [{membre, absence}]. Sert au calendrier des absences.
+     */
+    absences: function (opts) {
+      opts = opts || {};
+      var out = [];
+      etat.membres.forEach(function (m) {
+        if (!opts.tous && !m.actif) return;
+        if (opts.role && m.role !== opts.role) return;
+        if (opts.membreId && m.id !== opts.membreId) return;
+        (m.absences || []).forEach(function (a) {
+          if (opts.depuis && (a.fin || a.debut) < opts.depuis) return;
+          if (opts.jusqu && a.debut > opts.jusqu) return;
+          out.push({ membre: m, absence: a });
+        });
+      });
+      return out.sort(function (x, y) {
+        if (x.absence.debut !== y.absence.debut) return x.absence.debut < y.absence.debut ? -1 : 1;
+        return (x.membre.nom + x.membre.prenom).localeCompare(y.membre.nom + y.membre.prenom, "fr");
+      });
+    },
+
     ajouteAbsence: function (i, o) {
       return Promise.resolve().then(function () {
         var m = D.membre(i); if (!m) throw erreur("Membre introuvable.");
-        var debut = texte(o.debut), fin = texte(o.fin) || debut;
-        if (!debut) throw erreur("Indique la date de début de l'absence.");
-        if (global.Cal.diff(debut, fin) < 0) throw erreur("La fin de l'absence précède son début.");
-        m.absences.push({ id: id(), debut: debut, fin: fin, motif: texte(o.motif) || "Absence" });
+        var v = valideAbsence(m, o, null);
+        v.id = id();
+        m.absences.push(v);
         m.absences.sort(function (a, b) { return a.debut < b.debut ? -1 : 1; });
+        return sauve();
+      });
+    },
+    majAbsence: function (i, idAbs, o) {
+      return Promise.resolve().then(function () {
+        var m = D.membre(i); if (!m) throw erreur("Membre introuvable.");
+        var a = m.absences.filter(function (x) { return x.id === idAbs; })[0];
+        if (!a) throw erreur("Absence introuvable.");
+        var v = valideAbsence(m, o, idAbs);
+        a.debut = v.debut; a.fin = v.fin; a.motif = v.motif;
+        m.absences.sort(function (x, y) { return x.debut < y.debut ? -1 : 1; });
         return sauve();
       });
     },

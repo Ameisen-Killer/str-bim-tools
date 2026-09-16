@@ -80,6 +80,40 @@
 
   function estWeekend(s) { var d = dt(s); if (!d) return false; var j = d.getDay(); return j === 0 || j === 6; }
 
+  /** Premier jour du mois contenant la date. */
+  function premierMois(s) {
+    var d = dt(s); if (!d) return null;
+    d.setDate(1);
+    return iso(d);
+  }
+
+  /** Nombre de jours du mois contenant la date. */
+  function nbJoursMois(s) {
+    var d = dt(s); if (!d) return 0;
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0, 12).getDate();
+  }
+
+  /** Décale une date de n mois. Le quantième est ramené au dernier jour si le mois est plus court. */
+  function ajouteMois(s, n) {
+    var d = dt(s); if (!d) return null;
+    var jour = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + n);
+    d.setDate(Math.min(jour, new Date(d.getFullYear(), d.getMonth() + 1, 0, 12).getDate()));
+    return iso(d);
+  }
+
+  /** Découpe une liste de jours en mois : [{cle, jours:[]}] */
+  function mois(jours) {
+    var out = [], cle = null;
+    jours.forEach(function (j) {
+      var k = j.slice(0, 7);
+      if (k !== cle) { out.push({ cle: k, premier: j, jours: [] }); cle = k; }
+      out[out.length - 1].jours.push(j);
+    });
+    return out;
+  }
+
   /* --------------------------------------------------------- affichage */
 
   function jourCourt(s) { var d = dt(s); return d ? JOURS[d.getDay()] : ""; }
@@ -93,6 +127,18 @@
     var d = dt(s); if (!d) return "—";
     var noms = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     return noms[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()] + " " + d.getFullYear();
+  }
+
+  /** « septembre 2026 » */
+  function fmtMois(s) {
+    var d = dt(s); if (!d) return "—";
+    return MOIS[d.getMonth()] + " " + d.getFullYear();
+  }
+
+  /** « sept. 26 », pour un en-tête étroit */
+  function fmtMoisCourt(s) {
+    var d = dt(s); if (!d) return "—";
+    return MOIS_COURT[d.getMonth()] + " " + String(d.getFullYear()).slice(2);
   }
 
   /** « 15.09.2026 » */
@@ -270,8 +316,10 @@
     iso: iso, dt: dt, ajoute: ajoute, diff: diff, lundi: lundi,
     aujourdhui: aujourdhui, isoAuj: isoAuj, serie: serie,
     semaineISO: semaineISO, estWeekend: estWeekend,
+    premierMois: premierMois, nbJoursMois: nbJoursMois, ajouteMois: ajouteMois, mois: mois,
     jourCourt: jourCourt, quantieme: quantieme,
     fmtCourt: fmtCourt, fmtLong: fmtLong, fmtCH: fmtCH, fmtJours: fmtJours,
+    fmtMois: fmtMois, fmtMoisCourt: fmtMoisCourt,
     paques: paques, feries: feries, ferie: ferie, chome: chome,
     estOuvre: estOuvre, nbOuvres: nbOuvres, reculeOuvres: reculeOuvres,
     CANTONS: CANTONS, MOIS: MOIS
