@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Équipe · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=1">
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification</div>
+    <h1>Équipe</h1>
+    <p class="chapeau">Ingénieurs et dessinateurs, leur capacité hebdomadaire et leurs absences. La capacité sert de référence au tableau de bord : c'est elle qui fait apparaître une surcharge.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">01 — Ingénieurs</div>
+          <h2 id="t-ing">Ingénieurs</h2>
+        </div>
+        <div class="outils">
+          <button class="btn btn-or" type="button" data-nouveau="ingenieur">Nouvel ingénieur</button>
+        </div>
+      </div>
+      <div class="defile" id="liste-ing"></div>
+    </section>
+
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">02 — Dessinateurs</div>
+          <h2 id="t-des">Dessinateurs</h2>
+        </div>
+        <div class="outils">
+          <button class="btn btn-or" type="button" data-nouveau="dessinateur">Nouveau dessinateur</button>
+        </div>
+      </div>
+      <div class="defile" id="liste-des"></div>
+    </section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=1"></script>
+<script src="/planif/assets/donnees.js?v=1"></script>
+<script src="/planif/assets/calculs.js?v=1"></script>
+<script src="/planif/assets/ui.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  D.pret().then(function () {
+    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, action: function () { formulaire(null, "dessinateur"); } }]);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+    [].forEach.call(document.querySelectorAll("[data-nouveau]"), function (b) {
+      b.addEventListener("click", function () { formulaire(null, b.dataset.nouveau); });
+    });
+    dessine();
+  }).catch(function (e) { UI.toast(e.message || "Chargement impossible."); });
+
+  /* ------------------------------------------------------------- affichage */
+
+  function dessine() {
+    rendListe("ingenieur", document.getElementById("liste-ing"), document.getElementById("t-ing"));
+    rendListe("dessinateur", document.getElementById("liste-des"), document.getElementById("t-des"));
+  }
+
+  function rendListe(role, hote, titre) {
+    var membres = D.membres({ role: role, tous: true });
+    UI.vide(hote);
+    titre.textContent = role === "ingenieur" ? "Ingénieurs" : "Dessinateurs";
+
+    if (!membres.length) {
+      hote.appendChild(el("div", { class: "vide", text: "Aucun " + (role === "ingenieur" ? "ingénieur" : "dessinateur") + " enregistré" }));
+      return;
+    }
+
+    // Charge de la semaine en cours, pour situer chacun d'un coup d'œil
+    var jours = C.serie(C.lundi(C.isoAuj()), 7);
+    var rep = Calc.repartition(D.taches({ sansTerminees: true }), D.membres({ tous: true }), D.canton());
+
+    var corps = el("tbody");
+    membres.forEach(function (m) {
+      var b = Calc.bilan(m, jours, rep[m.id], D.canton());
+      var pourcent = b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
+      var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
+
+      corps.appendChild(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
+        el("td", {}, [
+          el("div", { class: "principal", text: m.prenom + " " + m.nom }),
+          el("div", { class: "secondaire", text: m.email })
+        ]),
+        el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
+        el("td", {}, [
+          el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
+          el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])
+        ]),
+        el("td", {}, [
+          m.absences.length
+            ? el("div", {}, [
+                el("div", { class: "num", text: m.absences.length + (m.absences.length > 1 ? " périodes" : " période") }),
+                prochaine ? el("div", { class: "secondaire", text: prochaine.motif + " · " + C.fmtCourt(prochaine.debut) + " → " + C.fmtCourt(prochaine.fin) }) : null
+              ])
+            : el("span", { class: "secondaire", text: "—" })
+        ]),
+        el("td", { class: "actions" }, [
+          el("button", { class: "btn btn-nu", type: "button", text: "Absences", onclick: function () { absences(m.id); } }),
+          el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(m.id); } }),
+          el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(m); } })
+        ])
+      ]));
+    });
+
+    hote.appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { text: "Nom et adresse" }),
+        el("th", { text: "Capacité" }),
+        el("th", { text: "Cette semaine" }),
+        el("th", { text: "Absences" }),
+        el("th", { text: "" })
+      ])]),
+      corps
+    ]));
+  }
+
+  /* ------------------------------------------------------------ formulaire */
+
+  function formulaire(idMembre, roleDefaut) {
+    var m = idMembre ? D.membre(idMembre) : null;
+    var corps = el("div", { class: "grille-champs" }, [
+      UI.champ({ nom: "prenom", label: "Prénom", valeur: m ? m.prenom : "", exemple: "Camille", autocomplete: "given-name" }),
+      UI.champ({ nom: "nom", label: "Nom", valeur: m ? m.nom : "", exemple: "Berger", autocomplete: "family-name" }),
+      UI.champ({ nom: "email", label: "Adresse e-mail", type: "email", valeur: m ? m.email : "", exemple: "camille.berger@exemple.ch", large: true }),
+      UI.champ({
+        nom: "role", label: "Rôle", type: "select", valeur: m ? m.role : (roleDefaut || "dessinateur"),
+        options: [{ valeur: "ingenieur", label: "Ingénieur" }, { valeur: "dessinateur", label: "Dessinateur" }]
+      }),
+      UI.champ({
+        nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7",
+        valeur: m ? m.capacite : D.reglages().capaciteDefaut,
+        aide: "5 pour un plein temps, 4 pour un 80 %."
+      }),
+      UI.champ({
+        nom: "actif", label: "Présence à l'effectif", type: "select", valeur: m ? String(m.actif) : "true",
+        options: [{ valeur: "true", label: "Actif — apparaît au planning" }, { valeur: "false", label: "Inactif — masqué du planning" }]
+      })
+    ]);
+
+    UI.ouvre({
+      surtitre: m ? "Modifier" : "Nouveau membre",
+      titre: m ? m.prenom + " " + m.nom : "Membre de l'équipe",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            var v = UI.lit(corps);
+            v.actif = v.actif === "true";
+            var p = m ? D.majMembre(m.id, v) : D.ajouteMembre(v);
+            return p.then(function () { dessine(); UI.toast(m ? "Membre modifié." : "Membre ajouté."); })
+              .catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  /* -------------------------------------------------------------- absences */
+
+  function absences(idMembre) {
+    var m = D.membre(idMembre);
+    var liste = el("div", { style: "margin-bottom:26px" });
+
+    function rend() {
+      UI.vide(liste);
+      if (!m.absences.length) {
+        liste.appendChild(el("div", { class: "vide", style: "padding:22px 0", text: "Aucune absence enregistrée" }));
+        return;
+      }
+      var corps = el("tbody");
+      m.absences.forEach(function (a) {
+        var n = C.nbOuvres(a.debut, a.fin, D.canton());
+        corps.appendChild(el("tr", {}, [
+          el("td", {}, [
+            el("div", { class: "principal", text: a.motif }),
+            el("div", { class: "secondaire", text: C.fmtCH(a.debut) + " → " + C.fmtCH(a.fin) })
+          ]),
+          el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
+          el("td", { class: "actions" }, [
+            el("button", {
+              class: "btn btn-nu btn-rouge", type: "button", text: "Retirer",
+              onclick: function () { D.suppAbsence(m.id, a.id).then(function () { rend(); dessine(); }); }
+            })
+          ])
+        ]));
+      });
+      liste.appendChild(el("table", { class: "liste", style: "min-width:0" }, [corps]));
+    }
+    rend();
+
+    var ajout = el("div", { class: "grille-champs" }, [
+      UI.champ({ nom: "debut", label: "Du", type: "date" }),
+      UI.champ({ nom: "fin", label: "Au", type: "date", aide: "Laisser vide pour un seul jour." }),
+      UI.champ({ nom: "motif", label: "Motif", valeur: "Vacances", exemple: "Vacances, service, formation…" })
+    ]);
+
+    var corps = el("div", {}, [
+      el("p", { class: "aide", style: "margin-bottom:20px;font-size:14px;color:var(--texte-doux)", text: "Les jours d'absence sortent de la capacité disponible et apparaissent hachurés au tableau de bord." }),
+      liste,
+      el("div", { class: "legende", style: "display:block;margin-bottom:10px", text: "Ajouter une période" }),
+      ajout
+    ]);
+
+    UI.ouvre({
+      surtitre: "Absences",
+      titre: m.prenom + " " + m.nom,
+      corps: corps,
+      boutons: [
+        { label: "Fermer" },
+        {
+          label: "Ajouter", or: true, action: function () {
+            var v = UI.lit(ajout);
+            return D.ajouteAbsence(m.id, v).then(function () {
+              rend(); dessine();
+              ajout.querySelector("[name=debut]").value = "";
+              ajout.querySelector("[name=fin]").value = "";
+              UI.toast("Absence enregistrée.");
+              return false;
+            }).catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function supprime(m) {
+    var n = D.taches({ membreId: m.id }).length;
+    UI.confirme(
+      "Supprimer " + m.prenom + " " + m.nom + " ?",
+      n ? "Ce membre est affecté à " + n + (n > 1 ? " tâches" : " tâche") + ". Les tâches sont conservées mais se retrouveront sans affectation."
+        : "Ce membre sera retiré de l'équipe et des affaires auxquelles il participe.",
+      "Supprimer", true
+    ).then(function (ok) {
+      if (!ok) return;
+      D.suppMembre(m.id).then(function () { dessine(); UI.toast("Membre supprimé."); });
+    });
+  }
+})();
+</script>
+</body>
+</html>

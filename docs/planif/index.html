@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tableau de bord · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=1">
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification</div>
+    <h1>Tableau de bord</h1>
+    <p class="chapeau">Une ligne par membre, une colonne par jour. Les barres se déplacent à la souris ou au doigt : glisser sur le côté décale la tâche, glisser vers une autre ligne la réaffecte.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="plan-barre">
+        <button class="btn" type="button" id="prec" aria-label="Semaine précédente">◀ Précédente</button>
+        <button class="btn" type="button" id="auj">Aujourd'hui</button>
+        <button class="btn" type="button" id="suiv" aria-label="Semaine suivante">Suivante ▶</button>
+        <span class="plan-periode" id="periode"></span>
+        <span style="flex:1 1 auto"></span>
+        <select id="duree" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Nombre de semaines affichées">
+          <option value="7">1 semaine</option>
+          <option value="14" selected>2 semaines</option>
+          <option value="28">4 semaines</option>
+        </select>
+        <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:240px" aria-label="Filtrer par affaire"></select>
+        <label class="case" style="text-transform:none;letter-spacing:.04em">
+          <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
+        </label>
+      </div>
+
+      <div class="cles" id="cles"></div>
+
+      <div class="plan-defile" id="plan-defile" style="margin-top:28px">
+        <div class="plan" id="plan"></div>
+      </div>
+
+      <div class="legende-plan">
+        <span><i class="ech" aria-hidden="true"></i> Échéance</span>
+        <span><i class="ret" aria-hidden="true"></i> En retard</span>
+        <span><i class="dash" aria-hidden="true"></i> Charge ingénieur</span>
+        <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
+        <span>Fond hachuré : absence</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">02 — Points d'attention</div>
+          <h2 id="titre-alertes">Alertes</h2>
+        </div>
+      </div>
+      <div class="alertes" id="alertes"></div>
+    </section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=1"></script>
+<script src="/planif/assets/donnees.js?v=1"></script>
+<script src="/planif/assets/calculs.js?v=1"></script>
+<script src="/planif/assets/ui.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  var CLE_VUE = "planif.vue";
+  var vue = { debut: null, duree: 14, affaire: "", occupes: false };
+  var memorise0 = null;
+  try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
+  // Première visite sur un écran étroit : une seule semaine, sinon tout est illisible.
+  if (!memorise0 && window.innerWidth < 760) vue.duree = 7;
+  if (!vue.debut) vue.debut = C.lundi(C.isoAuj());
+
+  function memorise() {
+    try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
+  }
+
+  D.pret().then(function () {
+    UI.chrome("tableau", [{
+      label: "Nouvelle tâche", or: true,
+      action: function () { location.href = "/planif/taches/?nouvelle=1"; }
+    }]);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+
+    document.getElementById("prec").addEventListener("click", function () { decale(-7); });
+    document.getElementById("suiv").addEventListener("click", function () { decale(7); });
+    document.getElementById("auj").addEventListener("click", function () {
+      vue.debut = C.lundi(C.isoAuj()); memorise(); rend();
+    });
+    var duree = document.getElementById("duree");
+    duree.value = String(vue.duree);
+    duree.addEventListener("change", function () { vue.duree = parseInt(duree.value, 10); memorise(); rend(); });
+
+    var fa = document.getElementById("f-affaire");
+    fa.appendChild(el("option", { value: "" }, ["Toutes les affaires"]));
+    D.affaires({ tous: true }).forEach(function (a) {
+      fa.appendChild(el("option", { value: a.id, selected: a.id === vue.affaire }, [a.code + " · " + a.nom]));
+    });
+    fa.value = vue.affaire || "";
+    fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
+
+    var fo = document.getElementById("f-occupes");
+    fo.checked = !!vue.occupes;
+    fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
+
+    rend();
+  }).catch(function (e) { UI.toast(e.message || "Chargement impossible."); });
+
+  function decale(n) { vue.debut = C.ajoute(vue.debut, n); memorise(); rend(); }
+
+  /* --------------------------------------------------------------- rendu */
+
+  var jours = [], sems = [], membres = [], rep = {};
+
+  function rend() {
+    var canton = D.canton();
+    jours = C.serie(vue.debut, vue.duree);
+    sems = Calc.semaines(jours);
+
+    var taches = D.taches({ sansTerminees: false }).filter(function (t) {
+      if (vue.affaire && t.affaireId !== vue.affaire) return false;
+      return true;
+    });
+
+    membres = D.membres({}).slice();
+    rep = Calc.repartition(taches, membres, canton);
+
+    // index des barres à dessiner, par membre
+    var barres = {};
+    taches.forEach(function (t) {
+      var debut = Calc.debutEffectif(t, canton), fin = Calc.finEffective(t);
+      if (!debut || !fin) return;
+      if (fin < jours[0] || debut > jours[jours.length - 1]) return;       // hors fenêtre
+      Calc.affectations(t).forEach(function (af) {
+        (barres[af.membreId] || (barres[af.membreId] = [])).push({
+          tache: t, role: af.role, charge: af.charge, debut: debut, fin: fin, membreId: af.membreId
+        });
+      });
+    });
+
+    if (vue.occupes) membres = membres.filter(function (m) { return barres[m.id] && barres[m.id].length; });
+
+    rendPeriode();
+    rendCles(canton);
+    rendPlan(barres, canton);
+    rendAlertes(canton);
+  }
+
+  function rendPeriode() {
+    var p = document.getElementById("periode");
+    UI.vide(p);
+    var premiere = sems[0], derniere = sems[sems.length - 1];
+    p.appendChild(el("b", { text: premiere.num === derniere.num ? "S" + premiere.num : "S" + premiere.num + " → S" + derniere.num }));
+    p.appendChild(document.createTextNode(" · " + C.fmtCourt(jours[0]) + " → " + C.fmtCourt(jours[jours.length - 1])));
+  }
+
+  function rendCles(canton) {
+    var hote = UI.vide(document.getElementById("cles"));
+    var charge = 0, capacite = 0;
+    membres.forEach(function (m) {
+      var b = Calc.bilan(m, jours, rep[m.id], canton);
+      charge += b.charge; capacite += b.capacite;
+    });
+    var taux = capacite > 0 ? Math.round(charge / capacite * 100) : 0;
+    var auj = C.isoAuj();
+    var retard = D.taches({ sansTerminees: true }).filter(function (t) {
+      return t.echeance && t.echeance < auj && (!vue.affaire || t.affaireId === vue.affaire);
+    }).length;
+
+    function cle(v, l, classe) {
+      hote.appendChild(el("div", { class: "cle" + (classe ? " " + classe : "") }, [
+        el("div", { class: "v", text: v }), el("div", { class: "l", text: l })
+      ]));
+    }
+    cle(C.fmtJours(charge), "Jours affectés", "");
+    cle(C.fmtJours(capacite), "Jours disponibles", "");
+    cle(taux + " %", "Taux d'occupation", taux > 100 ? "alerte" : "or");
+    cle(String(retard), "Tâches en retard", retard ? "alerte" : "");
+  }
+
+  /* ---------------------------------------------------------------- plan */
+
+  function rendPlan(barres, canton) {
+    var plan = UI.vide(document.getElementById("plan"));
+    var n = jours.length, auj = C.isoAuj();
+    plan.style.setProperty("--n", n);
+    plan.style.minWidth = Math.max(760, 150 + n * 34) + "px";
+
+    /* ---- en-tête : semaines puis jours ---- */
+    plan.appendChild(el("div", { class: "pl-nom pl-tete-nom" }, [
+      el("div", { class: "pl-membre" }, [el("span", { class: "r", text: "Équipe" })])
+    ]));
+
+    var lignesSem = el("div", { class: "pl-sems" });
+    sems.forEach(function (s) {
+      var actuelle = s.jours.indexOf(auj) >= 0;
+      lignesSem.appendChild(el("div", {
+        class: "pl-sem" + (actuelle ? " actuelle" : ""),
+        style: "--span:" + s.jours.length,
+        text: "Semaine " + s.num
+      }));
+    });
+
+    var lignesJour = el("div", { class: "pl-jours" });
+    jours.forEach(function (j) {
+      var motif = C.chome(j, canton);
+      lignesJour.appendChild(el("div", {
+        class: "pl-jour" + (motif ? " chome" : "") + (j === auj ? " auj" : ""),
+        title: motif || C.fmtLong(j)
+      }, [C.jourCourt(j), el("b", { text: String(C.quantieme(j)) })]));
+    });
+
+    plan.appendChild(el("div", { class: "pl-zone pl-tete-zone" }, [lignesSem, lignesJour]));
+
+    /* ---- une ligne par membre ---- */
+    if (!membres.length) {
+      plan.appendChild(el("div", { class: "pl-nom" }));
+      plan.appendChild(el("div", { class: "pl-zone" }, [
+        el("div", { class: "vide", text: "Aucun membre à afficher" })
+      ]));
+      return;
+    }
+
+    membres.forEach(function (m) {
+      var b = Calc.bilan(m, jours, rep[m.id], canton);
+      plan.appendChild(el("div", { class: "pl-nom" }, [
+        el("div", { class: "pl-membre" }, [
+          el("div", {}, [
+            el("div", { class: "n", text: m.prenom + " " + m.nom }),
+            el("div", { class: "r", text: D.ROLES[m.role] }),
+            el("div", { class: "c", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" })
+          ])
+        ])
+      ]));
+
+      var fond = el("div", { class: "pl-fond", "aria-hidden": "true" });
+      jours.forEach(function (j) {
+        var classes = [];
+        if (C.chome(j, canton)) classes.push("chome");
+        else if (Calc.absenceLe(m, j)) classes.push("abs");
+        if (j === auj) classes.push("auj");
+        fond.appendChild(el("i", { class: classes.join(" ") }));
+      });
+
+      var piste = el("div", { class: "pl-piste" });
+      var liste = (barres[m.id] || []).slice().sort(function (x, y) {
+        return x.debut < y.debut ? -1 : x.debut > y.debut ? 1 : 0;
+      });
+
+      var pistesFin = [];                       // dernière colonne occupée par piste
+      liste.forEach(function (info) {
+        var c1 = Math.max(1, C.diff(jours[0], info.debut) + 1);
+        var c2 = Math.min(n, C.diff(jours[0], info.fin) + 1);
+        if (c2 < 1 || c1 > n) return;
+        var cn = Math.max(1, c2 - c1 + 1);
+
+        var l = 0;
+        while (l < pistesFin.length && pistesFin[l] >= c1) l++;
+        pistesFin[l] = c1 + cn - 1;
+
+        piste.appendChild(barre(info, c1, cn, l + 1, canton));
+      });
+      if (!liste.length) {
+        piste.appendChild(el("div", {
+          class: "pl-vide", style: "grid-row:1;grid-column:1/-1;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(236,232,224,.16);display:flex;align-items:center;padding-left:8px",
+          text: "Rien de planifié"
+        }));
+      }
+
+      var bilan = el("div", { class: "pl-bilan" });
+      sems.forEach(function (s) {
+        var bs = Calc.bilan(m, s.jours, rep[m.id], canton);
+        var classe = bs.charge <= 0.005 ? "nul"
+          : bs.charge > bs.capacite + 0.05 ? "trop"
+          : bs.taux >= 0.9 ? "plein" : "";
+        bilan.appendChild(el("div", { class: "pl-bw " + classe, style: "--span:" + s.jours.length }, [
+          el("span", { text: "S" + s.num + "  " + C.fmtJours(bs.charge) + " / " + C.fmtJours(bs.capacite) + " j" }),
+          el("span", { class: "bj" }, [el("i", { style: "width:" + Math.min(100, bs.capacite > 0 ? Math.round(bs.taux * 100) : (bs.charge ? 100 : 0)) + "%" })])
+        ]));
+      });
+
+      var zone = el("div", { class: "pl-zone", dataset: { membre: m.id, role: m.role } }, [fond, piste, bilan]);
+      plan.appendChild(zone);
+    });
+  }
+
+  function barre(info, c1, cn, ligne, canton) {
+    var t = info.tache, a = D.affaire(t.affaireId);
+    var auj = C.isoAuj();
+    var classes = ["bt"];
+    if (info.role === "ingenieur") classes.push("role-i");
+    if (t.statut === "termine") classes.push("termine");
+    else if (t.echeance < auj) classes.push("retard");
+    if (C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
+
+    var n = el("div", {
+      class: classes.join(" "),
+      style: "--tt:" + UI.teinte(a ? a.teinte : 1) + ";--c1:" + c1 + ";--cn:" + cn + ";--l:" + ligne,
+      tabindex: "0", role: "button",
+      title: (a ? a.code + " · " : "") + t.titre + "\n" +
+             D.ROLES[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
+             C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
+             (t.statut !== "termine" && t.echeance < auj ? "\nEn retard" : "")
+    }, [
+      el("span", { class: "code", text: a ? a.code : "—" }),
+      el("span", { class: "lib", text: t.titre }),
+      el("span", { class: "jr", text: C.fmtJours(info.charge) + " j" })
+    ]);
+
+    activeGlissement(n, info, canton);
+    n.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        applique(info, e.key === "ArrowLeft" ? -1 : 1, null);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault(); fiche(info);
+      }
+    });
+    return n;
+  }
+
+  /* ------------------------------------------------- glisser-déposer */
+
+  function activeGlissement(n, info, canton) {
+    n.addEventListener("pointerdown", function (e) {
+      if (e.button) return;
+      var zone = n.closest(".pl-zone");
+      if (!zone) return;
+      var largeur = zone.getBoundingClientRect().width / jours.length;
+      var x0 = e.clientX, y0 = e.clientY, bouge = false, delta = 0, cible = null;
+
+      // Rectangles des lignes, figés au début du geste : plus fiable que elementFromPoint.
+      var zones = [].map.call(document.querySelectorAll(".pl-zone[data-membre]"), function (z) {
+        return { id: z.dataset.membre, role: z.dataset.role, el: z, r: z.getBoundingClientRect() };
+      });
+
+      try { n.setPointerCapture(e.pointerId); } catch (err) {}
+
+      function bougeSouris(ev) {
+        var dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (!bouge && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        if (!bouge) { bouge = true; n.classList.add("glisse"); document.body.classList.add("glisse-en-cours"); }
+        delta = Math.round(dx / largeur);
+        n.style.transform = "translateX(" + (delta * largeur) + "px)";
+
+        var trouve = null;
+        for (var i = 0; i < zones.length; i++) {
+          if (ev.clientY >= zones[i].r.top && ev.clientY <= zones[i].r.bottom) { trouve = zones[i]; break; }
+        }
+        if (trouve !== cible) {
+          zones.forEach(function (z) { z.el.classList.remove("cible"); });
+          cible = trouve;
+          if (cible && cible.id !== info.membreId) cible.el.classList.add("cible");
+        }
+      }
+
+      function fin(ev) {
+        n.removeEventListener("pointermove", bougeSouris);
+        n.removeEventListener("pointerup", fin);
+        n.removeEventListener("pointercancel", fin);
+        try { n.releasePointerCapture(e.pointerId); } catch (err) {}
+        zones.forEach(function (z) { z.el.classList.remove("cible"); });
+        n.classList.remove("glisse");
+        document.body.classList.remove("glisse-en-cours");
+        n.style.transform = "";
+        if (!bouge) { fiche(info); return; }
+        applique(info, delta, cible ? cible.id : null);
+      }
+
+      n.addEventListener("pointermove", bougeSouris);
+      n.addEventListener("pointerup", fin);
+      n.addEventListener("pointercancel", fin);
+    });
+  }
+
+  /** Décale la tâche de `delta` jours et, si demandé, la réaffecte à un autre membre. */
+  function applique(info, delta, membreCible) {
+    var t = D.tache(info.tache.id);
+    if (!t) return;
+    var champs = {};
+    if (delta) {
+      champs.debut = C.ajoute(info.debut, delta);
+      champs.echeance = C.ajoute(t.echeance, delta);
+    }
+    var reaffecte = null;
+    if (membreCible) {
+      var m = D.membre(membreCible);
+      var actuel = info.role === "ingenieur" ? t.ingenieurId : t.dessinateurId;
+      if (m && m.id !== actuel) {
+        if (m.role !== info.role) {
+          UI.toast("Une charge " + (info.role === "ingenieur" ? "ingénieur" : "dessin") +
+                   " ne peut aller qu'à un " + (info.role === "ingenieur" ? "ingénieur" : "dessinateur") + ".");
+          if (!delta) return;
+        } else {
+          champs[info.role === "ingenieur" ? "ingenieurId" : "dessinateurId"] = m.id;
+          reaffecte = m.prenom + " " + m.nom;
+        }
+      }
+    }
+    if (!Object.keys(champs).length) return;
+    D.retoucheTache(t.id, champs).then(function () {
+      rend();
+      var dits = [];
+      if (delta) dits.push("décalée de " + (delta > 0 ? "+" : "") + delta + " j");
+      if (reaffecte) dits.push("confiée à " + reaffecte);
+      UI.toast("Tâche " + dits.join(", ") + ".");
+    }).catch(function (e) { UI.toast(e.message); });
+  }
+
+  /* -------------------------------------------------------------- fiche */
+
+  function fiche(info) {
+    var t = D.tache(info.tache.id), a = D.affaire(t.affaireId);
+    var canton = D.canton();
+    var debut = Calc.debutEffectif(t, canton);
+
+    function ligne(cle, valeur) {
+      return el("div", { style: "display:flex;gap:16px;padding:9px 0;border-bottom:1px solid var(--ligne-faible)" }, [
+        el("span", { style: "font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible);min-width:140px", text: cle }),
+        el("span", { style: "font-size:14.5px", text: valeur })
+      ]);
+    }
+
+    var statut = el("select", { name: "statut" });
+    Object.keys(D.STATUTS_TACHE).forEach(function (k) {
+      statut.appendChild(el("option", { value: k, selected: k === t.statut }, [D.STATUTS_TACHE[k]]));
+    });
+    var avancement = el("input", { type: "number", name: "avancement", min: "0", max: "100", step: "5" });
+    avancement.value = t.avancement;
+
+    var corps = el("div", {}, [
+      ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
+      ligne("Ingénieur", t.chargeInge > 0 ? D.nomMembre(t.ingenieurId) + " · " + C.fmtJours(t.chargeInge) + " j" : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? D.nomMembre(t.dessinateurId) + " · " + C.fmtJours(t.chargeDessin) + " j" : "—"),
+      ligne("Période", C.fmtCH(debut) + " → " + C.fmtCH(t.echeance) + (t.debut ? "" : "  (calée au plus tard)")),
+      ligne("Jours ouvrés", String(C.nbOuvres(debut, t.echeance, canton))),
+      t.note ? ligne("Note", t.note) : null,
+      el("div", { class: "grille-champs", style: "margin-top:24px" }, [
+        el("div", { class: "champ" }, [el("label", { text: "Statut" }), statut]),
+        el("div", { class: "champ" }, [el("label", { text: "Avancement (%)" }), avancement])
+      ]),
+      el("div", { class: "outils", style: "margin-top:22px" }, [
+        el("button", { class: "btn", type: "button", text: "− 1 semaine", onclick: function () { UI.ferme(); applique(info, -7, null); } }),
+        el("button", { class: "btn", type: "button", text: "+ 1 semaine", onclick: function () { UI.ferme(); applique(info, 7, null); } })
+      ])
+    ]);
+
+    UI.ouvre({
+      surtitre: D.ROLES[info.role] + " · " + C.fmtJours(info.charge) + " j",
+      titre: t.titre,
+      corps: corps,
+      boutons: [
+        { label: "Modifier en détail", gauche: true, action: function () { location.href = "/planif/taches/?tache=" + encodeURIComponent(t.id); } },
+        { label: "Fermer" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            return D.retoucheTache(t.id, {
+              statut: statut.value,
+              avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
+            }).then(function () { rend(); UI.toast("Tâche mise à jour."); });
+          }
+        }
+      ]
+    });
+  }
+
+  /* ------------------------------------------------------------ alertes */
+
+  function rendAlertes(canton) {
+    var hote = UI.vide(document.getElementById("alertes"));
+    var liste = Calc.alertes(D.etat(), canton).filter(function (al) {
+      if (!vue.affaire) return true;
+      if (al.tacheId) { var t = D.tache(al.tacheId); return t && t.affaireId === vue.affaire; }
+      return true;
+    });
+    document.getElementById("titre-alertes").textContent =
+      liste.length ? liste.length + (liste.length > 1 ? " points d'attention" : " point d'attention") : "Rien à signaler";
+
+    if (!liste.length) {
+      hote.appendChild(el("div", { class: "vide", text: "Aucun retard, aucune surcharge" }));
+      return;
+    }
+    liste.slice(0, 20).forEach(function (al) {
+      hote.appendChild(el("div", { class: "al " + al.type }, [
+        el("span", { class: "q", text: al.quoi }),
+        el("div", {}, [el("b", { text: al.texte }), " — " + al.detail])
+      ]));
+    });
+    if (liste.length > 20) {
+      hote.appendChild(el("div", { class: "secondaire", style: "font-family:var(--mono);font-size:11px;color:var(--texte-faible)", text: "et " + (liste.length - 20) + " autres" }));
+    }
+  }
+})();
+</script>
+</body>
+</html>

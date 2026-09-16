@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Affaires · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=1">
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification</div>
+    <h1>Affaires</h1>
+    <p class="chapeau">Chaque affaire porte son équipe et sa teinte. La teinte suit l'affaire partout : dans la liste des tâches comme sur les barres du tableau de bord.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">01 — Portefeuille</div>
+          <h2 id="titre-liste">Affaires</h2>
+        </div>
+        <div class="outils">
+          <label class="case" style="text-transform:none;letter-spacing:.04em">
+            <input type="checkbox" id="voir-terminees"> Voir les affaires terminées
+          </label>
+          <button class="btn btn-or" type="button" id="btn-nouvelle">Nouvelle affaire</button>
+        </div>
+      </div>
+      <div class="defile" id="liste"></div>
+    </section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=1"></script>
+<script src="/planif/assets/donnees.js?v=1"></script>
+<script src="/planif/assets/calculs.js?v=1"></script>
+<script src="/planif/assets/ui.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  D.pret().then(function () {
+    UI.chrome("affaires", [{ label: "Nouvelle affaire", or: true, action: function () { formulaire(null); } }]);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+    document.getElementById("btn-nouvelle").addEventListener("click", function () { formulaire(null); });
+    document.getElementById("voir-terminees").addEventListener("change", dessine);
+    dessine();
+  }).catch(function (e) { UI.toast(e.message || "Chargement impossible."); });
+
+  /* ------------------------------------------------------------- affichage */
+
+  function dessine() {
+    var tous = document.getElementById("voir-terminees").checked;
+    var affaires = D.affaires({ tous: tous });
+    var hote = document.getElementById("liste");
+    UI.vide(hote);
+    document.getElementById("titre-liste").textContent =
+      affaires.length + (affaires.length > 1 ? " affaires" : " affaire");
+
+    if (!affaires.length) {
+      hote.appendChild(el("div", { class: "vide", text: "Aucune affaire — commence par en créer une" }));
+      return;
+    }
+
+    var corps = el("tbody");
+    affaires.forEach(function (a) {
+      var taches = D.taches({ affaireId: a.id });
+      var restant = taches.reduce(function (s, t) {
+        return s + (t.statut === "termine" ? 0 : Calc.chargeTotale(t) * (1 - (t.avancement || 0) / 100));
+      }, 0);
+      var enRetard = taches.filter(function (t) { return t.statut !== "termine" && t.echeance < C.isoAuj(); }).length;
+      var t = UI.teinte(a.teinte);
+
+      var equipe = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
+      a.ingenieurs.forEach(function (i) {
+        var m = D.membre(i); if (m) equipe.appendChild(el("span", { class: "etiq ing", text: m.prenom + " " + m.nom.charAt(0) + "." }));
+      });
+      a.dessinateurs.forEach(function (i) {
+        var m = D.membre(i); if (m) equipe.appendChild(el("span", { class: "etiq des", text: m.prenom + " " + m.nom.charAt(0) + "." }));
+      });
+      if (!equipe.childNodes.length) equipe.appendChild(el("span", { class: "secondaire", text: "Aucun membre affecté" }));
+
+      corps.appendChild(el("tr", {}, [
+        el("td", {}, [
+          el("div", { style: "display:flex;align-items:center;gap:9px" }, [
+            el("span", { class: "pastille", style: "color:" + t, "aria-hidden": "true" }),
+            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em", text: a.code })
+          ]),
+          el("div", { class: "principal", style: "margin-top:4px", text: a.nom }),
+          a.note ? el("div", { class: "secondaire", text: a.note }) : null
+        ]),
+        el("td", {}, [equipe]),
+        el("td", {}, [
+          el("div", { class: "num", text: taches.length + (taches.length > 1 ? " tâches" : " tâche") }),
+          el("div", { class: "secondaire", text: C.fmtJours(restant) + " j restants" }),
+          enRetard ? el("div", { class: "secondaire", style: "color:var(--alerte)", text: enRetard + (enRetard > 1 ? " en retard" : " en retard") }) : null
+        ]),
+        el("td", { class: "num", text: a.echeance ? C.fmtCH(a.echeance) : "—" }),
+        el("td", {}, [
+          el("span", { class: "statut s-" + (a.statut === "active" ? "en_cours" : a.statut === "terminee" ? "termine" : "attente") }, [
+            el("i", { "aria-hidden": "true" }), D.STATUTS_AFFAIRE[a.statut]
+          ])
+        ]),
+        el("td", { class: "actions" }, [
+          el("a", { class: "btn btn-nu", href: "/planif/taches/?affaire=" + encodeURIComponent(a.id), text: "Tâches" }),
+          el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(a.id); } }),
+          el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(a, taches.length); } })
+        ])
+      ]));
+    });
+
+    hote.appendChild(el("table", { class: "liste", style: "min-width:860px" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { text: "Affaire" }),
+        el("th", { text: "Équipe" }),
+        el("th", { text: "Charge" }),
+        el("th", { text: "Échéance" }),
+        el("th", { text: "Statut" }),
+        el("th", { text: "" })
+      ])]),
+      corps
+    ]));
+  }
+
+  /* ------------------------------------------------------------ formulaire */
+
+  function formulaire(idAffaire) {
+    var a = idAffaire ? D.affaire(idAffaire) : null;
+    var ings = D.membres({ role: "ingenieur" }).map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom }; });
+    var dess = D.membres({ role: "dessinateur" }).map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom }; });
+
+    // Teinte : proposer la première libre pour éviter deux affaires identiques
+    var prises = D.affaires({ tous: true }).filter(function (x) { return !a || x.id !== a.id; }).map(function (x) { return x.teinte; });
+    var libre = 1; while (libre < 8 && prises.indexOf(libre) >= 0) libre++;
+
+    var teintes = el("div", { class: "cases" });
+    for (var i = 1; i <= 8; i++) {
+      (function (n) {
+        var input = el("input", { type: "radio", name: "teinte", value: String(n) });
+        input.checked = (a ? a.teinte : libre) === n;
+        teintes.appendChild(el("label", {
+          class: "case case-teinte", title: "Teinte " + n,
+          style: "color:" + UI.teinte(n) + ";border-color:color-mix(in srgb," + UI.teinte(n) + " 40%,transparent)"
+        }, [input, el("span", { class: "pastille", "aria-hidden": "true" }), el("span", { class: "sr", text: "Teinte " + n })]));
+      })(i);
+    }
+
+    var corps = el("div", {}, [
+      el("div", { class: "grille-champs" }, [
+        UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042" }),
+        UI.champ({ nom: "nom", label: "Libellé", valeur: a ? a.nom : "", exemple: "Immeuble de logements — gros œuvre", large: true }),
+        UI.champ({
+          nom: "statut", label: "Statut", type: "select", valeur: a ? a.statut : "active",
+          options: Object.keys(D.STATUTS_AFFAIRE).map(function (k) { return { valeur: k, label: D.STATUTS_AFFAIRE[k] }; })
+        }),
+        UI.champ({ nom: "echeance", label: "Échéance générale", type: "date", valeur: a ? a.echeance : "", aide: "Facultative : repère d'ensemble." }),
+        UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, phase, points de vigilance…", large: true })
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Teinte de l'affaire" }),
+        teintes
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Ingénieurs de l'affaire" }),
+        UI.cases("ingenieurs", ings, a ? a.ingenieurs : [])
+      ]),
+      el("fieldset", { style: "margin-top:22px" }, [
+        el("div", { class: "legende", text: "Dessinateurs de l'affaire" }),
+        UI.cases("dessinateurs", dess, a ? a.dessinateurs : [])
+      ])
+    ]);
+
+    UI.ouvre({
+      surtitre: a ? "Modifier" : "Nouvelle affaire",
+      titre: a ? a.code + " · " + a.nom : "Affaire",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            var v = UI.lit(corps);
+            var radio = corps.querySelector("input[name=teinte]:checked");
+            v.teinte = radio ? radio.value : 1;
+            var p = a ? D.majAffaire(a.id, v) : D.ajouteAffaire(v);
+            return p.then(function () { dessine(); UI.toast(a ? "Affaire modifiée." : "Affaire créée."); })
+              .catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function supprime(a, nbTaches) {
+    UI.confirme(
+      "Supprimer l'affaire " + a.code + " ?",
+      nbTaches ? "Ses " + nbTaches + (nbTaches > 1 ? " tâches seront supprimées" : " tâche sera supprimée") + " en même temps. Cette action est définitive."
+        : "Cette action est définitive.",
+      "Supprimer", true
+    ).then(function (ok) {
+      if (!ok) return;
+      D.suppAffaire(a.id).then(function () { dessine(); UI.toast("Affaire supprimée."); });
+    });
+  }
+})();
+</script>
+</body>
+</html>

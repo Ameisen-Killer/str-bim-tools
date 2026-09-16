@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tâches · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=1">
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification</div>
+    <h1>Tâches</h1>
+    <p class="chapeau">Une tâche porte deux charges distinctes — ingénieur et dessin — parce qu'elles ne pèsent jamais pareil sur les deux métiers. Sans date de début, la tâche se cale au plus tard avant son échéance.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">01 — Liste</div>
+          <h2 id="titre-liste">Tâches</h2>
+        </div>
+        <div class="outils">
+          <button class="btn" type="button" id="btn-csv">Export CSV</button>
+          <button class="btn btn-or" type="button" id="btn-nouvelle">Nouvelle tâche</button>
+        </div>
+      </div>
+
+      <div class="grille-champs" id="filtres" style="margin-bottom:26px"></div>
+      <div class="defile" id="liste"></div>
+    </section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=1"></script>
+<script src="/planif/assets/donnees.js?v=1"></script>
+<script src="/planif/assets/calculs.js?v=1"></script>
+<script src="/planif/assets/ui.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  var filtres = { affaire: "", membre: "", statut: "", masqueTerminees: true, texte: "" };
+
+  D.pret().then(function () {
+    var p = new URLSearchParams(location.search);
+    if (p.get("affaire")) filtres.affaire = p.get("affaire");
+    if (p.get("membre")) filtres.membre = p.get("membre");
+
+    UI.chrome("taches", [{ label: "Nouvelle tâche", or: true, action: function () { formulaire(null); } }]);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+    document.getElementById("btn-nouvelle").addEventListener("click", function () { formulaire(null); });
+    document.getElementById("btn-csv").addEventListener("click", exporteCSV);
+
+    rendFiltres();
+    dessine();
+
+    if (p.get("nouvelle") === "1") formulaire(null);
+    if (p.get("tache")) formulaire(p.get("tache"));
+  }).catch(function (e) { UI.toast(e.message || "Chargement impossible."); });
+
+  /* --------------------------------------------------------------- filtres */
+
+  function rendFiltres() {
+    var hote = document.getElementById("filtres");
+    UI.vide(hote);
+
+    var chAffaire = UI.champ({
+      nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
+      options: [{ valeur: "", label: "Toutes les affaires" }].concat(
+        D.affaires({ tous: true }).map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; }))
+    });
+    var chMembre = UI.champ({
+      nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
+      options: [{ valeur: "", label: "Toute l'équipe" }].concat(
+        D.membres({ tous: true }).map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom }; }))
+    });
+    var chStatut = UI.champ({
+      nom: "f-statut", label: "Statut", type: "select", valeur: filtres.statut,
+      options: [{ valeur: "", label: "Tous les statuts" }].concat(
+        Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; }))
+    });
+    var chTexte = UI.champ({ nom: "f-texte", label: "Recherche", valeur: filtres.texte, exemple: "Coffrage, armature…" });
+
+    hote.appendChild(chAffaire); hote.appendChild(chMembre);
+    hote.appendChild(chStatut); hote.appendChild(chTexte);
+
+    var masque = el("input", { type: "checkbox" });
+    masque.checked = filtres.masqueTerminees;
+    masque.addEventListener("change", function () { filtres.masqueTerminees = masque.checked; dessine(); });
+    hote.appendChild(el("div", { class: "champ", style: "justify-content:flex-end" }, [
+      el("label", { class: "case", style: "white-space:nowrap" }, [masque, "Masquer les terminées"])
+    ]));
+
+    chAffaire.querySelector("select").addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
+    chMembre.querySelector("select").addEventListener("change", function () { filtres.membre = this.value; dessine(); });
+    chStatut.querySelector("select").addEventListener("change", function () { filtres.statut = this.value; dessine(); });
+    chTexte.querySelector("input").addEventListener("input", function () { filtres.texte = this.value; dessine(); });
+  }
+
+  function selection() {
+    var q = filtres.texte.trim().toLowerCase();
+    return D.taches({ affaireId: filtres.affaire || null, membreId: filtres.membre || null })
+      .filter(function (t) {
+        if (filtres.masqueTerminees && t.statut === "termine") return false;
+        if (filtres.statut && t.statut !== filtres.statut) return false;
+        if (q) {
+          var a = D.affaire(t.affaireId);
+          var foin = (t.titre + " " + (t.note || "") + " " + (a ? a.code + " " + a.nom : "")).toLowerCase();
+          if (foin.indexOf(q) < 0) return false;
+        }
+        return true;
+      });
+  }
+
+  /* ------------------------------------------------------------- affichage */
+
+  function dessine() {
+    var taches = selection();
+    var hote = document.getElementById("liste");
+    UI.vide(hote);
+
+    var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
+    document.getElementById("titre-liste").textContent =
+      taches.length + (taches.length > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(charge) + " j";
+
+    if (!taches.length) {
+      hote.appendChild(el("div", { class: "vide", text: "Aucune tâche ne correspond" }));
+      return;
+    }
+
+    var auj = C.isoAuj();
+    var corps = el("tbody");
+    taches.forEach(function (t) {
+      var a = D.affaire(t.affaireId);
+      var teinte = UI.teinte(a ? a.teinte : 1);
+      var debut = Calc.debutEffectif(t, D.canton());
+      var retard = t.statut !== "termine" && t.echeance < auj;
+      var reste = C.diff(auj, t.echeance);
+
+      var gens = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
+      if (t.chargeInge > 0) {
+        gens.appendChild(el("span", { class: "etiq ing", text: (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "Non affecté") + " · " + C.fmtJours(t.chargeInge) + " j" }));
+      }
+      if (t.chargeDessin > 0) {
+        gens.appendChild(el("span", { class: "etiq des", text: (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "Non affecté") + " · " + C.fmtJours(t.chargeDessin) + " j" }));
+      }
+
+      corps.appendChild(el("tr", {}, [
+        el("td", {}, [
+          el("div", { style: "display:flex;align-items:center;gap:8px" }, [
+            el("span", { class: "pastille", style: "color:" + teinte, "aria-hidden": "true" }),
+            el("span", { class: "num", style: "color:" + teinte + ";font-size:11px;letter-spacing:.1em", text: a ? a.code : "—" })
+          ]),
+          el("div", { class: "principal", style: "margin-top:4px", text: t.titre }),
+          t.note ? el("div", { class: "secondaire", text: t.note }) : null
+        ]),
+        el("td", {}, [gens]),
+        el("td", {}, [
+          el("div", { class: "num", text: C.fmtJours(Calc.chargeTotale(t)) + " j" }),
+          t.debut ? null : el("div", { class: "secondaire", text: "calé au plus tard" })
+        ]),
+        el("td", { class: "num", style: "white-space:nowrap" }, [
+          el("div", { text: C.fmtCH(debut) + " →" }),
+          el("div", { style: retard ? "color:var(--alerte)" : "color:var(--or)", text: C.fmtCH(t.echeance) }),
+          el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : "dans " + reste + " j") })
+        ]),
+        el("td", {}, [
+          el("span", { class: "statut s-" + t.statut }, [el("i", { "aria-hidden": "true" }), D.STATUTS_TACHE[t.statut]]),
+          t.avancement ? el("div", { class: "jauge" }, [el("i", { style: "width:" + t.avancement + "%" })]) : null,
+          t.avancement ? el("div", { class: "secondaire", text: t.avancement + " %" }) : null
+        ]),
+        el("td", { class: "actions" }, [
+          el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(t.id); } }),
+          el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(t); } })
+        ])
+      ]));
+    });
+
+    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { text: "Tâche" }),
+        el("th", { text: "Affectations" }),
+        el("th", { text: "Charge" }),
+        el("th", { text: "Période" }),
+        el("th", { text: "Avancement" }),
+        el("th", { text: "" })
+      ])]),
+      corps
+    ]));
+  }
+
+  /* ------------------------------------------------------------ formulaire */
+
+  function selMembres(nom, role, valeur, affaireId) {
+    var sel = el("select", { name: nom, id: "c-" + nom });
+    sel.appendChild(el("option", { value: "" }, ["— Aucun —"]));
+
+    var aff = affaireId ? D.affaire(affaireId) : null;
+    var idsEquipe = aff ? (role === "ingenieur" ? aff.ingenieurs : aff.dessinateurs) : [];
+    var tous = D.membres({ role: role });
+    var equipe = tous.filter(function (m) { return idsEquipe.indexOf(m.id) >= 0; });
+    var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
+
+    function groupe(label, liste) {
+      if (!liste.length) return;
+      var g = el("optgroup", { label: label });
+      liste.forEach(function (m) {
+        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom]));
+      });
+      sel.appendChild(g);
+    }
+    groupe("Équipe de l'affaire", equipe);
+    groupe(equipe.length ? "Autres" : "Équipe", autres);
+    sel.value = valeur || "";
+    return sel;
+  }
+
+  function formulaire(idTache) {
+    var t = idTache ? D.tache(idTache) : null;
+    var affaires = D.affaires({ tous: true });
+    if (!affaires.length) {
+      return UI.ouvre({
+        titre: "Aucune affaire",
+        corps: el("p", { style: "color:var(--texte-doux)", text: "Une tâche se rattache toujours à une affaire. Crée d'abord une affaire." }),
+        boutons: [{ label: "Fermer" }, { label: "Aller aux affaires", or: true, action: function () { location.href = "/planif/affaires/"; } }]
+      });
+    }
+
+    var affaireInit = t ? t.affaireId : (filtres.affaire || affaires[0].id);
+
+    var chAffaire = UI.champ({
+      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
+      options: affaires.map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; })
+    });
+
+    var boiteIng = el("div", { class: "champ" }, [el("label", { for: "c-ingenieurId", text: "Ingénieur" })]);
+    var boiteDes = el("div", { class: "champ" }, [el("label", { for: "c-dessinateurId", text: "Dessinateur" })]);
+    function rebranche() {
+      var aff = chAffaire.querySelector("select").value;
+      var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : "");
+      var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : "");
+      if (boiteIng.querySelector("select")) boiteIng.querySelector("select").remove();
+      if (boiteDes.querySelector("select")) boiteDes.querySelector("select").remove();
+      boiteIng.appendChild(selMembres("ingenieurId", "ingenieur", vi, aff));
+      boiteDes.appendChild(selMembres("dessinateurId", "dessinateur", vd, aff));
+    }
+    rebranche();
+    chAffaire.querySelector("select").addEventListener("change", rebranche);
+
+    var corps = el("div", {}, [
+      el("div", { class: "grille-champs" }, [
+        chAffaire,
+        UI.champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1", large: true })
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Charges estimées et affectations" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({
+            nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0",
+            valeur: t ? t.chargeInge : "", exemple: "0", aide: "Calcul, contrôle, coordination."
+          }),
+          boiteIng,
+          UI.champ({
+            nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0",
+            valeur: t ? t.chargeDessin : "", exemple: "0", aide: "Production des plans."
+          }),
+          boiteDes
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Dates" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({
+            nom: "debut", label: "Début", type: "date", valeur: t ? t.debut : "",
+            aide: "Facultatif. Vide, la tâche se cale au plus tard avant l'échéance."
+          }),
+          UI.champ({ nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "", aide: "Obligatoire." })
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Suivi" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({
+            nom: "statut", label: "Statut", type: "select", valeur: t ? t.statut : "a_faire",
+            options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
+          }),
+          UI.champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", valeur: t ? t.avancement : 0 }),
+          UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
+        ])
+      ])
+    ]);
+
+    UI.ouvre({
+      surtitre: t ? "Modifier la tâche" : "Nouvelle tâche",
+      titre: t ? t.titre : "Tâche",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            var v = UI.lit(corps);
+            var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
+            return p.then(function () { dessine(); UI.toast(t ? "Tâche modifiée." : "Tâche créée."); })
+              .catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function supprime(t) {
+    UI.confirme("Supprimer la tâche ?", t.titre, "Supprimer", true).then(function (ok) {
+      if (!ok) return;
+      D.suppTache(t.id).then(function () { dessine(); UI.toast("Tâche supprimée."); });
+    });
+  }
+
+  /* -------------------------------------------------------------- export */
+
+  function exporteCSV() {
+    var lignes = [["Affaire", "Libellé", "Tâche", "Charge ingénieur (j)", "Ingénieur",
+                   "Charge dessin (j)", "Dessinateur", "Début", "Échéance", "Statut", "Avancement (%)", "Note"]];
+    selection().forEach(function (t) {
+      var a = D.affaire(t.affaireId);
+      lignes.push([
+        a ? a.code : "", a ? a.nom : "", t.titre,
+        C.fmtJours(t.chargeInge), t.ingenieurId ? D.nomMembre(t.ingenieurId) : "",
+        C.fmtJours(t.chargeDessin), t.dessinateurId ? D.nomMembre(t.dessinateurId) : "",
+        C.fmtCH(Calc.debutEffectif(t, D.canton())), C.fmtCH(t.echeance),
+        D.STATUTS_TACHE[t.statut], t.avancement, t.note || ""
+      ]);
+    });
+    UI.telecharge("taches-" + C.isoAuj() + ".csv", UI.csv(lignes), "text/csv;charset=utf-8");
+    UI.toast("Export CSV généré.");
+  }
+})();
+</script>
+</body>
+</html>
