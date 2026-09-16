@@ -97,6 +97,11 @@ p{margin:0}
 .btn-nu:hover{border-color:var(--ligne)}
 .btn-rouge:hover{color:var(--alerte);border-color:rgba(201,112,90,.5);background:transparent}
 .btn[disabled]{opacity:.35;cursor:not-allowed}
+
+/* Liste déroulante native : sans couleurs explicites, les options héritent du
+   texte translucide du bouton et deviennent illisibles sur le fond clair de Windows. */
+select option,select optgroup{background:#0A0A0A;color:#ECE8E0}
+select option:checked{background:#2A2418;color:#D6A85C}
 .btn-ico{min-width:34px;justify-content:center;padding:8px}
 
 /* --------------------------------------------------------- formulaires */
