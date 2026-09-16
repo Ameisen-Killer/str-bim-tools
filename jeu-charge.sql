@@ -25,6 +25,9 @@ begin
 end $$;
 
 -- ------------------------------------------------------------------ membres
+-- 80 membres pour 40 prénoms et 40 noms : le second tour décale les noms de
+-- sept rangs, sinon chaque nom ressortirait tel quel au tour suivant et le
+-- bureau compterait quarante homonymes.
 insert into public.membres (prenom, nom, email, role, capacite, actif)
 select
   (array['Alice','Bastien','Chloé','Damien','Elsa','Fabien','Gaëlle','Hugo','Inès','Jonas',
@@ -34,7 +37,7 @@ select
   (array['Aebischer','Blanc','Chollet','Dupraz','Égger','Favre','Gay','Huguenin','Imhof','Jaccard',
          'Kohler','Liechti','Martin','Nicolet','Oberson','Perrin','Quartier','Rey','Savoy','Thévenaz',
          'Udry','Vionnet','Wenger','Yerly','Zufferey','Amstutz','Brunner','Cretton','Dubey','Emery',
-         'Fournier','Genoud','Hofer','Jordan','Kaeser','Lambiel','Meyer','Nussbaum','Pasche','Roulin'])[((g * 17) % 40) + 1],
+         'Fournier','Genoud','Hofer','Jordan','Kaeser','Lambiel','Meyer','Nussbaum','Pasche','Roulin'])[((g * 17 + ((g - 1) / 40) * 7) % 40) + 1],
   'charge.m' || g || '@charge.exemple.ch',
   case when g <= 36 then 'ingenieur' else 'dessinateur' end,
   case g % 10 when 3 then 4 when 7 then 3 else 5 end,
