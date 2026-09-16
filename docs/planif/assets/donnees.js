@@ -15,8 +15,16 @@
 
   /* ------------------------------------------------------------ utilitaires */
 
+  // Identifiants au format UUID : c'est ce qu'attend la base, et cela permet
+  // de créer une ligne côté navigateur sans aller demander son numéro au serveur.
+  var RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   function id() {
-    return Date.now().toString(36).slice(-6) + Math.random().toString(36).slice(2, 7);
+    if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+    });
   }
   function copie(o) { return JSON.parse(JSON.stringify(o)); }
   function texte(v) { return String(v == null ? "" : v).trim(); }
@@ -39,8 +47,9 @@
 
   /* ------------------------------------------------ adaptateur de stockage */
 
-  var ADAPTATEUR = {
+  var ADAPTATEUR_LOCAL = {
     nom: "navigateur",
+    semeSiVide: true,
     lire: function () {
       return new Promise(function (res) {
         var brut = null;
@@ -59,14 +68,24 @@
 
   /* ------------------------------------------------------------ état vivant */
 
+  // La base l'emporte dès qu'elle est configurée ; sinon, le navigateur.
+  var ADAPTATEUR = (global.Sb && global.Sb.configure) ? global.Sb.ADAPT : ADAPTATEUR_LOCAL;
+
   var etat = null;
+  var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
   var abonnes = [];
   var chargement = null;
 
   function previens() { abonnes.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } }); }
 
+  /* Enregistre, puis seulement alors met à jour la référence : si l'écriture
+     échoue, l'écart reste à rejouer au prochain essai plutôt que d'être perdu. */
   function sauve() {
-    return ADAPTATEUR.ecrire(etat).then(function () { previens(); return etat; });
+    return ADAPTATEUR.ecrire(etat, precedent).then(function () {
+      precedent = copie(etat);
+      previens();
+      return etat;
+    });
   }
 
   /** Complète un état lu du stockage : champs manquants, migrations. */
@@ -118,6 +137,52 @@
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
       });
+    });
+    return e;
+  }
+
+  /**
+   * Une sauvegarde faite avant le passage à la base porte des identifiants
+   * courts, que PostgreSQL refuse. On les remplace par des UUID en reportant
+   * la correspondance sur toutes les références, pour qu'une saisie faite en
+   * local puisse être reversée telle quelle dans la base.
+   */
+  function renumerote(e) {
+    var vers = {};
+    function neuf(ancien) {
+      if (!ancien) return ancien;
+      if (RE_UUID.test(ancien)) return ancien;
+      if (!vers[ancien]) vers[ancien] = id();
+      return vers[ancien];
+    }
+    e.membres.forEach(function (m) {
+      m.id = neuf(m.id);
+      m.absences.forEach(function (a) { a.id = neuf(a.id); });
+    });
+    e.affaires.forEach(function (a) {
+      a.id = neuf(a.id);
+      a.ingenieurs = a.ingenieurs.map(neuf);
+      a.dessinateurs = a.dessinateurs.map(neuf);
+    });
+    e.taches.forEach(function (t) {
+      t.id = neuf(t.id);
+      t.affaireId = neuf(t.affaireId);
+      t.ingenieurId = neuf(t.ingenieurId);
+      t.dessinateurId = neuf(t.dessinateurId);
+    });
+
+    // Références orphelines : la base les refuserait, on les coupe ici.
+    var vraisM = {}, vraisA = {};
+    e.membres.forEach(function (m) { vraisM[m.id] = true; });
+    e.affaires.forEach(function (a) { vraisA[a.id] = true; });
+    e.affaires.forEach(function (a) {
+      a.ingenieurs = a.ingenieurs.filter(function (x) { return vraisM[x]; });
+      a.dessinateurs = a.dessinateurs.filter(function (x) { return vraisM[x]; });
+    });
+    e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
+    e.taches.forEach(function (t) {
+      if (!vraisM[t.ingenieurId]) t.ingenieurId = null;
+      if (!vraisM[t.dessinateurId]) t.dessinateurId = null;
     });
     return e;
   }
@@ -197,11 +262,16 @@
     pret: function () {
       if (chargement) return chargement;
       chargement = ADAPTATEUR.lire().then(function (brut) {
-        if (!brut) {
+        if (!brut && ADAPTATEUR.semeSiVide) {
           etat = demo();                        // première visite : jeu de démonstration
-          return ADAPTATEUR.ecrire(etat).then(function () { return etat; });
+          precedent = null;
+          return ADAPTATEUR.ecrire(etat, null).then(function () {
+            precedent = copie(etat);
+            return etat;
+          });
         }
-        etat = normalise(brut);
+        etat = normalise(brut || etatVierge());
+        precedent = copie(etat);
         return etat;
       });
       return chargement;
@@ -368,7 +438,7 @@
         if (!brut || typeof brut !== "object" || !("membres" in brut)) {
           throw erreur("Ce fichier ne ressemble pas à une sauvegarde de la planification.");
         }
-        etat = normalise(brut);
+        etat = renumerote(normalise(brut));
         etat.reglages.demo = false;
         return sauve();
       });

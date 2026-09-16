@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connexion · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=2">
+<style>
+  main.cx{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(24px,6vh,72px) var(--g)}
+  .cx-boite{width:100%;max-width:430px}
+  .cx-boite h1{font-size:clamp(38px,6vw,58px);line-height:1;margin-top:12px}
+  .cx-filet{height:1px;background:rgba(214,168,92,.55);margin:26px 0 30px;transform:scaleX(0);transform-origin:left;animation:trace 1.6s cubic-bezier(.55,.05,.25,1) .25s forwards}
+  @keyframes trace{to{transform:scaleX(1)}}
+  .cx-champs{display:grid;gap:18px}
+  .cx-msg{margin-top:20px;border-left:2px solid var(--alerte);padding:10px 0 10px 14px;font-size:14px;color:var(--texte-doux)}
+  .cx-msg.ok{border-left-color:var(--or)}
+  .cx-actions{display:flex;flex-direction:column;gap:12px;margin-top:28px}
+  .cx-actions .btn{justify-content:center;padding:13px 16px}
+  .cx-bas{margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne);display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;
+          font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
+  .cx-bas a,.cx-bas button{color:inherit;background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-decoration:none;transition:color .3s}
+  .cx-bas a:hover,.cx-bas button:hover{color:var(--or)}
+</style>
+</head>
+<body>
+
+<main class="cx">
+  <div class="cx-boite">
+    <div class="surtitre">STR Bim Tools · Planification</div>
+    <h1 id="titre">Connexion</h1>
+    <div class="cx-filet" aria-hidden="true"></div>
+
+    <form id="formulaire" autocomplete="on" novalidate>
+      <div class="cx-champs">
+        <div class="champ">
+          <label for="email">Adresse e-mail</label>
+          <input type="email" id="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </div>
+        <div class="champ" id="bloc-mdp">
+          <label for="mdp" id="label-mdp">Mot de passe</label>
+          <input type="password" id="mdp" name="mdp" autocomplete="current-password" required>
+          <div class="aide" id="aide-mdp" hidden>Six caractères au minimum.</div>
+        </div>
+      </div>
+
+      <div class="cx-msg" id="message" hidden></div>
+
+      <div class="cx-actions">
+        <button class="btn btn-or" type="submit" id="valider">Se connecter</button>
+      </div>
+    </form>
+
+    <div class="cx-bas">
+      <button type="button" id="bascule">Créer un compte</button>
+      <button type="button" id="oubli">Mot de passe oublié</button>
+      <a href="/">str-bim-tools.com</a>
+    </div>
+  </div>
+</main>
+
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+
+  var p = new URLSearchParams(location.search);
+  var retour = p.get("retour") || "/planif/";
+  if (retour.charAt(0) !== "/" || retour.indexOf("//") === 0) retour = "/planif/";   // pas de renvoi hors du site
+
+  var form = document.getElementById("formulaire");
+  var email = document.getElementById("email");
+  var mdp = document.getElementById("mdp");
+  var valider = document.getElementById("valider");
+  var bascule = document.getElementById("bascule");
+  var oubli = document.getElementById("oubli");
+  var boiteMsg = document.getElementById("message");
+  var titre = document.getElementById("titre");
+  var labelMdp = document.getElementById("label-mdp");
+  var aideMdp = document.getElementById("aide-mdp");
+
+  var mode = "connexion";            // connexion | inscription | nouveau
+  var jetonRecuperation = null;
+
+  function dis(texte, bon) {
+    boiteMsg.textContent = texte;
+    boiteMsg.className = "cx-msg" + (bon ? " ok" : "");
+    boiteMsg.hidden = !texte;
+  }
+
+  if (p.get("motif")) dis(p.get("motif"));
+  if (!window.Sb || !window.Sb.configure) {
+    dis("Aucune base n'est configurée : l'outil fonctionne en mode local, sans connexion.");
+    valider.disabled = true;
+  }
+
+  /* --- retour d'un courriel de réinitialisation : le jeton arrive dans le # --- */
+  (function recuperation() {
+    var h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (h.get("type") === "recovery" && h.get("access_token")) {
+      jetonRecuperation = h.get("access_token");
+      history.replaceState(null, "", location.pathname);
+      passeEn("nouveau");
+      dis("Choisis ton nouveau mot de passe.", true);
+    } else if (h.get("error_description")) {
+      dis(h.get("error_description"));
+      history.replaceState(null, "", location.pathname);
+    }
+  })();
+
+  function passeEn(m) {
+    mode = m;
+    if (m === "connexion") {
+      titre.textContent = "Connexion";
+      valider.textContent = "Se connecter";
+      labelMdp.textContent = "Mot de passe";
+      mdp.autocomplete = "current-password";
+      aideMdp.hidden = true;
+      bascule.textContent = "Créer un compte";
+      email.parentNode.hidden = false;
+      oubli.hidden = false;
+    } else if (m === "inscription") {
+      titre.textContent = "Créer un compte";
+      valider.textContent = "Créer mon compte";
+      labelMdp.textContent = "Mot de passe à choisir";
+      mdp.autocomplete = "new-password";
+      aideMdp.hidden = false;
+      bascule.textContent = "J'ai déjà un compte";
+      email.parentNode.hidden = false;
+      oubli.hidden = false;
+    } else {
+      titre.textContent = "Nouveau mot de passe";
+      valider.textContent = "Enregistrer le mot de passe";
+      labelMdp.textContent = "Nouveau mot de passe";
+      mdp.autocomplete = "new-password";
+      aideMdp.hidden = false;
+      email.parentNode.hidden = true;
+      bascule.hidden = true;
+      oubli.hidden = true;
+    }
+    mdp.value = "";
+  }
+
+  bascule.addEventListener("click", function () {
+    dis("");
+    passeEn(mode === "connexion" ? "inscription" : "connexion");
+    (mode === "inscription" ? email : email).focus();
+  });
+
+  oubli.addEventListener("click", function () {
+    var adresse = email.value.trim();
+    if (!adresse) { dis("Saisis d'abord ton adresse, puis redemande un lien."); email.focus(); return; }
+    oubli.disabled = true;
+    fetch(window.PLANIF_CONFIG.supabase.url + "/auth/v1/recover", {
+      method: "POST",
+      headers: { apikey: window.PLANIF_CONFIG.supabase.cle, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: adresse, redirect_to: location.origin + "/planif/connexion/" })
+    }).then(function () {
+      dis("Si un compte existe pour cette adresse, un lien vient d'être envoyé.", true);
+    }).catch(function () {
+      dis("Envoi impossible pour l'instant.");
+    }).then(function () { oubli.disabled = false; });
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    dis("");
+    var adresse = email.value.trim(), secret = mdp.value;
+
+    if (mode !== "nouveau") {
+      if (!adresse) { dis("L'adresse e-mail est obligatoire."); return email.focus(); }
+      if (!secret) { dis("Le mot de passe est obligatoire."); return mdp.focus(); }
+    }
+    if (mode !== "connexion" && secret.length < 6) {
+      dis("Mot de passe trop court : six caractères au minimum."); return mdp.focus();
+    }
+
+    valider.disabled = true;
+    var libelle = valider.textContent;
+    valider.textContent = "…";
+
+    function fini(msg) {
+      valider.disabled = false;
+      valider.textContent = libelle;
+      if (msg) dis(msg);
+    }
+
+    if (mode === "connexion") {
+      window.Sb.connexion(adresse, secret)
+        .then(function () { location.replace(retour); })
+        .catch(function (err) { fini(err.message); });
+
+    } else if (mode === "inscription") {
+      window.Sb.inscription(adresse, secret)
+        .then(function (r) {
+          if (r.confirmation) {
+            fini("");
+            passeEn("connexion");
+            dis("Compte créé. Ouvre le courriel de confirmation, puis reviens te connecter.", true);
+          } else {
+            location.replace(retour);
+          }
+        })
+        .catch(function (err) { fini(err.message); });
+
+    } else {
+      fetch(window.PLANIF_CONFIG.supabase.url + "/auth/v1/user", {
+        method: "PUT",
+        headers: {
+          apikey: window.PLANIF_CONFIG.supabase.cle,
+          Authorization: "Bearer " + jetonRecuperation,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ password: secret })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("Lien expiré : redemande un courriel de réinitialisation.");
+        fini("");
+        passeEn("connexion");
+        dis("Mot de passe enregistré. Connecte-toi.", true);
+      }).catch(function (err) { fini(err.message); });
+    }
+  });
+
+  email.focus();
+})();
+</script>
+</body>
+</html>

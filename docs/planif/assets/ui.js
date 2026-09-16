@@ -179,6 +179,44 @@
     return o;
   }
 
+  /* ------------------------------------------------------------- session */
+
+  var SB = global.Sb;
+  var avecBase = !!(SB && SB.configure);
+
+  function pageConnexion(parametres) {
+    location.replace("/planif/connexion/?" + parametres);
+  }
+
+  /**
+   * À appeler en tête de chaque page : renvoie false et redirige vers la
+   * connexion si la base est branchée et que personne n'est connecté.
+   */
+  function session() {
+    if (!avecBase || SB.connecte()) return true;
+    pageConnexion("retour=" + encodeURIComponent(location.pathname));
+    return false;
+  }
+
+  /** Traitement unique des erreurs de chargement. */
+  function echec(e) {
+    var m = (e && e.message) || "Chargement impossible.";
+    if (avecBase && /session|acc[eè]s refus/i.test(m)) {
+      SB.deconnexion();
+      pageConnexion("retour=" + encodeURIComponent(location.pathname) + "&motif=" + encodeURIComponent(m));
+      return;
+    }
+    toast(m);
+  }
+
+  function deconnecte() {
+    confirme("Se déconnecter ?", "Tu devras saisir ton mot de passe pour revenir.", "Se déconnecter")
+      .then(function (ok) {
+        if (!ok) return;
+        SB.deconnexion().then(function () { pageConnexion(""); });
+      });
+  }
+
   /* --------------------------------------------------------- barre et menu */
 
   var PAGES = [
@@ -203,7 +241,11 @@
       pousse.appendChild(el("button", { class: "btn" + (a.or ? " btn-or" : ""), type: "button", onclick: a.action, text: a.label }));
     });
     pousse.appendChild(el("button", { class: "btn", type: "button", onclick: ouvreDonnees, text: "Données" }));
+    if (avecBase) pousse.appendChild(el("button", { class: "btn btn-nu", type: "button", onclick: deconnecte, text: "Quitter" }));
     nav.appendChild(pousse);
+
+    var etiquette = avecBase ? SB.email()
+      : (D.estDemo() ? "Jeu de démonstration" : "Données locales");
 
     hote.appendChild(el("div", { class: "barre" }, [
       el("div", { class: "barre-h" }, [
@@ -212,7 +254,7 @@
           el("span", { class: "sep", text: "·" }),
           el("a", { href: "/planif/", class: "ici", text: "Planification" })
         ]),
-        el("span", { class: "maj", text: D.estDemo() ? "Jeu de démonstration" : "Données locales" })
+        el("span", { class: "maj", text: etiquette })
       ]),
       nav
     ]));
@@ -225,7 +267,7 @@
     hote.appendChild(el("footer", { class: "pied-outil" }, [
       el("a", { href: "/", text: "← str-bim-tools.com" }),
       el("div", { class: "droite" }, [
-        el("span", { class: "maj", text: "Données enregistrées dans ce navigateur" }),
+        el("span", { class: "maj", text: avecBase ? "Base hébergée en Europe (Francfort)" : "Données enregistrées dans ce navigateur" }),
         el("a", { href: "/mentions-legales/", text: "Mentions légales" })
       ])
     ]));
@@ -268,9 +310,13 @@
       el("p", {
         class: "aide",
         style: "font-size:14px;line-height:1.6;color:var(--texte-doux);max-width:48em",
-        text: "Les données de planification sont pour l'instant enregistrées dans ce navigateur, sur cet ordinateur. " +
-              "Elles ne sont ni envoyées ni partagées. Vider les données du site, changer de machine ou " +
-              "naviguer en privé revient donc à repartir de zéro : exporte régulièrement une sauvegarde."
+        text: avecBase
+          ? "Les données sont enregistrées dans la base du projet, hébergée à Francfort, et te suivent d'un poste à l'autre. " +
+            "Seules les adresses inscrites dans la liste des accès peuvent les lire ou les modifier. " +
+            "L'export reste utile comme sauvegarde à toi, hors ligne."
+          : "Les données de planification sont pour l'instant enregistrées dans ce navigateur, sur cet ordinateur. " +
+            "Elles ne sont ni envoyées ni partagées. Vider les données du site, changer de machine ou " +
+            "naviguer en privé revient donc à repartir de zéro : exporte régulièrement une sauvegarde."
       }),
       el("div", { class: "cles", style: "margin-top:22px" }, [
         el("div", { class: "cle" }, [el("div", { class: "v", text: String(e.membres.length) }), el("div", { class: "l", text: "Membres" })]),
@@ -299,7 +345,8 @@
         {
           label: "Tout effacer", rouge: true, gauche: true, action: function () {
             return confirme("Tout effacer ?",
-              "Membres, affaires et tâches seront supprimés de ce navigateur. Cette action est définitive : exporte d'abord une sauvegarde si tu veux pouvoir revenir en arrière.",
+              "Membres, affaires et tâches seront supprimés " + (avecBase ? "de la base, pour toute l'équipe" : "de ce navigateur") +
+              ". Cette action est définitive : exporte d'abord une sauvegarde si tu veux pouvoir revenir en arrière.",
               "Effacer définitivement", true).then(function (ok) {
                 if (!ok) return false;
                 return D.videTout().then(function () { location.reload(); });
@@ -361,6 +408,7 @@
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
-    telecharge: telecharge, csv: csv, nomFichier: nomFichier
+    telecharge: telecharge, csv: csv, nomFichier: nomFichier,
+    session: session, echec: echec, avecBase: avecBase
   };
 })(window);

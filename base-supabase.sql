@@ -120,9 +120,33 @@ begin
 end $$;
 
 -- =========================================================== sécurité (RLS) ==
--- Tout est fermé par défaut ; seules les personnes connectées lisent et écrivent.
--- Quand chaque membre aura son compte, c'est ici qu'on restreindra l'écriture
--- (par exemple : chacun modifie l'avancement de ses tâches, toi seul le reste).
+-- Être connecté ne suffit pas : il faut être inscrit dans public.acces.
+-- Sans cette liste blanche, quiconque parviendrait à se créer un compte sur le
+-- projet aurait tous les droits sur la planification. La liste est la vraie
+-- serrure ; le réglage « inscriptions fermées » n'est qu'un verrou de plus.
+
+create table if not exists public.acces (
+  email      text primary key,
+  droit      text not null default 'admin' check (droit in ('admin', 'lecture')),
+  ajoute_le  timestamptz not null default now()
+);
+
+-- Le premier compte autorisé. Ajouter ici l'adresse de chaque personne
+-- qui doit pouvoir ouvrir l'outil.
+insert into public.acces (email, droit) values ('varintony@gmail.com', 'admin')
+  on conflict (email) do nothing;
+
+-- security definer : la fonction doit pouvoir lire acces malgré la RLS posée dessus.
+create or replace function public.est_autorise()
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.acces a
+    where lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+$$;
+revoke all on function public.est_autorise() from public;
+grant execute on function public.est_autorise() to authenticated;
 
 alter table public.membres         enable row level security;
 alter table public.absences        enable row level security;
@@ -130,14 +154,22 @@ alter table public.affaires        enable row level security;
 alter table public.affaire_membres enable row level security;
 alter table public.taches          enable row level security;
 alter table public.reglages        enable row level security;
+alter table public.acces           enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages'] loop
+  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres',
+                           'taches', 'reglages', 'acces'] loop
     execute format('drop policy if exists "equipe connectee" on public.%I', t);
+    execute format('drop policy if exists "equipe autorisee" on public.%I', t);
     execute format(
-      'create policy "equipe connectee" on public.%I
-         for all to authenticated using (true) with check (true)', t);
+      'create policy "equipe autorisee" on public.%I
+         for all to authenticated
+         using (public.est_autorise()) with check (public.est_autorise())', t);
   end loop;
 end $$;
+
+-- Vérifié en ligne après exécution, avec la clé publiable et sans connexion :
+--   lecture  -> 200 et [] (rien ne fuite)
+--   écriture -> 401 « new row violates row-level security policy »

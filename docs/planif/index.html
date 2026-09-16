@@ -10,7 +10,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=1">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=2">
 </head>
 <body>
 
@@ -74,10 +74,12 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=1"></script>
-<script src="/planif/assets/donnees.js?v=1"></script>
-<script src="/planif/assets/calculs.js?v=1"></script>
-<script src="/planif/assets/ui.js?v=1"></script>
+<script src="/planif/assets/calendrier.js?v=2"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=1"></script>
+<script src="/planif/assets/donnees.js?v=2"></script>
+<script src="/planif/assets/calculs.js?v=2"></script>
+<script src="/planif/assets/ui.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -94,6 +96,8 @@
   function memorise() {
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
   }
+
+  if (!UI.session()) return;
 
   D.pret().then(function () {
     UI.chrome("tableau", [{
@@ -126,7 +130,7 @@
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
 
     rend();
-  }).catch(function (e) { UI.toast(e.message || "Chargement impossible."); });
+  }).catch(UI.echec);
 
   function decale(n) { vue.debut = C.ajoute(vue.debut, n); memorise(); rend(); }
 
