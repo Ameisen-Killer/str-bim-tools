@@ -35,16 +35,55 @@
     return out;
   }
 
-  /** Début effectif : celui saisi, sinon « au plus tard » en remontant depuis l'échéance. */
-  function debutEffectif(t, canton) {
-    if (t.debut) return t.debut;
+  /**
+   * L'échéance fait foi ; le début s'en déduit.
+   * On remonte le temps depuis l'échéance, jour par jour, en cumulant la
+   * capacité réelle de la personne (0 le week-end, les jours fériés et pendant
+   * ses absences, 0,8 par jour pour un 80 %) jusqu'à couvrir sa charge.
+   * Changer la durée, l'échéance ou une absence redonne donc toujours un début juste.
+   * Sans personne affectée (ou inactive), on compte un jour ouvré = un jour de travail.
+   */
+  function debutPour(charge, fin, membre, canton) {
+    if (!fin) return null;
+    if (membre && !membre.actif) membre = null;
+    var cumul = 0, cur = fin, dernierTravaille = null;
+    for (var garde = 0; garde < 1500; garde++) {
+      var cap = membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0);
+      if (cap > 0) {
+        cumul += cap;
+        dernierTravaille = cur;
+        if (cumul >= charge - 1e-6) return cur;
+      }
+      cur = C.ajoute(cur, -1);
+    }
+    return dernierTravaille || fin;
+  }
+
+  function membreParDefaut(id) {
+    return (global.Donnees && global.Donnees.membre) ? global.Donnees.membre(id) : null;
+  }
+
+  /** Début de l'affectation d'un membre sur une tâche. */
+  function debutAffectation(t, af, canton, trouve) {
+    return debutPour(af.charge, t.echeance, (trouve || membreParDefaut)(af.membreId), canton);
+  }
+
+  /**
+   * Début de la tâche : le plus tôt des débuts de ses intervenants.
+   * Une charge non affectée compte aussi, sur le seul calendrier du canton.
+   */
+  function debutEffectif(t, canton, trouve) {
     if (!t.echeance) return null;
-    var j = Math.max(1, Math.ceil(chargeTotale(t)));
-    return C.reculeOuvres(t.echeance, j, canton);
+    trouve = trouve || membreParDefaut;
+    var debuts = [];
+    if (t.chargeInge > 0) debuts.push(debutPour(t.chargeInge, t.echeance, t.ingenieurId ? trouve(t.ingenieurId) : null, canton));
+    if (t.chargeDessin > 0) debuts.push(debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton));
+    if (!debuts.length) return t.echeance;
+    return debuts.sort()[0];
   }
 
   /** Fin effective : l'échéance. */
-  function finEffective(t) { return t.echeance || t.debut || null; }
+  function finEffective(t) { return t.echeance || null; }
 
   function somme(liste) { var s = 0; for (var i = 0; i < liste.length; i++) s += liste[i]; return s; }
 
@@ -68,12 +107,14 @@
 
     // 1. Chaque affectation devient un lot : sa période, et la capacité de chaque jour
     taches.forEach(function (t) {
-      var debut = debutEffectif(t, canton), fin = finEffective(t);
-      if (!debut || !fin || C.diff(debut, fin) < 0) return;
+      var fin = finEffective(t);
+      if (!fin) return;
 
       affectations(t).forEach(function (af) {
         var membre = index[af.membreId];
         if (!membre) return;
+        // Chaque intervenant a sa propre fenêtre : 0,5 j d'ingénieur ne s'étale pas sur les 4 j du dessin
+        var debut = debutPour(af.charge, fin, membre, canton);
         var jours = [], base = [], cur = debut, garde = 0;
         while (garde++ < 800) {
           jours.push(cur);
@@ -211,6 +252,8 @@
     chargeTotale: chargeTotale,
     affectations: affectations,
     debutEffectif: debutEffectif,
+    debutAffectation: debutAffectation,
+    debutPour: debutPour,
     finEffective: finEffective,
     repartition: repartition,
     bilan: bilan,

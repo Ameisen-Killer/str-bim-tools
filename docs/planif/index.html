@@ -77,8 +77,8 @@
 <script src="/planif/assets/calendrier.js?v=2"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=1"></script>
-<script src="/planif/assets/donnees.js?v=2"></script>
-<script src="/planif/assets/calculs.js?v=3"></script>
+<script src="/planif/assets/donnees.js?v=3"></script>
+<script src="/planif/assets/calculs.js?v=4"></script>
 <script src="/planif/assets/ui.js?v=2"></script>
 <script>
 (function () {
@@ -154,10 +154,12 @@
     // index des barres à dessiner, par membre
     var barres = {};
     taches.forEach(function (t) {
-      var debut = Calc.debutEffectif(t, canton), fin = Calc.finEffective(t);
-      if (!debut || !fin) return;
-      if (fin < jours[0] || debut > jours[jours.length - 1]) return;       // hors fenêtre
+      var fin = Calc.finEffective(t);
+      if (!fin || fin < jours[0]) return;
       Calc.affectations(t).forEach(function (af) {
+        // Chaque barre a son propre début : celui de la personne, selon ses jours travaillés
+        var debut = Calc.debutAffectation(t, af, canton);
+        if (debut > jours[jours.length - 1]) return;                      // hors fenêtre
         (barres[af.membreId] || (barres[af.membreId] = [])).push({
           tache: t, role: af.role, charge: af.charge, debut: debut, fin: fin, membreId: af.membreId
         });
@@ -405,8 +407,12 @@
     if (!t) return;
     var champs = {};
     if (delta) {
-      champs.debut = C.ajoute(info.debut, delta);
-      champs.echeance = C.ajoute(t.echeance, delta);
+      // On déplace l'échéance ; le début se recalcule. Une échéance posée sur un
+      // jour chômé glisse au prochain jour ouvré dans le sens du déplacement.
+      var ech = C.ajoute(t.echeance, delta), pas = delta > 0 ? 1 : -1, garde = 0;
+      while (C.chome(ech, D.canton()) && garde++ < 30) ech = C.ajoute(ech, pas);
+      delta = C.diff(t.echeance, ech);
+      if (delta) { champs.echeance = ech; champs.debut = null; }
     }
     var reaffecte = null;
     if (membreCible) {
@@ -438,7 +444,11 @@
   function fiche(info) {
     var t = D.tache(info.tache.id), a = D.affaire(t.affaireId);
     var canton = D.canton();
-    var debut = Calc.debutEffectif(t, canton);
+
+    function periode(charge, idMembre) {
+      var d = Calc.debutPour(charge, t.echeance, idMembre ? D.membre(idMembre) : null, canton);
+      return "  ·  " + C.fmtCH(d) + " → " + C.fmtCH(t.echeance);
+    }
 
     function ligne(cle, valeur) {
       return el("div", { style: "display:flex;gap:16px;padding:9px 0;border-bottom:1px solid var(--ligne-faible)" }, [
@@ -456,10 +466,9 @@
 
     var corps = el("div", {}, [
       ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
-      ligne("Ingénieur", t.chargeInge > 0 ? D.nomMembre(t.ingenieurId) + " · " + C.fmtJours(t.chargeInge) + " j" : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? D.nomMembre(t.dessinateurId) + " · " + C.fmtJours(t.chargeDessin) + " j" : "—"),
-      ligne("Période", C.fmtCH(debut) + " → " + C.fmtCH(t.echeance) + (t.debut ? "" : "  (calée au plus tard)")),
-      ligne("Jours ouvrés", String(C.nbOuvres(debut, t.echeance, canton))),
+      ligne("Ingénieur", t.chargeInge > 0 ? D.nomMembre(t.ingenieurId) + " · " + C.fmtJours(t.chargeInge) + " j" + periode(t.chargeInge, t.ingenieurId) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? D.nomMembre(t.dessinateurId) + " · " + C.fmtJours(t.chargeDessin) + " j" + periode(t.chargeDessin, t.dessinateurId) : "—"),
+      ligne("Échéance", C.fmtLong(t.echeance)),
       t.note ? ligne("Note", t.note) : null,
       el("div", { class: "grille-champs", style: "margin-top:24px" }, [
         el("div", { class: "champ" }, [el("label", { text: "Statut" }), statut]),

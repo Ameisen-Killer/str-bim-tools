@@ -20,7 +20,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Une tâche porte deux charges distinctes — ingénieur et dessin — parce qu'elles ne pèsent jamais pareil sur les deux métiers. Sans date de début, la tâche se cale au plus tard avant son échéance.</p>
+    <p class="chapeau">Une tâche porte deux charges distinctes — ingénieur et dessin — parce qu'elles ne pèsent jamais pareil sur les deux métiers. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -50,8 +50,8 @@
 <script src="/planif/assets/calendrier.js?v=2"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=1"></script>
-<script src="/planif/assets/donnees.js?v=2"></script>
-<script src="/planif/assets/calculs.js?v=3"></script>
+<script src="/planif/assets/donnees.js?v=3"></script>
+<script src="/planif/assets/calculs.js?v=4"></script>
 <script src="/planif/assets/ui.js?v=2"></script>
 <script>
 (function () {
@@ -179,8 +179,7 @@
         ]),
         el("td", {}, [gens]),
         el("td", {}, [
-          el("div", { class: "num", text: C.fmtJours(Calc.chargeTotale(t)) + " j" }),
-          t.debut ? null : el("div", { class: "secondaire", text: "calé au plus tard" })
+          el("div", { class: "num", text: C.fmtJours(Calc.chargeTotale(t)) + " j" })
         ]),
         el("td", { class: "num", style: "white-space:nowrap" }, [
           el("div", { text: C.fmtCH(debut) + " →" }),
@@ -270,6 +269,35 @@
     rebranche();
     chAffaire.querySelector("select").addEventListener("change", rebranche);
 
+    // Début recalculé à chaque frappe : durée, échéance ou intervenant
+    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:9px" });
+    function recalcule() {
+      var v = UI.lit(corps);
+      UI.vide(apercu);
+      if (!v.echeance) {
+        apercu.appendChild(el("span", { class: "aide", text: "Saisis l'échéance." }));
+        return;
+      }
+      var lignes = [
+        { role: "Ingénieur", charge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0, id: v.ingenieurId },
+        { role: "Dessin", charge: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0, id: v.dessinateurId }
+      ].filter(function (x) { return x.charge > 0; });
+      if (!lignes.length) {
+        apercu.appendChild(el("span", { class: "aide", text: "Saisis une charge." }));
+        return;
+      }
+      lignes.forEach(function (x) {
+        var m = x.id ? D.membre(x.id) : null;
+        var debut = Calc.debutPour(x.charge, v.echeance, m, D.canton());
+        var ouvres = C.nbOuvres(debut, v.echeance, D.canton());
+        apercu.appendChild(el("div", {}, [
+          el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
+          el("span", { class: "or", text: C.fmtLong(debut) }),
+          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") + (m ? "" : " · personne non choisie") })
+        ]));
+      });
+    }
+
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         chAffaire,
@@ -294,10 +322,13 @@
         el("div", { class: "legende", text: "Dates" }),
         el("div", { class: "grille-champs", style: "margin-top:12px" }, [
           UI.champ({
-            nom: "debut", label: "Début", type: "date", valeur: t ? t.debut : "",
-            aide: "Facultatif. Vide, la tâche se cale au plus tard avant l'échéance."
+            nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "",
+            aide: "C'est la date qui fait foi : le début s'en déduit."
           }),
-          UI.champ({ nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "", aide: "Obligatoire." })
+          el("div", { class: "champ" }, [
+            el("span", { class: "legende", text: "Début calculé" }),
+            apercu
+          ])
         ])
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
@@ -312,6 +343,10 @@
         ])
       ])
     ]);
+
+    corps.addEventListener("input", recalcule);
+    corps.addEventListener("change", recalcule);
+    recalcule();
 
     UI.ouvre({
       surtitre: t ? "Modifier la tâche" : "Nouvelle tâche",

@@ -128,7 +128,7 @@
         titre: texte(t.titre), note: texte(t.note),
         chargeInge: Math.max(0, nombre(t.chargeInge, 0)),
         chargeDessin: Math.max(0, nombre(t.chargeDessin, 0)),
-        debut: texte(t.debut) || null,
+        debut: null,                            // toujours déduit de l'échéance (calculs.js)
         echeance: texte(t.echeance) || null,
         ingenieurId: texte(t.ingenieurId) || null,
         dessinateurId: texte(t.dessinateurId) || null,
@@ -236,13 +236,10 @@
     if (ci + cd <= 0) throw erreur("Indique au moins une durée estimée, côté ingénieur ou côté dessin.");
     if (ci > 0 && !texte(o.ingenieurId)) throw erreur("Une charge ingénieur est saisie : affecte un ingénieur.");
     if (cd > 0 && !texte(o.dessinateurId)) throw erreur("Une charge dessin est saisie : affecte un dessinateur.");
-    if (texte(o.debut) && texte(o.echeance) && global.Cal.diff(o.debut, o.echeance) < 0) {
-      throw erreur("Le début ne peut pas être postérieur à l'échéance.");
-    }
     return {
       affaireId: texte(o.affaireId), titre: texte(o.titre), note: texte(o.note),
       chargeInge: ci, chargeDessin: cd,
-      debut: texte(o.debut) || null, echeance: texte(o.echeance),
+      debut: null, echeance: texte(o.echeance),
       ingenieurId: ci > 0 ? texte(o.ingenieurId) : (texte(o.ingenieurId) || null),
       dessinateurId: cd > 0 ? texte(o.dessinateurId) : (texte(o.dessinateurId) || null),
       statut: STATUTS_TACHE[o.statut] ? o.statut : "a_faire",
@@ -484,7 +481,7 @@
       e.taches.push({
         id: id(), affaireId: aff, titre: titre, note: "",
         chargeInge: ci, chargeDessin: cd,
-        debut: debut, echeance: ech, ingenieurId: ing, dessinateurId: des,
+        debut: null, echeance: ech, ingenieurId: ing, dessinateurId: des,
         statut: statut, avancement: av,
         cree: new Date().toISOString(), maj: new Date().toISOString()
       });
