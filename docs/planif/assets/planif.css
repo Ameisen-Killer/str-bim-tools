@@ -180,6 +180,9 @@ p{margin:0}
 .btn-nu:hover{border-color:var(--ligne)}
 .btn-rouge:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.5);background:transparent}
 .btn[disabled]{opacity:.35;cursor:not-allowed}
+/* action en cours : le bouton reste lisible et s'annonce */
+.btn.occupe{opacity:1;cursor:progress}
+.btn.occupe::after{content:"…";margin-left:3px}
 
 /* Liste déroulante native : sans couleurs explicites, les options héritent du
    texte translucide du bouton et deviennent illisibles sur le fond clair de Windows. */

@@ -214,8 +214,40 @@
     });
   }
   var insere = function (t, l) { return requete(t, { methode: "POST", corps: l, prefer: "return=minimal" }); };
-  var modifie = function (t, id, v) { return requete(t + "?id=eq." + encodeURIComponent(id), { methode: "PATCH", corps: v, prefer: "return=minimal" }); };
-  var efface = function (t, id) { return requete(t + "?id=eq." + encodeURIComponent(id), { methode: "DELETE", prefer: "return=minimal" }); };
+
+  /* Suppression par lots. PostgREST accepte une liste d'identifiants : effacer
+     ligne par ligne, c'était un aller-retour par ligne, et vider un bureau
+     chargé en demandait plusieurs milliers à la suite. Cent identifiants font
+     une URL d'environ 3,7 ko, loin des limites des serveurs et des navigateurs. */
+  var LOT = 100;
+
+  function enLots(liste, taille) {
+    var out = [];
+    for (var i = 0; i < liste.length; i += taille) out.push(liste.slice(i, i + taille));
+    return out;
+  }
+
+  function liste(ids) { return "(" + ids.map(encodeURIComponent).join(",") + ")"; }
+
+  function effaceLot(table, ids) {
+    var suite = Promise.resolve();
+    enLots(ids, LOT).forEach(function (paquet) {
+      suite = suite.then(function () {
+        return requete(table + "?id=in." + liste(paquet), { methode: "DELETE", prefer: "return=minimal" });
+      });
+    });
+    return suite;
+  }
+
+  /* Tout vider : deux suppressions suffisent. Les tâches et les liens d'équipe
+     partent en cascade avec leur affaire, les absences avec leur membre
+     (voir base-supabase.sql). Les réglages ne sont pas des données : le canton
+     et la capacité par défaut restent en place. */
+  function videTout() {
+    return requete("affaires?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" })
+      .then(function () { return requete("membres?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" }); })
+      .then(function () {});
+  }
 
   /* ------------------------------------------------- traduction des champs */
 
@@ -304,16 +336,25 @@
   function parId(liste) {
     var m = {}; (liste || []).forEach(function (o) { m[o.id] = o; }); return m;
   }
-  function memeChose(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function pareil(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
-  /** Opérations à mener sur une collection plate. */
+  /**
+   * Opérations à mener sur une collection plate.
+   * Une modification ne retient que les champs qui ont bougé : la base reçoit
+   * le changement, pas toute la ligne. Deux collègues qui touchent deux
+   * colonnes différentes de la même tâche ne s'écrasent donc plus.
+   */
   function compare(avant, apres, versBase) {
     var a = parId(avant), b = parId(apres);
     var ajouts = [], modifs = [], retraits = [];
     apres.forEach(function (o) {
       var ligne = versBase(o);
-      if (!a[o.id]) ajouts.push(ligne);
-      else if (!memeChose(versBase(a[o.id]), ligne)) modifs.push(ligne);
+      if (!a[o.id]) return ajouts.push(ligne);
+      var vieux = versBase(a[o.id]), champs = null;
+      Object.keys(ligne).forEach(function (k) {
+        if (k !== "id" && !pareil(ligne[k], vieux[k])) (champs || (champs = {}))[k] = ligne[k];
+      });
+      if (champs) modifs.push({ id: o.id, champs: champs });
     });
     avant.forEach(function (o) { if (!b[o.id]) retraits.push(o.id); });
     return { ajouts: ajouts, modifs: modifs, retraits: retraits };
@@ -322,13 +363,37 @@
   function appliqueTable(table, d) {
     var suite = Promise.resolve();
     if (d.ajouts.length) suite = suite.then(function () { return insere(table, d.ajouts); });
-    d.modifs.forEach(function (l) {
-      suite = suite.then(function () {
-        var v = {}; Object.keys(l).forEach(function (k) { if (k !== "id") v[k] = l[k]; });
-        return modifie(table, l.id, v);
+
+    /* Les lignes qui subissent le même changement partent ensemble : retirer un
+       membre désaffecte toutes ses tâches de la même façon, c'était auparavant
+       une requête par tâche. */
+    var groupes = {};
+    d.modifs.forEach(function (m) {
+      var cle = JSON.stringify(m.champs);
+      (groupes[cle] || (groupes[cle] = { champs: m.champs, ids: [] })).ids.push(m.id);
+    });
+    Object.keys(groupes).forEach(function (cle) {
+      var g = groupes[cle];
+      enLots(g.ids, LOT).forEach(function (paquet) {
+        suite = suite.then(function () {
+          return requete(table + "?id=in." + liste(paquet),
+            { methode: "PATCH", corps: g.champs, prefer: "return=minimal" });
+        });
       });
     });
     return suite;
+  }
+
+  /** { valeur de cle : [valeurs de champ] } */
+  function groupe(liste, cle, champ) {
+    var out = {};
+    liste.forEach(function (l) { (out[l[cle]] || (out[l[cle]] = [])).push(l[champ]); });
+    return out;
+  }
+
+  /** Nombre de requêtes qu'un regroupement demanderait. */
+  function appels(groupes) {
+    return Object.keys(groupes).reduce(function (n, k) { return n + Math.ceil(groupes[k].length / LOT); }, 0);
   }
 
   function toutesAbsences(etat) {
@@ -367,16 +432,30 @@
     // Ordre : on retire ce qui dépend avant ce dont ça dépend, on ajoute l'inverse.
     var suite = Promise.resolve();
 
-    dTaches.retraits.forEach(function (id) { suite = suite.then(function () { return efface("taches", id); }); });
-    dAbsences.retraits.forEach(function (id) { suite = suite.then(function () { return efface("absences", id); }); });
-    liensMorts.forEach(function (l) {
-      suite = suite.then(function () {
-        return requete("affaire_membres?affaire_id=eq." + l.affaire_id + "&membre_id=eq." + l.membre_id,
-          { methode: "DELETE", prefer: "return=minimal" });
+    if (dTaches.retraits.length) suite = suite.then(function () { return effaceLot("taches", dTaches.retraits); });
+    if (dAbsences.retraits.length) suite = suite.then(function () { return effaceLot("absences", dAbsences.retraits); });
+
+    /* Les liens d'équipe n'ont pas d'identifiant propre : ils se suppriment par
+       couple. On regroupe du côté qui fait le moins d'appels — retirer un membre
+       du bureau tient en une requête, refaire l'équipe d'une affaire aussi. */
+    if (liensMorts.length) {
+      var parAffaire = groupe(liensMorts, "affaire_id", "membre_id");
+      var parMembre = groupe(liensMorts, "membre_id", "affaire_id");
+      var choix = appels(parMembre) < appels(parAffaire)
+        ? { cle: "membre_id", autre: "affaire_id", groupes: parMembre }
+        : { cle: "affaire_id", autre: "membre_id", groupes: parAffaire };
+      Object.keys(choix.groupes).forEach(function (fixe) {
+        enLots(choix.groupes[fixe], LOT).forEach(function (paquet) {
+          suite = suite.then(function () {
+            return requete("affaire_membres?" + choix.cle + "=eq." + encodeURIComponent(fixe) +
+              "&" + choix.autre + "=in." + liste(paquet), { methode: "DELETE", prefer: "return=minimal" });
+          });
+        });
       });
-    });
-    dAffaires.retraits.forEach(function (id) { suite = suite.then(function () { return efface("affaires", id); }); });
-    dMembres.retraits.forEach(function (id) { suite = suite.then(function () { return efface("membres", id); }); });
+    }
+
+    if (dAffaires.retraits.length) suite = suite.then(function () { return effaceLot("affaires", dAffaires.retraits); });
+    if (dMembres.retraits.length) suite = suite.then(function () { return effaceLot("membres", dMembres.retraits); });
 
     suite = suite.then(function () { return appliqueTable("membres", dMembres); });
     suite = suite.then(function () { return appliqueTable("affaires", dAffaires); });
@@ -412,7 +491,8 @@
       nom: "supabase",
       semeSiVide: false,
       lire: charge,
-      ecrire: ecrire
+      ecrire: ecrire,
+      videTout: videTout
     }
   };
 })(window);

@@ -88,8 +88,17 @@
         type: "button",
         onclick: function () {
           var r = b.action ? b.action() : true;
-          Promise.resolve(r).then(function (v) { if (v !== false) ferme(); })
-            .catch(function (e) { toast(e && e.message ? e.message : "Opération impossible."); });
+          // Une action qui part sur le réseau peut durer : le bouton le montre
+          // au lieu de rester muet, et un second clic ne la relance pas.
+          var attente = !!(r && typeof r.then === "function");
+          if (attente) occupe(bouton, true);
+          Promise.resolve(r).then(function (v) {
+            if (attente) occupe(bouton, false);
+            if (v !== false) ferme();
+          }).catch(function (e) {
+            if (attente) occupe(bouton, false);
+            toast(e && e.message ? e.message : "Opération impossible.");
+          });
         }
       }, [b.label]);
       pied.appendChild(bouton);
@@ -103,6 +112,14 @@
       if (premier) premier.focus();
     }, 60);
     return boite;
+  }
+
+  /** Action en cours : le bouton cliqué l'annonce, les autres sont bloqués. */
+  function occupe(bouton, actif) {
+    if (bouton.parentNode) {
+      [].forEach.call(bouton.parentNode.querySelectorAll(".btn"), function (n) { n.disabled = actif; });
+    }
+    bouton.classList.toggle("occupe", actif);
   }
 
   function ferme() {
@@ -721,6 +738,9 @@
               ". Cette action est définitive : exporte d'abord une sauvegarde si tu veux pouvoir revenir en arrière.",
               "Effacer définitivement", true).then(function (ok) {
                 if (!ok) return false;
+                // La fenêtre de confirmation s'est refermée : sans ce mot,
+                // l'écran resterait muet pendant l'aller-retour avec la base.
+                toast("Effacement en cours…");
                 return D.videTout().then(function () { location.reload(); });
               });
           }

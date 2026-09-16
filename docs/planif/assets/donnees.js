@@ -531,8 +531,28 @@
         return sauve();
       });
     },
+    /**
+     * Vide membres, affaires et tâches. Le canton et la capacité par défaut
+     * sont des réglages, pas des données : ils survivent.
+     * Quand le stockage sait se vider d'un bloc (la base le fait en deux
+     * suppressions, grâce aux cascades), on ne repasse pas par le calcul
+     * d'écart, qui listerait des milliers de lignes à effacer une à une.
+     */
     videTout: function () {
-      return Promise.resolve().then(function () { etat = etatVierge(); return sauve(); });
+      return Promise.resolve().then(function () {
+        var avant = etat.reglages;
+        etat = etatVierge();
+        etat.reglages.canton = avant.canton;
+        etat.reglages.capaciteDefaut = avant.capaciteDefaut;
+        if (!ADAPTATEUR.videTout) return sauve();
+        version++;
+        return ADAPTATEUR.videTout().then(function () {
+          precedent = copie(etat);
+          version++;
+          previens();
+          return etat;
+        });
+      });
     },
     chargeDemo: function () {
       return Promise.resolve().then(function () { etat = demo(); return sauve(); });
