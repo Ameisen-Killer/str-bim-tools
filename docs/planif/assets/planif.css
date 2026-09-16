@@ -154,7 +154,7 @@ p{margin:0}
 
 /* Action principale en bouton flottant : téléphone uniquement */
 .fab{display:none}
-.seul-mobile{display:none}
+.seul-mobile{display:none!important}           /* !important : .btn, plus bas, imposerait inline-flex */
 
 /* ------------------------------------------------------------- en-tete */
 .entete{padding-top:clamp(36px,6vh,64px);padding-bottom:clamp(18px,3vh,30px)}
@@ -406,6 +406,9 @@ body.glisse-en-cours{user-select:none;-webkit-user-select:none}
 
 /* chiffres-cles */
 .cles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:1px;background:var(--ligne-faible);border:1px solid var(--ligne-faible)}
+/* Les quatre chiffres du tableau de bord : 4 ou 2 par ligne, jamais 3 + 1 avec une case vide */
+#cles{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){#cles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .cle{background:var(--noir);padding:18px 16px}
 .cle .v{font-size:clamp(30px,4vw,44px);font-weight:200;line-height:1;font-variant-numeric:tabular-nums}
 .cle .l{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible);margin-top:8px}
@@ -458,7 +461,7 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   }
   .fab b{font-weight:400;font-size:20px;line-height:1;letter-spacing:0}
   body.avec-fab main{padding-bottom:84px}
-  .seul-mobile{display:inline-flex}
+  .seul-mobile{display:inline-flex!important}
 
   /* boutons et champs au doigt ; 16 px évite le zoom automatique des navigateurs mobiles */
   .btn{min-height:40px}
