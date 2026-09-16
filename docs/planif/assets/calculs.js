@@ -46,45 +46,89 @@
   /** Fin effective : l'échéance. */
   function finEffective(t) { return t.echeance || t.debut || null; }
 
+  function somme(liste) { var s = 0; for (var i = 0; i < liste.length; i++) s += liste[i]; return s; }
+
   /**
-   * Étale la charge de chaque affectation sur les jours ouvrés de sa période,
-   * au prorata de la capacité quotidienne du membre concerné.
+   * Place la charge de chaque affectation dans les jours de sa période, comme
+   * le ferait un planificateur : chaque tâche remplit d'abord la capacité
+   * ENCORE LIBRE du membre, et les tâches les plus contraintes se servent en
+   * premier (fenêtre la plus courte, puis échéance la plus proche).
+   *
+   * Un étalement à parts égales, tâche par tâche, fabriquait des surcharges
+   * fictives : une tâche de 6 j sur 7 jours ouvrés posait 0,86 j sur un jour
+   * déjà occupé par une tâche d'un jour, alors que les 7 j tenaient exactement.
+   * Seul ce qui ne rentre vraiment pas dans la capacité libre apparaît en
+   * surcharge, réparti au prorata de la capacité de chaque jour.
+   *
    * Renvoie { membreId: { "AAAA-MM-JJ": { total, parts:[{tacheId, role, jours}] } } }
    */
   function repartition(taches, membres, canton) {
-    var parMembre = {};
-    var index = {};
+    var index = {}, lots = {};
     membres.forEach(function (m) { index[m.id] = m; });
 
+    // 1. Chaque affectation devient un lot : sa période, et la capacité de chaque jour
     taches.forEach(function (t) {
       var debut = debutEffectif(t, canton), fin = finEffective(t);
-      if (!debut || !fin) return;
+      if (!debut || !fin || C.diff(debut, fin) < 0) return;
 
       affectations(t).forEach(function (af) {
         var membre = index[af.membreId];
         if (!membre) return;
-
-        // Jours de la période et poids de chacun
-        var jours = [], poids = [], somme = 0, cur = debut, garde = 0;
+        var jours = [], base = [], cur = debut, garde = 0;
         while (garde++ < 800) {
           jours.push(cur);
-          var p = capaciteJour(membre, cur, canton);
-          poids.push(p); somme += p;
+          base.push(capaciteJour(membre, cur, canton));
           if (cur === fin) break;
           cur = C.ajoute(cur, 1);
         }
+        (lots[af.membreId] || (lots[af.membreId] = [])).push({
+          tacheId: t.id, role: af.role, charge: af.charge, fin: fin,
+          jours: jours, base: base,
+          ouvres: base.filter(function (c) { return c > 0; }).length
+        });
+      });
+    });
+
+    // 2. Remplissage, membre par membre
+    var parMembre = {};
+    Object.keys(lots).forEach(function (mid) {
+      var occupe = {};
+      var cible = parMembre[mid] = {};
+
+      lots[mid].sort(function (a, b) {
+        if (a.ouvres !== b.ouvres) return a.ouvres - b.ouvres;
+        if (a.fin !== b.fin) return a.fin < b.fin ? -1 : 1;
+        return a.tacheId < b.tacheId ? -1 : 1;          // ordre stable d'un rendu à l'autre
+      });
+
+      lots[mid].forEach(function (lot) {
+        var parts = lot.jours.map(function () { return 0; });
+        var reste = lot.charge;
+
+        // D'abord la capacité encore libre, au prorata de ce qui reste chaque jour
+        var libre = lot.jours.map(function (j, k) { return Math.max(0, lot.base[k] - (occupe[j] || 0)); });
+        var totalLibre = somme(libre);
+        if (totalLibre > 0) {
+          var place = Math.min(reste, totalLibre);
+          libre.forEach(function (l, k) { parts[k] += place * l / totalLibre; });
+          reste -= place;
+        }
+
+        // Ce qui ne rentre pas : vraie surcharge, au prorata de la capacité du jour.
         // Période entièrement chômée ou en congé : on répartit quand même,
         // sinon la tâche disparaîtrait du planning sans prévenir.
-        if (somme <= 0) { poids = jours.map(function () { return 1; }); somme = jours.length; }
-        if (!somme) return;
+        if (reste > 1e-9) {
+          var poids = lot.base.slice(), s = somme(poids);
+          if (s <= 0) { poids = lot.jours.map(function () { return 1; }); s = poids.length; }
+          poids.forEach(function (p, k) { parts[k] += reste * p / s; });
+        }
 
-        var cible = parMembre[af.membreId] || (parMembre[af.membreId] = {});
-        jours.forEach(function (j, k) {
-          if (poids[k] <= 0) return;
-          var part = af.charge * poids[k] / somme;
+        lot.jours.forEach(function (j, k) {
+          if (parts[k] <= 1e-9) return;
+          occupe[j] = (occupe[j] || 0) + parts[k];
           var cell = cible[j] || (cible[j] = { total: 0, parts: [] });
-          cell.total += part;
-          cell.parts.push({ tacheId: t.id, role: af.role, jours: part });
+          cell.total += parts[k];
+          cell.parts.push({ tacheId: lot.tacheId, role: lot.role, jours: parts[k] });
         });
       });
     });
