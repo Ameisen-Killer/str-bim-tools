@@ -220,13 +220,18 @@
   /* --------------------------------------------------------- barre et menu */
 
   var PAGES = [
-    { cle: "tableau", href: "/planif/", nom: "Tableau de bord" },
-    { cle: "taches", href: "/planif/taches/", nom: "Tâches" },
-    { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
-    { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" }
+    { cle: "tableau", href: "/planif/", nom: "Tableau de bord", court: "Planning" },
+    { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
+    { cle: "affaires", href: "/planif/affaires/", nom: "Affaires", court: "Affaires" },
+    { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" }
   ];
 
-  /** Construit barre + navigation dans l'élément [data-chrome]. */
+  /**
+   * Construit barre + navigation dans l'élément [data-chrome].
+   * Ligne du haut : fil d'Ariane à gauche, « Données » et « Quitter » à droite.
+   * Ligne du bas : les quatre sections, puis les actions de la page. Sur
+   * téléphone, l'action principale (or) devient un bouton flottant à portée de pouce.
+   */
   function chrome(actif, actions) {
     var hote = document.querySelector("[data-chrome]");
     if (!hote) return;
@@ -234,30 +239,73 @@
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
     PAGES.forEach(function (p) {
-      nav.appendChild(el("a", { href: p.href, "aria-current": p.cle === actif ? "page" : null, text: p.nom }));
+      nav.appendChild(el("a", { href: p.href, "aria-current": p.cle === actif ? "page" : null }, [
+        el("span", { class: "long", text: p.nom }),
+        el("span", { class: "court", text: p.court })
+      ]));
     });
     var pousse = el("div", { class: "pousse outils" });
     (actions || []).forEach(function (a) {
       pousse.appendChild(el("button", { class: "btn" + (a.or ? " btn-or" : ""), type: "button", onclick: a.action, text: a.label }));
     });
-    pousse.appendChild(el("button", { class: "btn", type: "button", onclick: ouvreDonnees, text: "Données" }));
-    if (avecBase) pousse.appendChild(el("button", { class: "btn btn-nu", type: "button", onclick: deconnecte, text: "Quitter" }));
     nav.appendChild(pousse);
 
     var etiquette = avecBase ? SB.email()
       : (D.estDemo() ? "Jeu de démonstration" : "Données locales");
 
+    var outilsHaut = el("div", { class: "barre-outils" }, [
+      el("span", { class: "maj", text: etiquette }),
+      el("button", { type: "button", onclick: ouvreDonnees, text: "Données" }),
+      avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
+    ]);
+
     hote.appendChild(el("div", { class: "barre" }, [
       el("div", { class: "barre-h" }, [
         el("div", {}, [
-          el("a", { href: "/", text: "STR Bim Tools" }),
-          el("span", { class: "sep", text: "·" }),
+          el("span", { class: "marque" }, [
+            el("a", { href: "/", text: "STR Bim Tools" }),
+            el("span", { class: "sep", text: "·" })
+          ]),
           el("a", { href: "/planif/", class: "ici", text: "Planification" })
         ]),
-        el("span", { class: "maj", text: etiquette })
+        outilsHaut
       ]),
       nav
     ]));
+
+    var ancien = document.querySelector(".fab");
+    if (ancien) ancien.remove();
+    var principale = (actions || []).filter(function (a) { return a.or; })[0];
+    if (principale) {
+      document.body.appendChild(el("button", {
+        class: "fab", type: "button", onclick: principale.action, "aria-label": principale.label
+      }, [el("b", { text: "+", "aria-hidden": "true" }), principale.label.replace(/^(Nouvelle|Nouveau|Nouvel) /, "")]));
+      document.body.classList.add("avec-fab");
+    }
+  }
+
+  /* ------------------------------------------ tableaux lisibles sur téléphone
+     Sur petit écran, chaque ligne de tableau devient une fiche (planif.css).
+     L'en-tête disparaît : chaque cellule reçoit donc le libellé de sa colonne,
+     affiché devant sa valeur. Posé automatiquement sur tout tableau inséré. */
+
+  function etiquetteTableau(table) {
+    var titres = [].map.call(table.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); });
+    if (!titres.length) return;
+    [].forEach.call(table.querySelectorAll("tbody tr"), function (tr) {
+      [].forEach.call(tr.children, function (td, i) {
+        if (i > 0 && titres[i] && !td.classList.contains("actions")) td.setAttribute("data-l", titres[i]);
+      });
+    });
+  }
+
+  if (global.MutationObserver) {
+    new MutationObserver(function () {
+      [].forEach.call(document.querySelectorAll("table.liste:not([data-etiq])"), function (t) {
+        t.setAttribute("data-etiq", "");
+        etiquetteTableau(t);
+      });
+    }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   function pied() {

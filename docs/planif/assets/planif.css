@@ -76,6 +76,16 @@ p{margin:0}
 .nav-outil a:hover{color:var(--texte)}
 .nav-outil a[aria-current]{color:var(--or);border-color:rgba(214,168,92,.32)}
 .nav-outil .pousse{margin-left:auto;flex:0 0 auto}
+.nav-outil .court{display:none}
+
+/* Réglages et déconnexion : discrets, dans la ligne du haut */
+.barre-outils{display:flex;align-items:baseline;gap:18px;white-space:nowrap}
+.barre-outils button{background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;transition:color .3s}
+.barre-outils button:hover{color:var(--or)}
+
+/* Action principale en bouton flottant : téléphone uniquement */
+.fab{display:none}
+.seul-mobile{display:none}
 
 /* ------------------------------------------------------------- en-tete */
 .entete{padding-top:clamp(36px,6vh,64px);padding-bottom:clamp(18px,3vh,30px)}
@@ -153,6 +163,7 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .tete-section h2{font-size:clamp(21px,2.4vw,28px);font-weight:200}
 .num-section{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
 .outils{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.outils.decalages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 
 .carte{border:1px solid var(--ligne);padding:clamp(18px,2.6vw,26px);background:rgba(236,232,224,.015)}
 .carte + .carte{margin-top:16px}
@@ -239,7 +250,7 @@ table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-s
 .pl-tete-zone{border-bottom:0}
 
 /* en-tete : semaines puis jours */
-.pl-sems,.pl-jours{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+.pl-sems,.pl-jours{display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)))}
 .pl-sem{
   grid-column:span var(--span);border-left:1px solid var(--ligne);
   font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
@@ -257,14 +268,14 @@ table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-s
 .pl-jour.auj b{color:var(--or)}
 
 /* fond des colonnes */
-.pl-fond{position:absolute;inset:0;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));pointer-events:none}
+.pl-fond{position:absolute;inset:0;display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)));pointer-events:none}
 .pl-fond i{border-left:1px solid var(--ligne-faible)}
 .pl-fond i.chome{background:rgba(236,232,224,.035)}
 .pl-fond i.abs{background:repeating-linear-gradient(135deg,rgba(236,232,224,.06) 0 3px,transparent 3px 7px)}
 .pl-fond i.auj{background:rgba(214,168,92,.08);border-left-color:rgba(214,168,92,.4)}
 
 /* pistes et barres */
-.pl-piste{position:relative;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));grid-auto-rows:26px;row-gap:5px;padding:9px 0;min-height:44px}
+.pl-piste{position:relative;display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)));grid-auto-rows:26px;row-gap:5px;padding:9px 0;min-height:44px}
 .bt{
   grid-row:var(--l);grid-column:var(--c1)/span var(--cn);
   position:relative;display:flex;align-items:center;gap:7px;
@@ -273,7 +284,7 @@ table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-s
   border-left:2px solid var(--tt);
   background:color-mix(in srgb,var(--tt) 11%,transparent);
   font-size:12.5px;color:var(--texte);white-space:nowrap;overflow:hidden;
-  transition:background .2s,border-color .2s;touch-action:none;
+  transition:background .2s,border-color .2s;touch-action:manipulation;
 }
 .bt:hover{background:color-mix(in srgb,var(--tt) 20%,transparent)}
 .bt:focus-visible{outline:1px solid var(--or);outline-offset:1px}
@@ -293,7 +304,7 @@ table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-s
 .pl-membre .c{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--texte-faible);margin-top:5px}
 
 /* bilan hebdomadaire, sous les barres, aligné sur les semaines */
-.pl-bilan{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));border-top:1px dashed rgba(236,232,224,.09)}
+.pl-bilan{display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)));border-top:1px dashed rgba(236,232,224,.09)}
 .pl-bw{
   grid-column:span var(--span);border-left:1px solid var(--ligne-faible);
   padding:5px 8px 7px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;
@@ -345,17 +356,88 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   .plan{--wnom:140px}
   .modale-boite{margin-top:0;min-height:100dvh;max-height:none;width:100%}
 }
-@media (max-width:560px){
-  /* barre toujours visible : sur téléphone, elle doit rester compacte */
-  .barre-h .maj{display:none}
-  .barre-h{padding-bottom:8px}
-}
+/* =====================================================================
+   Téléphone (≤ 640 px) — l'outil doit s'y utiliser, pas seulement s'y afficher.
+   Cibles tactiles d'au moins 40 px, rien qui oblige à défiler de côté,
+   action principale à portée de pouce.
+   ===================================================================== */
 @media (max-width:640px){
-  .entete{padding-top:26px}
+  .entete{padding-top:22px;padding-bottom:14px}
+  .entete h1{font-size:34px}
+  .entete .chapeau{display:none}                     /* au téléphone, on vient pour agir : droit au contenu */
+  body.avec-fab #btn-nouvelle{display:none}          /* doublon du bouton flottant */
   .modale-pied{flex-direction:column-reverse;align-items:stretch}
   .modale-pied .btn{justify-content:center}
   .modale-pied .gauche{margin-right:0;margin-top:6px}
   footer.pied-outil .maj{display:none}
+
+  /* barre : compacte, les quatre sections tiennent sans défiler */
+  .barre-h{padding-bottom:6px}
+  .barre-h .marque,.barre-h .maj{display:none}
+  .nav-outil{gap:2px;padding-bottom:8px}
+  .nav-outil a{padding:9px 9px;letter-spacing:.1em}
+  .nav-outil .long{display:none}
+  .nav-outil .court{display:inline}
+  .nav-outil .pousse{display:none}
+
+  .fab{
+    display:flex;position:fixed;z-index:40;right:16px;bottom:max(18px,env(safe-area-inset-bottom));
+    align-items:center;gap:10px;height:52px;padding:0 22px;
+    background:var(--or);color:var(--noir);border:0;cursor:pointer;
+    font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  }
+  .fab b{font-weight:400;font-size:20px;line-height:1;letter-spacing:0}
+  body.avec-fab main{padding-bottom:84px}
+  .seul-mobile{display:inline-flex}
+
+  /* boutons et champs au doigt ; 16 px évite le zoom automatique des navigateurs mobiles */
+  .btn{min-height:40px}
+  .btn-nu{padding-inline:10px}
+  .champ input,.champ select,.champ textarea,.champ input[type=date],.champ input[type=number]{font-size:16px;min-height:44px}
+  .case{min-height:40px}
+  .tete-section{margin-bottom:16px}
+  .section{padding-block:22px}
+
+  /* tableaux -> fiches empilées ; les libellés viennent de l'en-tête (ui.js) */
+  table.liste{min-width:0!important}
+  table.liste thead{display:none}
+  table.liste,table.liste tbody,table.liste tr,table.liste td{display:block}
+  table.liste tr{padding:14px 0;border-bottom:1px solid var(--ligne)}
+  table.liste tr:hover td{background:none}
+  table.liste td{border:0;padding:3px 0}
+  table.liste td[data-l]{position:relative;padding-left:104px;min-height:24px}
+  table.liste td[data-l]::before{
+    content:attr(data-l);position:absolute;left:0;top:6px;width:96px;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);
+  }
+  table.liste td.actions{display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 0;text-align:left}
+  table.liste td.actions .btn{flex:1 1 auto;justify-content:center;border-color:var(--ligne)}
+  .defile{overflow-x:visible}
+
+  /* filtres repliés derrière un bouton */
+  #filtres{display:none!important}
+  #filtres.ouvert{display:grid!important}
+
+  /* tableau de bord : un bloc par membre, la semaine sur toute la largeur */
+  .plan-barre{gap:8px}
+  .plan-barre .txt{display:none}
+  .plan-periode{order:-1;flex:1 0 100%;padding:0 0 4px}
+  .plan-barre select{flex:1 1 40%;min-width:0}
+  .plan{grid-template-columns:minmax(0,1fr)}
+  .pl-tete-nom{display:none}
+  .pl-nom{position:static;padding:16px 0 6px;border-bottom:0}
+  .pl-membre > div{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;width:100%}
+  .pl-membre .c{margin:0 0 0 auto}
+  .pl-zone{border-bottom:1px solid var(--ligne)}
+  .bt{font-size:12px;padding:0 6px;gap:5px}
+  .bt .code{display:none}
+  .bt.etroite .jr{display:none}                      /* 1 ou 2 jours : la place va au libellé */
+  .outils.decalages{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nav-outil a{min-height:40px;display:inline-flex;align-items:center}
+  .barre-outils button{padding:10px 0;margin:-10px 0}
+  .pl-bw{padding-inline:4px}
+  .cles .cle{padding:14px 12px}
+  .al{flex-direction:column;gap:2px}
 }
 
 @media print{
