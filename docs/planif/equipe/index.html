@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=9">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=10">
 </head>
 <body>
 
@@ -31,6 +31,7 @@
   <div class="wrap" data-bandeau></div>
 
   <div class="wrap">
+    <div data-recherche style="margin-top:10px"></div>
     <section class="section">
       <div class="tete-section">
         <div>
@@ -66,11 +67,14 @@
 <script src="/planif/assets/supabase.js?v=2"></script>
 <script src="/planif/assets/donnees.js?v=3"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=4"></script>
+<script src="/planif/assets/ui.js?v=5"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  var barre = null;                                 // recherche instantanée
+  var suivi = UI.suiviApparitions();
 
   if (!UI.session()) return;
 
@@ -82,23 +86,50 @@
     [].forEach.call(document.querySelectorAll("[data-nouveau]"), function (b) {
       b.addEventListener("click", function () { formulaire(null, b.dataset.nouveau); });
     });
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher un nom, une adresse, une absence…",
+      surSaisie: dessine,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
+    });
     dessine();
   }).catch(UI.echec);
 
   /* ------------------------------------------------------------- affichage */
 
+  function champsCherches(m) {
+    return [m.prenom + " " + m.nom, m.email, D.ROLES[m.role], m.actif ? "" : "inactif"]
+      .concat(m.absences.map(function (a) { return a.motif; }));
+  }
+
+  function selection(role, sansTexte) {
+    var mots = sansTexte || !barre ? [] : barre.termes();
+    return D.membres({ role: role || null, tous: true })
+      .filter(function (m) { return UI.correspond(champsCherches(m), mots); });
+  }
+
   function dessine() {
+    suivi.debut();
+    if (barre) barre.compte(selection().length, selection(null, true).length);
     rendListe("ingenieur", document.getElementById("liste-ing"), document.getElementById("t-ing"));
     rendListe("dessinateur", document.getElementById("liste-des"), document.getElementById("t-des"));
   }
 
   function rendListe(role, hote, titre) {
-    var membres = D.membres({ role: role, tous: true });
+    var membres = selection(role);
+    var mots = barre ? barre.termes() : [];
+    var q = barre ? barre.valeur().trim() : "";
     UI.vide(hote);
-    titre.textContent = role === "ingenieur" ? "Ingénieurs" : "Dessinateurs";
+    var libelle = role === "ingenieur" ? "Ingénieurs" : "Dessinateurs";
+    titre.textContent = q ? libelle + " · " + membres.length : libelle;
 
     if (!membres.length) {
-      hote.appendChild(el("div", { class: "vide", text: "Aucun " + (role === "ingenieur" ? "ingénieur" : "dessinateur") + " enregistré" }));
+      var sing = role === "ingenieur" ? "ingénieur" : "dessinateur";
+      hote.appendChild(q
+        ? el("div", { class: "sans-resultat", style: "padding:26px 0 10px" }, [
+            el("p", { class: "aide", style: "margin:0" }, ["Aucun " + sing + " pour « ", el("em", { style: "font-style:normal;color:var(--or)", text: q }), " »"])
+          ])
+        : el("div", { class: "vide", text: "Aucun " + sing + " enregistré" }));
       return;
     }
 
@@ -112,10 +143,10 @@
       var pourcent = b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
       var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
 
-      corps.appendChild(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
+      corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
         el("td", {}, [
-          el("div", { class: "principal", text: m.prenom + " " + m.nom }),
-          el("div", { class: "secondaire", text: m.email })
+          el("div", { class: "principal" }, [UI.surligne(m.prenom + " " + m.nom, mots)]),
+          el("div", { class: "secondaire" }, [UI.surligne(m.email, mots)])
         ]),
         el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
         el("td", {}, [
@@ -126,7 +157,7 @@
           m.absences.length
             ? el("div", {}, [
                 el("div", { class: "num", text: m.absences.length + (m.absences.length > 1 ? " périodes" : " période") }),
-                prochaine ? el("div", { class: "secondaire", text: prochaine.motif + " · " + C.fmtCourt(prochaine.debut) + " → " + C.fmtCourt(prochaine.fin) }) : null
+                prochaine ? el("div", { class: "secondaire" }, [UI.surligne(prochaine.motif, mots), " · " + C.fmtCourt(prochaine.debut) + " → " + C.fmtCourt(prochaine.fin)]) : null
               ])
             : el("span", { class: "secondaire", text: "—" })
         ]),
@@ -135,7 +166,7 @@
           el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(m.id); } }),
           el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(m); } })
         ])
-      ]));
+      ]), m.id));
     });
 
     hote.appendChild(el("table", { class: "liste" }, [

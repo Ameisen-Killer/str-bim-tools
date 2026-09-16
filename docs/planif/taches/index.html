@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=9">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=10">
 </head>
 <body>
 
@@ -43,6 +43,7 @@
         </div>
       </div>
 
+      <div data-recherche></div>
       <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between;margin-bottom:16px">
         <span>Filtres</span><span id="nb-filtres" class="or"></span>
       </button>
@@ -59,13 +60,15 @@
 <script src="/planif/assets/supabase.js?v=2"></script>
 <script src="/planif/assets/donnees.js?v=3"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=4"></script>
+<script src="/planif/assets/ui.js?v=5"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
-  var filtres = { affaire: "", membre: "", statut: "", masqueTerminees: true, texte: "" };
+  var filtres = { affaire: "", membre: "", statut: "", masqueTerminees: true };
+  var barre = null;                                 // recherche instantanée
+  var suivi = UI.suiviApparitions();
 
   if (!UI.session()) return;
 
@@ -83,6 +86,13 @@
     document.getElementById("btn-filtres").addEventListener("click", function () {
       var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
       this.setAttribute("aria-expanded", String(ouvert));
+    });
+
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher une tâche, une affaire, une personne…",
+      surSaisie: dessine,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
 
     rendFiltres();
@@ -113,10 +123,8 @@
       options: [{ valeur: "", label: "Tous les statuts" }].concat(
         Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; }))
     });
-    var chTexte = UI.champ({ nom: "f-texte", label: "Recherche", valeur: filtres.texte, exemple: "Coffrage, armature…" });
-
     hote.appendChild(chAffaire); hote.appendChild(chMembre);
-    hote.appendChild(chStatut); hote.appendChild(chTexte);
+    hote.appendChild(chStatut);
 
     var masque = el("input", { type: "checkbox" });
     masque.checked = filtres.masqueTerminees;
@@ -128,21 +136,31 @@
     chAffaire.querySelector("select").addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
     chMembre.querySelector("select").addEventListener("change", function () { filtres.membre = this.value; dessine(); });
     chStatut.querySelector("select").addEventListener("change", function () { filtres.statut = this.value; dessine(); });
-    chTexte.querySelector("input").addEventListener("input", function () { filtres.texte = this.value; dessine(); });
   }
 
-  function selection() {
-    var q = filtres.texte.trim().toLowerCase();
+  /** Tout ce qui, dans une tâche, peut être cherché. */
+  function champsCherches(t) {
+    var a = D.affaire(t.affaireId);
+    return [
+      t.titre, t.note, a && a.code, a && a.nom,
+      t.ingenieurId && D.nomMembre(t.ingenieurId),
+      t.dessinateurId && D.nomMembre(t.dessinateurId),
+      D.STATUTS_TACHE[t.statut]
+    ];
+  }
+
+  /**
+   * opts.sansTexte : ignore la recherche (pour le total du compteur)
+   * opts.terminees : force l'inclusion des tâches terminées
+   */
+  function selection(opts) {
+    opts = opts || {};
+    var mots = opts.sansTexte || !barre ? [] : barre.termes();
     return D.taches({ affaireId: filtres.affaire || null, membreId: filtres.membre || null })
       .filter(function (t) {
-        if (filtres.masqueTerminees && t.statut === "termine") return false;
+        if (filtres.masqueTerminees && !opts.terminees && t.statut === "termine") return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
-        if (q) {
-          var a = D.affaire(t.affaireId);
-          var foin = (t.titre + " " + (t.note || "") + " " + (a ? a.code + " " + a.nom : "")).toLowerCase();
-          if (foin.indexOf(q) < 0) return false;
-        }
-        return true;
+        return UI.correspond(champsCherches(t), mots);
       });
   }
 
@@ -150,11 +168,14 @@
 
   function dessine() {
     var taches = selection();
+    var mots = barre ? barre.termes() : [];
     var hote = document.getElementById("liste");
     UI.vide(hote);
+    suivi.debut();
+    if (barre) barre.compte(taches.length, selection({ sansTexte: true }).length);
 
     // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [filtres.affaire, filtres.membre, filtres.statut, filtres.texte.trim()].filter(Boolean).length;
+    var actifs = [filtres.affaire, filtres.membre, filtres.statut].filter(Boolean).length;
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
@@ -162,7 +183,7 @@
       taches.length + (taches.length > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(charge) + " j";
 
     if (!taches.length) {
-      hote.appendChild(el("div", { class: "vide", text: "Aucune tâche ne correspond" }));
+      hote.appendChild(sansResultat(mots, actifs));
       return;
     }
 
@@ -177,20 +198,26 @@
 
       var gens = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
       if (t.chargeInge > 0) {
-        gens.appendChild(el("span", { class: "etiq ing", text: (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "Non affecté") + " · " + C.fmtJours(t.chargeInge) + " j" }));
+        gens.appendChild(el("span", { class: "etiq ing" }, [
+          UI.surligne(t.ingenieurId ? D.nomMembre(t.ingenieurId) : "Non affecté", mots),
+          " · " + C.fmtJours(t.chargeInge) + " j"
+        ]));
       }
       if (t.chargeDessin > 0) {
-        gens.appendChild(el("span", { class: "etiq des", text: (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "Non affecté") + " · " + C.fmtJours(t.chargeDessin) + " j" }));
+        gens.appendChild(el("span", { class: "etiq des" }, [
+          UI.surligne(t.dessinateurId ? D.nomMembre(t.dessinateurId) : "Non affecté", mots),
+          " · " + C.fmtJours(t.chargeDessin) + " j"
+        ]));
       }
 
-      corps.appendChild(el("tr", {}, [
+      corps.appendChild(suivi.marque(el("tr", {}, [
         el("td", {}, [
           el("div", { style: "display:flex;align-items:center;gap:8px" }, [
             el("span", { class: "pastille", style: "color:" + teinte, "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + teinte + ";font-size:11px;letter-spacing:.1em", text: a ? a.code : "—" })
+            el("span", { class: "num", style: "color:" + teinte + ";font-size:11px;letter-spacing:.1em" }, [UI.surligne(a ? a.code : "—", mots)])
           ]),
-          el("div", { class: "principal", style: "margin-top:4px", text: t.titre }),
-          t.note ? el("div", { class: "secondaire", text: t.note }) : null
+          el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(t.titre, mots)]),
+          t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
         ]),
         el("td", {}, [gens]),
         el("td", {}, [
@@ -202,7 +229,7 @@
           el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : "dans " + reste + " j") })
         ]),
         el("td", {}, [
-          el("span", { class: "statut s-" + t.statut }, [el("i", { "aria-hidden": "true" }), D.STATUTS_TACHE[t.statut]]),
+          el("span", { class: "statut s-" + t.statut }, [el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_TACHE[t.statut], mots)]),
           t.avancement ? el("div", { class: "jauge" }, [el("i", { style: "width:" + t.avancement + "%" })]) : null,
           t.avancement ? el("div", { class: "secondaire", text: t.avancement + " %" }) : null
         ]),
@@ -210,7 +237,7 @@
           el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(t.id); } }),
           el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(t); } })
         ])
-      ]));
+      ]), t.id));
     });
 
     hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
@@ -224,6 +251,36 @@
       ])]),
       corps
     ]));
+  }
+
+  /** Aucun résultat : dire pourquoi, et proposer la sortie la plus probable. */
+  function sansResultat(mots, filtresActifs) {
+    var q = barre ? barre.valeur().trim() : "";
+    var bloc = el("div", { class: "sans-resultat" });
+    if (!q) {
+      bloc.appendChild(el("p", { class: "q", text: "Aucune tâche ne correspond" }));
+      return bloc;
+    }
+    bloc.appendChild(el("p", { class: "q" }, ["Rien pour « ", el("em", { text: q }), " »"]));
+
+    var terminees = filtres.masqueTerminees
+      ? selection({ terminees: true }).filter(function (t) { return t.statut === "termine"; }).length : 0;
+    if (terminees) {
+      bloc.appendChild(el("p", { class: "aide", text: terminees + (terminees > 1 ? " tâches terminées correspondent." : " tâche terminée correspond.") }));
+      bloc.appendChild(el("button", {
+        class: "btn btn-or", type: "button", text: "Afficher les terminées",
+        onclick: function () { filtres.masqueTerminees = false; rendFiltres(); dessine(); }
+      }));
+    } else if (filtresActifs) {
+      bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur les tâches filtrées." }));
+      bloc.appendChild(el("button", {
+        class: "btn btn-or", type: "button", text: "Retirer les filtres",
+        onclick: function () { filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
+      }));
+    } else {
+      bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le libellé, la note, l'affaire, les personnes et le statut." }));
+    }
+    return bloc;
   }
 
   /* ------------------------------------------------------------ formulaire */

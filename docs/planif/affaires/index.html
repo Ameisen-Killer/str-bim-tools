@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=9">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=10">
 </head>
 <body>
 
@@ -44,6 +44,7 @@
           <button class="btn btn-or" type="button" id="btn-nouvelle">Nouvelle affaire</button>
         </div>
       </div>
+      <div data-recherche></div>
       <div class="defile" id="liste"></div>
     </section>
   </div>
@@ -56,11 +57,14 @@
 <script src="/planif/assets/supabase.js?v=2"></script>
 <script src="/planif/assets/donnees.js?v=3"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=4"></script>
+<script src="/planif/assets/ui.js?v=5"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  var barre = null;                                 // recherche instantanée
+  var suivi = UI.suiviApparitions();
 
   if (!UI.session()) return;
 
@@ -71,21 +75,58 @@
     document.querySelector(".entete").classList.add("vu");
     document.getElementById("btn-nouvelle").addEventListener("click", function () { formulaire(null); });
     document.getElementById("voir-terminees").addEventListener("change", dessine);
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher une affaire, un numéro, une personne…",
+      surSaisie: dessine,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
+    });
     dessine();
   }).catch(UI.echec);
 
   /* ------------------------------------------------------------- affichage */
 
+  function champsCherches(a) {
+    return [a.code, a.nom, a.note, D.STATUTS_AFFAIRE[a.statut]]
+      .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre));
+  }
+
+  function selection(opts) {
+    opts = opts || {};
+    var tous = opts.tous || document.getElementById("voir-terminees").checked;
+    var mots = opts.sansTexte || !barre ? [] : barre.termes();
+    return D.affaires({ tous: tous }).filter(function (a) { return UI.correspond(champsCherches(a), mots); });
+  }
+
   function dessine() {
-    var tous = document.getElementById("voir-terminees").checked;
-    var affaires = D.affaires({ tous: tous });
+    var affaires = selection();
+    var mots = barre ? barre.termes() : [];
     var hote = document.getElementById("liste");
     UI.vide(hote);
+    suivi.debut();
+    if (barre) barre.compte(affaires.length, selection({ sansTexte: true }).length);
     document.getElementById("titre-liste").textContent =
       affaires.length + (affaires.length > 1 ? " affaires" : " affaire");
 
     if (!affaires.length) {
-      hote.appendChild(el("div", { class: "vide", text: "Aucune affaire — commence par en créer une" }));
+      var q = barre ? barre.valeur().trim() : "";
+      if (!q) {
+        hote.appendChild(el("div", { class: "vide", text: "Aucune affaire — commence par en créer une" }));
+        return;
+      }
+      var bloc = el("div", { class: "sans-resultat" }, [el("p", { class: "q" }, ["Rien pour « ", el("em", { text: q }), " »"])]);
+      var cachees = document.getElementById("voir-terminees").checked ? 0
+        : selection({ tous: true }).filter(function (a) { return a.statut === "terminee"; }).length;
+      if (cachees) {
+        bloc.appendChild(el("p", { class: "aide", text: cachees + (cachees > 1 ? " affaires terminées correspondent." : " affaire terminée correspond.") }));
+        bloc.appendChild(el("button", {
+          class: "btn btn-or", type: "button", text: "Voir les affaires terminées",
+          onclick: function () { document.getElementById("voir-terminees").checked = true; dessine(); }
+        }));
+      } else {
+        bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, la note, le statut et l'équipe." }));
+      }
+      hote.appendChild(bloc);
       return;
     }
 
@@ -99,22 +140,28 @@
       var t = UI.teinte(a.teinte);
 
       var equipe = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
+      // Un nom cherché s'affiche en entier, pour que le passage trouvé soit visible
+      function etiquette(m, classe) {
+        var cherche = mots.length && UI.correspond([m.prenom + " " + m.nom], mots);
+        var nom = cherche ? m.prenom + " " + m.nom : m.prenom + " " + m.nom.charAt(0) + ".";
+        return el("span", { class: "etiq " + classe }, [UI.surligne(nom, mots)]);
+      }
       a.ingenieurs.forEach(function (i) {
-        var m = D.membre(i); if (m) equipe.appendChild(el("span", { class: "etiq ing", text: m.prenom + " " + m.nom.charAt(0) + "." }));
+        var m = D.membre(i); if (m) equipe.appendChild(etiquette(m, "ing"));
       });
       a.dessinateurs.forEach(function (i) {
-        var m = D.membre(i); if (m) equipe.appendChild(el("span", { class: "etiq des", text: m.prenom + " " + m.nom.charAt(0) + "." }));
+        var m = D.membre(i); if (m) equipe.appendChild(etiquette(m, "des"));
       });
       if (!equipe.childNodes.length) equipe.appendChild(el("span", { class: "secondaire", text: "Aucun membre affecté" }));
 
-      corps.appendChild(el("tr", {}, [
+      corps.appendChild(suivi.marque(el("tr", {}, [
         el("td", {}, [
           el("div", { style: "display:flex;align-items:center;gap:9px" }, [
             el("span", { class: "pastille", style: "color:" + t, "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em", text: a.code })
+            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [UI.surligne(a.code, mots)])
           ]),
-          el("div", { class: "principal", style: "margin-top:4px", text: a.nom }),
-          a.note ? el("div", { class: "secondaire", text: a.note }) : null
+          el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(a.nom, mots)]),
+          a.note ? el("div", { class: "secondaire" }, [UI.surligne(a.note, mots)]) : null
         ]),
         el("td", {}, [equipe]),
         el("td", {}, [
@@ -125,7 +172,7 @@
         el("td", { class: "num", text: a.echeance ? C.fmtCH(a.echeance) : "—" }),
         el("td", {}, [
           el("span", { class: "statut s-" + (a.statut === "active" ? "en_cours" : a.statut === "terminee" ? "termine" : "attente") }, [
-            el("i", { "aria-hidden": "true" }), D.STATUTS_AFFAIRE[a.statut]
+            el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_AFFAIRE[a.statut], mots)
           ])
         ]),
         el("td", { class: "actions" }, [
@@ -133,7 +180,7 @@
           el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(a.id); } }),
           el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(a, taches.length); } })
         ])
-      ]));
+      ]), a.id));
     });
 
     hote.appendChild(el("table", { class: "liste", style: "min-width:860px" }, [

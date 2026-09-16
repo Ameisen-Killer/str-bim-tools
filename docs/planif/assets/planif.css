@@ -429,6 +429,66 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   .plan{--wnom:140px}
   .modale-boite{margin-top:0;min-height:100dvh;max-height:none;width:100%}
 }
+/* ------------------------------------------------------------ recherche
+   Un seul trait : le champ n'a pas de cadre, seulement un filet qui passe à
+   l'or quand on y entre, et au rouge quand plus rien ne correspond. */
+.recherche{
+  position:relative;display:flex;align-items:center;gap:16px;
+  margin:0 0 26px;padding:6px 0 14px;border-bottom:1px solid var(--ligne);
+}
+.recherche::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--or);
+  transform:scaleX(0);transform-origin:left;transition:transform .8s cubic-bezier(.55,.05,.25,1),background .3s;
+}
+.recherche:focus-within::after,.recherche.remplie::after{transform:scaleX(1)}
+.recherche.aucun::after{background:var(--alerte)}
+
+.recherche-loupe{position:relative;flex:0 0 auto;width:22px;height:22px;color:var(--texte-faible);transition:color .3s}
+.recherche-loupe::before{content:"";position:absolute;left:1px;top:1px;width:14px;height:14px;border:1.5px solid currentColor;border-radius:50%}
+.recherche-loupe::after{content:"";position:absolute;left:13.5px;top:14px;width:8px;height:1.5px;background:currentColor;transform:rotate(45deg);transform-origin:left center}
+.recherche:focus-within .recherche-loupe,.recherche.remplie .recherche-loupe{color:var(--or)}
+
+.recherche-champ{
+  flex:1 1 auto;min-width:0;padding:0;border:0;outline:none;background:none;
+  -webkit-appearance:none;appearance:none;
+  font-family:var(--sans);font-weight:200;font-size:clamp(22px,2.6vw,32px);line-height:1.25;
+  letter-spacing:.005em;color:var(--texte);caret-color:var(--or);
+}
+.recherche-champ::placeholder{color:var(--texte-faible)}
+.recherche-champ::-webkit-search-cancel-button,.recherche-champ::-webkit-search-decoration{-webkit-appearance:none;display:none}
+
+.recherche-compte{flex:0 0 auto;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--texte-faible);white-space:nowrap;font-variant-numeric:tabular-nums}
+.recherche-compte b{font-weight:400;color:var(--texte);transition:color .3s}
+.recherche.remplie .recherche-compte b{color:var(--or)}
+.recherche.aucun .recherche-compte b{color:var(--alerte)}
+
+.recherche-touche kbd{font-family:var(--mono);font-size:11px;color:var(--texte-faible);border:1px solid var(--ligne);padding:1px 7px}
+.recherche:focus-within .recherche-touche,.recherche.remplie .recherche-touche{display:none}
+
+.recherche-effacer{
+  display:none;flex:0 0 auto;background:none;border:0;padding:8px 0;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);transition:color .25s;
+}
+.recherche-effacer:hover,.recherche-effacer:focus-visible{color:var(--or);outline:none}
+.recherche.remplie .recherche-effacer{display:inline-block}
+
+/* passages trouvés */
+mark.trouve{
+  color:inherit;background:rgba(var(--or-rvb),.2);box-shadow:inset 0 -1px 0 var(--or);
+  padding:0 1px;margin:0 -1px;border-radius:1px;
+}
+
+/* lignes qui entrent dans les résultats : fondu montant, en cascade */
+.apparait > td{animation:apparait .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0ms)}
+@keyframes apparait{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* aucun résultat */
+.sans-resultat{padding:46px 0 30px;text-align:center}
+.sans-resultat .q{font-weight:200;font-size:clamp(22px,2.6vw,30px);line-height:1.2;color:var(--texte)}
+.sans-resultat .q em{font-style:normal;color:var(--or)}
+.sans-resultat .aide{margin-top:10px;font-size:14px;color:var(--texte-doux)}
+.sans-resultat .btn{margin-top:18px}
+
 /* =====================================================================
    Téléphone (≤ 640 px) — l'outil doit s'y utiliser, pas seulement s'y afficher.
    Cibles tactiles d'au moins 40 px, rien qui oblige à défiler de côté,
@@ -506,6 +566,10 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   .bt .code{display:none}
   .bt.etroite .jr{display:none}                      /* 1 ou 2 jours : la place va au libellé */
   .outils.decalages{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .recherche{gap:12px;margin-bottom:18px}
+  .recherche-touche{display:none}                   /* pas de clavier physique */
+  .recherche-champ{font-size:22px}
+  .recherche-compte{font-size:11px}
   .nav-outil a{min-height:40px;display:inline-flex;align-items:center}
   .barre-outils button{padding:10px 0;margin:-10px 0}
   .theme-lib{display:none}

@@ -389,6 +389,169 @@
     }
   }
 
+  /* ------------------------------------------------------------- recherche
+     Une barre commune aux listes (tâches, affaires, équipe), filtrée à chaque
+     caractère. Insensible à la casse et aux accents (« beton » trouve
+     « Béton »), plusieurs mots se cumulent (« coffrage kevin »).
+     Raccourcis : « / » ou Ctrl+K pour chercher, Échap pour effacer,
+     Entrée pour ouvrir le résultat quand il n'en reste qu'un. */
+
+  /** Forme de comparaison : minuscules, sans accents. */
+  function plie(s) {
+    return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  }
+
+  /** Les mots cherchés, déjà pliés. */
+  function termes(q) { return plie(q).split(/\s+/).filter(Boolean); }
+
+  /** Vrai si chaque mot se trouve dans au moins un des champs. */
+  function correspond(champs, mots) {
+    if (!mots.length) return true;
+    var foin = plie(champs.filter(Boolean).join("   "));
+    return mots.every(function (m) { return foin.indexOf(m) >= 0; });
+  }
+
+  /**
+   * Texte avec les passages trouvés surlignés. La recherche se fait sur la
+   * forme pliée ; une table de correspondance ramène les positions au texte
+   * d'origine, pour surligner « Béton » quand on a tapé « beton ».
+   */
+  function surligne(texte, mots) {
+    texte = String(texte == null ? "" : texte);
+    var frag = document.createDocumentFragment();
+    if (!mots || !mots.length || !texte) { frag.appendChild(document.createTextNode(texte)); return frag; }
+
+    var plat = "", origine = [];
+    for (var i = 0; i < texte.length; i++) {
+      var p = plie(texte.charAt(i));
+      for (var k = 0; k < p.length; k++) { plat += p.charAt(k); origine.push(i); }
+    }
+    var zones = [];
+    mots.forEach(function (m) {
+      var depart = 0, pos;
+      while (m && (pos = plat.indexOf(m, depart)) >= 0) {
+        zones.push([origine[pos], origine[pos + m.length - 1] + 1]);
+        depart = pos + m.length;
+      }
+    });
+    if (!zones.length) { frag.appendChild(document.createTextNode(texte)); return frag; }
+
+    zones.sort(function (a, b) { return a[0] - b[0]; });
+    var fusion = [zones[0]];
+    zones.slice(1).forEach(function (z) {
+      var der = fusion[fusion.length - 1];
+      if (z[0] <= der[1]) der[1] = Math.max(der[1], z[1]); else fusion.push(z);
+    });
+
+    var curseur = 0;
+    fusion.forEach(function (z) {
+      if (z[0] > curseur) frag.appendChild(document.createTextNode(texte.slice(curseur, z[0])));
+      frag.appendChild(el("mark", { class: "trouve", text: texte.slice(z[0], z[1]) }));
+      curseur = z[1];
+    });
+    if (curseur < texte.length) frag.appendChild(document.createTextNode(texte.slice(curseur)));
+    return frag;
+  }
+
+  /** Nombre qui défile jusqu'à sa nouvelle valeur. */
+  function defileNombre(noeud, cible) {
+    var depart = parseInt(noeud.textContent, 10);
+    noeud._cible = cible;
+    cancelAnimationFrame(noeud._anim);
+    if (isNaN(depart) || depart === cible || document.hidden) { noeud.textContent = String(cible); return; }
+    var t0 = null, duree = 260;
+    // Filet de sécurité : si l'affichage est suspendu (onglet caché), la valeur finale est posée quand même
+    setTimeout(function () { if (noeud._cible === cible) noeud.textContent = String(cible); }, duree + 60);
+    function pas(t) {
+      if (t0 === null) t0 = t;
+      var x = Math.min(1, (t - t0) / duree), e = 1 - Math.pow(1 - x, 3);
+      noeud.textContent = String(Math.round(depart + (cible - depart) * e));
+      if (x < 1) noeud._anim = requestAnimationFrame(pas);
+    }
+    noeud._anim = requestAnimationFrame(pas);
+  }
+
+  /**
+   * Barre de recherche.
+   * recherche({ hote, exemple, surSaisie(q), surEntree() })
+   * Renvoie { valeur(), compte(n, total), termes() }.
+   * La requête est reflétée dans l'adresse (?q=…) : une recherche se garde en favori.
+   */
+  function recherche(o) {
+    var initiale = new URLSearchParams(location.search).get("q") || "";
+
+    var champ = el("input", {
+      type: "search", class: "recherche-champ", placeholder: o.exemple || "Rechercher…",
+      autocomplete: "off", spellcheck: "false", "aria-label": o.exemple || "Rechercher", enterkeyhint: "search"
+    });
+    champ.value = initiale;
+
+    var loupe = el("span", { class: "recherche-loupe", "aria-hidden": "true" });
+    var nb = el("b", { text: "0" }), total = el("span", { text: "0" });
+    var compteur = el("span", { class: "recherche-compte", "aria-live": "polite" }, [nb, " / ", total]);
+    var effacer = el("button", { type: "button", class: "recherche-effacer", "aria-label": "Effacer la recherche", text: "Effacer" });
+    var touche = el("span", { class: "recherche-touche", "aria-hidden": "true" }, [el("kbd", { text: "/" })]);
+
+    var bloc = el("div", { class: "recherche", role: "search" }, [loupe, champ, touche, effacer, compteur]);
+    vide(o.hote).appendChild(bloc);
+
+    function etat() {
+      var plein = champ.value.length > 0;
+      bloc.classList.toggle("remplie", plein);
+      var url = new URL(location.href);
+      if (champ.value.trim()) url.searchParams.set("q", champ.value.trim()); else url.searchParams.delete("q");
+      history.replaceState(null, "", url.pathname + url.search);
+    }
+
+    champ.addEventListener("input", function () { etat(); o.surSaisie(champ.value); });
+    champ.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        if (champ.value) { e.preventDefault(); champ.value = ""; etat(); o.surSaisie(""); }
+        else champ.blur();
+      } else if (e.key === "Enter" && o.surEntree) {
+        e.preventDefault(); o.surEntree();
+      }
+    });
+    effacer.addEventListener("click", function () { champ.value = ""; etat(); o.surSaisie(""); champ.focus(); });
+
+    // « / » ou Ctrl+K depuis n'importe où, sauf pendant une saisie ou avec une fenêtre ouverte
+    document.addEventListener("keydown", function (e) {
+      var cible = e.target, enSaisie = /^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName) || cible.isContentEditable;
+      var fenetre = document.querySelector(".modale.ouverte");
+      if (fenetre) return;
+      if ((e.key === "/" && !enSaisie) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+        e.preventDefault(); champ.focus(); champ.select();
+      }
+    });
+
+    etat();
+    return {
+      valeur: function () { return champ.value; },
+      termes: function () { return termes(champ.value); },
+      compte: function (n, t) { defileNombre(nb, n); defileNombre(total, t); bloc.classList.toggle("aucun", !!champ.value.trim() && n === 0); }
+    };
+  }
+
+  /**
+   * Mémoire des lignes affichées, pour ne faire apparaître en fondu que
+   * celles qui entrent dans les résultats : les autres ne clignotent pas.
+   */
+  function suiviApparitions() {
+    var avant = null, maintenant = null, rang = 0;
+    return {
+      /** À appeler au début de chaque rendu de la liste. */
+      debut: function () { avant = maintenant; maintenant = {}; rang = 0; },
+      /** Pose le fondu sur une ligne nouvelle ; rien au premier rendu ni sur une ligne déjà là. */
+      marque: function (noeud, id) {
+        maintenant[id] = true;
+        if (!avant || avant[id]) return noeud;
+        noeud.classList.add("apparait");
+        noeud.style.setProperty("--d", Math.min(rang++, 10) * 22 + "ms");
+        return noeud;
+      }
+    };
+  }
+
   /* ------------------------------------------ tableaux lisibles sur téléphone
      Sur petit écran, chaque ligne de tableau devient une fiche (planif.css).
      L'en-tête disparaît : chaque cellule reçoit donc le libellé de sa colonne,
@@ -562,6 +725,8 @@
     champ: champ, cases: cases, lit: lit,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
-    session: session, echec: echec, avecBase: avecBase
+    session: session, echec: echec, avecBase: avecBase,
+    recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
+    suiviApparitions: suiviApparitions
   };
 })(window);
