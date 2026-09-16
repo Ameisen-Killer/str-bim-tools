@@ -461,7 +461,11 @@
     if (isNaN(depart) || depart === cible || document.hidden) { noeud.textContent = String(cible); return; }
     var t0 = null, duree = 260;
     // Filet de sécurité : si l'affichage est suspendu (onglet caché), la valeur finale est posée quand même
-    setTimeout(function () { if (noeud._cible === cible) noeud.textContent = String(cible); }, duree + 60);
+    setTimeout(function () {
+      if (noeud._cible !== cible) return;
+      cancelAnimationFrame(noeud._anim);          // une étape en retard ne doit pas réécrire la valeur finale
+      noeud.textContent = String(cible);
+    }, duree + 60);
     function pas(t) {
       if (t0 === null) t0 = t;
       var x = Math.min(1, (t - t0) / duree), e = 1 - Math.pow(1 - x, 3);

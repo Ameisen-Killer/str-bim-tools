@@ -60,7 +60,7 @@
 <script src="/planif/assets/supabase.js?v=2"></script>
 <script src="/planif/assets/donnees.js?v=3"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=5"></script>
+<script src="/planif/assets/ui.js?v=6"></script>
 <script>
 (function () {
   "use strict";
@@ -217,6 +217,8 @@
             el("span", { class: "num", style: "color:" + teinte + ";font-size:11px;letter-spacing:.1em" }, [UI.surligne(a ? a.code : "—", mots)])
           ]),
           el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(t.titre, mots)]),
+          // Affaire concernée, sous le libellé : le numéro seul ne suffit pas à la reconnaître
+          a ? el("div", { class: "affaire-ligne", style: "margin-top:3px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [UI.surligne(a.nom, mots)]) : null,
           t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
         ]),
         el("td", {}, [gens]),
