@@ -689,8 +689,26 @@
         var brut;
         try { brut = JSON.parse(lecteur.result); }
         catch (err) { return toast("Fichier illisible : ce n'est pas du JSON."); }
-        D.importe(brut).then(function () { toast("Sauvegarde restaurée."); location.reload(); })
-          .catch(function (err) { toast(err.message); });
+        if (!brut || typeof brut !== "object" || !("membres" in brut)) {
+          return toast("Ce fichier ne ressemble pas à une sauvegarde de la planification.");
+        }
+        // Importer REMPLACE tout : sans confirmation, un vieux fichier ou un jeu
+        // de démonstration effaçait d'un clic le planning réel de toute l'équipe.
+        function compte(o) {
+          return (o.membres || []).length + " membres, " + (o.affaires || []).length + " affaires, " + (o.taches || []).length + " tâches";
+        }
+        confirme("Remplacer toutes les données ?",
+          "Le contenu actuel (" + compte(D.etat()) + ") sera remplacé par celui du fichier « " + f.name + " » (" + compte(brut) + ")" +
+          (avecBase ? ", dans la base, pour toute l'équipe" : "") +
+          (brut.reglages && brut.reglages.demo ? ". Attention : ce fichier est un jeu de démonstration" : "") +
+          ". Ce qui n'est pas dans le fichier sera supprimé définitivement : exporte d'abord une sauvegarde si besoin.",
+          "Remplacer", true
+        ).then(function (ok) {
+          if (!ok) return;
+          toast("Import en cours…");
+          D.importe(brut).then(function () { toast("Sauvegarde restaurée."); location.reload(); })
+            .catch(function (err) { toast(err.message); });
+        });
       };
       lecteur.readAsText(f);
     });

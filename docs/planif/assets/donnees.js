@@ -30,6 +30,8 @@
   function texte(v) { return String(v == null ? "" : v).trim(); }
   function nombre(v, defaut) { var n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : defaut; }
   function erreur(m) { var e = new Error(m); e.metier = true; return e; }
+  function dixieme(n) { return Math.round(n * 10) / 10; }
+  var CHARGE_MAX = 999.9;                          // plafond de numeric(4,1) en base
 
   var ROLES = { ingenieur: "Ingénieur", dessinateur: "Dessinateur" };
   var STATUTS_TACHE = {
@@ -73,20 +75,60 @@
 
   var etat = null;
   var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
-  var abonnes = [];
+  var abonnes = [], rechargements = [];
   var chargement = null;
 
   function previens() { abonnes.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } }); }
 
-  /* Enregistre, puis seulement alors met à jour la référence : si l'écriture
-     échoue, l'écart reste à rejouer au prochain essai plutôt que d'être perdu. */
-  function sauve() {
-    version++;                                     // l'état a bougé : index et calculs mis en cache sont périmés
-    return ADAPTATEUR.ecrire(etat, precedent).then(function () {
-      precedent = copie(etat);
+  /* Les écritures partent une par une, dans l'ordre des actions.
+     Deux écritures simultanées calculaient leur écart depuis la même référence :
+     deux décalages rapides pouvaient arriver dans le désordre, et une écriture
+     réussie marquait comme enregistré ce qu'une autre, encore en route, allait
+     peut-être rater. Chaque écriture emporte donc sa photo de l'état, et c'est
+     cette photo — pas l'état du moment où elle se termine — qui devient la référence. */
+  var file = Promise.resolve();
+  var generation = 0;           // change à chaque échec : les écritures en attente qui en dépendaient sont abandonnées
+
+  function enFile(ecrire, instantane) {
+    var gen = generation;
+    var ecriture = file.then(function () {
+      if (gen !== generation) throw erreur("Modification abandonnée : l'enregistrement précédent a échoué.");
+      return ecrire();
+    }).then(function () {
+      precedent = instantane;
       version++;
       previens();
       return etat;
+    }, function (e) {
+      if (gen !== generation) throw e;
+      generation++;
+      return resynchronise().then(function () { throw e; });
+    });
+    file = ecriture.catch(function () {});
+    return ecriture;
+  }
+
+  function sauve() {
+    version++;                                     // l'état a bougé : index et calculs mis en cache sont périmés
+    var instantane = copie(etat);
+    return enFile(function () { return ADAPTATEUR.ecrire(instantane, precedent); }, instantane);
+  }
+
+  /* Écriture refusée ou interrompue : garder l'écran tel quel ferait croire à
+     un enregistrement, et la même écriture serait rejouée — et refusée — à
+     chaque action suivante. On relit la base, seule à savoir ce qui est
+     vraiment passé (une écriture coupée à mi-chemin a pu en enregistrer une
+     partie). Base injoignable : retour au dernier état confirmé. */
+  function resynchronise() {
+    return ADAPTATEUR.lire().then(function (brut) {
+      if (!brut) throw erreur("Lecture vide.");
+      etat = normalise(brut);
+      precedent = copie(etat);
+    }).catch(function () {
+      etat = precedent ? copie(precedent) : etatVierge();
+    }).then(function () {
+      version++;
+      rechargements.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } });
     });
   }
 
@@ -235,8 +277,8 @@
     if (!ROLES[o.role]) throw erreur("Le rôle doit être « ingénieur » ou « dessinateur ».");
     var double = etat.membres.some(function (m) { return m.id !== idExistant && m.email.toLowerCase() === mail; });
     if (double) throw erreur("Un membre utilise déjà cette adresse e-mail.");
-    var cap = nombre(o.capacite, etat.reglages.capaciteDefaut);
-    if (cap <= 0 || cap > 7) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
+    var cap = dixieme(nombre(o.capacite, etat.reglages.capaciteDefaut));
+    if (!(cap >= 0.5 && cap <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
     return {
       nom: texte(o.nom), prenom: texte(o.prenom), email: mail,
       role: o.role, capacite: cap, actif: o.actif !== false
@@ -283,9 +325,12 @@
     if (!texte(o.affaireId)) throw erreur("Choisis l'affaire à laquelle la tâche se rattache.");
     if (!etat.affaires.some(function (a) { return a.id === o.affaireId; })) throw erreur("Cette affaire n'existe plus.");
     if (!texte(o.echeance)) throw erreur("L'échéance est obligatoire : c'est elle qui place la tâche au calendrier.");
-    var ci = Math.max(0, nombre(o.chargeInge, 0));
-    var cd = Math.max(0, nombre(o.chargeDessin, 0));
-    if (ci + cd <= 0) throw erreur("Indique au moins une durée estimée, côté ingénieur ou côté dessin.");
+    // Au dixième de jour : c'est la précision de la base (numeric(4,1)). Sans cet
+    // arrondi, l'écran gardait 0,71 j quand la base enregistrait 0,7 j.
+    var ci = dixieme(Math.max(0, nombre(o.chargeInge, 0)));
+    var cd = dixieme(Math.max(0, nombre(o.chargeDessin, 0)));
+    if (ci + cd <= 0) throw erreur("Indique au moins une durée estimée, côté ingénieur ou côté dessin (0,1 j au minimum).");
+    if (ci > CHARGE_MAX || cd > CHARGE_MAX) throw erreur("Une charge ne peut pas dépasser " + String(CHARGE_MAX).replace(".", ",") + " j.");
     if (ci > 0 && !texte(o.ingenieurId)) throw erreur("Une charge ingénieur est saisie : affecte un ingénieur.");
     if (cd > 0 && !texte(o.dessinateurId)) throw erreur("Une charge dessin est saisie : affecte un dessinateur.");
     return {
@@ -331,6 +376,8 @@
     canton: function () { return etat.reglages.canton; },
 
     surChangement: function (f) { abonnes.push(f); return function () { abonnes = abonnes.filter(function (x) { return x !== f; }); }; },
+    /** Après un enregistrement refusé, l'état a été relu depuis la base : la page doit se redessiner. */
+    surRechargement: function (f) { rechargements.push(f); },
 
     majReglages: function (o) {
       if (o.canton != null) etat.reglages.canton = texte(o.canton) || "VD";
@@ -546,12 +593,8 @@
         etat.reglages.capaciteDefaut = avant.capaciteDefaut;
         if (!ADAPTATEUR.videTout) return sauve();
         version++;
-        return ADAPTATEUR.videTout().then(function () {
-          precedent = copie(etat);
-          version++;
-          previens();
-          return etat;
-        });
+        var instantane = copie(etat);
+        return enFile(function () { return ADAPTATEUR.videTout(); }, instantane);
       });
     },
     chargeDemo: function () {

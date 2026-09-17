@@ -69,14 +69,23 @@
 </main>
 
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
 <script>
 (function () {
   "use strict";
 
   var p = new URLSearchParams(location.search);
-  var retour = p.get("retour") || "/planif/";
-  if (retour.charAt(0) !== "/" || retour.indexOf("//") === 0) retour = "/planif/";   // pas de renvoi hors du site
+  /* Pas de renvoi hors de l'outil. Tester le premier caractère ne suffisait
+     pas : « /\exemple.org » est lu par le navigateur comme « //exemple.org ».
+     On laisse donc le navigateur résoudre l'adresse, puis on vérifie où elle mène. */
+  function retourSur(brut) {
+    try {
+      var u = new URL(brut || "/planif/", location.origin);
+      if (u.origin === location.origin && u.pathname.indexOf("/planif/") === 0) return u.pathname + u.search + u.hash;
+    } catch (e) {}
+    return "/planif/";
+  }
+  var retour = retourSur(p.get("retour"));
 
   var form = document.getElementById("formulaire");
   var email = document.getElementById("email");

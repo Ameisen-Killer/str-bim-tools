@@ -54,12 +54,19 @@
     } catch (e) {}
   }
 
+  /** Panne réseau (hors ligne, sortie de veille…) : à distinguer d'un refus du serveur. */
+  function erreurReseau() {
+    var e = erreur("Serveur injoignable. Vérifie ta connexion, puis réessaie.");
+    e.reseau = true;
+    return e;
+  }
+
   function appelAuth(chemin, corps) {
     return fetch(URL_BASE + "/auth/v1/" + chemin, {
       method: "POST",
       headers: { apikey: CLE, "Content-Type": "application/json" },
       body: JSON.stringify(corps)
-    }).then(function (r) {
+    }).catch(function () { throw erreurReseau(); }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (r.ok) return j;
         throw erreur(messageAuth(j, r.status));
@@ -76,7 +83,6 @@
     if (/signups not allowed/i.test(m)) return "Les inscriptions sont fermées sur ce projet.";
     if (/password should be at least/i.test(m)) return "Mot de passe trop court : six caractères au minimum.";
     if (/rate limit|too many/i.test(m)) return "Trop de tentatives. Patiente quelques minutes.";
-    if (statut === 0) return "Serveur injoignable. Vérifie ta connexion.";
     return m || "Connexion impossible (" + statut + ").";
   }
 
@@ -93,11 +99,24 @@
       });
   }
 
+  /* Un seul renouvellement à la fois : au chargement, six lectures partent
+     ensemble et auraient chacune présenté le même jeton de renouvellement.
+     Une panne réseau ne déconnecte pas : la session reste, on réessaiera.
+     Seul un refus du serveur (jeton révoqué ou expiré) la fait tomber. */
+  var renouvellement = null;
+
   function rafraichis() {
+    if (renouvellement) return renouvellement;
     if (!session || !session.rafraichissement) return Promise.reject(erreur("Session expirée."));
-    return appelAuth("token?grant_type=refresh_token", { refresh_token: session.rafraichissement })
-      .then(function (j) { return poseSession(depuisJeton(j)); })
-      .catch(function (e) { poseSession(null); throw e; });
+    renouvellement = appelAuth("token?grant_type=refresh_token", { refresh_token: session.rafraichissement })
+      .then(function (j) { return poseSession(depuisJeton(j)); }, function (e) {
+        if (e.reseau) throw e;
+        poseSession(null);
+        throw erreur("Session expirée : reconnecte-toi.");
+      });
+    var libere = function () { renouvellement = null; };
+    renouvellement.then(libere, libere);
+    return renouvellement;
   }
 
   function deconnexion() {
@@ -160,7 +179,7 @@
         method: options.methode || "GET",
         headers: entetes,
         body: options.corps ? JSON.stringify(options.corps) : undefined
-      });
+      }).catch(function () { throw erreurReseau(); });
     }).then(function (r) {
       if (r.status === 204) return null;
       return r.text().then(function (txt) {
@@ -174,6 +193,11 @@
         if (r.status === 401 || r.status === 403) {
           throw erreur("Accès refusé. Ton adresse est-elle bien dans la liste des accès ?");
         }
+        // Codes PostgreSQL les plus probables, traduits pour l'écran
+        var code = j && j.code;
+        if (code === "23505") throw erreur("Enregistrement refusé : ce numéro d'affaire ou cette adresse e-mail existe déjà (peut-être créé entre-temps par un collègue). L'affichage a été rechargé.");
+        if (code === "23503") throw erreur("Enregistrement refusé : un élément lié (affaire ou membre) a été supprimé entre-temps. L'affichage a été rechargé.");
+        if (code === "23514" || code === "22003") throw erreur("Enregistrement refusé : une valeur sort des limites de la base. L'affichage a été rechargé.");
         throw erreur((j && (j.message || j.hint)) || ("Erreur " + r.status + " sur " + chemin));
       });
     });
@@ -213,7 +237,12 @@
       return (l && l.length === pas) ? suiteSequentielle(base, acc, pas) : acc;
     });
   }
-  var insere = function (t, l) { return requete(t, { methode: "POST", corps: l, prefer: "return=minimal" }); };
+  /* Insertion rejouable : si une écriture a été coupée après que la base a
+     enregistré ces lignes, les renvoyer ne doit pas échouer sur un doublon de
+     clé — la ligne existante est simplement mise à jour. */
+  var insere = function (t, l) {
+    return requete(t, { methode: "POST", corps: l, prefer: "resolution=merge-duplicates,return=minimal" });
+  };
 
   /* Suppression par lots. PostgREST accepte une liste d'identifiants : effacer
      ligne par ligne, c'était un aller-retour par ligne, et vider un bureau

@@ -57,10 +57,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
-<script src="/planif/assets/donnees.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
+<script src="/planif/assets/donnees.js?v=7"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=9"></script>
+<script src="/planif/assets/ui.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -96,6 +96,7 @@
     });
 
     rendFiltres();
+    D.surRechargement(dessine);
     dessine();
 
     if (p.get("nouvelle") === "1") formulaire(null);
@@ -308,7 +309,9 @@
 
     var aff = affaireId ? D.affaire(affaireId) : null;
     var idsEquipe = aff ? (role === "ingenieur" ? aff.ingenieurs : aff.dessinateurs) : [];
-    var tous = D.membres({ role: role });
+    // Un inactif qui porte déjà la tâche reste proposé : absent de la liste, la
+    // tâche ne pouvait plus être enregistrée sans lui choisir un remplaçant.
+    var tous = D.membres({ role: role, tous: true }).filter(function (m) { return m.actif || m.id === valeur; });
     var equipe = tous.filter(function (m) { return idsEquipe.indexOf(m.id) >= 0; });
     var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
 
@@ -316,7 +319,7 @@
       if (!liste.length) return;
       var g = el("optgroup", { label: label });
       liste.forEach(function (m) {
-        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom]));
+        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom + (m.actif ? "" : " (inactif)")]));
       });
       sel.appendChild(g);
     }
@@ -459,7 +462,8 @@
   function supprime(t) {
     UI.confirme("Supprimer la tâche ?", t.titre, "Supprimer", true).then(function (ok) {
       if (!ok) return;
-      D.suppTache(t.id).then(function () { dessine(); UI.toast("Tâche supprimée."); });
+      D.suppTache(t.id).then(function () { dessine(); UI.toast("Tâche supprimée."); })
+        .catch(function (e) { UI.toast(e.message); });
     });
   }
 

@@ -131,9 +131,10 @@ create table if not exists public.acces (
   ajoute_le  timestamptz not null default now()
 );
 
--- Le premier compte autorisé. Ajouter ici l'adresse de chaque personne
--- qui doit pouvoir ouvrir l'outil.
-insert into public.acces (email, droit) values ('varintony@gmail.com', 'admin')
+-- Le premier compte autorisé. Remplacer l'adresse d'exemple par la vraie AVANT
+-- d'exécuter, et ne pas la recopier ici : ce fichier est dans un dépôt public.
+-- Même chose pour chaque personne qui doit pouvoir ouvrir l'outil.
+insert into public.acces (email, droit) values ('prenom.nom@exemple.ch', 'admin')
   on conflict (email) do nothing;
 
 -- security definer : la fonction doit pouvoir lire acces malgré la RLS posée dessus.

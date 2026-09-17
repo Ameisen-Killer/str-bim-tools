@@ -85,10 +85,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
-<script src="/planif/assets/donnees.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
+<script src="/planif/assets/donnees.js?v=7"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=9"></script>
+<script src="/planif/assets/ui.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -143,6 +143,7 @@
     fo.checked = !!vue.occupes;
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
 
+    D.surRechargement(rend);
     rend();
   }).catch(UI.echec);
 
@@ -187,7 +188,10 @@
           });
         });
       });
-      cacheRep = { cle: cle, rep: Calc.repartition(taches, membres, canton), affectations: affectations };
+      // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
+      // comme sur la page Équipe et dans les alertes
+      var enCours = taches.filter(function (t) { return t.statut !== "termine"; });
+      cacheRep = { cle: cle, rep: Calc.repartition(enCours, membres, canton), affectations: affectations };
     }
     rep = cacheRep.rep;
 
@@ -560,8 +564,9 @@
     // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
     var champRole = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
     var confie = el("select", { name: "confie" });
-    D.membres({ role: info.role }).forEach(function (m) {
-      confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom]));
+    D.membres({ role: info.role, tous: true }).forEach(function (m) {
+      if (!m.actif && m.id !== t[champRole]) return;     // un inactif n'apparaît que s'il porte déjà la tâche
+      confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom + (m.actif ? "" : " (inactif)")]));
     });
     confie.value = t[champRole] || "";
 

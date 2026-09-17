@@ -97,10 +97,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
-<script src="/planif/assets/donnees.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
+<script src="/planif/assets/donnees.js?v=7"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=9"></script>
+<script src="/planif/assets/ui.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -147,6 +147,7 @@
     document.getElementById("pdf").addEventListener("click", exportePdf);
     document.getElementById("btn-nouvelle").addEventListener("click", nouvelle);
 
+    D.surRechargement(rend);
     rend();
   }).catch(UI.echec);
 

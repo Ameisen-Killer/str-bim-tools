@@ -67,10 +67,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
-<script src="/planif/assets/donnees.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
+<script src="/planif/assets/donnees.js?v=7"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=9"></script>
+<script src="/planif/assets/ui.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -110,6 +110,7 @@
       try { localStorage.setItem(CLE_AFFAIRE, affaire); } catch (e) {}
       dessine();
     });
+    D.surRechargement(dessine);
     dessine();
   }).catch(UI.echec);
 
@@ -275,7 +276,8 @@
       "Supprimer", true
     ).then(function (ok) {
       if (!ok) return;
-      D.suppMembre(m.id).then(function () { dessine(); UI.toast("Membre supprimé."); });
+      D.suppMembre(m.id).then(function () { dessine(); UI.toast("Membre supprimé."); })
+        .catch(function (e) { UI.toast(e.message); });
     });
   }
 })();

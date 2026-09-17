@@ -54,10 +54,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=4"></script>
-<script src="/planif/assets/donnees.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=5"></script>
+<script src="/planif/assets/donnees.js?v=7"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=9"></script>
+<script src="/planif/assets/ui.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -81,6 +81,7 @@
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
+    D.surRechargement(dessine);
     dessine();
   }).catch(UI.echec);
 
@@ -200,8 +201,15 @@
 
   function formulaire(idAffaire) {
     var a = idAffaire ? D.affaire(idAffaire) : null;
-    var ings = D.membres({ role: "ingenieur" }).map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom }; });
-    var dess = D.membres({ role: "dessinateur" }).map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom }; });
+    // Les inactifs déjà dans l'équipe restent proposés (cochés) : absents de la
+    // liste, ils étaient retirés de l'affaire sans prévenir à l'enregistrement.
+    function candidats(role, deja) {
+      return D.membres({ role: role, tous: true })
+        .filter(function (m) { return m.actif || deja.indexOf(m.id) >= 0; })
+        .map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom + (m.actif ? "" : " (inactif)") }; });
+    }
+    var ings = candidats("ingenieur", a ? a.ingenieurs : []);
+    var dess = candidats("dessinateur", a ? a.dessinateurs : []);
 
     // Teinte : proposer la première libre pour éviter deux affaires identiques
     var prises = D.affaires({ tous: true }).filter(function (x) { return !a || x.id !== a.id; }).map(function (x) { return x.teinte; });
@@ -272,7 +280,8 @@
       "Supprimer", true
     ).then(function (ok) {
       if (!ok) return;
-      D.suppAffaire(a.id).then(function () { dessine(); UI.toast("Affaire supprimée."); });
+      D.suppAffaire(a.id).then(function () { dessine(); UI.toast("Affaire supprimée."); })
+        .catch(function (e) { UI.toast(e.message); });
     });
   }
 })();
