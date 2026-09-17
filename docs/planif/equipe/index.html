@@ -32,6 +32,9 @@
 
   <div class="wrap">
     <div data-recherche style="margin-top:10px"></div>
+    <div class="plan-barre" style="margin-top:-8px">
+      <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par affaire"></select>
+    </div>
     <section class="section">
       <div class="tete-section">
         <div>
@@ -75,6 +78,8 @@
 
   var barre = null;                                 // recherche instantanée
   var suivi = UI.suiviApparitions();
+  var CLE_AFFAIRE = "planif.equipe.affaire";
+  var affaire = "";                                 // filtre d'affaire, "" = toutes
 
   if (!UI.session()) return;
 
@@ -92,6 +97,19 @@
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
+    var fa = document.getElementById("f-affaire");
+    fa.appendChild(el("option", { value: "" }, ["Toutes les affaires"]));
+    D.affaires({ tous: true }).forEach(function (a) {
+      fa.appendChild(el("option", { value: a.id }, [a.code + " · " + a.nom]));
+    });
+    try { affaire = localStorage.getItem(CLE_AFFAIRE) || ""; } catch (e) {}
+    if (!D.affaire(affaire)) affaire = "";
+    fa.value = affaire;
+    fa.addEventListener("change", function () {
+      affaire = fa.value;
+      try { localStorage.setItem(CLE_AFFAIRE, affaire); } catch (e) {}
+      dessine();
+    });
     dessine();
   }).catch(UI.echec);
 
@@ -104,8 +122,21 @@
 
   function selection(role, sansTexte) {
     var mots = sansTexte || !barre ? [] : barre.termes();
+    var dans = affaire ? membresAffaire(affaire) : null;
     return D.membres({ role: role || null, tous: true })
-      .filter(function (m) { return UI.correspond(champsCherches(m), mots); });
+      .filter(function (m) { return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots); });
+  }
+
+  // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche
+  function membresAffaire(id) {
+    var a = D.affaire(id), dans = Object.create(null);
+    if (!a) return dans;
+    a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
+    D.taches({ affaireId: id }).forEach(function (t) {
+      if (t.ingenieurId) dans[t.ingenieurId] = true;
+      if (t.dessinateurId) dans[t.dessinateurId] = true;
+    });
+    return dans;
   }
 
   // Répartition de la charge : calculée une fois par version des données, et non
@@ -131,11 +162,13 @@
     var q = barre ? barre.valeur().trim() : "";
     UI.vide(hote);
     var libelle = role === "ingenieur" ? "Ingénieurs" : "Dessinateurs";
-    titre.textContent = q ? libelle + " · " + membres.length : libelle;
+    titre.textContent = q || affaire ? libelle + " · " + membres.length : libelle;
 
     if (!membres.length) {
       var sing = role === "ingenieur" ? "ingénieur" : "dessinateur";
-      hote.appendChild(q
+      hote.appendChild(!q && affaire
+        ? el("div", { class: "vide", text: "Aucun " + sing + " sur cette affaire" })
+        : q
         ? el("div", { class: "sans-resultat", style: "padding:26px 0 10px" }, [
             el("p", { class: "aide", style: "margin:0" }, ["Aucun " + sing + " pour « ", el("em", { style: "font-style:normal;color:var(--or)", text: q }), " »"])
           ])
