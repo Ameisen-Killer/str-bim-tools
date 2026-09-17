@@ -394,17 +394,18 @@
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
         el("div", { class: "legende", text: "Charges estimées et affectations" }),
-        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+        // Une ligne par métier : la personne, puis sa charge (2 colonnes, 1 sur téléphone)
+        el("div", { class: "grille-champs", style: "margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))" }, [
+          boiteIng,
           UI.champ({
             nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
             valeur: t ? t.chargeInge : "", exemple: "0", aide: "Calcul, contrôle, coordination."
           }),
-          boiteIng,
+          boiteDes,
           UI.champ({
             nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
             valeur: t ? t.chargeDessin : "", exemple: "0", aide: "Production des plans."
-          }),
-          boiteDes
+          })
         ])
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
