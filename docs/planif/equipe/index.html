@@ -161,8 +161,8 @@
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
     UI.vide(hote);
-    var libelle = role === "ingenieur" ? "Ingénieurs" : "Dessinateurs";
-    titre.textContent = q || affaire ? libelle + " · " + membres.length : libelle;
+    var libelle = role === "ingenieur" ? "Ingénieur" : "Dessinateur";
+    titre.textContent = membres.length + " " + libelle + (membres.length > 1 ? "s" : "");
 
     if (!membres.length) {
       var sing = role === "ingenieur" ? "ingénieur" : "dessinateur";
