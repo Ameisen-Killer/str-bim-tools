@@ -44,6 +44,11 @@
           <option value="28">4 semaines</option>
         </select>
         <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:240px" aria-label="Filtrer par affaire"></select>
+        <select id="f-role" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par métier">
+          <option value="">Toute l'équipe</option>
+          <option value="ingenieur">Ingénieurs</option>
+          <option value="dessinateur">Dessinateurs</option>
+        </select>
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
         </label>
@@ -90,7 +95,7 @@
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.vue";
-  var vue = { debut: null, duree: 14, affaire: "", occupes: false };
+  var vue = { debut: null, duree: 14, affaire: "", role: "", occupes: false };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
   // Première visite sur un écran étroit : une seule semaine, sinon tout est illisible.
@@ -128,6 +133,11 @@
     });
     fa.value = vue.affaire || "";
     fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
+
+    var fr = document.getElementById("f-role");
+    fr.value = vue.role || "";
+    if (fr.value !== (vue.role || "")) vue.role = "";
+    fr.addEventListener("change", function () { vue.role = fr.value; memorise(); rend(); });
 
     var fo = document.getElementById("f-occupes");
     fo.checked = !!vue.occupes;
@@ -180,6 +190,16 @@
       cacheRep = { cle: cle, rep: Calc.repartition(taches, membres, canton), affectations: affectations };
     }
     rep = cacheRep.rep;
+
+    // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe
+    var ORDRE_ROLES = { ingenieur: 0, dessinateur: 1 };
+    membres = membres.filter(function (m) { return !vue.role || m.role === vue.role; })
+      .map(function (m, i) { return { m: m, i: i }; })
+      .sort(function (x, y) {
+        return rang(x.m) - rang(y.m) || x.i - y.i;
+      })
+      .map(function (o) { return o.m; });
+    function rang(m) { return m.role in ORDRE_ROLES ? ORDRE_ROLES[m.role] : 9; }
 
     // index des barres à dessiner, par membre
     var barres = {}, premier = jours[0], dernier = jours[jours.length - 1];
