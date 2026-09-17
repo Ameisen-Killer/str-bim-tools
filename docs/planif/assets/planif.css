@@ -320,6 +320,11 @@ table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-s
 .pl-zone{position:relative;border-bottom:1px solid var(--ligne-faible)}
 .pl-tete-nom{padding-bottom:0;border-bottom:0}
 .pl-tete-zone{border-bottom:0}
+/* intertitre de groupe (ingénieurs, dessinateurs) : toute la largeur, le texte reste visible au défilement horizontal */
+.pl-groupe{grid-column:1/-1;padding:34px 0 12px;border-bottom:1px solid var(--ligne)}
+.pl-groupe > div{position:sticky;left:0;display:inline-block}
+.pl-groupe h3{font-size:clamp(21px,2.4vw,28px);font-weight:200;margin-top:6px}
+.plan > .pl-groupe:nth-child(3){padding-top:14px}
 
 /* en-tete : semaines puis jours */
 .pl-sems,.pl-jours{display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)))}

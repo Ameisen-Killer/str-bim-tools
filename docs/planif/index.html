@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=13">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=14">
 </head>
 <body>
 
@@ -299,7 +299,20 @@
       return;
     }
 
+    var TITRES_GROUPES = { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" };
+    var groupeCourant = null;
     membres.forEach(function (m) {
+      // Un intertitre à chaque changement de métier, comme dans la page Équipe
+      if (m.role !== groupeCourant) {
+        groupeCourant = m.role;
+        var nb = membres.filter(function (x) { return x.role === m.role; }).length;
+        plan.appendChild(el("div", { class: "pl-groupe" }, [
+          el("div", {}, [
+            el("div", { class: "num-section", text: nb + (nb > 1 ? " membres" : " membre") }),
+            el("h3", { text: TITRES_GROUPES[m.role] || D.ROLES[m.role] || "Autres" })
+          ])
+        ]));
+      }
       var b = Calc.bilan(m, jours, rep[m.id], canton);
       plan.appendChild(el("div", { class: "pl-nom" }, [
         el("div", { class: "pl-membre" }, [
