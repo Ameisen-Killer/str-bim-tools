@@ -48,7 +48,7 @@
 <script src="/planif/assets/supabase.js?v=7"></script>
 <script src="/planif/assets/donnees.js?v=12"></script>
 <script src="/planif/assets/calculs.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=17"></script>
+<script src="/planif/assets/ui.js?v=18"></script>
 <script>
 (function () {
   "use strict";
@@ -251,7 +251,7 @@
             : el("span", { class: "secondaire", text: "—" })
         ]),
         el("td", { class: "actions" }, [
-          el("button", { class: "btn btn-nu", type: "button", text: "Absences", onclick: function () { UI.absences(m.id, dessine); } }),
+          UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); }),
           UI.boutonIcone("modifier", "Modifier", m.prenom + " " + m.nom, function () { formulaire(m.id); }),
           UI.boutonIcone("supprimer", "Supprimer", m.prenom + " " + m.nom, function () { supprime(m); })
         ])

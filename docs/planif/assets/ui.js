@@ -34,7 +34,7 @@
 
   /**
    * Bouton-icône d'une ligne de liste (icônes SVG de docs/planif/icons, style dans planif.css).
-   * type : "modifier" ou "supprimer" ; titre : l'action, en bulle au survol ;
+   * type : "modifier", "supprimer" ou "absence" ; titre : l'action, en bulle au survol ;
    * quoi : l'objet visé, précisé pour les lecteurs d'écran.
    */
   function boutonIcone(type, titre, quoi, action) {
