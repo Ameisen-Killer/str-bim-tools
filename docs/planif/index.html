@@ -197,7 +197,9 @@
 
     // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe
     var ORDRE_ROLES = { ingenieur: 0, dessinateur: 1 };
-    membres = membres.filter(function (m) { return !vue.role || m.role === vue.role; })
+    // Affaire choisie : seulement son équipe, sinon ses barres se perdent parmi des dizaines de lignes vides
+    var dansAffaire = vue.affaire ? membresAffaire(vue.affaire, taches) : null;
+    membres = membres.filter(function (m) { return (!vue.role || m.role === vue.role) && (!dansAffaire || dansAffaire[m.id]); })
       .map(function (m, i) { return { m: m, i: i }; })
       .sort(function (x, y) {
         return rang(x.m) - rang(y.m) || x.i - y.i;
@@ -218,6 +220,17 @@
     rendCles(canton);
     rendPlan(barres, canton);
     rendAlertes(canton);
+  }
+
+  /** Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte une tâche (même règle que la page Équipe). */
+  function membresAffaire(id, tachesAffaire) {
+    var a = D.affaire(id), dans = Object.create(null);
+    if (a) a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
+    tachesAffaire.forEach(function (t) {
+      if (t.ingenieurId) dans[t.ingenieurId] = true;
+      if (t.dessinateurId) dans[t.dessinateurId] = true;
+    });
+    return dans;
   }
 
   function rendPeriode() {
