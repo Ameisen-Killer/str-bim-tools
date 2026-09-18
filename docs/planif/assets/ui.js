@@ -34,7 +34,7 @@
 
   /**
    * Bouton-icône d'une ligne de liste (icônes SVG de docs/planif/icons, style dans planif.css).
-   * type : "modifier", "supprimer" ou "absence" ; titre : l'action, en bulle au survol ;
+   * type : "modifier", "supprimer", "absence" ou "taches" ; titre : l'action, en bulle au survol ;
    * quoi : l'objet visé, précisé pour les lecteurs d'écran.
    */
   function boutonIcone(type, titre, quoi, action) {
@@ -42,6 +42,14 @@
       class: "ico ico-" + type, type: "button", title: titre,
       "aria-label": quoi ? titre + " « " + quoi + " »" : titre,
       onclick: action
+    });
+  }
+
+  /** Même chose pour un lien qui mène à une autre page (les tâches d'une affaire, par exemple). */
+  function lienIcone(type, titre, quoi, href) {
+    return el("a", {
+      class: "ico ico-" + type, href: href, title: titre,
+      "aria-label": quoi ? titre + " « " + quoi + " »" : titre
     });
   }
 
@@ -1180,7 +1188,7 @@
   }
 
   global.UI = {
-    el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone,
+    el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit, optionsParRole: optionsParRole,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,

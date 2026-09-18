@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- trois tâches : une coche, puis une ligne de texte -->
+  <path d="M6 12l3 3 6-6.5"/>
+  <path d="M21 12h21"/>
+  <path d="M6 24l3 3 6-6.5"/>
+  <path d="M21 24h21"/>
+  <path d="M6 36l3 3 6-6.5"/>
+  <path d="M21 36h21"/>
+</svg>
