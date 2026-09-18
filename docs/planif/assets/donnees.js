@@ -37,8 +37,12 @@
     ingenieur: "Ingénieur", dessinateur: "Dessinateur",
     administrateur: "Administrateur", administratif: "Administratif"
   };
+  // Côté sur lequel un rôle reçoit des charges : un administrateur est affecté
+  // comme un ingénieur (équipe d'une affaire, charge ingénieur d'une tâche).
+  var COTES = { ingenieur: "ingenieur", administrateur: "ingenieur", dessinateur: "dessinateur" };
+  function cote(r) { return COTES[r] || ""; }
   // Seuls ces rôles portent des tâches et paraissent au tableau de bord
-  var PLANIFIES = { ingenieur: true, dessinateur: true };
+  var PLANIFIES = { ingenieur: true, administrateur: true, dessinateur: true };
   function libelleRole(r) { return ROLES[r] || "À désigner"; }
 
   var SUCCURSALES = { geneve: "Genève", lausanne: "Lausanne", nyon: "Nyon" };
@@ -381,6 +385,7 @@
   var D = {
     ROLES: ROLES,
     PLANIFIES: PLANIFIES,
+    cote: cote,
     libelleRole: libelleRole,
     SUCCURSALES: SUCCURSALES,
     DISCIPLINES: DISCIPLINES,
@@ -424,11 +429,13 @@
     },
 
     /* --------------------------------------------------------- membres */
-    /** opts : tous (inactifs compris), role, planifies (ingénieurs et dessinateurs seulement) */
+    /** opts : tous (inactifs compris), role (exact), cote (« ingenieur » inclut les administrateurs),
+     *  planifies (ceux qui portent des tâches) */
     membres: function (opts) {
       opts = opts || {};
       return etat.membres.filter(function (m) { return opts.tous ? true : m.actif; })
         .filter(function (m) { return opts.role != null ? m.role === opts.role : true; })
+        .filter(function (m) { return opts.cote ? cote(m.role) === opts.cote : true; })
         .filter(function (m) { return opts.planifies ? !!PLANIFIES[m.role] : true; })
         .slice().sort(function (a, b) {
           return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr");

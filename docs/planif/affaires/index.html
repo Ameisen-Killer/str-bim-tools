@@ -54,8 +54,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=6"></script>
-<script src="/planif/assets/donnees.js?v=8"></script>
+<script src="/planif/assets/supabase.js?v=7"></script>
+<script src="/planif/assets/donnees.js?v=9"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
 <script src="/planif/assets/ui.js?v=11"></script>
 <script>
@@ -204,9 +204,11 @@
     // Les inactifs déjà dans l'équipe restent proposés (cochés) : absents de la
     // liste, ils étaient retirés de l'affaire sans prévenir à l'enregistrement.
     function candidats(role, deja) {
-      return D.membres({ role: role, tous: true })
+      return D.membres({ cote: role, tous: true })
         .filter(function (m) { return m.actif || deja.indexOf(m.id) >= 0; })
-        .map(function (m) { return { valeur: m.id, label: m.prenom + " " + m.nom + (m.actif ? "" : " (inactif)") }; });
+        .map(function (m) {
+          return { valeur: m.id, label: m.prenom + " " + m.nom + (m.role === "administrateur" ? " · administrateur" : "") + (m.actif ? "" : " (inactif)") };
+        });
     }
     var ings = candidats("ingenieur", a ? a.ingenieurs : []);
     var dess = candidats("dessinateur", a ? a.dessinateurs : []);

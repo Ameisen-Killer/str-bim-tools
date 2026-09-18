@@ -85,8 +85,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=6"></script>
-<script src="/planif/assets/donnees.js?v=8"></script>
+<script src="/planif/assets/supabase.js?v=7"></script>
+<script src="/planif/assets/donnees.js?v=9"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
 <script src="/planif/assets/ui.js?v=11"></script>
 <script>
@@ -195,17 +195,18 @@
     }
     rep = cacheRep.rep;
 
-    // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe
+    // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe.
+    // Les administrateurs sont rangés avec les ingénieurs : ils en prennent les charges.
     var ORDRE_ROLES = { ingenieur: 0, dessinateur: 1 };
     // Affaire choisie : seulement son équipe, sinon ses barres se perdent parmi des dizaines de lignes vides
     var dansAffaire = vue.affaire ? membresAffaire(vue.affaire, taches) : null;
-    membres = membres.filter(function (m) { return (!vue.role || m.role === vue.role) && (!dansAffaire || dansAffaire[m.id]); })
+    membres = membres.filter(function (m) { return (!vue.role || D.cote(m.role) === vue.role) && (!dansAffaire || dansAffaire[m.id]); })
       .map(function (m, i) { return { m: m, i: i }; })
       .sort(function (x, y) {
         return rang(x.m) - rang(y.m) || x.i - y.i;
       })
       .map(function (o) { return o.m; });
-    function rang(m) { return m.role in ORDRE_ROLES ? ORDRE_ROLES[m.role] : 9; }
+    function rang(m) { var c = D.cote(m.role); return c in ORDRE_ROLES ? ORDRE_ROLES[c] : 9; }
 
     // index des barres à dessiner, par membre
     var barres = {}, premier = jours[0], dernier = jours[jours.length - 1];
@@ -320,13 +321,14 @@
     var groupeCourant = null;
     membres.forEach(function (m) {
       // Un intertitre à chaque changement de métier, comme dans la page Équipe
-      if (m.role !== groupeCourant) {
-        groupeCourant = m.role;
-        var nb = membres.filter(function (x) { return x.role === m.role; }).length;
+      var cote = D.cote(m.role);
+      if (cote !== groupeCourant) {
+        groupeCourant = cote;
+        var nb = membres.filter(function (x) { return D.cote(x.role) === cote; }).length;
         plan.appendChild(el("div", { class: "pl-groupe" }, [
           el("div", {}, [
             el("div", { class: "num-section", text: nb + (nb > 1 ? " membres" : " membre") }),
-            el("h3", { text: TITRES_GROUPES[m.role] || D.ROLES[m.role] || "Autres" })
+            el("h3", { text: TITRES_GROUPES[cote] || "Autres" })
           ])
         ]));
       }
@@ -599,9 +601,9 @@
       var m = D.membre(membreCible);
       var actuel = info.role === "ingenieur" ? t.ingenieurId : t.dessinateurId;
       if (m && m.id !== actuel) {
-        if (m.role !== info.role) {
+        if (D.cote(m.role) !== info.role) {
           UI.toast("Une charge " + (info.role === "ingenieur" ? "ingénieur" : "dessin") +
-                   " ne peut aller qu'à un " + (info.role === "ingenieur" ? "ingénieur" : "dessinateur") + ".");
+                   " ne peut aller qu'à un " + (info.role === "ingenieur" ? "ingénieur ou un administrateur" : "dessinateur") + ".");
           if (!delta) return;
         } else {
           champs[info.role === "ingenieur" ? "ingenieurId" : "dessinateurId"] = m.id;
@@ -647,9 +649,9 @@
     // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
     var champRole = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
     var confie = el("select", { name: "confie" });
-    D.membres({ role: info.role, tous: true }).forEach(function (m) {
+    D.membres({ cote: info.role, tous: true }).forEach(function (m) {
       if (!m.actif && m.id !== t[champRole]) return;     // un inactif n'apparaît que s'il porte déjà la tâche
-      confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom + (m.actif ? "" : " (inactif)")]));
+      confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom + (m.role === "administrateur" ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
     });
     confie.value = t[champRole] || "";
 

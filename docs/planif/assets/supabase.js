@@ -315,8 +315,10 @@
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {};
 
+      // Côté de chacun dans l'équipe d'une affaire : un administrateur compte comme un ingénieur
+      var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
       var role = {};
-      membres.forEach(function (m) { role[m.id] = m.role; });
+      membres.forEach(function (m) { role[m.id] = cote(m.role); });
 
       return {
         version: 1,
