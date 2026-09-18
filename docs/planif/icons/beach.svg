@@ -1,18 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- soleil -->
-  <circle cx="40.5" cy="7.5" r="3"/>
-  <!-- tronc du palmier -->
-  <path d="M16.5 36.5c.4-8.2 3.2-15.2 7.8-20.5"/>
-  <!-- palmes -->
-  <path d="M24.3 16c-2.6-4.2-7.8-5.9-12.6-4.2"/>
-  <path d="M24.3 16c-4.9-.2-9 2.3-10.9 6.6"/>
-  <path d="M24.3 16c.6-4 2.6-7 5.6-8.8"/>
-  <path d="M24.3 16c2.1-4.3 6.4-6.3 10.4-5.3"/>
-  <path d="M24.3 16c4.8-.6 9.2 1.4 11.2 5.6"/>
-  <!-- dune de sable -->
-  <path d="M4 42c3.5-4.2 8.2-6.2 13.2-6.2S26.5 37.8 30 42"/>
-  <!-- vague -->
-  <path d="M31 36.5c1.6-1.3 3.2-1.3 4.8 0s3.2 1.3 4.8 0"/>
-  <!-- rivage -->
-  <path d="M4 42h40"/>
+  <!-- îlot -->
+  <path d="M5 44c5-4 12-6 19.5-6S39 40 44 44"/>
+  <!-- tronc creux, légèrement penché -->
+  <path d="M19.6 38.2c.8-8.8 3.4-16.4 7.9-22.4"/>
+  <path d="M24 38c.6-8 3-14.8 7-20.4"/>
+  <!-- palmes retombantes, en traits parallèles -->
+  <path d="M30 9C21 5 10 7 4.5 21.5"/>
+  <path d="M29.6 12.2C22.4 9.6 14.2 11.4 9.6 23"/>
+  <path d="M29.2 15.2C23.6 13.6 18.2 15.6 15 24"/>
+  <path d="M31 9c7.6-3.6 13.8.6 14.6 11.4"/>
+  <path d="M31.8 12.4c5.2-1.8 9.4 1.4 9.8 9"/>
+  <path d="M30.4 8.4c2.4-4.4 7.8-6 12.6-3.8"/>
 </svg>
