@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- dossier, ouvert en bas à droite pour le signe plus -->
+  <path d="M26 40H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3h9l4 4h19a3 3 0 0 1 3 3v9"/>
+  <path d="M5 20h38"/>
+  <!-- plus -->
+  <path d="M36.5 30v13M30 36.5h13"/>
+</svg>

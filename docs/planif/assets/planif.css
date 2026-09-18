@@ -299,6 +299,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-ajout-tache{--ico:url(/planif/icons/clipboard_add.svg?v=1)}
 .ico-absence{--ico:url(/planif/icons/beach.svg?v=2)}
 .ico-taches{--ico:url(/planif/icons/task_list.svg?v=1)}
+.ico-ajout-affaire{--ico:url(/planif/icons/folder_add.svg?v=1)}
+.ico-ajout-membre{--ico:url(/planif/icons/user_add.svg?v=1)}
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}

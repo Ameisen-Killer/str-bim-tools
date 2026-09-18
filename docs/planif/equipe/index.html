@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=25">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=26">
 </head>
 <body>
 
@@ -73,7 +73,7 @@
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, action: function () { formulaire(null, ""); } }]);
+    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, icone: "ico-ajout-membre", action: function () { formulaire(null, ""); } }]);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
@@ -196,7 +196,9 @@
             el("h2", { text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
           ]),
           s.nouveau ? el("div", { class: "outils" }, [
-            el("button", { class: "btn btn-or", type: "button", text: s.nouveau, onclick: function () { formulaire(null, s.role); } })
+            el("button", { class: "btn btn-or", type: "button", onclick: function () { formulaire(null, s.role); } }, [
+              el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), s.nouveau
+            ])
           ]) : null
         ]),
         liste
