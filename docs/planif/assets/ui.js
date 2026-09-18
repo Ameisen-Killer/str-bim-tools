@@ -947,7 +947,7 @@
 
   function selMembres(nom, role, valeur, affaireId) {
     var sel = el("select", { name: nom, id: "c-" + nom });
-    sel.appendChild(el("option", { value: "" }, ["— Aucun —"]));
+    sel.appendChild(el("option", { value: "" }, ["— À affecter —"]));
 
     var aff = affaireId ? D.affaire(affaireId) : null;
     var idsEquipe = aff ? (role === "ingenieur" ? aff.ingenieurs : aff.dessinateurs) : [];
@@ -1034,7 +1034,7 @@
         apercu.appendChild(el("div", {}, [
           el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
           el("span", { class: "or", text: C.fmtLong(debut) }),
-          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") + (m ? "" : " · personne non choisie") })
+          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") + (m ? "" : " · à affecter") })
         ]));
       });
     }

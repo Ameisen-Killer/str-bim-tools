@@ -83,9 +83,8 @@ create table if not exists public.taches (
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),
-  constraint periode_ordonnee check (debut is null or debut <= echeance),
-  constraint inge_si_charge  check (charge_inge   = 0 or ingenieur_id   is not null),
-  constraint dess_si_charge  check (charge_dessin = 0 or dessinateur_id is not null)
+  constraint periode_ordonnee check (debut is null or debut <= echeance)
+  -- Une charge sans personne est permise : elle attend son affectation (« À affecter »)
 );
 create index if not exists taches_affaire   on public.taches (affaire_id);
 create index if not exists taches_echeance  on public.taches (echeance);

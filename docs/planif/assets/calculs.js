@@ -35,6 +35,14 @@
     return out;
   }
 
+  /** Les charges d'une tâche qui attendent encore quelqu'un : [{role, charge}] */
+  function nonAffectees(t) {
+    var out = [];
+    if (t.chargeInge > 0 && !t.ingenieurId) out.push({ role: "ingenieur", charge: t.chargeInge });
+    if (t.chargeDessin > 0 && !t.dessinateurId) out.push({ role: "dessinateur", charge: t.chargeDessin });
+    return out;
+  }
+
   /**
    * L'échéance fait foi ; le début s'en déduit.
    * On remonte le temps depuis l'échéance, jour par jour, en cumulant la
@@ -250,7 +258,7 @@
     capaciteJour: capaciteJour,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
-    affectations: affectations,
+    affectations: affectations, nonAffectees: nonAffectees,
     debutEffectif: debutEffectif,
     debutAffectation: debutAffectation,
     debutPour: debutPour,

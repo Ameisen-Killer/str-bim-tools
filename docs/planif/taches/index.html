@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=17">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=18">
 </head>
 <body>
 
@@ -58,9 +58,9 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=7"></script>
-<script src="/planif/assets/donnees.js?v=11"></script>
-<script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=14"></script>
+<script src="/planif/assets/donnees.js?v=12"></script>
+<script src="/planif/assets/calculs.js?v=5"></script>
+<script src="/planif/assets/ui.js?v=15"></script>
 <script>
 (function () {
   "use strict";
@@ -116,7 +116,8 @@
     });
     var chMembre = UI.champ({
       nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
-      options: [{ valeur: "", label: "Toute l'équipe" }].concat(UI.optionsParRole(D.membres({ tous: true })))
+      options: [{ valeur: "", label: "Toute l'équipe" }, { valeur: "a-affecter", label: "À affecter (sans personne)" }]
+        .concat(UI.optionsParRole(D.membres({ tous: true })))
     });
     var chStatut = UI.champ({
       nom: "f-statut", label: "Statut", type: "select", valeur: filtres.statut,
@@ -145,7 +146,8 @@
       t.titre, t.note, a && a.code, a && a.nom,
       t.ingenieurId && D.nomMembre(t.ingenieurId),
       t.dessinateurId && D.nomMembre(t.dessinateurId),
-      D.STATUTS_TACHE[t.statut]
+      D.STATUTS_TACHE[t.statut],
+      Calc.nonAffectees(t).length ? "À affecter" : ""
     ];
   }
 
@@ -164,8 +166,10 @@
   function selection(opts) {
     opts = opts || {};
     var mots = opts.sansTexte || !barre ? [] : barre.termes();
-    return D.taches({ affaireId: filtres.affaire || null, membreId: filtres.membre || null })
+    var sansPersonne = filtres.membre === "a-affecter";   // tâches dont une charge attend encore quelqu'un
+    return D.taches({ affaireId: filtres.affaire || null, membreId: sansPersonne ? null : (filtres.membre || null) })
       .filter(function (t) {
+        if (sansPersonne && !Calc.nonAffectees(t).length) return false;
         if (filtres.masqueTerminees && !opts.terminees && t.statut === "termine") return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
         return !mots.length || UI.contient(foinDe(t), mots);
@@ -282,14 +286,14 @@
 
       var gens = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
       if (t.chargeInge > 0) {
-        gens.appendChild(el("span", { class: "etiq ing" }, [
-          UI.surligne(t.ingenieurId ? D.nomMembre(t.ingenieurId) : "Non affecté", mots),
+        gens.appendChild(el("span", { class: "etiq ing" + (t.ingenieurId ? "" : " a-affecter") }, [
+          UI.surligne(t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter", mots),
           " · " + C.fmtJours(t.chargeInge) + " j"
         ]));
       }
       if (t.chargeDessin > 0) {
-        gens.appendChild(el("span", { class: "etiq des" }, [
-          UI.surligne(t.dessinateurId ? D.nomMembre(t.dessinateurId) : "Non affecté", mots),
+        gens.appendChild(el("span", { class: "etiq des" + (t.dessinateurId ? "" : " a-affecter") }, [
+          UI.surligne(t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter", mots),
           " · " + C.fmtJours(t.chargeDessin) + " j"
         ]));
       }

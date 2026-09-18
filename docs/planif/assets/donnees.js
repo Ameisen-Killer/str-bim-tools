@@ -393,14 +393,13 @@
     var cd = dixieme(Math.max(0, nombre(o.chargeDessin, 0)));
     if (ci + cd <= 0) throw erreur("Indique au moins une durée estimée, côté ingénieur ou côté dessin (0,1 j au minimum).");
     if (ci > CHARGE_MAX || cd > CHARGE_MAX) throw erreur("Une charge ne peut pas dépasser " + String(CHARGE_MAX).replace(".", ",") + " j.");
-    if (ci > 0 && !texte(o.ingenieurId)) throw erreur("Une charge ingénieur est saisie : affecte un ingénieur.");
-    if (cd > 0 && !texte(o.dessinateurId)) throw erreur("Une charge dessin est saisie : affecte un dessinateur.");
+    // Une charge sans personne est permise : elle attend son affectation (« À affecter » au tableau de bord)
     return {
       affaireId: texte(o.affaireId), titre: texte(o.titre), note: texte(o.note),
       chargeInge: ci, chargeDessin: cd,
       debut: null, echeance: texte(o.echeance),
-      ingenieurId: ci > 0 ? texte(o.ingenieurId) : (texte(o.ingenieurId) || null),
-      dessinateurId: cd > 0 ? texte(o.dessinateurId) : (texte(o.dessinateurId) || null),
+      ingenieurId: texte(o.ingenieurId) || null,
+      dessinateurId: texte(o.dessinateurId) || null,
       statut: STATUTS_TACHE[o.statut] ? o.statut : "a_faire",
       avancement: Math.min(100, Math.max(0, nombre(o.avancement, 0)))
     };

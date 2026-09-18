@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=17">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=18">
 </head>
 <body class="large">
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tableau de bord</h1>
-    <p class="chapeau">Une ligne par membre, une colonne par jour. À la souris, glisser une barre sur le côté décale son échéance, vers une autre ligne la réaffecte. Au doigt, toucher une barre ouvre sa fiche.</p>
+    <p class="chapeau">Une ligne par membre, une colonne par jour. À la souris, glisser une barre sur le côté décale son échéance, vers une autre ligne la réaffecte. Au doigt, toucher une barre ouvre sa fiche. Les charges qui n'ont encore personne ouvrent le planning, sur les lignes « À affecter » : glisser une barre sur un membre la lui confie.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -86,9 +86,9 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=7"></script>
-<script src="/planif/assets/donnees.js?v=11"></script>
-<script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=14"></script>
+<script src="/planif/assets/donnees.js?v=12"></script>
+<script src="/planif/assets/calculs.js?v=5"></script>
+<script src="/planif/assets/ui.js?v=15"></script>
 <script>
 (function () {
   "use strict";
@@ -192,7 +192,19 @@
       // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
       // comme sur la page Équipe et dans les alertes
       var enCours = taches.filter(function (t) { return t.statut !== "termine"; });
-      cacheRep = { cle: cle, rep: Calc.repartition(enCours, membres, canton), affectations: affectations };
+      // Charges sans personne : placées sur le seul calendrier du canton, en attendant quelqu'un
+      var aAffecter = [];
+      enCours.forEach(function (t) {
+        var fin = Calc.finEffective(t);
+        if (!fin) return;
+        Calc.nonAffectees(t).forEach(function (na) {
+          aAffecter.push({
+            tache: t, role: na.role, charge: na.charge, fin: fin, membreId: null,
+            debut: Calc.debutPour(na.charge, fin, null, canton)
+          });
+        });
+      });
+      cacheRep = { cle: cle, rep: Calc.repartition(enCours, membres, canton), affectations: affectations, aAffecter: aAffecter };
     }
     rep = cacheRep.rep;
 
@@ -216,11 +228,19 @@
       (barres[info.membreId] || (barres[info.membreId] = [])).push(info);
     });
 
+    // Charges à affecter, par métier : elles ouvrent le planning
+    var libres = {};
+    cacheRep.aAffecter.forEach(function (info) {
+      if (info.fin < premier || info.debut > dernier) return;
+      if (vue.role && info.role !== vue.role) return;
+      (libres[info.role] || (libres[info.role] = [])).push(info);
+    });
+
     if (vue.occupes) membres = membres.filter(function (m) { return barres[m.id] && barres[m.id].length; });
 
     rendPeriode();
     rendCles(canton);
-    rendPlan(barres, canton);
+    rendPlan(barres, libres, canton);
     rendAlertes(canton);
   }
 
@@ -269,7 +289,7 @@
 
   /* ---------------------------------------------------------------- plan */
 
-  function rendPlan(barres, canton) {
+  function rendPlan(barres, libres, canton) {
     var plan = UI.vide(document.getElementById("plan"));
     var n = jours.length, auj = C.isoAuj();
     plan.style.setProperty("--n", n);
@@ -309,6 +329,72 @@
 
     plan.appendChild(el("div", { class: "pl-zone pl-tete-zone" }, [lignesSem, lignesJour]));
 
+    // Fond d'une ligne : jours chômés, absences du membre (aucune pour une ligne à affecter), aujourd'hui
+    function fondDe(m) {
+      var fond = el("div", { class: "pl-fond", "aria-hidden": "true" });
+      jours.forEach(function (j) {
+        var classes = [];
+        if (C.chome(j, canton)) classes.push("chome");
+        else if (m && Calc.absenceLe(m, j)) classes.push("abs");
+        if (j === auj) classes.push("auj");
+        fond.appendChild(el("i", { class: classes.join(" ") }));
+      });
+      return fond;
+    }
+
+    // Piste d'une ligne : ses barres, empilées quand elles se chevauchent
+    function pisteDe(barresLigne) {
+      var piste = el("div", { class: "pl-piste" });
+      var liste = barresLigne.slice().sort(function (x, y) {
+        return x.debut < y.debut ? -1 : x.debut > y.debut ? 1 : 0;
+      });
+      if (vue.duree === 7) placeAuDemiJour(liste, piste, canton);
+      else {
+        var pistesFin = [];                     // dernière colonne occupée par piste
+        liste.forEach(function (info) {
+          var c1 = Math.max(1, C.diff(jours[0], info.debut) + 1);
+          var c2 = Math.min(n, C.diff(jours[0], info.fin) + 1);
+          if (c2 < 1 || c1 > n) return;
+          var cn = Math.max(1, c2 - c1 + 1);
+
+          var l = 0;
+          while (l < pistesFin.length && pistesFin[l] >= c1) l++;
+          pistesFin[l] = c1 + cn - 1;
+
+          piste.appendChild(barre(info, c1, cn, l + 1, canton));
+        });
+      }
+      if (!liste.length) piste.appendChild(el("div", { class: "pl-vide", text: "Rien de planifié" }));
+      return piste;
+    }
+
+    /* ---- tout en haut : les charges qui n'ont encore personne ----
+       Une ligne par métier. Glisser une barre sur un membre la lui confie. */
+    var rolesLibres = ["ingenieur", "dessinateur"].filter(function (r) { return libres[r] && libres[r].length; });
+    if (rolesLibres.length) {
+      var nbLibres = rolesLibres.reduce(function (s, r) { return s + libres[r].length; }, 0);
+      plan.appendChild(el("div", { class: "pl-groupe a-affecter" }, [
+        el("div", {}, [
+          el("div", { class: "num-section", text: nbLibres + (nbLibres > 1 ? " charges sans personne" : " charge sans personne") }),
+          el("h3", { text: "À affecter" })
+        ])
+      ]));
+      rolesLibres.forEach(function (r) {
+        var total = libres[r].reduce(function (s, i) { return s + i.charge; }, 0);
+        plan.appendChild(el("div", { class: "pl-nom" }, [
+          el("div", { class: "pl-membre" }, [
+            el("div", {}, [
+              el("div", { class: "n", text: r === "ingenieur" ? "Charge ingénieur" : "Charge dessin" }),
+              el("div", { class: "r", text: "À affecter" }),
+              el("div", { class: "c", text: libres[r].length + (libres[r].length > 1 ? " tâches · " : " tâche · ") + C.fmtJours(total) + " j" })
+            ])
+          ])
+        ]));
+        // data-membre vide : la ligne reçoit aussi les charges qu'on veut remettre à affecter
+        plan.appendChild(el("div", { class: "pl-zone a-affecter", dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r])]));
+      });
+    }
+
     /* ---- une ligne par membre ---- */
     if (!membres.length) {
       plan.appendChild(el("div", { class: "pl-nom" }));
@@ -344,42 +430,8 @@
         ])
       ]));
 
-      var fond = el("div", { class: "pl-fond", "aria-hidden": "true" });
-      jours.forEach(function (j) {
-        var classes = [];
-        if (C.chome(j, canton)) classes.push("chome");
-        else if (Calc.absenceLe(m, j)) classes.push("abs");
-        if (j === auj) classes.push("auj");
-        fond.appendChild(el("i", { class: classes.join(" ") }));
-      });
-
-      var piste = el("div", { class: "pl-piste" });
-      var liste = (barres[m.id] || []).slice().sort(function (x, y) {
-        return x.debut < y.debut ? -1 : x.debut > y.debut ? 1 : 0;
-      });
-
-      if (vue.duree === 7) placeAuDemiJour(liste, piste, canton);
-      else {
-      var pistesFin = [];                       // dernière colonne occupée par piste
-      liste.forEach(function (info) {
-        var c1 = Math.max(1, C.diff(jours[0], info.debut) + 1);
-        var c2 = Math.min(n, C.diff(jours[0], info.fin) + 1);
-        if (c2 < 1 || c1 > n) return;
-        var cn = Math.max(1, c2 - c1 + 1);
-
-        var l = 0;
-        while (l < pistesFin.length && pistesFin[l] >= c1) l++;
-        pistesFin[l] = c1 + cn - 1;
-
-        piste.appendChild(barre(info, c1, cn, l + 1, canton));
-      });
-      }
-      if (!liste.length) {
-        piste.appendChild(el("div", {
-          class: "pl-vide",
-          text: "Rien de planifié"
-        }));
-      }
+      var fond = fondDe(m);
+      var piste = pisteDe(barres[m.id] || []);
 
       var bilan = el("div", { class: "pl-bilan" });
       sems.forEach(function (s) {
@@ -561,7 +613,7 @@
         if (trouve !== cible) {
           zones.forEach(function (z) { z.el.classList.remove("cible"); });
           cible = trouve;
-          if (cible && cible.id !== info.membreId) cible.el.classList.add("cible");
+          if (cible && cible.id !== (info.membreId || "")) cible.el.classList.add("cible");
         }
       }
 
@@ -575,7 +627,7 @@
         document.body.classList.remove("glisse-en-cours");
         n.style.transform = "";
         if (!bouge) { fiche(info); return; }
-        applique(info, delta, cible ? cible.id : null);
+        applique(info, delta, cible ? cible.id : null, cible ? cible.role : null);
       }
 
       n.addEventListener("pointermove", bougeSouris);
@@ -584,8 +636,9 @@
     });
   }
 
-  /** Décale la tâche de `delta` jours et, si demandé, la réaffecte à un autre membre. */
-  function applique(info, delta, membreCible) {
+  /** Décale la tâche de `delta` jours et, si demandé, la réaffecte à un autre membre.
+   *  membreCible vide ("") : la ligne « À affecter » du métier roleCible — la charge redevient libre. */
+  function applique(info, delta, membreCible, roleCible) {
     var t = D.tache(info.tache.id);
     if (!t) return;
     var champs = {};
@@ -597,17 +650,20 @@
       delta = C.diff(t.echeance, ech);
       if (delta) { champs.echeance = ech; champs.debut = null; }
     }
-    var reaffecte = null;
-    if (membreCible) {
+    var reaffecte = null, libere = false;
+    var champ = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
+    var actuel = t[champ];
+    if (membreCible === "") {
+      if (roleCible === info.role && actuel) { champs[champ] = null; libere = true; }
+    } else if (membreCible) {
       var m = D.membre(membreCible);
-      var actuel = info.role === "ingenieur" ? t.ingenieurId : t.dessinateurId;
       if (m && m.id !== actuel) {
         if (D.cote(m.role) !== info.role) {
           UI.toast("Une charge " + (info.role === "ingenieur" ? "ingénieur" : "dessin") +
                    " ne peut aller qu'à un " + (info.role === "ingenieur" ? "ingénieur ou un administrateur" : "dessinateur") + ".");
           if (!delta) return;
         } else {
-          champs[info.role === "ingenieur" ? "ingenieurId" : "dessinateurId"] = m.id;
+          champs[champ] = m.id;
           reaffecte = m.prenom + " " + m.nom;
         }
       }
@@ -618,6 +674,7 @@
       var dits = [];
       if (delta) dits.push("décalée de " + (delta > 0 ? "+" : "") + delta + " j");
       if (reaffecte) dits.push("confiée à " + reaffecte);
+      if (libere) dits.push("remise à affecter");
       UI.toast("Tâche " + dits.join(", ") + ".");
     }).catch(function (e) { UI.toast(e.message); });
   }
@@ -649,7 +706,7 @@
 
     // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
     var champRole = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
-    var confie = el("select", { name: "confie" });
+    var confie = el("select", { name: "confie" }, [el("option", { value: "" }, ["— À affecter —"])]);
     D.membres({ cote: info.role, tous: true }).forEach(function (m) {
       if (!m.actif && m.id !== t[champRole]) return;     // un inactif n'apparaît que s'il porte déjà la tâche
       confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom + (m.role === "administrateur" ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
@@ -665,8 +722,8 @@
 
     var corps = el("div", {}, [
       ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
-      ligne("Ingénieur", t.chargeInge > 0 ? D.nomMembre(t.ingenieurId) + " · " + C.fmtJours(t.chargeInge) + " j" + periode(t.chargeInge, t.ingenieurId) : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? D.nomMembre(t.dessinateurId) + " · " + C.fmtJours(t.chargeDessin) + " j" + periode(t.chargeDessin, t.dessinateurId) : "—"),
+      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + periode(t.chargeInge, t.ingenieurId) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + periode(t.chargeDessin, t.dessinateurId) : "—"),
       ligne("Échéance", C.fmtLong(t.echeance)),
       t.note ? ligne("Note", t.note) : null,
       el("div", { class: "grille-champs", style: "margin-top:24px" }, [
@@ -695,10 +752,12 @@
               statut: statut.value,
               avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
             };
-            if (confie.value && confie.value !== t[champRole]) champs[champRole] = confie.value;
+            // Choisir « À affecter » libère la charge
+            if (confie.value !== (t[champRole] || "")) champs[champRole] = confie.value || null;
             return D.retoucheTache(t.id, champs).then(function () {
               rend();
-              UI.toast(champs[champRole] ? "Tâche confiée à " + D.nomMembre(confie.value) + "." : "Tâche mise à jour.");
+              UI.toast(champs[champRole] ? "Tâche confiée à " + D.nomMembre(confie.value) + "."
+                : champRole in champs ? "Charge remise à affecter." : "Tâche mise à jour.");
             });
           }
         }

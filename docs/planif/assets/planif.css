@@ -420,6 +420,12 @@ table.liste tr.fini td{opacity:.7}
 .pl-bw.trop .bj i{background:var(--alerte)}
 .pl-bw.nul{color:var(--texte-faible)}
 .pl-zone.cible{background:rgba(var(--or-rvb),.07);box-shadow:inset 0 0 0 1px rgba(var(--or-rvb),.35)}
+
+/* charges sans personne, en tête du planning ; le filet de gauche garde la teinte de l'affaire */
+.pl-groupe.a-affecter h3{color:var(--or)}
+.pl-zone.a-affecter{background:rgba(var(--or-rvb),.035)}
+.pl-zone.a-affecter .bt{border-top-style:dashed;border-right-style:dashed;border-bottom-style:dashed}
+.etiq.a-affecter{border-style:dashed;color:var(--texte-faible)}
 body.glisse-en-cours{user-select:none;-webkit-user-select:none}
 
 .legende-plan{display:flex;flex-wrap:wrap;gap:14px 22px;margin-top:22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
