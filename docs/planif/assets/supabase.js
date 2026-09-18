@@ -284,8 +284,9 @@
 
   var VERS_BASE = {
     membres: function (m) {
-      return { id: m.id, nom: m.nom, prenom: m.prenom, email: m.email,
-               role: m.role, capacite: m.capacite, actif: m.actif };
+      return { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
+               role: vide(m.role), succursale: vide(m.succursale), discipline: vide(m.discipline),
+               capacite: m.capacite, actif: m.actif };
     },
     affaires: function (a) {
       return { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
@@ -326,7 +327,8 @@
         },
         membres: membres.map(function (m) {
           return {
-            id: m.id, nom: m.nom, prenom: m.prenom, email: m.email, role: m.role,
+            id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "", role: m.role || "",
+            succursale: m.succursale || "", discipline: m.discipline || "",
             capacite: parseFloat(m.capacite), actif: m.actif,
             absences: absences.filter(function (a) { return a.membre_id === m.id; })
               .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })

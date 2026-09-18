@@ -33,7 +33,30 @@
   function dixieme(n) { return Math.round(n * 10) / 10; }
   var CHARGE_MAX = 999.9;                          // plafond de numeric(4,1) en base
 
-  var ROLES = { ingenieur: "Ingénieur", dessinateur: "Dessinateur" };
+  var ROLES = {
+    ingenieur: "Ingénieur", dessinateur: "Dessinateur",
+    administrateur: "Administrateur", administratif: "Administratif"
+  };
+  // Seuls ces rôles portent des tâches et paraissent au tableau de bord
+  var PLANIFIES = { ingenieur: true, dessinateur: true };
+  function libelleRole(r) { return ROLES[r] || "À désigner"; }
+
+  var SUCCURSALES = { geneve: "Genève", lausanne: "Lausanne", nyon: "Nyon" };
+  var DISCIPLINES = {
+    administrateurs: "Administrateurs",
+    structure: "Structure et ouvrages d'art",
+    geotechnique: "Géotechnique / travaux spéciaux",
+    environnement: "Environnement et développement durable",
+    investigation: "Investigation géotechnique",
+    genie_civil: "Génie civil et infrastructures",
+    administration: "Administration"
+  };
+  // Disciplines présentes dans chaque succursale, dans l'ordre de la liste téléphonique
+  var DISCIPLINES_PAR_SUCCURSALE = {
+    geneve: ["administrateurs", "structure", "geotechnique", "environnement", "investigation", "genie_civil", "administration"],
+    lausanne: ["administrateurs", "structure"],
+    nyon: ["structure"]
+  };
   var STATUTS_TACHE = {
     a_faire: "À faire", en_cours: "En cours", attente: "En attente", termine: "Terminé"
   };
@@ -179,7 +202,10 @@
       e.membres.push({
         id: texte(m.id) || id(),
         nom: texte(m.nom), prenom: texte(m.prenom), email: texte(m.email),
-        role: ROLES[m.role] ? m.role : "dessinateur",
+        // Rôle vide ou nul : membre pas encore désigné. Absent (ancienne sauvegarde) : dessinateur.
+        role: ROLES[m.role] ? m.role : (m.role === "" || m.role === null ? "" : "dessinateur"),
+        succursale: SUCCURSALES[m.succursale] ? m.succursale : "",
+        discipline: DISCIPLINES[m.discipline] ? m.discipline : "",
         capacite: nombre(m.capacite, e.reglages.capaciteDefaut),
         actif: m.actif !== false,
         absences: (m.absences || []).map(function (a) {
@@ -271,17 +297,23 @@
   function valideMembre(o, idExistant) {
     if (!texte(o.nom)) throw erreur("Le nom est obligatoire.");
     if (!texte(o.prenom)) throw erreur("Le prénom est obligatoire.");
-    var mail = texte(o.email).toLowerCase();
-    if (!mail) throw erreur("L'adresse e-mail est obligatoire.");
-    if (!RE_MAIL.test(mail)) throw erreur("Cette adresse e-mail n'est pas valide.");
-    if (!ROLES[o.role]) throw erreur("Le rôle doit être « ingénieur » ou « dessinateur ».");
-    var double = etat.membres.some(function (m) { return m.id !== idExistant && m.email.toLowerCase() === mail; });
+    var mail = texte(o.email).toLowerCase();              // facultative
+    if (mail && !RE_MAIL.test(mail)) throw erreur("Cette adresse e-mail n'est pas valide.");
+    var role = texte(o.role);
+    if (role && !ROLES[role]) throw erreur("Rôle inconnu.");
+    var succ = texte(o.succursale), disc = texte(o.discipline);
+    if (succ && !SUCCURSALES[succ]) throw erreur("Succursale inconnue.");
+    if (disc && !DISCIPLINES[disc]) throw erreur("Discipline inconnue.");
+    if (succ && disc && DISCIPLINES_PAR_SUCCURSALE[succ].indexOf(disc) < 0) {
+      throw erreur("La discipline « " + DISCIPLINES[disc] + " » n'existe pas à " + SUCCURSALES[succ] + ".");
+    }
+    var double = mail && etat.membres.some(function (m) { return m.id !== idExistant && m.email.toLowerCase() === mail; });
     if (double) throw erreur("Un membre utilise déjà cette adresse e-mail.");
     var cap = dixieme(nombre(o.capacite, etat.reglages.capaciteDefaut));
     if (!(cap >= 0.5 && cap <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
     return {
       nom: texte(o.nom), prenom: texte(o.prenom), email: mail,
-      role: o.role, capacite: cap, actif: o.actif !== false
+      role: role, succursale: succ, discipline: disc, capacite: cap, actif: o.actif !== false
     };
   }
 
@@ -348,6 +380,11 @@
 
   var D = {
     ROLES: ROLES,
+    PLANIFIES: PLANIFIES,
+    libelleRole: libelleRole,
+    SUCCURSALES: SUCCURSALES,
+    DISCIPLINES: DISCIPLINES,
+    DISCIPLINES_PAR_SUCCURSALE: DISCIPLINES_PAR_SUCCURSALE,
     STATUTS_TACHE: STATUTS_TACHE,
     STATUTS_AFFAIRE: STATUTS_AFFAIRE,
     source: ADAPTATEUR.nom,
@@ -387,10 +424,12 @@
     },
 
     /* --------------------------------------------------------- membres */
+    /** opts : tous (inactifs compris), role, planifies (ingénieurs et dessinateurs seulement) */
     membres: function (opts) {
       opts = opts || {};
       return etat.membres.filter(function (m) { return opts.tous ? true : m.actif; })
-        .filter(function (m) { return opts.role ? m.role === opts.role : true; })
+        .filter(function (m) { return opts.role != null ? m.role === opts.role : true; })
+        .filter(function (m) { return opts.planifies ? !!PLANIFIES[m.role] : true; })
         .slice().sort(function (a, b) {
           return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr");
         });

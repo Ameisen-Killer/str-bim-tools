@@ -57,6 +57,8 @@
           <option value="">Toute l'équipe</option>
           <option value="ingenieur">Ingénieurs</option>
           <option value="dessinateur">Dessinateurs</option>
+          <option value="administrateur">Administrateurs</option>
+          <option value="administratif">Administratifs</option>
         </select>
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-masque"> Masquer qui n'a rien
@@ -97,10 +99,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=5"></script>
-<script src="/planif/assets/donnees.js?v=7"></script>
+<script src="/planif/assets/supabase.js?v=6"></script>
+<script src="/planif/assets/donnees.js?v=8"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=10"></script>
+<script src="/planif/assets/ui.js?v=11"></script>
 <script>
 (function () {
   "use strict";
@@ -202,7 +204,7 @@
   }
 
   function libelleRole() {
-    return vue.role === "ingenieur" ? "Ingénieurs" : vue.role === "dessinateur" ? "Dessinateurs" : "Toute l'équipe";
+    return vue.role ? D.libelleRole(vue.role) + "s" : "Toute l'équipe";
   }
 
   function rendPeriode(nbMembres) {
@@ -316,7 +318,7 @@
         el("div", { class: "pl-membre" }, [
           el("div", {}, [
             el("div", { class: "n", text: m.prenom + " " + m.nom }),
-            el("div", { class: "r", text: D.ROLES[m.role] }),
+            el("div", { class: "r", text: D.libelleRole(m.role) }),
             el("div", { class: "c", text: nb ? C.fmtJours(nb) + " j d'absence" : "—" })
           ])
         ])
@@ -427,7 +429,7 @@
       corps.appendChild(el("tr", {}, [
         el("td", {}, [
           el("div", { class: "principal", text: m.prenom + " " + m.nom }),
-          el("div", { class: "secondaire", text: D.ROLES[m.role] })
+          el("div", { class: "secondaire", text: D.libelleRole(m.role) })
         ]),
         el("td", { text: a.motif }),
         el("td", { class: "num", text: C.fmtCH(a.debut) + " → " + C.fmtCH(fin) }),

@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Équipe</h1>
-    <p class="chapeau">Ingénieurs et dessinateurs, leur capacité hebdomadaire et leurs absences. La capacité sert de référence au tableau de bord : c'est elle qui fait apparaître une surcharge.</p>
+    <p class="chapeau">Les membres des succursales, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -33,33 +33,11 @@
   <div class="wrap">
     <div data-recherche style="margin-top:10px"></div>
     <div class="plan-barre" style="margin-top:-8px">
+      <select id="f-succursale" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par succursale"></select>
+      <select id="f-discipline" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par discipline"></select>
       <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par affaire"></select>
     </div>
-    <section class="section">
-      <div class="tete-section">
-        <div>
-          <div class="num-section">01 — Ingénieurs</div>
-          <h2 id="t-ing">Ingénieurs</h2>
-        </div>
-        <div class="outils">
-          <button class="btn btn-or" type="button" data-nouveau="ingenieur">Nouvel ingénieur</button>
-        </div>
-      </div>
-      <div class="defile" id="liste-ing"></div>
-    </section>
-
-    <section class="section">
-      <div class="tete-section">
-        <div>
-          <div class="num-section">02 — Dessinateurs</div>
-          <h2 id="t-des">Dessinateurs</h2>
-        </div>
-        <div class="outils">
-          <button class="btn btn-or" type="button" data-nouveau="dessinateur">Nouveau dessinateur</button>
-        </div>
-      </div>
-      <div class="defile" id="liste-des"></div>
-    </section>
+    <div id="sections"></div>
   </div>
 </main>
 
@@ -67,10 +45,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=5"></script>
-<script src="/planif/assets/donnees.js?v=7"></script>
+<script src="/planif/assets/supabase.js?v=6"></script>
+<script src="/planif/assets/donnees.js?v=8"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=10"></script>
+<script src="/planif/assets/ui.js?v=11"></script>
 <script>
 (function () {
   "use strict";
@@ -78,54 +56,105 @@
 
   var barre = null;                                 // recherche instantanée
   var suivi = UI.suiviApparitions();
-  var CLE_AFFAIRE = "planif.equipe.affaire";
-  var affaire = "";                                 // filtre d'affaire, "" = toutes
+  var CLE_FILTRES = "planif.equipe.filtres";
+  var CLE_AFFAIRE = "planif.equipe.affaire";         // ancien réglage, repris une fois
+  var filtres = { affaire: "", succursale: "", discipline: "" };
+
+  // Une section par rôle. Les membres pas encore désignés viennent en tête :
+  // c'est là qu'il reste du travail.
+  var SECTIONS = [
+    { role: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", masqueSiVide: true },
+    { role: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs", nouveau: "Nouvel ingénieur" },
+    { role: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs", nouveau: "Nouveau dessinateur" },
+    { role: "administrateur", titre: "Administrateurs", sing: "administrateur", plur: "administrateurs", nouveau: "Nouvel administrateur" },
+    { role: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs", nouveau: "Nouvel administratif" }
+  ];
 
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, action: function () { formulaire(null, "dessinateur"); } }]);
+    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, action: function () { formulaire(null, ""); } }]);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    [].forEach.call(document.querySelectorAll("[data-nouveau]"), function (b) {
-      b.addEventListener("click", function () { formulaire(null, b.dataset.nouveau); });
-    });
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un nom, une adresse, une absence…",
+      exemple: "Rechercher un nom, une succursale, une discipline, une absence…",
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
+
+    try { Object.assign(filtres, JSON.parse(localStorage.getItem(CLE_FILTRES) || "{}")); } catch (e) {}
+    try { if (!filtres.affaire) filtres.affaire = localStorage.getItem(CLE_AFFAIRE) || ""; } catch (e) {}
+    if (!D.affaire(filtres.affaire)) filtres.affaire = "";
+    if (!D.SUCCURSALES[filtres.succursale]) filtres.succursale = "";
+
     var fa = document.getElementById("f-affaire");
     fa.appendChild(el("option", { value: "" }, ["Toutes les affaires"]));
     D.affaires({ tous: true }).forEach(function (a) {
       fa.appendChild(el("option", { value: a.id }, [a.code + " · " + a.nom]));
     });
-    try { affaire = localStorage.getItem(CLE_AFFAIRE) || ""; } catch (e) {}
-    if (!D.affaire(affaire)) affaire = "";
-    fa.value = affaire;
-    fa.addEventListener("change", function () {
-      affaire = fa.value;
-      try { localStorage.setItem(CLE_AFFAIRE, affaire); } catch (e) {}
-      dessine();
+    fa.value = filtres.affaire;
+    fa.addEventListener("change", function () { filtres.affaire = fa.value; memorise(); dessine(); });
+
+    var fs = document.getElementById("f-succursale");
+    fs.appendChild(el("option", { value: "" }, ["Toutes les succursales"]));
+    Object.keys(D.SUCCURSALES).forEach(function (k) {
+      fs.appendChild(el("option", { value: k }, [D.SUCCURSALES[k]]));
     });
+    fs.value = filtres.succursale;
+    fs.addEventListener("change", function () {
+      filtres.succursale = fs.value;
+      optionsDiscipline();
+      memorise(); dessine();
+    });
+
+    var fd = document.getElementById("f-discipline");
+    fd.addEventListener("change", function () { filtres.discipline = fd.value; memorise(); dessine(); });
+    optionsDiscipline();
+
     D.surRechargement(dessine);
     dessine();
   }).catch(UI.echec);
 
+  function memorise() {
+    try { localStorage.setItem(CLE_FILTRES, JSON.stringify(filtres)); } catch (e) {}
+  }
+
+  /** Le filtre de discipline ne propose que celles de la succursale choisie. */
+  function optionsDiscipline() {
+    var fd = UI.vide(document.getElementById("f-discipline"));
+    var cles = disciplinesDe(filtres.succursale);
+    if (cles.indexOf(filtres.discipline) < 0) filtres.discipline = "";
+    fd.appendChild(el("option", { value: "" }, ["Toutes les disciplines"]));
+    cles.forEach(function (k) { fd.appendChild(el("option", { value: k }, [D.DISCIPLINES[k]])); });
+    fd.value = filtres.discipline;
+  }
+
+  function disciplinesDe(succursale) {
+    return succursale ? D.DISCIPLINES_PAR_SUCCURSALE[succursale].slice() : Object.keys(D.DISCIPLINES);
+  }
+
   /* ------------------------------------------------------------- affichage */
 
+  function rattachement(m) {
+    return [D.SUCCURSALES[m.succursale], D.DISCIPLINES[m.discipline]].filter(Boolean).join(" · ");
+  }
+
   function champsCherches(m) {
-    return [m.prenom + " " + m.nom, m.email, D.ROLES[m.role], m.actif ? "" : "inactif"]
+    return [m.prenom + " " + m.nom, m.email, D.libelleRole(m.role), rattachement(m), m.actif ? "" : "inactif"]
       .concat(m.absences.map(function (a) { return a.motif; }));
   }
 
   function selection(role, sansTexte) {
     var mots = sansTexte || !barre ? [] : barre.termes();
-    var dans = affaire ? membresAffaire(affaire) : null;
-    return D.membres({ role: role || null, tous: true })
-      .filter(function (m) { return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots); });
+    var dans = filtres.affaire ? membresAffaire(filtres.affaire) : null;
+    return D.membres({ role: role == null ? null : role, tous: true })
+      .filter(function (m) {
+        if (filtres.succursale && m.succursale !== filtres.succursale) return false;
+        if (filtres.discipline && m.discipline !== filtres.discipline) return false;
+        return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots);
+      });
   }
 
   // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche
@@ -141,7 +170,7 @@
   }
 
   // Répartition de la charge : calculée une fois par version des données, et non
-  // deux fois à chaque frappe (une par section). Sur 6 000 tâches, c'était l'essentiel du temps.
+  // une fois par section à chaque frappe. Sur 6 000 tâches, c'était l'essentiel du temps.
   var cacheRep = { v: -1, rep: null };
   function repartitionCourante() {
     if (cacheRep.v !== D.version()) {
@@ -153,50 +182,66 @@
   function dessine() {
     suivi.debut();
     if (barre) barre.compte(selection().length, selection(null, true).length);
-    rendListe("ingenieur", document.getElementById("liste-ing"), document.getElementById("t-ing"));
-    rendListe("dessinateur", document.getElementById("liste-des"), document.getElementById("t-des"));
+    var hote = UI.vide(document.getElementById("sections"));
+    var n = 0;
+    SECTIONS.forEach(function (s) {
+      var membres = selection(s.role);
+      if (s.masqueSiVide && !membres.length) return;
+      n++;
+      var liste = el("div", { class: "defile" });
+      hote.appendChild(el("section", { class: "section" }, [
+        el("div", { class: "tete-section" }, [
+          el("div", {}, [
+            el("div", { class: "num-section", text: (n < 10 ? "0" : "") + n + " — " + s.titre }),
+            el("h2", { text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
+          ]),
+          s.nouveau ? el("div", { class: "outils" }, [
+            el("button", { class: "btn btn-or", type: "button", text: s.nouveau, onclick: function () { formulaire(null, s.role); } })
+          ]) : null
+        ]),
+        liste
+      ]));
+      rendListe(s, membres, liste);
+    });
   }
 
-  function rendListe(role, hote, titre) {
-    var membres = selection(role);
+  function rendListe(s, membres, hote) {
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
-    UI.vide(hote);
-    var libelle = role === "ingenieur" ? "Ingénieur" : "Dessinateur";
-    titre.textContent = membres.length + " " + libelle + (membres.length > 1 ? "s" : "");
+    var filtre = filtres.affaire || filtres.succursale || filtres.discipline;
 
     if (!membres.length) {
-      var sing = role === "ingenieur" ? "ingénieur" : "dessinateur";
-      hote.appendChild(!q && affaire
-        ? el("div", { class: "vide", text: "Aucun " + sing + " sur cette affaire" })
-        : q
+      hote.appendChild(q
         ? el("div", { class: "sans-resultat", style: "padding:26px 0 10px" }, [
-            el("p", { class: "aide", style: "margin:0" }, ["Aucun " + sing + " pour « ", el("em", { style: "font-style:normal;color:var(--or)", text: q }), " »"])
+            el("p", { class: "aide", style: "margin:0" }, ["Aucun " + s.sing + " pour « ", el("em", { style: "font-style:normal;color:var(--or)", text: q }), " »"])
           ])
-        : el("div", { class: "vide", text: "Aucun " + sing + " enregistré" }));
+        : el("div", { class: "vide", text: filtre ? "Aucun " + s.sing + " pour ces filtres" : "Aucun " + s.sing + " enregistré" }));
       return;
     }
 
     // Charge de la semaine en cours, pour situer chacun d'un coup d'œil
     var jours = C.serie(C.lundi(C.isoAuj()), 7);
     var rep = repartitionCourante();
+    var planifie = !!D.PLANIFIES[s.role];
 
     var corps = el("tbody");
     membres.forEach(function (m) {
       var b = Calc.bilan(m, jours, rep[m.id], D.canton());
       var pourcent = b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
       var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
+      var sousTitre = [rattachement(m), m.email].filter(Boolean).join(" · ");
 
       corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
         el("td", {}, [
           el("div", { class: "principal" }, [UI.surligne(m.prenom + " " + m.nom, mots)]),
-          el("div", { class: "secondaire" }, [UI.surligne(m.email, mots)])
+          el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots) : "Succursale non renseignée"])
         ]),
+        el("td", {}, [choixRole(m)]),
         el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
-        el("td", {}, [
+        el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
           el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])
-        ]),
+        ] : [el("span", { class: "secondaire", text: "—" })]),
         el("td", {}, [
           m.absences.length
             ? el("div", {}, [
@@ -215,7 +260,8 @@
 
     hote.appendChild(el("table", { class: "liste" }, [
       el("thead", {}, [el("tr", {}, [
-        el("th", { text: "Nom et adresse" }),
+        el("th", { text: "Nom et rattachement" }),
+        el("th", { text: "Rôle" }),
         el("th", { text: "Capacité" }),
         el("th", { text: "Cette semaine" }),
         el("th", { text: "Absences" }),
@@ -225,28 +271,78 @@
     ]));
   }
 
+  function optionsRole() {
+    return [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
+      return { valeur: k, label: D.ROLES[k] };
+    }));
+  }
+
+  /** Désignation directe depuis la liste, sans ouvrir la fiche. */
+  function choixRole(m) {
+    var s = el("select", {
+      class: "btn", "aria-label": "Rôle de " + m.prenom + " " + m.nom,
+      style: "text-transform:none;letter-spacing:.04em;padding-block:6px"
+    });
+    optionsRole().forEach(function (o) {
+      s.appendChild(el("option", { value: o.valeur, selected: o.valeur === m.role }, [o.label]));
+    });
+    s.addEventListener("change", function () {
+      var v = Object.assign({}, m, { role: s.value });
+      D.majMembre(m.id, v).then(function () {
+        dessine();
+        UI.toast(m.prenom + " " + m.nom + " : " + D.libelleRole(v.role).toLowerCase() + ".");
+      }).catch(function (e) { s.value = m.role; UI.toast(e.message); });
+    });
+    return s;
+  }
+
   /* ------------------------------------------------------------ formulaire */
 
   function formulaire(idMembre, roleDefaut) {
     var m = idMembre ? D.membre(idMembre) : null;
+    var succ0 = m ? m.succursale : (filtres.succursale || "");
     var corps = el("div", { class: "grille-champs" }, [
       UI.champ({ nom: "prenom", label: "Prénom", valeur: m ? m.prenom : "", exemple: "Camille", autocomplete: "given-name" }),
       UI.champ({ nom: "nom", label: "Nom", valeur: m ? m.nom : "", exemple: "Berger", autocomplete: "family-name" }),
-      UI.champ({ nom: "email", label: "Adresse e-mail", type: "email", valeur: m ? m.email : "", exemple: "camille.berger@exemple.ch", large: true }),
       UI.champ({
-        nom: "role", label: "Rôle", type: "select", valeur: m ? m.role : (roleDefaut || "dessinateur"),
-        options: [{ valeur: "ingenieur", label: "Ingénieur" }, { valeur: "dessinateur", label: "Dessinateur" }]
+        nom: "succursale", label: "Succursale", type: "select", valeur: succ0,
+        options: [{ valeur: "", label: "Non renseignée" }].concat(Object.keys(D.SUCCURSALES).map(function (k) {
+          return { valeur: k, label: D.SUCCURSALES[k] };
+        }))
+      }),
+      UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] }),
+      UI.champ({
+        nom: "role", label: "Rôle", type: "select", valeur: m ? m.role : (roleDefaut || ""),
+        options: optionsRole()
       }),
       UI.champ({
         nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
         valeur: m ? m.capacite : D.reglages().capaciteDefaut,
         aide: "5 pour un plein temps, 4 pour un 80 %."
       }),
+      UI.champ({ nom: "email", label: "Adresse e-mail (facultative)", type: "email", valeur: m ? m.email : "", exemple: "camille.berger@exemple.ch", large: true }),
       UI.champ({
         nom: "actif", label: "Présence à l'effectif", type: "select", valeur: m ? String(m.actif) : "true",
-        options: [{ valeur: "true", label: "Actif — apparaît au planning" }, { valeur: "false", label: "Inactif — masqué du planning" }]
+        options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Inactif — masqué du planning" }]
       })
     ]);
+
+    // La liste des disciplines suit la succursale choisie
+    var selSucc = corps.querySelector("[name=succursale]"), selDisc = corps.querySelector("[name=discipline]");
+    function remplitDisciplines(garde) {
+      UI.vide(selDisc);
+      selDisc.appendChild(el("option", { value: "" }, ["Non renseignée"]));
+      disciplinesDe(selSucc.value).forEach(function (k) {
+        selDisc.appendChild(el("option", { value: k }, [D.DISCIPLINES[k]]));
+      });
+      selDisc.value = disciplinesDe(selSucc.value).indexOf(garde) >= 0 ? garde : "";
+    }
+    remplitDisciplines(m ? m.discipline : (filtres.discipline || ""));
+    // Une seule discipline possible (Nyon) : elle est choisie d'office
+    selSucc.addEventListener("change", function () {
+      var cles = disciplinesDe(selSucc.value);
+      remplitDisciplines(cles.length === 1 ? cles[0] : selDisc.value);
+    });
 
     UI.ouvre({
       surtitre: m ? "Modifier" : "Nouveau membre",

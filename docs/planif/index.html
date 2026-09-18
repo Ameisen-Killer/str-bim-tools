@@ -85,10 +85,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=5"></script>
-<script src="/planif/assets/donnees.js?v=7"></script>
+<script src="/planif/assets/supabase.js?v=6"></script>
+<script src="/planif/assets/donnees.js?v=8"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=10"></script>
+<script src="/planif/assets/ui.js?v=11"></script>
 <script>
 (function () {
   "use strict";
@@ -170,7 +170,7 @@
       return true;
     });
 
-    membres = D.membres({}).slice();
+    membres = D.membres({ planifies: true }).slice();   // administrateurs, administratifs et non désignés n'ont pas de planning
     // La répartition ne dépend ni de la semaine affichée ni de la durée : changer
     // de semaine ne la recalcule pas. Seuls les données, le filtre d'affaire ou le canton la périment.
     var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton;

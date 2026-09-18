@@ -18,14 +18,21 @@ create table if not exists public.membres (
   id         uuid primary key default gen_random_uuid(),
   nom        text not null,
   prenom     text not null,
-  email      text not null unique,
-  role       text not null check (role in ('ingenieur', 'dessinateur')),
+  email      text unique,
+  role       text constraint membres_role_check
+               check (role is null or role in ('ingenieur', 'dessinateur', 'administrateur', 'administratif')),
+  succursale text constraint membres_succursale_check
+               check (succursale is null or succursale in ('geneve', 'lausanne', 'nyon')),
+  discipline text constraint membres_discipline_check
+               check (discipline is null or discipline in ('administrateurs', 'structure', 'geotechnique',
+                      'environnement', 'investigation', 'genie_civil', 'administration')),
   capacite   numeric(3,1) not null default 5 check (capacite > 0 and capacite <= 7),
   actif      boolean not null default true,
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now()
 );
 comment on column public.membres.capacite is 'Jours travaillés par semaine : 5 pour un plein temps.';
+comment on column public.membres.role is 'Vide : membre pas encore désigné. Seuls ingénieurs et dessinateurs portent des tâches.';
 
 -- --------------------------------------------------------------- absences ---
 create table if not exists public.absences (

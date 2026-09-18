@@ -890,7 +890,7 @@
       champ({
         nom: "membre", label: "Membre", type: "select", large: true, valeur: o.membreId || membres[0].id,
         options: membres.map(function (m) {
-          return { valeur: m.id, label: m.prenom + " " + m.nom + " · " + D.ROLES[m.role] };
+          return { valeur: m.id, label: m.prenom + " " + m.nom + " · " + D.libelleRole(m.role) };
         })
       }),
       champ({ nom: "debut", label: "Du", type: "date", valeur: o.debut || "" }),
