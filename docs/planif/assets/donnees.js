@@ -52,11 +52,12 @@
     administrateur: "Administrateurs", administratif: "Administratifs", "": "À désigner"
   };
 
-  /* Ordre alphabétique : nom, puis prénom. Comparer « nom + prénom » collés
-     rangeait « S. Sofiane » après « Seng Sokhemmara » (« SSo » > « Sen »). */
+  /* Ordre alphabétique : prénom, puis nom quand deux prénoms sont identiques —
+     c'est l'ordre dans lequel les noms s'affichent. Les deux champs sont comparés
+     l'un après l'autre : collés, un nom court se rangeait mal. */
   function compareMembres(a, b) {
-    return a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }) ||
-           a.prenom.localeCompare(b.prenom, "fr", { sensitivity: "base" });
+    return a.prenom.localeCompare(b.prenom, "fr", { sensitivity: "base" }) ||
+           a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" });
   }
 
   /** Membres regroupés par rôle, dans l'ordre des rôles, alphabétiques dans chaque groupe :
