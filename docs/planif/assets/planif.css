@@ -267,8 +267,28 @@ table.liste tr.groupe-taches:hover td,table.liste tr.groupe-vide:hover td{backgr
 table.liste tr.groupe-vide td{padding:14px 0}
 
 /* terminer une tâche d'un clic */
-.tache-titre{display:flex;align-items:flex-start;gap:12px}
-.coche-fin{flex:0 0 auto;width:18px;height:18px;margin:3px 0 0;accent-color:var(--or);cursor:pointer}
+.tache-titre{display:flex;align-items:flex-start;gap:10px}
+.tache-titre .ico-coche{margin:-6px 0 0 -6px}
+
+/* icônes (docs/planif/icons) : le dessin noir sert de masque, la couleur vient
+   du thème — gris doux au repos, or au survol, rouge pour supprimer */
+.ico{
+  flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;padding:0;background:none;border:1px solid transparent;
+  color:var(--texte-doux);cursor:pointer;transition:color .2s,border-color .2s,background-color .2s;
+}
+.ico::before{
+  content:"";width:22px;height:22px;background-color:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
+}
+.ico:hover{color:var(--or);border-color:rgba(var(--or-rvb),.35);background-color:rgba(var(--or-rvb),.06)}
+.ico:focus-visible{outline:1px solid var(--or);outline-offset:1px}
+.ico-coche{--ico:url(/planif/icons/checkbox.png?v=2);color:var(--texte-faible)}
+.ico-coche.fait{color:var(--or)}
+.ico-modifier{--ico:url(/planif/icons/clipboard_check_edit.png?v=2)}
+.ico-supprimer{--ico:url(/planif/icons/garbage_can.png?v=2)}
+.ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
+table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste tr.fini .principal{text-decoration:line-through;text-decoration-thickness:1px;color:var(--texte-doux)}
 table.liste tr.fini td{opacity:.7}
 
@@ -635,6 +655,8 @@ mark.trouve{
   }
   table.liste td.actions{display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 0;text-align:left}
   table.liste td.actions .btn{flex:1 1 auto;justify-content:center;border-color:var(--ligne)}
+  .ico{width:44px;height:44px}                         /* cible au doigt */
+  table.liste td.actions .ico{border-color:var(--ligne)}
   .defile{overflow-x:visible}
 
   /* filtres repliés derrière un bouton */

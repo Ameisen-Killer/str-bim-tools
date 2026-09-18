@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=18">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=19">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Cocher la case d'une tâche la marque terminée. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
+    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur la coche d'une tâche la marque terminée. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -327,8 +327,14 @@
           t.avancement ? el("div", { class: "secondaire", text: t.avancement + " %" }) : null
         ]),
         el("td", { class: "actions" }, [
-          el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { formulaire(t.id); } }),
-          el("button", { class: "btn btn-nu btn-rouge", type: "button", text: "Supprimer", onclick: function () { supprime(t); } })
+          el("button", {
+            class: "ico ico-modifier", type: "button", title: "Modifier",
+            "aria-label": "Modifier « " + t.titre + " »", onclick: function () { formulaire(t.id); }
+          }),
+          el("button", {
+            class: "ico ico-supprimer", type: "button", title: "Supprimer",
+            "aria-label": "Supprimer « " + t.titre + " »", onclick: function () { supprime(t); }
+          })
         ])
       ]), t.id);
     }
@@ -346,16 +352,16 @@
 
   var avantFin = {};                                // statut et avancement d'avant la coche, pour revenir en arrière
 
+  // Bouton à bascule : l'icône est pâle tant que la tâche est ouverte, dorée une fois terminée
   function coche(t) {
     var fini = t.statut === "termine";
-    var c = el("input", {
-      type: "checkbox", class: "coche-fin",
+    return el("button", {
+      type: "button", class: "ico ico-coche" + (fini ? " fait" : ""),
+      "aria-pressed": fini ? "true" : "false",
       title: fini ? "Rouvrir la tâche" : "Marquer comme terminée",
-      "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »"
+      "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »",
+      onclick: function () { termine(t.id, !fini); }
     });
-    c.checked = fini;
-    c.addEventListener("change", function () { termine(t.id, c.checked); });
-    return c;
   }
 
   function termine(id, fait) {
