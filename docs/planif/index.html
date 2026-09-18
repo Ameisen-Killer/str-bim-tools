@@ -88,7 +88,7 @@
 <script src="/planif/assets/supabase.js?v=7"></script>
 <script src="/planif/assets/donnees.js?v=11"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=13"></script>
+<script src="/planif/assets/ui.js?v=14"></script>
 <script>
 (function () {
   "use strict";
@@ -111,7 +111,8 @@
   D.pret().then(function () {
     UI.chrome("tableau", [{
       label: "Nouvelle tâche", or: true,
-      action: function () { location.href = "/planif/taches/?nouvelle=1"; }
+      // Sur place : le formulaire complet s'ouvre sans quitter le tableau de bord
+      action: function () { UI.formulaireTache(null, { affaireId: vue.affaire, surEnregistrement: rend }); }
     }]);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
@@ -685,7 +686,8 @@
       titre: t.titre,
       corps: corps,
       boutons: [
-        { label: "Modifier en détail", gauche: true, action: function () { location.href = "/planif/taches/?tache=" + encodeURIComponent(t.id); } },
+        // Le formulaire complet remplace la fiche, sans quitter le tableau de bord
+        { label: "Modifier en détail", gauche: true, action: function () { UI.formulaireTache(t.id, { surEnregistrement: rend }); return false; } },
         { label: "Fermer" },
         {
           label: "Enregistrer", or: true, action: function () {

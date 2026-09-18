@@ -941,6 +941,175 @@
     });
   }
 
+  /* ---------------------------------------------------------------- tâche
+     Formulaire complet d'une tâche, commun à la page Tâches et au tableau de
+     bord : il s'ouvre sur place, sans changer de page. */
+
+  function selMembres(nom, role, valeur, affaireId) {
+    var sel = el("select", { name: nom, id: "c-" + nom });
+    sel.appendChild(el("option", { value: "" }, ["— Aucun —"]));
+
+    var aff = affaireId ? D.affaire(affaireId) : null;
+    var idsEquipe = aff ? (role === "ingenieur" ? aff.ingenieurs : aff.dessinateurs) : [];
+    // Un inactif qui porte déjà la tâche reste proposé : absent de la liste, la
+    // tâche ne pouvait plus être enregistrée sans lui choisir un remplaçant.
+    var tous = D.membres({ cote: role, tous: true }).filter(function (m) { return m.actif || m.id === valeur; });
+    var equipe = tous.filter(function (m) { return idsEquipe.indexOf(m.id) >= 0; });
+    var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
+
+    function groupe(label, liste) {
+      if (!liste.length) return;
+      var g = el("optgroup", { label: label });
+      liste.forEach(function (m) {
+        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom + (m.role === "administrateur" ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
+      });
+      sel.appendChild(g);
+    }
+    groupe("Équipe de l'affaire", equipe);
+    groupe(equipe.length ? "Autres" : "Équipe", autres);
+    sel.value = valeur || "";
+    return sel;
+  }
+
+  /**
+   * formulaireTache(idTache, o) — idTache nul pour une nouvelle tâche.
+   * o.affaireId : affaire proposée pour une nouvelle tâche
+   * o.surEnregistrement : appelée après l'enregistrement, pour redessiner la page
+   */
+  function formulaireTache(idTache, o) {
+    o = o || {};
+    var Calc = global.Calc;
+    var t = idTache ? D.tache(idTache) : null;
+    var affaires = D.affaires({ tous: true });
+    if (!affaires.length) {
+      return ouvre({
+        titre: "Aucune affaire",
+        corps: el("p", { style: "color:var(--texte-doux)", text: "Une tâche se rattache toujours à une affaire. Crée d'abord une affaire." }),
+        boutons: [{ label: "Fermer" }, { label: "Aller aux affaires", or: true, action: function () { location.href = "/planif/affaires/"; } }]
+      });
+    }
+
+    var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaires[0].id);
+
+    var chAffaire = champ({
+      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
+      options: affaires.map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; })
+    });
+
+    var boiteIng = el("div", { class: "champ" }, [el("label", { for: "c-ingenieurId", text: "Ingénieur" })]);
+    var boiteDes = el("div", { class: "champ" }, [el("label", { for: "c-dessinateurId", text: "Dessinateur" })]);
+    function rebranche() {
+      var aff = chAffaire.querySelector("select").value;
+      var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : "");
+      var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : "");
+      if (boiteIng.querySelector("select")) boiteIng.querySelector("select").remove();
+      if (boiteDes.querySelector("select")) boiteDes.querySelector("select").remove();
+      boiteIng.appendChild(selMembres("ingenieurId", "ingenieur", vi, aff));
+      boiteDes.appendChild(selMembres("dessinateurId", "dessinateur", vd, aff));
+    }
+    rebranche();
+    chAffaire.querySelector("select").addEventListener("change", rebranche);
+
+    // Début recalculé à chaque frappe : durée, échéance ou intervenant
+    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:9px" });
+    function recalcule() {
+      var v = lit(corps);
+      vide(apercu);
+      if (!v.echeance) {
+        apercu.appendChild(el("span", { class: "aide", text: "Saisis l'échéance." }));
+        return;
+      }
+      var lignes = [
+        { role: "Ingénieur", charge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0, id: v.ingenieurId },
+        { role: "Dessin", charge: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0, id: v.dessinateurId }
+      ].filter(function (x) { return x.charge > 0; });
+      if (!lignes.length) {
+        apercu.appendChild(el("span", { class: "aide", text: "Saisis une charge." }));
+        return;
+      }
+      lignes.forEach(function (x) {
+        var m = x.id ? D.membre(x.id) : null;
+        var debut = Calc.debutPour(x.charge, v.echeance, m, D.canton());
+        var ouvres = C.nbOuvres(debut, v.echeance, D.canton());
+        apercu.appendChild(el("div", {}, [
+          el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
+          el("span", { class: "or", text: C.fmtLong(debut) }),
+          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") + (m ? "" : " · personne non choisie") })
+        ]));
+      });
+    }
+
+    var corps = el("div", {}, [
+      el("div", { class: "grille-champs" }, [
+        chAffaire,
+        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1", large: true })
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Charges estimées et affectations" }),
+        // Une ligne par métier : la personne, puis sa charge (2 colonnes, 1 sur téléphone)
+        el("div", { class: "grille-champs", style: "margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))" }, [
+          boiteIng,
+          champ({
+            nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
+            valeur: t ? t.chargeInge : "", exemple: "0", aide: "Calcul, contrôle, coordination."
+          }),
+          boiteDes,
+          champ({
+            nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
+            valeur: t ? t.chargeDessin : "", exemple: "0", aide: "Production des plans."
+          })
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Dates" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          champ({
+            nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "",
+            aide: "C'est la date qui fait foi : le début s'en déduit."
+          }),
+          el("div", { class: "champ" }, [
+            el("span", { class: "legende", text: "Début calculé" }),
+            apercu
+          ])
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Suivi" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          champ({
+            nom: "statut", label: "Statut", type: "select", valeur: t ? t.statut : "a_faire",
+            options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
+          }),
+          champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
+          champ({ nom: "note", label: "Note", type: "textarea", valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
+        ])
+      ])
+    ]);
+
+    corps.addEventListener("input", recalcule);
+    corps.addEventListener("change", recalcule);
+    recalcule();
+
+    return ouvre({
+      surtitre: t ? "Modifier la tâche" : "Nouvelle tâche",
+      titre: t ? t.titre : "Tâche",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, action: function () {
+            var v = lit(corps);
+            var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
+            return p.then(function () {
+              if (o.surEnregistrement) o.surEnregistrement();
+              toast(t ? "Tâche modifiée." : "Tâche créée.");
+            }).catch(function (e) { toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
   /* ------------------------------------------------------------ impression
      Pas de bibliothèque PDF : l'export passe par l'impression du navigateur,
      où « Enregistrer au format PDF » est proposé partout, y compris sur
@@ -998,7 +1167,7 @@
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit, optionsParRole: optionsParRole,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
-    absences: absences, nouvelleAbsence: nouvelleAbsence, imprime: imprime,
+    absences: absences, nouvelleAbsence: nouvelleAbsence, formulaireTache: formulaireTache, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
