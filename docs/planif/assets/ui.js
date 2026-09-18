@@ -152,8 +152,15 @@
     var ctrl;
     if (o.type === "select") {
       ctrl = el("select", { name: o.nom, id: "c-" + o.nom });
+      var option = function (op) {
+        return el("option", { value: op.valeur, selected: String(op.valeur) === String(o.valeur) }, [op.label]);
+      };
+      // Une entrée { groupe, options } devient un sous-groupe titré de la liste
       (o.options || []).forEach(function (op) {
-        ctrl.appendChild(el("option", { value: op.valeur, selected: String(op.valeur) === String(o.valeur) }, [op.label]));
+        if (!op.options) { ctrl.appendChild(option(op)); return; }
+        var g = el("optgroup", { label: op.groupe });
+        op.options.forEach(function (sub) { g.appendChild(option(sub)); });
+        ctrl.appendChild(g);
       });
     } else if (o.type === "textarea") {
       ctrl = el("textarea", { name: o.nom, id: "c-" + o.nom, rows: o.rows || 3, placeholder: o.exemple || "" });
@@ -171,6 +178,14 @@
       ctrl,
       o.aide ? el("div", { class: "aide", text: o.aide }) : null
     ]);
+  }
+
+  /** Options d'une liste de membres, en sous-groupes par rôle et par ordre alphabétique dans chacun. */
+  function optionsParRole(membres, libelle) {
+    libelle = libelle || function (m) { return m.prenom + " " + m.nom; };
+    return D.parRole(membres).map(function (g) {
+      return { groupe: g.titre, options: g.membres.map(function (m) { return { valeur: m.id, label: libelle(m) }; }) };
+    });
   }
 
   /** Cases à cocher multiples, rendues comme des étiquettes. */
@@ -886,12 +901,11 @@
     var membres = D.membres({});
     if (!membres.length) return toast("Aucun membre à l'effectif : commence par l'équipe.");
 
+    var groupes = optionsParRole(membres);
     var corps = el("div", { class: "grille-champs" }, [
       champ({
-        nom: "membre", label: "Membre", type: "select", large: true, valeur: o.membreId || membres[0].id,
-        options: membres.map(function (m) {
-          return { valeur: m.id, label: m.prenom + " " + m.nom + " · " + D.libelleRole(m.role) };
-        })
+        nom: "membre", label: "Membre", type: "select", large: true,
+        valeur: o.membreId || groupes[0].options[0].valeur, options: groupes
       }),
       champ({ nom: "debut", label: "Du", type: "date", valeur: o.debut || "" }),
       champ({ nom: "fin", label: "Au", type: "date", valeur: o.fin || "", aide: "Laisser vide pour un seul jour." }),
@@ -972,7 +986,7 @@
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
-    champ: champ, cases: cases, lit: lit,
+    champ: champ, cases: cases, lit: lit, optionsParRole: optionsParRole,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
     absences: absences, nouvelleAbsence: nouvelleAbsence, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,

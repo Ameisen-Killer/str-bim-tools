@@ -700,6 +700,9 @@ mark.trouve{
   .plan{min-width:0!important;--wnom:118px}
   .pl-nom{position:static;background:none;padding:5px 8px 5px 0}
   .pl-nom,.pl-zone{break-inside:avoid}
+  .pl-groupe,.plan > .pl-groupe:nth-child(3){padding:10px 0 4px;break-after:avoid}
+  .pl-groupe h3{font-size:12pt;margin-top:2px}
+  .pl-groupe .num-section{font-size:6pt}
   .pl-membre .n{font-size:8.5pt;line-height:1.2}
   .pl-membre .r,.pl-membre .c{font-size:6pt;letter-spacing:.1em}
   .pl-mois,.pl-sem{font-size:6.5pt;letter-spacing:.12em;padding:3px 0 4px 4px}

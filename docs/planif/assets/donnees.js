@@ -45,6 +45,31 @@
   var PLANIFIES = { ingenieur: true, administrateur: true, dessinateur: true };
   function libelleRole(r) { return ROLES[r] || "À désigner"; }
 
+  // Ordre des rôles dans les listes : ceux qui portent des tâches d'abord
+  var ORDRE_ROLES = ["ingenieur", "dessinateur", "administrateur", "administratif", ""];
+  var TITRES_ROLES = {
+    ingenieur: "Ingénieurs", dessinateur: "Dessinateurs",
+    administrateur: "Administrateurs", administratif: "Administratifs", "": "À désigner"
+  };
+
+  /* Ordre alphabétique : nom, puis prénom. Comparer « nom + prénom » collés
+     rangeait « S. Sofiane » après « Seng Sokhemmara » (« SSo » > « Sen »). */
+  function compareMembres(a, b) {
+    return a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }) ||
+           a.prenom.localeCompare(b.prenom, "fr", { sensitivity: "base" });
+  }
+
+  /** Membres regroupés par rôle, dans l'ordre des rôles, alphabétiques dans chaque groupe :
+   *  [{ role, titre, membres }], sans les groupes vides. */
+  function parRole(membres) {
+    return ORDRE_ROLES.map(function (r) {
+      return {
+        role: r, titre: TITRES_ROLES[r],
+        membres: membres.filter(function (m) { return (ROLES[m.role] ? m.role : "") === r; }).sort(compareMembres)
+      };
+    }).filter(function (g) { return g.membres.length; });
+  }
+
   var SUCCURSALES = { geneve: "Genève", lausanne: "Lausanne", nyon: "Nyon" };
   var DISCIPLINES = {
     administrateurs: "Administrateurs",
@@ -387,6 +412,9 @@
     PLANIFIES: PLANIFIES,
     cote: cote,
     libelleRole: libelleRole,
+    TITRES_ROLES: TITRES_ROLES,
+    compareMembres: compareMembres,
+    parRole: parRole,
     SUCCURSALES: SUCCURSALES,
     DISCIPLINES: DISCIPLINES,
     DISCIPLINES_PAR_SUCCURSALE: DISCIPLINES_PAR_SUCCURSALE,
@@ -437,9 +465,7 @@
         .filter(function (m) { return opts.role != null ? m.role === opts.role : true; })
         .filter(function (m) { return opts.cote ? cote(m.role) === opts.cote : true; })
         .filter(function (m) { return opts.planifies ? !!PLANIFIES[m.role] : true; })
-        .slice().sort(function (a, b) {
-          return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr");
-        });
+        .slice().sort(compareMembres);
     },
     membre: function (i) { return idx().membres[i] || null; },
     nomMembre: function (i) { var m = D.membre(i); return m ? m.prenom + " " + m.nom : "—"; },
@@ -494,7 +520,7 @@
       });
       return out.sort(function (x, y) {
         if (x.absence.debut !== y.absence.debut) return x.absence.debut < y.absence.debut ? -1 : 1;
-        return (x.membre.nom + x.membre.prenom).localeCompare(y.membre.nom + y.membre.prenom, "fr");
+        return compareMembres(x.membre, y.membre);
       });
     },
 
