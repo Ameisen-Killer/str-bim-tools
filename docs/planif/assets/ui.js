@@ -37,12 +37,22 @@
   /* --------------------------------------------------------------- messages */
 
   var boiteToast = null, minuterie = null;
-  function toast(message) {
+  /** Message bref. action facultative : { label, action } — un bouton, « Annuler » par exemple. */
+  function toast(message, action) {
     if (!boiteToast) { boiteToast = el("div", { class: "toast", role: "status" }); document.body.appendChild(boiteToast); }
-    boiteToast.textContent = message;
+    vide(boiteToast);
+    boiteToast.appendChild(document.createTextNode(message));
+    if (action) {
+      boiteToast.appendChild(el("button", {
+        type: "button", class: "toast-action", text: action.label,
+        onclick: function () { boiteToast.classList.remove("vu"); action.action(); }
+      }));
+    }
+    boiteToast.classList.toggle("actif", !!action);
     boiteToast.classList.add("vu");
     clearTimeout(minuterie);
-    minuterie = setTimeout(function () { boiteToast.classList.remove("vu"); }, 3200);
+    // Avec un bouton, le temps de le trouver
+    minuterie = setTimeout(function () { boiteToast.classList.remove("vu"); }, action ? 6000 : 3200);
   }
 
   /* ---------------------------------------------------------------- modale */

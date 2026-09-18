@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=16">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=17">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Une tâche porte deux charges distinctes — ingénieur et dessin — parce qu'elles ne pèsent jamais pareil sur les deux métiers. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
+    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Cocher la case d'une tâche la marque terminée. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -60,7 +60,7 @@
 <script src="/planif/assets/supabase.js?v=7"></script>
 <script src="/planif/assets/donnees.js?v=11"></script>
 <script src="/planif/assets/calculs.js?v=4"></script>
-<script src="/planif/assets/ui.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=13"></script>
 <script>
 (function () {
   "use strict";
@@ -198,8 +198,29 @@
       return;
     }
 
-    var auj = C.isoAuj();
+    var auj = C.isoAuj(), lundi = C.lundi(auj);
     var corps = el("tbody");
+
+    /* Rangement par semaine. Chaque tâche paraît une fois, dans la première
+       semaine où il reste à y travailler : celle de son début, ou la semaine en
+       cours si elle a déjà commencé. Les retards passent devant, les tâches
+       terminées avant cette semaine ferment la liste. */
+    var infos = taches.map(function (t, i) {
+      var debut = debutDe(t);
+      var groupe = t.statut !== "termine" && t.echeance < auj ? "retard"
+        : t.echeance < lundi ? "passe"
+        : C.lundi(debut > lundi ? debut : lundi);
+      return { t: t, i: i, debut: debut, groupe: groupe };
+    });
+    function rang(g) { return g === "retard" ? 0 : g === "passe" ? 2 : 1; }
+    infos.sort(function (x, y) {
+      return rang(x.groupe) - rang(y.groupe) || (x.groupe < y.groupe ? -1 : x.groupe > y.groupe ? 1 : 0) || x.i - y.i;
+    });
+    var bilans = {};
+    infos.forEach(function (o) {
+      var b = bilans[o.groupe] || (bilans[o.groupe] = { n: 0, charge: 0 });
+      b.n++; b.charge += Calc.chargeTotale(o.t);
+    });
 
     hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
       el("thead", {}, [el("tr", {}, [
@@ -213,13 +234,49 @@
       corps
     ]));
 
-    // 150 lignes tout de suite, la suite en approchant du bas de la page
-    affichage = UI.paquets({ elements: taches, taille: 150, hote: hote, ajoute: function (t) { corps.appendChild(ligne(t)); } });
+    // La semaine en cours s'affiche toujours, même vide, sauf pendant une recherche
+    var semaineVue = !!mots.length || !!bilans[lundi], groupeCourant = null;
 
-    function ligne(t) {
+    // 150 lignes tout de suite, la suite en approchant du bas de la page
+    affichage = UI.paquets({ elements: infos, taille: 150, hote: hote, ajoute: function (o) {
+      if (o.groupe !== groupeCourant) {
+        if (!semaineVue && rang(o.groupe) > 0) {
+          semaineVue = true;
+          corps.appendChild(titreGroupe(lundi, { n: 0, charge: 0 }));
+          corps.appendChild(el("tr", { class: "groupe-vide" }, [
+            el("td", { colspan: "6", class: "secondaire", text: "Rien à faire ni à commencer cette semaine" })
+          ]));
+        }
+        groupeCourant = o.groupe;
+        corps.appendChild(titreGroupe(o.groupe, bilans[o.groupe]));
+      }
+      corps.appendChild(ligne(o.t, o.debut));
+    } });
+
+    function titreGroupe(g, b) {
+      var titre, sous;
+      if (g === "retard") { titre = "En retard"; sous = "Échéance dépassée"; }
+      else if (g === "passe") { titre = "Terminées avant cette semaine"; sous = "Échéance passée"; }
+      else {
+        var s = C.semaineISO(g), n = Math.round(C.diff(lundi, g) / 7);
+        titre = "Semaine " + s.num + (s.annee !== C.semaineISO(lundi).annee ? " · " + s.annee : "");
+        sous = (n === 0 ? "Cette semaine" : n === 1 ? "Semaine prochaine" : "Dans " + n + " semaines") +
+               " · " + C.fmtCourt(g) + " → " + C.fmtCourt(C.ajoute(g, 6));
+      }
+      return el("tr", { class: "groupe-taches" + (g === "retard" ? " retard" : g === lundi ? " actuelle" : "") }, [
+        el("td", { colspan: "6" }, [
+          el("div", { class: "num-section", text: sous }),
+          el("h3", {}, [
+            titre,
+            el("span", { class: "compte", text: b.n + (b.n > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(b.charge) + " j" })
+          ])
+        ])
+      ]);
+    }
+
+    function ligne(t, debut) {
       var a = D.affaire(t.affaireId);
       var teinte = UI.teinte(a ? a.teinte : 1);
-      var debut = Calc.debutEffectif(t, D.canton());
       var retard = t.statut !== "termine" && t.echeance < auj;
       var reste = C.diff(auj, t.echeance);
 
@@ -237,17 +294,20 @@
         ]));
       }
 
-      return suivi.marque(el("tr", {}, [
-        el("td", {}, [
-          el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
-          // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
-          el("div", { class: "affaire-ligne", style: "display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [
-            el("span", { class: "pastille", style: "color:" + teinte + ";align-self:center", "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne(a ? a.code : "—", mots)]),
-            a ? el("span", {}, [UI.surligne(a.nom, mots)]) : null
-          ]),
-          t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
-        ]),
+      return suivi.marque(el("tr", { class: t.statut === "termine" ? "fini" : "" }, [
+        el("td", {}, [el("div", { class: "tache-titre" }, [
+          coche(t),
+          el("div", {}, [
+            el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
+            // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
+            el("div", { class: "affaire-ligne", style: "display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [
+              el("span", { class: "pastille", style: "color:" + teinte + ";align-self:center", "aria-hidden": "true" }),
+              el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne(a ? a.code : "—", mots)]),
+              a ? el("span", {}, [UI.surligne(a.nom, mots)]) : null
+            ]),
+            t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
+          ])
+        ])]),
         el("td", {}, [gens]),
         el("td", {}, [
           el("div", { class: "num", text: C.fmtJours(Calc.chargeTotale(t)) + " j" })
@@ -255,7 +315,7 @@
         el("td", { class: "num", style: "white-space:nowrap" }, [
           el("div", { text: C.fmtCH(debut) + " →" }),
           el("div", { style: retard ? "color:var(--alerte)" : "color:var(--or)", text: C.fmtCH(t.echeance) }),
-          el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : "dans " + reste + " j") })
+          el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : reste === 0 ? "aujourd'hui" : "dans " + reste + " j") })
         ]),
         el("td", {}, [
           el("span", { class: "statut s-" + t.statut }, [el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_TACHE[t.statut], mots)]),
@@ -268,6 +328,49 @@
         ])
       ]), t.id);
     }
+  }
+
+  // Début de chaque tâche, calculé une fois par version des données : le
+  // rangement par semaine en a besoin pour toutes les tâches, à chaque frappe.
+  var debuts = { v: -1, parId: {} };
+  function debutDe(t) {
+    if (debuts.v !== D.version()) debuts = { v: D.version(), parId: {} };
+    return debuts.parId[t.id] || (debuts.parId[t.id] = Calc.debutEffectif(t, D.canton()));
+  }
+
+  /* ------------------------------------------------ terminer en un clic */
+
+  var avantFin = {};                                // statut et avancement d'avant la coche, pour revenir en arrière
+
+  function coche(t) {
+    var fini = t.statut === "termine";
+    var c = el("input", {
+      type: "checkbox", class: "coche-fin",
+      title: fini ? "Rouvrir la tâche" : "Marquer comme terminée",
+      "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »"
+    });
+    c.checked = fini;
+    c.addEventListener("change", function () { termine(t.id, c.checked); });
+    return c;
+  }
+
+  function termine(id, fait) {
+    var t = D.tache(id);
+    if (!t) return;
+    var champs;
+    if (fait) {
+      avantFin[id] = { statut: t.statut, avancement: t.avancement };
+      champs = { statut: "termine", avancement: 100 };
+    } else {
+      // Rouverte : l'état d'avant la coche s'il est connu, sinon « en cours »
+      champs = avantFin[id] || { statut: "en_cours" };
+      delete avantFin[id];
+    }
+    D.retoucheTache(id, champs).then(function () {
+      dessine();
+      UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.",
+        fait ? { label: "Annuler", action: function () { termine(id, false); } } : null);
+    }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
   /** Aucun résultat : dire pourquoi, et proposer la sortie la plus probable. */
