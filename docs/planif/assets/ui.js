@@ -403,8 +403,12 @@
       ]));
     });
     var pousse = el("div", { class: "pousse outils" });
+    // a.icone : classe d'une icône (planif.css) posée devant le libellé
     (actions || []).forEach(function (a) {
-      pousse.appendChild(el("button", { class: "btn" + (a.or ? " btn-or" : ""), type: "button", onclick: a.action, text: a.label }));
+      pousse.appendChild(el("button", { class: "btn" + (a.or ? " btn-or" : ""), type: "button", onclick: a.action }, [
+        a.icone ? el("span", { class: "ico-txt " + a.icone, "aria-hidden": "true" }) : null,
+        a.label
+      ]));
     });
     nav.appendChild(pousse);
 
@@ -448,7 +452,10 @@
     if (principale) {
       document.body.appendChild(el("button", {
         class: "fab", type: "button", onclick: principale.action, "aria-label": principale.label
-      }, [el("b", { text: "+", "aria-hidden": "true" }), principale.label.replace(/^(Nouvelle|Nouveau|Nouvel) /, "")]));
+      }, [
+        principale.icone ? el("span", { class: "ico-txt " + principale.icone, "aria-hidden": "true" }) : el("b", { text: "+", "aria-hidden": "true" }),
+        principale.label.replace(/^(Nouvelle|Nouveau|Nouvel) /, "")
+      ]));
       document.body.classList.add("avec-fab");
     }
   }

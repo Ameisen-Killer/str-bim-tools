@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=23">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=24">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
         </div>
         <div class="outils">
           <button class="btn" type="button" id="btn-csv">Export CSV</button>
-          <button class="btn btn-or" type="button" id="btn-nouvelle">Nouvelle tâche</button>
+          <button class="btn btn-or" type="button" id="btn-nouvelle"><span class="ico-txt ico-ajout-tache" aria-hidden="true"></span>Nouvelle tâche</button>
         </div>
       </div>
 
@@ -60,7 +60,7 @@
 <script src="/planif/assets/supabase.js?v=7"></script>
 <script src="/planif/assets/donnees.js?v=12"></script>
 <script src="/planif/assets/calculs.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=16"></script>
+<script src="/planif/assets/ui.js?v=17"></script>
 <script>
 (function () {
   "use strict";
@@ -77,7 +77,7 @@
     if (p.get("affaire")) filtres.affaire = p.get("affaire");
     if (p.get("membre")) filtres.membre = p.get("membre");
 
-    UI.chrome("taches", [{ label: "Nouvelle tâche", or: true, action: function () { formulaire(null); } }]);
+    UI.chrome("taches", [{ label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }]);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");

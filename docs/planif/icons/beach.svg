@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- soleil -->
+  <circle cx="40.5" cy="7.5" r="3"/>
+  <!-- tronc du palmier -->
+  <path d="M16.5 36.5c.4-8.2 3.2-15.2 7.8-20.5"/>
+  <!-- palmes -->
+  <path d="M24.3 16c-2.6-4.2-7.8-5.9-12.6-4.2"/>
+  <path d="M24.3 16c-4.9-.2-9 2.3-10.9 6.6"/>
+  <path d="M24.3 16c.6-4 2.6-7 5.6-8.8"/>
+  <path d="M24.3 16c2.1-4.3 6.4-6.3 10.4-5.3"/>
+  <path d="M24.3 16c4.8-.6 9.2 1.4 11.2 5.6"/>
+  <!-- dune de sable -->
+  <path d="M4 42c3.5-4.2 8.2-6.2 13.2-6.2S26.5 37.8 30 42"/>
+  <!-- vague -->
+  <path d="M31 36.5c1.6-1.3 3.2-1.3 4.8 0s3.2 1.3 4.8 0"/>
+  <!-- rivage -->
+  <path d="M4 42h40"/>
+</svg>

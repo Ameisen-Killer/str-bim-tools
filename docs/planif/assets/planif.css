@@ -291,6 +291,13 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-modifier{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
 .ico-supprimer{--ico:url(/planif/icons/trash.svg?v=1)}
 .ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
+/* icône devant le libellé d'un bouton (Nouvelle tâche, Nouvelle absence) : couleur du bouton */
+.ico-txt{
+  flex:0 0 auto;display:inline-block;width:18px;height:18px;background-color:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
+}
+.ico-ajout-tache{--ico:url(/planif/icons/clipboard_add.svg?v=1)}
+.ico-absence{--ico:url(/planif/icons/beach.svg?v=2)}
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}
@@ -635,6 +642,7 @@ mark.trouve{
     font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
   }
   .fab b{font-weight:400;font-size:20px;line-height:1;letter-spacing:0}
+  .fab .ico-txt{width:22px;height:22px}
   body.avec-fab main{padding-bottom:84px}
   .seul-mobile{display:inline-flex!important}
 
