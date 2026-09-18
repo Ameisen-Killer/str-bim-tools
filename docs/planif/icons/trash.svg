@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- couvercle et poignée -->
+  <path d="M8 12h32"/>
+  <path d="M19 12V8.5A1.5 1.5 0 0 1 20.5 7h7A1.5 1.5 0 0 1 29 8.5V12"/>
+  <!-- cuve, légèrement évasée -->
+  <path d="M11.5 12l2 27a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3l2-27"/>
+  <!-- rainures -->
+  <path d="M19 19v16M24 19v16M29 19v16"/>
+</svg>

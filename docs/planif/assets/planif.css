@@ -272,7 +272,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .tache-titre{display:flex;align-items:flex-start;gap:10px;padding-left:3px}
 .tache-titre .ico-coche{margin-top:-6px}
 
-/* icônes (docs/planif/icons) : le dessin noir sert de masque, la couleur vient
+/* icônes (docs/planif/icons, SVG au trait) : le dessin noir sert de masque, la couleur vient
    du thème — gris doux au repos, or au survol, rouge pour supprimer */
 .ico{
   flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
@@ -288,8 +288,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico:focus-visible{outline:none;border-color:var(--or);box-shadow:inset 0 0 0 1px var(--or)}
 .ico-coche{--ico:url(/planif/icons/thumb_up.svg?v=1);color:var(--texte-faible)}
 .ico-coche.fait{color:var(--or)}
-.ico-modifier{--ico:url(/planif/icons/clipboard_check_edit.png?v=2)}
-.ico-supprimer{--ico:url(/planif/icons/garbage_can.png?v=2)}
+.ico-modifier{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
+.ico-supprimer{--ico:url(/planif/icons/trash.svg?v=1)}
 .ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste tr.fini .principal{text-decoration:line-through;text-decoration-thickness:1px;color:var(--texte-doux)}
