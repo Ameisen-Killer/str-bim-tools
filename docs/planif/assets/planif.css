@@ -291,7 +291,9 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-modifier{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
 .ico-supprimer{--ico:url(/planif/icons/trash.svg?v=1)}
 .ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
+table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
+table.liste td.actions .btn + .ico{margin-left:8px}
 table.liste tr.fini .principal{text-decoration:line-through;text-decoration-thickness:1px;color:var(--texte-doux)}
 table.liste tr.fini td{opacity:.7}
 
@@ -660,6 +662,7 @@ mark.trouve{
   table.liste td.actions .btn{flex:1 1 auto;justify-content:center;border-color:var(--ligne)}
   .ico{width:44px;height:44px}                         /* cible au doigt */
   table.liste td.actions .ico{border-color:var(--ligne)}
+  table.liste td.actions .ico + .ico,table.liste td.actions .btn + .ico{margin-left:0}   /* l'écart vient du gap */
   .defile{overflow-x:visible}
 
   /* filtres repliés derrière un bouton */

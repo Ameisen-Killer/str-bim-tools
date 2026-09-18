@@ -32,6 +32,19 @@
 
   function vide(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
 
+  /**
+   * Bouton-icône d'une ligne de liste (icônes SVG de docs/planif/icons, style dans planif.css).
+   * type : "modifier" ou "supprimer" ; titre : l'action, en bulle au survol ;
+   * quoi : l'objet visé, précisé pour les lecteurs d'écran.
+   */
+  function boutonIcone(type, titre, quoi, action) {
+    return el("button", {
+      class: "ico ico-" + type, type: "button", title: titre,
+      "aria-label": quoi ? titre + " « " + quoi + " »" : titre,
+      onclick: action
+    });
+  }
+
   function teinte(n) { return "var(--t" + Math.min(8, Math.max(1, n || 1)) + ")"; }
 
   /* --------------------------------------------------------------- messages */
@@ -856,16 +869,13 @@
           ]),
           el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
           el("td", { class: "actions" }, [
-            el("button", { class: "btn btn-nu", type: "button", text: "Modifier", onclick: function () { edite(a); } }),
-            el("button", {
-              class: "btn btn-nu btn-rouge", type: "button", text: "Retirer",
-              onclick: function () {
-                D.suppAbsence(m.id, a.id).then(function () {
-                  if (enCours && enCours.id === a.id) edite(null); else rend();
-                  previent();
-                  toast("Absence retirée.");
-                }).catch(function (e) { toast(e.message); });
-              }
+            boutonIcone("modifier", "Modifier", a.motif, function () { edite(a); }),
+            boutonIcone("supprimer", "Retirer", a.motif, function () {
+              D.suppAbsence(m.id, a.id).then(function () {
+                if (enCours && enCours.id === a.id) edite(null); else rend();
+                previent();
+                toast("Absence retirée.");
+              }).catch(function (e) { toast(e.message); });
             })
           ])
         ]));
@@ -1163,7 +1173,7 @@
   }
 
   global.UI = {
-    el: el, vide: vide, teinte: teinte, toast: toast,
+    el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit, optionsParRole: optionsParRole,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
