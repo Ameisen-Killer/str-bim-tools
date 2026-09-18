@@ -389,9 +389,21 @@
     else if (t.echeance < auj) classes.push("retard");
     if (C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
 
+    // Vue d'une semaine : une charge partielle n'occupe que sa part du premier jour.
+    // La tâche est calée sur son échéance, la part libre est donc au début.
+    var decal = "";
+    if (vue.duree === 7 && info.debut >= jours[0]) {
+      var libre = 1 - fractionPremierJour(info, canton);
+      if (libre > 0.01) {
+        var poids = 0;                            // largeur de la plage, week-ends à demi
+        for (var k = c1 - 1; k < c1 - 1 + cn; k++) poids += C.estWeekend(jours[k]) ? 0.5 : 1;
+        decal = ";margin-left:calc(2px + " + (libre / poids * 100).toFixed(3) + "%)";
+      }
+    }
+
     var n = el("div", {
       class: classes.join(" "),
-      style: "--tt:" + UI.teinte(a ? a.teinte : 1) + ";--c1:" + c1 + ";--cn:" + cn + ";--l:" + ligne,
+      style: "--tt:" + UI.teinte(a ? a.teinte : 1) + ";--c1:" + c1 + ";--cn:" + cn + ";--l:" + ligne + decal,
       tabindex: "0", role: "button",
       title: (a ? a.code + " · " : "") + t.titre + "\n" +
              D.ROLES[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
@@ -413,6 +425,19 @@
       }
     });
     return n;
+  }
+
+  /** Part du premier jour réellement occupée : ce qui reste de la charge une fois
+   *  les jours suivants remplis jusqu'à l'échéance, rapporté à la capacité du jour. */
+  function fractionPremierJour(info, canton) {
+    var m = D.membre(info.membreId);
+    if (m && !m.actif) m = null;
+    function cap(j) { return m ? Calc.capaciteJour(m, j, canton) : (C.estOuvre(j, canton) ? 1 : 0); }
+    var apres = 0;
+    for (var j = info.fin; j > info.debut; j = C.ajoute(j, -1)) apres += cap(j);
+    var c = cap(info.debut);
+    if (c <= 0) return 1;
+    return Math.max(0, Math.min(1, (info.charge - apres) / c));
   }
 
   /* ------------------------------------------------- glisser-déposer */
