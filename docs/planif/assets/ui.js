@@ -1031,7 +1031,7 @@
     var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaires[0].id);
 
     var chAffaire = champ({
-      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit,
+      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
       options: affaires.map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; })
     });
 
@@ -1078,11 +1078,12 @@
       });
     }
 
-    // Deux colonnes d'un bout à l'autre (une sur téléphone) : voir .compacte dans planif.css
+    // Affaire puis libellé sur toute la largeur, le reste sur deux colonnes (une sur téléphone) :
+    // voir .compacte dans planif.css
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         chAffaire,
-        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1" })
+        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1", large: true })
       ]),
       el("fieldset", {}, [
         el("div", { class: "legende", text: "Charges estimées et affectations" }),

@@ -348,9 +348,9 @@ table.liste tr.fini td{opacity:.7}
 .modale-pied{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne)}
 .modale-pied .gauche{margin-right:auto}
 
-/* Fenêtre resserrée (formulaire de tâche) : moins de blanc, deux colonnes d'un
-   bout à l'autre (une sur téléphone). Les intertitres, moins espacés, prennent
-   un filet pour rester des intertitres et non des libellés de plus. */
+/* Fenêtre resserrée (formulaire de tâche) : moins de blanc, champs sur deux
+   colonnes (une sur téléphone). Les intertitres, moins espacés, prennent un
+   filet pour rester des intertitres et non des libellés de plus. */
 .modale-boite.compacte{padding:clamp(18px,2.4vw,26px)}
 .compacte .modale-tete{margin-bottom:14px}
 .compacte .modale-tete .surtitre{margin-bottom:5px}
