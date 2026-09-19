@@ -78,7 +78,7 @@
 
   /* ---------------------------------------------------------------- modale */
 
-  var modale = null, boite = null, fermeEnCours = null, dernierFocus = null;
+  var modale = null, boite = null, fermeEnCours = null, dernierFocus = null, boutonEntree = null;
 
   function prepareModale() {
     if (modale) return;
@@ -88,18 +88,31 @@
     ]);
     document.body.appendChild(modale);
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && modale.classList.contains("ouverte")) ferme();
+      if (!modale.classList.contains("ouverte")) return;
+      if (e.key === "Escape") ferme();
+      // Entrée dans un champ vaut un clic sur le bouton désigné ; dans une zone
+      // de texte (note), elle garde son rôle : aller à la ligne. Une touche
+      // maintenue ne compte pas : l'Entrée qui a ouvert la fenêtre (recherche)
+      // ne doit pas l'enregistrer en se répétant.
+      else if (e.key === "Enter" && !e.repeat && boutonEntree && !e.isComposing &&
+               /^(INPUT|SELECT)$/.test(e.target.tagName) && boite.contains(e.target)) {
+        e.preventDefault();
+        boutonEntree.click();
+      }
     });
   }
 
   /**
-   * ouvre({surtitre, titre, corps:Node, boutons:[{label, or, rouge, gauche, action}]})
+   * ouvre({surtitre, titre, corps:Node, compacte, boutons:[{label, or, rouge, gauche, entree, action}]})
    * L'action peut renvoyer une promesse ; renvoyer false empêche la fermeture.
+   * compacte : fenêtre resserrée (planif.css) ; entree : bouton déclenché par la touche Entrée.
    */
   function ouvre(o) {
     prepareModale();
     dernierFocus = document.activeElement;
     fermeEnCours = o.surFermeture || null;
+    boutonEntree = null;
+    boite.className = "modale-boite" + (o.compacte ? " compacte" : "");
     vide(boite);
 
     boite.appendChild(el("div", { class: "modale-tete" }, [
@@ -132,6 +145,7 @@
           });
         }
       }, [b.label]);
+      if (b.entree) boutonEntree = bouton;
       pied.appendChild(bouton);
     });
     if (pied.childNodes.length) boite.appendChild(pied);
@@ -1017,7 +1031,7 @@
     var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaires[0].id);
 
     var chAffaire = champ({
-      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
+      nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit,
       options: affaires.map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; })
     });
 
@@ -1036,7 +1050,7 @@
     chAffaire.querySelector("select").addEventListener("change", rebranche);
 
     // Début recalculé à chaque frappe : durée, échéance ou intervenant
-    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:9px" });
+    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:7px" });
     function recalcule() {
       var v = lit(corps);
       vide(apercu);
@@ -1064,30 +1078,31 @@
       });
     }
 
+    // Deux colonnes d'un bout à l'autre (une sur téléphone) : voir .compacte dans planif.css
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         chAffaire,
-        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1", large: true })
+        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1" })
       ]),
-      el("fieldset", { style: "margin-top:26px" }, [
+      el("fieldset", {}, [
         el("div", { class: "legende", text: "Charges estimées et affectations" }),
-        // Une ligne par métier : la personne, puis sa charge (2 colonnes, 1 sur téléphone)
-        el("div", { class: "grille-champs", style: "margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))" }, [
+        // Une ligne par métier : la personne, puis sa charge
+        el("div", { class: "grille-champs" }, [
           boiteIng,
           champ({
             nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeInge : "", exemple: "0", aide: "Calcul, contrôle, coordination."
+            valeur: t ? t.chargeInge : "", exemple: "0"
           }),
           boiteDes,
           champ({
             nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeDessin : "", exemple: "0", aide: "Production des plans."
+            valeur: t ? t.chargeDessin : "", exemple: "0"
           })
         ])
       ]),
-      el("fieldset", { style: "margin-top:26px" }, [
+      el("fieldset", {}, [
         el("div", { class: "legende", text: "Dates" }),
-        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+        el("div", { class: "grille-champs" }, [
           champ({
             nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "",
             aide: "C'est la date qui fait foi : le début s'en déduit."
@@ -1098,15 +1113,15 @@
           ])
         ])
       ]),
-      el("fieldset", { style: "margin-top:26px" }, [
+      el("fieldset", {}, [
         el("div", { class: "legende", text: "Suivi" }),
-        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+        el("div", { class: "grille-champs" }, [
           champ({
             nom: "statut", label: "Statut", type: "select", valeur: t ? t.statut : "a_faire",
             options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
           }),
           champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
-          champ({ nom: "note", label: "Note", type: "textarea", valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
+          champ({ nom: "note", label: "Note", type: "textarea", rows: 2, valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
         ])
       ])
     ]);
@@ -1119,10 +1134,11 @@
       surtitre: t ? "Modifier la tâche" : "Nouvelle tâche",
       titre: t ? t.titre : "Tâche",
       corps: corps,
+      compacte: true,
       boutons: [
         { label: "Annuler" },
         {
-          label: "Enregistrer", or: true, action: function () {
+          label: "Enregistrer", or: true, entree: true, action: function () {
             var v = lit(corps);
             var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
             return p.then(function () {
