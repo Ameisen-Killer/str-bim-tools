@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- deux corps de bâtiment, comme l'icône du site -->
+  <path d="M5 42h30"/>
+  <path d="M9 42V14h13v28"/>
+  <path d="M22 42V23h10v19"/>
+  <!-- fenêtres -->
+  <path d="M13.5 20h4M13.5 26h4M13.5 32h4M26 29h2M26 35h2"/>
+  <!-- plus -->
+  <path d="M38.5 5v13M32 11.5h13"/>
+</svg>

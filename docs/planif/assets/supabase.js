@@ -15,7 +15,8 @@
   var CLE_SESSION = "planif.session";
   var configure = !!(URL_BASE && CLE);
 
-  function erreur(m) { var e = new Error(m); e.metier = true; return e; }
+  /* code : code d'erreur de la base ou de l'API (PGRST202…), quand il y en a un */
+  function erreur(m, code) { var e = new Error(m); e.metier = true; if (code) e.code = code; return e; }
 
   /* ------------------------------------------------------------- session */
 
@@ -74,14 +75,23 @@
     });
   }
 
-  /* Les messages de Supabase sont en anglais : on les retraduit pour l'écran. */
+  /* Les messages de Supabase sont en anglais : on les retraduit pour l'écran.
+     Celui de la garde des comptes (base) est déjà en français : il passe tel quel. */
   function messageAuth(j, statut) {
     var m = (j && (j.error_description || j.msg || j.message || j.error)) || "";
+    var attente = /after (\d+) seconds?/i.exec(m);
     if (/invalid login credentials/i.test(m)) return "Adresse ou mot de passe incorrect.";
-    if (/email not confirmed/i.test(m)) return "Adresse non confirmée : ouvre le courriel de confirmation avant de te connecter.";
+    if (/email not confirmed/i.test(m)) return "Adresse pas encore activée : ouvre le lien reçu par courriel, ou redemande-le.";
     if (/user already registered/i.test(m)) return "Un compte existe déjà pour cette adresse.";
-    if (/signups not allowed/i.test(m)) return "Les inscriptions sont fermées sur ce projet.";
+    if (/signups? not allowed/i.test(m)) return "La création de comptes est fermée sur ce projet.";
     if (/password should be at least/i.test(m)) return "Mot de passe trop court : six caractères au minimum.";
+    if (/should be different from the old password/i.test(m)) return "Choisis un mot de passe différent de l'ancien.";
+    if (/weak|known to be/i.test(m)) return "Mot de passe trop faible : choisis-en un plus long ou moins courant.";
+    if (/invalid or has expired|otp_expired|token has expired/i.test(m)) return "Ce lien a expiré ou a déjà servi : redemande-en un.";
+    if (/not authorized/i.test(m)) return "Courriel refusé par Supabase : sans serveur d'envoi à toi (SMTP), il ne livre qu'aux membres de ton équipe Supabase.";
+    if (/error sending/i.test(m)) return "Envoi du courriel impossible : vérifie le serveur d'envoi (SMTP) du projet Supabase.";
+    if (attente) return "Patiente " + attente[1] + " secondes avant de redemander un lien.";
+    if (/email rate limit/i.test(m)) return "Limite d'envoi de courriels atteinte : réessaie plus tard.";
     if (/rate limit|too many/i.test(m)) return "Trop de tentatives. Patiente quelques minutes.";
     return m || "Connexion impossible (" + statut + ").";
   }
@@ -91,12 +101,53 @@
       .then(function (j) { var s = poseSession(depuisJeton(j)); cacheTheme(s); return s; });
   }
 
-  function inscription(email, motDePasse) {
-    return appelAuth("signup", { email: email, password: motDePasse })
-      .then(function (j) {
-        if (j.access_token) return { session: poseSession(depuisJeton(j)), confirmation: false };
-        return { session: null, confirmation: true };   // confirmation par courriel demandée
+  /* Plus d'inscription libre : un compte naît quand on demande un lien pour une
+     adresse inscrite dans la liste des accès (console du super admin). */
+
+  /**
+   * Lien de connexion par courriel. Crée le compte s'il n'existe pas encore —
+   * la garde de la base (hook « Before User Created ») refuse les adresses
+   * absentes de la liste des accès. Nouveau compte : courriel « Confirm
+   * signup » ; compte existant : « Magic Link ». Les deux ramènent sur la page
+   * de connexion, qui fait choisir un mot de passe.
+   */
+  function envoieLien(email) {
+    var retour = global.location.origin + "/planif/connexion/";
+    return appelAuth("otp?redirect_to=" + encodeURIComponent(retour), { email: email, create_user: true });
+  }
+
+  /**
+   * Jeton reçu dans un lien (modèles de courriels avec {{ .TokenHash }}) contre
+   * une session. Valable une seule fois : la page ne l'échange qu'au moment où
+   * la personne valide son mot de passe, jamais au chargement — un antivirus de
+   * messagerie qui ouvre les liens à l'avance ne le consomme donc pas.
+   */
+  function verifieLien(jeton, type) {
+    return appelAuth("verify", { type: type === "recovery" ? "recovery" : "email", token_hash: jeton });
+  }
+
+  /**
+   * Mot de passe choisi depuis un lien reçu par courriel. jetons : réponse de
+   * verifieLien, ou jetons lus dans l'adresse (#access_token=…). La session
+   * s'ouvre dans la foulée.
+   */
+  function choisitMotDePasse(jetons, motDePasse) {
+    return fetch(URL_BASE + "/auth/v1/user", {
+      method: "PUT",
+      headers: { apikey: CLE, Authorization: "Bearer " + jetons.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ password: motDePasse })
+    }).catch(function () { throw erreurReseau(); }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (u) {
+        if (r.status === 401 || r.status === 403) throw erreur("Ce lien a expiré : redemande-en un.");
+        if (!r.ok) throw erreur(messageAuth(u, r.status));
+        var s = poseSession(depuisJeton({
+          access_token: jetons.access_token, refresh_token: jetons.refresh_token,
+          expires_in: parseInt(jetons.expires_in, 10) || 3600, user: u
+        }));
+        cacheTheme(s);
+        return s;
       });
+    });
   }
 
   /* Un seul renouvellement à la fois : au chargement, six lectures partent
@@ -190,17 +241,42 @@
           var total = parseInt(((r.headers.get("Content-Range") || "").split("/")[1]), 10);
           return { lignes: j || [], total: isNaN(total) ? null : total };
         }
+        var code = j && j.code;
         if (r.status === 401 || r.status === 403) {
-          throw erreur("Accès refusé. Ton adresse est-elle bien dans la liste des accès ?");
+          throw erreur("Accès refusé. Ton adresse est-elle bien dans la liste des accès ?", code);
         }
         // Codes PostgreSQL les plus probables, traduits pour l'écran
-        var code = j && j.code;
-        if (code === "23505") throw erreur("Enregistrement refusé : ce numéro d'affaire ou cette adresse e-mail existe déjà (peut-être créé entre-temps par un collègue). L'affichage a été rechargé.");
-        if (code === "23503") throw erreur("Enregistrement refusé : un élément lié (affaire ou membre) a été supprimé entre-temps. L'affichage a été rechargé.");
-        if (code === "23514" || code === "22003") throw erreur("Enregistrement refusé : une valeur sort des limites de la base. L'affichage a été rechargé.");
-        throw erreur((j && (j.message || j.hint)) || ("Erreur " + r.status + " sur " + chemin));
+        if (code === "23505") throw erreur("Enregistrement refusé : ce numéro d'affaire ou cette adresse e-mail existe déjà (peut-être créé entre-temps par un collègue). L'affichage a été rechargé.", code);
+        if (code === "23503") throw erreur("Enregistrement refusé : un élément lié (affaire ou membre) a été supprimé entre-temps, ou n'appartient pas au bureau affiché. L'affichage a été rechargé.", code);
+        if (code === "23514" || code === "22003") throw erreur("Enregistrement refusé : une valeur sort des limites de la base. L'affichage a été rechargé.", code);
+        // Les fonctions de la base (console, profil) répondent en français : le message passe tel quel
+        throw erreur((j && (j.message || j.hint)) || ("Erreur " + r.status + " sur " + chemin), code);
       });
     });
+  }
+
+  /** Appel d'une fonction de la base (profil, console). */
+  function rpc(nom, args) {
+    return requete("rpc/" + nom, { methode: "POST", corps: args || {} });
+  }
+
+  /* Profil de la personne connectée : bureau, droits, succursales et
+     disciplines du bureau. Tant que la migration multi-bureaux n'a pas été
+     exécutée, la fonction n'existe pas (PGRST202) : null, et l'outil garde
+     son fonctionnement d'avant. */
+  function profil() {
+    return rpc("mon_profil").catch(function (e) {
+      if (e.code === "PGRST202") return null;
+      throw e;
+    });
+  }
+
+  /* Réglages publics du service de connexion : inscriptions ouvertes ou non,
+     confirmation de l'adresse. La console s'en sert pour signaler un réglage manquant. */
+  function reglagesAuth() {
+    return fetch(URL_BASE + "/auth/v1/settings", { headers: { apikey: CLE } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
   }
 
   /*
@@ -514,18 +590,23 @@
     connecte: function () { return !!session; },
     email: function () { return session ? session.email : ""; },
     connexion: connexion,
-    inscription: inscription,
+    envoieLien: envoieLien,
+    verifieLien: verifieLien,
+    choisitMotDePasse: choisitMotDePasse,
     deconnexion: deconnexion,
     rafraichis: rafraichis,
     utilisateur: utilisateur,
     enregistrePreferences: enregistrePreferences,
     requete: requete,
+    rpc: rpc,
+    reglagesAuth: reglagesAuth,
     ADAPT: {
       nom: "supabase",
       semeSiVide: false,
       lire: charge,
       ecrire: ecrire,
-      videTout: videTout
+      videTout: videTout,
+      profil: profil
     }
   };
 })(window);

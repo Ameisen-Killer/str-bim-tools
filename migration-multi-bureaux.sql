@@ -1,31 +1,31 @@
 -- ============================================================================
---  Outil de planification STR Bim Tools — schéma PostgreSQL pour Supabase
+--  Outil de planification — plusieurs bureaux d'études et console du super admin
 -- ----------------------------------------------------------------------------
---  Installation neuve, en une fois, dans le projet Supabase :
+--  À exécuter une fois, dans le projet Supabase :
 --    Dashboard > SQL Editor > New query > coller ce fichier > Run.
---  Une base déjà en service se met à jour par les fichiers migration-*.sql.
 --
 --  AVANT D'EXÉCUTER : remplacer l'adresse d'exemple de la ligne « super admin »
---  par celle du compte qui administrera l'outil. Ne pas l'enregistrer dans le
---  dépôt : ce fichier est public.
+--  ci-dessous par celle avec laquelle tu te connectes à l'outil. Ne pas
+--  l'enregistrer dans le dépôt : ce fichier est public. Tant que l'adresse
+--  d'exemple est là, le script s'arrête sans rien modifier.
 --
---  Ce fichier ne contient aucune donnée et aucun secret : il décrit la forme
---  des tables, les fonctions et la sécurité. Il double le modèle du mode local
---  (docs/planif/assets/donnees.js) : mêmes champs, mêmes contraintes.
+--  Ce que fait la migration :
+--    - crée la table des bureaux ; toutes les données actuelles rejoignent le
+--      bureau n° 1, « Mon bureau », à renommer dans la console ;
+--    - chaque membre, absence, affaire, lien d'équipe, tâche et réglage porte
+--      son bureau, rempli par la base elle-même : l'outil n'a rien à envoyer ;
+--    - la liste des accès devient « adresse → bureau », avec le super admin ;
+--    - succursales et disciplines deviennent propres à chaque bureau ; celles
+--      d'aujourd'hui sont reprises pour le bureau n° 1 ;
+--    - la RLS cloisonne les bureaux : chacun ne voit et ne modifie que le sien ;
+--    - la console passe par des fonctions réservées au super admin ;
+--    - une garde refuse la création d'un compte de connexion pour une adresse
+--      absente de la liste des accès (à activer ensuite dans Authentication >
+--      Auth Hooks > « Before User Created », fonction garde_creation_compte).
 --
---  Organisation : plusieurs bureaux d'études dans une même base. Chaque ligne
---  appartient à un bureau ; la RLS cloisonne les bureaux, et chaque adresse
---  autorisée (table acces) ne voit que le sien. Le super admin gère bureaux
---  et accès depuis la console (/planif/console/), par des fonctions réservées.
---  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
---  qui permet de publier cette clé dans un dépôt public.
---
---  Après exécution, dans le tableau de bord Supabase (voir reglages-supabase.md) :
---    - Authentication > Auth Hooks : « Before User Created », fonction
---      public.garde_creation_compte ;
---    - Authentication > Sign In / Providers : inscriptions autorisées et
---      confirmation de l'adresse obligatoire ;
---    - serveur d'envoi (SMTP) et modèles de courriels en français.
+--  L'outil en ligne continue de fonctionner pendant et après l'exécution.
+--  Tout se fait dans une transaction : à la moindre erreur, rien n'est modifié.
+--  Peut être relancé sans dommage.
 -- ============================================================================
 
 begin;
@@ -84,25 +84,86 @@ create table if not exists public.succursale_disciplines (
   foreign key (bureau_id, discipline) references public.disciplines (bureau_id, code) on delete cascade
 );
 
+-- ------------------------------------------------------------ bureau n° 1 ---
+-- Première exécution : le bureau d'aujourd'hui est créé, avec les succursales
+-- et disciplines que l'outil connaissait jusqu'ici. Exécutions suivantes : on
+-- reprend le plus ancien bureau, sans rien réécrire.
+do $$
+declare
+  v_b uuid;
+begin
+  select id into v_b from public.bureaux order by cree_le, id limit 1;
+  if v_b is null then
+    insert into public.bureaux (nom) values ('Mon bureau') returning id into v_b;
+
+    insert into public.succursales (bureau_id, code, nom, ordre) values
+      (v_b, 'geneve',   'Genève',   1),
+      (v_b, 'lausanne', 'Lausanne', 2),
+      (v_b, 'nyon',     'Nyon',     3);
+
+    insert into public.disciplines (bureau_id, code, nom, ordre) values
+      (v_b, 'administrateurs', 'Administrateurs',                          1),
+      (v_b, 'structure',       'Structure et ouvrages d''art',             2),
+      (v_b, 'geotechnique',    'Géotechnique / travaux spéciaux',          3),
+      (v_b, 'environnement',   'Environnement et développement durable',   4),
+      (v_b, 'investigation',   'Investigation géotechnique',               5),
+      (v_b, 'genie_civil',     'Génie civil et infrastructures',           6),
+      (v_b, 'administration',  'Administration',                           7);
+
+    insert into public.succursale_disciplines (bureau_id, succursale, discipline)
+    select v_b, s, d
+    from (values
+      ('geneve', 'administrateurs'), ('geneve', 'structure'), ('geneve', 'geotechnique'),
+      ('geneve', 'environnement'), ('geneve', 'investigation'), ('geneve', 'genie_civil'),
+      ('geneve', 'administration'),
+      ('lausanne', 'administrateurs'), ('lausanne', 'structure'),
+      ('nyon', 'structure')
+    ) as v(s, d);
+  end if;
+  perform set_config('planif.bureau_1', v_b::text, true);
+end $$;
+
 -- ----------------------------------------------------------------- accès ---
 -- Une ligne par adresse autorisée : son bureau, son état, et pour le super
 -- admin le bureau qu'il consulte en ce moment (bureau_actif).
-create table if not exists public.acces (
-  email        text primary key constraint acces_email_minuscules check (email = lower(btrim(email))),
-  bureau_id    uuid not null constraint acces_bureau_fk references public.bureaux (id) on delete cascade,
-  droit        text not null default 'utilisateur'
-               constraint acces_droit_check check (droit in ('utilisateur', 'responsable')),
-  super_admin  boolean not null default false,
-  bureau_actif uuid constraint acces_bureau_actif_fk references public.bureaux (id) on delete set null,
-  actif        boolean not null default true,
-  ajoute_le    timestamptz not null default now()
-);
+alter table public.acces add column if not exists droit        text not null default 'utilisateur';
+alter table public.acces add column if not exists ajoute_le    timestamptz not null default now();
+alter table public.acces add column if not exists bureau_id    uuid;
+alter table public.acces add column if not exists super_admin  boolean not null default false;
+alter table public.acces add column if not exists bureau_actif uuid;
+alter table public.acces add column if not exists actif        boolean not null default true;
+
+update public.acces set email = lower(btrim(email)) where email <> lower(btrim(email));
+update public.acces set bureau_id = current_setting('planif.bureau_1')::uuid where bureau_id is null;
+alter table public.acces alter column bureau_id set not null;
+
+-- Droits : « utilisateur » pour tous ; « responsable » est réservé à une
+-- délégation future (gérer les accès de son propre bureau).
+alter table public.acces drop constraint if exists acces_droit_check;
+update public.acces set droit = 'utilisateur' where droit not in ('utilisateur', 'responsable');
+alter table public.acces alter column droit set default 'utilisateur';
+alter table public.acces add constraint acces_droit_check check (droit in ('utilisateur', 'responsable'));
+
+alter table public.acces drop constraint if exists acces_email_minuscules;
+alter table public.acces add constraint acces_email_minuscules check (email = lower(btrim(email)));
+
 comment on table public.acces is
   'Adresses autorisées à se connecter, chacune rattachée à un bureau. Lue et écrite uniquement par les fonctions de la base (console du super admin).';
-comment on column public.acces.droit is
-  '« utilisateur » pour tous ; « responsable » est réservé à une délégation future (gérer les accès de son propre bureau).';
 comment on column public.acces.bureau_actif is
   'Super admin seulement : bureau affiché dans le planning. Vide : son propre bureau.';
+
+do $$
+declare
+  n int;
+begin
+  update public.acces set super_admin = true, actif = true
+   where email = lower(btrim(current_setting('planif.super_admin')));
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception 'L''adresse % n''est pas dans la liste des accès : vérifie son orthographe (c''est celle avec laquelle tu te connectes à l''outil).',
+      current_setting('planif.super_admin');
+  end if;
+end $$;
 
 -- --------------------------------------------------- qui est connecté ? ---
 -- security definer : ces fonctions lisent acces et bureaux, fermés à tous.
@@ -147,156 +208,89 @@ language sql stable set search_path = '' as $$
   select public.bureau_courant() is not null;
 $$;
 
--- ------------------------------------------------- date de mise à jour ---
-create or replace function public.touche_maj_le()
-returns trigger language plpgsql as $$
+-- ------------------------------------------------ tables de planification ---
+-- Chaque ligne reçoit son bureau. La mise à jour de masse ne touche pas aux
+-- dates de modification (déclencheurs suspendus le temps du remplissage).
+do $$
+declare
+  t text;
+  v_b uuid := current_setting('planif.bureau_1')::uuid;
 begin
-  new.maj_le := now();
-  return new;
+  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches'] loop
+    execute format('alter table public.%I add column if not exists bureau_id uuid', t);
+    execute format('alter table public.%I disable trigger user', t);
+    execute format('update public.%I set bureau_id = $1 where bureau_id is null', t) using v_b;
+    execute format('alter table public.%I enable trigger user', t);
+    execute format('alter table public.%I alter column bureau_id set default public.bureau_par_defaut()', t);
+    execute format('alter table public.%I alter column bureau_id set not null', t);
+    execute format('create index if not exists %I on public.%I (bureau_id)', t || '_bureau', t);
+  end loop;
 end $$;
 
--- ---------------------------------------------------------------- membres ---
-create table if not exists public.membres (
-  id         uuid primary key default gen_random_uuid(),
-  bureau_id  uuid not null default public.bureau_par_defaut()
-             constraint membres_bureau_fk references public.bureaux (id) on delete cascade,
-  nom        text not null,
-  prenom     text not null,
-  email      text,
-  role       text constraint membres_role_check
-               check (role is null or role in ('ingenieur', 'dessinateur', 'administrateur', 'administratif')),
-  succursale text,
-  discipline text,
-  capacite   numeric(3,1) not null default 5 check (capacite > 0 and capacite <= 7),
-  actif      boolean not null default true,
-  cree_le    timestamptz not null default now(),
-  maj_le     timestamptz not null default now(),
-  constraint membres_id_bureau_key    unique (id, bureau_id),
-  constraint membres_email_bureau_key unique (bureau_id, email),
-  constraint membres_succursale_fk foreign key (bureau_id, succursale)
-    references public.succursales (bureau_id, code) on delete set null (succursale),
-  constraint membres_discipline_fk foreign key (bureau_id, discipline)
-    references public.disciplines (bureau_id, code) on delete set null (discipline)
-);
-create index if not exists membres_bureau on public.membres (bureau_id);
-comment on column public.membres.capacite is 'Jours travaillés par semaine : 5 pour un plein temps.';
-comment on column public.membres.role is 'Vide : membre pas encore désigné. Seuls ingénieurs, administrateurs et dessinateurs portent des tâches.';
-comment on column public.membres.succursale is 'Code d''une succursale du bureau (table succursales).';
-comment on column public.membres.discipline is 'Code d''une discipline du bureau (table disciplines).';
+-- Colonnes ajoutées par migration-succursales.sql : présentes, par sécurité
+alter table public.membres add column if not exists succursale text;
+alter table public.membres add column if not exists discipline text;
 
--- --------------------------------------------------------------- absences ---
-create table if not exists public.absences (
-  id         uuid primary key default gen_random_uuid(),
-  bureau_id  uuid not null default public.bureau_par_defaut()
-             constraint absences_bureau_fk references public.bureaux (id) on delete cascade,
-  membre_id  uuid not null references public.membres (id) on delete cascade,
-  debut      date not null,
-  fin        date not null,
-  motif      text not null default 'Absence',
-  constraint absence_ordonnee check (fin >= debut),
-  constraint absences_membre_bureau_fk foreign key (membre_id, bureau_id)
-    references public.membres (id, bureau_id) on delete cascade
-);
-create index if not exists absences_membre on public.absences (membre_id, debut);
-create index if not exists absences_bureau on public.absences (bureau_id);
+-- Les listes figées d'hier cèdent la place aux listes de chaque bureau
+alter table public.membres drop constraint if exists membres_succursale_check;
+alter table public.membres drop constraint if exists membres_discipline_check;
 
--- --------------------------------------------------------------- affaires ---
-create table if not exists public.affaires (
-  id         uuid primary key default gen_random_uuid(),
-  bureau_id  uuid not null default public.bureau_par_defaut()
-             constraint affaires_bureau_fk references public.bureaux (id) on delete cascade,
-  code       text not null,
-  nom        text not null,
-  note       text not null default '',
-  teinte     smallint not null default 1 check (teinte between 1 and 8),
-  statut     text not null default 'active' check (statut in ('active', 'suspendue', 'terminee')),
-  echeance   date,
-  cree_le    timestamptz not null default now(),
-  maj_le     timestamptz not null default now(),
-  constraint affaires_id_bureau_key   unique (id, bureau_id),
-  constraint affaires_code_bureau_key unique (bureau_id, code)
-);
-create index if not exists affaires_bureau on public.affaires (bureau_id);
-comment on column public.affaires.teinte is 'Index 1..8 dans la palette du site : la couleur reste définie côté interface.';
+-- Unicité par bureau : deux bureaux peuvent avoir chacun une affaire « 26-001 »
+alter table public.affaires drop constraint if exists affaires_code_key;
+alter table public.membres  drop constraint if exists membres_email_key;
 
--- Équipe d'une affaire. Le rôle n'est pas répété ici : il est porté par le membre.
-create table if not exists public.affaire_membres (
-  affaire_id uuid not null references public.affaires (id) on delete cascade,
-  membre_id  uuid not null references public.membres  (id) on delete cascade,
-  bureau_id  uuid not null default public.bureau_par_defaut()
-             constraint affaire_membres_bureau_fk references public.bureaux (id) on delete cascade,
-  primary key (affaire_id, membre_id),
-  constraint affaire_membres_affaire_fk foreign key (affaire_id, bureau_id)
-    references public.affaires (id, bureau_id) on delete cascade,
-  constraint affaire_membres_membre_fk foreign key (membre_id, bureau_id)
-    references public.membres (id, bureau_id) on delete cascade
-);
-create index if not exists affaire_membres_bureau on public.affaire_membres (bureau_id);
-
--- ----------------------------------------------------------------- tâches ---
-create table if not exists public.taches (
-  id             uuid primary key default gen_random_uuid(),
-  bureau_id      uuid not null default public.bureau_par_defaut()
-                 constraint taches_bureau_fk references public.bureaux (id) on delete cascade,
-  affaire_id     uuid not null references public.affaires (id) on delete cascade,
-  titre          text not null,
-  note           text not null default '',
-  charge_inge    numeric(4,1) not null default 0 check (charge_inge >= 0),
-  charge_dessin  numeric(4,1) not null default 0 check (charge_dessin >= 0),
-  debut          date,
-  echeance       date not null,
-  ingenieur_id   uuid references public.membres (id) on delete set null,
-  dessinateur_id uuid references public.membres (id) on delete set null,
-  statut         text not null default 'a_faire' check (statut in ('a_faire', 'en_cours', 'attente', 'termine')),
-  avancement     smallint not null default 0 check (avancement between 0 and 100),
-  cree_le        timestamptz not null default now(),
-  maj_le         timestamptz not null default now(),
-  constraint charge_non_nulle check (charge_inge + charge_dessin > 0),
-  constraint periode_ordonnee check (debut is null or debut <= echeance),
-  -- Une charge sans personne est permise : elle attend son affectation (« À affecter »).
-  -- Affaire et personnes : forcément du même bureau que la tâche.
-  constraint taches_affaire_bureau_fk foreign key (affaire_id, bureau_id)
-    references public.affaires (id, bureau_id) on delete cascade,
-  constraint taches_ingenieur_bureau_fk foreign key (ingenieur_id, bureau_id)
-    references public.membres (id, bureau_id) on delete set null (ingenieur_id),
-  constraint taches_dessinateur_bureau_fk foreign key (dessinateur_id, bureau_id)
-    references public.membres (id, bureau_id) on delete set null (dessinateur_id)
-);
-create index if not exists taches_bureau    on public.taches (bureau_id);
-create index if not exists taches_affaire   on public.taches (affaire_id);
-create index if not exists taches_echeance  on public.taches (echeance);
-create index if not exists taches_ingenieur on public.taches (ingenieur_id);
-create index if not exists taches_dessin    on public.taches (dessinateur_id);
-
-comment on column public.taches.debut is
-  'Facultatif. Vide, l''interface cale la tâche au plus tard avant son échéance.';
-comment on column public.taches.charge_inge is
-  'Jours d''ingénieur. Distincte de la charge dessin : les deux métiers ne pèsent pas pareil sur une même tâche.';
-
--- --------------------------------------------------------------- réglages ---
--- Une ligne par bureau, créée avec lui (déclencheur plus bas).
-create table if not exists public.reglages (
-  bureau_id        uuid primary key default public.bureau_par_defaut()
-                   constraint reglages_bureau_fk references public.bureaux (id) on delete cascade,
-  id               boolean not null default true check (id),
-  canton           text not null default 'VD',
-  capacite_defaut  numeric(3,1) not null default 5,
-  maj_le           timestamptz not null default now()
-);
+-- Réglages : une ligne par bureau
+alter table public.reglages add column if not exists bureau_id uuid;
+alter table public.reglages disable trigger user;
+update public.reglages set bureau_id = current_setting('planif.bureau_1')::uuid where bureau_id is null;
+alter table public.reglages enable trigger user;
+alter table public.reglages alter column bureau_id set not null;
+alter table public.reglages drop constraint if exists reglages_pkey;
+alter table public.reglages add constraint reglages_pkey primary key (bureau_id);
+alter table public.reglages alter column bureau_id set default public.bureau_par_defaut();
 comment on column public.reglages.id is 'Historique (une seule ligne avant les bureaux) : toujours vrai.';
 
+-- Clés étrangères et unicités, ajoutées une seule fois. Les références entre
+-- tables incluent le bureau : une tâche ne peut viser que l'affaire et les
+-- personnes de son propre bureau.
 do $$
-declare t text;
+declare
+  c text[];
 begin
-  foreach t in array array['membres', 'affaires', 'taches', 'reglages'] loop
-    execute format('drop trigger if exists maj_le on public.%I', t);
-    execute format(
-      'create trigger maj_le before update on public.%I
-         for each row execute function public.touche_maj_le()', t);
+  foreach c slice 1 in array array[
+    ['acces',           'acces_bureau_fk',               'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['acces',           'acces_bureau_actif_fk',         'foreign key (bureau_actif) references public.bureaux (id) on delete set null'],
+    ['reglages',        'reglages_bureau_fk',            'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['membres',         'membres_bureau_fk',             'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['membres',         'membres_id_bureau_key',         'unique (id, bureau_id)'],
+    ['membres',         'membres_email_bureau_key',      'unique (bureau_id, email)'],
+    ['membres',         'membres_succursale_fk',         'foreign key (bureau_id, succursale) references public.succursales (bureau_id, code) on delete set null (succursale)'],
+    ['membres',         'membres_discipline_fk',         'foreign key (bureau_id, discipline) references public.disciplines (bureau_id, code) on delete set null (discipline)'],
+    ['affaires',        'affaires_bureau_fk',            'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['affaires',        'affaires_id_bureau_key',        'unique (id, bureau_id)'],
+    ['affaires',        'affaires_code_bureau_key',      'unique (bureau_id, code)'],
+    ['absences',        'absences_bureau_fk',            'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['absences',        'absences_membre_bureau_fk',     'foreign key (membre_id, bureau_id) references public.membres (id, bureau_id) on delete cascade'],
+    ['affaire_membres', 'affaire_membres_bureau_fk',     'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['affaire_membres', 'affaire_membres_affaire_fk',    'foreign key (affaire_id, bureau_id) references public.affaires (id, bureau_id) on delete cascade'],
+    ['affaire_membres', 'affaire_membres_membre_fk',     'foreign key (membre_id, bureau_id) references public.membres (id, bureau_id) on delete cascade'],
+    ['taches',          'taches_bureau_fk',              'foreign key (bureau_id) references public.bureaux (id) on delete cascade'],
+    ['taches',          'taches_affaire_bureau_fk',      'foreign key (affaire_id, bureau_id) references public.affaires (id, bureau_id) on delete cascade'],
+    ['taches',          'taches_ingenieur_bureau_fk',    'foreign key (ingenieur_id, bureau_id) references public.membres (id, bureau_id) on delete set null (ingenieur_id)'],
+    ['taches',          'taches_dessinateur_bureau_fk',  'foreign key (dessinateur_id, bureau_id) references public.membres (id, bureau_id) on delete set null (dessinateur_id)']
+  ] loop
+    if not exists (
+      select 1 from pg_constraint
+      where conrelid = format('public.%I', c[1])::regclass and conname = c[2]
+    ) then
+      execute format('alter table public.%I add constraint %I %s', c[1], c[2], c[3]);
+    end if;
   end loop;
 end $$;
 
 -- Un bureau naît avec sa ligne de réglages (canton, capacité par défaut)
+insert into public.reglages (bureau_id) select b.id from public.bureaux b on conflict (bureau_id) do nothing;
+
 create or replace function public.bureau_cree_reglages()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -312,20 +306,6 @@ create trigger cree_reglages after insert on public.bureaux
 drop trigger if exists maj_le on public.bureaux;
 create trigger maj_le before update on public.bureaux
   for each row execute function public.touche_maj_le();
-
--- -------------------------------------------- bureau n° 1 et super admin ---
-do $$
-declare
-  v_b uuid;
-begin
-  select id into v_b from public.bureaux order by cree_le, id limit 1;
-  if v_b is null then
-    insert into public.bureaux (nom) values ('Mon bureau') returning id into v_b;
-  end if;
-  insert into public.acces (email, bureau_id, super_admin)
-  values (lower(btrim(current_setting('planif.super_admin'))), v_b, true)
-  on conflict (email) do update set super_admin = true, actif = true;
-end $$;
 
 -- =========================================================== sécurité (RLS) ==
 -- On repart de zéro : les politiques existantes de ces tables sont retirées.
@@ -718,9 +698,13 @@ grant execute on function public.garde_creation_compte(jsonb) to supabase_auth_a
 
 commit;
 
--- L'API relit la forme des tables et des fonctions
+-- L'API relit la forme des tables et des fonctions, pour que tout soit visible tout de suite
 notify pgrst, 'reload schema';
 
--- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite)
---   écriture -> 401 « new row violates row-level security policy »
+-- Contrôle : bureaux, accès, super admin
+select
+  (select count(*) from public.bureaux)                         as bureaux,
+  (select count(*) from public.acces)                           as acces,
+  (select string_agg(email, ', ') from public.acces where super_admin) as super_admin,
+  (select count(*) from public.membres  where bureau_id is null) as membres_sans_bureau,
+  (select count(*) from public.taches   where bureau_id is null) as taches_sans_bureau;

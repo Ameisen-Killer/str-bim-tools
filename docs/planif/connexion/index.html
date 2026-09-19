@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=30">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=31">
 <style>
   main.cx{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(24px,6vh,72px) var(--g)}
   .cx-boite{width:100%;max-width:430px}
@@ -22,14 +22,16 @@
   .cx-filet{height:1px;background:rgba(var(--or-rvb),.55);margin:26px 0 30px;transform:scaleX(0);transform-origin:left;animation:trace 1.6s cubic-bezier(.55,.05,.25,1) .25s forwards}
   @keyframes trace{to{transform:scaleX(1)}}
   .cx-champs{display:grid;gap:18px}
+  .cx-champs input[readonly]{color:var(--texte-doux);background:transparent}
   .cx-msg{margin-top:20px;border-left:2px solid var(--alerte);padding:10px 0 10px 14px;font-size:14px;color:var(--texte-doux)}
   .cx-msg.ok{border-left-color:var(--or)}
   .cx-actions{display:flex;flex-direction:column;gap:12px;margin-top:28px}
   .cx-actions .btn{justify-content:center;padding:13px 16px}
   .cx-bas{margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne);display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;
           font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
-  .cx-bas a,.cx-bas button{color:inherit;background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-decoration:none;transition:color .3s}
+  .cx-bas a,.cx-bas button{color:inherit;background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-decoration:none;text-align:left;transition:color .3s}
   .cx-bas a:hover,.cx-bas button:hover{color:var(--or)}
+  .cx-bas button[disabled]{opacity:.5;cursor:progress}
 </style>
 </head>
 <body>
@@ -46,7 +48,7 @@
           <label for="email">Adresse e-mail</label>
           <input type="email" id="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </div>
-        <div class="champ" id="bloc-mdp">
+        <div class="champ">
           <label for="mdp" id="label-mdp">Mot de passe</label>
           <input type="password" id="mdp" name="mdp" autocomplete="current-password" required>
           <div class="aide" id="aide-mdp" hidden>Six caractères au minimum.</div>
@@ -61,15 +63,14 @@
     </form>
 
     <div class="cx-bas">
-      <button type="button" id="bascule">Créer un compte</button>
-      <button type="button" id="oubli">Mot de passe oublié</button>
+      <button type="button" id="oubli">Mot de passe oublié ou première connexion</button>
       <a href="/">str-bim-tools.com</a>
     </div>
   </div>
 </main>
 
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=7"></script>
+<script src="/planif/assets/supabase.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -91,15 +92,17 @@
   var email = document.getElementById("email");
   var mdp = document.getElementById("mdp");
   var valider = document.getElementById("valider");
-  var bascule = document.getElementById("bascule");
   var oubli = document.getElementById("oubli");
   var boiteMsg = document.getElementById("message");
   var titre = document.getElementById("titre");
   var labelMdp = document.getElementById("label-mdp");
   var aideMdp = document.getElementById("aide-mdp");
 
-  var mode = "connexion";            // connexion | inscription | nouveau
-  var jetonRecuperation = null;
+  var mode = "connexion";            // connexion | nouveau (mot de passe à choisir depuis un lien)
+  /* Lien reçu par courriel : { jeton, type } tant que le jeton n'a pas servi,
+     puis { jetons } (session ouverte), pour qu'un mot de passe refusé puisse
+     être corrigé sans redemander de lien. */
+  var lien = null;
 
   function dis(texte, bon) {
     boiteMsg.textContent = texte;
@@ -107,77 +110,81 @@
     boiteMsg.hidden = !texte;
   }
 
+  var OUBLI = "« Mot de passe oublié ou première connexion »";
+
+  function messageLien(code, texte) {
+    if (code === "otp_expired" || /expired|invalid/i.test(texte || "")) {
+      return "Ce lien a expiré ou a déjà servi. Saisis ton adresse, puis " + OUBLI + " pour en recevoir un nouveau.";
+    }
+    return "Lien refusé : " + texte;
+  }
+
+  function passeEn(m) {
+    mode = m;
+    var nouveau = m === "nouveau";
+    titre.textContent = nouveau ? "Nouveau mot de passe" : "Connexion";
+    valider.textContent = nouveau ? "Enregistrer et entrer" : "Se connecter";
+    labelMdp.textContent = nouveau ? "Mot de passe à choisir" : "Mot de passe";
+    mdp.autocomplete = nouveau ? "new-password" : "current-password";
+    aideMdp.hidden = !nouveau;
+    // Le lien suffit à reconnaître la personne : l'adresse n'est pas redemandée
+    email.readOnly = nouveau;
+    email.parentNode.hidden = nouveau && !email.value;
+    oubli.hidden = nouveau;
+    mdp.value = "";
+  }
+
   if (p.get("motif")) dis(p.get("motif"));
   if (!window.Sb || !window.Sb.configure) {
     dis("Aucune base n'est configurée : l'outil fonctionne en mode local, sans connexion.");
     valider.disabled = true;
+    oubli.disabled = true;
   }
 
-  /* --- retour d'un courriel de réinitialisation : le jeton arrive dans le # --- */
-  (function recuperation() {
+  /* --- retour d'un lien reçu par courriel ---
+     Deux formes. #jeton=…&type=… : modèles de courriels de l'outil ; placé
+     après le #, le jeton n'est jamais envoyé au serveur du site, et il n'est
+     échangé qu'à la validation du mot de passe, jamais à l'ouverture de la
+     page (un antivirus qui visite les liens à l'avance ne le grille pas).
+     #access_token=… : modèles d'origine de Supabase ; la session est déjà ouverte. */
+  (function retourDeLien() {
     var h = new URLSearchParams(location.hash.replace(/^#/, ""));
-    if (h.get("type") === "recovery" && h.get("access_token")) {
-      jetonRecuperation = h.get("access_token");
-      history.replaceState(null, "", location.pathname);
+    var type = h.get("type") || p.get("type") || "";
+    var jeton = h.get("jeton") || p.get("jeton");
+    var refus = h.get("error_description") || p.get("error_description") || h.get("error") || p.get("error");
+
+    if (jeton) {
+      lien = { jeton: jeton, type: type };
+    } else if (h.get("access_token") && /^(recovery|signup|magiclink|invite)$/.test(type)) {
+      lien = { jetons: { access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: h.get("expires_in") } };
+    } else if (refus) {
+      dis(messageLien(h.get("error_code") || p.get("error_code"), refus));
+    }
+    if (lien || refus) history.replaceState(null, "", location.pathname);   // le jeton ne reste ni dans l'historique ni à l'écran
+
+    if (lien) {
       passeEn("nouveau");
-      dis("Choisis ton nouveau mot de passe.", true);
-    } else if (h.get("error_description")) {
-      dis(h.get("error_description"));
-      history.replaceState(null, "", location.pathname);
+      var bienvenue = type === "signup" || type === "invite";
+      if (bienvenue) titre.textContent = "Bienvenue";
+      dis(bienvenue ? "Choisis ton mot de passe pour activer ton accès." : "Choisis ton nouveau mot de passe.", true);
     }
   })();
 
-  function passeEn(m) {
-    mode = m;
-    if (m === "connexion") {
-      titre.textContent = "Connexion";
-      valider.textContent = "Se connecter";
-      labelMdp.textContent = "Mot de passe";
-      mdp.autocomplete = "current-password";
-      aideMdp.hidden = true;
-      bascule.textContent = "Créer un compte";
-      email.parentNode.hidden = false;
-      oubli.hidden = false;
-    } else if (m === "inscription") {
-      titre.textContent = "Créer un compte";
-      valider.textContent = "Créer mon compte";
-      labelMdp.textContent = "Mot de passe à choisir";
-      mdp.autocomplete = "new-password";
-      aideMdp.hidden = false;
-      bascule.textContent = "J'ai déjà un compte";
-      email.parentNode.hidden = false;
-      oubli.hidden = false;
-    } else {
-      titre.textContent = "Nouveau mot de passe";
-      valider.textContent = "Enregistrer le mot de passe";
-      labelMdp.textContent = "Nouveau mot de passe";
-      mdp.autocomplete = "new-password";
-      aideMdp.hidden = false;
-      email.parentNode.hidden = true;
-      bascule.hidden = true;
-      oubli.hidden = true;
-    }
-    mdp.value = "";
-  }
-
-  bascule.addEventListener("click", function () {
-    dis("");
-    passeEn(mode === "connexion" ? "inscription" : "connexion");
-    (mode === "inscription" ? email : email).focus();
-  });
-
+  /* --- lien par courriel : premier accès, ou mot de passe oublié ---
+     Même demande dans les deux cas : le compte est créé s'il n'existe pas
+     encore (pour une adresse inscrite dans la liste des accès). */
   oubli.addEventListener("click", function () {
     var adresse = email.value.trim();
     if (!adresse) { dis("Saisis d'abord ton adresse, puis redemande un lien."); email.focus(); return; }
     oubli.disabled = true;
-    fetch(window.PLANIF_CONFIG.supabase.url + "/auth/v1/recover", {
-      method: "POST",
-      headers: { apikey: window.PLANIF_CONFIG.supabase.cle, "Content-Type": "application/json" },
-      body: JSON.stringify({ email: adresse, redirect_to: location.origin + "/planif/connexion/" })
-    }).then(function () {
-      dis("Si un compte existe pour cette adresse, un lien vient d'être envoyé.", true);
-    }).catch(function () {
-      dis("Envoi impossible pour l'instant.");
+    window.Sb.envoieLien(adresse).then(function () {
+      dis("Lien envoyé à " + adresse + " : ouvre-le pour choisir ton mot de passe. Rien reçu d'ici quelques minutes ? Regarde dans les indésirables.", true);
+    }).catch(function (err) {
+      var m = err.message || "";
+      dis(/non autoris/i.test(m) ? "Cette adresse n'est pas autorisée : demande l'accès à l'administrateur de l'outil."
+        : /création de comptes est fermée/i.test(m) ? "Ton accès n'est pas encore ouvert : contacte l'administrateur de l'outil."
+        : err.reseau || /patiente|limite|trop de tentatives/i.test(m) ? m
+        : "Envoi impossible pour l'instant : réessaie dans quelques minutes.");
     }).then(function () { oubli.disabled = false; });
   });
 
@@ -186,21 +193,19 @@
     dis("");
     var adresse = email.value.trim(), secret = mdp.value;
 
-    if (mode !== "nouveau") {
+    if (mode === "connexion") {
       if (!adresse) { dis("L'adresse e-mail est obligatoire."); return email.focus(); }
       if (!secret) { dis("Le mot de passe est obligatoire."); return mdp.focus(); }
-    }
-    if (mode !== "connexion" && secret.length < 6) {
+    } else if (secret.length < 6) {
       dis("Mot de passe trop court : six caractères au minimum."); return mdp.focus();
     }
 
     valider.disabled = true;
-    var libelle = valider.textContent;
     valider.textContent = "…";
 
     function fini(msg) {
       valider.disabled = false;
-      valider.textContent = libelle;
+      valider.textContent = mode === "nouveau" ? "Enregistrer et entrer" : "Se connecter";
       if (msg) dis(msg);
     }
 
@@ -208,39 +213,24 @@
       window.Sb.connexion(adresse, secret)
         .then(function () { location.replace(retour); })
         .catch(function (err) { fini(err.message); });
-
-    } else if (mode === "inscription") {
-      window.Sb.inscription(adresse, secret)
-        .then(function (r) {
-          if (r.confirmation) {
-            fini("");
-            passeEn("connexion");
-            dis("Compte créé. Ouvre le courriel de confirmation, puis reviens te connecter.", true);
-          } else {
-            location.replace(retour);
-          }
-        })
-        .catch(function (err) { fini(err.message); });
-
-    } else {
-      fetch(window.PLANIF_CONFIG.supabase.url + "/auth/v1/user", {
-        method: "PUT",
-        headers: {
-          apikey: window.PLANIF_CONFIG.supabase.cle,
-          Authorization: "Bearer " + jetonRecuperation,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ password: secret })
-      }).then(function (r) {
-        if (!r.ok) throw new Error("Lien expiré : redemande un courriel de réinitialisation.");
-        fini("");
-        passeEn("connexion");
-        dis("Mot de passe enregistré. Connecte-toi.", true);
-      }).catch(function (err) { fini(err.message); });
+      return;
     }
+
+    // Le jeton du lien ne sert qu'une fois : la session obtenue est gardée pour les essais suivants
+    var jetons = lien.jetons ? Promise.resolve(lien.jetons)
+      : window.Sb.verifieLien(lien.jeton, lien.type).then(function (j) { lien = { jetons: j }; return j; }, function (err) {
+          if (err.reseau) throw err;                     // panne réseau : le lien reste bon, on pourra réessayer
+          lien = null;
+          passeEn("connexion");
+          throw new Error(messageLien("otp_expired", ""));
+        });
+    jetons
+      .then(function (j) { return window.Sb.choisitMotDePasse(j, secret); })
+      .then(function () { location.replace("/planif/"); })
+      .catch(function (err) { fini(err.message); });
   });
 
-  email.focus();
+  (mode === "nouveau" ? mdp : email).focus();
 })();
 </script>
 </body>

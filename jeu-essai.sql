@@ -15,12 +15,14 @@
 --    - statuts : à faire, en cours, en attente, terminé ;
 --    - affaires active, suspendue, terminée ; un membre inactif ;
 --    - tâches ingénieur seul, dessin seul, et mixtes ;
---    - les huit teintes d'affaire.
+--    - les huit teintes d'affaire ;
+--    - des succursales et disciplines propres au bureau.
 --
---  Marquage, pour pouvoir tout retirer d'un coup (purge-jeu-essai.sql) :
---    - membres : adresse en @essai.exemple.ch
---    - affaires : note contenant [jeu d'essai]
---  Les données réelles déjà saisies ne sont jamais touchées.
+--  Tout va dans un bureau à part, « Bureau d'essai (fictif) » : les bureaux
+--  réels ne sont jamais touchés. Pour le voir, le super admin le choisit dans
+--  le menu des bureaux, en haut du planning (ou « Ouvrir » dans la console).
+--  Retrait complet, bureau compris : purge-jeu-essai.sql.
+--  Nécessite la migration multi-bureaux (migration-multi-bureaux.sql).
 -- ============================================================================
 
 begin;
@@ -28,25 +30,43 @@ begin;
 -- Garde-fou : pas de doublon si le script est relancé
 do $$
 begin
-  if exists (select 1 from public.membres where email like '%@essai.exemple.ch') then
+  if exists (select 1 from public.bureaux where id = 'e55a1000-0000-4000-8000-000000000001')
+     or exists (select 1 from public.membres where email like '%@essai.exemple.ch') then
     raise exception 'Le jeu d''essai est déjà présent. Lancer d''abord purge-jeu-essai.sql.';
   end if;
 end $$;
 
+-- ------------------------------------------------------------------- bureau
+insert into public.bureaux (id, nom) values ('e55a1000-0000-4000-8000-000000000001', 'Bureau d''essai (fictif)');
+
+-- Toutes les lignes insérées ci-dessous rejoignent ce bureau (valeur par défaut de bureau_id)
+select set_config('planif.bureau', 'e55a1000-0000-4000-8000-000000000001', true);
+
+insert into public.succursales (bureau_id, code, nom, ordre) values
+  (current_setting('planif.bureau')::uuid, 'lausanne', 'Lausanne', 1),
+  (current_setting('planif.bureau')::uuid, 'fribourg', 'Fribourg', 2);
+insert into public.disciplines (bureau_id, code, nom, ordre) values
+  (current_setting('planif.bureau')::uuid, 'structure',   'Structure',   1),
+  (current_setting('planif.bureau')::uuid, 'genie_civil', 'Génie civil', 2);
+insert into public.succursale_disciplines (bureau_id, succursale, discipline) values
+  (current_setting('planif.bureau')::uuid, 'lausanne', 'structure'),
+  (current_setting('planif.bureau')::uuid, 'lausanne', 'genie_civil'),
+  (current_setting('planif.bureau')::uuid, 'fribourg', 'structure');
+
 -- ------------------------------------------------------------------ membres
-insert into public.membres (prenom, nom, email, role, capacite, actif) values
-  ('Anne',   'Rochat',      'anne.rochat@essai.exemple.ch',       'ingenieur',   5, true),
-  ('Julien', 'Pittet',      'julien.pittet@essai.exemple.ch',     'ingenieur',   5, true),
-  ('Sara',   'Meylan',      'sara.meylan@essai.exemple.ch',       'ingenieur',   4, true),
-  ('David',  'Cuendet',     'david.cuendet@essai.exemple.ch',     'ingenieur',   5, true),
-  ('Nora',   'Baeriswyl',   'nora.baeriswyl@essai.exemple.ch',    'ingenieur',   3, true),
-  ('Kevin',  'Monnier',     'kevin.monnier@essai.exemple.ch',     'dessinateur', 5, true),
-  ('Lucie',  'Jaquier',     'lucie.jaquier@essai.exemple.ch',     'dessinateur', 5, true),
-  ('Tiago',  'Ferreira',    'tiago.ferreira@essai.exemple.ch',    'dessinateur', 5, true),
-  ('Inès',   'Bovet',       'ines.bovet@essai.exemple.ch',        'dessinateur', 4, true),
-  ('Marco',  'Gianoli',     'marco.gianoli@essai.exemple.ch',     'dessinateur', 5, true),
-  ('Emma',   'Chappuis',    'emma.chappuis@essai.exemple.ch',     'dessinateur', 5, true),
-  ('Loris',  'Vuilleumier', 'loris.vuilleumier@essai.exemple.ch', 'dessinateur', 5, false);
+insert into public.membres (prenom, nom, email, role, capacite, actif, succursale, discipline) values
+  ('Anne',   'Rochat',      'anne.rochat@essai.exemple.ch',       'ingenieur',   5, true,  'lausanne', 'structure'),
+  ('Julien', 'Pittet',      'julien.pittet@essai.exemple.ch',     'ingenieur',   5, true,  'lausanne', 'structure'),
+  ('Sara',   'Meylan',      'sara.meylan@essai.exemple.ch',       'ingenieur',   4, true,  'fribourg', 'structure'),
+  ('David',  'Cuendet',     'david.cuendet@essai.exemple.ch',     'ingenieur',   5, true,  'lausanne', 'genie_civil'),
+  ('Nora',   'Baeriswyl',   'nora.baeriswyl@essai.exemple.ch',    'ingenieur',   3, true,  'fribourg', 'structure'),
+  ('Kevin',  'Monnier',     'kevin.monnier@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'structure'),
+  ('Lucie',  'Jaquier',     'lucie.jaquier@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'structure'),
+  ('Tiago',  'Ferreira',    'tiago.ferreira@essai.exemple.ch',    'dessinateur', 5, true,  'lausanne', 'genie_civil'),
+  ('Inès',   'Bovet',       'ines.bovet@essai.exemple.ch',        'dessinateur', 4, true,  'fribourg', 'structure'),
+  ('Marco',  'Gianoli',     'marco.gianoli@essai.exemple.ch',     'dessinateur', 5, true,  'fribourg', 'structure'),
+  ('Emma',   'Chappuis',    'emma.chappuis@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'genie_civil'),
+  ('Loris',  'Vuilleumier', 'loris.vuilleumier@essai.exemple.ch', 'dessinateur', 5, false, 'lausanne', 'structure');
 
 -- ----------------------------------------------------------------- affaires
 insert into public.affaires (code, nom, note, teinte, statut, echeance)
@@ -66,7 +86,7 @@ from (values
   ('26-911', 'Immeuble mixte — expertise de dalle',              'Rapport rendu.',                            6, 'terminee', -30),
   ('26-912', 'Mur de soutènement — route communale',             'Mur en L, drainage.',                       7, 'active',    25)
 ) as v(code, nom, note, teinte, statut, dec)
-on conflict (code) do nothing;
+on conflict (bureau_id, code) do nothing;
 
 -- ------------------------------------------------------- équipes d'affaire
 insert into public.affaire_membres (affaire_id, membre_id)
@@ -85,8 +105,8 @@ from (values
   ('26-911','anne.rochat'), ('26-911','tiago.ferreira'),
   ('26-912','nora.baeriswyl'), ('26-912','kevin.monnier')
 ) as v(code, login)
-join public.affaires a on a.code = v.code and a.note like '[jeu d''essai]%'
-join public.membres  m on m.email = v.login || '@essai.exemple.ch';
+join public.affaires a on a.code = v.code and a.bureau_id = current_setting('planif.bureau')::uuid
+join public.membres  m on m.email = v.login || '@essai.exemple.ch' and m.bureau_id = a.bureau_id;
 
 -- ----------------------------------------------------------------- absences
 insert into public.absences (membre_id, debut, fin, motif)
@@ -99,7 +119,7 @@ from (values
   ('julien.pittet',  26, 37, 'Service militaire'),
   ('tiago.ferreira', 40, 49, 'Vacances')
 ) as v(login, d1, d2, motif)
-join public.membres m on m.email = v.login || '@essai.exemple.ch';
+join public.membres m on m.email = v.login || '@essai.exemple.ch' and m.bureau_id = current_setting('planif.bureau')::uuid;
 
 -- ------------------------------------------------------------------- tâches
 -- dec : décalage de l'échéance en jours depuis aujourd'hui, ramené au vendredi
@@ -186,9 +206,9 @@ from (values
   ('26-909', 'Plans de réservations des conduites',      0.0, 2.0, null,             'marco.gianoli',     8, 'a_faire',    0),
   ('26-912', 'Contrôle des plans de l''entreprise',      1.0, 0.0, 'david.cuendet',  null,               -3, 'en_cours',  60)
 ) as v(code, titre, ci, cd, ing, des, dec, statut, av)
-join public.affaires a on a.code = v.code and a.note like '[jeu d''essai]%'
-left join public.membres i on i.email = v.ing || '@essai.exemple.ch'
-left join public.membres d on d.email = v.des || '@essai.exemple.ch';
+join public.affaires a on a.code = v.code and a.bureau_id = current_setting('planif.bureau')::uuid
+left join public.membres i on i.email = v.ing || '@essai.exemple.ch' and i.bureau_id = a.bureau_id
+left join public.membres d on d.email = v.des || '@essai.exemple.ch' and d.bureau_id = a.bureau_id;
 
 commit;
 

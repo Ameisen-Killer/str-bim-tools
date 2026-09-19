@@ -71,22 +71,48 @@
     }).filter(function (g) { return g.membres.length; });
   }
 
-  var SUCCURSALES = { geneve: "Genève", lausanne: "Lausanne", nyon: "Nyon" };
-  var DISCIPLINES = {
-    administrateurs: "Administrateurs",
-    structure: "Structure et ouvrages d'art",
-    geotechnique: "Géotechnique / travaux spéciaux",
-    environnement: "Environnement et développement durable",
-    investigation: "Investigation géotechnique",
-    genie_civil: "Génie civil et infrastructures",
-    administration: "Administration"
+  /* Succursales et disciplines : propres à chaque bureau, elles arrivent avec le
+     profil (base multi-bureaux). Les pages lisent ces trois objets directement :
+     ils sont remplis sur place, jamais remplacés. Les codes commencent par une
+     lettre, sinon l'ordre des clés d'un objet JavaScript ne serait plus celui de la liste. */
+  var SUCCURSALES = {}, DISCIPLINES = {}, DISCIPLINES_PAR_SUCCURSALE = {};
+
+  // Listes d'origine : mode local, et base qui n'est pas encore passée en multi-bureaux
+  var LISTES_ORIGINE = {
+    disciplines: [
+      { code: "administrateurs", nom: "Administrateurs" },
+      { code: "structure", nom: "Structure et ouvrages d'art" },
+      { code: "geotechnique", nom: "Géotechnique / travaux spéciaux" },
+      { code: "environnement", nom: "Environnement et développement durable" },
+      { code: "investigation", nom: "Investigation géotechnique" },
+      { code: "genie_civil", nom: "Génie civil et infrastructures" },
+      { code: "administration", nom: "Administration" }
+    ],
+    // Disciplines présentes dans chaque succursale, dans l'ordre de la liste téléphonique
+    succursales: [
+      { code: "geneve", nom: "Genève", disciplines: ["administrateurs", "structure", "geotechnique", "environnement", "investigation", "genie_civil", "administration"] },
+      { code: "lausanne", nom: "Lausanne", disciplines: ["administrateurs", "structure"] },
+      { code: "nyon", nom: "Nyon", disciplines: ["structure"] }
+    ]
   };
-  // Disciplines présentes dans chaque succursale, dans l'ordre de la liste téléphonique
-  var DISCIPLINES_PAR_SUCCURSALE = {
-    geneve: ["administrateurs", "structure", "geotechnique", "environnement", "investigation", "genie_civil", "administration"],
-    lausanne: ["administrateurs", "structure"],
-    nyon: ["structure"]
-  };
+
+  function poseListes(l) {
+    [SUCCURSALES, DISCIPLINES, DISCIPLINES_PAR_SUCCURSALE].forEach(function (o) {
+      Object.keys(o).forEach(function (k) { delete o[k]; });
+    });
+    (l.disciplines || []).forEach(function (d) { DISCIPLINES[d.code] = d.nom; });
+    (l.succursales || []).forEach(function (s) {
+      SUCCURSALES[s.code] = s.nom;
+      DISCIPLINES_PAR_SUCCURSALE[s.code] = (s.disciplines || []).filter(function (c) { return DISCIPLINES[c]; });
+    });
+  }
+  poseListes(LISTES_ORIGINE);
+
+  /** Disciplines proposées pour une succursale : les siennes, ou toutes si aucune n'y est rattachée. */
+  function disciplinesDe(succursale) {
+    var l = succursale && DISCIPLINES_PAR_SUCCURSALE[succursale];
+    return l && l.length ? l.slice() : Object.keys(DISCIPLINES);
+  }
   var STATUTS_TACHE = {
     a_faire: "À faire", en_cours: "En cours", attente: "En attente", termine: "Terminé"
   };
@@ -130,6 +156,44 @@
   var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
   var abonnes = [], rechargements = [];
   var chargement = null;
+
+  /* ---------------------------------------------------------------- profil
+     Qui est connecté, dans quel bureau, avec quels droits. Sans base
+     multi-bureaux (mode local, ou migration pas encore exécutée) : un seul
+     bureau, et tous les droits, comme avant. */
+
+  var profil = null, profilEnCours = null;
+
+  // Les messages commencent par « Accès refusé » : UI.echec déconnecte et renvoie à la connexion
+  var REFUS = {
+    inconnu: "Accès refusé : ton adresse n'est pas autorisée. Demande l'accès à l'administrateur de l'outil.",
+    suspendu: "Accès refusé : ton accès est suspendu.",
+    bureau_suspendu: "Accès refusé : ton bureau est suspendu.",
+    sans_bureau: "Accès refusé : ton adresse n'est rattachée à aucun bureau."
+  };
+
+  /** forcer : relit le profil (la console, après avoir créé ou renommé un bureau). */
+  function chargeProfil(forcer) {
+    if (profilEnCours && !forcer) return profilEnCours;
+    var lecture = ADAPTATEUR.profil ? ADAPTATEUR.profil() : Promise.resolve(null);
+    profilEnCours = lecture.then(function (brut) {
+      if (!brut) {
+        profil = { multi: false, superAdmin: false, peutTout: true, bureau: null, bureaux: [] };
+        return profil;
+      }
+      if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
+      profil = {
+        multi: true, email: brut.email || "", superAdmin: !!brut.superAdmin,
+        // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
+        peutTout: !!brut.superAdmin,
+        bureau: brut.bureau || null, bureaux: brut.bureaux || []
+      };
+      poseListes({ succursales: brut.succursales || [], disciplines: brut.disciplines || [] });
+      return profil;
+    });
+    profilEnCours.catch(function () { profilEnCours = null; });
+    return profilEnCours;
+  }
 
   function previens() { abonnes.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } }); }
 
@@ -279,12 +343,15 @@
    * courts, que PostgreSQL refuse. On les remplace par des UUID en reportant
    * la correspondance sur toutes les références, pour qu'une saisie faite en
    * local puisse être reversée telle quelle dans la base.
+   * tout : renouvelle aussi les UUID. Un fichier exporté d'un autre bureau
+   * porte les identifiants de lignes qui existent déjà là-bas : réécrits tels
+   * quels, la base les aurait refusés en plein import, après l'effacement.
    */
-  function renumerote(e) {
+  function renumerote(e, tout) {
     var vers = {};
     function neuf(ancien) {
       if (!ancien) return ancien;
-      if (RE_UUID.test(ancien)) return ancien;
+      if (!tout && RE_UUID.test(ancien)) return ancien;
       if (!vers[ancien]) vers[ancien] = id();
       return vers[ancien];
     }
@@ -334,7 +401,7 @@
     var succ = texte(o.succursale), disc = texte(o.discipline);
     if (succ && !SUCCURSALES[succ]) throw erreur("Succursale inconnue.");
     if (disc && !DISCIPLINES[disc]) throw erreur("Discipline inconnue.");
-    if (succ && disc && DISCIPLINES_PAR_SUCCURSALE[succ].indexOf(disc) < 0) {
+    if (succ && disc && disciplinesDe(succ).indexOf(disc) < 0) {
       throw erreur("La discipline « " + DISCIPLINES[disc] + " » n'existe pas à " + SUCCURSALES[succ] + ".");
     }
     var double = mail && etat.membres.some(function (m) { return m.id !== idExistant && m.email.toLowerCase() === mail; });
@@ -418,14 +485,23 @@
     SUCCURSALES: SUCCURSALES,
     DISCIPLINES: DISCIPLINES,
     DISCIPLINES_PAR_SUCCURSALE: DISCIPLINES_PAR_SUCCURSALE,
+    disciplinesDe: disciplinesDe,
     STATUTS_TACHE: STATUTS_TACHE,
     STATUTS_AFFAIRE: STATUTS_AFFAIRE,
     source: ADAPTATEUR.nom,
 
-    /** À appeler au chargement de chaque page. Renvoie l'état complet. */
+    /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
+    chargeProfil: chargeProfil,
+    profil: function () { return profil; },
+    /** Tout effacer, importer : réservés au super admin quand la base compte plusieurs bureaux. */
+    peutToutGerer: function () { return !profil || profil.peutTout; },
+
+    /** À appeler au chargement de chaque page. Renvoie l'état complet.
+     *  Le profil passe d'abord : ses listes servent à relire les membres. */
     pret: function () {
       if (chargement) return chargement;
-      chargement = ADAPTATEUR.lire().then(function (brut) {
+      chargement = Promise.all([chargeProfil(), ADAPTATEUR.lire()]).then(function (r) {
+        var brut = r[1];
         if (!brut && ADAPTATEUR.semeSiVide) {
           etat = demo();                        // première visite : jeu de démonstration
           precedent = null;
@@ -645,7 +721,7 @@
         if (!brut || typeof brut !== "object" || !("membres" in brut)) {
           throw erreur("Ce fichier ne ressemble pas à une sauvegarde de la planification.");
         }
-        etat = renumerote(normalise(brut));
+        etat = renumerote(normalise(brut), true);
         etat.reglages.demo = false;
         return sauve();
       });

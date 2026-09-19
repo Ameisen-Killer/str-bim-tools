@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=30">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=31">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Équipe</h1>
-    <p class="chapeau">Les membres des succursales, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge.</p>
+    <p class="chapeau">Les membres du bureau, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -45,10 +45,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=7"></script>
-<script src="/planif/assets/donnees.js?v=12"></script>
+<script src="/planif/assets/supabase.js?v=8"></script>
+<script src="/planif/assets/donnees.js?v=13"></script>
 <script src="/planif/assets/calculs.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=21"></script>
+<script src="/planif/assets/ui.js?v=22"></script>
 <script>
 (function () {
   "use strict";
@@ -97,7 +97,9 @@
     fa.value = filtres.affaire;
     fa.addEventListener("change", function () { filtres.affaire = fa.value; memorise(); dessine(); });
 
+    // Succursales et disciplines sont celles du bureau : un bureau qui n'en a pas n'affiche pas ces filtres
     var fs = document.getElementById("f-succursale");
+    fs.hidden = !Object.keys(D.SUCCURSALES).length;
     fs.appendChild(el("option", { value: "" }, ["Toutes les succursales"]));
     Object.keys(D.SUCCURSALES).forEach(function (k) {
       fs.appendChild(el("option", { value: k }, [D.SUCCURSALES[k]]));
@@ -110,6 +112,7 @@
     });
 
     var fd = document.getElementById("f-discipline");
+    fd.hidden = !Object.keys(D.DISCIPLINES).length;
     fd.addEventListener("change", function () { filtres.discipline = fd.value; memorise(); dessine(); });
     optionsDiscipline();
 
@@ -131,9 +134,7 @@
     fd.value = filtres.discipline;
   }
 
-  function disciplinesDe(succursale) {
-    return succursale ? D.DISCIPLINES_PAR_SUCCURSALE[succursale].slice() : Object.keys(D.DISCIPLINES);
-  }
+  function disciplinesDe(succursale) { return D.disciplinesDe(succursale); }
 
   /* ------------------------------------------------------------- affichage */
 
@@ -236,7 +237,8 @@
       corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
         el("td", {}, [
           el("div", { class: "principal" }, [UI.surligne(m.prenom + " " + m.nom, mots)]),
-          el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots) : "Succursale non renseignée"])
+          el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots)
+            : (Object.keys(D.SUCCURSALES).length ? "Succursale non renseignée" : "")])
         ]),
         el("td", {}, [choixRole(m)]),
         el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
@@ -303,16 +305,18 @@
   function formulaire(idMembre, roleDefaut) {
     var m = idMembre ? D.membre(idMembre) : null;
     var succ0 = m ? m.succursale : (filtres.succursale || "");
+    // Champs présents seulement si le bureau a des succursales, des disciplines
+    var avecSucc = Object.keys(D.SUCCURSALES).length > 0, avecDisc = Object.keys(D.DISCIPLINES).length > 0;
     var corps = el("div", { class: "grille-champs" }, [
       UI.champ({ nom: "prenom", label: "Prénom", valeur: m ? m.prenom : "", exemple: "Camille", autocomplete: "given-name" }),
       UI.champ({ nom: "nom", label: "Nom", valeur: m ? m.nom : "", exemple: "Berger", autocomplete: "family-name" }),
-      UI.champ({
+      avecSucc ? UI.champ({
         nom: "succursale", label: "Succursale", type: "select", valeur: succ0,
         options: [{ valeur: "", label: "Non renseignée" }].concat(Object.keys(D.SUCCURSALES).map(function (k) {
           return { valeur: k, label: D.SUCCURSALES[k] };
         }))
-      }),
-      UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] }),
+      }) : null,
+      avecDisc ? UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] }) : null,
       UI.champ({
         nom: "role", label: "Rôle", type: "select", valeur: m ? m.role : (roleDefaut || ""),
         options: optionsRole()
@@ -331,19 +335,21 @@
 
     // La liste des disciplines suit la succursale choisie
     var selSucc = corps.querySelector("[name=succursale]"), selDisc = corps.querySelector("[name=discipline]");
+    function succChoisie() { return selSucc ? selSucc.value : ""; }
     function remplitDisciplines(garde) {
+      if (!selDisc) return;
       UI.vide(selDisc);
       selDisc.appendChild(el("option", { value: "" }, ["Non renseignée"]));
-      disciplinesDe(selSucc.value).forEach(function (k) {
+      disciplinesDe(succChoisie()).forEach(function (k) {
         selDisc.appendChild(el("option", { value: k }, [D.DISCIPLINES[k]]));
       });
-      selDisc.value = disciplinesDe(selSucc.value).indexOf(garde) >= 0 ? garde : "";
+      selDisc.value = disciplinesDe(succChoisie()).indexOf(garde) >= 0 ? garde : "";
     }
     remplitDisciplines(m ? m.discipline : (filtres.discipline || ""));
-    // Une seule discipline possible (Nyon) : elle est choisie d'office
-    selSucc.addEventListener("change", function () {
-      var cles = disciplinesDe(selSucc.value);
-      remplitDisciplines(cles.length === 1 ? cles[0] : selDisc.value);
+    // Une seule discipline possible dans la succursale : elle est choisie d'office
+    if (selSucc) selSucc.addEventListener("change", function () {
+      var cles = disciplinesDe(succChoisie());
+      remplitDisciplines(cles.length === 1 ? cles[0] : (selDisc ? selDisc.value : ""));
     });
 
     UI.ouvre({

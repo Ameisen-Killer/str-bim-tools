@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Console · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<script>
+/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
+(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=31">
+<style>
+  /* Propre à la console : lignes suspendues, listes éditables du formulaire de bureau */
+  table.liste tr.suspendu td{opacity:.55}
+  table.liste tr.suspendu td.actions{opacity:1}
+  .principal .etiq{margin-left:10px;vertical-align:2px}
+  .lien-nombre{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:var(--ligne);text-underline-offset:4px;transition:color .25s}
+  .lien-nombre:hover{color:var(--or);text-decoration-color:currentColor}
+  .acces-etat{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--texte-doux)}
+  .acces-etat.alerte{color:var(--alerte)}
+  .acces-etat.attente{color:var(--texte-faible)}
+
+  .liste-edit{display:grid;gap:8px}
+  .ligne-edit{display:flex;align-items:center;gap:10px}
+  .ligne-edit input[type=text],table.matrice input[type=text]{
+    flex:1 1 auto;min-width:0;width:100%;
+    font-family:var(--sans);font-weight:300;font-size:15px;color:var(--texte);
+    background:rgba(var(--encre),.03);border:1px solid var(--ligne);border-radius:0;padding:7px 10px;height:36px;
+    transition:border-color .25s,background .25s;
+  }
+  .ligne-edit input[type=text]:focus,table.matrice input[type=text]:focus{outline:none;border-color:var(--or-doux);background:rgba(var(--encre),.05)}
+  .ligne-edit .meta,table.matrice .meta{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--texte-faible);white-space:nowrap}
+  .ajout-ligne{margin-top:10px}
+  .matrice-defile{overflow-x:auto;scrollbar-width:thin}
+  table.matrice{border-collapse:collapse;width:100%}
+  table.matrice th{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible);
+    font-weight:400;text-align:center;padding:0 8px 8px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;
+  }
+  table.matrice th:first-child{text-align:left;padding-left:0}
+  table.matrice td{padding:4px 8px;border-top:1px solid var(--ligne-faible);text-align:center;vertical-align:middle}
+  table.matrice td:first-child{padding-left:0;text-align:left;width:100%;min-width:180px}
+  table.matrice td:last-child{padding-right:0}
+  table.matrice input[type=checkbox]{accent-color:var(--or);width:18px;height:18px;margin:0;cursor:pointer}
+  .compacte fieldset > p.aide{margin-top:8px;font-size:12.5px;color:var(--texte-faible);line-height:1.45}
+  .compacte fieldset > p.aide + *{margin-top:12px}
+  .perte{margin-top:18px;border-left:2px solid var(--alerte);padding:8px 0 8px 12px;font-size:13.5px;color:var(--texte-doux)}
+  .al.fait{border-left-color:rgba(159,184,163,.9)}
+  .al a{color:var(--or);text-underline-offset:3px}
+  .al code{font-family:var(--mono);font-size:12.5px;color:var(--texte)}
+  @media (max-width:640px){
+    .ligne-edit input[type=text],table.matrice input[type=text]{font-size:16px;height:44px}
+    .ligne-edit .meta{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification · super admin</div>
+    <h1>Console</h1>
+    <p class="chapeau">Les bureaux d'études et les adresses autorisées à s'y connecter. Chaque utilisateur ne voit que les données de son bureau ; toi, tu passes de l'un à l'autre par le menu du bureau, en haut de page.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" id="console"></div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=4"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=8"></script>
+<script src="/planif/assets/donnees.js?v=13"></script>
+<script src="/planif/assets/ui.js?v=22"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, SB = window.Sb, el = UI.el;
+
+  var etat = null;            // réponse de console_etat : { moi, bureaux, utilisateurs }
+  var auth = null;            // réglages publics de Supabase Auth (inscriptions, confirmation)
+  var barre = null;           // recherche des utilisateurs
+  var filtreBureau = "";
+  var hotes = {};             // conteneurs, remplis à chaque rafraîchissement
+  var suivi = UI.suiviApparitions();
+  var RE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var zone = document.getElementById("console");
+
+  if (!UI.session()) return;
+
+  if (!UI.avecBase) {
+    UI.pied();
+    document.querySelector(".entete").classList.add("vu");
+    return message("Sans base", "La console gère les bureaux de la base en ligne. Sans base configurée, l'outil fonctionne en mode local et n'a rien à gérer ici.");
+  }
+
+  D.chargeProfil().then(function (p) {
+    var admin = p.multi && p.superAdmin;
+    UI.chrome("console", admin ? actionsBarre() : []);
+    UI.pied();
+    document.querySelector(".entete").classList.add("vu");
+    if (!p.multi) {
+      return message("Migration à exécuter",
+        "La base n'est pas encore passée en multi-bureaux. Exécute migration-multi-bureaux.sql dans Supabase " +
+        "(SQL Editor > New query), après y avoir mis ton adresse, puis recharge cette page.");
+    }
+    if (!p.superAdmin) return message("Accès réservé", "La console est réservée au super admin de l'outil.");
+    construit();
+    return Promise.all([
+      recharge(),
+      SB.reglagesAuth().then(function (r) { auth = r; })
+    ]).then(rafraichit);
+  }).catch(UI.echec);
+
+  function actionsBarre() {
+    return [
+      { label: "Nouveau bureau", icone: "ico-ajout-bureau", action: function () { formulaireBureau(null); } },
+      { label: "Nouvel utilisateur", or: true, icone: "ico-ajout-membre", action: function () { formulaireUtilisateur(null); } }
+    ];
+  }
+
+  function message(titre, texte) {
+    UI.vide(zone).appendChild(el("section", { class: "section" }, [
+      el("div", { class: "carte" }, [
+        el("div", { class: "num-section", text: titre }),
+        el("p", { style: "margin-top:12px;color:var(--texte-doux);font-size:15px;max-width:52em", text: texte }),
+        el("a", { class: "btn", href: "/planif/", style: "margin-top:20px" }, ["Retour au planning"])
+      ])
+    ]));
+  }
+
+  /* ------------------------------------------------------------- données */
+
+  function recharge() {
+    return SB.rpc("console_etat").then(function (e) { etat = e; });
+  }
+
+  /* Après une écriture : l'état de la console, et le profil, dont la barre tire
+     la liste des bureaux et le nom du bureau affiché. */
+  function apresChangement() {
+    return Promise.all([recharge(), D.chargeProfil(true)]).then(function () {
+      UI.chrome("console", actionsBarre());
+      rafraichit();
+    });
+  }
+
+  function bureau(id) { return etat.bureaux.filter(function (b) { return b.id === id; })[0] || null; }
+  function nomBureau(id) { var b = bureau(id); return b ? b.nom : "—"; }
+  function utilisateursDe(id) { return etat.utilisateurs.filter(function (u) { return u.bureauId === id; }); }
+  function affiche(b) { var p = D.profil(); return !!(p && p.bureau && p.bureau.id === b.id); }
+  function nb(n, sing, plur) { return n + " " + (n > 1 ? plur : sing); }
+
+  function nomCanton(code) {
+    var c = C.CANTONS.filter(function (x) { return x.code === code; })[0];
+    return c ? "Fériés : " + c.nom : "";
+  }
+
+  /** « 19.09.2026 · 17:43 », à l'heure locale */
+  function quand(horodatage) {
+    var d = new Date(horodatage);
+    if (isNaN(d.getTime())) return "—";
+    var deux = function (n) { return (n < 10 ? "0" : "") + n; };
+    return C.fmtCH(C.iso(d)) + " · " + deux(d.getHours()) + ":" + deux(d.getMinutes());
+  }
+
+  /* ------------------------------------------------------------- squelette */
+
+  function construit() {
+    UI.vide(zone);
+
+    hotes.titreBureaux = el("h2");
+    hotes.bureaux = el("div", { class: "defile" });
+    zone.appendChild(el("section", { class: "section", id: "bureaux" }, [
+      el("div", { class: "tete-section" }, [
+        el("div", {}, [el("div", { class: "num-section", text: "01 — Bureaux" }), hotes.titreBureaux]),
+        el("div", { class: "outils" }, [
+          el("button", { class: "btn btn-or", type: "button", onclick: function () { formulaireBureau(null); } }, [
+            el("span", { class: "ico-txt ico-ajout-bureau", "aria-hidden": "true" }), "Nouveau bureau"
+          ])
+        ])
+      ]),
+      hotes.bureaux
+    ]));
+
+    hotes.titreUtilisateurs = el("h2");
+    hotes.recherche = el("div");
+    hotes.filtre = el("select", {
+      class: "btn", style: "text-transform:none;letter-spacing:.04em;max-width:320px", "aria-label": "Filtrer par bureau"
+    });
+    hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessineUtilisateurs(); });
+    hotes.utilisateurs = el("div", { class: "defile" });
+    zone.appendChild(el("section", { class: "section", id: "utilisateurs" }, [
+      el("div", { class: "tete-section" }, [
+        el("div", {}, [el("div", { class: "num-section", text: "02 — Utilisateurs" }), hotes.titreUtilisateurs]),
+        el("div", { class: "outils" }, [
+          el("button", { id: "btn-nouvelle", class: "btn btn-or", type: "button", onclick: function () { formulaireUtilisateur(null); } }, [
+            el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouvel utilisateur"
+          ])
+        ])
+      ]),
+      hotes.recherche,
+      el("div", { class: "plan-barre", style: "margin-top:-8px" }, [hotes.filtre]),
+      hotes.utilisateurs
+    ]));
+    barre = UI.recherche({
+      hote: hotes.recherche,
+      exemple: "Rechercher une adresse, un bureau…",
+      surSaisie: dessineUtilisateurs,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaireUtilisateur(l[0]); }
+    });
+
+    hotes.miseEnRoute = el("div");
+    zone.appendChild(el("section", { class: "section", id: "mise-en-route" }, [
+      el("div", { class: "tete-section" }, [
+        el("div", {}, [el("div", { class: "num-section", text: "03 — Mise en route" }), el("h2", { text: "Réglages Supabase" })])
+      ]),
+      hotes.miseEnRoute
+    ]));
+  }
+
+  function rafraichit() {
+    if (!etat) return;
+    dessineBureaux();
+    remplitFiltre();
+    dessineUtilisateurs();
+    dessineMiseEnRoute();
+  }
+
+  /* ----------------------------------------------------------------- bureaux */
+
+  function dessineBureaux() {
+    var liste = etat.bureaux;
+    hotes.titreBureaux.textContent = nb(liste.length, "bureau", "bureaux");
+    if (!liste.length) {
+      UI.vide(hotes.bureaux).appendChild(el("div", { class: "vide", text: "Aucun bureau" }));
+      return;
+    }
+    var corps = el("tbody");
+    liste.forEach(function (b) {
+      var nbU = utilisateursDe(b.id).length;
+      var details = [b.actif ? "" : "Suspendu", nomCanton(b.canton),
+        b.succursales.length ? nb(b.succursales.length, "succursale", "succursales") : ""].filter(Boolean).join(" · ");
+      corps.appendChild(el("tr", { class: b.actif ? "" : "suspendu" }, [
+        el("td", {}, [
+          el("div", { class: "principal" }, [b.nom, affiche(b) ? el("span", { class: "etiq ing", text: "Affiché" }) : null]),
+          el("div", { class: "secondaire", text: details })
+        ]),
+        el("td", { class: "num" }, [
+          nbU ? el("button", {
+            type: "button", class: "lien-nombre", title: "Voir ses utilisateurs",
+            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessineUtilisateurs(); document.getElementById("utilisateurs").scrollIntoView({ behavior: "smooth" }); }
+          }, [String(nbU)]) : "0"
+        ]),
+        el("td", { class: "num", text: String(b.membres) }),
+        el("td", { class: "num", text: String(b.affaires) }),
+        el("td", { class: "num", text: String(b.taches) }),
+        el("td", { class: "num", text: b.activite ? quand(b.activite) : "—" }),
+        el("td", { class: "actions" }, [
+          el("button", { class: "btn", type: "button", title: "Afficher ce bureau dans le planning", onclick: function () { ouvreBureau(b); } }, ["Ouvrir"]),
+          UI.boutonIcone("modifier", "Modifier", b.nom, function () { formulaireBureau(b); }),
+          UI.boutonIcone("supprimer", "Supprimer", b.nom, function () { supprimeBureau(b); })
+        ])
+      ]));
+    });
+    UI.vide(hotes.bureaux).appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, ["Bureau", "Utilisateurs", "Membres", "Affaires", "Tâches", "Dernière activité", ""].map(function (t) {
+        return el("th", { text: t });
+      }))]),
+      corps
+    ]));
+  }
+
+  function ouvreBureau(b) {
+    UI.toast("Ouverture du bureau « " + b.nom + " »…");
+    SB.rpc("choisit_bureau", { p_bureau: b.id })
+      .then(function () { location.href = "/planif/"; })
+      .catch(function (e) { UI.toast(e.message); });
+  }
+
+  /** Code stable d'une nouvelle succursale ou discipline, tiré de son nom : « Génie civil » → genie_civil. */
+  function codeLibre(nom, pris, prefixe) {
+    var base = String(nom || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 30);
+    if (!/^[a-z]/.test(base)) base = prefixe + (base ? "_" + base : "");
+    var code = base, n = 2;
+    while (pris[code]) code = base + "_" + n++;
+    return code;
+  }
+
+  function formulaireBureau(b) {
+    var nouveau = !b;
+    var compteur = 0;
+    function cle() { return "k" + (++compteur); }
+
+    // Copies de travail : rien ne part vers la base avant « Enregistrer »
+    var discs = (b ? b.disciplines : []).map(function (d) { return { cle: cle(), code: d.code, nom: d.nom, membres: d.membres || 0 }; });
+    var parCode = {};
+    discs.forEach(function (d) { parCode[d.code] = d; });
+    var succs = (b ? b.succursales : []).map(function (s) {
+      var avec = {};
+      (s.disciplines || []).forEach(function (c) { if (parCode[c]) avec[parCode[c].cle] = true; });
+      return { cle: cle(), code: s.code, nom: s.nom, membres: s.membres || 0, avec: avec };
+    });
+    var pertes = [];                                    // retraits qui touchent des membres
+
+    var champs = el("div", { class: "grille-champs" }, [
+      UI.champ({ nom: "nom", label: "Nom du bureau", valeur: b ? b.nom : "", exemple: "Bureau d'études Exemple SA", large: true }),
+      UI.champ({
+        nom: "actif", label: "Accès au bureau", type: "select", valeur: b ? String(b.actif) : "true",
+        options: [{ valeur: "true", label: "Ouvert" }, { valeur: "false", label: "Suspendu : ses utilisateurs n'entrent plus" }]
+      }),
+      UI.champ({
+        nom: "canton", label: "Jours fériés", type: "select", valeur: b ? b.canton : "VD",
+        options: C.CANTONS.map(function (c) { return { valeur: c.code, label: c.nom }; })
+      }),
+      UI.champ({
+        nom: "capaciteDefaut", label: "Capacité par défaut (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7",
+        inputmode: "decimal", valeur: b ? b.capaciteDefaut : 5
+      })
+    ]);
+
+    var zoneSucc = el("div"), zoneDisc = el("div"), zonePertes = el("div");
+
+    function texte(obj, exemple, apres) {
+      var i = el("input", { type: "text", value: obj.nom, placeholder: exemple, "aria-label": exemple, autocomplete: "off", spellcheck: "false" });
+      i.addEventListener("input", function () { obj.nom = i.value; if (apres) apres(); });
+      return i;
+    }
+    function membres(n) { return n ? el("span", { class: "meta", text: nb(n, "membre", "membres") }) : null; }
+
+    function retire(liste, obj, genre) {
+      liste.splice(liste.indexOf(obj), 1);
+      if (obj.code && obj.membres) {
+        pertes.push(obj.membres + (obj.membres > 1 ? " membres perdront leur " : " membre perdra sa ") + genre + " « " + obj.nom + " ».");
+      }
+      dessine();
+    }
+
+    function dessineSuccursales() {
+      var l = el("div", { class: "liste-edit" });
+      if (!succs.length) l.appendChild(el("p", { class: "aide", text: "Aucune succursale : le champ disparaît des fiches de l'équipe." }));
+      succs.forEach(function (s) {
+        l.appendChild(el("div", { class: "ligne-edit" }, [
+          texte(s, "Nom de la succursale", dessineDisciplines),
+          membres(s.membres),
+          UI.boutonIcone("supprimer", "Retirer", s.nom || "succursale", function () { retire(succs, s, "succursale"); })
+        ]));
+      });
+      UI.vide(zoneSucc).appendChild(l);
+      zoneSucc.appendChild(el("button", {
+        class: "btn btn-nu ajout-ligne", type: "button",
+        onclick: function () {
+          var s = { cle: cle(), code: "", nom: "", membres: 0, avec: {} };
+          discs.forEach(function (d) { s.avec[d.cle] = true; });
+          succs.push(s);
+          dessine();
+          var champsTexte = zoneSucc.querySelectorAll("input[type=text]");
+          champsTexte[champsTexte.length - 1].focus();
+        }
+      }, ["+ Ajouter une succursale"]));
+    }
+
+    function dessineDisciplines() {
+      var corps = el("tbody");
+      discs.forEach(function (d) {
+        corps.appendChild(el("tr", {}, [
+          el("td", {}, [el("div", { class: "ligne-edit" }, [texte(d, "Nom de la discipline"), membres(d.membres)])]),
+          succs.map(function (s) {
+            var c = el("input", { type: "checkbox", "aria-label": (d.nom || "Discipline") + " à " + (s.nom || "cette succursale") });
+            c.checked = !!s.avec[d.cle];
+            c.addEventListener("change", function () { s.avec[d.cle] = c.checked; });
+            return el("td", {}, [c]);
+          }),
+          el("td", {}, [UI.boutonIcone("supprimer", "Retirer", d.nom || "discipline", function () {
+            succs.forEach(function (s) { delete s.avec[d.cle]; });
+            retire(discs, d, "discipline");
+          })])
+        ].reduce(function (a, x) { return a.concat(x); }, [])));
+      });
+      var tete = el("tr", {}, [el("th", { text: succs.length ? "Discipline · présente à" : "Discipline" })]
+        .concat(succs.map(function (s) { return el("th", { text: s.nom || "…", title: s.nom }); }))
+        .concat([el("th", {})]));
+      UI.vide(zoneDisc);
+      if (!discs.length) {
+        zoneDisc.appendChild(el("p", { class: "aide", text: "Aucune discipline : le champ disparaît des fiches de l'équipe." }));
+      } else {
+        zoneDisc.appendChild(el("div", { class: "matrice-defile" }, [el("table", { class: "matrice" }, [el("thead", {}, [tete]), corps])]));
+      }
+      zoneDisc.appendChild(el("button", {
+        class: "btn btn-nu ajout-ligne", type: "button",
+        onclick: function () {
+          var d = { cle: cle(), code: "", nom: "", membres: 0 };
+          succs.forEach(function (s) { s.avec[d.cle] = true; });   // nouvelle discipline : présente partout
+          discs.push(d);
+          dessine();
+          var champsTexte = zoneDisc.querySelectorAll("input[type=text]");
+          champsTexte[champsTexte.length - 1].focus();
+        }
+      }, ["+ Ajouter une discipline"]));
+    }
+
+    function dessine() {
+      dessineSuccursales();
+      dessineDisciplines();
+      UI.vide(zonePertes);
+      if (pertes.length) {
+        zonePertes.appendChild(el("div", { class: "perte" }, ["À l'enregistrement : " + pertes.join(" ")]));
+      }
+    }
+
+    var corps = el("div", {}, [
+      champs,
+      el("fieldset", {}, [
+        el("div", { class: "legende", text: "Succursales" }),
+        el("p", { class: "aide", text: "Les sites du bureau. Chaque membre de l'équipe peut être rattaché à l'un d'eux." }),
+        zoneSucc
+      ]),
+      el("fieldset", {}, [
+        el("div", { class: "legende", text: "Disciplines" }),
+        el("p", { class: "aide", text: "Les départements du bureau, et les succursales où chacun existe. Une succursale sans aucune case cochée propose toutes les disciplines." }),
+        zoneDisc
+      ]),
+      zonePertes
+    ]);
+    dessine();
+
+    UI.ouvre({
+      surtitre: nouveau ? "Nouveau bureau" : "Modifier le bureau",
+      titre: nouveau ? "Bureau d'études" : b.nom,
+      corps: corps,
+      compacte: true,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: nouveau ? "Créer le bureau" : "Enregistrer", or: true, entree: true, action: function () {
+            var v = UI.lit(champs);
+            if (!String(v.nom || "").trim()) { UI.toast("Le nom du bureau est obligatoire."); return false; }
+            var vides = succs.concat(discs).some(function (o) { return !String(o.nom || "").trim(); });
+            if (vides) { UI.toast("Donne un nom à chaque succursale et à chaque discipline, ou retire les lignes vides."); return false; }
+            var doublon = function (l) {
+              var vus = {};
+              return l.some(function (o) { var k = o.nom.trim().toLowerCase(); if (vus[k]) return true; vus[k] = true; return false; });
+            };
+            if (doublon(succs) || doublon(discs)) { UI.toast("Deux succursales, ou deux disciplines, portent le même nom."); return false; }
+
+            // Codes des nouvelles lignes, tirés de leur nom et uniques dans le bureau
+            var prisD = {}, prisS = {};
+            discs.forEach(function (d) { if (d.code) prisD[d.code] = true; });
+            succs.forEach(function (s) { if (s.code) prisS[s.code] = true; });
+            discs.forEach(function (d) { if (!d.code) { d.code = codeLibre(d.nom, prisD, "d"); prisD[d.code] = true; } });
+            succs.forEach(function (s) { if (!s.code) { s.code = codeLibre(s.nom, prisS, "s"); prisS[s.code] = true; } });
+
+            var donnees = {
+              id: b ? b.id : null,
+              nom: v.nom.trim(),
+              actif: v.actif === "true",
+              canton: v.canton,
+              capaciteDefaut: parseFloat(String(v.capaciteDefaut).replace(",", ".")) || 5,
+              disciplines: discs.map(function (d) { return { code: d.code, nom: d.nom.trim() }; }),
+              succursales: succs.map(function (s) {
+                return {
+                  code: s.code, nom: s.nom.trim(),
+                  disciplines: discs.filter(function (d) { return s.avec[d.cle]; }).map(function (d) { return d.code; })
+                };
+              })
+            };
+            return SB.rpc("console_enregistre_bureau", { p: donnees }).then(function () {
+              UI.toast(nouveau ? "Bureau « " + donnees.nom + " » créé." : "Bureau enregistré.");
+              return apresChangement();
+            }).catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function supprimeBureau(b) {
+    var siens = utilisateursDe(b.id);
+    if (siens.some(function (u) { return u.superAdmin; })) {
+      return UI.toast("Tu es rattaché à ce bureau : rattache-toi d'abord à un autre (Utilisateurs, ton adresse, Modifier).");
+    }
+    var corps = el("div", {}, [
+      el("p", {
+        style: "color:var(--texte-doux);font-size:15px;max-width:46em;margin-bottom:20px",
+        text: "Le bureau « " + b.nom + " » sera supprimé avec tout son contenu : " +
+          nb(b.membres, "membre", "membres") + ", " + nb(b.affaires, "affaire", "affaires") + ", " + nb(b.taches, "tâche", "tâches") +
+          ", leurs absences, ses succursales, ses disciplines et ses réglages. " +
+          (siens.length ? nb(siens.length, "utilisateur perdra son accès", "utilisateurs perdront leur accès") + ". " : "") +
+          "Cette action est définitive : exporte d'abord ses données (Ouvrir, puis Données > Exporter) si tu veux en garder une copie."
+      }),
+      el("div", { class: "grille-champs" }, [
+        UI.champ({ nom: "confirmation", label: "Pour confirmer, tape le nom du bureau", exemple: b.nom, large: true })
+      ])
+    ]);
+    UI.ouvre({
+      surtitre: "Supprimer un bureau",
+      titre: b.nom,
+      corps: corps,
+      compacte: true,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Supprimer définitivement", rouge: true, action: function () {
+            var saisi = corps.querySelector("[name=confirmation]").value.trim().toLowerCase();
+            if (saisi !== b.nom.trim().toLowerCase()) {
+              UI.toast("Le nom tapé ne correspond pas : rien n'a été supprimé.");
+              return false;
+            }
+            var etaitAffiche = affiche(b);
+            return SB.rpc("console_supprime_bureau", { p_bureau: b.id }).then(function () {
+              UI.toast("Bureau « " + b.nom + " » supprimé.");
+              if (etaitAffiche) filtreBureau = "";
+              return apresChangement();
+            }).catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  /* ------------------------------------------------------------ utilisateurs */
+
+  function remplitFiltre() {
+    var f = UI.vide(hotes.filtre);
+    f.appendChild(el("option", { value: "" }, ["Tous les bureaux"]));
+    etat.bureaux.forEach(function (b) { f.appendChild(el("option", { value: b.id }, [b.nom])); });
+    if (!bureau(filtreBureau)) filtreBureau = "";
+    f.value = filtreBureau;
+  }
+
+  /** Où en est la personne : du simple accès inscrit à la dernière connexion. */
+  function situation(u) {
+    if (!u.actif) return { texte: "Accès suspendu", classe: "alerte" };
+    if (u.derniereConnexion) return { texte: "Dernière connexion : " + quand(u.derniereConnexion), classe: "" };
+    if (u.confirme) return { texte: "Compte activé, jamais connecté", classe: "attente" };
+    if (u.compte) return { texte: "Lien envoyé, pas encore ouvert", classe: "attente" };
+    return { texte: "Pas encore de compte : envoie-lui le lien", classe: "attente" };
+  }
+
+  function champsCherches(u) {
+    return [u.email, nomBureau(u.bureauId), situation(u).texte, u.superAdmin ? "super admin" : ""];
+  }
+
+  function selection(sansTexte) {
+    var mots = sansTexte || !barre ? [] : barre.termes();
+    return etat.utilisateurs.filter(function (u) {
+      if (filtreBureau && u.bureauId !== filtreBureau) return false;
+      return UI.correspond(champsCherches(u), mots);
+    });
+  }
+
+  function dessineUtilisateurs() {
+    if (!etat) return;
+    suivi.debut();
+    var liste = selection(), mots = barre ? barre.termes() : [];
+    hotes.titreUtilisateurs.textContent = nb(etat.utilisateurs.length, "utilisateur", "utilisateurs");
+    if (barre) barre.compte(liste.length, selection(true).length);
+    UI.vide(hotes.utilisateurs);
+    if (!liste.length) {
+      hotes.utilisateurs.appendChild(el("div", { class: "vide", text: filtreBureau || mots.length ? "Aucun utilisateur pour cette recherche" : "Aucun utilisateur" }));
+      return;
+    }
+    var corps = el("tbody");
+    liste.forEach(function (u) {
+      var s = situation(u);
+      corps.appendChild(suivi.marque(el("tr", { class: u.actif ? "" : "suspendu" }, [
+        el("td", {}, [
+          el("div", { class: "principal" }, [UI.surligne(u.email, mots), u.superAdmin ? el("span", { class: "etiq ing", text: "Super admin" }) : null]),
+          el("div", { class: "secondaire", text: "Inscrit le " + C.fmtCH(String(u.ajoute || "").slice(0, 10)) })
+        ]),
+        el("td", {}, [UI.surligne(nomBureau(u.bureauId), mots)]),
+        el("td", {}, [el("span", { class: "acces-etat " + s.classe }, [UI.surligne(s.texte, mots)])]),
+        el("td", { class: "actions" }, [
+          u.actif ? UI.boutonIcone("lien", "Envoyer un lien de connexion", u.email, function () { envoieLien(u); }) : null,
+          UI.boutonIcone("modifier", "Modifier", u.email, function () { formulaireUtilisateur(u); }),
+          u.superAdmin ? null : UI.boutonIcone("supprimer", "Retirer l'accès", u.email, function () { supprimeUtilisateur(u); })
+        ])
+      ]), u.email));
+    });
+    hotes.utilisateurs.appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, ["Adresse", "Bureau", "Connexion", ""].map(function (t) { return el("th", { text: t }); }))]),
+      corps
+    ]));
+  }
+
+  function formulaireUtilisateur(u) {
+    var nouveau = !u;
+    if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
+    var p = D.profil();
+    var bureauInit = u ? u.bureauId : (filtreBureau || (p.bureau && bureau(p.bureau.id) ? p.bureau.id : etat.bureaux[0].id));
+
+    var champs = el("div", { class: "grille-champs" }, [
+      UI.champ({ nom: "email", label: "Adresse e-mail", type: "email", valeur: u ? u.email : "", exemple: "prenom.nom@bureau.ch", large: true }),
+      UI.champ({
+        nom: "bureauId", label: "Bureau", type: "select", valeur: bureauInit,
+        options: etat.bureaux.map(function (b) { return { valeur: b.id, label: b.nom + (b.actif ? "" : " (suspendu)") }; })
+      }),
+      UI.champ({
+        nom: "actif", label: "Accès", type: "select", valeur: u ? String(u.actif) : "true",
+        options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Suspendu" }]
+      })
+    ]);
+    // L'adresse est la clé de l'accès : pour en changer, retirer l'accès puis en créer un autre
+    if (u) champs.querySelector("[name=email]").readOnly = true;
+    if (u && u.superAdmin) champs.querySelector("[name=actif]").disabled = true;
+
+    var envoi = el("input", { type: "checkbox" });
+    envoi.checked = true;
+    var corps = el("div", {}, [champs]);
+    if (nouveau) {
+      corps.appendChild(el("div", { class: "cases", style: "margin-top:18px" }, [
+        el("label", { class: "case" }, [envoi, "Envoyer tout de suite le lien de bienvenue"])
+      ]));
+      corps.appendChild(el("p", {
+        class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible);max-width:46em",
+        text: "Le courriel lui fait choisir son mot de passe. Sinon, elle passera par « Mot de passe oublié ou première connexion » sur la page de connexion."
+      }));
+    }
+
+    UI.ouvre({
+      surtitre: nouveau ? "Nouvel utilisateur" : "Modifier l'accès",
+      titre: nouveau ? "Accès à l'outil" : u.email,
+      corps: corps,
+      compacte: true,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: nouveau ? "Créer l'accès" : "Enregistrer", or: true, entree: true, action: function () {
+            var v = UI.lit(champs);
+            var adresse = String(v.email || "").trim().toLowerCase();
+            if (!RE_MAIL.test(adresse)) { UI.toast("Cette adresse e-mail n'est pas valide."); return false; }
+            var donnees = { email: adresse, bureauId: v.bureauId, actif: v.actif === "true", nouveau: nouveau };
+            return SB.rpc("console_enregistre_utilisateur", { p: donnees }).then(function () {
+              if (!nouveau || !envoi.checked) {
+                UI.toast(nouveau ? "Accès créé." : "Accès enregistré.");
+                return apresChangement();
+              }
+              return SB.envoieLien(adresse).then(function () {
+                UI.toast("Accès créé, lien envoyé à " + adresse + ".");
+                return apresChangement();
+              }, function (e) {
+                // L'accès existe ; seul le courriel n'est pas parti. L'alerte s'ouvre une fois cette fenêtre fermée.
+                return apresChangement().then(function () { setTimeout(function () { alerteEnvoi(adresse, e); }, 0); });
+              });
+            }).catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function envoieLien(u) {
+    UI.confirme("Envoyer un lien à " + u.email + " ?",
+      u.compte
+        ? "Un courriel part tout de suite. Le lien ouvre l'outil et lui fait choisir un nouveau mot de passe."
+        : "Un courriel part tout de suite. Le lien crée son compte et lui fait choisir son mot de passe.",
+      "Envoyer"
+    ).then(function (ok) {
+      if (!ok) return;
+      UI.toast("Envoi en cours…");
+      SB.envoieLien(u.email).then(function () {
+        UI.toast("Lien envoyé à " + u.email + ".");
+        return apresChangement();
+      }).catch(function (e) { alerteEnvoi(u.email, e); });
+    });
+  }
+
+  /** Courriel refusé : on dit pourquoi, et quel réglage de Supabase y remédie. */
+  function alerteEnvoi(adresse, e) {
+    var m = e.message || "";
+    var conseil = /SMTP|équipe Supabase|Limite d'envoi/i.test(m)
+      ? "Branche un serveur d'envoi à toi : voir « 03 — Mise en route », plus bas."
+      : /création de comptes est fermée/i.test(m)
+      ? "Autorise la création des comptes : voir « 03 — Mise en route », plus bas."
+      : /non autoris/i.test(m)
+      ? "La garde a refusé l'adresse : vérifie qu'elle est bien inscrite, active, dans un bureau ouvert."
+      : "";
+    UI.ouvre({
+      surtitre: "Courriel non envoyé",
+      titre: adresse,
+      compacte: true,
+      corps: el("div", {}, [
+        el("p", { style: "color:var(--texte-doux);font-size:15px;max-width:46em", text: "L'accès est bien inscrit, mais le courriel n'est pas parti. " + m }),
+        conseil ? el("p", { class: "aide", style: "margin-top:12px;font-size:14px;color:var(--texte-doux)", text: conseil }) : null
+      ]),
+      boutons: [{ label: "Compris", or: true }]
+    });
+  }
+
+  function supprimeUtilisateur(u) {
+    UI.confirme("Retirer l'accès de " + u.email + " ?",
+      "Cette adresse n'ouvrira plus l'outil. Son compte de connexion reste, mais ne donne plus accès à rien : " +
+      "pour lui rendre l'accès, il suffira de l'inscrire à nouveau.",
+      "Retirer l'accès", true
+    ).then(function (ok) {
+      if (!ok) return;
+      SB.rpc("console_supprime_utilisateur", { p_email: u.email }).then(function () {
+        UI.toast("Accès retiré.");
+        return apresChangement();
+      }).catch(function (e) { UI.toast(e.message); });
+    });
+  }
+
+  /* ---------------------------------------------------------- mise en route
+     Ce que le navigateur peut vérifier seul (inscriptions, confirmation de
+     l'adresse) est coché d'office ; le reste se vérifie dans Supabase. */
+
+  function dessineMiseEnRoute() {
+    var ref = (/^https:\/\/([a-z0-9]+)\.supabase\.co/i.exec((window.PLANIF_CONFIG.supabase || {}).url || "") || [])[1];
+    function lien(chemin, texte) {
+      return ref ? el("a", { href: "https://supabase.com/dashboard/project/" + ref + chemin, target: "_blank", rel: "noopener" }, [texte]) : texte;
+    }
+    function point(etatPoint, titre, contenu) {
+      var q = { fait: "Fait", manque: "À faire", verifier: "À vérifier" }[etatPoint];
+      return el("div", { class: "al" + (etatPoint === "fait" ? " fait" : etatPoint === "manque" ? " grave" : "") }, [
+        el("span", { class: "q", text: q }),
+        el("div", {}, [el("b", { text: titre }), " "].concat(contenu))
+      ]);
+    }
+    var inscriptions = auth ? (auth.disable_signup ? "manque" : "fait") : "verifier";
+    var confirmation = auth ? (auth.mailer_autoconfirm ? "manque" : "fait") : "verifier";
+
+    UI.vide(hotes.miseEnRoute).appendChild(el("div", { class: "alertes" }, [
+      point("fait", "Base multi-bureaux.", ["migration-multi-bureaux.sql est exécutée : cette page s'affiche."]),
+      point("verifier", "Serveur d'envoi (SMTP).", [
+        "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",
+        lien("/auth/smtp", "Authentication > Emails > SMTP Settings"),
+        " : ta boîte chez IONOS ou un service comme Brevo."
+      ]),
+      point("verifier", "Modèles de courriels en français.", [
+        lien("/auth/templates", "Authentication > Emails > Templates"),
+        " : « Confirm signup », « Magic Link » et « Reset Password ». Textes prêts dans ",
+        el("code", { text: "reglages-supabase.md" }), " (dépôt)."
+      ]),
+      point("verifier", "Garde des comptes.", [
+        lien("/auth/hooks", "Authentication > Auth Hooks"),
+        " : « Before User Created », type Postgres, fonction ", el("code", { text: "public.garde_creation_compte" }),
+        ". Sans elle, n'importe qui peut se créer un compte (qui n'ouvre rien, la base restant fermée)."
+      ]),
+      point(inscriptions, "Création des comptes autorisée.", [
+        inscriptions === "manque" ? "Fermée : les nouveaux utilisateurs ne peuvent pas activer leur accès. " : "",
+        lien("/auth/providers", "Authentication > Sign In / Providers"), " : « Allow new users to sign up » activé ; la garde filtre les adresses."
+      ]),
+      point(confirmation, "Confirmation de l'adresse obligatoire.", [
+        confirmation === "manque" ? "Désactivée : quelqu'un qui connaît une adresse inscrite pourrait ouvrir son compte à sa place. " : "",
+        lien("/auth/providers", "Authentication > Sign In / Providers > Email"), " : « Confirm email » activé."
+      ])
+    ]));
+  }
+})();
+</script>
+</body>
+</html>

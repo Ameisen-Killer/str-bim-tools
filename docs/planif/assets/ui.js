@@ -127,6 +127,7 @@
 
     var pied = el("div", { class: "modale-pied" });
     (o.boutons || []).forEach(function (b) {
+      if (!b) return;                         // bouton absent selon les droits
       var bouton = el("button", {
         class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : ""),
         type: "button",
@@ -360,6 +361,32 @@
   }
   appliqueTheme(themeChoisi());
 
+  /**
+   * Menu déroulant de la barre (thème, bureau) : ouverture au clic, fermeture
+   * au clic ailleurs ou par Échap, flèches pour passer d'un choix à l'autre.
+   * Renvoie ouvre(etat).
+   */
+  function deroulant(bouton, menu) {
+    function ouvre(etat) {
+      menu.hidden = !etat;
+      bouton.setAttribute("aria-expanded", String(etat));
+      if (etat) { var c = menu.querySelector("[aria-checked=true]") || menu.querySelector("button,a"); if (c) c.focus(); }
+    }
+    bouton.addEventListener("click", function (e) { e.stopPropagation(); ouvre(menu.hidden); });
+    document.addEventListener("click", function (e) { if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });
+    document.addEventListener("keydown", function (e) {
+      if (menu.hidden) return;
+      if (e.key === "Escape") { ouvre(false); bouton.focus(); }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        var items = [].slice.call(menu.querySelectorAll("button,a")), n = items.length, i = items.indexOf(document.activeElement);
+        var bas = e.key === "ArrowDown";
+        items[i < 0 ? (bas ? 0 : n - 1) : (i + (bas ? 1 : n - 1)) % n].focus();
+      }
+    });
+    return ouvre;
+  }
+
   /** Bouton « Thème » et son menu, pour la ligne du haut. */
   function menuTheme() {
     var bouton = el("button", {
@@ -369,6 +396,7 @@
       el("span", { class: "theme-lib", text: "Thème" })
     ]);
     var menu = el("div", { class: "menu-theme", role: "menu", hidden: true });
+    var ouvre = deroulant(bouton, menu);
     var actuel = themeChoisi();
     THEMES.forEach(function (t) {
       menu.appendChild(el("button", {
@@ -376,24 +404,53 @@
         onclick: function () { choisitTheme(t.v); ouvre(false); bouton.focus(); }
       }, [el("span", { class: "coche", "aria-hidden": "true" }), t.l]));
     });
-
-    function ouvre(etat) {
-      menu.hidden = !etat;
-      bouton.setAttribute("aria-expanded", String(etat));
-      if (etat) { var c = menu.querySelector("[aria-checked=true]") || menu.firstChild; c.focus(); }
-    }
-    bouton.addEventListener("click", function (e) { e.stopPropagation(); ouvre(menu.hidden); });
-    document.addEventListener("click", function (e) { if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });
-    document.addEventListener("keydown", function (e) {
-      if (menu.hidden) return;
-      if (e.key === "Escape") { ouvre(false); bouton.focus(); }
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        var items = [].slice.call(menu.children), i = items.indexOf(document.activeElement);
-        items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
-      }
-    });
     return el("div", { class: "theme" }, [bouton, menu]);
+  }
+
+  /* ---------------------------------------------------------- bureau courant
+     À la suite du fil d'Ariane. Chacun voit le nom de son bureau ; le super
+     admin passe d'un bureau à l'autre par ce menu : la base retient son choix
+     et toutes les pages s'y rapportent (voir choisit_bureau en base). */
+
+  function bureauCourant(p) {
+    if (!p || !p.multi || !p.bureau) return null;
+    var etat = function (actif) { return actif ? null : el("span", { class: "bureau-etat", text: "suspendu" }); };
+
+    if (!p.superAdmin) {
+      return el("span", { class: "bureau" }, [
+        el("span", { class: "sep", text: "·" }),
+        el("span", { class: "bureau-nom", text: p.bureau.nom, title: p.bureau.nom })
+      ]);
+    }
+
+    var bouton = el("button", {
+      type: "button", class: "bureau-btn", "aria-haspopup": "menu", "aria-expanded": "false",
+      title: "Changer de bureau", "aria-label": "Bureau affiché : " + p.bureau.nom + ". Changer de bureau"
+    }, [
+      el("span", { class: "bureau-nom", text: p.bureau.nom }),
+      etat(p.bureau.actif),
+      el("span", { class: "fleche", "aria-hidden": "true", text: "▾" })
+    ]);
+    var menu = el("div", { class: "menu-bureau", role: "menu", hidden: true });
+    var ouvre = deroulant(bouton, menu);
+
+    p.bureaux.forEach(function (b) {
+      var ici = b.id === p.bureau.id;
+      menu.appendChild(el("button", {
+        type: "button", role: "menuitemradio", "aria-checked": String(ici),
+        onclick: function () {
+          ouvre(false);
+          if (ici) return bouton.focus();
+          toast("Ouverture du bureau « " + b.nom + " »…");
+          SB.rpc("choisit_bureau", { p_bureau: b.id })
+            .then(function () { location.reload(); })
+            .catch(function (e) { toast(e.message); });
+        }
+      }, [el("span", { class: "coche", "aria-hidden": "true" }), el("span", { class: "lib", text: b.nom }), etat(b.actif)]));
+    });
+    menu.appendChild(el("a", { href: "/planif/console/", role: "menuitem", class: "vers-console" }, ["Gérer les bureaux et les accès"]));
+
+    return el("span", { class: "bureau choix" }, [el("span", { class: "sep", text: "·" }), bouton, menu]);
   }
 
   /* --------------------------------------------------------- barre et menu */
@@ -417,8 +474,13 @@
     if (!hote) return;
     vide(hote);
 
+    // Profil connu une fois les données (ou le seul profil, pour la console) chargées
+    var profil = D.profil ? D.profil() : null;
+    var superAdmin = !!(profil && profil.multi && profil.superAdmin);
+    var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
+
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
-    PAGES.forEach(function (p) {
+    pages.forEach(function (p) {
       nav.appendChild(el("a", { href: p.href, "aria-current": p.cle === actif ? "page" : null }, [
         el("span", { class: "long", text: p.nom }),
         el("span", { class: "court", text: p.court })
@@ -440,18 +502,20 @@
     var outilsHaut = el("div", { class: "barre-outils" }, [
       el("span", { class: "maj", text: etiquette }),
       menuTheme(),
-      el("button", { type: "button", onclick: ouvreDonnees, text: "Données" }),
+      // Pas de données du planning chargées (console) : rien à sauvegarder d'ici
+      D.etat() ? el("button", { type: "button", onclick: ouvreDonnees, text: "Données" }) : null,
       avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
     ]);
 
     hote.appendChild(el("div", { class: "barre" }, [
       el("div", { class: "barre-h" }, [
-        el("div", {}, [
+        el("div", { class: "fil" + (superAdmin ? " avec-choix" : "") }, [
           el("span", { class: "marque" }, [
             el("a", { href: "/", text: "STR Bim Tools" }),
             el("span", { class: "sep", text: "·" })
           ]),
-          el("a", { href: "/planif/", class: "ici", text: "Planification" })
+          el("a", { href: "/planif/", class: "ici", text: "Planification" }),
+          bureauCourant(profil)
         ]),
         outilsHaut
       ]),
@@ -747,6 +811,11 @@
 
   function ouvreDonnees() {
     var e = D.etat();
+    var profil = D.profil ? D.profil() : null;
+    var nomBureau = profil && profil.multi && profil.bureau ? profil.bureau.nom : "";
+    var pourTous = nomBureau ? "pour tout le bureau « " + nomBureau + " »" : "pour toute l'équipe";
+    // Avec plusieurs bureaux, effacer ou remplacer tout un bureau est réservé au super admin
+    var toutGerer = D.peutToutGerer ? D.peutToutGerer() : true;
     var entree = el("input", { type: "file", accept: ".json,application/json", style: "display:none" });
     entree.addEventListener("change", function () {
       var f = entree.files && entree.files[0];
@@ -766,7 +835,7 @@
         }
         confirme("Remplacer toutes les données ?",
           "Le contenu actuel (" + compte(D.etat()) + ") sera remplacé par celui du fichier « " + f.name + " » (" + compte(brut) + ")" +
-          (avecBase ? ", dans la base, pour toute l'équipe" : "") +
+          (avecBase ? ", dans la base, " + pourTous : "") +
           (brut.reglages && brut.reglages.demo ? ". Attention : ce fichier est un jeu de démonstration" : "") +
           ". Ce qui n'est pas dans le fichier sera supprimé définitivement : exporte d'abord une sauvegarde si besoin.",
           "Remplacer", true
@@ -784,7 +853,11 @@
       el("p", {
         class: "aide",
         style: "font-size:14px;line-height:1.6;color:var(--texte-doux);max-width:48em",
-        text: avecBase
+        text: avecBase && nomBureau
+          ? "Les données du bureau « " + nomBureau + " » sont enregistrées dans la base du projet, hébergée à Francfort, " +
+            "et te suivent d'un poste à l'autre. Seuls les utilisateurs de ce bureau peuvent les lire ou les modifier. " +
+            "L'export reste utile comme sauvegarde à toi, hors ligne."
+          : avecBase
           ? "Les données sont enregistrées dans la base du projet, hébergée à Francfort, et te suivent d'un poste à l'autre. " +
             "Seules les adresses inscrites dans la liste des accès peuvent les lire ou les modifier. " +
             "L'export reste utile comme sauvegarde à toi, hors ligne."
@@ -816,10 +889,10 @@
       titre: "Données",
       corps: corps,
       boutons: [
-        {
+        toutGerer ? {
           label: "Tout effacer", rouge: true, gauche: true, action: function () {
             return confirme("Tout effacer ?",
-              "Membres, affaires et tâches seront supprimés " + (avecBase ? "de la base, pour toute l'équipe" : "de ce navigateur") +
+              "Membres, affaires et tâches seront supprimés " + (avecBase ? "de la base, " + pourTous : "de ce navigateur") +
               ". Cette action est définitive : exporte d'abord une sauvegarde si tu veux pouvoir revenir en arrière.",
               "Effacer définitivement", true).then(function (ok) {
                 if (!ok) return false;
@@ -829,8 +902,8 @@
                 return D.videTout().then(function () { location.reload(); });
               });
           }
-        },
-        { label: "Importer", action: function () { entree.click(); return false; } },
+        } : null,
+        toutGerer ? { label: "Importer", action: function () { entree.click(); return false; } } : null,
         {
           label: "Exporter", action: function () {
             telecharge(nomFichier(), JSON.stringify(D.exporte(), null, 2));

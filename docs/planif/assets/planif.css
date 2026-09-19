@@ -154,6 +154,40 @@ p{margin:0}
 .menu-theme .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
 .menu-theme [aria-checked="true"] .coche{background:currentColor}
 
+/* Bureau courant, à la suite du fil d'Ariane ; le super admin en change par un menu */
+.fil{display:flex;align-items:baseline;flex-wrap:nowrap;min-width:0}
+.bureau{position:relative;display:inline-flex;align-items:baseline;min-width:0}
+.bureau-nom{display:inline-block;max-width:min(30vw,320px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.bureau-etat{margin-left:8px;color:var(--alerte);font-size:10px;letter-spacing:.14em}
+.bureau-btn{
+  display:inline-flex;align-items:baseline;gap:7px;min-width:0;
+  background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;
+  color:var(--or);cursor:pointer;transition:color .3s;
+}
+.bureau-btn:hover{color:var(--texte)}
+.bureau-btn:focus-visible{outline:1px solid var(--or);outline-offset:4px}
+.bureau-btn .fleche{font-size:9px;letter-spacing:0}
+.menu-bureau{
+  position:absolute;left:-12px;top:calc(100% + 14px);z-index:50;
+  min-width:250px;max-width:min(92vw,440px);max-height:min(62vh,460px);overflow-y:auto;
+  display:flex;flex-direction:column;padding:6px;
+  background:var(--noir-2);border:1px solid var(--ligne);
+  animation:monte .25s cubic-bezier(.2,.7,.2,1);
+}
+.menu-bureau[hidden]{display:none}
+.menu-bureau button,.menu-bureau a{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 12px;margin:0;background:none;border:0;cursor:pointer;text-decoration:none;
+  font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--texte-doux);
+}
+.menu-bureau button:hover,.menu-bureau button:focus-visible,.menu-bureau a:hover,.menu-bureau a:focus-visible{color:var(--texte);background:rgba(var(--encre),.05);outline:none}
+.menu-bureau [aria-checked="true"]{color:var(--or)}
+.menu-bureau .lib{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-bureau .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
+.menu-bureau [aria-checked="true"] .coche{background:currentColor}
+.menu-bureau .vers-console{border-top:1px solid var(--ligne-faible);margin-top:6px;padding-top:14px;color:var(--texte-faible)}
+.menu-bureau .vers-console::after{content:"→";margin-left:auto}
+
 /* Action principale en bouton flottant : téléphone uniquement */
 .fab{display:none}
 .seul-mobile{display:none!important}           /* !important : .btn, plus bas, imposerait inline-flex */
@@ -302,6 +336,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-ajout-affaire{--ico:url(/planif/icons/folder_add.svg?v=1)}
 .ico-ajout-membre{--ico:url(/planif/icons/user_add.svg?v=1)}
 .ico-export{--ico:url(/planif/icons/file_export.svg?v=1)}
+.ico-ajout-bureau{--ico:url(/planif/icons/building_add.svg?v=1)}
+.ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}
@@ -651,6 +687,13 @@ mark.trouve{
   /* barre : compacte, les quatre sections tiennent sans défiler */
   .barre-h{padding-bottom:6px}
   .barre-h .marque,.barre-h .maj{display:none}
+  /* bureau : seul le super admin le garde (il en change) ; il prend alors la place de « Planification » */
+  .barre-h .bureau{display:none}
+  .barre-h .bureau.choix{display:inline-flex}
+  .barre-h .fil.avec-choix .ici,.barre-h .bureau.choix > .sep{display:none}
+  .bureau-nom{max-width:38vw}
+  .bureau-btn{padding:10px 0;margin:-10px 0}
+  .menu-bureau{left:-4px}
   .nav-outil{gap:2px;padding-bottom:8px}
   .nav-outil a{padding:9px 9px;letter-spacing:.1em}
   .nav-outil .long{display:none}

@@ -8,21 +8,29 @@
 --  Valeurs pseudo-aléatoires mais déterministes : deux exécutions donnent le
 --  même jeu (à la date du jour près).
 --
---  Marquage, indépendant du jeu d'essai :
+--  Tout va dans un bureau à part, « Bureau de charge (fictif) », que le super
+--  admin ouvre depuis le menu des bureaux ou la console. Marquage conservé :
 --    membres  : adresse en @charge.exemple.ch
 --    affaires : note commençant par [jeu de charge]
---  Retrait complet : purge-jeu-charge.sql. Les données réelles et le jeu
---  d'essai ne sont pas touchés.
+--  Retrait complet, bureau compris : purge-jeu-charge.sql. Les données réelles
+--  et le jeu d'essai ne sont pas touchés.
+--  Nécessite la migration multi-bureaux (migration-multi-bureaux.sql).
 -- ============================================================================
 
 begin;
 
 do $$
 begin
-  if exists (select 1 from public.membres where email like '%@charge.exemple.ch') then
+  if exists (select 1 from public.bureaux where id = 'c4a26e00-0000-4000-8000-000000000002')
+     or exists (select 1 from public.membres where email like '%@charge.exemple.ch') then
     raise exception 'Le jeu de charge est déjà présent. Lancer d''abord purge-jeu-charge.sql.';
   end if;
 end $$;
+
+insert into public.bureaux (id, nom) values ('c4a26e00-0000-4000-8000-000000000002', 'Bureau de charge (fictif)');
+
+-- Toutes les lignes insérées ci-dessous rejoignent ce bureau (valeur par défaut de bureau_id)
+select set_config('planif.bureau', 'c4a26e00-0000-4000-8000-000000000002', true);
 
 -- ------------------------------------------------------------------ membres
 -- 80 membres pour 40 prénoms et 40 noms : le second tour décale les noms de
@@ -67,11 +75,11 @@ insert into public.affaire_membres (affaire_id, membre_id)
 select distinct a.id, m.id
 from generate_series(1, 400) g
 cross join generate_series(0, 4) k
-join public.affaires a on a.code = 'C-' || lpad(g::text, 4, '0')
+join public.affaires a on a.code = 'C-' || lpad(g::text, 4, '0') and a.bureau_id = current_setting('planif.bureau')::uuid
 join public.membres  m on m.email = 'charge.m' ||
   case when k < 2 then ((g * 31 + k * 11) % 36) + 1          -- ingénieurs 1..36
        else          ((g * 29 + k * 13) % 44) + 37 end        -- dessinateurs 37..80
-  || '@charge.exemple.ch'
+  || '@charge.exemple.ch' and m.bureau_id = a.bureau_id
 on conflict do nothing;
 
 -- ----------------------------------------------------------------- absences
@@ -81,7 +89,7 @@ select m.id,
        current_date + ((g * 53) % 300 - 60) + (g % 10),
        (array['Vacances','Formation','Service militaire','Congé'])[(g % 4) + 1]
 from generate_series(1, 300) g
-join public.membres m on m.email = 'charge.m' || (((g * 29) % 80) + 1) || '@charge.exemple.ch';
+join public.membres m on m.email = 'charge.m' || (((g * 29) % 80) + 1) || '@charge.exemple.ch' and m.bureau_id = current_setting('planif.bureau')::uuid;
 
 -- ------------------------------------------------------------------- tâches
 with base as (
@@ -116,9 +124,9 @@ select a.id,
             when t.dec <= 10                    then (t.g % 10) * 10
             else 0 end
 from t
-join public.affaires a on a.code = 'C-' || lpad((((t.g * 7919) % 400) + 1)::text, 4, '0')
-join public.membres  i on i.email = 'charge.m' || (((t.g * 13) % 36) + 1)  || '@charge.exemple.ch'
-join public.membres  d on d.email = 'charge.m' || (((t.g * 17) % 44) + 37) || '@charge.exemple.ch';
+join public.affaires a on a.code = 'C-' || lpad((((t.g * 7919) % 400) + 1)::text, 4, '0') and a.bureau_id = current_setting('planif.bureau')::uuid
+join public.membres  i on i.email = 'charge.m' || (((t.g * 13) % 36) + 1)  || '@charge.exemple.ch' and i.bureau_id = a.bureau_id
+join public.membres  d on d.email = 'charge.m' || (((t.g * 17) % 44) + 37) || '@charge.exemple.ch' and d.bureau_id = a.bureau_id;
 
 commit;
 
