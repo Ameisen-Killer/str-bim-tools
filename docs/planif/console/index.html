@@ -319,7 +319,7 @@
     if (!etat) return;
     var valeurs = {
       bureaux: etat.bureaux.length,
-      personnes: personnes().length,
+      personnes: migrationFaite() ? personnes().length : "!",
       "mise-en-route": ""
     };
     SECTIONS.forEach(function (s) {
@@ -721,8 +721,30 @@
     });
   }
 
+  /* La base d'avant la migration ne renvoie pas les fiches de l'équipe : sans
+     ce garde-fou, la console montrerait une poignée d'accès et laisserait
+     croire que les membres ont disparu. */
+  function migrationFaite() { return !!(etat && etat.membres); }
+
   function dessinePersonnes() {
     if (!etat) return;
+    if (!migrationFaite()) {
+      hotes.titrePersonnes.textContent = "Migration à exécuter";
+      UI.vide(hotes.personnes).appendChild(el("div", { class: "al grave" }, [
+        el("span", { class: "q", text: "À faire" }),
+        el("div", {}, [
+          el("b", { text: "Les personnes de l'équipe ne sont pas encore ici." }),
+          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
+            "La base tient encore les membres et les accès dans deux listes séparées. Exécute ",
+            el("code", { text: "migration-console-membres.sql" }),
+            " dans Supabase (SQL Editor > New query), après y avoir remplacé le domaine d'exemple en tête du fichier, puis recharge cette page."
+          ]),
+          el("p", { class: "aide", style: "margin-top:10px;font-size:13.5px;color:var(--texte-faible)", text:
+            "Elle donne à chaque membre actif son adresse et un accès suspendu : aucun courriel ne part, tu ouvres les accès un par un ensuite." })
+        ])
+      ]));
+      return;
+    }
     suivi.debut();
     var liste = selection(), mots = barre ? barre.termes() : [];
     var total = personnes().length;
@@ -806,6 +828,7 @@
 
   function formulairePersonne(p) {
     var nouveau = !p;
+    if (!migrationFaite()) return UI.toast("Exécute d'abord migration-console-membres.sql dans Supabase.");
     if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
     var prof = D.profil();
     var bureauInit = p ? p.bureauId
