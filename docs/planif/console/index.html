@@ -16,6 +16,12 @@
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=33">
 <style>
+  /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
+     au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
+     haut et le pied, qui vont déjà d'un bord à l'autre. Le chapeau garde ses
+     52 em : une ligne de texte longue de deux mètres ne se lit pas. */
+  .wrap.large{max-width:none}
+
   /* Menu des sections, à gauche : une seule section à la fois, le menu reste
      en vue pendant qu'on fait défiler la section ouverte. */
   .console-grille{display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(24px,3vw,48px);align-items:start}
@@ -99,14 +105,14 @@
 <div data-chrome></div>
 
 <main>
-  <div class="wrap entete">
+  <div class="wrap large entete">
     <div class="surtitre">Planification · super admin</div>
     <h1>Console</h1>
     <p class="chapeau">Les bureaux d'études et les personnes qui y travaillent : leur fiche au planning et, pour celles qui s'y connectent, leur accès. Chacune ne voit que les données de son bureau ; toi, tu passes de l'un à l'autre par le menu du bureau, en haut de page.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
-  <div class="wrap" id="console"></div>
+  <div class="wrap large" id="console"></div>
 </main>
 
 <div data-pied></div>
