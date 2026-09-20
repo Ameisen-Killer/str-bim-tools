@@ -92,6 +92,20 @@ language sql immutable set search_path = '' as $$
          end;
 $$;
 
+-- Adresse retenue pour un membre au moment de la reprise. L'adresse déjà
+-- inscrite sur sa fiche ne vaut que si elle est du domaine du bureau : une
+-- adresse d'essai (…@a.com) ne doit pas devenir son adresse de connexion.
+-- Utile seulement ici : une base neuve n'a personne à reprendre.
+create or replace function public.adresse_de_migration(p_email text, p_prenom text, p_nom text, p_domaine text)
+returns text
+language sql immutable set search_path = '' as $$
+  select case
+           when lower(btrim(coalesce(p_email, ''))) like '%@' || lower(btrim(coalesce(p_domaine, '?')))
+             then lower(btrim(p_email))
+           else public.adresse_depuis_nom(p_prenom, p_nom, p_domaine)
+         end;
+$$;
+
 -- ==================================== 4. la console enregistre une personne ==
 
 drop function if exists public.console_enregistre_utilisateur(jsonb);
@@ -325,6 +339,7 @@ end $$;
 
 revoke all on function public.simplifie_nom(text) from public, anon;
 revoke all on function public.adresse_depuis_nom(text, text, text) from public, anon;
+revoke all on function public.adresse_de_migration(text, text, text, text) from public, anon;
 
 -- ================================== 6. les membres d'aujourd'hui deviennent ==
 -- ============================================== des personnes de la console ==
@@ -349,10 +364,7 @@ insert into public.acces (email, bureau_id, membre_id, actif)
 select x.adresse, x.bureau_id, x.id, false
   from (
     select m.id, m.bureau_id,
-           coalesce(
-             nullif(lower(btrim(coalesce(m.email, ''))), ''),
-             public.adresse_depuis_nom(m.prenom, m.nom, current_setting('planif.domaine'))
-           ) as adresse
+           public.adresse_de_migration(m.email, m.prenom, m.nom, current_setting('planif.domaine')) as adresse
       from public.membres m
      where m.actif
        and lower(btrim(coalesce(m.email, ''))) not like '%.exemple.ch'
@@ -366,10 +378,7 @@ select x.adresse, x.bureau_id, x.id, false
              where m2.actif
                and lower(btrim(coalesce(m2.email, ''))) not like '%.exemple.ch'
                and not exists (select 1 from public.acces a2 where a2.membre_id = m2.id)
-               and coalesce(
-                     nullif(lower(btrim(coalesce(m2.email, ''))), ''),
-                     public.adresse_depuis_nom(m2.prenom, m2.nom, current_setting('planif.domaine'))
-                   ) = x.adresse);
+               and public.adresse_de_migration(m2.email, m2.prenom, m2.nom, current_setting('planif.domaine')) = x.adresse);
 
 -- La colonne membres.email reste : elle sert de repère aux jeux d'essai, qui
 -- s'y retrouvent pour se purger. Ce n'est PAS l'adresse de connexion — celle-ci
