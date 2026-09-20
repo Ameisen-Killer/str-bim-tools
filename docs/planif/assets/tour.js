@@ -112,7 +112,7 @@
     }
   })();
 
-  var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0, RECUL = .88;
+  var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0, RECUL = .95;   // < 1 : la tour respire dans son cadre
   function taille() {
     var r = cv.getBoundingClientRect();
     if (!r.width || !r.height) return;
