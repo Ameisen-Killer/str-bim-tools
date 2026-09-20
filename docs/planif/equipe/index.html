@@ -76,7 +76,7 @@
     // Les fiches se tiennent dans la console : d'ici, on consulte et on pose les absences.
     var p = D.profil();
     UI.chrome("equipe", p && p.superAdmin
-      ? [{ label: "Console", or: true, icone: "ico-ajout-membre", action: function () { location.href = "/planif/console/#personnes"; } }]
+      ? [{ label: "Console", or: true, icone: "ico-ajout-membre", action: function () { location.href = "/planif/console/#utilisateurs"; } }]
       : []);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));

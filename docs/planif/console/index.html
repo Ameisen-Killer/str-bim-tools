@@ -56,6 +56,29 @@
     .console-menu .compte{display:none}
   }
 
+  /* Liste des utilisateurs : une ligne par personne, réglée sur place. Les
+     menus déroulants remplacent l'ouverture de la fiche pour les quatre
+     champs qu'on change le plus souvent. */
+  #utilisateurs table.liste td{padding-top:7px;padding-bottom:7px;vertical-align:middle}
+  #utilisateurs table.liste .principal{font-size:15px}
+  .sel-ligne{
+    width:100%;max-width:190px;min-width:0;
+    font-family:var(--sans);font-weight:300;font-size:13.5px;color:var(--texte);
+    background:rgba(var(--encre),.03);border:1px solid var(--ligne);border-radius:0;
+    padding:5px 8px;height:32px;cursor:pointer;
+    text-transform:none;letter-spacing:.02em;transition:border-color .25s,color .25s;
+  }
+  .sel-ligne:hover{border-color:var(--or-doux)}
+  .sel-ligne:focus{outline:none;border-color:var(--or)}
+  .sel-ligne:disabled{opacity:.4;cursor:default}
+  .sel-ligne.vide{color:var(--texte-faible)}
+  .sel-ligne.suspendu{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45)}
+  .mail-ligne{font-family:var(--mono);font-size:12.5px;color:var(--texte-doux);word-break:break-all}
+  .quand-ligne{font-family:var(--mono);font-size:12px;color:var(--texte-faible);white-space:nowrap}
+  @media (max-width:640px){
+    .sel-ligne{max-width:none;height:40px;font-size:16px}
+  }
+
   /* Propre à la console : lignes suspendues, listes éditables du formulaire de bureau */
   table.liste tr.suspendu td{opacity:.55}
   table.liste tr.suspendu td.actions{opacity:1}
@@ -129,7 +152,7 @@
 
   var etat = null;            // réponse de console_etat : { moi, bureaux, membres, utilisateurs }
   var auth = null;            // réglages publics de Supabase Auth (inscriptions, confirmation)
-  var barre = null;           // recherche des personnes
+  var barre = null;           // recherche des utilisateurs
   var filtreBureau = "";
   var hotes = {};             // conteneurs, remplis à chaque rafraîchissement
   var suivi = UI.suiviApparitions();
@@ -165,7 +188,7 @@
   function actionsBarre() {
     return [
       { label: "Nouveau bureau", icone: "ico-ajout-bureau", action: function () { formulaireBureau(null); } },
-      { label: "Nouvelle personne", or: true, icone: "ico-ajout-membre", action: function () { formulairePersonne(null); } }
+      { label: "Nouvel utilisateur", or: true, icone: "ico-ajout-membre", action: function () { formulaireUtilisateur(null); } }
     ];
   }
 
@@ -237,31 +260,31 @@
       hotes.bureaux
     ]));
 
-    hotes.titrePersonnes = el("h2");
+    hotes.titreUtilisateurs = el("h2");
     hotes.recherche = el("div");
     hotes.filtre = el("select", {
       class: "btn", style: "text-transform:none;letter-spacing:.04em;max-width:320px", "aria-label": "Filtrer par bureau"
     });
-    hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessinePersonnes(); });
-    hotes.personnes = el("div", { class: "defile" });
-    hotes.vue.appendChild(el("section", { class: "section", id: "personnes" }, [
+    hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessineUtilisateurs(); });
+    hotes.utilisateurs = el("div", { class: "defile" });
+    hotes.vue.appendChild(el("section", { class: "section", id: "utilisateurs" }, [
       el("div", { class: "tete-section" }, [
-        el("div", {}, [el("div", { class: "num-section", text: "02 — Personnes" }), hotes.titrePersonnes]),
+        el("div", {}, [el("div", { class: "num-section", text: "02 — Utilisateurs" }), hotes.titreUtilisateurs]),
         el("div", { class: "outils" }, [
-          el("button", { id: "btn-nouvelle", class: "btn btn-or", type: "button", onclick: function () { formulairePersonne(null); } }, [
-            el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouvelle personne"
+          el("button", { id: "btn-nouvelle", class: "btn btn-or", type: "button", onclick: function () { formulaireUtilisateur(null); } }, [
+            el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouvel utilisateur"
           ])
         ])
       ]),
       hotes.recherche,
       el("div", { class: "plan-barre", style: "margin-top:-8px" }, [hotes.filtre]),
-      hotes.personnes
+      hotes.utilisateurs
     ]));
     barre = UI.recherche({
       hote: hotes.recherche,
       exemple: "Rechercher un nom, une adresse, un bureau…",
-      surSaisie: dessinePersonnes,
-      surEntree: function () { var l = selection(); if (l.length === 1) formulairePersonne(l[0]); }
+      surSaisie: dessineUtilisateurs,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaireUtilisateur(l[0]); }
     });
 
     hotes.miseEnRoute = el("div");
@@ -279,12 +302,12 @@
 
   /* ------------------------------------------------------------------ menu
      Une section à la fois : la console est un outil de réglage, on y vient
-     pour une chose précise. L'adresse garde la section ouverte (#personnes),
+     pour une chose précise. L'adresse garde la section ouverte (#utilisateurs),
      ce qui permet d'y renvoyer depuis le planning. */
 
   var SECTIONS = [
     { cle: "bureaux", label: "Bureaux" },
-    { cle: "personnes", label: "Personnes" },
+    { cle: "utilisateurs", label: "Utilisateurs" },
     { cle: "mise-en-route", label: "Mise en route" }
   ];
 
@@ -321,7 +344,7 @@
     if (!etat) return;
     var valeurs = {
       bureaux: etat.bureaux.length,
-      personnes: migrationFaite() ? personnes().length : "!",
+      utilisateurs: migrationFaite() ? personnes().length : "!",
       "mise-en-route": ""
     };
     SECTIONS.forEach(function (s) {
@@ -333,7 +356,7 @@
     if (!etat) return;
     dessineBureaux();
     remplitFiltre();
-    dessinePersonnes();
+    dessineUtilisateurs();
     dessineMiseEnRoute();
     majComptes();
   }
@@ -359,8 +382,8 @@
         ]),
         el("td", { class: "num" }, [
           b.membres ? el("button", {
-            type: "button", class: "lien-nombre", title: "Voir ses personnes",
-            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessinePersonnes(); montre("personnes"); }
+            type: "button", class: "lien-nombre", title: "Voir ses utilisateurs",
+            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessineUtilisateurs(); montre("utilisateurs"); }
           }, [String(b.membres)]) : "0"
         ]),
         el("td", { class: "num", text: String(nbU) }),
@@ -375,7 +398,7 @@
       ]));
     });
     UI.vide(hotes.bureaux).appendChild(el("table", { class: "liste" }, [
-      el("thead", {}, [el("tr", {}, ["Bureau", "Personnes", "Avec accès", "Affaires", "Tâches", "Dernière activité", ""].map(function (t) {
+      el("thead", {}, [el("tr", {}, ["Bureau", "Utilisateurs", "Avec accès", "Affaires", "Tâches", "Dernière activité", ""].map(function (t) {
         return el("th", { text: t });
       }))]),
       corps
@@ -669,10 +692,6 @@
     return [nomListe(l.succursales, p.succursale), nomListe(l.disciplines, p.discipline)].filter(Boolean).join(" · ");
   }
 
-  function capaciteTexte(c) {
-    return c == null ? "" : String(c).replace(".", ",") + " j/sem.";
-  }
-
   /** Fiches et accès réunis : chaque membre, puis les accès qui n'ont pas de fiche. */
   function personnes() {
     var liste = (etat.membres || []).map(function (m) {
@@ -712,7 +731,8 @@
 
   function champsCherches(p) {
     return [nomDe(p), p.email, nomBureau(p.bureauId), D.libelleRole(p.role),
-            rattachement(p), situation(p).texte, p.superAdmin ? "super admin" : ""];
+            rattachement(p), situation(p).texte, connexionTexte(p),
+            p.superAdmin ? "super admin" : ""];
   }
 
   function selection(sansTexte) {
@@ -728,14 +748,14 @@
      croire que les membres ont disparu. */
   function migrationFaite() { return !!(etat && etat.membres); }
 
-  function dessinePersonnes() {
+  function dessineUtilisateurs() {
     if (!etat) return;
     if (!migrationFaite()) {
-      hotes.titrePersonnes.textContent = "Migration à exécuter";
-      UI.vide(hotes.personnes).appendChild(el("div", { class: "al grave" }, [
+      hotes.titreUtilisateurs.textContent = "Migration à exécuter";
+      UI.vide(hotes.utilisateurs).appendChild(el("div", { class: "al grave" }, [
         el("span", { class: "q", text: "À faire" }),
         el("div", {}, [
-          el("b", { text: "Les personnes de l'équipe ne sont pas encore ici." }),
+          el("b", { text: "Les utilisateurs de l'équipe ne sont pas encore ici." }),
           el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
             "La base tient encore les membres et les accès dans deux listes séparées. Exécute ",
             el("code", { text: "migration-console-membres.sql" }),
@@ -750,47 +770,147 @@
     suivi.debut();
     var liste = selection(), mots = barre ? barre.termes() : [];
     var total = personnes().length;
-    hotes.titrePersonnes.textContent = nb(total, "personne", "personnes");
+    hotes.titreUtilisateurs.textContent = nb(total, "utilisateur", "utilisateurs");
     if (barre) barre.compte(liste.length, selection(true).length);
-    UI.vide(hotes.personnes);
+    UI.vide(hotes.utilisateurs);
     if (!liste.length) {
-      hotes.personnes.appendChild(el("div", {
-        class: "vide", text: filtreBureau || mots.length ? "Aucune personne pour cette recherche" : "Aucune personne"
+      hotes.utilisateurs.appendChild(el("div", {
+        class: "vide", text: filtreBureau || mots.length ? "Aucun utilisateur pour cette recherche" : "Aucun utilisateur"
       }));
       return;
     }
+    var plusieursBureaux = etat.bureaux.length > 1;
     var corps = el("tbody");
     liste.forEach(function (p) {
-      var s = situation(p);
-      var dessous = [rattachement(p), p.fiche ? capaciteTexte(p.capacite) : "Sans fiche au planning"].filter(Boolean).join(" · ");
-      corps.appendChild(suivi.marque(el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, [
+      var cellules = [
+        // Le nom, puis son adresse juste dessous : c'est par là qu'on cherche.
         el("td", {}, [
           el("div", { class: "principal" }, [
             UI.surligne(nomDe(p), mots),
             p.superAdmin ? el("span", { class: "etiq ing", text: "Super admin" }) : null,
             p.fiche && !p.actif ? el("span", { class: "etiq", text: "Inactif" }) : null
           ]),
-          dessous ? el("div", { class: "secondaire" }, [UI.surligne(dessous, mots)]) : null
+          p.fiche ? el("div", { class: "mail-ligne" }, [UI.surligne(p.email || "sans adresse", mots)]) : null
         ]),
-        el("td", {}, [UI.surligne(p.fiche ? D.libelleRole(p.role) : "—", mots)]),
-        el("td", {}, [UI.surligne(nomBureau(p.bureauId), mots)]),
-        el("td", {}, [
-          el("div", { class: "principal" }, [UI.surligne(p.email || "—", mots)]),
-          el("div", {}, [el("span", { class: "acces-etat " + s.classe }, [UI.surligne(s.texte, mots)])])
-        ]),
-        el("td", { class: "actions" }, [
-          p.email && p.accesActif ? UI.boutonIcone("lien", "Envoyer un lien de connexion", nomDe(p), function () { envoieLien(p); }) : null,
-          UI.boutonIcone("modifier", "Modifier", nomDe(p), function () { formulairePersonne(p); }),
-          p.superAdmin ? null : UI.boutonIcone("supprimer", "Supprimer", nomDe(p), function () { supprimePersonne(p); })
-        ])
-      ]), p.id || p.email));
+        el("td", {}, [selSuccursale(p)]),
+        el("td", {}, [selDiscipline(p)]),
+        el("td", {}, [selRole(p)]),
+        el("td", { class: "num", text: p.fiche ? C.fmtJours(p.capacite) : "—" }),
+        el("td", {}, [selAcces(p)]),
+        el("td", {}, [el("span", { class: "quand-ligne" }, [UI.surligne(connexionTexte(p), mots)])])
+      ];
+      if (plusieursBureaux) cellules.splice(1, 0, el("td", {}, [UI.surligne(nomBureau(p.bureauId), mots)]));
+      cellules.push(el("td", { class: "actions" }, [
+        p.email && p.accesActif ? UI.boutonIcone("lien", "Envoyer un lien de connexion", nomDe(p), function () { envoieLien(p); }) : null,
+        UI.boutonIcone("modifier", "Ouvrir la fiche", nomDe(p), function () { formulaireUtilisateur(p); }),
+        p.superAdmin ? null : UI.boutonIcone("supprimer", "Supprimer", nomDe(p), function () { supprimeUtilisateur(p); })
+      ]));
+      corps.appendChild(suivi.marque(el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, cellules), p.id || p.email));
     });
-    hotes.personnes.appendChild(el("table", { class: "liste" }, [
-      el("thead", {}, [el("tr", {}, ["Personne", "Rôle", "Bureau", "Accès à l'outil", ""].map(function (t) {
-        return el("th", { text: t });
-      }))]),
+    var entetes = ["Utilisateur", "Succursale", "Discipline", "Rôle", "j/sem.", "Accès", "Dernière connexion", ""];
+    if (plusieursBureaux) entetes.splice(1, 0, "Bureau");
+    hotes.utilisateurs.appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, entetes.map(function (t) { return el("th", { text: t }); }))]),
       corps
     ]));
+  }
+
+  /* ------------------------------------------------- réglages sur la ligne
+     Quatre menus déroulants par utilisateur : le geste courant (désigner un
+     rôle, rattacher à une succursale, suspendre un accès) se fait sans ouvrir
+     la fiche. Chacun renvoie la personne entière à la base, le champ changé
+     mis à jour ; en cas de refus, le menu reprend sa valeur d'avant. */
+
+  function menu(p, options, valeur, aria, surChoix, classes) {
+    var s = el("select", { class: "sel-ligne" + (classes ? " " + classes : ""), "aria-label": aria + " de " + nomDe(p) });
+    options.forEach(function (o) {
+      s.appendChild(el("option", { value: o.valeur, selected: String(o.valeur) === String(valeur == null ? "" : valeur) }, [o.label]));
+    });
+    if (!valeur) s.classList.add("vide");
+    s.addEventListener("change", function () {
+      var avant = valeur == null ? "" : String(valeur);
+      var choisi = s.value;
+      s.disabled = true;
+      surChoix(choisi, function () { s.value = avant; s.disabled = false; });
+    });
+    return s;
+  }
+
+  /** Enregistre la personne avec un champ changé. */
+  function enregistreVite(p, modif, message, annule) {
+    var donnees = {
+      id: p.id, bureauId: p.bureauId, prenom: p.prenom, nom: p.nom, role: p.role,
+      succursale: p.succursale, discipline: p.discipline, capacite: p.capacite,
+      actif: p.actif, avecFiche: p.fiche,
+      email: p.email, avecAcces: !!p.email, accesActif: p.accesActif
+    };
+    Object.keys(modif).forEach(function (c) { donnees[c] = modif[c]; });
+    return SB.rpc("console_enregistre_personne", { p: donnees }).then(function () {
+      UI.toast(message);
+      return apresChangement();
+    }).catch(function (e) { UI.toast(e.message); annule(); });
+  }
+
+  function selSuccursale(p) {
+    var l = listesDe(p.bureauId);
+    if (!p.fiche || !l.succursales.length) return el("span", { class: "secondaire", text: "—" });
+    var options = [{ valeur: "", label: "Non renseignée" }].concat(l.succursales.map(function (s) {
+      return { valeur: s.code, label: s.nom };
+    }));
+    return menu(p, options, p.succursale, "Succursale", function (code, annule) {
+      // La discipline suit : celle d'avant n'existe peut-être pas dans la nouvelle succursale.
+      var possibles = disciplinesDe(p.bureauId, code);
+      var disc = possibles.indexOf(p.discipline) >= 0 ? p.discipline : (possibles.length === 1 ? possibles[0] : "");
+      enregistreVite(p, { succursale: code, discipline: disc },
+        nomDe(p) + " : " + (code ? nomListe(l.succursales, code) : "sans succursale") + ".", annule);
+    });
+  }
+
+  function selDiscipline(p) {
+    var l = listesDe(p.bureauId);
+    if (!p.fiche || !l.disciplines.length) return el("span", { class: "secondaire", text: "—" });
+    var codes = disciplinesDe(p.bureauId, p.succursale);
+    var options = [{ valeur: "", label: "Non renseignée" }].concat(codes.map(function (c) {
+      return { valeur: c, label: nomListe(l.disciplines, c) };
+    }));
+    return menu(p, options, p.discipline, "Discipline", function (code, annule) {
+      enregistreVite(p, { discipline: code },
+        nomDe(p) + " : " + (code ? nomListe(l.disciplines, code) : "sans discipline") + ".", annule);
+    });
+  }
+
+  function selRole(p) {
+    if (!p.fiche) return el("span", { class: "secondaire", text: "—" });
+    var options = [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
+      return { valeur: k, label: D.ROLES[k] };
+    }));
+    return menu(p, options, p.role, "Rôle", function (role, annule) {
+      enregistreVite(p, { role: role },
+        nomDe(p) + " : " + D.libelleRole(role).toLowerCase() + ".", annule);
+    });
+  }
+
+  /** Ouvrir ou suspendre l'accès. Sans adresse, il n'y a rien à ouvrir. */
+  function selAcces(p) {
+    if (!p.email) return el("span", { class: "secondaire", text: "Sans accès" });
+    var s = menu(p, [
+      { valeur: "true", label: "Ouvert" },
+      { valeur: "false", label: "Suspendu" }
+    ], String(p.accesActif), "Accès", function (val, annule) {
+      enregistreVite(p, { accesActif: val === "true" },
+        nomDe(p) + (val === "true" ? " : accès ouvert." : " : accès suspendu."), annule);
+    }, p.accesActif ? "" : "suspendu");
+    if (p.superAdmin) { s.disabled = true; s.title = "Le super admin garde son accès."; }
+    return s;
+  }
+
+  /** Dernière connexion, ou l'étape où en est la personne. */
+  function connexionTexte(p) {
+    if (!p.email) return "—";
+    if (p.derniereConnexion) return quand(p.derniereConnexion);
+    if (p.confirme) return "compte activé";
+    if (p.compte) return "lien envoyé";
+    return "jamais venue";
   }
 
   /* ------------------------------------------------------- l'adresse proposée
@@ -828,7 +948,7 @@
 
   /* ------------------------------------------------------------- formulaire */
 
-  function formulairePersonne(p) {
+  function formulaireUtilisateur(p) {
     var nouveau = !p;
     if (!migrationFaite()) return UI.toast("Exécute d'abord migration-console-membres.sql dans Supabase.");
     if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
@@ -954,7 +1074,7 @@
     majAcces();
 
     UI.ouvre({
-      surtitre: nouveau ? "Nouvelle personne" : "Modifier",
+      surtitre: nouveau ? "Nouvel utilisateur" : "Modifier",
       titre: nouveau ? "Fiche et accès" : nomDe(p),
       corps: corps,
       boutons: [
@@ -1034,7 +1154,7 @@
     });
   }
 
-  function supprimePersonne(p) {
+  function supprimeUtilisateur(p) {
     // Un accès sans fiche : seul l'accès part. Une fiche : tout part avec elle.
     if (!p.fiche) {
       UI.confirme("Retirer l'accès de " + p.email + " ?",
