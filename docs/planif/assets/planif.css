@@ -197,12 +197,14 @@ p{margin:0}
 /* Tour filaire du tableau de bord (tour.js) : décor en haut à droite, jamais
    sous les mains — aucun clic ne l'atteint, et elle s'efface si la place manque. */
 .entete .surtitre,.entete h1,.entete .chapeau{position:relative;z-index:1}
-.tour-place{position:absolute;top:0;right:0;width:min(26vw,300px);height:300px;pointer-events:none}
+/* Cadre resserré sur la tour : elle n'occupe qu'une centaine de pixels de
+   large, les bords vides éloigneraient le filet pour rien. */
+.tour-place{position:absolute;top:0;right:0;width:min(15vw,150px);height:300px;pointer-events:none}
 .tour-place canvas{display:block;width:100%;height:100%}
 .entete.avec-tour{min-height:300px}
-.avec-tour .chapeau{max-width:min(52em,calc(100% - 330px))}
+.avec-tour .chapeau{max-width:min(52em,calc(100% - 190px))}
 /* Le filet s'arrête avant la tour : pas de trait qui la traverse */
-.avec-tour .filet-or{width:calc(100% - min(26vw,300px) - 36px)}
+.avec-tour .filet-or{width:calc(100% - min(15vw,150px) - 30px)}
 @media (max-width:1100px){
   .tour-place{display:none}
   .entete.avec-tour{min-height:0}

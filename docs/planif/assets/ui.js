@@ -704,7 +704,9 @@
       bloc.classList.toggle("remplie", plein);
       var url = new URL(location.href);
       if (champ.value.trim()) url.searchParams.set("q", champ.value.trim()); else url.searchParams.delete("q");
-      history.replaceState(null, "", url.pathname + url.search);
+      // Le fragment reste : la console s'en sert pour retenir la section ouverte,
+      // et le réécrire sans lui la renvoyait à la première à chaque chargement.
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
 
     champ.addEventListener("input", function () { etat(); o.surSaisie(champ.value); });
