@@ -16,6 +16,40 @@
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=33">
 <style>
+  /* Menu des sections, à gauche : une seule section à la fois, le menu reste
+     en vue pendant qu'on fait défiler la section ouverte. */
+  .console-grille{display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(24px,3vw,48px);align-items:start}
+  .console-menu{position:sticky;top:76px;display:grid;gap:1px}
+  .console-menu button{
+    display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;
+    background:none;border:0;border-left:1px solid var(--ligne);border-radius:0;
+    padding:12px 0 12px 14px;text-align:left;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--texte-faible);transition:color .25s,border-color .25s,padding-left .25s;
+  }
+  .console-menu button:hover{color:var(--texte);border-left-color:var(--or-doux)}
+  .console-menu button[aria-current="true"]{color:var(--or);border-left-color:var(--or);padding-left:18px}
+  .console-menu .compte{font-size:11px;letter-spacing:.06em;color:var(--texte-faible)}
+  .console-menu button[aria-current="true"] .compte{color:var(--or-doux)}
+  /* La section ouverte ne porte plus de filet : le menu sépare déjà */
+  .console-vue > .section{border-top:0;padding-top:0}
+  .console-vue > .section[hidden]{display:none}
+  @media (max-width:860px){
+    .console-grille{grid-template-columns:minmax(0,1fr);gap:18px}
+    .console-menu{
+      position:static;grid-auto-flow:column;grid-auto-columns:max-content;gap:0;
+      overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--ligne);
+    }
+    .console-menu::-webkit-scrollbar{display:none}
+    .console-menu button{
+      border-left:0;border-bottom:1px solid transparent;margin-bottom:-1px;
+      padding:12px 16px;min-height:44px;white-space:nowrap;
+    }
+    .console-menu button:hover{border-left:0;border-bottom-color:var(--or-doux)}
+    .console-menu button[aria-current="true"]{border-left:0;border-bottom-color:var(--or);padding-left:16px}
+    .console-menu .compte{display:none}
+  }
+
   /* Propre à la console : lignes suspendues, listes éditables du formulaire de bureau */
   table.liste tr.suspendu td{opacity:.55}
   table.liste tr.suspendu td.actions{opacity:1}
@@ -177,10 +211,13 @@
 
   function construit() {
     UI.vide(zone);
+    hotes.menu = el("nav", { class: "console-menu", "aria-label": "Sections de la console" });
+    hotes.vue = el("div", { class: "console-vue" });
+    zone.appendChild(el("div", { class: "console-grille" }, [hotes.menu, hotes.vue]));
 
     hotes.titreBureaux = el("h2");
     hotes.bureaux = el("div", { class: "defile" });
-    zone.appendChild(el("section", { class: "section", id: "bureaux" }, [
+    hotes.vue.appendChild(el("section", { class: "section", id: "bureaux" }, [
       el("div", { class: "tete-section" }, [
         el("div", {}, [el("div", { class: "num-section", text: "01 — Bureaux" }), hotes.titreBureaux]),
         el("div", { class: "outils" }, [
@@ -199,7 +236,7 @@
     });
     hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessinePersonnes(); });
     hotes.personnes = el("div", { class: "defile" });
-    zone.appendChild(el("section", { class: "section", id: "personnes" }, [
+    hotes.vue.appendChild(el("section", { class: "section", id: "personnes" }, [
       el("div", { class: "tete-section" }, [
         el("div", {}, [el("div", { class: "num-section", text: "02 — Personnes" }), hotes.titrePersonnes]),
         el("div", { class: "outils" }, [
@@ -220,12 +257,68 @@
     });
 
     hotes.miseEnRoute = el("div");
-    zone.appendChild(el("section", { class: "section", id: "mise-en-route" }, [
+    hotes.vue.appendChild(el("section", { class: "section", id: "mise-en-route" }, [
       el("div", { class: "tete-section" }, [
         el("div", {}, [el("div", { class: "num-section", text: "03 — Mise en route" }), el("h2", { text: "Réglages Supabase" })])
       ]),
       hotes.miseEnRoute
     ]));
+
+    construitMenu();
+    montre(cleDuHash(), true);
+    window.addEventListener("hashchange", function () { montre(cleDuHash(), true); });
+  }
+
+  /* ------------------------------------------------------------------ menu
+     Une section à la fois : la console est un outil de réglage, on y vient
+     pour une chose précise. L'adresse garde la section ouverte (#personnes),
+     ce qui permet d'y renvoyer depuis le planning. */
+
+  var SECTIONS = [
+    { cle: "bureaux", label: "Bureaux" },
+    { cle: "personnes", label: "Personnes" },
+    { cle: "mise-en-route", label: "Mise en route" }
+  ];
+
+  function cleDuHash() {
+    var h = String(location.hash || "").replace(/^#/, "");
+    return SECTIONS.some(function (s) { return s.cle === h; }) ? h : SECTIONS[0].cle;
+  }
+
+  function construitMenu() {
+    UI.vide(hotes.menu);
+    SECTIONS.forEach(function (s) {
+      var compte = el("span", { class: "compte" });
+      var b = el("button", { type: "button", "data-cle": s.cle, onclick: function () { montre(s.cle); } },
+        [el("span", { text: s.label }), compte]);
+      hotes.menu.appendChild(b);
+      s.hoteCompte = compte;
+    });
+  }
+
+  /** Affiche une section. depuisAdresse : l'adresse a déjà la bonne valeur. */
+  function montre(cle, depuisAdresse) {
+    SECTIONS.forEach(function (s) {
+      var section = document.getElementById(s.cle);
+      if (section) section.hidden = s.cle !== cle;
+      var b = hotes.menu.querySelector('[data-cle="' + s.cle + '"]');
+      if (b) b.setAttribute("aria-current", String(s.cle === cle));
+    });
+    if (!depuisAdresse && location.hash !== "#" + cle) {
+      history.replaceState(null, "", "#" + cle);
+    }
+  }
+
+  function majComptes() {
+    if (!etat) return;
+    var valeurs = {
+      bureaux: etat.bureaux.length,
+      personnes: personnes().length,
+      "mise-en-route": ""
+    };
+    SECTIONS.forEach(function (s) {
+      if (s.hoteCompte) s.hoteCompte.textContent = valeurs[s.cle] === "" ? "" : String(valeurs[s.cle]);
+    });
   }
 
   function rafraichit() {
@@ -234,6 +327,7 @@
     remplitFiltre();
     dessinePersonnes();
     dessineMiseEnRoute();
+    majComptes();
   }
 
   /* ----------------------------------------------------------------- bureaux */
@@ -258,7 +352,7 @@
         el("td", { class: "num" }, [
           b.membres ? el("button", {
             type: "button", class: "lien-nombre", title: "Voir ses personnes",
-            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessinePersonnes(); document.getElementById("personnes").scrollIntoView({ behavior: "smooth" }); }
+            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessinePersonnes(); montre("personnes"); }
           }, [String(b.membres)]) : "0"
         ]),
         el("td", { class: "num", text: String(nbU) }),
