@@ -128,3 +128,25 @@ et la même adresse dans **Redirect URLs**.
 3. Déconnexion, puis « Mot de passe oublié ou première connexion » avec la même adresse : second courriel,
    nouveau mot de passe.
 4. Avec une adresse qui n'est pas dans la console : « Cette adresse n'est pas autorisée ».
+
+## 8. Un courriel n'arrive pas
+
+Dans l'ordre, du plus fréquent au plus rare.
+
+- **Mis en quarantaine par le filtre du destinataire.** Constaté le 19.09.2026 avec un filtre d'entreprise :
+  sujet en anglais, expéditeur `noreply@mail.app.supabase.io`, motif « Spam ». Cette adresse d'envoi par
+  défaut est partagée par tous les projets Supabase et ne s'appuie pas sur le domaine du lien : beaucoup de
+  filtres la retiennent. Faire les étapes 4 et 5 : l'expéditeur devient l'adresse du domaine, signée SPF et
+  DKIM par lui, le texte passe en français et le lien ne transite plus par `supabase.co`. Puis demander au
+  destinataire (ou à son informatique) de libérer le message et de mettre `str-bim-tools.com` en liste
+  blanche — le domaine d'envoi, pas l'adresse Supabase partagée.
+- **Adresse hors de l'équipe Supabase, sans SMTP à soi.** Supabase refuse l'envoi et la console ouvre
+  « Courriel non envoyé ». Seule l'étape 4 y remédie.
+- **Limite d'envoi.** 2 courriels par heure sans SMTP à soi, 30 avec ; et 60 secondes entre deux demandes
+  pour une même adresse. La console affiche le message d'attente.
+- **Refus du serveur d'envoi** (mot de passe de la boîte, expéditeur différent de la boîte) : la réponse
+  exacte d'IONOS est dans Supabase, partie Logs, rubrique Auth.
+
+État du domaine au 19.09.2026, vérifié dans les DNS publics : SPF `include:_spf-eu.ionos.com`,
+DKIM `s1-ionos` et `s2-ionos` publiés, DMARC `p=none`. Rien à corriger de ce côté ; un `p=quarantine`
+avec adresse de rapport pourra venir plus tard, une fois quelques envois aboutis.
