@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Équipe</h1>
-    <p class="chapeau">Les membres du bureau, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge.</p>
+    <p class="chapeau">Les membres du bureau, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge. Les absences se posent ici ; le reste de la fiche se règle dans la console.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -64,16 +64,20 @@
   // c'est là qu'il reste du travail.
   var SECTIONS = [
     { role: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", masqueSiVide: true },
-    { role: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs", nouveau: "Nouvel ingénieur" },
-    { role: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs", nouveau: "Nouveau dessinateur" },
-    { role: "administrateur", titre: "Administrateurs", sing: "administrateur", plur: "administrateurs", nouveau: "Nouvel administrateur" },
-    { role: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs", nouveau: "Nouvel administratif" }
+    { role: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs" },
+    { role: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs" },
+    { role: "administrateur", titre: "Administrateurs", sing: "administrateur", plur: "administrateurs" },
+    { role: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs" }
   ];
 
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    UI.chrome("equipe", [{ label: "Nouveau membre", or: true, icone: "ico-ajout-membre", action: function () { formulaire(null, ""); } }]);
+    // Les fiches se tiennent dans la console : d'ici, on consulte et on pose les absences.
+    var p = D.profil();
+    UI.chrome("equipe", p && p.superAdmin
+      ? [{ label: "Console", or: true, icone: "ico-ajout-membre", action: function () { location.href = "/planif/console/#personnes"; } }]
+      : []);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
@@ -81,7 +85,7 @@
       hote: document.querySelector("[data-recherche]"),
       exemple: "Rechercher un nom, une succursale, une discipline, une absence…",
       surSaisie: dessine,
-      surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
+      surEntree: function () { var l = selection(); if (l.length === 1) UI.absences(l[0].id, dessine); }
     });
 
     try { Object.assign(filtres, JSON.parse(localStorage.getItem(CLE_FILTRES) || "{}")); } catch (e) {}
@@ -143,7 +147,7 @@
   }
 
   function champsCherches(m) {
-    return [m.prenom + " " + m.nom, m.email, D.libelleRole(m.role), rattachement(m), m.actif ? "" : "inactif"]
+    return [m.prenom + " " + m.nom, D.libelleRole(m.role), rattachement(m), m.actif ? "" : "inactif"]
       .concat(m.absences.map(function (a) { return a.motif; }));
   }
 
@@ -196,11 +200,6 @@
             el("div", { class: "num-section", text: (n < 10 ? "0" : "") + n + " — " + s.titre }),
             el("h2", { text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
           ]),
-          s.nouveau ? el("div", { class: "outils" }, [
-            el("button", { class: "btn btn-or", type: "button", onclick: function () { formulaire(null, s.role); } }, [
-              el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), s.nouveau
-            ])
-          ]) : null
         ]),
         liste
       ]));
@@ -218,7 +217,7 @@
         ? el("div", { class: "sans-resultat", style: "padding:26px 0 10px" }, [
             el("p", { class: "aide", style: "margin:0" }, ["Aucun " + s.sing + " pour « ", el("em", { style: "font-style:normal;color:var(--or)", text: q }), " »"])
           ])
-        : el("div", { class: "vide", text: filtre ? "Aucun " + s.sing + " pour ces filtres" : "Aucun " + s.sing + " enregistré" }));
+        : el("div", { class: "vide", text: filtre ? "Aucun " + s.sing + " pour ces filtres" : "Aucun " + s.sing + " — les fiches se créent dans la console" }));
       return;
     }
 
@@ -232,7 +231,7 @@
       var b = Calc.bilan(m, jours, rep[m.id], D.canton());
       var pourcent = b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
       var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
-      var sousTitre = [rattachement(m), m.email].filter(Boolean).join(" · ");
+      var sousTitre = rattachement(m);
 
       corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
         el("td", {}, [
@@ -240,7 +239,7 @@
           el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots)
             : (Object.keys(D.SUCCURSALES).length ? "Succursale non renseignée" : "")])
         ]),
-        el("td", {}, [choixRole(m)]),
+        el("td", {}, [UI.surligne(D.libelleRole(m.role), mots)]),
         el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
         el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
@@ -255,9 +254,7 @@
             : el("span", { class: "secondaire", text: "—" })
         ]),
         el("td", { class: "actions" }, [
-          UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); }),
-          UI.boutonIcone("modifier", "Modifier", m.prenom + " " + m.nom, function () { formulaire(m.id); }),
-          UI.boutonIcone("supprimer", "Supprimer", m.prenom + " " + m.nom, function () { supprime(m); })
+          UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); })
         ])
       ]), m.id));
     });
@@ -275,115 +272,6 @@
     ]));
   }
 
-  function optionsRole() {
-    return [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
-      return { valeur: k, label: D.ROLES[k] };
-    }));
-  }
-
-  /** Désignation directe depuis la liste, sans ouvrir la fiche. */
-  function choixRole(m) {
-    var s = el("select", {
-      class: "btn", "aria-label": "Rôle de " + m.prenom + " " + m.nom,
-      style: "text-transform:none;letter-spacing:.04em;padding-block:6px"
-    });
-    optionsRole().forEach(function (o) {
-      s.appendChild(el("option", { value: o.valeur, selected: o.valeur === m.role }, [o.label]));
-    });
-    s.addEventListener("change", function () {
-      var v = Object.assign({}, m, { role: s.value });
-      D.majMembre(m.id, v).then(function () {
-        dessine();
-        UI.toast(m.prenom + " " + m.nom + " : " + D.libelleRole(v.role).toLowerCase() + ".");
-      }).catch(function (e) { s.value = m.role; UI.toast(e.message); });
-    });
-    return s;
-  }
-
-  /* ------------------------------------------------------------ formulaire */
-
-  function formulaire(idMembre, roleDefaut) {
-    var m = idMembre ? D.membre(idMembre) : null;
-    var succ0 = m ? m.succursale : (filtres.succursale || "");
-    // Champs présents seulement si le bureau a des succursales, des disciplines
-    var avecSucc = Object.keys(D.SUCCURSALES).length > 0, avecDisc = Object.keys(D.DISCIPLINES).length > 0;
-    var corps = el("div", { class: "grille-champs" }, [
-      UI.champ({ nom: "prenom", label: "Prénom", valeur: m ? m.prenom : "", exemple: "Camille", autocomplete: "given-name" }),
-      UI.champ({ nom: "nom", label: "Nom", valeur: m ? m.nom : "", exemple: "Berger", autocomplete: "family-name" }),
-      avecSucc ? UI.champ({
-        nom: "succursale", label: "Succursale", type: "select", valeur: succ0,
-        options: [{ valeur: "", label: "Non renseignée" }].concat(Object.keys(D.SUCCURSALES).map(function (k) {
-          return { valeur: k, label: D.SUCCURSALES[k] };
-        }))
-      }) : null,
-      avecDisc ? UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] }) : null,
-      UI.champ({
-        nom: "role", label: "Rôle", type: "select", valeur: m ? m.role : (roleDefaut || ""),
-        options: optionsRole()
-      }),
-      UI.champ({
-        nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
-        valeur: m ? m.capacite : D.reglages().capaciteDefaut,
-        aide: "5 pour un plein temps, 4 pour un 80 %."
-      }),
-      UI.champ({ nom: "email", label: "Adresse e-mail (facultative)", type: "email", valeur: m ? m.email : "", exemple: "camille.berger@exemple.ch", large: true }),
-      UI.champ({
-        nom: "actif", label: "Présence à l'effectif", type: "select", valeur: m ? String(m.actif) : "true",
-        options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Inactif — masqué du planning" }]
-      })
-    ]);
-
-    // La liste des disciplines suit la succursale choisie
-    var selSucc = corps.querySelector("[name=succursale]"), selDisc = corps.querySelector("[name=discipline]");
-    function succChoisie() { return selSucc ? selSucc.value : ""; }
-    function remplitDisciplines(garde) {
-      if (!selDisc) return;
-      UI.vide(selDisc);
-      selDisc.appendChild(el("option", { value: "" }, ["Non renseignée"]));
-      disciplinesDe(succChoisie()).forEach(function (k) {
-        selDisc.appendChild(el("option", { value: k }, [D.DISCIPLINES[k]]));
-      });
-      selDisc.value = disciplinesDe(succChoisie()).indexOf(garde) >= 0 ? garde : "";
-    }
-    remplitDisciplines(m ? m.discipline : (filtres.discipline || ""));
-    // Une seule discipline possible dans la succursale : elle est choisie d'office
-    if (selSucc) selSucc.addEventListener("change", function () {
-      var cles = disciplinesDe(succChoisie());
-      remplitDisciplines(cles.length === 1 ? cles[0] : (selDisc ? selDisc.value : ""));
-    });
-
-    UI.ouvre({
-      surtitre: m ? "Modifier" : "Nouveau membre",
-      titre: m ? m.prenom + " " + m.nom : "Membre de l'équipe",
-      corps: corps,
-      boutons: [
-        { label: "Annuler" },
-        {
-          label: "Enregistrer", or: true, action: function () {
-            var v = UI.lit(corps);
-            v.actif = v.actif === "true";
-            var p = m ? D.majMembre(m.id, v) : D.ajouteMembre(v);
-            return p.then(function () { dessine(); UI.toast(m ? "Membre modifié." : "Membre ajouté."); })
-              .catch(function (e) { UI.toast(e.message); return false; });
-          }
-        }
-      ]
-    });
-  }
-
-  function supprime(m) {
-    var n = D.taches({ membreId: m.id }).length;
-    UI.confirme(
-      "Supprimer " + m.prenom + " " + m.nom + " ?",
-      n ? "Ce membre est affecté à " + n + (n > 1 ? " tâches" : " tâche") + ". Les tâches sont conservées mais se retrouveront sans affectation."
-        : "Ce membre sera retiré de l'équipe et des affaires auxquelles il participe.",
-      "Supprimer", true
-    ).then(function (ok) {
-      if (!ok) return;
-      D.suppMembre(m.id).then(function () { dessine(); UI.toast("Membre supprimé."); })
-        .catch(function (e) { UI.toast(e.message); });
-    });
-  }
 })();
 </script>
 </body>

@@ -15,8 +15,10 @@
 --
 --  Organisation : plusieurs bureaux d'études dans une même base. Chaque ligne
 --  appartient à un bureau ; la RLS cloisonne les bureaux, et chaque adresse
---  autorisée (table acces) ne voit que le sien. Le super admin gère bureaux
---  et accès depuis la console (/planif/console/), par des fonctions réservées.
+--  autorisée (table acces) ne voit que le sien. Le super admin gère bureaux,
+--  personnes et accès depuis la console (/planif/console/), par des fonctions
+--  réservées. L'outil lui-même ne crée ni ne modifie de membre : la table
+--  membres y est en lecture seule.
 --  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
 --  qui permet de publier cette clé dans un dépôt public.
 --
@@ -87,6 +89,8 @@ create table if not exists public.succursale_disciplines (
 -- ----------------------------------------------------------------- accès ---
 -- Une ligne par adresse autorisée : son bureau, son état, et pour le super
 -- admin le bureau qu'il consulte en ce moment (bureau_actif).
+-- membre_id : la fiche du planning derrière cette adresse. La contrainte vers
+-- membres est posée plus bas, une fois cette table-là créée.
 create table if not exists public.acces (
   email        text primary key constraint acces_email_minuscules check (email = lower(btrim(email))),
   bureau_id    uuid not null constraint acces_bureau_fk references public.bureaux (id) on delete cascade,
@@ -94,6 +98,7 @@ create table if not exists public.acces (
                constraint acces_droit_check check (droit in ('utilisateur', 'responsable')),
   super_admin  boolean not null default false,
   bureau_actif uuid constraint acces_bureau_actif_fk references public.bureaux (id) on delete set null,
+  membre_id    uuid,
   actif        boolean not null default true,
   ajoute_le    timestamptz not null default now()
 );
@@ -103,6 +108,8 @@ comment on column public.acces.droit is
   '« utilisateur » pour tous ; « responsable » est réservé à une délégation future (gérer les accès de son propre bureau).';
 comment on column public.acces.bureau_actif is
   'Super admin seulement : bureau affiché dans le planning. Vide : son propre bureau.';
+comment on column public.acces.membre_id is
+  'Membre planifié derrière cette adresse. Vide : accès sans fiche au planning (super admin, externe).';
 
 -- --------------------------------------------------- qui est connecté ? ---
 -- security definer : ces fonctions lisent acces et bureaux, fermés à tous.
@@ -179,7 +186,23 @@ create table if not exists public.membres (
     references public.disciplines (bureau_id, code) on delete set null (discipline)
 );
 create index if not exists membres_bureau on public.membres (bureau_id);
+
+-- Le lien accès → membre, maintenant que les deux tables existent. Un membre a
+-- au plus un accès ; un accès peut n'avoir aucune fiche (super admin, externe).
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'acces_membre_fk') then
+    alter table public.acces add constraint acces_membre_fk
+      foreign key (membre_id, bureau_id) references public.membres (id, bureau_id)
+      on delete set null (membre_id);
+  end if;
+end $$;
+create unique index if not exists acces_membre_unique
+  on public.acces (membre_id) where membre_id is not null;
+
 comment on column public.membres.capacite is 'Jours travaillés par semaine : 5 pour un plein temps.';
+comment on column public.membres.email is
+  'Adresse d''annuaire, facultative. Ce n''est PAS l''adresse de connexion (elle vit dans acces) : elle sert de repère aux jeux d''essai.';
 comment on column public.membres.role is 'Vide : membre pas encore désigné. Seuls ingénieurs, administrateurs et dessinateurs portent des tâches.';
 comment on column public.membres.succursale is 'Code d''une succursale du bureau (table succursales).';
 comment on column public.membres.discipline is 'Code d''une discipline du bureau (table disciplines).';
@@ -351,13 +374,18 @@ begin
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
 
-  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches'] loop
+  foreach t in array array['absences', 'affaires', 'affaire_membres', 'taches'] loop
     execute format(
       'create policy "bureau courant" on public.%I for all to authenticated
          using (bureau_id = (select public.bureau_courant()))
          with check (bureau_id = (select public.bureau_courant()))', t);
   end loop;
 end $$;
+
+-- Membres : l'outil les lit, il ne les écrit pas. Créer, modifier, supprimer
+-- une personne passe par la console (fonctions security definer, plus bas).
+create policy "bureau courant (lecture)" on public.membres for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
 
 -- Réglages : lus et modifiés (canton, capacité), jamais créés ni supprimés depuis l'outil
 create policy "bureau courant (lecture)" on public.reglages for select to authenticated
@@ -483,10 +511,27 @@ begin
         order by lower(b.nom))
       from public.bureaux b
       left join public.reglages r on r.bureau_id = b.id), '[]'::jsonb),
+    -- Les fiches du planning, avec l'accès de chacune s'il existe
+    'membres', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'id', m.id, 'bureauId', m.bureau_id, 'prenom', m.prenom, 'nom', m.nom,
+          'role', m.role, 'succursale', m.succursale, 'discipline', m.discipline,
+          'capacite', m.capacite, 'actif', m.actif,
+          'email', a.email, 'accesActif', a.actif, 'superAdmin', coalesce(a.super_admin, false),
+          'compte', u.id is not null,
+          'confirme', u.email_confirmed_at is not null,
+          'derniereConnexion', u.last_sign_in_at,
+          'taches', (select count(*) from public.taches t
+                      where t.ingenieur_id = m.id or t.dessinateur_id = m.id))
+        order by lower(m.prenom), lower(m.nom))
+      from public.membres m
+      left join public.acces a on a.membre_id = m.id
+      left join auth.users u on lower(u.email) = a.email), '[]'::jsonb),
+    -- Les accès, y compris ceux qui n'ont pas de fiche au planning
     'utilisateurs', coalesce((
       select jsonb_agg(jsonb_build_object(
           'email', a.email, 'bureauId', a.bureau_id, 'superAdmin', a.super_admin,
-          'actif', a.actif, 'droit', a.droit, 'ajoute', a.ajoute_le,
+          'actif', a.actif, 'droit', a.droit, 'ajoute', a.ajoute_le, 'membreId', a.membre_id,
           'compte', u.id is not null,
           'confirme', u.email_confirmed_at is not null,
           'derniereConnexion', u.last_sign_in_at)
@@ -616,40 +661,176 @@ begin
   end if;
 end $$;
 
--- Ajoute ou modifie un accès : adresse, bureau, actif ou suspendu
-create or replace function public.console_enregistre_utilisateur(p jsonb)
-returns void
+-- ------------------------------------------ une adresse depuis le nom ---
+
+-- Minuscules, sans accent, sans espace ni ponctuation (le trait d'union reste).
+create or replace function public.simplifie_nom(p text)
+returns text
+language sql immutable set search_path = '' as $$
+  select regexp_replace(
+           translate(
+             replace(replace(replace(replace(
+               lower(btrim(coalesce(p, ''))),
+               'œ', 'oe'), 'æ', 'ae'), 'ß', 'ss'), 'ø', 'o'),
+             'àáâãäåçèéêëìíîïñòóôõöùúûüýÿ',
+             'aaaaaaceeeeiiiinooooouuuuyy'),
+           '[^a-z0-9-]', '', 'g');
+$$;
+
+-- Tony Varin → t.varin@<domaine>. Nul si le nom ou le prénom ne donne rien.
+create or replace function public.adresse_depuis_nom(p_prenom text, p_nom text, p_domaine text)
+returns text
+language sql immutable set search_path = '' as $$
+  select case
+           when public.simplifie_nom(p_prenom) = '' or public.simplifie_nom(p_nom) = ''
+             or btrim(coalesce(p_domaine, '')) = '' then null
+           else left(public.simplifie_nom(p_prenom), 1) || '.' ||
+                public.simplifie_nom(p_nom) || '@' || lower(btrim(p_domaine))
+         end;
+$$;
+
+-- ------------------------------------------ enregistrer une personne ---
+
+
+-- Fiche du membre et accès en une fois. Renvoie l'id du membre (nul si la
+-- ligne n'est qu'un accès, sans fiche au planning).
+--   { id, bureauId, prenom, nom, role, succursale, discipline, capacite,
+--     actif, avecFiche, email, avecAcces, accesActif }
+create or replace function public.console_enregistre_personne(p jsonb)
+returns uuid
 language plpgsql volatile security definer set search_path = '' as $$
 declare
-  v_email   text := lower(btrim(coalesce(p ->> 'email', '')));
-  v_bureau  uuid := nullif(p ->> 'bureauId', '')::uuid;
-  v_actif   boolean := coalesce((p ->> 'actif')::boolean, true);
-  v_nouveau boolean := coalesce((p ->> 'nouveau')::boolean, false);
-  v_nom     text;
+  v_id        uuid    := nullif(p ->> 'id', '')::uuid;
+  v_bureau    uuid    := nullif(p ->> 'bureauId', '')::uuid;
+  v_prenom    text    := btrim(coalesce(p ->> 'prenom', ''));
+  v_nom       text    := btrim(coalesce(p ->> 'nom', ''));
+  v_role      text    := nullif(btrim(coalesce(p ->> 'role', '')), '');
+  v_succ      text    := nullif(btrim(coalesce(p ->> 'succursale', '')), '');
+  v_disc      text    := nullif(btrim(coalesce(p ->> 'discipline', '')), '');
+  v_capacite  numeric := coalesce(nullif(p ->> 'capacite', '')::numeric, 5);
+  v_actif     boolean := coalesce((p ->> 'actif')::boolean, true);
+  v_fiche     boolean := coalesce((p ->> 'avecFiche')::boolean, true);
+  v_email     text    := lower(btrim(coalesce(p ->> 'email', '')));
+  v_acces     boolean := coalesce((p ->> 'avecAcces')::boolean, false);
+  v_ac_actif  boolean := coalesce((p ->> 'accesActif')::boolean, false);
+  v_ancien    text;
 begin
   if not public.est_super_admin() then
     raise exception 'Console réservée au super admin.';
   end if;
-  if v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]{2,}$' then
-    raise exception 'Cette adresse e-mail n''est pas valide.';
-  end if;
   if v_bureau is null or not exists (select 1 from public.bureaux x where x.id = v_bureau) then
-    raise exception 'Choisis le bureau de cet utilisateur.';
+    raise exception 'Choisis le bureau de cette personne.';
   end if;
-  if not v_actif and exists (select 1 from public.acces a where a.email = v_email and a.super_admin) then
-    raise exception 'Le super admin ne peut pas être suspendu.';
+  if not v_fiche and not v_acces then
+    raise exception 'Une personne sans fiche au planning et sans accès n''a rien à enregistrer.';
   end if;
-  if v_nouveau then
-    select x.nom into v_nom
-    from public.acces a join public.bureaux x on x.id = a.bureau_id
-    where a.email = v_email;
-    if found then
-      raise exception 'Cette adresse a déjà un accès, au bureau « % ».', v_nom;
+
+  -- ------------------------------------------------------------ la fiche ---
+  if v_fiche then
+    if v_prenom = '' then raise exception 'Le prénom est obligatoire.'; end if;
+    if v_nom    = '' then raise exception 'Le nom est obligatoire.';    end if;
+    if v_role is not null and v_role not in ('ingenieur', 'dessinateur', 'administrateur', 'administratif') then
+      raise exception 'Rôle inconnu.';
+    end if;
+    if not (v_capacite >= 0.5 and v_capacite <= 7) then
+      raise exception 'La capacité doit être comprise entre 0,5 et 7 jours par semaine.';
+    end if;
+    if v_succ is not null and not exists (
+         select 1 from public.succursales s where s.bureau_id = v_bureau and s.code = v_succ) then
+      raise exception 'Cette succursale n''existe pas dans ce bureau.';
+    end if;
+    if v_disc is not null and not exists (
+         select 1 from public.disciplines d where d.bureau_id = v_bureau and d.code = v_disc) then
+      raise exception 'Cette discipline n''existe pas dans ce bureau.';
+    end if;
+
+    if v_id is null then
+      insert into public.membres (bureau_id, prenom, nom, role, succursale, discipline, capacite, actif)
+      values (v_bureau, v_prenom, v_nom, v_role, v_succ, v_disc, round(v_capacite, 1), v_actif)
+      returning id into v_id;
+    else
+      update public.membres m
+         set bureau_id = v_bureau, prenom = v_prenom, nom = v_nom, role = v_role,
+             succursale = v_succ, discipline = v_disc, capacite = round(v_capacite, 1), actif = v_actif
+       where m.id = v_id;
+      if not found then
+        raise exception 'Cette personne n''existe plus.';
+      end if;
     end if;
   end if;
 
-  insert into public.acces (email, bureau_id, actif) values (v_email, v_bureau, v_actif)
-  on conflict (email) do update set bureau_id = excluded.bureau_id, actif = excluded.actif;
+  -- ------------------------------------------------------------- l'accès ---
+  if v_id is not null then
+    select a.email into v_ancien from public.acces a where a.membre_id = v_id;
+  end if;
+
+  if not v_acces then
+    -- L'accès est retiré : la fiche reste, la personne ne se connecte plus.
+    if v_ancien is not null then
+      if exists (select 1 from public.acces a where a.email = v_ancien and a.super_admin) then
+        raise exception 'Le super admin ne peut pas perdre son accès depuis la console.';
+      end if;
+      delete from public.acces a where a.email = v_ancien;
+    end if;
+    return v_id;
+  end if;
+
+  if v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]{2,}$' then
+    raise exception 'Cette adresse e-mail n''est pas valide.';
+  end if;
+
+  -- L'adresse est la clé du compte de connexion : elle ne peut plus bouger
+  -- une fois le compte créé, sinon la personne ne se reconnaîtrait plus.
+  if v_ancien is not null and v_ancien is distinct from v_email
+     and exists (select 1 from auth.users u where lower(u.email) = v_ancien) then
+    raise exception 'Le compte de % est déjà créé : son adresse ne peut plus changer. Retire son accès, puis crée-lui-en un autre.', v_ancien;
+  end if;
+
+  -- L'adresse appartient-elle déjà à quelqu'un d'autre ?
+  if exists (select 1 from public.acces a
+              where a.email = v_email
+                and a.membre_id is not null
+                and (v_id is null or a.membre_id <> v_id)) then
+    raise exception 'L''adresse % est déjà celle d''une autre personne.', v_email;
+  end if;
+
+  if v_ancien is not null and v_ancien is distinct from v_email then
+    delete from public.acces a where a.email = v_ancien;
+  end if;
+
+  if not v_ac_actif and exists (select 1 from public.acces a where a.email = v_email and a.super_admin) then
+    raise exception 'Le super admin ne peut pas être suspendu.';
+  end if;
+
+  -- Une adresse déjà inscrite sans fiche (accès créé avant la fiche) est
+  -- rattachée à ce membre plutôt que refusée.
+  insert into public.acces (email, bureau_id, membre_id, actif)
+  values (v_email, v_bureau, v_id, v_ac_actif)
+  on conflict (email) do update
+    set bureau_id = excluded.bureau_id,
+        membre_id = excluded.membre_id,
+        actif     = excluded.actif;
+
+  return v_id;
+end $$;
+
+-- Supprime une personne : sa fiche, son accès, ses absences, ses équipes.
+-- Ses tâches restent, sans affectation.
+create or replace function public.console_supprime_membre(p_membre uuid)
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  if exists (select 1 from public.acces a where a.membre_id = p_membre and a.super_admin) then
+    raise exception 'Le super admin ne peut pas être supprimé depuis la console.';
+  end if;
+  delete from public.acces  a where a.membre_id = p_membre;
+  delete from public.membres m where m.id = p_membre;
+  if not found then
+    raise exception 'Cette personne n''existe plus.';
+  end if;
 end $$;
 
 -- Retire un accès. Le compte de connexion reste, mais n'ouvre plus rien.
@@ -704,12 +885,16 @@ begin
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_profil()', 'public.choisit_bureau(uuid)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
-    'public.console_enregistre_utilisateur(jsonb)', 'public.console_supprime_utilisateur(text)'
+    'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
+    'public.console_supprime_utilisateur(text)'
   ] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated', f);
   end loop;
 end $$;
+
+revoke all on function public.simplifie_nom(text) from public, anon;
+revoke all on function public.adresse_depuis_nom(text, text, text) from public, anon;
 
 revoke all on function public.bureau_cree_reglages() from public, anon, authenticated;
 revoke all on function public.garde_creation_compte(jsonb) from public, anon, authenticated;

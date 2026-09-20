@@ -68,7 +68,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification · super admin</div>
     <h1>Console</h1>
-    <p class="chapeau">Les bureaux d'études et les adresses autorisées à s'y connecter. Chaque utilisateur ne voit que les données de son bureau ; toi, tu passes de l'un à l'autre par le menu du bureau, en haut de page.</p>
+    <p class="chapeau">Les bureaux d'études et les personnes qui y travaillent : leur fiche au planning et, pour celles qui s'y connectent, leur accès. Chacune ne voit que les données de son bureau ; toi, tu passes de l'un à l'autre par le menu du bureau, en haut de page.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -87,9 +87,9 @@
   "use strict";
   var D = window.Donnees, C = window.Cal, SB = window.Sb, el = UI.el;
 
-  var etat = null;            // réponse de console_etat : { moi, bureaux, utilisateurs }
+  var etat = null;            // réponse de console_etat : { moi, bureaux, membres, utilisateurs }
   var auth = null;            // réglages publics de Supabase Auth (inscriptions, confirmation)
-  var barre = null;           // recherche des utilisateurs
+  var barre = null;           // recherche des personnes
   var filtreBureau = "";
   var hotes = {};             // conteneurs, remplis à chaque rafraîchissement
   var suivi = UI.suiviApparitions();
@@ -125,7 +125,7 @@
   function actionsBarre() {
     return [
       { label: "Nouveau bureau", icone: "ico-ajout-bureau", action: function () { formulaireBureau(null); } },
-      { label: "Nouvel utilisateur", or: true, icone: "ico-ajout-membre", action: function () { formulaireUtilisateur(null); } }
+      { label: "Nouvelle personne", or: true, icone: "ico-ajout-membre", action: function () { formulairePersonne(null); } }
     ];
   }
 
@@ -192,31 +192,31 @@
       hotes.bureaux
     ]));
 
-    hotes.titreUtilisateurs = el("h2");
+    hotes.titrePersonnes = el("h2");
     hotes.recherche = el("div");
     hotes.filtre = el("select", {
       class: "btn", style: "text-transform:none;letter-spacing:.04em;max-width:320px", "aria-label": "Filtrer par bureau"
     });
-    hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessineUtilisateurs(); });
-    hotes.utilisateurs = el("div", { class: "defile" });
-    zone.appendChild(el("section", { class: "section", id: "utilisateurs" }, [
+    hotes.filtre.addEventListener("change", function () { filtreBureau = hotes.filtre.value; dessinePersonnes(); });
+    hotes.personnes = el("div", { class: "defile" });
+    zone.appendChild(el("section", { class: "section", id: "personnes" }, [
       el("div", { class: "tete-section" }, [
-        el("div", {}, [el("div", { class: "num-section", text: "02 — Utilisateurs" }), hotes.titreUtilisateurs]),
+        el("div", {}, [el("div", { class: "num-section", text: "02 — Personnes" }), hotes.titrePersonnes]),
         el("div", { class: "outils" }, [
-          el("button", { id: "btn-nouvelle", class: "btn btn-or", type: "button", onclick: function () { formulaireUtilisateur(null); } }, [
-            el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouvel utilisateur"
+          el("button", { id: "btn-nouvelle", class: "btn btn-or", type: "button", onclick: function () { formulairePersonne(null); } }, [
+            el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouvelle personne"
           ])
         ])
       ]),
       hotes.recherche,
       el("div", { class: "plan-barre", style: "margin-top:-8px" }, [hotes.filtre]),
-      hotes.utilisateurs
+      hotes.personnes
     ]));
     barre = UI.recherche({
       hote: hotes.recherche,
-      exemple: "Rechercher une adresse, un bureau…",
-      surSaisie: dessineUtilisateurs,
-      surEntree: function () { var l = selection(); if (l.length === 1) formulaireUtilisateur(l[0]); }
+      exemple: "Rechercher un nom, une adresse, un bureau…",
+      surSaisie: dessinePersonnes,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulairePersonne(l[0]); }
     });
 
     hotes.miseEnRoute = el("div");
@@ -232,7 +232,7 @@
     if (!etat) return;
     dessineBureaux();
     remplitFiltre();
-    dessineUtilisateurs();
+    dessinePersonnes();
     dessineMiseEnRoute();
   }
 
@@ -256,12 +256,12 @@
           el("div", { class: "secondaire", text: details })
         ]),
         el("td", { class: "num" }, [
-          nbU ? el("button", {
-            type: "button", class: "lien-nombre", title: "Voir ses utilisateurs",
-            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessineUtilisateurs(); document.getElementById("utilisateurs").scrollIntoView({ behavior: "smooth" }); }
-          }, [String(nbU)]) : "0"
+          b.membres ? el("button", {
+            type: "button", class: "lien-nombre", title: "Voir ses personnes",
+            onclick: function () { filtreBureau = b.id; remplitFiltre(); dessinePersonnes(); document.getElementById("personnes").scrollIntoView({ behavior: "smooth" }); }
+          }, [String(b.membres)]) : "0"
         ]),
-        el("td", { class: "num", text: String(b.membres) }),
+        el("td", { class: "num", text: String(nbU) }),
         el("td", { class: "num", text: String(b.affaires) }),
         el("td", { class: "num", text: String(b.taches) }),
         el("td", { class: "num", text: b.activite ? quand(b.activite) : "—" }),
@@ -273,7 +273,7 @@
       ]));
     });
     UI.vide(hotes.bureaux).appendChild(el("table", { class: "liste" }, [
-      el("thead", {}, [el("tr", {}, ["Bureau", "Utilisateurs", "Membres", "Affaires", "Tâches", "Dernière activité", ""].map(function (t) {
+      el("thead", {}, [el("tr", {}, ["Bureau", "Personnes", "Avec accès", "Affaires", "Tâches", "Dernière activité", ""].map(function (t) {
         return el("th", { text: t });
       }))]),
       corps
@@ -528,7 +528,11 @@
     });
   }
 
-  /* ------------------------------------------------------------ utilisateurs */
+  /* ---------------------------------------------------------------- personnes
+     Une personne, c'est sa fiche au planning (prénom, rôle, capacité…) et, si
+     elle se connecte à l'outil, son accès. Les deux s'enregistrent ensemble.
+     Un accès sans fiche reste possible — le super admin, un externe : il
+     paraît ici sans rôle ni capacité, et peut recevoir sa fiche plus tard. */
 
   function remplitFiltre() {
     var f = UI.vide(hotes.filtre);
@@ -538,118 +542,326 @@
     f.value = filtreBureau;
   }
 
-  /** Où en est la personne : du simple accès inscrit à la dernière connexion. */
-  function situation(u) {
-    if (!u.actif) return { texte: "Accès suspendu", classe: "alerte" };
-    if (u.derniereConnexion) return { texte: "Dernière connexion : " + quand(u.derniereConnexion), classe: "" };
-    if (u.confirme) return { texte: "Compte activé, jamais connecté", classe: "attente" };
-    if (u.compte) return { texte: "Lien envoyé, pas encore ouvert", classe: "attente" };
+  /* Succursales et disciplines appartiennent à un bureau : la console en sert
+     plusieurs, elle ne peut pas se reposer sur les listes du bureau affiché. */
+  function listesDe(idBureau) {
+    var b = bureau(idBureau);
+    return { succursales: (b && b.succursales) || [], disciplines: (b && b.disciplines) || [] };
+  }
+
+  function nomListe(liste, code) {
+    var x = liste.filter(function (e) { return e.code === code; })[0];
+    return x ? x.nom : "";
+  }
+
+  /** Disciplines ouvertes dans une succursale ; aucune déclarée : toutes celles du bureau. */
+  function disciplinesDe(idBureau, codeSucc) {
+    var l = listesDe(idBureau);
+    var s = l.succursales.filter(function (e) { return e.code === codeSucc; })[0];
+    if (!s || !s.disciplines || !s.disciplines.length) return l.disciplines.map(function (d) { return d.code; });
+    return s.disciplines;
+  }
+
+  function rattachement(p) {
+    var l = listesDe(p.bureauId);
+    return [nomListe(l.succursales, p.succursale), nomListe(l.disciplines, p.discipline)].filter(Boolean).join(" · ");
+  }
+
+  function capaciteTexte(c) {
+    return c == null ? "" : String(c).replace(".", ",") + " j/sem.";
+  }
+
+  /** Fiches et accès réunis : chaque membre, puis les accès qui n'ont pas de fiche. */
+  function personnes() {
+    var liste = (etat.membres || []).map(function (m) {
+      return {
+        id: m.id, bureauId: m.bureauId, prenom: m.prenom, nom: m.nom, role: m.role,
+        succursale: m.succursale, discipline: m.discipline, capacite: m.capacite,
+        actif: m.actif, taches: m.taches || 0, fiche: true,
+        email: m.email || "", accesActif: !!m.accesActif, superAdmin: !!m.superAdmin,
+        compte: !!m.compte, confirme: !!m.confirme, derniereConnexion: m.derniereConnexion
+      };
+    });
+    (etat.utilisateurs || []).forEach(function (u) {
+      if (u.membreId) return;
+      liste.push({
+        id: null, bureauId: u.bureauId, prenom: "", nom: "", role: null,
+        succursale: null, discipline: null, capacite: null,
+        actif: true, taches: 0, fiche: false,
+        email: u.email, accesActif: !!u.actif, superAdmin: !!u.superAdmin,
+        compte: !!u.compte, confirme: !!u.confirme, derniereConnexion: u.derniereConnexion,
+        ajoute: u.ajoute
+      });
+    });
+    return liste;
+  }
+
+  function nomDe(p) { return p.fiche ? p.prenom + " " + p.nom : p.email; }
+
+  /** Où en est la personne : de la fiche sans accès à la dernière connexion. */
+  function situation(p) {
+    if (!p.email)           return { texte: "Ne se connecte pas", classe: "attente" };
+    if (!p.accesActif)      return { texte: "Accès suspendu", classe: "alerte" };
+    if (p.derniereConnexion) return { texte: "Dernière connexion : " + quand(p.derniereConnexion), classe: "" };
+    if (p.confirme)         return { texte: "Compte activé, jamais connecté", classe: "attente" };
+    if (p.compte)           return { texte: "Lien envoyé, pas encore ouvert", classe: "attente" };
     return { texte: "Pas encore de compte : envoie-lui le lien", classe: "attente" };
   }
 
-  function champsCherches(u) {
-    return [u.email, nomBureau(u.bureauId), situation(u).texte, u.superAdmin ? "super admin" : ""];
+  function champsCherches(p) {
+    return [nomDe(p), p.email, nomBureau(p.bureauId), D.libelleRole(p.role),
+            rattachement(p), situation(p).texte, p.superAdmin ? "super admin" : ""];
   }
 
   function selection(sansTexte) {
     var mots = sansTexte || !barre ? [] : barre.termes();
-    return etat.utilisateurs.filter(function (u) {
-      if (filtreBureau && u.bureauId !== filtreBureau) return false;
-      return UI.correspond(champsCherches(u), mots);
+    return personnes().filter(function (p) {
+      if (filtreBureau && p.bureauId !== filtreBureau) return false;
+      return UI.correspond(champsCherches(p), mots);
     });
   }
 
-  function dessineUtilisateurs() {
+  function dessinePersonnes() {
     if (!etat) return;
     suivi.debut();
     var liste = selection(), mots = barre ? barre.termes() : [];
-    hotes.titreUtilisateurs.textContent = nb(etat.utilisateurs.length, "utilisateur", "utilisateurs");
+    var total = personnes().length;
+    hotes.titrePersonnes.textContent = nb(total, "personne", "personnes");
     if (barre) barre.compte(liste.length, selection(true).length);
-    UI.vide(hotes.utilisateurs);
+    UI.vide(hotes.personnes);
     if (!liste.length) {
-      hotes.utilisateurs.appendChild(el("div", { class: "vide", text: filtreBureau || mots.length ? "Aucun utilisateur pour cette recherche" : "Aucun utilisateur" }));
+      hotes.personnes.appendChild(el("div", {
+        class: "vide", text: filtreBureau || mots.length ? "Aucune personne pour cette recherche" : "Aucune personne"
+      }));
       return;
     }
     var corps = el("tbody");
-    liste.forEach(function (u) {
-      var s = situation(u);
-      corps.appendChild(suivi.marque(el("tr", { class: u.actif ? "" : "suspendu" }, [
+    liste.forEach(function (p) {
+      var s = situation(p);
+      var dessous = [rattachement(p), p.fiche ? capaciteTexte(p.capacite) : "Sans fiche au planning"].filter(Boolean).join(" · ");
+      corps.appendChild(suivi.marque(el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, [
         el("td", {}, [
-          el("div", { class: "principal" }, [UI.surligne(u.email, mots), u.superAdmin ? el("span", { class: "etiq ing", text: "Super admin" }) : null]),
-          el("div", { class: "secondaire", text: "Inscrit le " + C.fmtCH(String(u.ajoute || "").slice(0, 10)) })
+          el("div", { class: "principal" }, [
+            UI.surligne(nomDe(p), mots),
+            p.superAdmin ? el("span", { class: "etiq ing", text: "Super admin" }) : null,
+            p.fiche && !p.actif ? el("span", { class: "etiq", text: "Inactif" }) : null
+          ]),
+          dessous ? el("div", { class: "secondaire" }, [UI.surligne(dessous, mots)]) : null
         ]),
-        el("td", {}, [UI.surligne(nomBureau(u.bureauId), mots)]),
-        el("td", {}, [el("span", { class: "acces-etat " + s.classe }, [UI.surligne(s.texte, mots)])]),
+        el("td", {}, [UI.surligne(p.fiche ? D.libelleRole(p.role) : "—", mots)]),
+        el("td", {}, [UI.surligne(nomBureau(p.bureauId), mots)]),
+        el("td", {}, [
+          el("div", { class: "principal" }, [UI.surligne(p.email || "—", mots)]),
+          el("div", {}, [el("span", { class: "acces-etat " + s.classe }, [UI.surligne(s.texte, mots)])])
+        ]),
         el("td", { class: "actions" }, [
-          u.actif ? UI.boutonIcone("lien", "Envoyer un lien de connexion", u.email, function () { envoieLien(u); }) : null,
-          UI.boutonIcone("modifier", "Modifier", u.email, function () { formulaireUtilisateur(u); }),
-          u.superAdmin ? null : UI.boutonIcone("supprimer", "Retirer l'accès", u.email, function () { supprimeUtilisateur(u); })
+          p.email && p.accesActif ? UI.boutonIcone("lien", "Envoyer un lien de connexion", nomDe(p), function () { envoieLien(p); }) : null,
+          UI.boutonIcone("modifier", "Modifier", nomDe(p), function () { formulairePersonne(p); }),
+          p.superAdmin ? null : UI.boutonIcone("supprimer", "Supprimer", nomDe(p), function () { supprimePersonne(p); })
         ])
-      ]), u.email));
+      ]), p.id || p.email));
     });
-    hotes.utilisateurs.appendChild(el("table", { class: "liste" }, [
-      el("thead", {}, [el("tr", {}, ["Adresse", "Bureau", "Connexion", ""].map(function (t) { return el("th", { text: t }); }))]),
+    hotes.personnes.appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, ["Personne", "Rôle", "Bureau", "Accès à l'outil", ""].map(function (t) {
+        return el("th", { text: t });
+      }))]),
       corps
     ]));
   }
 
-  function formulaireUtilisateur(u) {
-    var nouveau = !u;
-    if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
-    var p = D.profil();
-    var bureauInit = u ? u.bureauId : (filtreBureau || (p.bureau && bureau(p.bureau.id) ? p.bureau.id : etat.bureaux[0].id));
+  /* ------------------------------------------------------- l'adresse proposée
+     Même règle que la base (adresse_depuis_nom) : Tony Varin → t.varin@…
+     Le domaine est celui que portent déjà les adresses du bureau ; aucune
+     adresse n'est écrite dans le dépôt. */
 
-    var champs = el("div", { class: "grille-champs" }, [
-      UI.champ({ nom: "email", label: "Adresse e-mail", type: "email", valeur: u ? u.email : "", exemple: "prenom.nom@bureau.ch", large: true }),
-      UI.champ({
-        nom: "bureauId", label: "Bureau", type: "select", valeur: bureauInit,
-        options: etat.bureaux.map(function (b) { return { valeur: b.id, label: b.nom + (b.actif ? "" : " (suspendu)") }; })
-      }),
-      UI.champ({
-        nom: "actif", label: "Accès", type: "select", valeur: u ? String(u.actif) : "true",
-        options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Suspendu" }]
-      })
+  function simplifie(t) {
+    return String(t || "").toLowerCase()
+      .replace(/œ/g, "oe").replace(/æ/g, "ae").replace(/ø/g, "o").replace(/ß/g, "ss")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9-]/g, "");
+  }
+
+  /** Domaine le plus répandu parmi les accès du bureau, sinon tous bureaux confondus. */
+  function domaineDe(idBureau) {
+    function cherche(id) {
+      var comptes = {}, meilleur = "", n = 0;
+      (etat.utilisateurs || []).forEach(function (u) {
+        if (id && u.bureauId !== id) return;
+        var d = String(u.email || "").split("@")[1];
+        if (!d) return;
+        comptes[d] = (comptes[d] || 0) + 1;
+        if (comptes[d] > n) { n = comptes[d]; meilleur = d; }
+      });
+      return meilleur;
+    }
+    return cherche(idBureau) || cherche("");
+  }
+
+  function proposeAdresse(prenom, nom, idBureau) {
+    var p = simplifie(prenom), f = simplifie(nom), d = domaineDe(idBureau);
+    return p && f && d ? p.charAt(0) + "." + f + "@" + d : "";
+  }
+
+  /* ------------------------------------------------------------- formulaire */
+
+  function formulairePersonne(p) {
+    var nouveau = !p;
+    if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
+    var prof = D.profil();
+    var bureauInit = p ? p.bureauId
+      : (filtreBureau || (prof.bureau && bureau(prof.bureau.id) ? prof.bureau.id : etat.bureaux[0].id));
+    var capDefaut = (bureau(bureauInit) || {}).capaciteDefaut || 5;
+
+    /* --------------------------------------------------------- la fiche --- */
+    var chBureau = UI.champ({
+      nom: "bureauId", label: "Bureau", type: "select", valeur: bureauInit,
+      options: etat.bureaux.map(function (b) { return { valeur: b.id, label: b.nom + (b.actif ? "" : " (suspendu)") }; })
+    });
+    var chPrenom = UI.champ({ nom: "prenom", label: "Prénom", valeur: p ? p.prenom : "", exemple: "Camille", autocomplete: "given-name" });
+    var chNom    = UI.champ({ nom: "nom", label: "Nom", valeur: p ? p.nom : "", exemple: "Berger", autocomplete: "family-name" });
+    var chSucc   = UI.champ({ nom: "succursale", label: "Succursale", type: "select", valeur: "", options: [] });
+    var chDisc   = UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] });
+    var chRole   = UI.champ({
+      nom: "role", label: "Rôle", type: "select", valeur: p ? p.role : "",
+      options: [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
+        return { valeur: k, label: D.ROLES[k] };
+      }))
+    });
+    var chCap    = UI.champ({
+      nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
+      valeur: p && p.capacite != null ? p.capacite : capDefaut,
+      aide: "5 pour un plein temps, 4 pour un 80 %."
+    });
+    var chActif  = UI.champ({
+      nom: "actif", label: "Présence à l'effectif", type: "select", valeur: p && p.fiche ? String(p.actif) : "true",
+      options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Inactif — masqué du planning" }]
+    });
+
+    var fiche = el("fieldset", {}, [
+      el("div", { class: "legende", text: "Au planning" }),
+      el("div", { class: "grille-champs" }, [chBureau, chRole, chPrenom, chNom, chSucc, chDisc, chCap, chActif])
     ]);
-    // L'adresse est la clé de l'accès : pour en changer, retirer l'accès puis en créer un autre
-    if (u) champs.querySelector("[name=email]").readOnly = true;
-    if (u && u.superAdmin) champs.querySelector("[name=actif]").disabled = true;
+
+    /* ---------------------------------------------------------- l'accès --- */
+    var aAcces = el("input", { type: "checkbox" });
+    aAcces.checked = p ? !!p.email : true;
+    var chMail = UI.champ({
+      nom: "email", label: "Adresse e-mail", type: "email", valeur: p ? p.email : "",
+      exemple: "c.berger@bureau.ch", large: true
+    });
+    var chAcces = UI.champ({
+      nom: "accesActif", label: "État de l'accès", type: "select",
+      valeur: p && p.email ? String(p.accesActif) : "false",
+      options: [
+        { valeur: "false", label: "Suspendu — n'ouvre pas encore l'outil" },
+        { valeur: "true", label: "Ouvert" }
+      ]
+    });
+    var champsAcces = el("div", { class: "grille-champs", style: "margin-top:12px" }, [chMail, chAcces]);
 
     var envoi = el("input", { type: "checkbox" });
-    envoi.checked = true;
-    var corps = el("div", {}, [champs]);
-    if (nouveau) {
-      corps.appendChild(el("div", { class: "cases", style: "margin-top:18px" }, [
-        el("label", { class: "case" }, [envoi, "Envoyer tout de suite le lien de bienvenue"])
-      ]));
-      corps.appendChild(el("p", {
-        class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible);max-width:46em",
-        text: "Le courriel lui fait choisir son mot de passe. Sinon, elle passera par « Mot de passe oublié ou première connexion » sur la page de connexion."
-      }));
+    var boiteEnvoi = el("div", { class: "cases", style: "margin-top:12px" }, [
+      el("label", { class: "case" }, [envoi, "Envoyer tout de suite le lien de bienvenue"])
+    ]);
+    var aideEnvoi = el("p", {
+      class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible);max-width:46em",
+      text: "Le courriel lui fait choisir son mot de passe. Sans envoi, elle passera par « Mot de passe oublié ou première connexion » sur la page de connexion."
+    });
+
+    var acces = el("fieldset", {}, [
+      el("div", { class: "legende", text: "Accès à l'outil" }),
+      el("div", { class: "cases" }, [el("label", { class: "case" }, [aAcces, "Se connecte à l'outil"])]),
+      champsAcces, boiteEnvoi, aideEnvoi
+    ]);
+
+    var corps = el("div", {}, [fiche, acces]);
+    var selBureau = chBureau.querySelector("select");
+    var selSucc = chSucc.querySelector("select"), selDisc = chDisc.querySelector("select");
+    var inPrenom = chPrenom.querySelector("input"), inNom = chNom.querySelector("input");
+    var inMail = chMail.querySelector("input"), selAcces = chAcces.querySelector("select");
+    var mailTenuAMain = !!(p && p.email);
+
+    /* L'adresse est la clé du compte : une fois celui-ci créé, elle ne bouge plus. */
+    if (p && p.compte) {
+      inMail.readOnly = true;
+      chMail.appendChild(el("div", { class: "aide", text: "Son compte est créé : pour changer d'adresse, retire son accès puis donne-lui-en un autre." }));
     }
+    if (p && p.superAdmin) { aAcces.disabled = true; selAcces.disabled = true; }
+
+    function remplitListes(succGardee, discGardee) {
+      var idB = selBureau.value, l = listesDe(idB);
+      UI.vide(selSucc).appendChild(el("option", { value: "" }, ["Non renseignée"]));
+      l.succursales.forEach(function (s) { selSucc.appendChild(el("option", { value: s.code }, [s.nom])); });
+      selSucc.value = l.succursales.some(function (s) { return s.code === succGardee; }) ? succGardee : "";
+      chSucc.style.display = l.succursales.length ? "" : "none";
+
+      var codes = disciplinesDe(idB, selSucc.value);
+      UI.vide(selDisc).appendChild(el("option", { value: "" }, ["Non renseignée"]));
+      codes.forEach(function (c) { selDisc.appendChild(el("option", { value: c }, [nomListe(l.disciplines, c)])); });
+      selDisc.value = codes.indexOf(discGardee) >= 0 ? discGardee : (codes.length === 1 ? codes[0] : "");
+      chDisc.style.display = l.disciplines.length ? "" : "none";
+    }
+    remplitListes(p ? p.succursale : "", p ? p.discipline : "");
+
+    selBureau.addEventListener("change", function () {
+      remplitListes(selSucc.value, selDisc.value);
+      majAdresse();
+    });
+    selSucc.addEventListener("change", function () { remplitListes(selSucc.value, selDisc.value); });
+
+    /* Tant que l'adresse n'a pas été touchée à la main, elle suit le nom. */
+    function majAdresse() {
+      if (mailTenuAMain || inMail.readOnly) return;
+      inMail.value = proposeAdresse(inPrenom.value, inNom.value, selBureau.value);
+    }
+    inPrenom.addEventListener("input", majAdresse);
+    inNom.addEventListener("input", majAdresse);
+    inMail.addEventListener("input", function () { mailTenuAMain = true; });
+
+    function majAcces() {
+      var ouvert = aAcces.checked;
+      champsAcces.style.display = ouvert ? "" : "none";
+      boiteEnvoi.style.display = ouvert && !(p && p.compte) ? "" : "none";
+      aideEnvoi.style.display = boiteEnvoi.style.display;
+      if (ouvert) majAdresse();
+    }
+    aAcces.addEventListener("change", majAcces);
+    majAcces();
 
     UI.ouvre({
-      surtitre: nouveau ? "Nouvel utilisateur" : "Modifier l'accès",
-      titre: nouveau ? "Accès à l'outil" : u.email,
+      surtitre: nouveau ? "Nouvelle personne" : "Modifier",
+      titre: nouveau ? "Fiche et accès" : nomDe(p),
       corps: corps,
-      compacte: true,
       boutons: [
         { label: "Annuler" },
         {
-          label: nouveau ? "Créer l'accès" : "Enregistrer", or: true, entree: true, action: function () {
-            var v = UI.lit(champs);
+          label: nouveau ? "Créer" : "Enregistrer", or: true, entree: true, action: function () {
+            var v = UI.lit(corps);
+            var veutAcces = aAcces.checked;
             var adresse = String(v.email || "").trim().toLowerCase();
-            if (!RE_MAIL.test(adresse)) { UI.toast("Cette adresse e-mail n'est pas valide."); return false; }
-            var donnees = { email: adresse, bureauId: v.bureauId, actif: v.actif === "true", nouveau: nouveau };
-            return SB.rpc("console_enregistre_utilisateur", { p: donnees }).then(function () {
-              if (!nouveau || !envoi.checked) {
-                UI.toast(nouveau ? "Accès créé." : "Accès enregistré.");
+            if (!String(v.prenom || "").trim()) { UI.toast("Le prénom est obligatoire."); return false; }
+            if (!String(v.nom || "").trim())    { UI.toast("Le nom est obligatoire."); return false; }
+            if (veutAcces && !RE_MAIL.test(adresse)) { UI.toast("Cette adresse e-mail n'est pas valide."); return false; }
+
+            var donnees = {
+              id: p && p.id ? p.id : null, bureauId: v.bureauId,
+              prenom: v.prenom, nom: v.nom, role: v.role,
+              succursale: v.succursale, discipline: v.discipline,
+              capacite: v.capacite, actif: v.actif === "true", avecFiche: true,
+              email: veutAcces ? adresse : "", avecAcces: veutAcces,
+              accesActif: veutAcces && v.accesActif === "true"
+            };
+            return SB.rpc("console_enregistre_personne", { p: donnees }).then(function () {
+              var envoyer = veutAcces && envoi.checked && boiteEnvoi.style.display !== "none";
+              if (!envoyer) {
+                UI.toast(nouveau ? "Personne créée." : "Fiche enregistrée.");
                 return apresChangement();
               }
               return SB.envoieLien(adresse).then(function () {
-                UI.toast("Accès créé, lien envoyé à " + adresse + ".");
+                UI.toast("Personne créée, lien envoyé à " + adresse + ".");
                 return apresChangement();
               }, function (e) {
-                // L'accès existe ; seul le courriel n'est pas parti. L'alerte s'ouvre une fois cette fenêtre fermée.
+                // La fiche est enregistrée ; seul le courriel n'est pas parti.
                 return apresChangement().then(function () { setTimeout(function () { alerteEnvoi(adresse, e); }, 0); });
               });
             }).catch(function (e) { UI.toast(e.message); return false; });
@@ -659,19 +871,19 @@
     });
   }
 
-  function envoieLien(u) {
-    UI.confirme("Envoyer un lien à " + u.email + " ?",
-      u.compte
+  function envoieLien(p) {
+    UI.confirme("Envoyer un lien à " + p.email + " ?",
+      p.compte
         ? "Un courriel part tout de suite. Le lien ouvre l'outil et lui fait choisir un nouveau mot de passe."
         : "Un courriel part tout de suite. Le lien crée son compte et lui fait choisir son mot de passe.",
       "Envoyer"
     ).then(function (ok) {
       if (!ok) return;
       UI.toast("Envoi en cours…");
-      SB.envoieLien(u.email).then(function () {
-        UI.toast("Lien envoyé à " + u.email + ".");
+      SB.envoieLien(p.email).then(function () {
+        UI.toast("Lien envoyé à " + p.email + ".");
         return apresChangement();
-      }).catch(function (e) { alerteEnvoi(u.email, e); });
+      }).catch(function (e) { alerteEnvoi(p.email, e); });
     });
   }
 
@@ -683,7 +895,7 @@
       : /création de comptes est fermée/i.test(m)
       ? "Autorise la création des comptes : voir « 03 — Mise en route », plus bas."
       : /non autoris/i.test(m)
-      ? "La garde a refusé l'adresse : vérifie qu'elle est bien inscrite, active, dans un bureau ouvert."
+      ? "La garde a refusé l'adresse : vérifie que son accès est ouvert, dans un bureau ouvert."
       : "";
     UI.ouvre({
       surtitre: "Courriel non envoyé",
@@ -697,15 +909,31 @@
     });
   }
 
-  function supprimeUtilisateur(u) {
-    UI.confirme("Retirer l'accès de " + u.email + " ?",
-      "Cette adresse n'ouvrira plus l'outil. Son compte de connexion reste, mais ne donne plus accès à rien : " +
-      "pour lui rendre l'accès, il suffira de l'inscrire à nouveau.",
-      "Retirer l'accès", true
-    ).then(function (ok) {
+  function supprimePersonne(p) {
+    // Un accès sans fiche : seul l'accès part. Une fiche : tout part avec elle.
+    if (!p.fiche) {
+      UI.confirme("Retirer l'accès de " + p.email + " ?",
+        "Cette adresse n'ouvrira plus l'outil. Son compte de connexion reste, mais ne donne plus accès à rien : " +
+        "pour lui rendre l'accès, il suffira de l'inscrire à nouveau.",
+        "Retirer l'accès", true
+      ).then(function (ok) {
+        if (!ok) return;
+        SB.rpc("console_supprime_utilisateur", { p_email: p.email }).then(function () {
+          UI.toast("Accès retiré.");
+          return apresChangement();
+        }).catch(function (e) { UI.toast(e.message); });
+      });
+      return;
+    }
+    var suites = [
+      p.taches ? "Ses " + p.taches + (p.taches > 1 ? " tâches sont conservées" : " tâche est conservée") + ", mais se retrouve" + (p.taches > 1 ? "nt" : "") + " sans affectation." : "",
+      p.email ? "Son accès à l'outil est retiré." : "",
+      "Ses absences et ses équipes d'affaire partent avec elle."
+    ].filter(Boolean).join(" ");
+    UI.confirme("Supprimer " + nomDe(p) + " ?", suites, "Supprimer", true).then(function (ok) {
       if (!ok) return;
-      SB.rpc("console_supprime_utilisateur", { p_email: u.email }).then(function () {
-        UI.toast("Accès retiré.");
+      SB.rpc("console_supprime_membre", { p_membre: p.id }).then(function () {
+        UI.toast("Personne supprimée.");
         return apresChangement();
       }).catch(function (e) { UI.toast(e.message); });
     });
