@@ -61,13 +61,18 @@
      champs qu'on change le plus souvent. */
   #utilisateurs table.liste td{padding-top:7px;padding-bottom:7px;vertical-align:middle}
   #utilisateurs table.liste .principal{font-size:15px}
+  /* Assez large pour lire l'intitulé : un menu rogné à « Structur… » ne dit
+     plus rien. Le tableau défile plutôt que de comprimer ses colonnes. */
   .sel-ligne{
-    width:100%;max-width:190px;min-width:0;
+    width:100%;min-width:136px;max-width:210px;
     font-family:var(--sans);font-weight:300;font-size:13.5px;color:var(--texte);
     background:rgba(var(--encre),.03);border:1px solid var(--ligne);border-radius:0;
     padding:5px 8px;height:32px;cursor:pointer;
     text-transform:none;letter-spacing:.02em;transition:border-color .25s,color .25s;
   }
+  .sel-ligne.court{min-width:108px;max-width:140px}
+  #utilisateurs table.liste th{white-space:nowrap}
+  #utilisateurs table.liste td.num{white-space:nowrap}
   .sel-ligne:hover{border-color:var(--or-doux)}
   .sel-ligne:focus{outline:none;border-color:var(--or)}
   .sel-ligne:disabled{opacity:.4;cursor:default}
@@ -779,7 +784,9 @@
       }));
       return;
     }
-    var plusieursBureaux = etat.bureaux.length > 1;
+    // Colonne Bureau seulement quand la liste en mêle plusieurs : sinon elle
+    // répète la même valeur sur chaque ligne et vole de la place aux menus.
+    var plusieursBureaux = liste.some(function (p) { return p.bureauId !== liste[0].bureauId; });
     var corps = el("tbody");
     liste.forEach(function (p) {
       var cellules = [
@@ -899,7 +906,7 @@
     ], String(p.accesActif), "Accès", function (val, annule) {
       enregistreVite(p, { accesActif: val === "true" },
         nomDe(p) + (val === "true" ? " : accès ouvert." : " : accès suspendu."), annule);
-    }, p.accesActif ? "" : "suspendu");
+    }, "court" + (p.accesActif ? "" : " suspendu"));
     if (p.superAdmin) { s.disabled = true; s.title = "Le super admin garde son accès."; }
     return s;
   }
