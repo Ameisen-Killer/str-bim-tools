@@ -546,6 +546,18 @@
     membre: function (i) { return idx().membres[i] || null; },
     nomMembre: function (i) { var m = D.membre(i); return m ? m.prenom + " " + m.nom : "—"; },
 
+    /** La fiche d'équipe de la personne connectée, repérée par son adresse.
+     *  null si personne n'est connecté, ou si aucune fiche ne porte cette adresse
+     *  (compte d'administration, adresse pas encore renseignée). */
+    monMembre: function () {
+      var mail = (profil && profil.email) || (global.Sb && global.Sb.connecte() ? global.Sb.email() : "");
+      mail = texte(mail).toLowerCase();
+      if (!mail || !etat) return null;
+      var moi = null;
+      etat.membres.forEach(function (m) { if (!moi && m.email && m.email.toLowerCase() === mail) moi = m; });
+      return moi;
+    },
+
     ajouteMembre: function (o) {
       return Promise.resolve().then(function () {
         var v = valideMembre(o, null);

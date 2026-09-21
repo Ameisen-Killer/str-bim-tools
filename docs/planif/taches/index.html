@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=33">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=34">
 </head>
 <body>
 
@@ -58,7 +58,7 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=8"></script>
-<script src="/planif/assets/donnees.js?v=13"></script>
+<script src="/planif/assets/donnees.js?v=14"></script>
 <script src="/planif/assets/calculs.js?v=5"></script>
 <script src="/planif/assets/ui.js?v=23"></script>
 <script>
@@ -76,6 +76,12 @@
     var p = new URLSearchParams(location.search);
     if (p.get("affaire")) filtres.affaire = p.get("affaire");
     if (p.get("membre")) filtres.membre = p.get("membre");
+    // Ouverte depuis le menu, sans consigne : chacun voit d'abord ses propres tâches.
+    // « ?membre= » vide, ou un lien qui vise une affaire, laissent la vue sur toute l'équipe.
+    else if (!p.has("membre") && !filtres.affaire) {
+      var moi = D.monMembre();
+      if (moi) filtres.membre = moi.id;
+    }
 
     UI.chrome("taches", [{ label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }]);
     UI.pied();
