@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce termine toute la tâche ; un clic sur l'étiquette d'une personne ne termine que sa part, le calcul ou le dessin. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
+    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce termine ce qui te revient : le calcul si tu en es l'ingénieur, le dessin si tu en es le dessinateur. L'étiquette d'une personne ferme sa part à elle ; la tâche n'est terminée qu'une fois les deux parts bouclées. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -60,7 +60,7 @@
 <script src="/planif/assets/supabase.js?v=9"></script>
 <script src="/planif/assets/donnees.js?v=16"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=24"></script>
+<script src="/planif/assets/ui.js?v=25"></script>
 <script>
 (function () {
   "use strict";
@@ -368,16 +368,38 @@
     return el("div", { class: "tache-bascules" }, [course(t), coche(t)]);
   }
 
-  // Bouton à bascule : l'icône est pâle tant que la tâche est ouverte, dorée une fois terminée.
-  // Il ferme la tâche entière ; pour une seule part, les étiquettes d'affectation.
+  /**
+   * Les parts de la tâche qui me reviennent : le calcul si j'en suis
+   * l'ingénieur, le dessin si j'en suis le dessinateur, les deux si je porte
+   * tout. Vide si la tâche ne m'est pas confiée (chef de projet, secrétariat) :
+   * le pouce ferme alors la tâche entière.
+   */
+  function mesParts(t) {
+    var moi = D.monMembre();
+    if (!moi) return [];
+    var out = [];
+    if (t.chargeInge > 0 && t.ingenieurId === moi.id) out.push("ingenieur");
+    if (t.chargeDessin > 0 && t.dessinateurId === moi.id) out.push("dessinateur");
+    return out;
+  }
+
+  // Bouton à bascule : l'icône est pâle tant que le travail est ouvert, dorée une
+  // fois fini. Il ferme ce qui me revient — ma part seule si je n'en porte qu'une ;
+  // les étiquettes d'affectation, elles, ferment n'importe quelle part.
   function coche(t) {
-    var fini = t.statut === "termine";
-    var deux = t.chargeInge > 0 && t.chargeDessin > 0;
+    var miennes = mesParts(t);
+    var fini = miennes.length
+      ? miennes.every(function (r) { return t[D.PARTS[r].fini]; })
+      : t.statut === "termine";
+    var quoi = miennes.length === 1 ? " le " + D.PARTS[miennes[0]].label.toLowerCase() + " de « "
+      : miennes.length ? " ma part de « " : " « ";
     return el("button", {
       type: "button", class: "ico ico-coche" + (fini ? " fait" : ""),
       "aria-pressed": fini ? "true" : "false",
-      title: fini ? "Rouvrir la tâche" : deux ? "Terminer le calcul et le dessin" : "Marquer comme terminée",
-      "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »",
+      title: (fini ? "Rouvrir" : "Terminer") +
+             (miennes.length === 1 ? " le " + D.PARTS[miennes[0]].label.toLowerCase()
+              : miennes.length ? " ma part" : " la tâche entière"),
+      "aria-label": (fini ? "Rouvrir" : "Terminer") + quoi + t.titre + " »",
       onclick: function () { termine(t.id, !fini); }
     });
   }
@@ -447,6 +469,31 @@
   function termine(id, fait) {
     var t = D.tache(id);
     if (!t) return;
+
+    /* La tâche m'est confiée : le pouce ne ferme que ce que je fais. Le
+       dessinateur qui a rendu ses plans ne clôt pas le calcul de l'ingénieur,
+       et l'ingénieur qui a fini sa note laisse le dessin ouvert. */
+    var miennes = mesParts(t);
+    if (miennes.length && miennes.length < 2) return terminePart(id, miennes[0], fait);
+    if (miennes.length === 2) {
+      // Je porte les deux : elles se ferment ensemble, en une écriture
+      var deux = {};
+      deux[D.PARTS.ingenieur.fini] = fait;
+      deux[D.PARTS.dessinateur.fini] = fait;
+      if (fait) avantFin[id] = { statut: t.statut, avancement: t.avancement };
+      else if (avantFin[id]) {
+        deux.statut = avantFin[id].statut;
+        deux.avancement = avantFin[id].avancement;
+        delete avantFin[id];
+      }
+      D.retoucheTache(id, deux).then(function () {
+        dessine();
+        UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.",
+          { label: "Annuler", action: function () { termine(id, !fait); } });
+      }).catch(function (e) { dessine(); UI.toast(e.message); });
+      return;
+    }
+
     var champs;
     if (fait) {
       avantFin[id] = { statut: t.statut, avancement: t.avancement };
