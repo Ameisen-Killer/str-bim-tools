@@ -147,9 +147,9 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=10"></script>
-<script src="/planif/assets/donnees.js?v=17"></script>
-<script src="/planif/assets/ui.js?v=26"></script>
+<script src="/planif/assets/supabase.js?v=11"></script>
+<script src="/planif/assets/donnees.js?v=18"></script>
+<script src="/planif/assets/ui.js?v=27"></script>
 <script>
 (function () {
   "use strict";
@@ -159,6 +159,7 @@
   var auth = null;            // réglages publics de Supabase Auth (inscriptions, confirmation)
   var barre = null;           // recherche des utilisateurs
   var filtreBureau = "";
+  var bureauDroits = "";          // bureau dont on règle les droits (section Droits)
   var hotes = {};             // conteneurs, remplis à chaque rafraîchissement
   var suivi = UI.suiviApparitions();
   var RE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -292,10 +293,24 @@
       surEntree: function () { var l = selection(); if (l.length === 1) formulaireUtilisateur(l[0]); }
     });
 
+    hotes.titreDroits = el("h2");
+    hotes.filtreDroits = el("select", {
+      class: "btn", style: "text-transform:none;letter-spacing:.04em;max-width:320px", "aria-label": "Bureau dont on règle les droits"
+    });
+    hotes.filtreDroits.addEventListener("change", function () { bureauDroits = hotes.filtreDroits.value; dessineDroits(); });
+    hotes.droits = el("div", { class: "defile" });
+    hotes.vue.appendChild(el("section", { class: "section", id: "droits" }, [
+      el("div", { class: "tete-section" }, [
+        el("div", {}, [el("div", { class: "num-section", text: "03 — Droits" }), hotes.titreDroits])
+      ]),
+      el("div", { class: "plan-barre", style: "margin-top:4px" }, [hotes.filtreDroits]),
+      hotes.droits
+    ]));
+
     hotes.miseEnRoute = el("div");
     hotes.vue.appendChild(el("section", { class: "section", id: "mise-en-route" }, [
       el("div", { class: "tete-section" }, [
-        el("div", {}, [el("div", { class: "num-section", text: "03 — Mise en route" }), el("h2", { text: "Réglages Supabase" })])
+        el("div", {}, [el("div", { class: "num-section", text: "04 — Mise en route" }), el("h2", { text: "Réglages Supabase" })])
       ]),
       hotes.miseEnRoute
     ]));
@@ -313,6 +328,7 @@
   var SECTIONS = [
     { cle: "bureaux", label: "Bureaux" },
     { cle: "utilisateurs", label: "Utilisateurs" },
+    { cle: "droits", label: "Droits" },
     { cle: "mise-en-route", label: "Mise en route" }
   ];
 
@@ -350,6 +366,7 @@
     var valeurs = {
       bureaux: etat.bureaux.length,
       utilisateurs: migrationFaite() ? personnes().length : "!",
+      droits: "",
       "mise-en-route": ""
     };
     SECTIONS.forEach(function (s) {
@@ -362,6 +379,7 @@
     dessineBureaux();
     remplitFiltre();
     dessineUtilisateurs();
+    dessineDroits();
     dessineMiseEnRoute();
     majComptes();
   }
@@ -843,6 +861,134 @@
       el("thead", {}, [el("tr", {}, entetes.map(function (t) { return el("th", { text: t }); }))]),
       corps
     ]));
+  }
+
+  /* ------------------------------------------------------------------ droits
+     Les droits se donnent à des groupes, jamais à une personne : on coche la
+     case au croisement d'un groupe et d'un droit. Qui ne porte aucun statut est
+     un utilisateur « lambda » — il n'a aucun de ces droits et mène son propre
+     travail, sans pouvoir engager celui des autres.
+     L'interface ne fait que refléter la base : les mêmes règles y sont posées
+     en RLS, une requête lancée hors de l'outil se heurte aux mêmes refus. */
+
+  function droitsEnBase() {
+    return !!(etat && etat.bureaux.length && etat.bureaux[0].droits);
+  }
+
+  /** Le bureau dont on règle les droits : celui choisi, sinon le sien. */
+  function bureauDesDroits() {
+    if (!etat || !etat.bureaux.length) return null;
+    var b = bureau(bureauDroits);
+    if (b) return b;
+    var prof = D.profil();
+    return (prof && prof.bureau && bureau(prof.bureau.id)) || etat.bureaux[0];
+  }
+
+  /** Une case du tableau : un droit pour un groupe, enregistré au clic. */
+  function caseDroit(b, statut, droit, accordes) {
+    var avant = accordes.indexOf(droit) >= 0;
+    var input = el("input", {
+      type: "checkbox",
+      "aria-label": D.DROITS[droit].titre + " — " + D.STATUTS_PLURIEL[statut] + " de " + b.nom
+    });
+    input.checked = avant;
+    input.addEventListener("change", function () {
+      var voulu = input.checked;
+      var liste = D.ORDRE_DROITS.filter(function (x) {
+        return x === droit ? voulu : accordes.indexOf(x) >= 0;
+      });
+      // Un code que cette version de l'outil ne connaît pas encore reste en place
+      accordes.forEach(function (x) { if (D.ORDRE_DROITS.indexOf(x) < 0) liste.push(x); });
+      input.disabled = true;
+      SB.rpc("console_enregistre_droits", { p: { bureauId: b.id, statut: statut, droits: liste } })
+        .then(function () {
+          UI.toast(D.STATUTS_PLURIEL[statut] + " : " + (voulu ? "droit accordé" : "droit retiré") +
+                   " — " + D.DROITS[droit].titre.toLowerCase() + ".");
+          return apresChangement();
+        })
+        .catch(function (e) {
+          UI.toast(e.message);
+          input.checked = avant;
+          input.disabled = false;
+        });
+    });
+    return el("label", { class: "case", style: "justify-content:center" }, [input]);
+  }
+
+  function dessineDroits() {
+    if (!etat) return;
+    UI.vide(hotes.droits);
+    hotes.titreDroits.textContent = "Ce que chaque groupe peut faire";
+
+    if (!migrationFaite() || !statutsEnBase() || !droitsEnBase()) {
+      hotes.filtreDroits.hidden = true;
+      hotes.droits.appendChild(el("div", { class: "al grave" }, [
+        el("span", { class: "q", text: "À faire" }),
+        el("div", {}, [
+          el("b", { text: "Les droits ne sont pas encore dans la base." }),
+          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
+            "Exécute dans Supabase (SQL Editor > New query), dans cet ordre : ",
+            el("code", { text: "migration-roles-statuts.sql" }),
+            ", puis coche les statuts de chacun dans « Utilisateurs », puis ",
+            el("code", { text: "migration-droits-groupes.sql" }),
+            ". Recharge ensuite cette page."
+          ]),
+          el("p", { class: "aide", style: "margin-top:10px;font-size:13.5px;color:var(--texte-faible)", text:
+            "Tant que la dernière n'est pas passée, chacun peut tout faire dans son bureau, comme aujourd'hui." })
+        ])
+      ]));
+      return;
+    }
+
+    var b = bureauDesDroits();
+    bureauDroits = b.id;
+    hotes.filtreDroits.hidden = etat.bureaux.length < 2;
+    UI.vide(hotes.filtreDroits);
+    etat.bureaux.forEach(function (x) {
+      hotes.filtreDroits.appendChild(el("option", { value: x.id, selected: x.id === b.id }, [x.nom]));
+    });
+
+    var corps = el("tbody");
+    D.ORDRE_STATUTS.forEach(function (s) {
+      var accordes = (b.droits && b.droits[s]) || [];
+      var n = (etat.membres || []).filter(function (m) {
+        return m.bureauId === b.id && m.actif && D.aStatut(m, s);
+      }).length;
+      var cellules = [el("td", {}, [
+        el("div", { class: "principal", text: D.STATUTS_PLURIEL[s] }),
+        el("div", { class: "secondaire", text: n
+          ? n + (n > 1 ? " personnes" : " personne")
+          : "personne — à cocher dans « Utilisateurs »" })
+      ])];
+      D.ORDRE_DROITS.forEach(function (d) {
+        cellules.push(el("td", { class: "num" }, [caseDroit(b, s, d, accordes)]));
+      });
+      corps.appendChild(el("tr", {}, cellules));
+    });
+
+    hotes.droits.appendChild(el("table", { class: "liste" }, [
+      el("thead", {}, [el("tr", {}, [el("th", { text: "Groupe" })].concat(
+        D.ORDRE_DROITS.map(function (d) {
+          return el("th", { class: "num", title: D.DROITS[d].aide, text: D.DROITS[d].titre });
+        })
+      ))]),
+      corps
+    ]));
+
+    var legende = el("div", { style: "margin-top:22px;max-width:56em" }, [
+      el("div", { class: "legende", text: "Ce que veut dire chaque droit" })
+    ]);
+    D.ORDRE_DROITS.forEach(function (d) {
+      legende.appendChild(el("p", { style: "margin-top:10px;font-size:14px;color:var(--texte-doux)" }, [
+        el("b", { text: D.DROITS[d].titre + " — " }),
+        D.DROITS[d].aide
+      ]));
+    });
+    legende.appendChild(el("p", {
+      class: "aide", style: "margin-top:18px;font-size:13.5px;color:var(--texte-faible)",
+      text: "Une personne qui ne porte aucun de ces trois statuts n'a aucun de ces droits : elle crée et modifie les tâches dont une part est la sienne, gère ses propres absences, et travaille normalement sur les affaires existantes. Les statuts se cochent dans « Utilisateurs ». Toi, super admin, tu passes partout."
+    }));
+    hotes.droits.appendChild(legende);
   }
 
   /* ------------------------------------------------- réglages sur la ligne

@@ -943,6 +943,10 @@
     var m = D.membre(idMembre);
     if (!m) return toast("Membre introuvable.");
     var previent = surChangement || function () {};
+    /* Sans le droit, les absences d'un collègue se consultent mais ne se
+       touchent pas. La base refuserait de toute façon : autant ne pas
+       proposer les boutons. */
+    var peutEcrire = D.peutAbsences(idMembre);
 
     var liste = el("div", { style: "margin-bottom:26px" });
     var champs = el("div", { class: "grille-champs" });
@@ -982,14 +986,14 @@
           ]),
           el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
           el("td", { class: "actions" }, [
-            boutonIcone("modifier", "Modifier", a.motif, function () { edite(a); }),
-            boutonIcone("supprimer", "Retirer", a.motif, function () {
+            peutEcrire ? boutonIcone("modifier", "Modifier", a.motif, function () { edite(a); }) : null,
+            peutEcrire ? boutonIcone("supprimer", "Retirer", a.motif, function () {
               D.suppAbsence(m.id, a.id).then(function () {
                 if (enCours && enCours.id === a.id) edite(null); else rend();
                 previent();
                 toast("Absence retirée.");
               }).catch(function (e) { toast(e.message); });
-            })
+            }) : null
           ])
         ]));
       });
@@ -997,17 +1001,19 @@
     }
 
     var corps = el("div", {}, [
-      el("p", { class: "aide", style: "margin-bottom:20px;font-size:14px;color:var(--texte-doux)", text: "Les jours d'absence sortent de la capacité disponible, apparaissent hachurés au tableau de bord et en barre au calendrier des absences." }),
+      el("p", { class: "aide", style: "margin-bottom:20px;font-size:14px;color:var(--texte-doux)", text: peutEcrire
+        ? "Les jours d'absence sortent de la capacité disponible, apparaissent hachurés au tableau de bord et en barre au calendrier des absences."
+        : "Les absences de " + m.prenom + " se consultent ici. Seuls " + m.prenom + " et les personnes qui en ont reçu le droit peuvent les modifier." }),
       liste,
-      el("div", { class: "legende", style: "display:flex;align-items:baseline;gap:12px;margin-bottom:10px" }, [libelleForm, annuler]),
-      champs
+      peutEcrire ? el("div", { class: "legende", style: "display:flex;align-items:baseline;gap:12px;margin-bottom:10px" }, [libelleForm, annuler]) : null,
+      peutEcrire ? champs : null
     ]);
 
     var boite = ouvre({
       surtitre: "Absences",
       titre: m.prenom + " " + m.nom,
       corps: corps,
-      boutons: [
+      boutons: peutEcrire ? [
         { label: "Fermer" },
         {
           label: "Ajouter", or: true, action: function () {
@@ -1021,7 +1027,7 @@
             }).catch(function (e) { toast(e.message); return false; });
           }
         }
-      ]
+      ] : [{ label: "Fermer" }]
     });
     valider = boite.querySelector(".modale-pied .btn-or");
     edite(null);
@@ -1031,7 +1037,14 @@
   function nouvelleAbsence(o) {
     o = o || {};
     var previent = o.surChangement || function () {};
+    /* Sans le droit de poser les absences des autres, la liste se réduit à
+       soi : on ne pose pas les vacances d'un collègue. */
     var membres = D.membres({});
+    if (!D.aDroit("absences_autrui")) {
+      var moi = D.monMembre();
+      if (!moi) return toast("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+      membres = [moi];
+    }
     if (!membres.length) return toast("Aucun membre à l'effectif : commence par l'équipe.");
 
     var groupes = optionsParMetier(membres);
@@ -1112,6 +1125,21 @@
       });
     }
 
+    /* Droits. Sans « créer des tâches pour les autres », on ne mène que les
+       tâches dont une part chargée est la sienne : sa propre part est alors
+       verrouillée sur soi, l'autre reste libre (un ingénieur confie le dessin,
+       un dessinateur nomme son ingénieur). Une tâche qui ne nous concerne pas
+       s'ouvre en lecture seule. La base applique exactement la même règle. */
+    var libre = D.aDroit("taches_autrui");
+    var moi = libre ? null : D.monMembre();
+    var maCote = libre ? "" : D.cote(moi && moi.metier);
+    if (!libre && !t && !maCote) {
+      return toast(moi
+        ? "Ton métier n'est pas encore désigné : demande-le à l'administrateur de l'outil, ou fais-toi donner le droit de créer des tâches pour les autres."
+        : "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+    }
+    var lectureSeule = !libre && !!t && !D.meConcerne(t);
+
     var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaires[0].id);
 
     var chAffaire = champ({
@@ -1127,8 +1155,17 @@
       var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : "");
       if (boiteIng.querySelector("select")) boiteIng.querySelector("select").remove();
       if (boiteDes.querySelector("select")) boiteDes.querySelector("select").remove();
+      // Ma part reste la mienne : le menu est posé sur moi et ne s'ouvre pas.
+      if (maCote === "ingenieur" && !t) vi = moi.id;
+      if (maCote === "dessinateur" && !t) vd = moi.id;
       boiteIng.appendChild(selMembres("ingenieurId", "ingenieur", vi, aff));
       boiteDes.appendChild(selMembres("dessinateurId", "dessinateur", vd, aff));
+      if (maCote && !t) {
+        var sien = (maCote === "ingenieur" ? boiteIng : boiteDes).querySelector("select");
+        sien.value = moi.id;
+        sien.disabled = true;
+        sien.title = "Sans le droit de créer des tâches pour les autres, cette part est la tienne.";
+      }
     }
     rebranche();
     chAffaire.querySelector("select").addEventListener("change", rebranche);
@@ -1265,18 +1302,43 @@
     corps.addEventListener("change", recalcule);
     recalcule();
 
+    /* Tâche d'un collègue, sans le droit : on la lit, on n'y touche pas. */
+    if (lectureSeule) {
+      corps.insertBefore(el("p", {
+        class: "aide", style: "margin-bottom:16px;font-size:14px;color:var(--texte-doux)",
+        text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier. Il faut pour cela en tenir une part, ou avoir reçu le droit de créer des tâches pour les autres."
+      }), corps.firstChild);
+      [].forEach.call(corps.querySelectorAll("input,select,textarea"), function (n) { n.disabled = true; });
+    }
+
+    /* Sans le droit, une tâche doit rester la sienne : ma part porte une
+       charge et c'est moi qui la tiens. Le contrôle est refait par la base. */
+    function resteMienne(v) {
+      if (libre) return true;
+      var id = moi && moi.id;
+      var ci = parseFloat(String(v.chargeInge).replace(",", ".")) || 0;
+      var cd = parseFloat(String(v.chargeDessin).replace(",", ".")) || 0;
+      return !!id && ((v.ingenieurId === id && ci > 0) || (v.dessinateurId === id && cd > 0));
+    }
+
     return ouvre({
-      surtitre: t ? "Modifier la tâche" : "Nouvelle tâche",
+      surtitre: t ? (lectureSeule ? "Tâche" : "Modifier la tâche") : "Nouvelle tâche",
       titre: t ? t.titre : "Tâche",
       corps: corps,
       compacte: true,
-      boutons: [
+      boutons: lectureSeule ? [{ label: "Fermer" }] : [
         { label: "Annuler" },
         {
           label: "Enregistrer", or: true, entree: true, action: function () {
             var v = lit(corps);
             v.finiInge = (v.parts || []).indexOf("finiInge") >= 0;
             v.finiDessin = (v.parts || []).indexOf("finiDessin") >= 0;
+            if (!resteMienne(v)) {
+              toast(maCote === "dessinateur"
+                ? "Garde ta part : saisis une charge de dessin, et laisse-toi comme dessinateur."
+                : "Garde ta part : saisis une charge de calcul, et laisse-toi comme ingénieur.");
+              return false;
+            }
             var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
             return p.then(function () {
               if (o.surEnregistrement) o.surEnregistrement();

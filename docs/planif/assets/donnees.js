@@ -72,6 +72,27 @@
   };
   function libelleStatut(s) { return STATUTS[s] || s; }
 
+  /* Les droits accordés aux groupes, cochés bureau par bureau dans la console.
+     Qui ne porte aucun statut n'en a aucun : c'est l'utilisateur « lambda ».
+     Ajouter un droit se fait ici — la base accepte n'importe quel code, elle ne
+     juge que ce qu'elle sait appliquer (voir migration-droits-groupes.sql). */
+  var ORDRE_DROITS = ["affaires_creer", "taches_autrui", "absences_autrui"];
+  var DROITS = {
+    affaires_creer: {
+      titre: "Ouvrir une affaire",
+      aide: "Créer une nouvelle affaire, et la retirer. Sans ce droit, on travaille normalement sur les affaires existantes."
+    },
+    taches_autrui: {
+      titre: "Créer des tâches pour les autres",
+      aide: "Sans ce droit, on ne crée et ne modifie que les tâches dont une part chargée est la sienne — en désignant librement qui tient l'autre part."
+    },
+    absences_autrui: {
+      titre: "Poser les absences des autres",
+      aide: "Sans ce droit, chacun ne gère que ses propres absences."
+    }
+  };
+  function libelleDroit(d) { return (DROITS[d] || {}).titre || d; }
+
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
   function statutsDe(m) {
     var l = (m && m.statuts) || [];
@@ -243,7 +264,9 @@
     var lecture = ADAPTATEUR.profil ? ADAPTATEUR.profil() : Promise.resolve(null);
     profilEnCours = lecture.then(function (brut) {
       if (!brut) {
-        profil = { multi: false, superAdmin: false, peutTout: true, metier: "", statuts: [], bureau: null, bureaux: [] };
+        // Mode local : un seul utilisateur, sur sa propre machine — tous les droits.
+        profil = { multi: false, superAdmin: false, peutTout: true, metier: "", statuts: [],
+                   droits: ORDRE_DROITS.slice(), bureau: null, bureaux: [] };
         return profil;
       }
       if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
@@ -256,6 +279,11 @@
         statuts: ORDRE_STATUTS.filter(function (s) {
           return (brut.statuts || []).indexOf(s) >= 0;
         }),
+        /* Les droits que ses statuts lui accordent, réunis par la base. Ils
+           servent à ne pas proposer l'impossible ; c'est la base qui tranche.
+           Absents (migration des droits pas encore passée) : tout est permis,
+           comme avant. */
+        droits: brut.droits ? (brut.droits || []).map(texte) : ORDRE_DROITS.slice(),
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
         bureau: brut.bureau || null, bureaux: brut.bureaux || []
@@ -585,6 +613,9 @@
     libelleStatut: libelleStatut,
     statutsDe: statutsDe,
     aStatut: aStatut,
+    DROITS: DROITS,
+    ORDRE_DROITS: ORDRE_DROITS,
+    libelleDroit: libelleDroit,
     compareMembres: compareMembres,
     parMetier: parMetier,
     SUCCURSALES: SUCCURSALES,
@@ -668,6 +699,40 @@
       var moi = null;
       etat.membres.forEach(function (m) { if (!moi && m.email && m.email.toLowerCase() === mail) moi = m; });
       return moi;
+    },
+
+    /* ----------------------------------------------------------- droits
+       Ce que la personne connectée a le droit de faire. Les pages s'en
+       servent pour ne pas proposer l'impossible ; c'est la base (RLS) qui
+       tranche pour de bon, avec exactement les mêmes règles. */
+
+    /** Le super admin a tous les droits : c'est lui qui les distribue. */
+    aDroit: function (code) {
+      if (!profil) return true;                       // profil pas encore lu
+      if (profil.superAdmin) return true;
+      return (profil.droits || []).indexOf(code) >= 0;
+    },
+
+    /** Une tâche me concerne-t-elle ? C'est y tenir une part chargée : le
+     *  calcul si j'en suis l'ingénieur, le dessin si j'en suis le dessinateur. */
+    meConcerne: function (t) {
+      var moi = D.monMembre();
+      if (!moi || !t) return false;
+      return (t.ingenieurId === moi.id && t.chargeInge > 0) ||
+             (t.dessinateurId === moi.id && t.chargeDessin > 0);
+    },
+
+    /** Puis-je créer ou modifier cette tâche ? (t nul : une tâche à créer,
+     *  dont on ne connaît pas encore les parts — seul le droit tranche.) */
+    peutEcrireTache: function (t) {
+      return D.aDroit("taches_autrui") || D.meConcerne(t);
+    },
+
+    /** Puis-je poser, modifier ou retirer les absences de ce membre ? */
+    peutAbsences: function (idMembre) {
+      if (D.aDroit("absences_autrui")) return true;
+      var moi = D.monMembre();
+      return !!(moi && moi.id === idMembre);
     },
 
     ajouteMembre: function (o) {

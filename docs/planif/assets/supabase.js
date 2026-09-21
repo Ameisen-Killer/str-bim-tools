@@ -249,6 +249,12 @@
         if (code === "23505") throw erreur("Enregistrement refusé : ce numéro d'affaire ou cette adresse e-mail existe déjà (peut-être créé entre-temps par un collègue). L'affichage a été rechargé.", code);
         if (code === "23503") throw erreur("Enregistrement refusé : un élément lié (affaire ou membre) a été supprimé entre-temps, ou n'appartient pas au bureau affiché. L'affichage a été rechargé.", code);
         if (code === "23514" || code === "22003") throw erreur("Enregistrement refusé : une valeur sort des limites de la base. L'affichage a été rechargé.", code);
+        /* 42501 : la RLS a refusé. C'est presque toujours un droit qui manque —
+           créer une affaire, poser l'absence d'un collègue, toucher une tâche
+           qui ne nous concerne pas. Les pages posent déjà leurs garde-fous ;
+           ce message-ci est le filet, quand l'écran est resté ouvert trop
+           longtemps ou qu'on a contourné le formulaire. */
+        if (code === "42501") throw erreur("Tu n'as pas le droit de faire cela : cette action est réservée à ton bureau ou aux personnes qui en ont reçu le droit. L'affichage a été rechargé.", code);
         // Les fonctions de la base (console, profil) répondent en français : le message passe tel quel
         throw erreur((j && (j.message || j.hint)) || ("Erreur " + r.status + " sur " + chemin), code);
       });

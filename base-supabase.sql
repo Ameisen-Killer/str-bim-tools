@@ -154,6 +154,20 @@ language sql stable set search_path = '' as $$
   select public.bureau_courant() is not null;
 $$;
 
+-- --------------------------------------------- qui suis-je, que puis-je ? ---
+-- La fiche d'équipe derrière l'adresse connectée (vide : accès sans fiche).
+create or replace function public.mon_membre()
+returns uuid
+language sql stable security definer set search_path = '' as $$
+  select a.membre_id
+    from public.acces a
+   where a.email = lower(coalesce(auth.jwt() ->> 'email', ''))
+     and a.actif;
+$$;
+
+-- mes_droits() et a_droit() lisent membres et droits_groupes : elles sont
+-- déclarées plus bas, une fois ces tables créées.
+
 -- ------------------------------------------------- date de mise à jour ---
 create or replace function public.touche_maj_le()
 returns trigger language plpgsql as $$
@@ -325,6 +339,46 @@ create table if not exists public.reglages (
 );
 comment on column public.reglages.id is 'Historique (une seule ligne avant les bureaux) : toujours vrai.';
 
+-- ------------------------------------------------- droits d'un groupe ---
+-- Ce que chaque groupe a le droit de faire, bureau par bureau. Les groupes
+-- sont les statuts portés par les membres ; qui n'en porte aucun est un
+-- utilisateur « lambda » et travaille sur ce qui le concerne, rien d'autre.
+-- La liste des droits est ouverte : un droit ajouté plus tard à l'outil
+-- n'oblige pas à toucher au schéma. Un code inconnu de l'outil ne fait rien.
+create table if not exists public.droits_groupes (
+  bureau_id uuid not null references public.bureaux (id) on delete cascade,
+  statut    text not null constraint droits_groupes_statut_check
+            check (statut in ('administrateur', 'chef_secteur', 'chef_projet')),
+  droits    text[] not null default '{}' constraint droits_groupes_droits_check
+            check (droits is not null and array_position(droits, null::text) is null),
+  maj_le    timestamptz not null default now(),
+  primary key (bureau_id, statut)
+);
+comment on table public.droits_groupes is
+  'Droits accordés à chaque groupe, bureau par bureau. Lue par les membres du bureau, écrite seulement par la console du super admin.';
+
+-- Tous les droits que mes statuts m'accordent, réunis. Aucun statut : rien.
+create or replace function public.mes_droits()
+returns text[]
+language sql stable security definer set search_path = '' as $$
+  select coalesce((
+    select array_agg(distinct d)
+      from public.acces a
+      join public.membres m on m.id = a.membre_id
+      join public.droits_groupes g
+        on g.bureau_id = m.bureau_id and g.statut = any (m.statuts)
+      cross join lateral unnest(g.droits) as d
+     where a.email = lower(coalesce(auth.jwt() ->> 'email', ''))
+       and a.actif), '{}'::text[]);
+$$;
+
+-- Le super admin passe partout : c'est lui qui distribue les droits.
+create or replace function public.a_droit(p_droit text)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.est_super_admin() or p_droit = any (public.mes_droits());
+$$;
+
 do $$
 declare t text;
 begin
@@ -337,11 +391,17 @@ begin
 end $$;
 
 -- Un bureau naît avec sa ligne de réglages (canton, capacité par défaut)
+-- Un bureau neuf part avec ses réglages et les droits d'origine : les trois
+-- groupes reçoivent les trois droits, à ajuster ensuite depuis la console.
 create or replace function public.bureau_cree_reglages()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.reglages (bureau_id) values (new.id) on conflict (bureau_id) do nothing;
+  insert into public.droits_groupes (bureau_id, statut, droits)
+  select new.id, s, array['affaires_creer', 'taches_autrui', 'absences_autrui']
+    from unnest(array['administrateur', 'chef_secteur', 'chef_projet']) as s
+  on conflict (bureau_id, statut) do nothing;
   return new;
 end $$;
 
@@ -367,6 +427,13 @@ begin
   on conflict (email) do update set super_admin = true, actif = true;
 end $$;
 
+-- Droits d'origine des bureaux déjà là (le déclencheur ne couvre que les neufs)
+insert into public.droits_groupes (bureau_id, statut, droits)
+select b.id, s, array['affaires_creer', 'taches_autrui', 'absences_autrui']
+  from public.bureaux b,
+       unnest(array['administrateur', 'chef_secteur', 'chef_projet']) as s
+on conflict (bureau_id, statut) do nothing;
+
 -- =========================================================== sécurité (RLS) ==
 -- On repart de zéro : les politiques existantes de ces tables sont retirées.
 -- Les tables de planification ne montrent que le bureau courant. Bureaux,
@@ -378,7 +445,8 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages',
-                           'acces', 'bureaux', 'succursales', 'disciplines', 'succursale_disciplines'] loop
+                           'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'succursale_disciplines'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -386,18 +454,92 @@ begin
     select tablename, policyname from pg_policies
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages',
-                        'acces', 'bureaux', 'succursales', 'disciplines', 'succursale_disciplines')
+                        'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                        'succursale_disciplines')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
 
-  foreach t in array array['absences', 'affaires', 'affaire_membres', 'taches'] loop
-    execute format(
-      'create policy "bureau courant" on public.%I for all to authenticated
-         using (bureau_id = (select public.bureau_courant()))
-         with check (bureau_id = (select public.bureau_courant()))', t);
-  end loop;
+  -- L'équipe d'une affaire suit l'affaire : rien de plus que le bureau.
+  execute
+    'create policy "bureau courant" on public.affaire_membres for all to authenticated
+       using (bureau_id = (select public.bureau_courant()))
+       with check (bureau_id = (select public.bureau_courant()))';
 end $$;
+
+-- ------------------------------------------------ ce que chacun peut écrire ---
+-- Lire, tout le bureau le peut. Écrire dépend du droit accordé au groupe, ou
+-- de ce qui nous concerne. Qui ne porte aucun statut est un utilisateur
+-- « lambda » : il mène son travail, pas celui des autres.
+
+-- Affaires : travailler sur les existantes pour tous ; en ouvrir une — ou la
+-- retirer, ce qui emporte ses tâches — demande le droit.
+create policy "bureau courant (lecture)" on public.affaires for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (modification)" on public.affaires for update to authenticated
+  using (bureau_id = (select public.bureau_courant()))
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "droit de créer" on public.affaires for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and (select public.a_droit('affaires_creer')));
+create policy "droit de retirer" on public.affaires for delete to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (select public.a_droit('affaires_creer')));
+
+-- Tâches : « me concerner », c'est tenir une part chargée — l'ingénieur d'une
+-- tâche qui a du calcul, le dessinateur d'une tâche qui a du dessin. Se mettre
+-- au calcul d'une tâche sans calcul ne serait pas s'y mettre.
+create policy "bureau courant (lecture)" on public.taches for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "droit ou ma tâche (création)" on public.taches for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant()) and (
+    (select public.a_droit('taches_autrui'))
+    or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+-- Une part chargée que personne ne tient reste prenable par tout le monde :
+-- c'est le geste du tableau de bord, « glisser une barre à affecter sur un
+-- membre ». Le WITH CHECK impose qu'à l'arrivée on soit bien dessus — on prend
+-- du travail, on n'en donne pas.
+create policy "droit ou ma tâche (modification)" on public.taches for update to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (
+    (select public.a_droit('taches_autrui'))
+    or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)
+    or (ingenieur_id   is null and charge_inge   > 0)
+    or (dessinateur_id is null and charge_dessin > 0)))
+  with check (bureau_id = (select public.bureau_courant()) and (
+    (select public.a_droit('taches_autrui'))
+    or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+create policy "droit ou ma tâche (suppression)" on public.taches for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (
+    (select public.a_droit('taches_autrui'))
+    or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+
+-- Absences : les siennes, ou le droit d'en poser pour les autres.
+create policy "bureau courant (lecture)" on public.absences for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "droit ou mes absences (création)" on public.absences for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and (membre_id = (select public.mon_membre())
+                   or (select public.a_droit('absences_autrui'))));
+create policy "droit ou mes absences (modification)" on public.absences for update to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (membre_id = (select public.mon_membre())
+              or (select public.a_droit('absences_autrui'))))
+  with check (bureau_id = (select public.bureau_courant())
+              and (membre_id = (select public.mon_membre())
+                   or (select public.a_droit('absences_autrui'))));
+create policy "droit ou mes absences (suppression)" on public.absences for delete to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (membre_id = (select public.mon_membre())
+              or (select public.a_droit('absences_autrui'))));
+
+-- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
+-- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
+create policy "bureau courant (lecture)" on public.droits_groupes for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
 
 -- Membres : l'outil les lit, il ne les écrit pas. Créer, modifier, supprimer
 -- une personne passe par la console (fonctions security definer, plus bas).
@@ -455,6 +597,7 @@ begin
     'membreId', v_acces.membre_id,
     'metier', v_membre.metier,
     'statuts', to_jsonb(coalesce(v_membre.statuts, '{}'::text[])),
+    'droits', to_jsonb(public.mes_droits()),
     'superAdmin', v_acces.super_admin,
     'droit', v_acces.droit,
     'bureau', jsonb_build_object('id', v_bureau.id, 'nom', v_bureau.nom, 'actif', v_bureau.actif),
@@ -513,6 +656,9 @@ begin
           'membres',  (select count(*) from public.membres  m where m.bureau_id = b.id),
           'affaires', (select count(*) from public.affaires x where x.bureau_id = b.id),
           'taches',   (select count(*) from public.taches   t where t.bureau_id = b.id),
+          'droits', coalesce((
+              select jsonb_object_agg(g.statut, to_jsonb(g.droits))
+              from public.droits_groupes g where g.bureau_id = b.id), '{}'::jsonb),
           'activite', greatest(
               (select max(t.maj_le) from public.taches   t where t.bureau_id = b.id),
               (select max(x.maj_le) from public.affaires x where x.bureau_id = b.id),
@@ -870,6 +1016,42 @@ begin
   return v_id;
 end $$;
 
+-- Les droits d'un groupe, dans un bureau. { bureauId, statut, droits: [...] }
+-- La liste reçue remplace l'ancienne. Les codes sont acceptés tels quels
+-- (lettres, chiffres, souligné) : un droit ajouté plus tard à l'outil n'oblige
+-- pas à repasser ici.
+create or replace function public.console_enregistre_droits(p jsonb)
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_bureau uuid := nullif(p ->> 'bureauId', '')::uuid;
+  v_statut text := btrim(coalesce(p ->> 'statut', ''));
+  v_droits text[];
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  if v_bureau is null or not exists (select 1 from public.bureaux x where x.id = v_bureau) then
+    raise exception 'Ce bureau n''existe pas.';
+  end if;
+  if v_statut not in ('administrateur', 'chef_secteur', 'chef_projet') then
+    raise exception 'Groupe inconnu.';
+  end if;
+
+  select coalesce(array_agg(distinct d.code), '{}'::text[])
+    into v_droits
+    from (select btrim(x.valeur) as code
+            from jsonb_array_elements_text(
+                   case when jsonb_typeof(p -> 'droits') = 'array' then p -> 'droits' else '[]'::jsonb end
+                 ) as x(valeur)) d
+   where d.code ~ '^[a-z][a-z0-9_]{0,39}$';
+
+  insert into public.droits_groupes (bureau_id, statut, droits)
+  values (v_bureau, v_statut, v_droits)
+  on conflict (bureau_id, statut) do update
+    set droits = excluded.droits, maj_le = now();
+end $$;
+
 -- Supprime une personne : sa fiche, son accès, ses absences, ses équipes.
 -- Ses tâches restent, sans affectation.
 create or replace function public.console_supprime_membre(p_membre uuid)
@@ -939,10 +1121,11 @@ declare
 begin
   foreach f in array array[
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
+    'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
     'public.mon_profil()', 'public.choisit_bureau(uuid)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
-    'public.console_supprime_utilisateur(text)'
+    'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'
   ] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated', f);

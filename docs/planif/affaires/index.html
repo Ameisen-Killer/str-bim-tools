@@ -54,10 +54,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=10"></script>
-<script src="/planif/assets/donnees.js?v=17"></script>
+<script src="/planif/assets/supabase.js?v=11"></script>
+<script src="/planif/assets/donnees.js?v=18"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=26"></script>
+<script src="/planif/assets/ui.js?v=27"></script>
 <script>
 (function () {
   "use strict";
@@ -69,11 +69,17 @@
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    UI.chrome("affaires", [{ label: "Nouvelle affaire", or: true, icone: "ico-ajout-affaire", action: function () { formulaire(null); } }]);
+    // Ouvrir une affaire demande le droit : sans lui, le bouton ne paraît pas.
+    var peutCreer = D.aDroit("affaires_creer");
+    UI.chrome("affaires", peutCreer
+      ? [{ label: "Nouvelle affaire", or: true, icone: "ico-ajout-affaire", action: function () { formulaire(null); } }]
+      : []);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    document.getElementById("btn-nouvelle").addEventListener("click", function () { formulaire(null); });
+    var btnNouvelle = document.getElementById("btn-nouvelle");
+    btnNouvelle.hidden = !peutCreer;
+    btnNouvelle.addEventListener("click", function () { formulaire(null); });
     document.getElementById("voir-terminees").addEventListener("change", dessine);
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -178,7 +184,10 @@
         el("td", { class: "actions" }, [
           UI.lienIcone("taches", "Tâches", a.code + " · " + a.nom, "/planif/taches/?affaire=" + encodeURIComponent(a.id)),
           UI.boutonIcone("modifier", "Modifier", a.code + " · " + a.nom, function () { formulaire(a.id); }),
-          UI.boutonIcone("supprimer", "Supprimer", a.code + " · " + a.nom, function () { supprime(a, taches.length); })
+          // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
+          D.aDroit("affaires_creer")
+            ? UI.boutonIcone("supprimer", "Supprimer", a.code + " · " + a.nom, function () { supprime(a, taches.length); })
+            : null
         ])
       ]), a.id));
     });
