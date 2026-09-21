@@ -137,7 +137,10 @@
     masque.checked = filtres.masqueTerminees;
     masque.addEventListener("change", function () { filtres.masqueTerminees = masque.checked; dessine(); });
     hote.appendChild(el("div", { class: "champ", style: "justify-content:flex-end" }, [
-      el("label", { class: "case", style: "white-space:nowrap" }, [masque, "Masquer les terminées"])
+      el("label", {
+        class: "case", style: "white-space:nowrap",
+        title: "Les tâches terminées, et celles dont la part de la personne regardée est rendue"
+      }, [masque, "Masquer les terminées"])
     ]));
 
     chAffaire.querySelector("select").addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
@@ -166,8 +169,20 @@
   }
 
   /**
+   * Plus rien à faire là-dessus, pour qui regarde : la tâche est terminée, ou
+   * la part de cette personne est rendue alors que l'autre métier travaille
+   * encore. La personne de référence est celle du filtre « Membre », sinon moi.
+   */
+  function rendu(t) {
+    if (t.statut === "termine") return true;
+    var qui = filtres.membre && filtres.membre !== "a-affecter" ? filtres.membre : (D.monMembre() || {}).id;
+    var parts = partsDe(t, qui);
+    return parts.length > 0 && parts.every(function (r) { return t[D.PARTS[r].fini]; });
+  }
+
+  /**
    * opts.sansTexte : ignore la recherche (pour le total du compteur)
-   * opts.terminees : force l'inclusion des tâches terminées
+   * opts.terminees : force l'inclusion des tâches terminées et des parts rendues
    */
   function selection(opts) {
     opts = opts || {};
@@ -176,7 +191,7 @@
     return D.taches({ affaireId: filtres.affaire || null, membreId: sansPersonne ? null : (filtres.membre || null) })
       .filter(function (t) {
         if (sansPersonne && !Calc.nonAffectees(t).length) return false;
-        if (filtres.masqueTerminees && !opts.terminees && t.statut === "termine") return false;
+        if (filtres.masqueTerminees && !opts.terminees && rendu(t)) return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
         return !mots.length || UI.contient(foinDe(t), mots);
       });
@@ -374,13 +389,17 @@
    * tout. Vide si la tâche ne m'est pas confiée (chef de projet, secrétariat) :
    * le pouce ferme alors la tâche entière.
    */
+  function partsDe(t, membreId) {
+    if (!membreId) return [];
+    var out = [];
+    if (t.chargeInge > 0 && t.ingenieurId === membreId) out.push("ingenieur");
+    if (t.chargeDessin > 0 && t.dessinateurId === membreId) out.push("dessinateur");
+    return out;
+  }
+
   function mesParts(t) {
     var moi = D.monMembre();
-    if (!moi) return [];
-    var out = [];
-    if (t.chargeInge > 0 && t.ingenieurId === moi.id) out.push("ingenieur");
-    if (t.chargeDessin > 0 && t.dessinateurId === moi.id) out.push("dessinateur");
-    return out;
+    return partsDe(t, moi && moi.id);
   }
 
   // Bouton à bascule : l'icône est pâle tant que le travail est ouvert, dorée une
@@ -521,9 +540,9 @@
     bloc.appendChild(el("p", { class: "q" }, ["Rien pour « ", el("em", { text: q }), " »"]));
 
     var terminees = filtres.masqueTerminees
-      ? selection({ terminees: true }).filter(function (t) { return t.statut === "termine"; }).length : 0;
+      ? selection({ terminees: true }).filter(rendu).length : 0;
     if (terminees) {
-      bloc.appendChild(el("p", { class: "aide", text: terminees + (terminees > 1 ? " tâches terminées correspondent." : " tâche terminée correspond.") }));
+      bloc.appendChild(el("p", { class: "aide", text: terminees + (terminees > 1 ? " tâches correspondent, terminées ou déjà rendues de ton côté." : " tâche correspond, terminée ou déjà rendue de ton côté.") }));
       bloc.appendChild(el("button", {
         class: "btn btn-or", type: "button", text: "Afficher les terminées",
         onclick: function () { filtres.masqueTerminees = false; rendFiltres(); dessine(); }
