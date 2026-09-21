@@ -379,7 +379,10 @@ table.liste tr.fini td{opacity:.7}
 button.etiq{background:none;font:inherit;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:color .2s,border-color .2s}
 button.etiq:hover{border-color:currentColor}
 button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
-.etiq > .coche{width:9px;height:5px;flex:0 0 auto;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);opacity:0;transition:opacity .2s}
+/* Coche au trait : la même marque partout où une part rendue doit se voir
+   (étiquettes de la liste, barres du planning, légende). */
+.coche{width:9px;height:5px;flex:0 0 auto;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+.etiq > .coche{opacity:0;transition:opacity .2s}
 .etiq.finie{color:var(--texte-faible);border-color:var(--ligne)}
 .etiq.finie > .coche{opacity:1}
 .losange{width:6px;height:6px;border:1px solid var(--or);transform:rotate(45deg);flex:0 0 auto}
@@ -517,6 +520,11 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .bt.fin::after{content:"";position:absolute;right:0;top:0;bottom:0;width:2px;background:var(--or)}
 .bt.retard{border-color:rgba(var(--alerte-rvb),.75)}
 .bt.termine{opacity:.42}
+/* Part rendue alors que la tâche vit encore : demi-teinte chez la personne qui
+   l'a finie, fond éteint et coche en tête ; l'autre métier garde sa barre pleine. */
+.bt.part-finie{opacity:.5;background:none}
+.bt.part-finie:hover{background:color-mix(in srgb,var(--tt) 14%,transparent)}
+.bt > .coche{margin-right:1px;color:var(--tt)}
 .bt.glisse{opacity:.55;cursor:grabbing;z-index:5}
 .bt.role-i{border-top-style:dashed}
 

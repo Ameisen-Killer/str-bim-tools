@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=36">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=37">
 </head>
 <body class="large">
 
@@ -66,6 +66,7 @@
         <span><i class="ech" aria-hidden="true"></i> Échéance</span>
         <span><i class="ret" aria-hidden="true"></i> En retard</span>
         <span><i class="dash" aria-hidden="true"></i> Charge ingénieur</span>
+        <span><i class="coche" aria-hidden="true"></i> Part terminée</span>
         <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
         <span>Fond hachuré : absence</span>
       </div>
@@ -548,8 +549,11 @@
     var classes = ["bt"];
     if (cn <= 2) classes.push("etroite");
     if (info.role === "ingenieur") classes.push("role-i");
-    // Part bouclée : la barre reste dessinée, éteinte, mais ne pèse plus sur la charge
-    if (t.statut === "termine" || info.fini) classes.push("termine");
+    /* Part bouclée : la barre reste à sa place chez la personne qui l'a rendue,
+       en demi-teinte et marquée d'une coche, mais ne pèse plus sur sa charge.
+       L'autre métier, lui, garde sa barre pleine tant qu'il n'a pas fini. */
+    if (t.statut === "termine") classes.push("termine");
+    else if (info.fini) classes.push("part-finie");
     else if (t.echeance < auj) classes.push("retard");
     if (C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
 
@@ -563,6 +567,7 @@
              (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
              (t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "")
     }, [
+      info.fini ? el("i", { class: "coche", "aria-hidden": "true" }) : null,
       el("span", { class: "code", text: a ? a.code : "—" }),
       el("span", { class: "lib", text: t.titre }),
       el("span", { class: "jr", text: C.fmtJours(info.charge) + " j" })
