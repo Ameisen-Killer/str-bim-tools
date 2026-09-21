@@ -130,6 +130,14 @@ join public.membres  d on d.email = 'charge.m' || (((t.g * 17) % 44) + 37) || '@
 
 commit;
 
+
+-- Les parts suivent le statut : une tâche terminée a ses deux parts fermées.
+update public.taches t
+   set fini_inge   = (t.charge_inge   > 0),
+       fini_dessin = (t.charge_dessin > 0)
+  from public.affaires a
+ where a.id = t.affaire_id and a.note like '[jeu de charge]%' and t.statut = 'termine';
+
 -- Contrôle : 80 / 400 / 6000 / 300
 select
   (select count(*) from public.membres  where email like '%@charge.exemple.ch')                  as membres,

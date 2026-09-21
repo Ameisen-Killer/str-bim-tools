@@ -358,6 +358,12 @@
 
   function vide(v) { return v === "" ? null : v; }
 
+  /* Les colonnes fini_inge / fini_dessin sont arrivées après coup (parts de
+     tâche terminées séparément). Tant que la migration n'a pas été passée dans
+     Supabase, les envoyer ferait refuser toute écriture de tâche : la lecture
+     dit si la base les connaît. À simplifier une fois la migration en place. */
+  var partsEnBase = true;
+
   var VERS_BASE = {
     membres: function (m) {
       return { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -369,11 +375,13 @@
                teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
     },
     taches: function (t) {
-      return { id: t.id, affaire_id: t.affaireId, titre: t.titre, note: t.note || "",
-               charge_inge: t.chargeInge, charge_dessin: t.chargeDessin,
-               debut: vide(t.debut), echeance: t.echeance,
-               ingenieur_id: vide(t.ingenieurId), dessinateur_id: vide(t.dessinateurId),
-               statut: t.statut, avancement: t.avancement };
+      var o = { id: t.id, affaire_id: t.affaireId, titre: t.titre, note: t.note || "",
+                charge_inge: t.chargeInge, charge_dessin: t.chargeDessin,
+                debut: vide(t.debut), echeance: t.echeance,
+                ingenieur_id: vide(t.ingenieurId), dessinateur_id: vide(t.dessinateurId),
+                statut: t.statut, avancement: t.avancement };
+      if (partsEnBase) { o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true; }
+      return o;
     }
   };
 
@@ -390,6 +398,9 @@
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {};
+
+      // La base connaît-elle déjà les parts terminées ? (colonnes fini_inge / fini_dessin)
+      partsEnBase = !taches.length || ("fini_inge" in taches[0]);
 
       // Côté de chacun dans l'équipe d'une affaire : un administrateur compte comme un ingénieur
       var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
@@ -430,6 +441,7 @@
             debut: t.debut, echeance: t.echeance,
             ingenieurId: t.ingenieur_id, dessinateurId: t.dessinateur_id,
             statut: t.statut, avancement: t.avancement,
+            finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
             cree: t.cree_le, maj: t.maj_le
           };
         })

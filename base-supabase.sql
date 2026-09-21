@@ -272,6 +272,11 @@ create table if not exists public.taches (
   dessinateur_id uuid references public.membres (id) on delete set null,
   statut         text not null default 'a_faire' check (statut in ('a_faire', 'en_cours', 'attente', 'termine')),
   avancement     smallint not null default 0 check (avancement between 0 and 100),
+  -- Les deux parts d'une tâche se terminent séparément : l'ingénieur qui boucle
+  -- son calcul libère sa charge sans fermer le dessin. Le statut ci-dessus en
+  -- est la synthèse : « termine » quand toutes les parts existantes le sont.
+  fini_inge      boolean not null default false,
+  fini_dessin    boolean not null default false,
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),

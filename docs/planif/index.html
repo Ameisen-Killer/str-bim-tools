@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=35">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=36">
 </head>
 <body class="large">
 
@@ -87,10 +87,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=8"></script>
-<script src="/planif/assets/donnees.js?v=15"></script>
-<script src="/planif/assets/calculs.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=23"></script>
+<script src="/planif/assets/supabase.js?v=9"></script>
+<script src="/planif/assets/donnees.js?v=16"></script>
+<script src="/planif/assets/calculs.js?v=6"></script>
+<script src="/planif/assets/ui.js?v=24"></script>
 <script src="/planif/assets/tour.js?v=2"></script>
 <script>
 (function () {
@@ -548,7 +548,8 @@
     var classes = ["bt"];
     if (cn <= 2) classes.push("etroite");
     if (info.role === "ingenieur") classes.push("role-i");
-    if (t.statut === "termine") classes.push("termine");
+    // Part bouclée : la barre reste dessinée, éteinte, mais ne pèse plus sur la charge
+    if (t.statut === "termine" || info.fini) classes.push("termine");
     else if (t.echeance < auj) classes.push("retard");
     if (C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
 
@@ -559,7 +560,8 @@
       title: (a ? a.code + " · " : "") + t.titre + "\n" +
              D.ROLES[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
-             (t.statut !== "termine" && t.echeance < auj ? "\nEn retard" : "")
+             (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
+             (t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "")
     }, [
       el("span", { class: "code", text: a ? a.code : "—" }),
       el("span", { class: "lib", text: t.titre }),
@@ -729,6 +731,23 @@
     var avancement = el("input", { type: "number", name: "avancement", min: "0", max: "100", step: "5", inputmode: "numeric" });
     avancement.value = t.avancement;
 
+    /* La part de cette barre se termine seule : le calcul bouclé libère
+       l'ingénieur sans retirer le dessin du planning. La tâche ne passe
+       « Terminé » qu'une fois les deux parts fermées. */
+    var part = D.PARTS[info.role];
+    var autre = D.PARTS[info.role === "ingenieur" ? "dessinateur" : "ingenieur"];
+    var autreOuverte = t[autre.charge] > 0 && !t[autre.fini];
+    var finiPart = el("input", { type: "checkbox", name: "fini" });
+    finiPart.checked = t[part.fini] === true;
+    finiPart.addEventListener("change", function () {
+      if (finiPart.checked && !autreOuverte) statut.value = "termine";
+      else if (!finiPart.checked && statut.value === "termine") statut.value = "en_cours";
+    });
+    statut.addEventListener("change", function () {
+      if (statut.value === "termine") finiPart.checked = true;
+      else if (!autreOuverte) finiPart.checked = false;
+    });
+
     // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
     var champRole = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
     var confie = el("select", { name: "confie" }, [el("option", { value: "" }, ["— À affecter —"])]);
@@ -747,14 +766,18 @@
 
     var corps = el("div", {}, [
       ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
-      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + periode(t.chargeInge, t.ingenieurId) : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + periode(t.chargeDessin, t.dessinateurId) : "—"),
+      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId)) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId)) : "—"),
       ligne("Échéance", C.fmtLong(t.echeance)),
       t.note ? ligne("Note", t.note) : null,
       el("div", { class: "grille-champs", style: "margin-top:24px" }, [
         el("div", { class: "champ" }, [el("label", { text: "Statut" }), statut]),
         el("div", { class: "champ" }, [el("label", { text: "Avancement (%)" }), avancement]),
-        el("div", { class: "champ" }, [el("label", { text: (info.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), confie])
+        el("div", { class: "champ" }, [el("label", { text: (info.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), confie]),
+        el("div", { class: "champ" }, [
+          el("span", { class: "legende", text: "Cette part" }),
+          el("div", { class: "cases" }, [el("label", { class: "case" }, [finiPart, part.label + " terminé"])])
+        ])
       ]),
       el("div", { class: "legende", style: "display:block;margin-top:24px", text: "Décaler l'échéance" }),
       el("div", { class: "outils decalages", style: "margin-top:10px" }, [
@@ -777,6 +800,9 @@
               statut: statut.value,
               avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
             };
+            // « Terminé » ferme les deux parts (donnees.js s'en charge) ;
+            // sinon seule celle de cette barre change.
+            if (statut.value !== "termine") champs[part.fini] = finiPart.checked;
             // Choisir « À affecter » libère la charge
             if (confie.value !== (t[champRole] || "")) champs[champRole] = confie.value || null;
             return D.retoucheTache(t.id, champs).then(function () {

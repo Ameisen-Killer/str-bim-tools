@@ -118,6 +118,44 @@
   };
   var STATUTS_AFFAIRE = { active: "Active", suspendue: "Suspendue", terminee: "Terminée" };
 
+  /* Les deux parts d'une tâche : le calcul, côté ingénieur, et le dessin.
+     Chacune se termine de son côté — l'ingénieur qui boucle sa note libère sa
+     charge sans fermer le dessin qui suit. Le statut n'en est que la synthèse. */
+  var PARTS = {
+    ingenieur:   { charge: "chargeInge",   membre: "ingenieurId",   fini: "finiInge",   label: "Calcul" },
+    dessinateur: { charge: "chargeDessin", membre: "dessinateurId", fini: "finiDessin", label: "Dessin" }
+  };
+
+  /** L'écriture nomme-t-elle les parts ? Si oui, ce sont elles qui décident. */
+  function partsNommees(o) { return ("finiInge" in o) || ("finiDessin" in o); }
+
+  /**
+   * Remet d'accord les parts et le statut après une écriture.
+   *  · une part de charge nulle n'existe pas : son drapeau retombe ;
+   *  · la tâche est « Terminé » exactement quand toutes ses parts le sont ;
+   *  · terminer ou rouvrir la tâche par son statut entraîne ses parts, alors
+   *    qu'une écriture qui nomme les parts garde le dernier mot.
+   */
+  function accordeParts(t, parts, etaitTermine) {
+    var aInge = t.chargeInge > 0, aDessin = t.chargeDessin > 0;
+    if (!aInge && !aDessin) return t;                  // tâche sans charge : rien à accorder
+    if (!parts) {
+      if (t.statut === "termine") { t.finiInge = true; t.finiDessin = true; }
+      else if (etaitTermine) { t.finiInge = false; t.finiDessin = false; }
+    }
+    t.finiInge = aInge && t.finiInge === true;
+    t.finiDessin = aDessin && t.finiDessin === true;
+    if ((!aInge || t.finiInge) && (!aDessin || t.finiDessin)) {
+      t.statut = "termine";
+      t.avancement = 100;
+    } else if (t.statut === "termine") {
+      t.statut = "en_cours";                           // une part rouverte rouvre la tâche
+    } else if (t.statut === "a_faire" && (t.finiInge || t.finiDessin)) {
+      t.statut = "en_cours";                           // une moitié bouclée : la tâche a bien démarré
+    }
+    return t;
+  }
+
   function etatVierge() {
     return {
       version: VERSION,
@@ -321,7 +359,8 @@
       });
     });
     (brut.taches || []).forEach(function (t) {
-      e.taches.push({
+      // accordeParts rattrape les tâches d'avant les parts : « Terminé » ferme les deux
+      e.taches.push(accordeParts({
         id: texte(t.id) || id(),
         affaireId: texte(t.affaireId),
         titre: texte(t.titre), note: texte(t.note),
@@ -333,9 +372,13 @@
         dessinateurId: texte(t.dessinateurId) || null,
         statut: STATUTS_TACHE[t.statut] ? t.statut : "a_faire",
         avancement: Math.min(100, Math.max(0, nombre(t.avancement, 0))),
+        finiInge: t.finiInge === true,
+        finiDessin: t.finiDessin === true,
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
-      });
+        // À la lecture, « Terminé » prime : une tâche d'avant les parts, ou
+        // reprise d'un jeu d'essai, retrouve ses deux parts fermées.
+      }, t.statut !== "termine" && partsNommees(t), false));
     });
     return e;
   }
@@ -470,7 +513,9 @@
       ingenieurId: texte(o.ingenieurId) || null,
       dessinateurId: texte(o.dessinateurId) || null,
       statut: STATUTS_TACHE[o.statut] ? o.statut : "a_faire",
-      avancement: Math.min(100, Math.max(0, nombre(o.avancement, 0)))
+      avancement: Math.min(100, Math.max(0, nombre(o.avancement, 0))),
+      finiInge: o.finiInge === true,
+      finiDessin: o.finiDessin === true
     };
   }
 
@@ -490,6 +535,7 @@
     disciplinesDe: disciplinesDe,
     STATUTS_TACHE: STATUTS_TACHE,
     STATUTS_AFFAIRE: STATUTS_AFFAIRE,
+    PARTS: PARTS,
     source: ADAPTATEUR.nom,
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
@@ -702,7 +748,7 @@
 
     ajouteTache: function (o) {
       return Promise.resolve().then(function () {
-        var v = valideTache(o);
+        var v = accordeParts(valideTache(o), partsNommees(o), false);
         v.id = id(); v.cree = new Date().toISOString(); v.maj = v.cree;
         etat.taches.push(v);
         return sauve().then(function () { return v; });
@@ -711,8 +757,10 @@
     majTache: function (i, o) {
       return Promise.resolve().then(function () {
         var t = D.tache(i); if (!t) throw erreur("Tâche introuvable.");
+        var etait = t.statut === "termine";
         var v = valideTache(o);
         Object.keys(v).forEach(function (k) { t[k] = v[k]; });
+        accordeParts(t, partsNommees(o), etait);
         t.maj = new Date().toISOString();
         return sauve().then(function () { return t; });
       });
@@ -721,7 +769,9 @@
     retoucheTache: function (i, champs) {
       return Promise.resolve().then(function () {
         var t = D.tache(i); if (!t) throw erreur("Tâche introuvable.");
+        var etait = t.statut === "termine";
         Object.keys(champs).forEach(function (k) { if (k in t) t[k] = champs[k]; });
+        accordeParts(t, partsNommees(champs), etait);
         t.maj = new Date().toISOString();
         return sauve().then(function () { return t; });
       });
@@ -803,7 +853,7 @@
         id: id(), affaireId: aff, titre: titre, note: "",
         chargeInge: ci, chargeDessin: cd,
         debut: null, echeance: ech, ingenieurId: ing, dessinateurId: des,
-        statut: statut, avancement: av,
+        statut: statut, avancement: av, finiInge: false, finiDessin: false,
         cree: new Date().toISOString(), maj: new Date().toISOString()
       });
     }

@@ -373,6 +373,15 @@ table.liste tr.fini td{opacity:.7}
 }
 .etiq.ing{border-color:rgba(var(--or-rvb),.4);color:var(--or)}
 .etiq.des{border-color:rgba(var(--verre-rvb),.4);color:var(--bleu)}
+/* Dans la liste des tâches, l'étiquette est aussi la bascule « cette part est
+   terminée » : la coche s'allume et l'étiquette s'éteint quand le métier a
+   bouclé sa moitié, sans rien changer à l'autre. */
+button.etiq{background:none;font:inherit;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:color .2s,border-color .2s}
+button.etiq:hover{border-color:currentColor}
+button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
+.etiq > .coche{width:9px;height:5px;flex:0 0 auto;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);opacity:0;transition:opacity .2s}
+.etiq.finie{color:var(--texte-faible);border-color:var(--ligne)}
+.etiq.finie > .coche{opacity:1}
 .losange{width:6px;height:6px;border:1px solid var(--or);transform:rotate(45deg);flex:0 0 auto}
 .pastille{width:8px;height:8px;flex:0 0 auto;border:1px solid currentColor;background:color-mix(in srgb,currentColor 22%,transparent);transform:rotate(45deg)}
 
@@ -738,6 +747,7 @@ mark.trouve{
   .btn-nu{padding-inline:10px}
   .champ input,.champ select,.champ textarea,.champ input[type=date],.champ input[type=number]{font-size:16px;min-height:44px}
   .case{min-height:40px}
+  button.etiq{min-height:36px;padding-inline:11px}   /* bascule de part : cible atteignable au doigt */
   .tete-section{margin-bottom:16px}
   .section{padding-block:22px}
 

@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=35">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=36">
 </head>
 <body class="large">
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce d'une tâche la marque terminée. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
+    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce termine toute la tâche ; un clic sur l'étiquette d'une personne ne termine que sa part, le calcul ou le dessin. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -57,10 +57,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=8"></script>
-<script src="/planif/assets/donnees.js?v=15"></script>
-<script src="/planif/assets/calculs.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=23"></script>
+<script src="/planif/assets/supabase.js?v=9"></script>
+<script src="/planif/assets/donnees.js?v=16"></script>
+<script src="/planif/assets/calculs.js?v=6"></script>
+<script src="/planif/assets/ui.js?v=24"></script>
 <script>
 (function () {
   "use strict";
@@ -290,19 +290,29 @@
       var retard = t.statut !== "termine" && t.echeance < auj;
       var reste = C.diff(auj, t.echeance);
 
+      // Une étiquette par métier, qui sert aussi de bascule : un clic termine
+      // cette part-là sans fermer l'autre (l'ingénieur qui boucle son calcul
+      // laisse le dessin au planning).
       var gens = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
-      if (t.chargeInge > 0) {
-        gens.appendChild(el("span", { class: "etiq ing" + (t.ingenieurId ? "" : " a-affecter") }, [
-          UI.surligne(t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter", mots),
-          " · " + C.fmtJours(t.chargeInge) + " j"
+      [
+        { role: "ingenieur", classe: "ing", charge: t.chargeInge, membre: t.ingenieurId, fini: t.finiInge },
+        { role: "dessinateur", classe: "des", charge: t.chargeDessin, membre: t.dessinateurId, fini: t.finiDessin }
+      ].forEach(function (p) {
+        if (!(p.charge > 0)) return;
+        var nom = p.membre ? D.nomMembre(p.membre) : "À affecter";
+        var label = D.PARTS[p.role].label;
+        gens.appendChild(el("button", {
+          type: "button",
+          class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
+          "aria-pressed": p.fini ? "true" : "false",
+          title: (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
+          onclick: function () { terminePart(t.id, p.role, !p.fini); }
+        }, [
+          el("i", { class: "coche", "aria-hidden": "true" }),
+          UI.surligne(nom, mots),
+          " · " + C.fmtJours(p.charge) + " j"
         ]));
-      }
-      if (t.chargeDessin > 0) {
-        gens.appendChild(el("span", { class: "etiq des" + (t.dessinateurId ? "" : " a-affecter") }, [
-          UI.surligne(t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter", mots),
-          " · " + C.fmtJours(t.chargeDessin) + " j"
-        ]));
-      }
+      });
 
       return suivi.marque(el("tr", { class: t.statut === "termine" ? "fini" : "" }, [
         el("td", {}, [el("div", { class: "tache-titre" }, [
@@ -358,13 +368,15 @@
     return el("div", { class: "tache-bascules" }, [course(t), coche(t)]);
   }
 
-  // Bouton à bascule : l'icône est pâle tant que la tâche est ouverte, dorée une fois terminée
+  // Bouton à bascule : l'icône est pâle tant que la tâche est ouverte, dorée une fois terminée.
+  // Il ferme la tâche entière ; pour une seule part, les étiquettes d'affectation.
   function coche(t) {
     var fini = t.statut === "termine";
+    var deux = t.chargeInge > 0 && t.chargeDessin > 0;
     return el("button", {
       type: "button", class: "ico ico-coche" + (fini ? " fait" : ""),
       "aria-pressed": fini ? "true" : "false",
-      title: fini ? "Rouvrir la tâche" : "Marquer comme terminée",
+      title: fini ? "Rouvrir la tâche" : deux ? "Terminer le calcul et le dessin" : "Marquer comme terminée",
       "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »",
       onclick: function () { termine(t.id, !fini); }
     });
@@ -403,6 +415,32 @@
       dessine();
       UI.toast(lance ? "Tâche en cours." : "Statut remis à « " + D.STATUTS_TACHE[retour] + " ».",
         lance ? { label: "Annuler", action: function () { demarre(id, false); } } : null);
+    }).catch(function (e) { dessine(); UI.toast(e.message); });
+  }
+
+  /**
+   * Terminer (ou rouvrir) une seule part : le calcul côté ingénieur, le dessin
+   * côté dessinateur. La charge de la part fermée quitte le planning, l'autre
+   * y reste ; la tâche ne passe « Terminé » qu'à la dernière part fermée.
+   */
+  function terminePart(id, role, fait) {
+    var t = D.tache(id);
+    if (!t) return;
+    var champs = {};
+    champs[D.PARTS[role].fini] = fait;
+    if (fait) avantFin[id] = { statut: t.statut, avancement: t.avancement };
+    else if (avantFin[id]) {           // annulation : la tâche retrouve son état d'avant
+      champs.statut = avantFin[id].statut;
+      champs.avancement = avantFin[id].avancement;
+      delete avantFin[id];
+    }
+    var label = D.PARTS[role].label;
+    D.retoucheTache(id, champs).then(function () {
+      dessine();
+      var apres = D.tache(id);
+      UI.toast(fait ? label + " terminé." + (apres && apres.statut === "termine" ? " Tâche terminée." : "")
+                    : label + " rouvert.",
+        { label: "Annuler", action: function () { terminePart(id, role, !fait); } });
     }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
@@ -473,14 +511,15 @@
   /* -------------------------------------------------------------- export */
 
   function exporteCSV() {
-    var lignes = [["Affaire", "Libellé", "Tâche", "Charge ingénieur (j)", "Ingénieur",
-                   "Charge dessin (j)", "Dessinateur", "Début", "Échéance", "Statut", "Avancement (%)", "Note"]];
+    var lignes = [["Affaire", "Libellé", "Tâche", "Charge ingénieur (j)", "Ingénieur", "Calcul terminé",
+                   "Charge dessin (j)", "Dessinateur", "Dessin terminé", "Début", "Échéance", "Statut", "Avancement (%)", "Note"]];
+    var oui = function (t, cle, charge) { return t[charge] > 0 ? (t[cle] ? "oui" : "non") : ""; };
     selection().forEach(function (t) {
       var a = D.affaire(t.affaireId);
       lignes.push([
         a ? a.code : "", a ? a.nom : "", t.titre,
-        C.fmtJours(t.chargeInge), t.ingenieurId ? D.nomMembre(t.ingenieurId) : "",
-        C.fmtJours(t.chargeDessin), t.dessinateurId ? D.nomMembre(t.dessinateurId) : "",
+        C.fmtJours(t.chargeInge), t.ingenieurId ? D.nomMembre(t.ingenieurId) : "", oui(t, "finiInge", "chargeInge"),
+        C.fmtJours(t.chargeDessin), t.dessinateurId ? D.nomMembre(t.dessinateurId) : "", oui(t, "finiDessin", "chargeDessin"),
         C.fmtCH(Calc.debutEffectif(t, D.canton())), C.fmtCH(t.echeance),
         D.STATUTS_TACHE[t.statut], t.avancement, t.note || ""
       ]);

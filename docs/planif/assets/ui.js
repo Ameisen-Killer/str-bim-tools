@@ -1124,11 +1124,39 @@
     rebranche();
     chAffaire.querySelector("select").addEventListener("change", rebranche);
 
+    /* Les deux parts se terminent séparément : ces cases font foi, le statut
+       n'en est que la synthèse (donnees.js les remet d'accord à l'écriture).
+       Une part sans charge ne se coche pas : sa case se grise à la frappe. */
+    var parts = [
+      { cle: "finiInge", charge: "chargeInge", label: "Calcul terminé" },
+      { cle: "finiDessin", charge: "chargeDessin", label: "Dessin terminé" }
+    ].map(function (p) {
+      var input = el("input", { type: "checkbox", name: "parts", value: p.cle });
+      input.checked = !!(t && t[p.cle]);
+      p.input = input;
+      p.etiquette = el("label", { class: "case" }, [input, p.label]);
+      return p;
+    });
+    var casesParts = el("div", { class: "cases" }, parts.map(function (p) { return p.etiquette; }));
+
     // Début recalculé à chaque frappe : durée, échéance ou intervenant
     var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:7px" });
     function recalcule() {
       var v = lit(corps);
       vide(apercu);
+
+      parts.forEach(function (p) {
+        var porte = (parseFloat(String(v[p.charge]).replace(",", ".")) || 0) > 0;
+        p.input.disabled = !porte;
+        if (!porte) p.input.checked = false;
+        p.etiquette.style.opacity = porte ? "" : ".4";
+      });
+      // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir
+      if (selStatut) {
+        if (parts.every(function (p) { return p.input.disabled || p.input.checked; })) selStatut.value = "termine";
+        else if (selStatut.value === "termine") selStatut.value = "en_cours";
+      }
+
       if (!v.echeance) {
         apercu.appendChild(el("span", { class: "aide", text: "Saisis l'échéance." }));
         return;
@@ -1197,10 +1225,32 @@
             options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
           }),
           champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
+          el("div", { class: "champ large" }, [
+            el("span", { class: "legende", text: "Parts terminées" }),
+            casesParts
+          ]),
           champ({ nom: "note", label: "Note", type: "textarea", rows: 2, valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
         ])
       ])
     ]);
+
+    // Statut et parts restent d'accord sous les doigts : choisir « Terminé »
+    // coche les parts portées, cocher la dernière passe le statut à « Terminé ».
+    var selStatut = corps.querySelector("select[name=statut]");
+    corps.addEventListener("change", function (e) {
+      var toutes = function () {
+        return parts.every(function (p) { return p.input.disabled || p.input.checked; });
+      };
+      if (e.target === selStatut) {
+        var fini = selStatut.value === "termine";
+        if (fini || toutes()) {
+          parts.forEach(function (p) { if (!p.input.disabled) p.input.checked = fini; });
+        }
+      } else if (e.target.name === "parts") {
+        if (toutes()) selStatut.value = "termine";
+        else if (selStatut.value === "termine") selStatut.value = "en_cours";
+      }
+    });
 
     corps.addEventListener("input", recalcule);
     corps.addEventListener("change", recalcule);
@@ -1216,6 +1266,8 @@
         {
           label: "Enregistrer", or: true, entree: true, action: function () {
             var v = lit(corps);
+            v.finiInge = (v.parts || []).indexOf("finiInge") >= 0;
+            v.finiDessin = (v.parts || []).indexOf("finiDessin") >= 0;
             var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
             return p.then(function () {
               if (o.surEnregistrement) o.surEnregistrement();

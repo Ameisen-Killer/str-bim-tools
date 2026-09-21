@@ -27,19 +27,34 @@
   /** Charge totale d'une tâche, toutes casquettes confondues. */
   function chargeTotale(t) { return (t.chargeInge || 0) + (t.chargeDessin || 0); }
 
-  /** Les affectations réelles d'une tâche : [{membreId, role, charge}] */
+  /**
+   * Une tâche porte deux parts, le calcul et le dessin, qui se terminent
+   * séparément : l'ingénieur qui boucle sa note de calcul libère sa charge
+   * sans fermer le dessin qui suit. Une part finie ne pèse donc plus sur le
+   * planning, n'attend plus personne et ne déclenche plus d'alerte ; seule la
+   * barre reste dessinée, marquée terminée.
+   */
+  function partFinie(t, role) { return role === "ingenieur" ? !!t.finiInge : !!t.finiDessin; }
+
+  /** Charge encore à faire : les parts qui ne sont pas terminées. */
+  function chargeOuverte(t) {
+    if (t.statut === "termine") return 0;
+    return (t.finiInge ? 0 : (t.chargeInge || 0)) + (t.finiDessin ? 0 : (t.chargeDessin || 0));
+  }
+
+  /** Les affectations réelles d'une tâche : [{membreId, role, charge, fini}] */
   function affectations(t) {
     var out = [];
-    if (t.chargeInge > 0 && t.ingenieurId) out.push({ membreId: t.ingenieurId, role: "ingenieur", charge: t.chargeInge });
-    if (t.chargeDessin > 0 && t.dessinateurId) out.push({ membreId: t.dessinateurId, role: "dessinateur", charge: t.chargeDessin });
+    if (t.chargeInge > 0 && t.ingenieurId) out.push({ membreId: t.ingenieurId, role: "ingenieur", charge: t.chargeInge, fini: !!t.finiInge });
+    if (t.chargeDessin > 0 && t.dessinateurId) out.push({ membreId: t.dessinateurId, role: "dessinateur", charge: t.chargeDessin, fini: !!t.finiDessin });
     return out;
   }
 
   /** Les charges d'une tâche qui attendent encore quelqu'un : [{role, charge}] */
   function nonAffectees(t) {
     var out = [];
-    if (t.chargeInge > 0 && !t.ingenieurId) out.push({ role: "ingenieur", charge: t.chargeInge });
-    if (t.chargeDessin > 0 && !t.dessinateurId) out.push({ role: "dessinateur", charge: t.chargeDessin });
+    if (t.chargeInge > 0 && !t.ingenieurId && !t.finiInge) out.push({ role: "ingenieur", charge: t.chargeInge });
+    if (t.chargeDessin > 0 && !t.dessinateurId && !t.finiDessin) out.push({ role: "dessinateur", charge: t.chargeDessin });
     return out;
   }
 
@@ -119,6 +134,7 @@
       if (!fin) return;
 
       affectations(t).forEach(function (af) {
+        if (af.fini) return;                      // part bouclée : sa charge ne pèse plus sur la personne
         var membre = index[af.membreId];
         if (!membre) return;
         // Chaque intervenant a sa propre fenêtre : 0,5 j d'ingénieur ne s'étale pas sur les 4 j du dessin
@@ -223,10 +239,10 @@
         out.push({ rang: 1, type: "proche", quoi: "Échéance proche",
           texte: libelle, detail: C.fmtLong(t.echeance), tacheId: t.id });
       }
-      if (t.chargeInge > 0 && !t.ingenieurId) {
+      if (t.chargeInge > 0 && !t.ingenieurId && !t.finiInge) {
         out.push({ rang: 1, type: "proche", quoi: "Sans ingénieur", texte: libelle, detail: "charge non affectée", tacheId: t.id });
       }
-      if (t.chargeDessin > 0 && !t.dessinateurId) {
+      if (t.chargeDessin > 0 && !t.dessinateurId && !t.finiDessin) {
         out.push({ rang: 1, type: "proche", quoi: "Sans dessinateur", texte: libelle, detail: "charge non affectée", tacheId: t.id });
       }
     });
@@ -258,6 +274,8 @@
     capaciteJour: capaciteJour,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
+    chargeOuverte: chargeOuverte,
+    partFinie: partFinie,
     affectations: affectations, nonAffectees: nonAffectees,
     debutEffectif: debutEffectif,
     debutAffectation: debutAffectation,
