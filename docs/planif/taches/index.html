@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=37">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=38">
 </head>
 <body class="large">
 
@@ -57,10 +57,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=9"></script>
-<script src="/planif/assets/donnees.js?v=16"></script>
+<script src="/planif/assets/supabase.js?v=10"></script>
+<script src="/planif/assets/donnees.js?v=17"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=25"></script>
+<script src="/planif/assets/ui.js?v=26"></script>
 <script>
 (function () {
   "use strict";
@@ -123,7 +123,7 @@
     var chMembre = UI.champ({
       nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
       options: [{ valeur: "", label: "Toute l'équipe" }, { valeur: "a-affecter", label: "À affecter (sans personne)" }]
-        .concat(UI.optionsParRole(D.membres({ tous: true })))
+        .concat(UI.optionsParMetier(D.membres({ tous: true })))
     });
     var chStatut = UI.champ({
       nom: "f-statut", label: "Statut", type: "select", valeur: filtres.statut,

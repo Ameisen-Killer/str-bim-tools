@@ -2,7 +2,8 @@
 --  Outil de planification — JEU DE CHARGE (données fictives, gros volume)
 -- ----------------------------------------------------------------------------
 --  Sert à éprouver la tenue de l'outil sur un bureau chargé :
---    80 membres (36 ingénieurs, 44 dessinateurs, temps partiels, 5 inactifs)
+--    80 membres (36 ingénieurs, 44 dessinateurs, temps partiels, 5 inactifs),
+--      dont quelques associés, chefs de secteur et chefs de projet
 --    400 affaires (actives, suspendues, terminées), ~1 900 liens d'équipe
 --    6 000 tâches étalées de -4 à +8 mois, 300 absences.
 --  Valeurs pseudo-aléatoires mais déterministes : deux exécutions donnent le
@@ -36,7 +37,7 @@ select set_config('planif.bureau', 'c4a26e00-0000-4000-8000-000000000002', true)
 -- 80 membres pour 40 prénoms et 40 noms : le second tour décale les noms de
 -- sept rangs, sinon chaque nom ressortirait tel quel au tour suivant et le
 -- bureau compterait quarante homonymes.
-insert into public.membres (prenom, nom, email, role, capacite, actif)
+insert into public.membres (prenom, nom, email, metier, statuts, capacite, actif)
 select
   (array['Alice','Bastien','Chloé','Damien','Elsa','Fabien','Gaëlle','Hugo','Inès','Jonas',
          'Karine','Luca','Maëlle','Nathan','Océane','Pierre','Quentin','Rachel','Simon','Tania',
@@ -47,7 +48,14 @@ select
          'Udry','Vionnet','Wenger','Yerly','Zufferey','Amstutz','Brunner','Cretton','Dubey','Emery',
          'Fournier','Genoud','Hofer','Jordan','Kaeser','Lambiel','Meyer','Nussbaum','Pasche','Roulin'])[((g * 17 + ((g - 1) / 40) * 7) % 40) + 1],
   'charge.m' || g || '@charge.exemple.ch',
+  -- 1..36 ingénieurs, 37..80 dessinateurs : les tâches plus bas s'appuient sur
+  -- ces bornes, aucun administratif ici (il ne porterait pas de charge).
   case when g <= 36 then 'ingenieur' else 'dessinateur' end,
+  -- Quelques casquettes semées dans le lot : un associé tous les treize, un
+  -- chef de secteur tous les onze, un chef de projet tous les cinq.
+  (case when g % 13 = 0 then array['administrateur'] else '{}'::text[] end
+   || case when g % 11 = 0 then array['chef_secteur'] else '{}'::text[] end
+   || case when g %  5 = 0 then array['chef_projet']  else '{}'::text[] end),
   case g % 10 when 3 then 4 when 7 then 3 else 5 end,
   g % 16 <> 0
 from generate_series(1, 80) g;

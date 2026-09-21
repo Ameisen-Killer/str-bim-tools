@@ -226,11 +226,20 @@
     ]);
   }
 
-  /** Options d'une liste de membres, en sous-groupes par rôle et par ordre alphabétique dans chacun. */
-  function optionsParRole(membres, libelle) {
+  /** Options d'une liste de membres, en sous-groupes par métier et par ordre alphabétique dans chacun. */
+  function optionsParMetier(membres, libelle) {
     libelle = libelle || function (m) { return m.prenom + " " + m.nom; };
-    return D.parRole(membres).map(function (g) {
+    return D.parMetier(membres).map(function (g) {
       return { groupe: g.titre, options: g.membres.map(function (m) { return { valeur: m.id, label: libelle(m) }; }) };
+    });
+  }
+
+  /** Étiquettes des statuts d'un membre, dans l'ordre ; rien s'il n'en porte aucun.
+   *  courts : intitulés abrégés, pour les listes denses. */
+  function etiquettesStatuts(m, courts) {
+    return D.statutsDe(m).map(function (s) {
+      return el("span", { class: "etiq statut " + s, title: D.STATUTS[s] },
+                [courts ? D.STATUTS_COURTS[s] : D.STATUTS[s]]);
     });
   }
 
@@ -1025,7 +1034,7 @@
     var membres = D.membres({});
     if (!membres.length) return toast("Aucun membre à l'effectif : commence par l'équipe.");
 
-    var groupes = optionsParRole(membres);
+    var groupes = optionsParMetier(membres);
     var corps = el("div", { class: "grille-champs" }, [
       champ({
         nom: "membre", label: "Membre", type: "select", large: true,
@@ -1075,7 +1084,7 @@
       if (!liste.length) return;
       var g = el("optgroup", { label: label });
       liste.forEach(function (m) {
-        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom + (m.role === "administrateur" ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
+        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom + (D.aStatut(m, "administrateur") ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
       });
       sel.appendChild(g);
     }
@@ -1334,7 +1343,8 @@
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
-    champ: champ, cases: cases, lit: lit, optionsParRole: optionsParRole,
+    champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
+    etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
     absences: absences, nouvelleAbsence: nouvelleAbsence, formulaireTache: formulaireTache, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,

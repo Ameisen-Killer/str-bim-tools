@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=37">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=38">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -147,9 +147,9 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=9"></script>
-<script src="/planif/assets/donnees.js?v=16"></script>
-<script src="/planif/assets/ui.js?v=25"></script>
+<script src="/planif/assets/supabase.js?v=10"></script>
+<script src="/planif/assets/donnees.js?v=17"></script>
+<script src="/planif/assets/ui.js?v=26"></script>
 <script>
 (function () {
   "use strict";
@@ -659,10 +659,10 @@
   }
 
   /* ---------------------------------------------------------------- personnes
-     Une personne, c'est sa fiche au planning (prénom, rôle, capacité…) et, si
+     Une personne, c'est sa fiche au planning (prénom, métier, statuts, capacité…) et, si
      elle se connecte à l'outil, son accès. Les deux s'enregistrent ensemble.
      Un accès sans fiche reste possible — le super admin, un externe : il
-     paraît ici sans rôle ni capacité, et peut recevoir sa fiche plus tard. */
+     paraît ici sans métier ni capacité, et peut recevoir sa fiche plus tard. */
 
   function remplitFiltre() {
     var f = UI.vide(hotes.filtre);
@@ -701,7 +701,8 @@
   function personnes() {
     var liste = (etat.membres || []).map(function (m) {
       return {
-        id: m.id, bureauId: m.bureauId, prenom: m.prenom, nom: m.nom, role: m.role,
+        id: m.id, bureauId: m.bureauId, prenom: m.prenom, nom: m.nom,
+        metier: m.metier, statuts: m.statuts || [],
         succursale: m.succursale, discipline: m.discipline, capacite: m.capacite,
         actif: m.actif, taches: m.taches || 0, fiche: true,
         email: m.email || "", accesActif: !!m.accesActif, superAdmin: !!m.superAdmin,
@@ -711,7 +712,7 @@
     (etat.utilisateurs || []).forEach(function (u) {
       if (u.membreId) return;
       liste.push({
-        id: null, bureauId: u.bureauId, prenom: "", nom: "", role: null,
+        id: null, bureauId: u.bureauId, prenom: "", nom: "", metier: null, statuts: [],
         succursale: null, discipline: null, capacite: null,
         actif: true, taches: 0, fiche: false,
         email: u.email, accesActif: !!u.actif, superAdmin: !!u.superAdmin,
@@ -735,9 +736,10 @@
   }
 
   function champsCherches(p) {
-    return [nomDe(p), p.email, nomBureau(p.bureauId), D.libelleRole(p.role),
+    return [nomDe(p), p.email, nomBureau(p.bureauId), D.libelleMetier(p.metier),
             rattachement(p), situation(p).texte, connexionTexte(p),
-            p.superAdmin ? "super admin" : ""];
+            p.superAdmin ? "super admin" : ""]
+      .concat(D.statutsDe(p).map(D.libelleStatut));
   }
 
   function selection(sansTexte) {
@@ -752,6 +754,13 @@
      ce garde-fou, la console montrerait une poignée d'accès et laisserait
      croire que les membres ont disparu. */
   function migrationFaite() { return !!(etat && etat.membres); }
+
+  /* Idem pour le métier séparé des statuts : tant que la base parle encore de
+     « role », la console montrerait tout le monde « à désigner » et sans aucune
+     casquette. On le dit plutôt que de le laisser croire. */
+  function statutsEnBase() {
+    return !(etat && etat.membres && etat.membres.length) || ("metier" in etat.membres[0]);
+  }
 
   function dessineUtilisateurs() {
     if (!etat) return;
@@ -778,6 +787,19 @@
     hotes.titreUtilisateurs.textContent = nb(total, "utilisateur", "utilisateurs");
     if (barre) barre.compte(liste.length, selection(true).length);
     UI.vide(hotes.utilisateurs);
+    if (!statutsEnBase()) {
+      hotes.utilisateurs.appendChild(el("div", { class: "al grave" }, [
+        el("span", { class: "q", text: "À faire" }),
+        el("div", {}, [
+          el("b", { text: "Le métier et les statuts ne sont pas encore dans la base." }),
+          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
+            "La base tient encore un rôle unique, qui mélange le métier et la place dans la société. Exécute ",
+            el("code", { text: "migration-roles-statuts.sql" }),
+            " dans Supabase (SQL Editor > New query), puis recharge cette page. En attendant, les métiers et les statuts affichés ci-dessous ne veulent rien dire."
+          ])
+        ])
+      ]));
+    }
     if (!liste.length) {
       hotes.utilisateurs.appendChild(el("div", {
         class: "vide", text: filtreBureau || mots.length ? "Aucun utilisateur pour cette recherche" : "Aucun utilisateur"
@@ -801,7 +823,8 @@
         ]),
         el("td", {}, [selSuccursale(p)]),
         el("td", {}, [selDiscipline(p)]),
-        el("td", {}, [selRole(p)]),
+        el("td", {}, [selMetier(p)]),
+        el("td", {}, [basculesStatuts(p)]),
         el("td", { class: "num", text: p.fiche ? C.fmtJours(p.capacite) : "—" }),
         el("td", {}, [selAcces(p)]),
         el("td", {}, [el("span", { class: "quand-ligne" }, [UI.surligne(connexionTexte(p), mots)])])
@@ -814,7 +837,7 @@
       ]));
       corps.appendChild(suivi.marque(el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, cellules), p.id || p.email));
     });
-    var entetes = ["Utilisateur", "Succursale", "Discipline", "Rôle", "j/sem.", "Accès", "Dernière connexion", ""];
+    var entetes = ["Utilisateur", "Succursale", "Discipline", "Métier", "Statuts", "j/sem.", "Accès", "Dernière connexion", ""];
     if (plusieursBureaux) entetes.splice(1, 0, "Bureau");
     hotes.utilisateurs.appendChild(el("table", { class: "liste" }, [
       el("thead", {}, [el("tr", {}, entetes.map(function (t) { return el("th", { text: t }); }))]),
@@ -823,10 +846,11 @@
   }
 
   /* ------------------------------------------------- réglages sur la ligne
-     Quatre menus déroulants par utilisateur : le geste courant (désigner un
-     rôle, rattacher à une succursale, suspendre un accès) se fait sans ouvrir
-     la fiche. Chacun renvoie la personne entière à la base, le champ changé
-     mis à jour ; en cas de refus, le menu reprend sa valeur d'avant. */
+     Quatre menus déroulants et trois bascules par utilisateur : le geste
+     courant — désigner un métier, cocher un statut, rattacher à une succursale,
+     suspendre un accès — se fait sans ouvrir la fiche. Chacun renvoie la
+     personne entière à la base, le champ changé mis à jour ; en cas de refus,
+     le réglage reprend sa valeur d'avant. */
 
   function menu(p, options, valeur, aria, surChoix, classes) {
     var s = el("select", { class: "sel-ligne" + (classes ? " " + classes : ""), "aria-label": aria + " de " + nomDe(p) });
@@ -846,7 +870,8 @@
   /** Enregistre la personne avec un champ changé. */
   function enregistreVite(p, modif, message, annule) {
     var donnees = {
-      id: p.id, bureauId: p.bureauId, prenom: p.prenom, nom: p.nom, role: p.role,
+      id: p.id, bureauId: p.bureauId, prenom: p.prenom, nom: p.nom,
+      metier: p.metier, statuts: p.statuts || [],
       succursale: p.succursale, discipline: p.discipline, capacite: p.capacite,
       actif: p.actif, avecFiche: p.fiche,
       email: p.email, avecAcces: !!p.email, accesActif: p.accesActif
@@ -886,15 +911,43 @@
     });
   }
 
-  function selRole(p) {
+  function selMetier(p) {
     if (!p.fiche) return el("span", { class: "secondaire", text: "—" });
-    var options = [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
-      return { valeur: k, label: D.ROLES[k] };
+    var options = [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.METIERS).map(function (k) {
+      return { valeur: k, label: D.METIERS[k] };
     }));
-    return menu(p, options, p.role, "Rôle", function (role, annule) {
-      enregistreVite(p, { role: role },
-        nomDe(p) + " : " + D.libelleRole(role).toLowerCase() + ".", annule);
+    return menu(p, options, p.metier, "Métier", function (metier, annule) {
+      enregistreVite(p, { metier: metier },
+        nomDe(p) + " : " + D.libelleMetier(metier).toLowerCase() + ".", annule);
     });
+  }
+
+  /* Les statuts se cochent sur la ligne : trois bascules, allumées quand la
+     personne les porte. C'est le geste courant — désigner les associés, les
+     chefs de secteur et les chefs de projet d'un bureau entier sans ouvrir
+     quatre-vingts fiches. La fiche, elle, garde les cases en toutes lettres. */
+  function basculesStatuts(p) {
+    if (!p.fiche) return el("span", { class: "secondaire", text: "—" });
+    var boite = el("div", { class: "statuts-ligne" });
+    D.ORDRE_STATUTS.forEach(function (s) {
+      var porte = D.aStatut(p, s);
+      var b = el("button", {
+        type: "button", class: "etiq statut " + s + (porte ? " porte" : ""),
+        title: D.STATUTS[s] + (porte ? " — cliquer pour retirer" : " — cliquer pour ajouter"),
+        "aria-pressed": porte ? "true" : "false",
+        "aria-label": D.STATUTS[s] + " de " + nomDe(p)
+      }, [D.STATUTS_COURTS[s]]);
+      b.addEventListener("click", function () {
+        var avant = D.statutsDe(p);
+        var apres = porte ? avant.filter(function (x) { return x !== s; }) : avant.concat([s]);
+        b.disabled = true;
+        enregistreVite(p, { statuts: apres },
+          nomDe(p) + (porte ? " n'est plus " : " est ") + D.STATUTS[s].toLowerCase() + ".",
+          function () { b.disabled = false; });
+      });
+      boite.appendChild(b);
+    });
+    return boite;
   }
 
   /** Ouvrir ou suspendre l'accès. Sans adresse, il n'y a rien à ouvrir. */
@@ -973,12 +1026,18 @@
     var chNom    = UI.champ({ nom: "nom", label: "Nom", valeur: p ? p.nom : "", exemple: "Berger", autocomplete: "family-name" });
     var chSucc   = UI.champ({ nom: "succursale", label: "Succursale", type: "select", valeur: "", options: [] });
     var chDisc   = UI.champ({ nom: "discipline", label: "Discipline", type: "select", valeur: "", options: [] });
-    var chRole   = UI.champ({
-      nom: "role", label: "Rôle", type: "select", valeur: p ? p.role : "",
-      options: [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.ROLES).map(function (k) {
-        return { valeur: k, label: D.ROLES[k] };
-      }))
+    var chMetier = UI.champ({
+      nom: "metier", label: "Métier", type: "select", valeur: p ? p.metier : "",
+      options: [{ valeur: "", label: "À désigner" }].concat(Object.keys(D.METIERS).map(function (k) {
+        return { valeur: k, label: D.METIERS[k] };
+      })),
+      aide: "Un seul. Seuls les ingénieurs et les dessinateurs paraissent au planning."
     });
+    // Les statuts se cumulent entre eux et avec le métier : on peut être
+    // ingénieur, administrateur et chef de projet à la fois.
+    var chStatuts = UI.cases("statuts", D.ORDRE_STATUTS.map(function (s) {
+      return { valeur: s, label: D.STATUTS[s] };
+    }), p ? D.statutsDe(p) : []);
     var chCap    = UI.champ({
       nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
       valeur: p && p.capacite != null ? p.capacite : capDefaut,
@@ -991,7 +1050,16 @@
 
     var fiche = el("fieldset", {}, [
       el("div", { class: "legende", text: "Au planning" }),
-      el("div", { class: "grille-champs" }, [chBureau, chRole, chPrenom, chNom, chSucc, chDisc, chCap, chActif])
+      el("div", { class: "grille-champs" }, [chBureau, chMetier, chPrenom, chNom, chSucc, chDisc, chCap, chActif])
+    ]);
+
+    var statuts = el("fieldset", {}, [
+      el("div", { class: "legende", text: "Statuts dans la société" }),
+      chStatuts,
+      el("p", {
+        class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible);max-width:46em",
+        text: "À cocher autant que nécessaire, ou aucune. Un administrateur est un associé du bureau. Ces statuts s'ajoutent au métier : on peut être ingénieur, administrateur et chef de projet à la fois."
+      })
     ]);
 
     /* ---------------------------------------------------------- l'accès --- */
@@ -1026,7 +1094,7 @@
       champsAcces, boiteEnvoi, aideEnvoi
     ]);
 
-    var corps = el("div", {}, [fiche, acces]);
+    var corps = el("div", {}, [fiche, statuts, acces]);
     var selBureau = chBureau.querySelector("select");
     var selSucc = chSucc.querySelector("select"), selDisc = chDisc.querySelector("select");
     var inPrenom = chPrenom.querySelector("input"), inNom = chNom.querySelector("input");
@@ -1097,7 +1165,7 @@
 
             var donnees = {
               id: p && p.id ? p.id : null, bureauId: v.bureauId,
-              prenom: v.prenom, nom: v.nom, role: v.role,
+              prenom: v.prenom, nom: v.nom, metier: v.metier, statuts: v.statuts || [],
               succursale: v.succursale, discipline: v.discipline,
               capacite: v.capacite, actif: v.actif === "true", avecFiche: true,
               email: veutAcces ? adresse : "", avecAcces: veutAcces,

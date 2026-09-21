@@ -33,24 +33,51 @@
   function dixieme(n) { return Math.round(n * 10) / 10; }
   var CHARGE_MAX = 999.9;                          // plafond de numeric(4,1) en base
 
-  var ROLES = {
-    ingenieur: "Ingénieur", dessinateur: "Dessinateur",
-    administrateur: "Administrateur", administratif: "Administratif"
+  /* Deux choses distinctes, et qui se cumulent :
+     · le MÉTIER qu'on exerce — un seul, c'est lui qui décide de la place au
+       planning (un ingénieur porte les charges de calcul, un dessinateur celles
+       de dessin, un administratif n'est pas planifié) ;
+     · les STATUTS qu'on porte dans la société — autant qu'il en faut, ou aucun.
+     Enrico est ingénieur, administrateur et chef de projet ; Christophe est
+     « juste » dessinateur. */
+  var METIERS = {
+    ingenieur: "Ingénieur", dessinateur: "Dessinateur", administratif: "Administratif"
   };
-  // Côté sur lequel un rôle reçoit des charges : un administrateur est affecté
-  // comme un ingénieur (équipe d'une affaire, charge ingénieur d'une tâche).
-  var COTES = { ingenieur: "ingenieur", administrateur: "ingenieur", dessinateur: "dessinateur" };
-  function cote(r) { return COTES[r] || ""; }
-  // Seuls ces rôles portent des tâches et paraissent au tableau de bord
-  var PLANIFIES = { ingenieur: true, administrateur: true, dessinateur: true };
-  function libelleRole(r) { return ROLES[r] || "À désigner"; }
+  // Côté sur lequel un métier reçoit des charges (équipe d'une affaire, charge d'une tâche)
+  var COTES = { ingenieur: "ingenieur", dessinateur: "dessinateur" };
+  function cote(m) { return COTES[m] || ""; }
+  // Seuls ces métiers portent des tâches et paraissent au tableau de bord
+  var PLANIFIES = { ingenieur: true, dessinateur: true };
+  function libelleMetier(m) { return METIERS[m] || "À désigner"; }
 
-  // Ordre des rôles dans les listes : ceux qui portent des tâches d'abord
-  var ORDRE_ROLES = ["ingenieur", "dessinateur", "administrateur", "administratif", ""];
-  var TITRES_ROLES = {
+  // Ordre des métiers dans les listes : ceux qui portent des tâches d'abord
+  var ORDRE_METIERS = ["ingenieur", "dessinateur", "administratif", ""];
+  var TITRES_METIERS = {
     ingenieur: "Ingénieurs", dessinateur: "Dessinateurs",
-    administrateur: "Administrateurs", administratif: "Administratifs", "": "À désigner"
+    administratif: "Administratifs", "": "À désigner"
   };
+
+  // Du plus large au plus étroit : c'est l'ordre d'affichage des étiquettes.
+  var ORDRE_STATUTS = ["administrateur", "chef_secteur", "chef_projet"];
+  var STATUTS = {
+    administrateur: "Administrateur", chef_secteur: "Chef de secteur", chef_projet: "Chef de projet"
+  };
+  // Version courte, pour les listes denses (colonne de la console, étiquettes)
+  var STATUTS_COURTS = {
+    administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet"
+  };
+  // « Chefs de secteur », et non « chef de secteurs » : le pluriel ne s'ajoute pas à la fin
+  var STATUTS_PLURIEL = {
+    administrateur: "Administrateurs", chef_secteur: "Chefs de secteur", chef_projet: "Chefs de projet"
+  };
+  function libelleStatut(s) { return STATUTS[s] || s; }
+
+  /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
+  function statutsDe(m) {
+    var l = (m && m.statuts) || [];
+    return ORDRE_STATUTS.filter(function (s) { return l.indexOf(s) >= 0; });
+  }
+  function aStatut(m, s) { return statutsDe(m).indexOf(s) >= 0; }
 
   /* Ordre alphabétique : prénom, puis nom quand deux prénoms sont identiques —
      c'est l'ordre dans lequel les noms s'affichent. Les deux champs sont comparés
@@ -60,13 +87,13 @@
            a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" });
   }
 
-  /** Membres regroupés par rôle, dans l'ordre des rôles, alphabétiques dans chaque groupe :
-   *  [{ role, titre, membres }], sans les groupes vides. */
-  function parRole(membres) {
-    return ORDRE_ROLES.map(function (r) {
+  /** Membres regroupés par métier, dans l'ordre des métiers, alphabétiques dans chaque groupe :
+   *  [{ metier, titre, membres }], sans les groupes vides. */
+  function parMetier(membres) {
+    return ORDRE_METIERS.map(function (r) {
       return {
-        role: r, titre: TITRES_ROLES[r],
-        membres: membres.filter(function (m) { return (ROLES[m.role] ? m.role : "") === r; }).sort(compareMembres)
+        metier: r, titre: TITRES_METIERS[r],
+        membres: membres.filter(function (m) { return (METIERS[m.metier] ? m.metier : "") === r; }).sort(compareMembres)
       };
     }).filter(function (g) { return g.membres.length; });
   }
@@ -216,7 +243,7 @@
     var lecture = ADAPTATEUR.profil ? ADAPTATEUR.profil() : Promise.resolve(null);
     profilEnCours = lecture.then(function (brut) {
       if (!brut) {
-        profil = { multi: false, superAdmin: false, peutTout: true, bureau: null, bureaux: [] };
+        profil = { multi: false, superAdmin: false, peutTout: true, metier: "", statuts: [], bureau: null, bureaux: [] };
         return profil;
       }
       if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
@@ -224,6 +251,11 @@
         multi: true, email: brut.email || "", superAdmin: !!brut.superAdmin,
         // Fiche du planning rattachée à cette adresse dans la console (vide : accès sans fiche)
         membreId: brut.membreId || null,
+        // Métier et statuts de cette fiche : sur quoi s'appuieront les droits d'accès
+        metier: METIERS[brut.metier] ? brut.metier : "",
+        statuts: ORDRE_STATUTS.filter(function (s) {
+          return (brut.statuts || []).indexOf(s) >= 0;
+        }),
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
         bureau: brut.bureau || null, bureaux: brut.bureaux || []
@@ -322,6 +354,21 @@
     return index;
   }
 
+  /* Ancienne sauvegarde : une seule colonne « role », où « administrateur »
+     valait ingénieur associé. On la relit en métier d'un côté, statut de l'autre.
+     Ni l'un ni l'autre : très vieille sauvegarde, où tout le monde dessinait. */
+  function reprisMetier(m) {
+    if (m.metier === undefined && m.role === undefined) return "dessinateur";
+    var v = texte(m.metier !== undefined ? m.metier : m.role);
+    if (v === "administrateur") return "ingenieur";
+    return METIERS[v] ? v : "";
+  }
+  function reprisStatuts(m) {
+    var l = (Array.isArray(m.statuts) ? m.statuts : []).map(texte);
+    if (m.metier === undefined && texte(m.role) === "administrateur") l.push("administrateur");
+    return ORDRE_STATUTS.filter(function (s) { return l.indexOf(s) >= 0; });
+  }
+
   /** Complète un état lu du stockage : champs manquants, migrations. */
   function normalise(brut) {
     var e = etatVierge();
@@ -336,8 +383,7 @@
       e.membres.push({
         id: texte(m.id) || id(),
         nom: texte(m.nom), prenom: texte(m.prenom), email: texte(m.email),
-        // Rôle vide ou nul : membre pas encore désigné. Absent (ancienne sauvegarde) : dessinateur.
-        role: ROLES[m.role] ? m.role : (m.role === "" || m.role === null ? "" : "dessinateur"),
+        metier: reprisMetier(m), statuts: reprisStatuts(m),
         succursale: SUCCURSALES[m.succursale] ? m.succursale : "",
         discipline: DISCIPLINES[m.discipline] ? m.discipline : "",
         capacite: nombre(m.capacite, e.reglages.capaciteDefaut),
@@ -441,8 +487,11 @@
     if (!texte(o.prenom)) throw erreur("Le prénom est obligatoire.");
     var mail = texte(o.email).toLowerCase();              // facultative
     if (mail && !RE_MAIL.test(mail)) throw erreur("Cette adresse e-mail n'est pas valide.");
-    var role = texte(o.role);
-    if (role && !ROLES[role]) throw erreur("Rôle inconnu.");
+    var metier = texte(o.metier);
+    if (metier && !METIERS[metier]) throw erreur("Métier inconnu.");
+    var statuts = ORDRE_STATUTS.filter(function (s) {
+      return (Array.isArray(o.statuts) ? o.statuts : []).indexOf(s) >= 0;
+    });
     var succ = texte(o.succursale), disc = texte(o.discipline);
     if (succ && !SUCCURSALES[succ]) throw erreur("Succursale inconnue.");
     if (disc && !DISCIPLINES[disc]) throw erreur("Discipline inconnue.");
@@ -455,7 +504,8 @@
     if (!(cap >= 0.5 && cap <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
     return {
       nom: texte(o.nom), prenom: texte(o.prenom), email: mail,
-      role: role, succursale: succ, discipline: disc, capacite: cap, actif: o.actif !== false
+      metier: metier, statuts: statuts,
+      succursale: succ, discipline: disc, capacite: cap, actif: o.actif !== false
     };
   }
 
@@ -522,13 +572,21 @@
   /* ------------------------------------------------------------ API publique */
 
   var D = {
-    ROLES: ROLES,
+    METIERS: METIERS,
+    ORDRE_METIERS: ORDRE_METIERS,
+    TITRES_METIERS: TITRES_METIERS,
     PLANIFIES: PLANIFIES,
     cote: cote,
-    libelleRole: libelleRole,
-    TITRES_ROLES: TITRES_ROLES,
+    libelleMetier: libelleMetier,
+    STATUTS: STATUTS,
+    STATUTS_COURTS: STATUTS_COURTS,
+    STATUTS_PLURIEL: STATUTS_PLURIEL,
+    ORDRE_STATUTS: ORDRE_STATUTS,
+    libelleStatut: libelleStatut,
+    statutsDe: statutsDe,
+    aStatut: aStatut,
     compareMembres: compareMembres,
-    parRole: parRole,
+    parMetier: parMetier,
     SUCCURSALES: SUCCURSALES,
     DISCIPLINES: DISCIPLINES,
     DISCIPLINES_PAR_SUCCURSALE: DISCIPLINES_PAR_SUCCURSALE,
@@ -581,14 +639,15 @@
     },
 
     /* --------------------------------------------------------- membres */
-    /** opts : tous (inactifs compris), role (exact), cote (« ingenieur » inclut les administrateurs),
-     *  planifies (ceux qui portent des tâches) */
+    /** opts : tous (inactifs compris), metier (exact), statut (porté, parmi d'autres),
+     *  cote (côté du planning), planifies (ceux qui portent des tâches) */
     membres: function (opts) {
       opts = opts || {};
       return etat.membres.filter(function (m) { return opts.tous ? true : m.actif; })
-        .filter(function (m) { return opts.role != null ? m.role === opts.role : true; })
-        .filter(function (m) { return opts.cote ? cote(m.role) === opts.cote : true; })
-        .filter(function (m) { return opts.planifies ? !!PLANIFIES[m.role] : true; })
+        .filter(function (m) { return opts.metier != null ? m.metier === opts.metier : true; })
+        .filter(function (m) { return opts.statut ? aStatut(m, opts.statut) : true; })
+        .filter(function (m) { return opts.cote ? cote(m.metier) === opts.cote : true; })
+        .filter(function (m) { return opts.planifies ? !!PLANIFIES[m.metier] : true; })
         .slice().sort(compareMembres);
     },
     membre: function (i) { return idx().membres[i] || null; },
@@ -651,7 +710,7 @@
       var out = [];
       etat.membres.forEach(function (m) {
         if (!opts.tous && !m.actif) return;
-        if (opts.role && m.role !== opts.role) return;
+        if (opts.metier && m.metier !== opts.metier) return;
         if (opts.membreId && m.id !== opts.membreId) return;
         (m.absences || []).forEach(function (a) {
           if (opts.depuis && (a.fin || a.debut) < opts.depuis) return;
@@ -828,16 +887,20 @@
     var e = etatVierge();
     e.reglages.demo = true;
 
-    function m(nom, prenom, role, cap) {
-      var o = { id: id(), nom: nom, prenom: prenom, role: role, capacite: cap, actif: true, absences: [],
+    function m(nom, prenom, metier, cap, statuts) {
+      var o = { id: id(), nom: nom, prenom: prenom, metier: metier, statuts: statuts || [],
+                capacite: cap, actif: true, absences: [],
                 email: (prenom + "." + nom).toLowerCase().replace(/[^a-z.]/g, "") + "@exemple.ch" };
       e.membres.push(o); return o.id;
     }
-    var i1 = m("Berger", "Camille", "ingenieur", 5);
-    var i2 = m("Rossi", "Marc", "ingenieur", 4);
+    // Camille porte les trois casquettes, Marc et Yann mènent leurs projets,
+    // les autres n'en portent aucune : de quoi voir le cumul à l'œuvre.
+    var i1 = m("Berger", "Camille", "ingenieur", 5, ["administrateur", "chef_secteur", "chef_projet"]);
+    var i2 = m("Rossi", "Marc", "ingenieur", 4, ["chef_projet"]);
     var d1 = m("Favre", "Léa", "dessinateur", 5);
-    var d2 = m("Dubois", "Yann", "dessinateur", 5);
+    var d2 = m("Dubois", "Yann", "dessinateur", 5, ["chef_projet"]);
     var d3 = m("Keller", "Sophie", "dessinateur", 3);
+    m("Nicolet", "Fabienne", "administratif", 4);
 
     function a(code, nom, teinte, ings, dess) {
       var o = { id: id(), code: code, nom: nom, note: "", teinte: teinte, statut: "active",

@@ -3,7 +3,7 @@
 -- ----------------------------------------------------------------------------
 --  À coller dans Supabase : SQL Editor > New query > Run.
 --
---  12 membres, 12 affaires, 61 tâches, 6 absences. Toutes les dates sont
+--  14 membres, 12 affaires, 61 tâches, 6 absences. Toutes les dates sont
 --  calculées à partir du jour d'exécution : le jeu reste pertinent quel que
 --  soit le moment où on le lance.
 --
@@ -12,7 +12,9 @@
 --    - surcharges (Kevin Monnier et Julien Pittet dans les deux semaines) ;
 --    - temps partiels (Sara Meylan 80 %, Nora Baeriswyl 60 %, Inès Bovet 80 %) ;
 --    - absences (vacances, service militaire, formation, congé) ;
---    - statuts : à faire, en cours, en attente, terminé ;
+--    - états d'une tâche : à faire, en cours, en attente, terminé ;
+--    - métiers et statuts cumulés (Anne est ingénieure, associée, chef de
+--      secteur et chef de projet ; Carole est administrative et associée) ;
 --    - affaires active, suspendue, terminée ; un membre inactif ;
 --    - tâches ingénieur seul, dessin seul, et mixtes ;
 --    - les huit teintes d'affaire ;
@@ -54,19 +56,24 @@ insert into public.succursale_disciplines (bureau_id, succursale, discipline) va
   (current_setting('planif.bureau')::uuid, 'fribourg', 'structure');
 
 -- ------------------------------------------------------------------ membres
-insert into public.membres (prenom, nom, email, role, capacite, actif, succursale, discipline) values
-  ('Anne',   'Rochat',      'anne.rochat@essai.exemple.ch',       'ingenieur',   5, true,  'lausanne', 'structure'),
-  ('Julien', 'Pittet',      'julien.pittet@essai.exemple.ch',     'ingenieur',   5, true,  'lausanne', 'structure'),
-  ('Sara',   'Meylan',      'sara.meylan@essai.exemple.ch',       'ingenieur',   4, true,  'fribourg', 'structure'),
-  ('David',  'Cuendet',     'david.cuendet@essai.exemple.ch',     'ingenieur',   5, true,  'lausanne', 'genie_civil'),
-  ('Nora',   'Baeriswyl',   'nora.baeriswyl@essai.exemple.ch',    'ingenieur',   3, true,  'fribourg', 'structure'),
-  ('Kevin',  'Monnier',     'kevin.monnier@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'structure'),
-  ('Lucie',  'Jaquier',     'lucie.jaquier@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'structure'),
-  ('Tiago',  'Ferreira',    'tiago.ferreira@essai.exemple.ch',    'dessinateur', 5, true,  'lausanne', 'genie_civil'),
-  ('Inès',   'Bovet',       'ines.bovet@essai.exemple.ch',        'dessinateur', 4, true,  'fribourg', 'structure'),
-  ('Marco',  'Gianoli',     'marco.gianoli@essai.exemple.ch',     'dessinateur', 5, true,  'fribourg', 'structure'),
-  ('Emma',   'Chappuis',    'emma.chappuis@essai.exemple.ch',     'dessinateur', 5, true,  'lausanne', 'genie_civil'),
-  ('Loris',  'Vuilleumier', 'loris.vuilleumier@essai.exemple.ch', 'dessinateur', 5, false, 'lausanne', 'structure');
+-- Le métier d'un côté, les statuts de l'autre : Anne est ingénieure, associée
+-- et chef de secteur ; Kevin dessine et mène ses projets ; la plupart ne
+-- portent aucune de ces casquettes.
+insert into public.membres (prenom, nom, email, metier, statuts, capacite, actif, succursale, discipline) values
+  ('Anne',   'Rochat',      'anne.rochat@essai.exemple.ch',       'ingenieur',   '{administrateur,chef_secteur,chef_projet}', 5, true,  'lausanne', 'structure'),
+  ('Julien', 'Pittet',      'julien.pittet@essai.exemple.ch',     'ingenieur',   '{chef_projet}',                 5, true,  'lausanne', 'structure'),
+  ('Sara',   'Meylan',      'sara.meylan@essai.exemple.ch',       'ingenieur',   '{chef_secteur,chef_projet}',    4, true,  'fribourg', 'structure'),
+  ('David',  'Cuendet',     'david.cuendet@essai.exemple.ch',     'ingenieur',   '{administrateur}',              5, true,  'lausanne', 'genie_civil'),
+  ('Nora',   'Baeriswyl',   'nora.baeriswyl@essai.exemple.ch',    'ingenieur',   '{}',                            3, true,  'fribourg', 'structure'),
+  ('Kevin',  'Monnier',     'kevin.monnier@essai.exemple.ch',     'dessinateur', '{chef_projet}',                 5, true,  'lausanne', 'structure'),
+  ('Lucie',  'Jaquier',     'lucie.jaquier@essai.exemple.ch',     'dessinateur', '{}',                            5, true,  'lausanne', 'structure'),
+  ('Tiago',  'Ferreira',    'tiago.ferreira@essai.exemple.ch',    'dessinateur', '{}',                            5, true,  'lausanne', 'genie_civil'),
+  ('Inès',   'Bovet',       'ines.bovet@essai.exemple.ch',        'dessinateur', '{}',                            4, true,  'fribourg', 'structure'),
+  ('Marco',  'Gianoli',     'marco.gianoli@essai.exemple.ch',     'dessinateur', '{}',                            5, true,  'fribourg', 'structure'),
+  ('Emma',   'Chappuis',    'emma.chappuis@essai.exemple.ch',     'dessinateur', '{}',                            5, true,  'lausanne', 'genie_civil'),
+  ('Loris',  'Vuilleumier', 'loris.vuilleumier@essai.exemple.ch', 'dessinateur', '{}',                            5, false, 'lausanne', 'structure'),
+  ('Carole', 'Progin',      'carole.progin@essai.exemple.ch',     'administratif', '{administrateur}',            4, true,  'lausanne', 'structure'),
+  ('Samir',  'Benali',      'samir.benali@essai.exemple.ch',      'administratif', '{}',                          3, true,  'fribourg', 'structure');
 
 -- ----------------------------------------------------------------- affaires
 insert into public.affaires (code, nom, note, teinte, statut, echeance)

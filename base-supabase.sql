@@ -170,8 +170,15 @@ create table if not exists public.membres (
   nom        text not null,
   prenom     text not null,
   email      text,
-  role       text constraint membres_role_check
-               check (role is null or role in ('ingenieur', 'dessinateur', 'administrateur', 'administratif')),
+  -- Le métier d'un côté, les statuts de l'autre : on est ingénieur OU
+  -- dessinateur OU administratif, et on peut en plus être associé, chef de
+  -- secteur, chef de projet — ou rien de tout cela.
+  metier     text constraint membres_metier_check
+               check (metier is null or metier in ('ingenieur', 'dessinateur', 'administratif')),
+  statuts    text[] not null default '{}' constraint membres_statuts_check
+               check (statuts is not null
+                      and array_position(statuts, null::text) is null
+                      and statuts <@ array['administrateur', 'chef_secteur', 'chef_projet']::text[]),
   succursale text,
   discipline text,
   capacite   numeric(3,1) not null default 5 check (capacite > 0 and capacite <= 7),
@@ -186,6 +193,8 @@ create table if not exists public.membres (
     references public.disciplines (bureau_id, code) on delete set null (discipline)
 );
 create index if not exists membres_bureau on public.membres (bureau_id);
+-- Retrouver « tous les chefs de projet » sans parcourir la table
+create index if not exists membres_statuts on public.membres using gin (statuts);
 
 -- Le lien accès → membre, maintenant que les deux tables existent. Un membre a
 -- au plus un accès ; un accès peut n'avoir aucune fiche (super admin, externe).
@@ -203,7 +212,10 @@ create unique index if not exists acces_membre_unique
 comment on column public.membres.capacite is 'Jours travaillés par semaine : 5 pour un plein temps.';
 comment on column public.membres.email is
   'Adresse d''annuaire, facultative. Ce n''est PAS l''adresse de connexion (elle vit dans acces) : elle sert de repère aux jeux d''essai.';
-comment on column public.membres.role is 'Vide : membre pas encore désigné. Seuls ingénieurs, administrateurs et dessinateurs portent des tâches.';
+comment on column public.membres.metier is
+  'Le métier exercé : ingenieur, dessinateur ou administratif. Vide : membre pas encore désigné. Seuls ingénieurs et dessinateurs portent des tâches.';
+comment on column public.membres.statuts is
+  'Place dans la société, cumulable avec le métier et entre eux : administrateur (associé), chef_secteur, chef_projet. Tableau vide : aucune de ces casquettes.';
 comment on column public.membres.succursale is 'Code d''une succursale du bureau (table succursales).';
 comment on column public.membres.discipline is 'Code d''une discipline du bureau (table disciplines).';
 
@@ -410,6 +422,7 @@ declare
   v_email   text := lower(coalesce(auth.jwt() ->> 'email', ''));
   v_acces   public.acces%rowtype;
   v_bureau  public.bureaux%rowtype;
+  v_membre  public.membres%rowtype;
   v_courant uuid;
 begin
   select * into v_acces from public.acces x where x.email = v_email;
@@ -430,10 +443,18 @@ begin
     return jsonb_build_object('autorise', false, 'motif', 'bureau_suspendu', 'email', v_email);
   end if;
 
+  if v_acces.membre_id is not null then
+    select * into v_membre from public.membres m where m.id = v_acces.membre_id;
+  end if;
+
+  -- Le métier et les statuts voyagent avec le profil : c'est sur eux que
+  -- s'appuient les droits d'accès.
   return jsonb_build_object(
     'autorise', true,
     'email', v_email,
     'membreId', v_acces.membre_id,
+    'metier', v_membre.metier,
+    'statuts', to_jsonb(coalesce(v_membre.statuts, '{}'::text[])),
     'superAdmin', v_acces.super_admin,
     'droit', v_acces.droit,
     'bureau', jsonb_build_object('id', v_bureau.id, 'nom', v_bureau.nom, 'actif', v_bureau.actif),
@@ -521,7 +542,8 @@ begin
     'membres', coalesce((
       select jsonb_agg(jsonb_build_object(
           'id', m.id, 'bureauId', m.bureau_id, 'prenom', m.prenom, 'nom', m.nom,
-          'role', m.role, 'succursale', m.succursale, 'discipline', m.discipline,
+          'metier', m.metier, 'statuts', to_jsonb(m.statuts),
+          'succursale', m.succursale, 'discipline', m.discipline,
           'capacite', m.capacite, 'actif', m.actif,
           'email', a.email, 'accesActif', a.actif, 'superAdmin', coalesce(a.super_admin, false),
           'compte', u.id is not null,
@@ -700,8 +722,12 @@ $$;
 
 -- Fiche du membre et accès en une fois. Renvoie l'id du membre (nul si la
 -- ligne n'est qu'un accès, sans fiche au planning).
---   { id, bureauId, prenom, nom, role, succursale, discipline, capacite,
---     actif, avecFiche, email, avecAcces, accesActif }
+--   { id, bureauId, prenom, nom, metier, statuts, succursale, discipline,
+--     capacite, actif, avecFiche, email, avecAcces, accesActif }
+-- « metier » est accepté sous son ancien nom « role » : une console restée en
+-- cache dans un navigateur continue d'enregistrer sans rien effacer. De même,
+-- l'absence de la clé « statuts » laisse les statuts en place ; une liste vide
+-- les retire.
 create or replace function public.console_enregistre_personne(p jsonb)
 returns uuid
 language plpgsql volatile security definer set search_path = '' as $$
@@ -710,7 +736,7 @@ declare
   v_bureau    uuid    := nullif(p ->> 'bureauId', '')::uuid;
   v_prenom    text    := btrim(coalesce(p ->> 'prenom', ''));
   v_nom       text    := btrim(coalesce(p ->> 'nom', ''));
-  v_role      text    := nullif(btrim(coalesce(p ->> 'role', '')), '');
+  v_metier    text    := nullif(btrim(coalesce(p ->> 'metier', p ->> 'role', '')), '');
   v_succ      text    := nullif(btrim(coalesce(p ->> 'succursale', '')), '');
   v_disc      text    := nullif(btrim(coalesce(p ->> 'discipline', '')), '');
   v_capacite  numeric := coalesce(nullif(p ->> 'capacite', '')::numeric, 5);
@@ -719,6 +745,7 @@ declare
   v_email     text    := lower(btrim(coalesce(p ->> 'email', '')));
   v_acces     boolean := coalesce((p ->> 'avecAcces')::boolean, false);
   v_ac_actif  boolean := coalesce((p ->> 'accesActif')::boolean, false);
+  v_statuts   text[];
   v_ancien    text;
 begin
   if not public.est_super_admin() then
@@ -731,12 +758,33 @@ begin
     raise exception 'Une personne sans fiche au planning et sans accès n''a rien à enregistrer.';
   end if;
 
+  -- L'ancien rôle « administrateur » arrive encore d'une console en cache :
+  -- il vaut ingénieur, et il ajoute le statut.
+  if v_metier = 'administrateur' then
+    v_metier := 'ingenieur';
+    if not p ? 'statuts' then
+      v_statuts := array['administrateur'];
+    end if;
+  end if;
+
+  -- Les statuts : nettoyés, dédoublonnés, rangés dans l'ordre de la hiérarchie.
+  if v_statuts is null and p ? 'statuts' then
+    select coalesce(array_agg(d.s order by array_position(
+             array['administrateur', 'chef_secteur', 'chef_projet']::text[], d.s)), '{}')
+      into v_statuts
+      from (select distinct btrim(x.valeur) as s
+              from jsonb_array_elements_text(
+                     case when jsonb_typeof(p -> 'statuts') = 'array' then p -> 'statuts' else '[]'::jsonb end
+                   ) as x(valeur)) d
+     where d.s in ('administrateur', 'chef_secteur', 'chef_projet');
+  end if;
+
   -- ------------------------------------------------------------ la fiche ---
   if v_fiche then
     if v_prenom = '' then raise exception 'Le prénom est obligatoire.'; end if;
     if v_nom    = '' then raise exception 'Le nom est obligatoire.';    end if;
-    if v_role is not null and v_role not in ('ingenieur', 'dessinateur', 'administrateur', 'administratif') then
-      raise exception 'Rôle inconnu.';
+    if v_metier is not null and v_metier not in ('ingenieur', 'dessinateur', 'administratif') then
+      raise exception 'Métier inconnu.';
     end if;
     if not (v_capacite >= 0.5 and v_capacite <= 7) then
       raise exception 'La capacité doit être comprise entre 0,5 et 7 jours par semaine.';
@@ -751,12 +799,14 @@ begin
     end if;
 
     if v_id is null then
-      insert into public.membres (bureau_id, prenom, nom, role, succursale, discipline, capacite, actif)
-      values (v_bureau, v_prenom, v_nom, v_role, v_succ, v_disc, round(v_capacite, 1), v_actif)
+      insert into public.membres (bureau_id, prenom, nom, metier, statuts, succursale, discipline, capacite, actif)
+      values (v_bureau, v_prenom, v_nom, v_metier, coalesce(v_statuts, '{}'),
+              v_succ, v_disc, round(v_capacite, 1), v_actif)
       returning id into v_id;
     else
       update public.membres m
-         set bureau_id = v_bureau, prenom = v_prenom, nom = v_nom, role = v_role,
+         set bureau_id = v_bureau, prenom = v_prenom, nom = v_nom, metier = v_metier,
+             statuts = coalesce(v_statuts, m.statuts),
              succursale = v_succ, discipline = v_disc, capacite = round(v_capacite, 1), actif = v_actif
        where m.id = v_id;
       if not found then

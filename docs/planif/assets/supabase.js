@@ -364,11 +364,20 @@
      dit si la base les connaît. À simplifier une fois la migration en place. */
   var partsEnBase = true;
 
+  /* Idem pour metier / statuts, arrivés quand le rôle unique s'est scindé en
+     métier et statuts cumulables : tant que migration-roles-statuts.sql n'est
+     pas passée, la base ne connaît que « role ». La lecture le dit.
+     À simplifier une fois la migration en place. */
+  var metiersEnBase = true;
+
   var VERS_BASE = {
     membres: function (m) {
-      return { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
-               role: vide(m.role), succursale: vide(m.succursale), discipline: vide(m.discipline),
-               capacite: m.capacite, actif: m.actif };
+      var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
+                succursale: vide(m.succursale), discipline: vide(m.discipline),
+                capacite: m.capacite, actif: m.actif };
+      if (metiersEnBase) { o.metier = vide(m.metier); o.statuts = m.statuts || []; }
+      else o.role = vide(m.metier);
+      return o;
     },
     affaires: function (a) {
       return { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
@@ -401,11 +410,23 @@
 
       // La base connaît-elle déjà les parts terminées ? (colonnes fini_inge / fini_dessin)
       partsEnBase = !taches.length || ("fini_inge" in taches[0]);
+      // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
+      metiersEnBase = !membres.length || ("metier" in membres[0]);
 
-      // Côté de chacun dans l'équipe d'une affaire : un administrateur compte comme un ingénieur
+      // Avant la migration, « administrateur » était un rôle, planifié du côté ingénieur
+      function metierDe(m) {
+        var v = metiersEnBase ? m.metier : m.role;
+        return v === "administrateur" ? "ingenieur" : (v || "");
+      }
+      function statutsDe(m) {
+        if (!metiersEnBase) return m.role === "administrateur" ? ["administrateur"] : [];
+        return Array.isArray(m.statuts) ? m.statuts : [];
+      }
+
+      // Côté de chacun dans l'équipe d'une affaire
       var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
       var role = {};
-      membres.forEach(function (m) { role[m.id] = cote(m.role); });
+      membres.forEach(function (m) { role[m.id] = cote(metierDe(m)); });
 
       return {
         version: 1,
@@ -416,7 +437,8 @@
         },
         membres: membres.map(function (m) {
           return {
-            id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "", role: m.role || "",
+            id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "",
+            metier: metierDe(m), statuts: statutsDe(m),
             succursale: m.succursale || "", discipline: m.discipline || "",
             capacite: parseFloat(m.capacite), actif: m.actif,
             absences: absences.filter(function (a) { return a.membre_id === m.id; })

@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=37">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=38">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Équipe</h1>
-    <p class="chapeau">Les membres du bureau, leur rôle, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge. Les absences se posent ici ; le reste de la fiche se règle dans la console.</p>
+    <p class="chapeau">Les membres du bureau, leur métier, les statuts qu'ils portent dans la société, leur capacité hebdomadaire et leurs absences. Seuls les ingénieurs et les dessinateurs paraissent au tableau de bord ; la capacité y sert de référence pour faire apparaître une surcharge. Les absences se posent ici ; le reste de la fiche se règle dans la console.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -35,6 +35,7 @@
     <div class="plan-barre" style="margin-top:-8px">
       <select id="f-succursale" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par succursale"></select>
       <select id="f-discipline" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par discipline"></select>
+      <select id="f-statut" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par statut"></select>
       <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par affaire"></select>
     </div>
     <div id="sections"></div>
@@ -45,10 +46,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=9"></script>
-<script src="/planif/assets/donnees.js?v=16"></script>
+<script src="/planif/assets/supabase.js?v=10"></script>
+<script src="/planif/assets/donnees.js?v=17"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=25"></script>
+<script src="/planif/assets/ui.js?v=26"></script>
 <script>
 (function () {
   "use strict";
@@ -58,16 +59,16 @@
   var suivi = UI.suiviApparitions();
   var CLE_FILTRES = "planif.equipe.filtres";
   var CLE_AFFAIRE = "planif.equipe.affaire";         // ancien réglage, repris une fois
-  var filtres = { affaire: "", succursale: "", discipline: "" };
+  var filtres = { affaire: "", succursale: "", discipline: "", statut: "" };
 
-  // Une section par rôle. Les membres pas encore désignés viennent en tête :
-  // c'est là qu'il reste du travail.
+  // Une section par métier. Les membres pas encore désignés viennent en tête :
+  // c'est là qu'il reste du travail. Les statuts, eux, se cumulent : ils ne
+  // rangent personne dans une section, ils s'affichent en étiquettes.
   var SECTIONS = [
-    { role: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", masqueSiVide: true },
-    { role: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs" },
-    { role: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs" },
-    { role: "administrateur", titre: "Administrateurs", sing: "administrateur", plur: "administrateurs" },
-    { role: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs" }
+    { metier: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", masqueSiVide: true },
+    { metier: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs" },
+    { metier: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs" },
+    { metier: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs" }
   ];
 
   if (!UI.session()) return;
@@ -83,7 +84,7 @@
     document.querySelector(".entete").classList.add("vu");
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un nom, une succursale, une discipline, une absence…",
+      exemple: "Rechercher un nom, un métier, un statut, une succursale, une absence…",
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) UI.absences(l[0].id, dessine); }
     });
@@ -120,6 +121,16 @@
     fd.addEventListener("change", function () { filtres.discipline = fd.value; memorise(); dessine(); });
     optionsDiscipline();
 
+    // « Qui sont les chefs de projet ? » — la question se pose sans passer par la recherche
+    var ft = document.getElementById("f-statut");
+    if (D.STATUTS[filtres.statut] === undefined) filtres.statut = "";
+    ft.appendChild(el("option", { value: "" }, ["Tous les statuts"]));
+    D.ORDRE_STATUTS.forEach(function (s) {
+      ft.appendChild(el("option", { value: s }, [D.STATUTS_PLURIEL[s]]));
+    });
+    ft.value = filtres.statut;
+    ft.addEventListener("change", function () { filtres.statut = ft.value; memorise(); dessine(); });
+
     D.surRechargement(dessine);
     dessine();
   }).catch(UI.echec);
@@ -147,17 +158,19 @@
   }
 
   function champsCherches(m) {
-    return [m.prenom + " " + m.nom, D.libelleRole(m.role), rattachement(m), m.actif ? "" : "inactif"]
+    return [m.prenom + " " + m.nom, D.libelleMetier(m.metier), rattachement(m), m.actif ? "" : "inactif"]
+      .concat(D.statutsDe(m).map(D.libelleStatut))
       .concat(m.absences.map(function (a) { return a.motif; }));
   }
 
-  function selection(role, sansTexte) {
+  function selection(metier, sansTexte) {
     var mots = sansTexte || !barre ? [] : barre.termes();
     var dans = filtres.affaire ? membresAffaire(filtres.affaire) : null;
-    return D.membres({ role: role == null ? null : role, tous: true })
+    return D.membres({ metier: metier == null ? null : metier, tous: true })
       .filter(function (m) {
         if (filtres.succursale && m.succursale !== filtres.succursale) return false;
         if (filtres.discipline && m.discipline !== filtres.discipline) return false;
+        if (filtres.statut && !D.aStatut(m, filtres.statut)) return false;
         return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots);
       });
   }
@@ -190,7 +203,7 @@
     var hote = UI.vide(document.getElementById("sections"));
     var n = 0;
     SECTIONS.forEach(function (s) {
-      var membres = selection(s.role);
+      var membres = selection(s.metier);
       if (s.masqueSiVide && !membres.length) return;
       n++;
       var liste = el("div", { class: "defile" });
@@ -210,7 +223,7 @@
   function rendListe(s, membres, hote) {
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
-    var filtre = filtres.affaire || filtres.succursale || filtres.discipline;
+    var filtre = filtres.affaire || filtres.succursale || filtres.discipline || filtres.statut;
 
     if (!membres.length) {
       hote.appendChild(q
@@ -224,7 +237,7 @@
     // Charge de la semaine en cours, pour situer chacun d'un coup d'œil
     var jours = C.serie(C.lundi(C.isoAuj()), 7);
     var rep = repartitionCourante();
-    var planifie = !!D.PLANIFIES[s.role];
+    var planifie = !!D.PLANIFIES[s.metier];
 
     var corps = el("tbody");
     membres.forEach(function (m) {
@@ -239,7 +252,13 @@
           el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots)
             : (Object.keys(D.SUCCURSALES).length ? "Succursale non renseignée" : "")])
         ]),
-        el("td", {}, [UI.surligne(D.libelleRole(m.role), mots)]),
+        el("td", {}, [
+          el("div", {}, [UI.surligne(D.libelleMetier(m.metier), mots)]),
+          // Les statuts se cumulent : ils s'écrivent sous le métier, pas à sa place
+          D.statutsDe(m).length
+            ? el("div", { class: "statuts-ligne", style: "margin-top:5px" }, UI.etiquettesStatuts(m))
+            : null
+        ]),
         el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
         el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
@@ -262,7 +281,7 @@
     hote.appendChild(el("table", { class: "liste" }, [
       el("thead", {}, [el("tr", {}, [
         el("th", { text: "Nom et rattachement" }),
-        el("th", { text: "Rôle" }),
+        el("th", { text: "Métier et statuts" }),
         el("th", { text: "Capacité" }),
         el("th", { text: "Cette semaine" }),
         el("th", { text: "Absences" }),
