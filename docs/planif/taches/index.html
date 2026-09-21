@@ -300,7 +300,7 @@
 
       return suivi.marque(el("tr", { class: t.statut === "termine" ? "fini" : "" }, [
         el("td", {}, [el("div", { class: "tache-titre" }, [
-          coche(t),
+          bascules(t),
           el("div", {}, [
             el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
             // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
@@ -345,6 +345,12 @@
   /* ------------------------------------------------ terminer en un clic */
 
   var avantFin = {};                                // statut et avancement d'avant la coche, pour revenir en arrière
+  var avantCours = {};                              // idem avant le départ de la course
+
+  // Les deux bascules d'avancement, la course au-dessus du pouce
+  function bascules(t) {
+    return el("div", { class: "tache-bascules" }, [course(t), coche(t)]);
+  }
 
   // Bouton à bascule : l'icône est pâle tant que la tâche est ouverte, dorée une fois terminée
   function coche(t) {
@@ -356,6 +362,42 @@
       "aria-label": (fini ? "Rouvrir « " : "Marquer comme terminée « ") + t.titre + " »",
       onclick: function () { termine(t.id, !fini); }
     });
+  }
+
+  // Bouton à bascule : l'icône est pâle tant que la tâche n'est pas lancée, dorée une fois en cours
+  function course(t) {
+    var lancee = t.statut === "en_cours";
+    return el("button", {
+      type: "button", class: "ico ico-course" + (lancee ? " actif" : ""),
+      "aria-pressed": lancee ? "true" : "false",
+      title: lancee ? "Retirer « En cours »" : "Marquer comme en cours",
+      "aria-label": (lancee ? "Retirer « En cours » de « " : "Marquer comme en cours « ") + t.titre + " »",
+      onclick: function () { demarre(t.id, !lancee); }
+    });
+  }
+
+  function demarre(id, lance) {
+    var t = D.tache(id);
+    if (!t) return;
+    var champs;
+    if (lance) {
+      // Relancée depuis « terminé », la tâche repart à son avancement d'avant la coche, jamais à 100 %
+      var repart = t.statut === "termine";
+      var avance = repart ? (avantFin[id] ? avantFin[id].avancement : 0) : t.avancement;
+      avantCours[id] = { statut: repart ? "a_faire" : t.statut, avancement: avance };
+      champs = { statut: "en_cours" };
+      if (repart) champs.avancement = avance;
+      delete avantFin[id];
+    } else {
+      champs = avantCours[id] || { statut: "a_faire" };
+      delete avantCours[id];
+    }
+    var retour = champs.statut;
+    D.retoucheTache(id, champs).then(function () {
+      dessine();
+      UI.toast(lance ? "Tâche en cours." : "Statut remis à « " + D.STATUTS_TACHE[retour] + " ».",
+        lance ? { label: "Annuler", action: function () { demarre(id, false); } } : null);
+    }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
   function termine(id, fait) {

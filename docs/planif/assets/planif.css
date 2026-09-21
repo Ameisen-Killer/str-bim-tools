@@ -321,7 +321,10 @@ table.liste tr.groupe-vide td{padding:14px 0}
 /* Un peu d'air à gauche : collé au bord de la colonne, le cadre de survol était rogné
    par la zone de défilement du tableau */
 .tache-titre{display:flex;align-items:flex-start;gap:10px;padding-left:3px}
-.tache-titre .ico-coche{margin-top:-6px}
+/* Les deux bascules d'avancement l'une sur l'autre : la course au-dessus du pouce */
+.tache-bascules{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:-6px}
+.tache-bascules .ico{width:36px;height:30px}
+.tache-bascules .ico::before{width:20px;height:20px}
 
 /* icônes (docs/planif/icons, SVG au trait) : le dessin noir sert de masque, la couleur vient
    du thème — gris doux au repos, or au survol, rouge pour supprimer */
@@ -339,6 +342,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico:focus-visible{outline:none;border-color:var(--or);box-shadow:inset 0 0 0 1px var(--or)}
 .ico-coche{--ico:url(/planif/icons/thumb_up.svg?v=1);color:var(--texte-faible)}
 .ico-coche.fait{color:var(--or)}
+.ico-course{--ico:url(/planif/icons/run.svg?v=1);color:var(--texte-faible)}
+.ico-course.actif{color:var(--or)}
 .ico-modifier{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
 .ico-supprimer{--ico:url(/planif/icons/trash.svg?v=1)}
 .ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
