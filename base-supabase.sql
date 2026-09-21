@@ -428,6 +428,7 @@ begin
   return jsonb_build_object(
     'autorise', true,
     'email', v_email,
+    'membreId', v_acces.membre_id,
     'superAdmin', v_acces.super_admin,
     'droit', v_acces.droit,
     'bureau', jsonb_build_object('id', v_bureau.id, 'nom', v_bureau.nom, 'actif', v_bureau.actif),

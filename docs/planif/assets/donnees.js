@@ -184,6 +184,8 @@
       if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
       profil = {
         multi: true, email: brut.email || "", superAdmin: !!brut.superAdmin,
+        // Fiche du planning rattachée à cette adresse dans la console (vide : accès sans fiche)
+        membreId: brut.membreId || null,
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
         bureau: brut.bureau || null, bureaux: brut.bureaux || []
@@ -546,13 +548,18 @@
     membre: function (i) { return idx().membres[i] || null; },
     nomMembre: function (i) { var m = D.membre(i); return m ? m.prenom + " " + m.nom : "—"; },
 
-    /** La fiche d'équipe de la personne connectée, repérée par son adresse.
-     *  null si personne n'est connecté, ou si aucune fiche ne porte cette adresse
-     *  (compte d'administration, adresse pas encore renseignée). */
+    /** La fiche d'équipe de la personne connectée. Le rattachement posé dans la
+     *  console fait foi ; à défaut, l'adresse de connexion est cherchée parmi les
+     *  fiches. null si personne n'est connecté, ou si aucune fiche ne lui revient
+     *  (accès sans fiche, adresse de connexion différente et pas encore rattachée). */
     monMembre: function () {
-      var mail = (profil && profil.email) || (global.Sb && global.Sb.connecte() ? global.Sb.email() : "");
-      mail = texte(mail).toLowerCase();
-      if (!mail || !etat) return null;
+      if (!etat) return null;
+      if (profil && profil.membreId) {
+        var lie = D.membre(profil.membreId);
+        if (lie) return lie;
+      }
+      var mail = texte((profil && profil.email) || (global.Sb && global.Sb.connecte() ? global.Sb.email() : "")).toLowerCase();
+      if (!mail) return null;
       var moi = null;
       etat.membres.forEach(function (m) { if (!moi && m.email && m.email.toLowerCase() === mail) moi = m; });
       return moi;
