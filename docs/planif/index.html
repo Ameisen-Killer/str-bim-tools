@@ -296,7 +296,8 @@
     });
     var taux = capacite > 0 ? Math.round(charge / capacite * 100) : 0;
     var auj = C.isoAuj();
-    var retard = D.taches({ sansTerminees: true }).filter(function (t) {
+    // Les trois autres chiffres suivent le filtre : le retard aussi, sinon il compte pour toute l'équipe
+    var retard = D.taches({ sansTerminees: true, membreId: vue.membre || null }).filter(function (t) {
       return t.echeance && t.echeance < auj && (!vue.affaire || t.affaireId === vue.affaire);
     }).length;
 
