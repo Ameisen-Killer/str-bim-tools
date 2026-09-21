@@ -869,6 +869,13 @@
 
   /** Enregistre la personne avec un champ changé. */
   function enregistreVite(p, modif, message, annule) {
+    /* Tant que la base parle de « role », cette console n'a pas de métier à lui
+       donner : l'enregistrer effacerait le rôle de la personne. On refuse. */
+    if (!statutsEnBase()) {
+      UI.toast("Exécute d'abord migration-roles-statuts.sql dans Supabase.");
+      annule();
+      return Promise.resolve();
+    }
     var donnees = {
       id: p.id, bureauId: p.bureauId, prenom: p.prenom, nom: p.nom,
       metier: p.metier, statuts: p.statuts || [],
@@ -1011,6 +1018,7 @@
   function formulaireUtilisateur(p) {
     var nouveau = !p;
     if (!migrationFaite()) return UI.toast("Exécute d'abord migration-console-membres.sql dans Supabase.");
+    if (!statutsEnBase()) return UI.toast("Exécute d'abord migration-roles-statuts.sql dans Supabase.");
     if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
     var prof = D.profil();
     var bureauInit = p ? p.bureauId
