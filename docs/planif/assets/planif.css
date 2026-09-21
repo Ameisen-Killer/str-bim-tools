@@ -383,6 +383,14 @@ table.liste tr.fini td{opacity:.7}
    ou décoche le statut de la personne, sans ouvrir sa fiche. Éteinte tant
    qu'elle n'est pas portée — d'où le « porte » plutôt qu'une coche dessinée. */
 .statuts-ligne{display:flex;flex-wrap:wrap;gap:4px}
+/* Les trois bascules de la console tiennent sur une ligne : empilées, elles
+   doublaient la hauteur de chaque ligne du tableau (44 px → 88 px), et il y a
+   quatre-vingts fiches à parcourir. Le tableau défile latéralement, c'est le
+   moindre mal. La variante sans « bascules » — les étiquettes en toutes
+   lettres de la page Équipe — garde le retour à la ligne : sur téléphone,
+   « Administrateur » et « Chef de secteur » ne tiennent pas côte à côte. */
+.statuts-ligne.bascules{flex-wrap:nowrap}
+.statuts-ligne.bascules > .etiq{flex:0 0 auto}
 button.etiq.statut{opacity:.4;transition:opacity .2s,color .2s,border-color .2s}
 button.etiq.statut:hover{opacity:.75}
 button.etiq.statut.porte{opacity:1}
