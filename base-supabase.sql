@@ -498,8 +498,9 @@ create policy "droit ou ma tâche (création)" on public.taches for insert to au
     or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
 -- Une part chargée que personne ne tient reste prenable par tout le monde :
 -- c'est le geste du tableau de bord, « glisser une barre à affecter sur un
--- membre ». Le WITH CHECK impose qu'à l'arrivée on soit bien dessus — on prend
--- du travail, on n'en donne pas.
+-- membre ». Le USING dit ce qu'on peut toucher ; le WITH CHECK ne garde que le
+-- bureau, pour qu'on puisse aussi passer la main — confier sa part à quelqu'un
+-- d'autre, ou la remettre à affecter. La tâche quitte alors son planning.
 create policy "droit ou ma tâche (modification)" on public.taches for update to authenticated
   using (bureau_id = (select public.bureau_courant()) and (
     (select public.a_droit('taches_autrui'))
@@ -507,10 +508,7 @@ create policy "droit ou ma tâche (modification)" on public.taches for update to
     or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)
     or (ingenieur_id   is null and charge_inge   > 0)
     or (dessinateur_id is null and charge_dessin > 0)))
-  with check (bureau_id = (select public.bureau_courant()) and (
-    (select public.a_droit('taches_autrui'))
-    or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
-    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+  with check (bureau_id = (select public.bureau_courant()));
 create policy "droit ou ma tâche (suppression)" on public.taches for delete to authenticated
   using (bureau_id = (select public.bureau_courant()) and (
     (select public.a_droit('taches_autrui'))

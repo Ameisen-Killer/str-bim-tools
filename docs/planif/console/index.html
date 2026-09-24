@@ -148,8 +148,8 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=12"></script>
-<script src="/planif/assets/donnees.js?v=18"></script>
-<script src="/planif/assets/ui.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=19"></script>
+<script src="/planif/assets/ui.js?v=28"></script>
 <script>
 (function () {
   "use strict";
@@ -1434,6 +1434,11 @@
 
     UI.vide(hotes.miseEnRoute).appendChild(el("div", { class: "alertes" }, [
       point("fait", "Base multi-bureaux.", ["migration-multi-bureaux.sql est exécutée : cette page s'affiche."]),
+      point("verifier", "Passer la main sur une tâche.", [
+        "Sans le droit « créer des tâches pour les autres », chacun peut confier sa part à un collègue du même métier. ",
+        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-passer-la-main.sql" }),
+        " (dépôt). Sans elle, la base refuse le geste."
+      ]),
       point("verifier", "Serveur d'envoi (SMTP).", [
         "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",
         lien("/auth/smtp", "Authentication > Emails > SMTP Settings"),

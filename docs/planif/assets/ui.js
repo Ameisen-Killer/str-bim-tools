@@ -1126,10 +1126,13 @@
     }
 
     /* Droits. Sans « créer des tâches pour les autres », on ne mène que les
-       tâches dont une part chargée est la sienne : sa propre part est alors
-       verrouillée sur soi, l'autre reste libre (un ingénieur confie le dessin,
-       un dessinateur nomme son ingénieur). Une tâche qui ne nous concerne pas
-       s'ouvre en lecture seule. La base applique exactement la même règle. */
+       tâches dont une part chargée est la sienne. À la création, sa propre part
+       est verrouillée sur soi, l'autre reste libre (un ingénieur confie le
+       dessin, un dessinateur nomme son ingénieur). Sur une tâche déjà là, rien
+       n'est verrouillé : on peut passer la main, c'est-à-dire confier sa part à
+       un collègue du même métier ou la remettre à affecter — la tâche quitte
+       alors son planning, et on n'y revient plus. Une tâche qui ne nous
+       concerne pas s'ouvre en lecture seule. La base applique les mêmes règles. */
     var libre = D.aDroit("taches_autrui");
     var moi = libre ? null : D.monMembre();
     var maCote = libre ? "" : D.cote(moi && moi.metier);
@@ -1139,6 +1142,14 @@
         : "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
     }
     var lectureSeule = !libre && !!t && !D.meConcerne(t);
+
+    /* La part que je tiens dans cette tâche : celle que je peux passer à
+       quelqu'un d'autre. Vide quand j'ai le droit, ou que la tâche est neuve. */
+    var maPart = "";
+    if (!libre && t && moi) {
+      if (t.ingenieurId === moi.id && t.chargeInge > 0) maPart = "ingenieur";
+      else if (t.dessinateurId === moi.id && t.chargeDessin > 0) maPart = "dessinateur";
+    }
 
     var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaires[0].id);
 
@@ -1153,8 +1164,10 @@
       var aff = chAffaire.querySelector("select").value;
       var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : "");
       var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : "");
-      if (boiteIng.querySelector("select")) boiteIng.querySelector("select").remove();
-      if (boiteDes.querySelector("select")) boiteDes.querySelector("select").remove();
+      [boiteIng, boiteDes].forEach(function (b) {
+        var s = b.querySelector("select"); if (s) s.remove();
+        var a = b.querySelector(".aide"); if (a) a.remove();
+      });
       // Ma part reste la mienne : le menu est posé sur moi et ne s'ouvre pas.
       if (maCote === "ingenieur" && !t) vi = moi.id;
       if (maCote === "dessinateur" && !t) vd = moi.id;
@@ -1165,6 +1178,11 @@
         sien.value = moi.id;
         sien.disabled = true;
         sien.title = "Sans le droit de créer des tâches pour les autres, cette part est la tienne.";
+      } else if (maPart) {
+        (maPart === "ingenieur" ? boiteIng : boiteDes).appendChild(el("div", {
+          class: "aide",
+          text: "Ta part : désigne quelqu'un d'autre pour lui passer la main."
+        }));
       }
     }
     rebranche();
@@ -1311,14 +1329,28 @@
       [].forEach.call(corps.querySelectorAll("input,select,textarea"), function (n) { n.disabled = true; });
     }
 
-    /* Sans le droit, une tâche doit rester la sienne : ma part porte une
-       charge et c'est moi qui la tiens. Le contrôle est refait par la base. */
+    function nombre(x) { return parseFloat(String(x).replace(",", ".")) || 0; }
+
+    /* Sans le droit, une tâche neuve doit porter sa part : on ne crée pas du
+       travail pour les autres. Le contrôle est refait par la base. */
     function resteMienne(v) {
       if (libre) return true;
       var id = moi && moi.id;
-      var ci = parseFloat(String(v.chargeInge).replace(",", ".")) || 0;
-      var cd = parseFloat(String(v.chargeDessin).replace(",", ".")) || 0;
-      return !!id && ((v.ingenieurId === id && ci > 0) || (v.dessinateurId === id && cd > 0));
+      return !!id && ((v.ingenieurId === id && nombre(v.chargeInge) > 0) ||
+                      (v.dessinateurId === id && nombre(v.chargeDessin) > 0));
+    }
+
+    /* Passer la main : la part que je tenais change de mains, retourne à
+       affecter, ou perd sa charge. La tâche quitte mon planning — et, sans le
+       droit, je ne pourrai plus y revenir. Renvoie le message à annoncer. */
+    function passageDeMain(v) {
+      if (!maPart || resteMienne(v)) return null;   // tant qu'une part me reste, je n'ai rien lâché
+      var cle = maPart === "ingenieur" ? "ingenieurId" : "dessinateurId";
+      var charge = nombre(maPart === "ingenieur" ? v.chargeInge : v.chargeDessin);
+      if (charge <= 0) return "Ta part n'a plus de charge : la tâche quitte ton planning.";
+      return v[cle]
+        ? "Tâche confiée à " + D.nomMembre(v[cle]) + " : elle quitte ton planning."
+        : "Ta part est remise à affecter : la tâche quitte ton planning.";
     }
 
     return ouvre({
@@ -1333,16 +1365,17 @@
             var v = lit(corps);
             v.finiInge = (v.parts || []).indexOf("finiInge") >= 0;
             v.finiDessin = (v.parts || []).indexOf("finiDessin") >= 0;
-            if (!resteMienne(v)) {
+            if (!t && !resteMienne(v)) {
               toast(maCote === "dessinateur"
-                ? "Garde ta part : saisis une charge de dessin, et laisse-toi comme dessinateur."
-                : "Garde ta part : saisis une charge de calcul, et laisse-toi comme ingénieur.");
+                ? "Une tâche que tu crées porte ta part : saisis une charge de dessin, et laisse-toi comme dessinateur."
+                : "Une tâche que tu crées porte ta part : saisis une charge de calcul, et laisse-toi comme ingénieur.");
               return false;
             }
+            var passe = t ? passageDeMain(v) : null;
             var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
             return p.then(function () {
               if (o.surEnregistrement) o.surEnregistrement();
-              toast(t ? "Tâche modifiée." : "Tâche créée.");
+              toast(passe || (t ? "Tâche modifiée." : "Tâche créée."));
             }).catch(function (e) { toast(e.message); return false; });
           }
         }

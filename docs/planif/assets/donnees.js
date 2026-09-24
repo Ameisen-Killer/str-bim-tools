@@ -84,7 +84,7 @@
     },
     taches_autrui: {
       titre: "Créer des tâches pour les autres",
-      aide: "Sans ce droit, on ne crée et ne modifie que les tâches dont une part chargée est la sienne — en désignant librement qui tient l'autre part."
+      aide: "Sans ce droit, on ne crée et ne modifie que les tâches dont une part chargée est la sienne — en désignant librement qui tient l'autre part, et en pouvant passer la main à un collègue."
     },
     absences_autrui: {
       titre: "Poser les absences des autres",
