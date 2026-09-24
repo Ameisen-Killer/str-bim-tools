@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#ffd400" />
+  <title>Buro — Amicale de Douvaine</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="assets/styles.css?v=1" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-wrap">
+        <div class="brand-mark">B</div>
+        <div>
+          <div class="brand">BURO</div>
+          <div class="brand-sub">Amicale de Douvaine</div>
+        </div>
+      </div>
+      <div class="user-wrap">
+        <select id="userSwitch" aria-label="Utilisateur de démonstration" hidden></select>
+        <span id="userName" class="user-name" hidden></span>
+        <span id="roleBadge" class="role-badge"></span>
+        <button id="logoutBtn" class="logout-btn" title="Se déconnecter" aria-label="Se déconnecter" hidden>⏻</button>
+      </div>
+    </header>
+
+    <main id="app"><div class="empty">Chargement…</div></main>
+
+    <button id="fab" class="fab" aria-label="Créer">+</button>
+
+    <nav class="bottom-nav" aria-label="Navigation principale">
+      <button data-route="dashboard" class="nav-btn active"><span>🏠</span><small>Accueil</small></button>
+      <button data-route="discussions" class="nav-btn"><span>💬</span><small>Discussions</small></button>
+      <button data-route="tasks" class="nav-btn"><span>✅</span><small>Tâches</small></button>
+      <button data-route="projects" class="nav-btn"><span>📋</span><small>Projets</small></button>
+      <button data-route="calendar" class="nav-btn"><span>🗓️</span><small>Planning</small></button>
+      <button data-route="more" class="nav-btn"><span>⚙️</span><small>Plus</small></button>
+    </nav>
+  </div>
+
+  <dialog id="modal" class="modal"><div id="modalContent"></div></dialog>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="assets/config.js?v=1"></script>
+  <script src="assets/supabase.js?v=1"></script>
+  <script src="assets/donnees.js?v=1"></script>
+  <script src="assets/app.js?v=1"></script>
+</body>
+</html>

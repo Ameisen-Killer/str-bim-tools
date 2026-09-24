@@ -1,0 +1,11 @@
+{
+  "name": "Buro — Amicale de Douvaine",
+  "short_name": "Buro",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff6bf",
+  "theme_color": "#ffd400",
+  "description": "Outil interne du bureau de l'Amicale de Douvaine",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

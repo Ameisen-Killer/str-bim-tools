@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#ffd400" />
+  <title>Connexion · Buro — Amicale de Douvaine</title>
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="../assets/styles.css?v=1" />
+  <style>
+    body{padding-bottom:0}
+    .cx{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+    .cx-boite{width:100%;max-width:440px}
+    .cx-marque{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    .cx .card{padding:22px}
+    .cx h1{margin:6px 0 0;font-size:clamp(30px,7vw,40px);line-height:1.02}
+    .cx-champs{display:grid;gap:14px;margin-top:18px}
+    .cx-champs input{width:100%;font-size:16px}
+    .cx-champs input[readonly]{background:#fff6db;color:var(--muted)}
+    .aide{font-size:11px;color:var(--muted)}
+    .cx-msg{margin-top:16px;padding:12px 14px;border:2px solid var(--line);border-radius:16px;background:#ffe1e5;font-size:14px;font-weight:700}
+    .cx-msg.ok{background:#e3ffe9}
+    .cx-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+    .cx-actions .btn{width:100%;font-size:15px}
+    .cx-bas{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;font-size:12px;font-weight:800}
+    .cx-bas button{background:none;border:0;padding:0;font:inherit;color:#8d3d05;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-align:left}
+    .cx-bas button[disabled]{opacity:.5;cursor:progress}
+  </style>
+</head>
+<body>
+<main class="cx">
+  <div class="cx-boite">
+    <div class="cx-marque">
+      <div class="brand-mark">B</div>
+      <div><div class="brand">BURO</div><div class="brand-sub">Amicale de Douvaine</div></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Buro · Accès du bureau</div>
+      <h1 id="titre">Connexion</h1>
+      <div class="retro-line"></div>
+
+      <form id="formulaire" autocomplete="on" novalidate>
+        <div class="cx-champs">
+          <div class="field">
+            <label for="email">Adresse e-mail</label>
+            <input type="email" id="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <div class="field">
+            <label for="mdp" id="label-mdp">Mot de passe</label>
+            <input type="password" id="mdp" name="mdp" autocomplete="current-password" required>
+            <div class="aide" id="aide-mdp" hidden>Six caractères au minimum.</div>
+          </div>
+        </div>
+
+        <div class="cx-msg" id="message" role="status" hidden></div>
+
+        <div class="cx-actions">
+          <button class="btn" type="submit" id="valider">Se connecter</button>
+        </div>
+      </form>
+
+      <div class="cx-bas">
+        <button type="button" id="oubli">Première connexion ou mot de passe oublié</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="../assets/config.js?v=1"></script>
+<script src="../assets/supabase.js?v=1"></script>
+<script>
+/* Même fonctionnement que la connexion de l'outil de planification :
+   - e-mail + mot de passe ;
+   - première connexion ou oubli : lien reçu par courriel (compte créé à la
+     demande, seulement pour une adresse de la liste des membres), puis choix
+     du mot de passe sur cette page. */
+(function () {
+  "use strict";
+
+  var p = new URLSearchParams(location.search);
+  var accueil = location.pathname.replace(/connexion\/?(index\.html)?$/, "");   // /kevin/ aujourd'hui
+
+  /* Pas de renvoi hors de Buro : l'adresse est résolue par le navigateur, puis vérifiée */
+  function retourSur(brut) {
+    try {
+      var u = new URL(brut || accueil, location.origin);
+      if (u.origin === location.origin && u.pathname.indexOf(accueil) === 0) return u.pathname + u.search + u.hash;
+    } catch (e) {}
+    return accueil;
+  }
+  var retour = retourSur(p.get("retour"));
+
+  var form = document.getElementById("formulaire");
+  var email = document.getElementById("email");
+  var mdp = document.getElementById("mdp");
+  var valider = document.getElementById("valider");
+  var oubli = document.getElementById("oubli");
+  var boiteMsg = document.getElementById("message");
+  var titre = document.getElementById("titre");
+  var labelMdp = document.getElementById("label-mdp");
+  var aideMdp = document.getElementById("aide-mdp");
+
+  var mode = "connexion";   // connexion | nouveau (mot de passe à choisir depuis un lien)
+  var lien = null;          // { jeton, type } tant que le jeton n'a pas servi, puis { jetons }
+
+  function dis(texte, bon) {
+    boiteMsg.textContent = texte;
+    boiteMsg.className = "cx-msg" + (bon ? " ok" : "");
+    boiteMsg.hidden = !texte;
+  }
+
+  var OUBLI = "« Première connexion ou mot de passe oublié »";
+  function messageLien(code, texte) {
+    if (code === "otp_expired" || /expired|invalid/i.test(texte || "")) {
+      return "Ce lien a expiré ou a déjà servi. Saisis ton adresse, puis " + OUBLI + " pour en recevoir un nouveau.";
+    }
+    return "Lien refusé : " + texte;
+  }
+
+  function passeEn(m) {
+    mode = m;
+    var nouveau = m === "nouveau";
+    titre.textContent = nouveau ? "Nouveau mot de passe" : "Connexion";
+    valider.textContent = nouveau ? "Enregistrer et entrer" : "Se connecter";
+    labelMdp.textContent = nouveau ? "Mot de passe à choisir" : "Mot de passe";
+    mdp.autocomplete = nouveau ? "new-password" : "current-password";
+    aideMdp.hidden = !nouveau;
+    email.readOnly = nouveau;
+    email.parentNode.hidden = nouveau && !email.value;
+    oubli.hidden = nouveau;
+    mdp.value = "";
+  }
+
+  if (p.get("motif")) dis(p.get("motif"));
+  if (!window.Sb || !window.Sb.configure) {
+    dis("Aucune base n'est encore branchée : Buro fonctionne en mode démonstration, sans connexion.", true);
+    valider.textContent = "Ouvrir la démonstration";
+    oubli.hidden = true;
+    email.parentNode.hidden = true;
+    mdp.parentNode.hidden = true;
+    form.addEventListener("submit", function (e) { e.preventDefault(); location.replace(accueil); });
+    return;
+  }
+
+  /* Retour d'un lien reçu par courriel.
+     #jeton=…&type=… : modèles de courriels de Buro ; le jeton n'est échangé
+     qu'à la validation du mot de passe (un antivirus qui visite les liens ne le grille pas).
+     #access_token=… : modèles d'origine de Supabase ; la session est déjà ouverte. */
+  (function retourDeLien() {
+    var h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    var type = h.get("type") || p.get("type") || "";
+    var jeton = h.get("jeton") || p.get("jeton");
+    var refus = h.get("error_description") || p.get("error_description") || h.get("error") || p.get("error");
+
+    if (jeton) {
+      lien = { jeton: jeton, type: type };
+    } else if (h.get("access_token") && /^(recovery|signup|magiclink|invite)$/.test(type)) {
+      lien = { jetons: { access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: h.get("expires_in") } };
+    } else if (refus) {
+      dis(messageLien(h.get("error_code") || p.get("error_code"), refus));
+    }
+    if (lien || refus) history.replaceState(null, "", location.pathname);
+
+    if (lien) {
+      passeEn("nouveau");
+      var bienvenue = type === "signup" || type === "invite";
+      if (bienvenue) titre.textContent = "Bienvenue";
+      dis(bienvenue ? "Choisis ton mot de passe pour activer ton accès." : "Choisis ton nouveau mot de passe.", true);
+    }
+  })();
+
+  /* Déjà connecté : droit dans Buro */
+  if (!lien && window.Sb.session() && !p.get("motif")) { location.replace(retour); return; }
+
+  oubli.addEventListener("click", function () {
+    var adresse = email.value.trim();
+    if (!adresse) { dis("Saisis d'abord ton adresse, puis redemande un lien."); email.focus(); return; }
+    oubli.disabled = true;
+    window.Sb.envoieLien(adresse).then(function () {
+      dis("Lien envoyé à " + adresse + " : ouvre-le pour choisir ton mot de passe. Rien reçu d'ici quelques minutes ? Regarde dans les indésirables.", true);
+    }).catch(function (err) {
+      var m = err.message || "";
+      dis(/non autoris/i.test(m) ? "Cette adresse ne fait pas partie des membres du bureau : demande l'accès au président."
+        : /création de comptes est fermée/i.test(m) ? "Ton accès n'est pas encore ouvert : contacte le président."
+        : err.reseau || /patiente|limite|trop de tentatives|SMTP|Supabase/i.test(m) ? m
+        : "Envoi impossible pour l'instant : réessaie dans quelques minutes.");
+    }).then(function () { oubli.disabled = false; });
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    dis("");
+    var adresse = email.value.trim(), secret = mdp.value;
+
+    if (mode === "connexion") {
+      if (!adresse) { dis("L'adresse e-mail est obligatoire."); return email.focus(); }
+      if (!secret) { dis("Le mot de passe est obligatoire."); return mdp.focus(); }
+    } else if (secret.length < 6) {
+      dis("Mot de passe trop court : six caractères au minimum."); return mdp.focus();
+    }
+
+    valider.disabled = true;
+    valider.textContent = "…";
+    function fini(msg) {
+      valider.disabled = false;
+      valider.textContent = mode === "nouveau" ? "Enregistrer et entrer" : "Se connecter";
+      if (msg) dis(msg);
+    }
+
+    if (mode === "connexion") {
+      window.Sb.connexion(adresse, secret)
+        .then(function () { location.replace(retour); })
+        .catch(function (err) { fini(err.message); });
+      return;
+    }
+
+    // Le jeton du lien ne sert qu'une fois : la session obtenue est gardée pour les essais suivants
+    var jetons = lien.jetons ? Promise.resolve(lien.jetons)
+      : window.Sb.verifieLien(lien.jeton, lien.type).then(function (j) { lien = { jetons: j }; return j; }, function (err) {
+          if (err.reseau) throw err;
+          lien = null;
+          passeEn("connexion");
+          throw new Error(messageLien("otp_expired", ""));
+        });
+    jetons
+      .then(function (j) { return window.Sb.choisitMotDePasse(j, secret); })
+      .then(function () { location.replace(accueil); })
+      .catch(function (err) { fini(err.message); });
+  });
+
+  (mode === "nouveau" ? mdp : email).focus();
+})();
+</script>
+</body>
+</html>
