@@ -1244,12 +1244,22 @@
       ]));
     }
 
+    /* La note se rédige ici. C'est souvent le vrai message de la tâche — « en
+       attente des éléments de Kevin » —, et il changera plus souvent que la
+       charge ou l'affaire : l'écrire ne doit pas demander le formulaire complet.
+       Entrée y va à la ligne au lieu d'enregistrer (voir la modale). */
+    var boiteNote = champ({
+      nom: "note", label: "Note", type: "textarea", rows: 2, large: true,
+      valeur: t.note, exemple: "Hypothèses, éléments en attente…"
+    });
+    var note = boiteNote.querySelector("textarea");
+    champs.push(boiteNote);
+
     var corps = el("div", {}, [
       ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
       ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId)) : "—"),
       ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId)) : "—"),
       ligne("Échéance", C.fmtLong(t.echeance)),
-      t.note ? ligne("Note", t.note) : null,
       lectureSeule
         ? el("p", { class: "aide", style: "margin-top:20px;font-size:14px;color:var(--texte-doux)", text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier." })
         : null,
@@ -1264,13 +1274,14 @@
     /* Tâche d'un collègue, sans le droit : on la lit, on n'y touche pas
        (la base applique la même règle). */
     if (lectureSeule) {
-      [].forEach.call(corps.querySelectorAll("input,select"), function (n) { n.disabled = true; });
+      [].forEach.call(corps.querySelectorAll("input,select,textarea"), function (n) { n.disabled = true; });
     }
 
     function enregistre() {
       var maj = {
         statut: statut.value,
-        avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
+        avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0)),
+        note: note.value.trim()
       };
       // Seules les parts de cette fiche changent : les autres gardent la leur
       coches.forEach(function (c) { maj[c.part.fini] = c.input.checked; });
