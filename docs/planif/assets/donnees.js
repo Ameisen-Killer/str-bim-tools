@@ -208,7 +208,7 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: []
+      membres: [], affaires: [], taches: [], contacts: []
     };
   }
 
@@ -454,6 +454,14 @@
         // reprise d'un jeu d'essai, retrouve ses deux parts fermées.
       }, t.statut !== "termine" && partsNommees(t), false));
     });
+    (brut.contacts || []).forEach(function (c) {
+      e.contacts.push({
+        id: texte(c.id) || id(),
+        nom: texte(c.nom), prenom: texte(c.prenom), societe: texte(c.societe),
+        telephone: texte(c.telephone), natel: texte(c.natel), email: texte(c.email),
+        role: texte(c.role), observations: texte(c.observations)
+      });
+    });
     return e;
   }
 
@@ -489,6 +497,8 @@
       t.ingenieurId = neuf(t.ingenieurId);
       t.dessinateurId = neuf(t.dessinateurId);
     });
+    // Les fiches de l'annuaire ne pendent à rien : seul leur identifiant change
+    (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
     var vraisM = {}, vraisA = {};
@@ -509,6 +519,8 @@
   /* ----------------------------------------------------------- validations */
 
   var RE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  var MSG_ANNUAIRE = "L'annuaire n'est pas encore installé dans la base : migration-annuaire.sql reste à exécuter dans Supabase.";
 
   function valideMembre(o, idExistant) {
     if (!texte(o.nom)) throw erreur("Le nom est obligatoire.");
@@ -553,6 +565,24 @@
     }
     return { debut: debut, fin: fin, motif: texte(o.motif) || "Absence" };
   }
+
+  /* Une fiche d'annuaire n'a presque rien d'obligatoire : on note ce qu'on a,
+     un numéro griffonné vaut mieux qu'une fiche non créée. Mais sans nom ni
+     société, elle ne se retrouverait pas — la base pose la même condition. */
+  function valideContact(o) {
+    var nom = texte(o.nom), societe = texte(o.societe);
+    if (!nom && !societe) throw erreur("Donne au moins un nom ou une société : sans l'un ni l'autre, la fiche resterait introuvable.");
+    var mail = texte(o.email).toLowerCase();
+    if (mail && !RE_MAIL.test(mail)) throw erreur("Cette adresse e-mail n'est pas valide.");
+    return {
+      nom: nom, prenom: texte(o.prenom), societe: societe,
+      telephone: texte(o.telephone), natel: texte(o.natel), email: mail,
+      role: texte(o.role), observations: texte(o.observations)
+    };
+  }
+
+  /** Une fiche se range sous son nom, ou sous sa société quand elle n'en a pas. */
+  function cleContact(c) { return ((c.nom || c.societe) + " " + c.prenom).trim(); }
 
   function valideAffaire(o, idExistant) {
     if (!texte(o.code)) throw erreur("Le numéro d'affaire est obligatoire.");
@@ -907,6 +937,52 @@
       });
     },
 
+    /* -------------------------------------------------------- annuaire */
+    /* La table est arrivée après les autres, et sa migration se lance à la
+       main : tant qu'elle n'est pas passée, l'annuaire se lit vide et refuse
+       d'écrire, plutôt que d'envoyer vers une table qui n'existe pas. */
+    annuaireEnBase: function () {
+      return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
+    },
+
+    /** Fiches rangées par nom, société à défaut. Liste neuve : l'appelant peut la trier autrement. */
+    contacts: function () {
+      return (etat.contacts || []).slice().sort(function (a, b) {
+        return cleContact(a).localeCompare(cleContact(b), "fr", { sensitivity: "base" });
+      });
+    },
+    contact: function (i) {
+      var l = etat.contacts || [];
+      for (var k = 0; k < l.length; k++) if (l[k].id === i) return l[k];
+      return null;
+    },
+
+    ajouteContact: function (o) {
+      return Promise.resolve().then(function () {
+        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
+        var v = valideContact(o);
+        v.id = id();
+        etat.contacts.push(v);
+        return sauve().then(function () { return v; });
+      });
+    },
+    majContact: function (i, o) {
+      return Promise.resolve().then(function () {
+        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
+        var c = D.contact(i); if (!c) throw erreur("Fiche introuvable.");
+        var v = valideContact(o);
+        Object.keys(v).forEach(function (k) { c[k] = v[k]; });
+        return sauve().then(function () { return c; });
+      });
+    },
+    suppContact: function (i) {
+      return Promise.resolve().then(function () {
+        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
+        etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
+        return sauve();
+      });
+    },
+
     /* ------------------------------------------------ sauvegarde / reprise */
     exporte: function () { return copie(etat); },
     importe: function (brut) {
@@ -997,6 +1073,19 @@
 
     var sophie = e.membres.find(function (x) { return x.id === d3; });
     sophie.absences.push({ id: id(), debut: C.ajoute(l, 8), fin: C.ajoute(l, 12), motif: "Vacances" });
+
+    // Annuaire : de quoi montrer les trois cas — une personne dans une société,
+    // une société seule, un indépendant sans société.
+    function ct(nom, prenom, societe, tel, natel, mail, role, obs) {
+      e.contacts.push({ id: id(), nom: nom, prenom: prenom, societe: societe, telephone: tel,
+                        natel: natel, email: mail, role: role, observations: obs });
+    }
+    ct("Devaud", "Claire", "Atelier Devaud architectes", "021 555 10 20", "079 555 10 21",
+       "claire.devaud@exemple.ch", "Architecte", "Interlocutrice pour l'immeuble de logements.");
+    ct("", "", "Régie du Lac SA", "021 555 30 00", "", "contact@exemple.ch", "Maître d'ouvrage",
+       "Passe par Mme Devaud pour les questions techniques.");
+    ct("Ferreira", "Tiago", "", "", "078 555 44 12", "t.ferreira@exemple.ch", "Entreprise de gros œuvre",
+       "Disponible tôt le matin.");
 
     return e;
   }

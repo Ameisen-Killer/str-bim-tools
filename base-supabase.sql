@@ -327,6 +327,32 @@ comment on column public.taches.debut is
 comment on column public.taches.charge_inge is
   'Jours d''ingénieur. Distincte de la charge dessin : les deux métiers ne pèsent pas pareil sur une même tâche.';
 
+-- --------------------------------------------------------------- annuaire ---
+-- Carnet d'adresses du bureau : clients, architectes, entreprises, partenaires.
+-- Sans lien avec les affaires : on y cherche une personne, on l'appelle.
+create table if not exists public.contacts (
+  id           uuid primary key default gen_random_uuid(),
+  bureau_id    uuid not null default public.bureau_par_defaut()
+               constraint contacts_bureau_fk references public.bureaux (id) on delete cascade,
+  nom          text not null default '',
+  prenom       text not null default '',
+  societe      text not null default '',
+  telephone    text not null default '',
+  natel        text not null default '',
+  email        text not null default '',
+  role         text not null default '',
+  observations text not null default '',
+  cree_le      timestamptz not null default now(),
+  maj_le       timestamptz not null default now(),
+  constraint contacts_nom_ou_societe
+    check (char_length(trim(nom)) > 0 or char_length(trim(societe)) > 0)
+);
+create index if not exists contacts_bureau on public.contacts (bureau_id);
+comment on column public.contacts.role is
+  'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
+comment on column public.contacts.natel is
+  'Téléphone mobile (suisse romand pour « portable »).';
+
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).
 create table if not exists public.reglages (
@@ -382,7 +408,7 @@ $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['membres', 'affaires', 'taches', 'reglages'] loop
+  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages'] loop
     execute format('drop trigger if exists maj_le on public.%I', t);
     execute format(
       'create trigger maj_le before update on public.%I
@@ -444,8 +470,8 @@ declare
   t text;
   p record;
 begin
-  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages',
-                           'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts',
+                           'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -533,6 +559,19 @@ create policy "droit ou mes absences (suppression)" on public.absences for delet
   using (bureau_id = (select public.bureau_courant())
          and (membre_id = (select public.mon_membre())
               or (select public.a_droit('absences_autrui'))));
+
+-- Annuaire : tout le bureau le lit et le tient. Un carnet d'adresses est un
+-- outil commun, pas le travail de quelqu'un : les quatre règles portent la
+-- même condition, celle des affaires en modification.
+create policy "bureau courant (lecture)" on public.contacts for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (création)" on public.contacts for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (modification)" on public.contacts for update to authenticated
+  using (bureau_id = (select public.bureau_courant()))
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (suppression)" on public.contacts for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.

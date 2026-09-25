@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Annuaire · Planification · STR Bim Tools</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<script>
+/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
+(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=41">
+</head>
+<body>
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <div class="surtitre">Planification</div>
+    <h1>Annuaire</h1>
+    <p class="chapeau">Le carnet d'adresses du bureau : clients, architectes, entreprises, partenaires. Une fiche porte au moins un nom ou une société ; tout le reste est facultatif. Un numéro se compose d'un clic sur téléphone, une adresse ouvre le courriel.</p>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+  <div class="wrap" data-migration></div>
+
+  <div class="wrap">
+    <section class="section">
+      <div class="tete-section">
+        <div>
+          <div class="num-section">01 — Carnet d'adresses</div>
+          <h2 id="titre-liste">Fiches</h2>
+        </div>
+        <div class="outils">
+          <button class="btn btn-or" type="button" id="btn-nouvelle"><span class="ico-txt ico-ajout-contact" aria-hidden="true"></span>Nouvelle fiche</button>
+        </div>
+      </div>
+      <div data-recherche></div>
+      <div class="defile" id="liste"></div>
+    </section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=4"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=13"></script>
+<script src="/planif/assets/donnees.js?v=20"></script>
+<script src="/planif/assets/calculs.js?v=6"></script>
+<script src="/planif/assets/ui.js?v=31"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, el = UI.el;
+
+  var barre = null;                                 // recherche instantanée
+  var suivi = UI.suiviApparitions();
+
+  if (!UI.session()) return;
+
+  D.pret().then(function () {
+    var pret = D.annuaireEnBase();
+    UI.chrome("annuaire", pret
+      ? [{ label: "Nouvelle fiche", or: true, icone: "ico-ajout-contact", action: function () { formulaire(null); } }]
+      : []);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+
+    var btnNouvelle = document.getElementById("btn-nouvelle");
+    btnNouvelle.hidden = !pret;
+    btnNouvelle.addEventListener("click", function () { formulaire(null); });
+
+    /* La table de l'annuaire s'installe par une migration lancée à la main :
+       tant qu'elle manque, mieux vaut le dire que d'afficher un carnet vide. */
+    if (!pret) {
+      document.querySelector("[data-migration]").appendChild(el("div", { class: "bandeau" }, [
+        el("span", { class: "losange", "aria-hidden": "true" }),
+        el("div", {}, [
+          el("strong", { text: "Annuaire pas encore installé. " }),
+          "La table des fiches n'existe pas dans la base. Exécute ",
+          el("code", { text: "migration-annuaire.sql" }),
+          " dans Supabase (SQL Editor), puis recharge cette page."
+        ])
+      ]));
+    }
+
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher un nom, une société, un rôle, un numéro…",
+      surSaisie: dessine,
+      surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
+    });
+    D.surRechargement(dessine);
+    dessine();
+  }).catch(UI.echec);
+
+  /* ------------------------------------------------------------- affichage */
+
+  function nomAffiche(c) {
+    var personne = (c.prenom + " " + c.nom).trim();
+    return personne || c.societe;
+  }
+
+  function champsCherches(c) {
+    return [c.nom, c.prenom, c.societe, c.role, c.telephone, c.natel, c.email, c.observations];
+  }
+
+  function selection(opts) {
+    opts = opts || {};
+    var mots = opts.sansTexte || !barre ? [] : barre.termes();
+    return D.contacts().filter(function (c) { return UI.correspond(champsCherches(c), mots); });
+  }
+
+  /** Numéro cliquable : « 021 555 10 20 » compose tel:+41215551020 sans les espaces. */
+  function lienTel(numero, mots) {
+    if (!numero) return null;
+    return el("a", { href: "tel:" + numero.replace(/[^+0-9]/g, ""), class: "lien-doux" }, [UI.surligne(numero, mots)]);
+  }
+
+  function dessine() {
+    var contacts = selection();
+    var mots = barre ? barre.termes() : [];
+    var hote = document.getElementById("liste");
+    UI.vide(hote);
+    suivi.debut();
+    if (barre) barre.compte(contacts.length, selection({ sansTexte: true }).length);
+    document.getElementById("titre-liste").textContent =
+      contacts.length + (contacts.length > 1 ? " fiches" : " fiche");
+
+    if (!contacts.length) {
+      var q = barre ? barre.valeur().trim() : "";
+      if (!q) {
+        hote.appendChild(el("div", { class: "vide", text: D.annuaireEnBase() ? "Aucune fiche — commence par en créer une" : "Annuaire indisponible" }));
+        return;
+      }
+      hote.appendChild(el("div", { class: "sans-resultat" }, [
+        el("p", { class: "q" }, ["Rien pour « ", el("em", { text: q }), " »"]),
+        el("p", { class: "aide", text: "La recherche porte sur le nom, la société, le rôle, les numéros, l'adresse et les observations." })
+      ]));
+      return;
+    }
+
+    var corps = el("tbody");
+    contacts.forEach(function (c) {
+      var personne = (c.prenom + " " + c.nom).trim();
+
+      var telephones = el("div", {});
+      if (c.telephone) telephones.appendChild(el("div", { class: "num" }, [lienTel(c.telephone, mots)]));
+      if (c.natel) {
+        telephones.appendChild(el("div", { class: "num" }, [
+          el("span", { class: "secondaire", style: "margin-right:6px", text: "Natel" }),
+          lienTel(c.natel, mots)
+        ]));
+      }
+      if (!c.telephone && !c.natel) telephones.appendChild(el("span", { class: "secondaire", text: "—" }));
+
+      corps.appendChild(suivi.marque(el("tr", {}, [
+        el("td", {}, [
+          el("div", { class: "principal" }, [UI.surligne(nomAffiche(c), mots)]),
+          personne && c.societe ? el("div", { class: "secondaire" }, [UI.surligne(c.societe, mots)]) : null
+        ]),
+        el("td", {}, [
+          c.role ? el("span", { class: "etiq" }, [UI.surligne(c.role, mots)]) : el("span", { class: "secondaire", text: "—" })
+        ]),
+        el("td", {}, [telephones]),
+        el("td", {}, [
+          c.email
+            ? el("a", { href: "mailto:" + c.email, class: "lien-doux" }, [UI.surligne(c.email, mots)])
+            : el("span", { class: "secondaire", text: "—" })
+        ]),
+        el("td", {}, [
+          c.observations ? el("div", { class: "secondaire" }, [UI.surligne(c.observations, mots)]) : el("span", { class: "secondaire", text: "—" })
+        ]),
+        el("td", { class: "actions" }, [
+          UI.boutonIcone("modifier", "Modifier", nomAffiche(c), function () { formulaire(c.id); }),
+          UI.boutonIcone("supprimer", "Supprimer", nomAffiche(c), function () { supprime(c); })
+        ])
+      ]), c.id));
+    });
+
+    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { text: "Contact" }),
+        el("th", { text: "Rôle" }),
+        el("th", { text: "Téléphone" }),
+        el("th", { text: "E-mail" }),
+        el("th", { text: "Observations" }),
+        el("th", { text: "" })
+      ])]),
+      corps
+    ]));
+  }
+
+  /* ------------------------------------------------------------ formulaire */
+
+  function formulaire(idContact) {
+    var c = idContact ? D.contact(idContact) : null;
+
+    var corps = el("div", { class: "grille-champs" }, [
+      UI.champ({ nom: "prenom", label: "Prénom", valeur: c ? c.prenom : "", exemple: "Claire", autocomplete: "given-name" }),
+      UI.champ({ nom: "nom", label: "Nom", valeur: c ? c.nom : "", exemple: "Devaud", autocomplete: "family-name" }),
+      UI.champ({ nom: "societe", label: "Société", valeur: c ? c.societe : "", exemple: "Atelier Devaud architectes", large: true,
+                 aide: "Le nom ou la société suffit : une fiche peut ne porter que l'un des deux." }),
+      UI.champ({ nom: "role", label: "Rôle", valeur: c ? c.role : "", exemple: "Architecte, maître d'ouvrage, entreprise…" }),
+      UI.champ({ nom: "email", label: "E-mail", type: "email", valeur: c ? c.email : "", exemple: "claire.devaud@exemple.ch" }),
+      UI.champ({ nom: "telephone", label: "Téléphone fixe", type: "tel", valeur: c ? c.telephone : "", exemple: "021 555 10 20", inputmode: "tel" }),
+      UI.champ({ nom: "natel", label: "Natel", type: "tel", valeur: c ? c.natel : "", exemple: "079 555 10 21", inputmode: "tel" }),
+      UI.champ({ nom: "observations", label: "Observations", type: "textarea", rows: 3, valeur: c ? c.observations : "",
+                 exemple: "Disponibilités, interlocuteur à privilégier, historique…", large: true })
+    ]);
+
+    UI.ouvre({
+      surtitre: c ? "Modifier" : "Nouvelle fiche",
+      titre: c ? nomAffiche(c) : "Fiche de contact",
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, entree: true, action: function () {
+            var v = UI.lit(corps);
+            var p = c ? D.majContact(c.id, v) : D.ajouteContact(v);
+            return p.then(function () { dessine(); UI.toast(c ? "Fiche modifiée." : "Fiche créée."); })
+              .catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  function supprime(c) {
+    UI.confirme("Supprimer cette fiche ?", nomAffiche(c) + (c.societe && nomAffiche(c) !== c.societe ? " · " + c.societe : "") + ". Cette action est définitive.", "Supprimer", true)
+      .then(function (ok) {
+        if (!ok) return;
+        D.suppContact(c.id).then(function () { dessine(); UI.toast("Fiche supprimée."); })
+          .catch(function (e) { UI.toast(e.message); });
+      });
+  }
+})();
+</script>
+</body>
+</html>

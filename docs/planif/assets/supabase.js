@@ -362,6 +362,10 @@
   function videTout() {
     return requete("affaires?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" })
       .then(function () { return requete("membres?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" }); })
+      .then(function () {
+        // L'annuaire ne pend à rien : aucune cascade ne l'emporte
+        if (annuaireEnBase) return requete("contacts?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" });
+      })
       .then(function () {});
   }
 
@@ -380,6 +384,26 @@
      pas passée, la base ne connaît que « role ». La lecture le dit.
      À simplifier une fois la migration en place. */
   var metiersEnBase = true;
+
+  /* L'annuaire est arrivé après coup, et sa migration se lance à la main :
+     tant que la table manque, PostgREST répond « table inconnue » (PGRST205,
+     ou 42P01 sur les versions plus anciennes). Faire échouer toute la lecture
+     pour cela priverait l'équipe de l'outil entier ; l'annuaire se montre donc
+     vide, en annonçant la migration, et le reste fonctionne.
+     À simplifier une fois la migration passée partout. */
+  var annuaireEnBase = true;
+
+  function tableAbsente(e) {
+    return e && (e.code === "PGRST205" || e.code === "PGRST202" || e.code === "42P01");
+  }
+
+  function litAnnuaire() {
+    return litTout("contacts", "id").catch(function (e) {
+      if (!tableAbsente(e)) throw e;
+      annuaireEnBase = false;
+      return [];
+    });
+  }
 
   var VERS_BASE = {
     membres: function (m) {
@@ -402,6 +426,11 @@
                 statut: t.statut, avancement: t.avancement };
       if (partsEnBase) { o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true; }
       return o;
+    },
+    contacts: function (c) {
+      return { id: c.id, nom: c.nom, prenom: c.prenom, societe: c.societe,
+               telephone: c.telephone, natel: c.natel, email: c.email,
+               role: c.role, observations: c.observations };
     }
   };
 
@@ -414,10 +443,12 @@
       litTout("affaires", "id"),
       litTout("affaire_membres", "affaire_id,membre_id"),
       litTout("taches", "id"),
-      litTout("reglages", "id")
+      litTout("reglages", "id"),
+      litAnnuaire()
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
-          liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {};
+          liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
+          contacts = r[6] || [];
 
       // La base connaît-elle déjà les parts terminées ? (colonnes fini_inge / fini_dessin)
       partsEnBase = !taches.length || ("fini_inge" in taches[0]);
@@ -476,6 +507,13 @@
             statut: t.statut, avancement: t.avancement,
             finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
             cree: t.cree_le, maj: t.maj_le
+          };
+        }),
+        contacts: contacts.map(function (c) {
+          return {
+            id: c.id, nom: c.nom || "", prenom: c.prenom || "", societe: c.societe || "",
+            telephone: c.telephone || "", natel: c.natel || "", email: c.email || "",
+            role: c.role || "", observations: c.observations || ""
           };
         })
       };
@@ -577,6 +615,7 @@
     var dAffaires = compare(av.affaires || [], etat.affaires, VERS_BASE.affaires);
     var dTaches   = compare(av.taches || [], etat.taches, VERS_BASE.taches);
     var dAbsences = compare(toutesAbsences(av), toutesAbsences(etat), function (a) { return a; });
+    var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -610,11 +649,16 @@
 
     if (dAffaires.retraits.length) suite = suite.then(function () { return effaceLot("affaires", dAffaires.retraits); });
     if (dMembres.retraits.length) suite = suite.then(function () { return effaceLot("membres", dMembres.retraits); });
+    // Tant que la migration de l'annuaire n'est pas passée, rien ne part vers une table qui n'existe pas
+    if (annuaireEnBase && dContacts.retraits.length) {
+      suite = suite.then(function () { return effaceLot("contacts", dContacts.retraits); });
+    }
 
     suite = suite.then(function () { return appliqueTable("membres", dMembres); });
     suite = suite.then(function () { return appliqueTable("affaires", dAffaires); });
     suite = suite.then(function () { return appliqueTable("taches", dTaches); });
     suite = suite.then(function () { return appliqueTable("absences", dAbsences); });
+    if (annuaireEnBase) suite = suite.then(function () { return appliqueTable("contacts", dContacts); });
     if (liensNeufs.length) suite = suite.then(function () { return insere("affaire_membres", liensNeufs); });
 
     var rAv = av.reglages || {}, rAp = etat.reglages;
@@ -651,7 +695,8 @@
       lire: charge,
       ecrire: ecrire,
       videTout: videTout,
-      profil: profil
+      profil: profil,
+      annuaireEnBase: function () { return annuaireEnBase; }
     }
   };
 })(window);

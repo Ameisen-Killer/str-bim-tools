@@ -361,6 +361,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-taches{--ico:url(/planif/icons/task_list.svg?v=1)}
 .ico-ajout-affaire{--ico:url(/planif/icons/folder_add.svg?v=1)}
 .ico-ajout-membre{--ico:url(/planif/icons/user_add.svg?v=1)}
+.ico-ajout-contact{--ico:url(/planif/icons/user_add.svg?v=1)}   /* annuaire : la même silhouette que pour un membre */
 .ico-export{--ico:url(/planif/icons/file_export.svg?v=1)}
 .ico-ajout-bureau{--ico:url(/planif/icons/building_add.svg?v=1)}
 .ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
@@ -369,6 +370,11 @@ table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}
 table.liste tr.fini .principal{text-decoration:line-through;text-decoration-thickness:1px;color:var(--texte-doux)}
 table.liste tr.fini td{opacity:.7}
+
+/* Lien discret au fil d'une liste : un numéro à composer, une adresse à écrire.
+   Le trait sous le texte suffit à l'annoncer ; l'or vient au survol. */
+.lien-doux{color:inherit;text-decoration:none;border-bottom:1px solid var(--ligne);transition:color .25s,border-color .25s}
+.lien-doux:hover,.lien-doux:focus-visible{color:var(--or);border-bottom-color:var(--or-doux);outline:none}
 
 .etiq{
   display:inline-flex;align-items:center;gap:6px;

@@ -469,7 +469,8 @@
     { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
     { cle: "affaires", href: "/planif/affaires/", nom: "Affaires", court: "Affaires" },
     { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" },
-    { cle: "absences", href: "/planif/absences/", nom: "Absences", court: "Absences" }
+    { cle: "absences", href: "/planif/absences/", nom: "Absences", court: "Absences" },
+    { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
   /**
@@ -842,7 +843,8 @@
         // Importer REMPLACE tout : sans confirmation, un vieux fichier ou un jeu
         // de démonstration effaçait d'un clic le planning réel de toute l'équipe.
         function compte(o) {
-          return (o.membres || []).length + " membres, " + (o.affaires || []).length + " affaires, " + (o.taches || []).length + " tâches";
+          return (o.membres || []).length + " membres, " + (o.affaires || []).length + " affaires, " +
+                 (o.taches || []).length + " tâches, " + (o.contacts || []).length + " fiches";
         }
         confirme("Remplacer toutes les données ?",
           "Le contenu actuel (" + compte(D.etat()) + ") sera remplacé par celui du fichier « " + f.name + " » (" + compte(brut) + ")" +
@@ -879,7 +881,9 @@
       el("div", { class: "cles", style: "margin-top:22px" }, [
         el("div", { class: "cle" }, [el("div", { class: "v", text: String(e.membres.length) }), el("div", { class: "l", text: "Membres" })]),
         el("div", { class: "cle" }, [el("div", { class: "v", text: String(e.affaires.length) }), el("div", { class: "l", text: "Affaires" })]),
-        el("div", { class: "cle" }, [el("div", { class: "v", text: String(e.taches.length) }), el("div", { class: "l", text: "Tâches" })])
+        el("div", { class: "cle" }, [el("div", { class: "v", text: String(e.taches.length) }), el("div", { class: "l", text: "Tâches" })]),
+        // L'annuaire part dans la sauvegarde comme le reste : il se compte ici aussi
+        el("div", { class: "cle" }, [el("div", { class: "v", text: String((e.contacts || []).length) }), el("div", { class: "l", text: "Fiches" })])
       ]),
       el("div", { class: "grille-champs", style: "margin-top:26px" }, [
         champ({
@@ -903,7 +907,7 @@
         toutGerer ? {
           label: "Tout effacer", rouge: true, gauche: true, action: function () {
             return confirme("Tout effacer ?",
-              "Membres, affaires et tâches seront supprimés " + (avecBase ? "de la base, " + pourTous : "de ce navigateur") +
+              "Membres, affaires, tâches et fiches de l'annuaire seront supprimés " + (avecBase ? "de la base, " + pourTous : "de ce navigateur") +
               ". Cette action est définitive : exporte d'abord une sauvegarde si tu veux pouvoir revenir en arrière.",
               "Effacer définitivement", true).then(function (ok) {
                 if (!ok) return false;
