@@ -8,13 +8,13 @@
 <meta name="theme-color" content="#050505">
 <script>
 /* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
-(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();
+(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8",ab:"#F5F5F4"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=42">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=43">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -149,7 +149,7 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=15"></script>
 <script src="/planif/assets/donnees.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=32"></script>
+<script src="/planif/assets/ui.js?v=33"></script>
 <script>
 (function () {
   "use strict";

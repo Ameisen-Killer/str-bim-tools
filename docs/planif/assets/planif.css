@@ -8,7 +8,7 @@
    Toutes les couleurs passent par ces variables. Les composantes « -rvb »
    servent aux transparences : rgba(var(--encre),.12) donne un filet
    parchemin sur fond noir, un filet d'encre sur fond clair.
-   Le thème est posé sur <html data-theme="sombre|clair"> avant le premier
+   Le thème est posé sur <html data-theme="sombre|clair|ab"> avant le premier
    rendu (script en tête de chaque page) : aucun éclair de la mauvaise couleur. */
 :root{
   color-scheme:dark;
@@ -72,6 +72,43 @@
   --texte-faible:rgba(var(--encre),.66);
 
   --t1:#7A5312; --t2:#284868; --t3:#3A5A40; --t4:#834424;
+  --t5:#4E4588; --t6:#39525D; --t7:#665619; --t8:#77403A;
+}
+
+/* Thème « AB ingénieurs » : les couleurs du bureau, relevées sur absa.ch —
+   le vert du logo et les gris neutres du site, sur blanc.
+   Le vert du logo, #CAE09B, ne fait que 1,4:1 sur blanc : il ne peut pas
+   porter un texte. Il reste donc aux remplissages (option choisie, pastilles),
+   et l'accent est sa version assombrie à teinte égale (79°, saturation
+   relevée) : #5C7722, qui passe AA sur le fond comme dans les fenêtres.
+   Le gris du site (#7B7B7B) tient le texte faible, pas le texte courant :
+   dans un tableau dense, il faut plus de contraste qu'en page vitrine.
+   Teintes d'affaire : le vert AB prend la première place, et l'ancien vert
+   sapin devient un bleu-vert pour rester distinct de lui. */
+:root[data-theme="ab"]{
+  color-scheme:light;
+  --encre:46,47,49;
+  --fond-rvb:245,245,244;
+  --or-rvb:92,119,34;
+  --alerte-rvb:152,54,30;
+  --verre-rvb:40,72,104;
+
+  --noir:#F5F5F4;
+  --noir-2:#FFFFFF;
+  --texte:#2E2F31;
+  --or:#5C7722;
+  --alerte:#98361E;
+  --bleu:#284868;
+  --voile:rgba(46,47,49,.38);
+  --option-choisie:#E6F1D0;
+
+  --ligne:rgba(var(--encre),.22);
+  --ligne-faible:rgba(var(--encre),.12);
+  --or-doux:rgba(var(--or-rvb),.7);
+  --texte-doux:rgba(var(--encre),.86);
+  --texte-faible:rgba(var(--encre),.72);
+
+  --t1:#5C7722; --t2:#284868; --t3:#2F5C55; --t4:#834424;
   --t5:#4E4588; --t6:#39525D; --t7:#665619; --t8:#77403A;
 }
 
@@ -855,7 +892,7 @@ mark.trouve{
 @page{size:A4 landscape;margin:9mm 8mm}
 
 @media print{
-  :root,:root[data-theme="sombre"],:root[data-theme="clair"]{
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"],:root[data-theme="ab"]{
     --encre:22,19,15;
     --fond-rvb:255,255,255;
     --or-rvb:122,83,18;

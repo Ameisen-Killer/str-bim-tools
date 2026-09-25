@@ -320,8 +320,14 @@
   var THEMES = [
     { v: "sombre", l: "Sombre" },
     { v: "clair", l: "Clair" },
+    { v: "ab", l: "AB ingénieurs" },
     { v: "systeme", l: "Système" }
   ];
+
+  /* Couleur de la barre du navigateur, sur téléphone : celle du fond de page
+     de chaque thème. Le même tableau est repris par le script en tête de
+     page, qui pose le thème avant le premier rendu. */
+  var FOND_THEME = { clair: "#F3F0E8", ab: "#F5F5F4", sombre: "#050505" };
   var mediaClair = global.matchMedia ? global.matchMedia("(prefers-color-scheme: light)") : null;
 
   function cleTheme() { return "planif.theme:" + (avecBase && SB.connecte() ? SB.email() : ""); }
@@ -335,7 +341,7 @@
     var effectif = choix === "systeme" ? (mediaClair && mediaClair.matches ? "clair" : "sombre") : choix;
     document.documentElement.setAttribute("data-theme", effectif);
     var meta = document.querySelector("meta[name=theme-color]");
-    if (meta) meta.setAttribute("content", effectif === "clair" ? "#F3F0E8" : "#050505");
+    if (meta) meta.setAttribute("content", FOND_THEME[effectif] || FOND_THEME.sombre);
     [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function (b) {
       b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === choix));
     });
