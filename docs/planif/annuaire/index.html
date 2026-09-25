@@ -38,9 +38,6 @@
           <div class="num-section">01 — Carnet d'adresses</div>
           <h2 id="titre-liste">Fiches</h2>
         </div>
-        <div class="outils">
-          <button class="btn btn-or" type="button" id="btn-nouvelle"><span class="ico-txt ico-ajout-contact" aria-hidden="true"></span>Nouvelle fiche</button>
-        </div>
       </div>
       <div data-recherche></div>
       <div class="defile" id="liste"></div>
@@ -75,9 +72,9 @@
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
 
-    var btnNouvelle = document.getElementById("btn-nouvelle");
-    btnNouvelle.hidden = !pret;
-    btnNouvelle.addEventListener("click", function () { formulaire(null); });
+    /* « Nouvelle fiche » ne paraît qu'une fois, dans la barre du haut (et en
+       bouton flottant au téléphone) : le doublon en tête de section faisait
+       deux boutons identiques à un écran d'intervalle. */
 
     /* La table de l'annuaire s'installe par une migration lancée à la main :
        tant qu'elle manque, mieux vaut le dire que d'afficher un carnet vide. */
