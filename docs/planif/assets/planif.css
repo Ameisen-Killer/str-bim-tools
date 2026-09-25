@@ -302,6 +302,10 @@ table.liste th{
 }
 table.liste td{padding:13px 14px 13px 0;border-bottom:1px solid var(--ligne-faible);vertical-align:top;font-size:14.5px}
 table.liste tr:hover td{background:rgba(var(--encre),.02)}
+/* une ligne de tâche s'ouvre au clic : fiche rapide (UI.ficheTache) */
+table.liste tr.cliquable{cursor:pointer}
+table.liste tr.cliquable:hover td{background:rgba(var(--encre),.05)}
+table.liste tr.cliquable:focus-visible{outline:1px solid var(--or);outline-offset:-1px}
 table.liste td.actions{text-align:right;white-space:nowrap;padding-right:0}
 table.liste .principal{font-size:16px;font-weight:300}
 table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;margin-top:3px}

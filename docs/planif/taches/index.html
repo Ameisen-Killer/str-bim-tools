@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=39">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=40">
 </head>
 <body class="large">
 
@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Tâches</h1>
-    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce termine ce qui te revient : le calcul si tu en es l'ingénieur, le dessin si tu en es le dessinateur. L'étiquette d'une personne ferme sa part à elle ; la tâche n'est terminée qu'une fois les deux parts bouclées. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
+    <p class="chapeau">Les tâches sont rangées par semaine : la semaine en cours d'abord, avec ce qui est à faire ou à commencer, puis les suivantes. Un clic sur le pouce termine ce qui te revient : le calcul si tu en es l'ingénieur, le dessin si tu en es le dessinateur. L'étiquette d'une personne ferme sa part à elle ; la tâche n'est terminée qu'une fois les deux parts bouclées. Un clic sur la ligne ouvre une fiche rapide : statut, avancement, affectation, échéance décalée ; le crayon ouvre le formulaire complet. L'échéance fait foi : le début se déduit de la charge et des jours réellement travaillés de chacun.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -60,7 +60,7 @@
 <script src="/planif/assets/supabase.js?v=12"></script>
 <script src="/planif/assets/donnees.js?v=19"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=28"></script>
+<script src="/planif/assets/ui.js?v=29"></script>
 <script>
 (function () {
   "use strict";
@@ -329,7 +329,7 @@
         ]));
       });
 
-      return suivi.marque(el("tr", { class: t.statut === "termine" ? "fini" : "" }, [
+      var rangee = el("tr", { class: "cliquable" + (t.statut === "termine" ? " fini" : ""), tabindex: "0" }, [
         el("td", {}, [el("div", { class: "tache-titre" }, [
           bascules(t),
           el("div", {}, [
@@ -364,7 +364,25 @@
             ? UI.boutonIcone("supprimer", "Supprimer", t.titre, function () { supprime(t); })
             : null
         ])
-      ]), t.id);
+      ]);
+
+      /* Un clic n'importe où sur la ligne ouvre la fiche rapide : le même volet
+         que le tableau de bord, pour régler statut, avancement, affectation ou
+         échéance sans passer par le formulaire complet (le crayon, lui, l'ouvre).
+         Les boutons de la ligne gardent leur rôle, et une sélection de texte
+         n'ouvre rien. */
+      rangee.addEventListener("click", function (ev) {
+        if (ev.target.closest("button, a, input, label, select, textarea")) return;
+        var sel = window.getSelection();
+        if (sel && !sel.isCollapsed && rangee.contains(sel.anchorNode)) return;
+        fiche(t.id);
+      });
+      rangee.addEventListener("keydown", function (ev) {
+        if (ev.key !== "Enter" || ev.target !== rangee) return;
+        ev.preventDefault();
+        fiche(t.id);
+      });
+      return suivi.marque(rangee, t.id);
     }
   }
 
@@ -567,6 +585,12 @@
   // Formulaire commun avec le tableau de bord (ui.js) : il s'ouvre sur place des deux côtés
   function formulaire(idTache) {
     UI.formulaireTache(idTache, { affaireId: filtres.affaire, surEnregistrement: dessine });
+  }
+
+  /* Fiche rapide, elle aussi commune au tableau de bord : la tâche entière,
+     avec une affectation et une case par part chargée. */
+  function fiche(idTache) {
+    UI.ficheTache(idTache, { surEnregistrement: dessine });
   }
 
   function supprime(t) {

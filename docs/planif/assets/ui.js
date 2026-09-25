@@ -1107,6 +1107,205 @@
     return sel;
   }
 
+  /* ------------------------------------------------------- fiche rapide */
+
+  /**
+   * Décale l'échéance de `jours` jours ; le début se recalcule. Une échéance
+   * posée sur un jour chômé glisse au prochain jour ouvré, dans le sens du
+   * déplacement. `apres` : à rappeler pour redessiner la page.
+   */
+  function decaleTache(id, jours, apres) {
+    var t = D.tache(id);
+    if (!t) return Promise.resolve();
+    var canton = D.canton(), ech = C.ajoute(t.echeance, jours), pas = jours > 0 ? 1 : -1, garde = 0;
+    while (C.chome(ech, canton) && garde++ < 30) ech = C.ajoute(ech, pas);
+    var delta = C.diff(t.echeance, ech);
+    if (!delta) return Promise.resolve();
+    return D.retoucheTache(id, { echeance: ech, debut: null }).then(function () {
+      if (apres) apres();
+      toast("Tâche décalée de " + (delta > 0 ? "+" : "") + delta + " j.");
+    }).catch(function (e) { toast(e.message); });
+  }
+
+  /**
+   * ficheTache(idTache, o) — fiche rapide : la version légère du formulaire.
+   * Ce qui se règle au vol (statut, avancement, affectation, part terminée,
+   * échéance décalée d'un ou sept jours), sans ouvrir le formulaire complet,
+   * qui reste à un bouton de là.
+   *
+   * o.role, o.charge : la barre cliquée au tableau de bord, donc un seul métier
+   *   — « Terminé » n'y ferme que cette part. Sans rôle (une ligne de la liste
+   *   des tâches), la fiche mène la tâche entière : une affectation et une case
+   *   par part chargée.
+   * o.surEnregistrement : appelée après chaque écriture, pour redessiner la page.
+   */
+  function ficheTache(idTache, o) {
+    o = o || {};
+    var Calc = global.Calc;
+    var t = D.tache(idTache);
+    if (!t) return;
+    var a = D.affaire(t.affaireId), canton = D.canton();
+    var lectureSeule = !D.peutEcrireTache(t);
+
+    // Les parts que cette fiche mène : celle de la barre cliquée, sinon toutes celles qui portent une charge
+    var roles = ["ingenieur", "dessinateur"].filter(function (r) {
+      return o.role ? o.role === r : t[D.PARTS[r].charge] > 0;
+    });
+    // Les autres gardent leur état — et tant qu'une reste ouverte, la tâche ne peut pas être terminée
+    var horsFiche = ["ingenieur", "dessinateur"].filter(function (r) {
+      return roles.indexOf(r) < 0 && t[D.PARTS[r].charge] > 0;
+    });
+    function autreOuverte() {
+      return horsFiche.some(function (r) { return !t[D.PARTS[r].fini]; });
+    }
+
+    function periode(charge, idMembre) {
+      var d = Calc.debutPour(charge, t.echeance, idMembre ? D.membre(idMembre) : null, canton);
+      return "  ·  " + C.fmtCH(d) + " → " + C.fmtCH(t.echeance);
+    }
+
+    function ligne(cle, valeur) {
+      return el("div", { style: "display:flex;flex-wrap:wrap;gap:2px 16px;padding:9px 0;border-bottom:1px solid var(--ligne-faible)" }, [
+        el("span", { style: "font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible);min-width:120px;padding-top:3px", text: cle }),
+        el("span", { style: "font-size:14.5px", text: valeur })
+      ]);
+    }
+
+    var statut = el("select", { name: "statut" });
+    Object.keys(D.STATUTS_TACHE).forEach(function (k) {
+      statut.appendChild(el("option", { value: k, selected: k === t.statut }, [D.STATUTS_TACHE[k]]));
+    });
+    var avancement = el("input", { type: "number", name: "avancement", min: "0", max: "100", step: "5", inputmode: "numeric" });
+    avancement.value = t.avancement;
+
+    /* Une case par part menée ici : le calcul bouclé libère l'ingénieur sans
+       retirer le dessin du planning. La tâche ne passe « Terminé » qu'une fois
+       toutes ses parts fermées. */
+    var coches = roles.map(function (r) {
+      var p = D.PARTS[r];
+      var input = el("input", { type: "checkbox", name: "fini", value: p.fini });
+      input.checked = t[p.fini] === true;
+      return { role: r, part: p, input: input, etiquette: el("label", { class: "case" }, [input, p.label + " terminé"]) };
+    });
+    function toutesCochees() {
+      return coches.length > 0 && coches.every(function (c) { return c.input.checked; });
+    }
+    function cocheToutes(v) { coches.forEach(function (c) { c.input.checked = v; }); }
+
+    coches.forEach(function (c) {
+      c.input.addEventListener("change", function () {
+        if (toutesCochees() && !autreOuverte()) statut.value = "termine";
+        else if (statut.value === "termine") statut.value = "en_cours";
+      });
+    });
+    statut.addEventListener("change", function () {
+      if (statut.value === "termine") {
+        cocheToutes(true);
+        // Une part menée ailleurs reste ouverte : la tâche ne se clôt qu'avec elle
+        if (autreOuverte()) statut.value = "en_cours";
+      } else if (toutesCochees() && !autreOuverte()) cocheToutes(false);
+    });
+
+    // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
+    var confies = roles.map(function (r) {
+      var p = D.PARTS[r];
+      var sel = el("select", { name: p.membre }, [el("option", { value: "" }, ["— À affecter —"])]);
+      D.membres({ cote: r, tous: true }).forEach(function (m) {
+        if (!m.actif && m.id !== t[p.membre]) return;   // un inactif n'apparaît que s'il porte déjà la tâche
+        sel.appendChild(el("option", { value: m.id, selected: m.id === t[p.membre] },
+          [m.prenom + " " + m.nom + (D.aStatut(m, "administrateur") ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
+      });
+      sel.value = t[p.membre] || "";
+      return { role: r, part: p, select: sel };
+    });
+
+    function decaleBouton(libelle, jours) {
+      return el("button", {
+        class: "btn", type: "button", text: libelle, style: "justify-content:center",
+        onclick: function () { ferme(); decaleTache(t.id, jours, o.surEnregistrement); }
+      });
+    }
+
+    var champs = [
+      el("div", { class: "champ" }, [el("label", { text: "Statut" }), statut]),
+      el("div", { class: "champ" }, [el("label", { text: "Avancement (%)" }), avancement])
+    ].concat(confies.map(function (c) {
+      return el("div", { class: "champ" }, [
+        el("label", { text: (c.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), c.select
+      ]);
+    }));
+    if (coches.length) {
+      champs.push(el("div", { class: "champ" + (coches.length > 1 ? " large" : "") }, [
+        el("span", { class: "legende", text: o.role ? "Cette part" : coches.length > 1 ? "Parts terminées" : "Part terminée" }),
+        el("div", { class: "cases" }, coches.map(function (c) { return c.etiquette; })),
+        horsFiche.length
+          ? el("div", { class: "aide", text: "Ne ferme que " + D.PARTS[roles[0]].label.toLowerCase() + " ; la tâche se termine avec " + D.PARTS[horsFiche[0]].label.toLowerCase() + "." })
+          : null
+      ]));
+    }
+
+    var corps = el("div", {}, [
+      ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
+      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId)) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId)) : "—"),
+      ligne("Échéance", C.fmtLong(t.echeance)),
+      t.note ? ligne("Note", t.note) : null,
+      lectureSeule
+        ? el("p", { class: "aide", style: "margin-top:20px;font-size:14px;color:var(--texte-doux)", text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier." })
+        : null,
+      el("div", { class: "grille-champs", style: "margin-top:24px" }, champs),
+      lectureSeule ? null : el("div", { class: "legende", style: "display:block;margin-top:24px", text: "Décaler l'échéance" }),
+      lectureSeule ? null : el("div", { class: "outils decalages", style: "margin-top:10px" }, [
+        decaleBouton("− 1 sem.", -7), decaleBouton("− 1 j", -1),
+        decaleBouton("+ 1 j", 1), decaleBouton("+ 1 sem.", 7)
+      ])
+    ]);
+
+    /* Tâche d'un collègue, sans le droit : on la lit, on n'y touche pas
+       (la base applique la même règle). */
+    if (lectureSeule) {
+      [].forEach.call(corps.querySelectorAll("input,select"), function (n) { n.disabled = true; });
+    }
+
+    function enregistre() {
+      var maj = {
+        statut: statut.value,
+        avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
+      };
+      // Seules les parts de cette fiche changent : les autres gardent la leur
+      coches.forEach(function (c) { maj[c.part.fini] = c.input.checked; });
+      var confiees = [], liberees = 0;
+      confies.forEach(function (c) {
+        if (c.select.value === (t[c.part.membre] || "")) return;
+        maj[c.part.membre] = c.select.value || null;
+        if (c.select.value) confiees.push(D.nomMembre(c.select.value));
+        else liberees++;
+      });
+      return D.retoucheTache(t.id, maj).then(function () {
+        if (o.surEnregistrement) o.surEnregistrement();
+        toast(confiees.length ? "Tâche confiée à " + confiees.join(" et ") + "."
+          : liberees ? (liberees > 1 ? "Charges remises à affecter." : "Charge remise à affecter.")
+          : "Tâche mise à jour.");
+      });
+    }
+
+    var detail = {
+      label: lectureSeule ? "Voir en détail" : "Modifier en détail", gauche: true,
+      // Le formulaire complet remplace la fiche, sans quitter la page
+      action: function () { formulaireTache(t.id, { surEnregistrement: o.surEnregistrement }); return false; }
+    };
+    return ouvre({
+      surtitre: o.role
+        ? D.METIERS[o.role] + " · " + C.fmtJours(o.charge != null ? o.charge : t[D.PARTS[o.role].charge]) + " j"
+        : "Tâche · " + C.fmtJours(Calc.chargeTotale(t)) + " j",
+      titre: t.titre,
+      corps: corps,
+      boutons: lectureSeule
+        ? [detail, { label: "Fermer" }]
+        : [detail, { label: "Fermer" }, { label: "Enregistrer", or: true, entree: true, action: enregistre }]
+    });
+  }
+
   /**
    * formulaireTache(idTache, o) — idTache nul pour une nouvelle tâche.
    * o.affaireId : affaire proposée pour une nouvelle tâche
@@ -1441,7 +1640,8 @@
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
-    absences: absences, nouvelleAbsence: nouvelleAbsence, formulaireTache: formulaireTache, imprime: imprime,
+    absences: absences, nouvelleAbsence: nouvelleAbsence,
+    formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,

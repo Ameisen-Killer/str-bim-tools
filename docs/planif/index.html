@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=39">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=40">
 </head>
 <body class="large">
 
@@ -91,7 +91,7 @@
 <script src="/planif/assets/supabase.js?v=12"></script>
 <script src="/planif/assets/donnees.js?v=19"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=28"></script>
+<script src="/planif/assets/ui.js?v=29"></script>
 <script src="/planif/assets/tour.js?v=2"></script>
 <script>
 (function () {
@@ -715,118 +715,11 @@
 
   /* -------------------------------------------------------------- fiche */
 
+  /* Fiche rapide d'une barre, donc d'un métier : « Terminé » n'y ferme que
+     cette part. Le même volet, sans rôle, s'ouvre au clic sur une ligne de la
+     page Tâches (UI.ficheTache dans ui.js). */
   function fiche(info) {
-    var t = D.tache(info.tache.id), a = D.affaire(t.affaireId);
-    var canton = D.canton();
-
-    function periode(charge, idMembre) {
-      var d = Calc.debutPour(charge, t.echeance, idMembre ? D.membre(idMembre) : null, canton);
-      return "  ·  " + C.fmtCH(d) + " → " + C.fmtCH(t.echeance);
-    }
-
-    function ligne(cle, valeur) {
-      return el("div", { style: "display:flex;flex-wrap:wrap;gap:2px 16px;padding:9px 0;border-bottom:1px solid var(--ligne-faible)" }, [
-        el("span", { style: "font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible);min-width:120px;padding-top:3px", text: cle }),
-        el("span", { style: "font-size:14.5px", text: valeur })
-      ]);
-    }
-
-    var statut = el("select", { name: "statut" });
-    Object.keys(D.STATUTS_TACHE).forEach(function (k) {
-      statut.appendChild(el("option", { value: k, selected: k === t.statut }, [D.STATUTS_TACHE[k]]));
-    });
-    var avancement = el("input", { type: "number", name: "avancement", min: "0", max: "100", step: "5", inputmode: "numeric" });
-    avancement.value = t.avancement;
-
-    /* La part de cette barre se termine seule : le calcul bouclé libère
-       l'ingénieur sans retirer le dessin du planning. La tâche ne passe
-       « Terminé » qu'une fois les deux parts fermées. */
-    var part = D.PARTS[info.role];
-    var autre = D.PARTS[info.role === "ingenieur" ? "dessinateur" : "ingenieur"];
-    var autreOuverte = t[autre.charge] > 0 && !t[autre.fini];
-    var finiPart = el("input", { type: "checkbox", name: "fini" });
-    finiPart.checked = t[part.fini] === true;
-    finiPart.addEventListener("change", function () {
-      if (finiPart.checked && !autreOuverte) statut.value = "termine";
-      else if (!finiPart.checked && statut.value === "termine") statut.value = "en_cours";
-    });
-    statut.addEventListener("change", function () {
-      if (statut.value === "termine") {
-        // La fiche est celle d'une barre, donc d'un métier : « Terminé » ferme
-        // cette part-là ; la tâche ne se clôt qu'avec l'autre.
-        finiPart.checked = true;
-        if (autreOuverte) statut.value = "en_cours";
-      } else if (!autreOuverte) finiPart.checked = false;
-    });
-
-    // Réaffectation sans glisser-déposer : indispensable au doigt, pratique à la souris
-    var champRole = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
-    var confie = el("select", { name: "confie" }, [el("option", { value: "" }, ["— À affecter —"])]);
-    D.membres({ cote: info.role, tous: true }).forEach(function (m) {
-      if (!m.actif && m.id !== t[champRole]) return;     // un inactif n'apparaît que s'il porte déjà la tâche
-      confie.appendChild(el("option", { value: m.id, selected: m.id === t[champRole] }, [m.prenom + " " + m.nom + (D.aStatut(m, "administrateur") ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
-    });
-    confie.value = t[champRole] || "";
-
-    function decaleBouton(libelle, jours) {
-      return el("button", {
-        class: "btn", type: "button", text: libelle, style: "justify-content:center",
-        onclick: function () { UI.ferme(); applique(info, jours, null); }
-      });
-    }
-
-    var corps = el("div", {}, [
-      ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
-      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId)) : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId)) : "—"),
-      ligne("Échéance", C.fmtLong(t.echeance)),
-      t.note ? ligne("Note", t.note) : null,
-      el("div", { class: "grille-champs", style: "margin-top:24px" }, [
-        el("div", { class: "champ" }, [el("label", { text: "Statut" }), statut]),
-        el("div", { class: "champ" }, [el("label", { text: "Avancement (%)" }), avancement]),
-        el("div", { class: "champ" }, [el("label", { text: (info.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), confie]),
-        el("div", { class: "champ" }, [
-          el("span", { class: "legende", text: "Cette part" }),
-          el("div", { class: "cases" }, [el("label", { class: "case" }, [finiPart, part.label + " terminé"])]),
-          t[autre.charge] > 0
-            ? el("div", { class: "aide", text: "Ne ferme que " + part.label.toLowerCase() + " ; la tâche se termine avec " + autre.label.toLowerCase() + "." })
-            : null
-        ])
-      ]),
-      el("div", { class: "legende", style: "display:block;margin-top:24px", text: "Décaler l'échéance" }),
-      el("div", { class: "outils decalages", style: "margin-top:10px" }, [
-        decaleBouton("− 1 sem.", -7), decaleBouton("− 1 j", -1),
-        decaleBouton("+ 1 j", 1), decaleBouton("+ 1 sem.", 7)
-      ])
-    ]);
-
-    UI.ouvre({
-      surtitre: D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j",
-      titre: t.titre,
-      corps: corps,
-      boutons: [
-        // Le formulaire complet remplace la fiche, sans quitter le tableau de bord
-        { label: "Modifier en détail", gauche: true, action: function () { UI.formulaireTache(t.id, { surEnregistrement: rend }); return false; } },
-        { label: "Fermer" },
-        {
-          label: "Enregistrer", or: true, action: function () {
-            var champs = {
-              statut: statut.value,
-              avancement: Math.min(100, Math.max(0, parseInt(avancement.value, 10) || 0))
-            };
-            // Seule la part de cette barre change : l'autre métier garde la sienne
-            champs[part.fini] = finiPart.checked;
-            // Choisir « À affecter » libère la charge
-            if (confie.value !== (t[champRole] || "")) champs[champRole] = confie.value || null;
-            return D.retoucheTache(t.id, champs).then(function () {
-              rend();
-              UI.toast(champs[champRole] ? "Tâche confiée à " + D.nomMembre(confie.value) + "."
-                : champRole in champs ? "Charge remise à affecter." : "Tâche mise à jour.");
-            });
-          }
-        }
-      ]
-    });
+    UI.ficheTache(info.tache.id, { role: info.role, charge: info.charge, surEnregistrement: rend });
   }
 
   /* ------------------------------------------------------------ alertes */
