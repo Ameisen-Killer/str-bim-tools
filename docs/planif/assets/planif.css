@@ -365,6 +365,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-export{--ico:url(/planif/icons/file_export.svg?v=1)}
 .ico-ajout-bureau{--ico:url(/planif/icons/building_add.svg?v=1)}
 .ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
+.ico-carte{--ico:url(/planif/icons/map_marker.svg?v=1)}
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}

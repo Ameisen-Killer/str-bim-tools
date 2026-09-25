@@ -46,10 +46,15 @@
   }
 
   /** Même chose pour un lien qui mène à une autre page (les tâches d'une affaire, par exemple). */
-  function lienIcone(type, titre, quoi, href) {
+  /* nouvelOnglet : pour une adresse qui sort de l'outil (une carte, par
+     exemple) — le planning reste ouvert derrière, et noopener garde la page
+     cible à distance de la nôtre. */
+  function lienIcone(type, titre, quoi, href, nouvelOnglet) {
     return el("a", {
       class: "ico ico-" + type, href: href, title: titre,
-      "aria-label": quoi ? titre + " « " + quoi + " »" : titre
+      "aria-label": quoi ? titre + " « " + quoi + " »" : titre,
+      target: nouvelOnglet ? "_blank" : null,
+      rel: nouvelOnglet ? "noopener noreferrer" : null
     });
   }
 
