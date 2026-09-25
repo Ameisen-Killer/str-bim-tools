@@ -53,26 +53,27 @@ end $$;
 
 -- ------------------------------------------------------------- les fiches ---
 -- Une ligne par régie, dans cet ordre :
---   société | rôle | rue et numéro | NPA | localité | téléphone | e-mail | observations
+--   société | rôle | rue et numéro | NPA | localité | téléphone | e-mail | site | observations
 -- Le canton et le pays sont posés plus bas, identiques pour toute la liste.
+-- Le site s'écrit sans « https:// » : l'outil le rétablit pour le lien.
 -- Les apostrophes se doublent : 'Régie de l''Arve SA'.
 insert into public.contacts
   (bureau_id, nom, prenom, societe, role, adresse, npa, localite, canton, pays,
-   telephone, natel, email, observations)
+   telephone, natel, email, site, observations)
 select (select bureau from _cible),
        '', '', s.societe, s.role, s.adresse, s.npa, s.localite, 'GE', 'Suisse',
-       s.telephone, '', s.email, s.observations
+       s.telephone, '', s.email, s.site, s.observations
   from (values
     -- ➜ COLLE OU COMPLÈTE TES LIGNES ICI, sur le modèle des deux exemples
     --    ci-dessous, puis retire les deux « -- » qui les commentent.
     --
-    -- ('Régie Exemple SA',        'Régie', 'Rue du Rhône 1',      '1204', 'Genève',  '022 000 00 00', 'info@exemple.ch', ''),
-    -- ('Gérance Exemple & Cie',   'Régie', 'Avenue de Champel 5', '1206', 'Genève',  '022 000 00 01', '',                'Contact : M. Untel'),
+    -- ('Régie Exemple SA',      'Régie', 'Rue du Rhône 1',      '1204', 'Genève', '022 000 00 00', 'info@exemple.ch', 'regie-exemple.ch', ''),
+    -- ('Gérance Exemple & Cie', 'Régie', 'Avenue de Champel 5', '1206', 'Genève', '022 000 00 01', '',                '',                 'Contact : M. Untel'),
     --
     -- Ligne neutre : elle ne crée rien et permet au fichier de s'exécuter tel
     -- quel, sans être modifié. À supprimer dès que la liste est remplie.
-    (null, null, null, null, null, null, null, null)
-  ) as s(societe, role, adresse, npa, localite, telephone, email, observations)
+    (null, null, null, null, null, null, null, null, null)
+  ) as s(societe, role, adresse, npa, localite, telephone, email, site, observations)
  where s.societe is not null
    and not exists (
      select 1 from public.contacts c

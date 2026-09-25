@@ -397,20 +397,22 @@
     return e && (e.code === "PGRST205" || e.code === "PGRST202" || e.code === "42P01");
   }
 
-  /* L'adresse postale est arrivée après l'annuaire : une base où la migration
-     a été passée trop tôt a la table sans ses colonnes. Une fiche lue le dit ;
-     sur un annuaire encore vide, personne ne peut le dire, alors on demande la
-     colonne à la base — une requête, et seulement dans ce cas.
+  /* L'adresse postale, puis le site web, sont arrivés après l'annuaire : une
+     base où la migration a été passée trop tôt a la table sans ses colonnes.
+     On regarde la dernière venue, « site » : l'avoir, c'est les avoir toutes.
+     Une fiche lue le dit ; sur un annuaire encore vide, personne ne peut le
+     dire, alors on demande la colonne à la base — une requête, et seulement
+     dans ce cas.
      Tant qu'elle manque, l'annuaire attend la migration comme si la table
      n'existait pas : mieux vaut un annuaire annoncé indisponible qu'une adresse
      saisie qui ne s'enregistre pas. */
   function litAnnuaire() {
     return litTout("contacts", "id").then(function (lignes) {
       if (lignes.length) {
-        if (!("adresse" in lignes[0])) annuaireEnBase = false;
+        if (!("site" in lignes[0])) annuaireEnBase = false;
         return lignes;
       }
-      return requete("contacts?select=adresse&limit=1")
+      return requete("contacts?select=site&limit=1")
         .then(function () { return lignes; })
         .catch(function (e) {
           if (e.code !== "42703") throw e;      // colonne inconnue
@@ -448,7 +450,7 @@
     },
     contacts: function (c) {
       return { id: c.id, nom: c.nom, prenom: c.prenom, societe: c.societe,
-               telephone: c.telephone, natel: c.natel, email: c.email, role: c.role,
+               telephone: c.telephone, natel: c.natel, email: c.email, site: c.site, role: c.role,
                adresse: c.adresse, npa: c.npa, localite: c.localite,
                canton: c.canton, pays: c.pays, observations: c.observations };
     }
@@ -533,7 +535,7 @@
           return {
             id: c.id, nom: c.nom || "", prenom: c.prenom || "", societe: c.societe || "",
             telephone: c.telephone || "", natel: c.natel || "", email: c.email || "",
-            role: c.role || "", adresse: c.adresse || "", npa: c.npa || "",
+            site: c.site || "", role: c.role || "", adresse: c.adresse || "", npa: c.npa || "",
             localite: c.localite || "", canton: c.canton || "", pays: c.pays || "",
             observations: c.observations || ""
           };

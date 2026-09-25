@@ -18,8 +18,9 @@
 --  l'autre ne se retrouverait pas. Elle porte aussi son adresse postale :
 --  rue, NPA, localité, canton, pays.
 --
---  DÉJÀ LANCÉE UNE FOIS ? Relance-la : l'adresse postale est arrivée après,
---  et les colonnes manquantes s'ajoutent sans toucher aux fiches existantes.
+--  DÉJÀ LANCÉE UNE FOIS ? Relance-la : l'adresse postale et le site web sont
+--  arrivés après, et les colonnes manquantes s'ajoutent sans toucher aux
+--  fiches existantes.
 --
 --  ORDRE À RESPECTER
 --    migration-multi-bureaux.sql d'abord (c'est elle qui pose bureau_par_defaut
@@ -47,6 +48,7 @@ create table if not exists public.contacts (
   telephone    text not null default '',
   natel        text not null default '',
   email        text not null default '',
+  site         text not null default '',
   role         text not null default '',
   adresse      text not null default '',
   npa          text not null default '',
@@ -68,6 +70,7 @@ alter table public.contacts add column if not exists npa      text not null defa
 alter table public.contacts add column if not exists localite text not null default '';
 alter table public.contacts add column if not exists canton   text not null default '';
 alter table public.contacts add column if not exists pays     text not null default '';
+alter table public.contacts add column if not exists site     text not null default '';
 
 comment on table  public.contacts is
   'Annuaire du bureau : clients, architectes, entreprises et partenaires.';
@@ -77,6 +80,8 @@ comment on column public.contacts.natel is
   'Téléphone mobile (suisse romand pour « portable »).';
 comment on column public.contacts.npa is
   'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
+comment on column public.contacts.site is
+  'Adresse du site web. Saisie sans « https:// » si l''on veut : l''interface le rétablit.';
 comment on column public.contacts.canton is
   'Canton, en abrégé (VD, GE, VS…). Vide pour une adresse hors de Suisse.';
 

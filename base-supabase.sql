@@ -340,6 +340,7 @@ create table if not exists public.contacts (
   telephone    text not null default '',
   natel        text not null default '',
   email        text not null default '',
+  site         text not null default '',
   role         text not null default '',
   adresse      text not null default '',
   npa          text not null default '',

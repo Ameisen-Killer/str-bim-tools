@@ -459,7 +459,7 @@
         id: texte(c.id) || id(),
         nom: texte(c.nom), prenom: texte(c.prenom), societe: texte(c.societe),
         telephone: texte(c.telephone), natel: texte(c.natel), email: texte(c.email),
-        role: texte(c.role), adresse: texte(c.adresse), npa: texte(c.npa),
+        site: texte(c.site), role: texte(c.role), adresse: texte(c.adresse), npa: texte(c.npa),
         localite: texte(c.localite), canton: texte(c.canton), pays: texte(c.pays),
         observations: texte(c.observations)
       });
@@ -571,6 +571,22 @@
   /* Une fiche d'annuaire n'a presque rien d'obligatoire : on note ce qu'on a,
      un numéro griffonné vaut mieux qu'une fiche non créée. Mais sans nom ni
      société, elle ne se retrouverait pas — la base pose la même condition. */
+  /* Le site s'écrit comme on veut — « uspi-ge.ch » ou « https://www.uspi-ge.ch » :
+     le schéma est retiré à l'enregistrement, l'interface le rétablit pour le
+     lien et n'affiche que le domaine. Ce qui ne ressemble pas à une adresse
+     est refusé, sans quoi on stockerait un lien qui ne mène nulle part. */
+  function valideSite(v) {
+    var site = texte(v).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    if (!site) return "";
+    if (/\s/.test(site) || !/^[^\s\/]+\.[^\s\/]{2,}/.test(site)) {
+      throw erreur("Cette adresse de site n'est pas valide : « uspi-ge.ch », ou l'adresse complète copiée du navigateur.");
+    }
+    return site;
+  }
+
+  /** Adresse complète du site, pour un lien. Vide si la fiche n'en porte pas. */
+  function urlSite(c) { return c && c.site ? "https://" + c.site : ""; }
+
   function valideContact(o) {
     var nom = texte(o.nom), societe = texte(o.societe);
     if (!nom && !societe) throw erreur("Donne au moins un nom ou une société : sans l'un ni l'autre, la fiche resterait introuvable.");
@@ -579,6 +595,7 @@
     return {
       nom: nom, prenom: texte(o.prenom), societe: societe,
       telephone: texte(o.telephone), natel: texte(o.natel), email: mail,
+      site: valideSite(o.site),
       role: texte(o.role), adresse: texte(o.adresse), npa: texte(o.npa),
       localite: texte(o.localite),
       // Le canton s'écrit en abrégé, et en majuscules : « vd » devient « VD »
@@ -959,6 +976,7 @@
     },
 
     adressePostale: adressePostale,
+    urlSite: urlSite,
 
     /** Fiches rangées par nom, société à défaut. Liste neuve : l'appelant peut la trier autrement. */
     contacts: function () {
@@ -1091,18 +1109,18 @@
 
     // Annuaire : de quoi montrer les trois cas — une personne dans une société,
     // une société seule, un indépendant sans société.
-    function ct(nom, prenom, societe, tel, natel, mail, role, adr, npa, loc, canton, obs) {
+    function ct(nom, prenom, societe, tel, natel, mail, site, role, adr, npa, loc, canton, obs) {
       e.contacts.push({ id: id(), nom: nom, prenom: prenom, societe: societe, telephone: tel,
-                        natel: natel, email: mail, role: role, adresse: adr, npa: npa,
+                        natel: natel, email: mail, site: site, role: role, adresse: adr, npa: npa,
                         localite: loc, canton: canton, pays: "Suisse", observations: obs });
     }
     ct("Devaud", "Claire", "Atelier Devaud architectes", "021 555 10 20", "079 555 10 21",
-       "claire.devaud@exemple.ch", "Architecte", "Rue de la Gare 12", "1003", "Lausanne", "VD",
+       "claire.devaud@exemple.ch", "www.exemple.ch", "Architecte", "Rue de la Gare 12", "1003", "Lausanne", "VD",
        "Interlocutrice pour l'immeuble de logements.");
-    ct("", "", "Régie du Lac SA", "021 555 30 00", "", "contact@exemple.ch", "Maître d'ouvrage",
-       "Avenue du Léman 3", "1005", "Lausanne", "VD",
+    ct("", "", "Régie du Lac SA", "021 555 30 00", "", "contact@exemple.ch", "regie-exemple.ch",
+       "Maître d'ouvrage", "Avenue du Léman 3", "1005", "Lausanne", "VD",
        "Passe par Mme Devaud pour les questions techniques.");
-    ct("Ferreira", "Tiago", "", "", "078 555 44 12", "t.ferreira@exemple.ch", "Entreprise de gros œuvre",
+    ct("Ferreira", "Tiago", "", "", "078 555 44 12", "t.ferreira@exemple.ch", "", "Entreprise de gros œuvre",
        "", "1860", "Aigle", "VD", "Disponible tôt le matin.");
 
     return e;

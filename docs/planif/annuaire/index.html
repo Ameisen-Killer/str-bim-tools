@@ -52,8 +52,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=14"></script>
-<script src="/planif/assets/donnees.js?v=21"></script>
+<script src="/planif/assets/supabase.js?v=15"></script>
+<script src="/planif/assets/donnees.js?v=22"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
 <script src="/planif/assets/ui.js?v=32"></script>
 <script>
@@ -111,7 +111,7 @@
   }
 
   function champsCherches(c) {
-    return [c.nom, c.prenom, c.societe, c.role, c.telephone, c.natel, c.email,
+    return [c.nom, c.prenom, c.societe, c.role, c.telephone, c.natel, c.email, c.site,
             c.adresse, c.npa, c.localite, c.canton, c.pays, c.observations];
   }
 
@@ -150,6 +150,22 @@
     var ou = [c.adresse, [c.npa, c.localite].filter(Boolean).join(" "), c.pays].filter(Boolean).join(", ");
     return UI.lienIcone("carte", "Voir sur la carte", nomAffiche(c),
       "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(ou), true);
+  }
+
+  /* Adresse électronique puis site, l'une sous l'autre — comme le fixe et le
+     natel dans la colonne d'à côté. Le site s'affiche sans « www. » : ce qui
+     compte est le domaine, et la colonne est étroite. */
+  function enLigne(c, mots) {
+    if (!c.email && !c.site) return el("span", { class: "secondaire", text: "—" });
+    return el("div", {}, [
+      c.email ? el("div", {}, [el("a", { href: "mailto:" + c.email, class: "lien-doux" }, [UI.surligne(c.email, mots)])]) : null,
+      c.site ? el("div", { class: c.email ? "secondaire" : "" }, [
+        el("a", {
+          href: D.urlSite(c), class: "lien-doux", target: "_blank", rel: "noopener noreferrer",
+          title: "Ouvrir " + D.urlSite(c)
+        }, [UI.surligne(c.site.replace(/^www\./i, ""), mots)])
+      ]) : null
+    ]);
   }
 
   function dessine() {
@@ -198,11 +214,7 @@
           c.role ? el("span", { class: "etiq" }, [UI.surligne(c.role, mots)]) : el("span", { class: "secondaire", text: "—" })
         ]),
         el("td", {}, [telephones]),
-        el("td", {}, [
-          c.email
-            ? el("a", { href: "mailto:" + c.email, class: "lien-doux" }, [UI.surligne(c.email, mots)])
-            : el("span", { class: "secondaire", text: "—" })
-        ]),
+        el("td", {}, [enLigne(c, mots)]),
         el("td", {}, [adresse(c, mots)]),
         el("td", {}, [
           c.observations ? el("div", { class: "secondaire" }, [UI.surligne(c.observations, mots)]) : el("span", { class: "secondaire", text: "—" })
@@ -220,7 +232,7 @@
         el("th", { text: "Contact" }),
         el("th", { text: "Rôle" }),
         el("th", { text: "Téléphone" }),
-        el("th", { text: "E-mail" }),
+        el("th", { text: "E-mail et site" }),
         el("th", { text: "Adresse" }),
         el("th", { text: "Observations" }),
         el("th", { text: "" })
@@ -246,6 +258,7 @@
                    aide: "Le nom ou la société suffit." }),
         UI.champ({ nom: "role", label: "Rôle", valeur: c ? c.role : "", exemple: "Architecte, entreprise…" }),
         UI.champ({ nom: "email", label: "E-mail", type: "email", valeur: c ? c.email : "", exemple: "claire.devaud@exemple.ch" }),
+        UI.champ({ nom: "site", label: "Site web", valeur: c ? c.site : "", exemple: "exemple.ch", inputmode: "url" }),
         UI.champ({ nom: "telephone", label: "Téléphone fixe", type: "tel", valeur: c ? c.telephone : "", exemple: "021 555 10 20", inputmode: "tel" }),
         UI.champ({ nom: "natel", label: "Natel", type: "tel", valeur: c ? c.natel : "", exemple: "079 555 10 21", inputmode: "tel" })
       ]),
