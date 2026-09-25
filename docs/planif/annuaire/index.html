@@ -24,7 +24,7 @@
   <div class="wrap entete">
     <div class="surtitre">Planification</div>
     <h1>Annuaire</h1>
-    <p class="chapeau">Le carnet d'adresses du bureau : clients, architectes, entreprises, partenaires. Une fiche porte au moins un nom ou une société ; tout le reste est facultatif. Un numéro se compose d'un clic sur téléphone, une adresse ouvre le courriel.</p>
+    <p class="chapeau">Le carnet d'adresses du bureau : clients, architectes, entreprises, partenaires. Une fiche porte un nom ou une société, ses coordonnées, son adresse postale et ce qu'il y a à savoir ; seul le nom ou la société est obligatoire. Un numéro se compose d'un clic sur téléphone, une adresse ouvre le courriel.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -52,8 +52,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=13"></script>
-<script src="/planif/assets/donnees.js?v=20"></script>
+<script src="/planif/assets/supabase.js?v=14"></script>
+<script src="/planif/assets/donnees.js?v=21"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
 <script src="/planif/assets/ui.js?v=31"></script>
 <script>
@@ -86,9 +86,9 @@
         el("span", { class: "losange", "aria-hidden": "true" }),
         el("div", {}, [
           el("strong", { text: "Annuaire pas encore installé. " }),
-          "La table des fiches n'existe pas dans la base. Exécute ",
+          "La base n'a pas encore la table des fiches, ou pas ses colonnes d'adresse. Exécute ",
           el("code", { text: "migration-annuaire.sql" }),
-          " dans Supabase (SQL Editor), puis recharge cette page."
+          " dans Supabase (SQL Editor) — relance-la si elle est déjà passée, elle ajoute l'adresse postale —, puis recharge cette page."
         ])
       ]));
     }
@@ -111,7 +111,8 @@
   }
 
   function champsCherches(c) {
-    return [c.nom, c.prenom, c.societe, c.role, c.telephone, c.natel, c.email, c.observations];
+    return [c.nom, c.prenom, c.societe, c.role, c.telephone, c.natel, c.email,
+            c.adresse, c.npa, c.localite, c.canton, c.pays, c.observations];
   }
 
   function selection(opts) {
@@ -124,6 +125,20 @@
   function lienTel(numero, mots) {
     if (!numero) return null;
     return el("a", { href: "tel:" + numero.replace(/[^+0-9]/g, ""), class: "lien-doux" }, [UI.surligne(numero, mots)]);
+  }
+
+  /* Adresse sur trois lignes au plus : la rue, puis « NPA localité (canton) »,
+     puis le pays quand il sort de Suisse — l'écrire partout n'apprendrait rien. */
+  function adresse(c, mots) {
+    var ville = [c.npa, c.localite].filter(Boolean).join(" ");
+    var lieu = ville + (c.canton ? (ville ? " " : "") + "(" + c.canton + ")" : "");
+    var etranger = c.pays && !/^(suisse|schweiz|svizzera|switzerland|ch)$/i.test(c.pays.trim());
+    if (!c.adresse && !lieu && !etranger) return el("span", { class: "secondaire", text: "—" });
+    return el("div", {}, [
+      c.adresse ? el("div", {}, [UI.surligne(c.adresse, mots)]) : null,
+      lieu ? el("div", { class: c.adresse ? "secondaire" : "" }, [UI.surligne(lieu, mots)]) : null,
+      etranger ? el("div", { class: "secondaire" }, [UI.surligne(c.pays, mots)]) : null
+    ]);
   }
 
   function dessine() {
@@ -177,6 +192,7 @@
             ? el("a", { href: "mailto:" + c.email, class: "lien-doux" }, [UI.surligne(c.email, mots)])
             : el("span", { class: "secondaire", text: "—" })
         ]),
+        el("td", {}, [adresse(c, mots)]),
         el("td", {}, [
           c.observations ? el("div", { class: "secondaire" }, [UI.surligne(c.observations, mots)]) : el("span", { class: "secondaire", text: "—" })
         ]),
@@ -187,12 +203,13 @@
       ]), c.id));
     });
 
-    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
+    hote.appendChild(el("table", { class: "liste", style: "min-width:1040px" }, [
       el("thead", {}, [el("tr", {}, [
         el("th", { text: "Contact" }),
         el("th", { text: "Rôle" }),
         el("th", { text: "Téléphone" }),
         el("th", { text: "E-mail" }),
+        el("th", { text: "Adresse" }),
         el("th", { text: "Observations" }),
         el("th", { text: "" })
       ])]),
@@ -205,17 +222,39 @@
   function formulaire(idContact) {
     var c = idContact ? D.contact(idContact) : null;
 
-    var corps = el("div", { class: "grille-champs" }, [
-      UI.champ({ nom: "prenom", label: "Prénom", valeur: c ? c.prenom : "", exemple: "Claire", autocomplete: "given-name" }),
-      UI.champ({ nom: "nom", label: "Nom", valeur: c ? c.nom : "", exemple: "Devaud", autocomplete: "family-name" }),
-      UI.champ({ nom: "societe", label: "Société", valeur: c ? c.societe : "", exemple: "Atelier Devaud architectes", large: true,
-                 aide: "Le nom ou la société suffit : une fiche peut ne porter que l'un des deux." }),
-      UI.champ({ nom: "role", label: "Rôle", valeur: c ? c.role : "", exemple: "Architecte, maître d'ouvrage, entreprise…" }),
-      UI.champ({ nom: "email", label: "E-mail", type: "email", valeur: c ? c.email : "", exemple: "claire.devaud@exemple.ch" }),
-      UI.champ({ nom: "telephone", label: "Téléphone fixe", type: "tel", valeur: c ? c.telephone : "", exemple: "021 555 10 20", inputmode: "tel" }),
-      UI.champ({ nom: "natel", label: "Natel", type: "tel", valeur: c ? c.natel : "", exemple: "079 555 10 21", inputmode: "tel" }),
-      UI.champ({ nom: "observations", label: "Observations", type: "textarea", rows: 3, valeur: c ? c.observations : "",
-                 exemple: "Disponibilités, interlocuteur à privilégier, historique…", large: true })
+    var corps = el("div", {}, [
+      el("div", { class: "grille-champs" }, [
+        UI.champ({ nom: "prenom", label: "Prénom", valeur: c ? c.prenom : "", exemple: "Claire", autocomplete: "given-name" }),
+        UI.champ({ nom: "nom", label: "Nom", valeur: c ? c.nom : "", exemple: "Devaud", autocomplete: "family-name" }),
+        UI.champ({ nom: "societe", label: "Société", valeur: c ? c.societe : "", exemple: "Atelier Devaud architectes", large: true,
+                   aide: "Le nom ou la société suffit : une fiche peut ne porter que l'un des deux." }),
+        UI.champ({ nom: "role", label: "Rôle", valeur: c ? c.role : "", exemple: "Architecte, maître d'ouvrage, entreprise…", large: true })
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Coordonnées" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({ nom: "email", label: "E-mail", type: "email", valeur: c ? c.email : "", exemple: "claire.devaud@exemple.ch", large: true }),
+          UI.champ({ nom: "telephone", label: "Téléphone fixe", type: "tel", valeur: c ? c.telephone : "", exemple: "021 555 10 20", inputmode: "tel" }),
+          UI.champ({ nom: "natel", label: "Natel", type: "tel", valeur: c ? c.natel : "", exemple: "079 555 10 21", inputmode: "tel" })
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Adresse postale" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({ nom: "adresse", label: "Rue et numéro", valeur: c ? c.adresse : "", exemple: "Rue de la Gare 12", large: true, autocomplete: "street-address" }),
+          UI.champ({ nom: "npa", label: "NPA", valeur: c ? c.npa : "", exemple: "1003", inputmode: "numeric", autocomplete: "postal-code" }),
+          UI.champ({ nom: "localite", label: "Localité", valeur: c ? c.localite : "", exemple: "Lausanne", autocomplete: "address-level2" }),
+          UI.champ({ nom: "canton", label: "Canton", valeur: c ? c.canton : "", exemple: "VD", aide: "En abrégé. Vide hors de Suisse." }),
+          UI.champ({ nom: "pays", label: "Pays", valeur: c ? c.pays : "Suisse", exemple: "Suisse", autocomplete: "country-name" })
+        ])
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Observations" }),
+        el("div", { class: "grille-champs", style: "margin-top:12px" }, [
+          UI.champ({ nom: "observations", label: "Notes libres", type: "textarea", rows: 3, valeur: c ? c.observations : "",
+                     exemple: "Disponibilités, interlocuteur à privilégier, historique…", large: true })
+        ])
+      ])
     ]);
 
     UI.ouvre({

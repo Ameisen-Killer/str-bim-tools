@@ -459,7 +459,9 @@
         id: texte(c.id) || id(),
         nom: texte(c.nom), prenom: texte(c.prenom), societe: texte(c.societe),
         telephone: texte(c.telephone), natel: texte(c.natel), email: texte(c.email),
-        role: texte(c.role), observations: texte(c.observations)
+        role: texte(c.role), adresse: texte(c.adresse), npa: texte(c.npa),
+        localite: texte(c.localite), canton: texte(c.canton), pays: texte(c.pays),
+        observations: texte(c.observations)
       });
     });
     return e;
@@ -520,7 +522,7 @@
 
   var RE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-  var MSG_ANNUAIRE = "L'annuaire n'est pas encore installé dans la base : migration-annuaire.sql reste à exécuter dans Supabase.";
+  var MSG_ANNUAIRE = "L'annuaire n'est pas encore installé dans la base : migration-annuaire.sql reste à exécuter dans Supabase — relance-la si tu l'as déjà passée, elle ajoute l'adresse postale.";
 
   function valideMembre(o, idExistant) {
     if (!texte(o.nom)) throw erreur("Le nom est obligatoire.");
@@ -577,8 +579,19 @@
     return {
       nom: nom, prenom: texte(o.prenom), societe: societe,
       telephone: texte(o.telephone), natel: texte(o.natel), email: mail,
-      role: texte(o.role), observations: texte(o.observations)
+      role: texte(o.role), adresse: texte(o.adresse), npa: texte(o.npa),
+      localite: texte(o.localite),
+      // Le canton s'écrit en abrégé, et en majuscules : « vd » devient « VD »
+      canton: texte(o.canton).toUpperCase(),
+      pays: texte(o.pays), observations: texte(o.observations)
     };
+  }
+
+  /** « Rue de la Gare 12, 1003 Lausanne (VD) » — ce qui est rempli, dans l'ordre. */
+  function adressePostale(c) {
+    var ville = [texte(c.npa), texte(c.localite)].filter(Boolean).join(" ");
+    var lieu = ville + (texte(c.canton) ? (ville ? " " : "") + "(" + c.canton + ")" : "");
+    return [texte(c.adresse), lieu, texte(c.pays)].filter(Boolean).join(", ");
   }
 
   /** Une fiche se range sous son nom, ou sous sa société quand elle n'en a pas. */
@@ -945,6 +958,8 @@
       return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
     },
 
+    adressePostale: adressePostale,
+
     /** Fiches rangées par nom, société à défaut. Liste neuve : l'appelant peut la trier autrement. */
     contacts: function () {
       return (etat.contacts || []).slice().sort(function (a, b) {
@@ -1076,16 +1091,19 @@
 
     // Annuaire : de quoi montrer les trois cas — une personne dans une société,
     // une société seule, un indépendant sans société.
-    function ct(nom, prenom, societe, tel, natel, mail, role, obs) {
+    function ct(nom, prenom, societe, tel, natel, mail, role, adr, npa, loc, canton, obs) {
       e.contacts.push({ id: id(), nom: nom, prenom: prenom, societe: societe, telephone: tel,
-                        natel: natel, email: mail, role: role, observations: obs });
+                        natel: natel, email: mail, role: role, adresse: adr, npa: npa,
+                        localite: loc, canton: canton, pays: "Suisse", observations: obs });
     }
     ct("Devaud", "Claire", "Atelier Devaud architectes", "021 555 10 20", "079 555 10 21",
-       "claire.devaud@exemple.ch", "Architecte", "Interlocutrice pour l'immeuble de logements.");
+       "claire.devaud@exemple.ch", "Architecte", "Rue de la Gare 12", "1003", "Lausanne", "VD",
+       "Interlocutrice pour l'immeuble de logements.");
     ct("", "", "Régie du Lac SA", "021 555 30 00", "", "contact@exemple.ch", "Maître d'ouvrage",
+       "Avenue du Léman 3", "1005", "Lausanne", "VD",
        "Passe par Mme Devaud pour les questions techniques.");
     ct("Ferreira", "Tiago", "", "", "078 555 44 12", "t.ferreira@exemple.ch", "Entreprise de gros œuvre",
-       "Disponible tôt le matin.");
+       "", "1860", "Aigle", "VD", "Disponible tôt le matin.");
 
     return e;
   }

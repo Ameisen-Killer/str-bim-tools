@@ -341,6 +341,11 @@ create table if not exists public.contacts (
   natel        text not null default '',
   email        text not null default '',
   role         text not null default '',
+  adresse      text not null default '',
+  npa          text not null default '',
+  localite     text not null default '',
+  canton       text not null default '',
+  pays         text not null default '',
   observations text not null default '',
   cree_le      timestamptz not null default now(),
   maj_le       timestamptz not null default now(),
@@ -352,6 +357,8 @@ comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
   'Téléphone mobile (suisse romand pour « portable »).';
+comment on column public.contacts.npa is
+  'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
 
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).

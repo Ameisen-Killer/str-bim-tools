@@ -15,7 +15,11 @@
 --  droit à ajouter dans droits_groupes, sur le modèle de « affaires_creer ».
 --
 --  Une fiche porte au moins un nom ou une société : une ligne sans l'un ni
---  l'autre ne se retrouverait pas.
+--  l'autre ne se retrouverait pas. Elle porte aussi son adresse postale :
+--  rue, NPA, localité, canton, pays.
+--
+--  DÉJÀ LANCÉE UNE FOIS ? Relance-la : l'adresse postale est arrivée après,
+--  et les colonnes manquantes s'ajoutent sans toucher aux fiches existantes.
 --
 --  ORDRE À RESPECTER
 --    migration-multi-bureaux.sql d'abord (c'est elle qui pose bureau_par_defaut
@@ -44,6 +48,11 @@ create table if not exists public.contacts (
   natel        text not null default '',
   email        text not null default '',
   role         text not null default '',
+  adresse      text not null default '',
+  npa          text not null default '',
+  localite     text not null default '',
+  canton       text not null default '',
+  pays         text not null default '',
   observations text not null default '',
   cree_le      timestamptz not null default now(),
   maj_le       timestamptz not null default now(),
@@ -52,12 +61,24 @@ create table if not exists public.contacts (
 );
 create index if not exists contacts_bureau on public.contacts (bureau_id);
 
+-- Table déjà créée par une version précédente de ce fichier : l'adresse postale
+-- s'y ajoute ici. C'est ce qui permet de relancer ce script sans y penser.
+alter table public.contacts add column if not exists adresse  text not null default '';
+alter table public.contacts add column if not exists npa      text not null default '';
+alter table public.contacts add column if not exists localite text not null default '';
+alter table public.contacts add column if not exists canton   text not null default '';
+alter table public.contacts add column if not exists pays     text not null default '';
+
 comment on table  public.contacts is
   'Annuaire du bureau : clients, architectes, entreprises et partenaires.';
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
   'Téléphone mobile (suisse romand pour « portable »).';
+comment on column public.contacts.npa is
+  'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
+comment on column public.contacts.canton is
+  'Canton, en abrégé (VD, GE, VS…). Vide pour une adresse hors de Suisse.';
 
 -- ------------------------------------------------------- date de mise à jour ---
 drop trigger if exists maj_le on public.contacts;
@@ -87,6 +108,11 @@ create policy "bureau courant (suppression)" on public.contacts for delete to au
 commit;
 
 -- ==================================================================== rapport ==
+-- Les colonnes en place, adresse postale comprise.
+select string_agg(column_name, ', ' order by ordinal_position) as colonnes
+  from information_schema.columns
+ where table_schema = 'public' and table_name = 'contacts';
+
 -- Ce que la base applique désormais sur l'annuaire.
 select p.cmd                                            as commande,
        p.policyname                                     as regle,
