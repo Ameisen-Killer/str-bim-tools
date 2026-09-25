@@ -239,7 +239,8 @@
       ]),
       el("fieldset", {}, [
         el("div", { class: "legende", text: "Adresse postale" }),
-        el("div", { class: "grille-champs" }, [
+        // NPA, localité, canton et pays sont courts : une seule ligne pour les quatre
+        el("div", { class: "grille-champs", style: "grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))" }, [
           UI.champ({ nom: "adresse", label: "Rue et numéro", valeur: c ? c.adresse : "", exemple: "Rue de la Gare 12", large: true, autocomplete: "street-address" }),
           UI.champ({ nom: "npa", label: "NPA", valeur: c ? c.npa : "", exemple: "1003", inputmode: "numeric", autocomplete: "postal-code" }),
           UI.champ({ nom: "localite", label: "Localité", valeur: c ? c.localite : "", exemple: "Lausanne", autocomplete: "address-level2" }),
