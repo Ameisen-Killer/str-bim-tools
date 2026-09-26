@@ -255,6 +255,13 @@ p{margin:0}
 .entete h1{margin-top:0;font-size:clamp(34px,5.4vw,62px);line-height:1;letter-spacing:.01em}
 .entete .surtitre + h1{margin-top:10px}
 .entete .chapeau{margin-top:12px;color:var(--texte-doux);font-size:15px;max-width:52em}
+/* Le compte de la liste au bout du titre : le titre dit quoi, le compte dit
+   combien, sur la même ligne. Chiffres tabulaires — il se recalcule à chaque
+   frappe dans la recherche, et une largeur qui frémit attire l'œil pour rien. */
+.entete h1 .compte-titre{
+  margin-left:.5em;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:clamp(12px,1.25vw,16px);letter-spacing:.1em;color:var(--texte-faible);white-space:nowrap;
+}
 .filet-or{height:1px;margin-top:clamp(20px,3vh,32px);background:rgba(var(--or-rvb),.55);transform:scaleX(0);transform-origin:left;transition:transform 1.6s cubic-bezier(.55,.05,.25,1) .2s}
 .vu .filet-or,.filet-or.vu{transform:scaleX(1)}
 
@@ -326,6 +333,9 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .section{padding-block:clamp(26px,4vh,42px);border-top:1px solid var(--ligne)}
 .section:first-of-type{border-top:0}
 .tete-section{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:22px}
+/* Titre de section parti (le compte est monté dans le titre de page) : il ne
+   reste que les actions de la liste, qui gardent leur place, à droite. */
+.tete-section.seule-action{justify-content:flex-end;margin-bottom:14px}
 .tete-section h2{font-size:clamp(21px,2.4vw,28px);font-weight:200}
 .num-section{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
 .outils{display:flex;flex-wrap:wrap;gap:8px;align-items:center}

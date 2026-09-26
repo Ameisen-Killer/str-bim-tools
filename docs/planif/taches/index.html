@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=46">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=47">
 </head>
 <body class="large">
 
@@ -22,7 +22,7 @@
 
 <main>
   <div class="wrap entete">
-    <h1>Tâches</h1>
+    <h1>Tâches <span id="titre-liste" class="compte-titre"></span></h1>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -30,11 +30,7 @@
 
   <div class="wrap">
     <section class="section">
-      <div class="tete-section">
-        <div>
-          <div class="num-section">01 — Liste</div>
-          <h2 id="titre-liste">Tâches</h2>
-        </div>
+      <div class="tete-section seule-action">
         <div class="outils">
           <button class="btn" type="button" id="btn-csv"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
         </div>
