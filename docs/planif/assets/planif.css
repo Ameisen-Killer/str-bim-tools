@@ -236,19 +236,26 @@ p{margin:0}
 .entete{position:relative;padding-top:clamp(20px,3vh,32px);padding-bottom:clamp(18px,3vh,30px)}
 /* Villa filaire du tableau de bord (villa.js) : décor en haut à droite, jamais
    sous les mains — aucun clic ne l'atteint, et elle s'efface si la place manque.
-   À la place de l'ancienne tour (26.09.2026) : elle imposait 300 px de haut à
-   l'en-tête, soit deux fois le titre. La maison est basse et large, elle tient
-   dans la hauteur que le titre occupe déjà — l'en-tête ne grandit plus d'un pixel. */
+   À la place de l'ancienne tour (26.09.2026), qui imposait 300 px de haut à
+   l'en-tête, soit deux fois le titre. La bande est montée à 170 px pour laisser
+   la maison prendre de l'ampleur : c'est le seul levier, le cadre étant limité
+   par sa hauteur. Le titre reste en haut, le filet descend au fond — la maison
+   est posée dessus, il lui sert de sol. */
 .entete .surtitre,.entete h1,.entete .chapeau{position:relative;z-index:1}
+.entete.avec-villa{display:flex;flex-direction:column;min-height:clamp(144px,11.8vw,172px)}  /* la bande suit la largeur du cadre : ni creux au-dessus du toit, ni maison rapetissée */
+.avec-villa .filet-or{margin-top:auto}               /* le filet tombe au fond de la bande */
 /* Le cadre prend la hauteur disponible au lieu de l'imposer : calé sur le filet
    en bas, sur le haut de l'en-tête en haut. La maison se redimensionne toute
-   seule dans ce qu'on lui laisse. */
+   seule dans ce qu'on lui laisse. Sa largeur suit : à cette hauteur, il lui faut
+   à peu près 4,2 fois plus de large pour que rien ne soit perdu. */
 .villa-place{position:absolute;top:5px;right:var(--g);bottom:calc(clamp(18px,3vh,30px) + 1px);
-  width:min(36vw,460px);pointer-events:none}
+  width:min(42vw,570px);pointer-events:none}
 .villa-place canvas{display:block;width:100%;height:100%}
-.avec-villa .chapeau{max-width:min(52em,calc(100% - min(36vw,460px) - 30px))}
+.avec-villa .chapeau{max-width:min(52em,calc(100% - min(42vw,570px) - 30px))}
 @media (max-width:1100px){
   .villa-place{display:none}
+  .entete.avec-villa{display:block;min-height:0}
+  .avec-villa .filet-or{margin-top:clamp(20px,3vh,32px)}
   .avec-villa .chapeau{max-width:52em}
 }
 .surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
