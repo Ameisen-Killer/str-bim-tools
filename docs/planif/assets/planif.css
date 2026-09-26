@@ -832,7 +832,7 @@ mark.trouve{
   .barre-h .bureau.choix{display:inline-flex}
   .barre-h .fil.avec-choix .ici,.barre-h .bureau.choix > .sep{display:none}
   .bureau-nom{max-width:38vw}
-  .bureau-btn{padding:10px 0;margin:-10px 0}
+  .bureau-btn,.barre-h .fil .ici{padding-block:12px;margin-block:-12px}
   .menu-bureau{left:-4px}
   .nav-outil{gap:2px;padding-bottom:8px}
   .nav-outil a{padding:9px 9px;letter-spacing:.1em}
@@ -888,7 +888,12 @@ mark.trouve{
   .plan-barre .txt{display:none}
   .plan-periode{order:-1;flex:1 0 100%;padding:0 0 4px}
   .plan-barre select{flex:1 1 40%;min-width:0}
-  .plan{grid-template-columns:minmax(0,1fr)}
+  /* Un bloc par membre, la semaine sur toute la largeur. La largeur minimale
+     du grand écran (760 px) doit tomber, sinon le planning reste deux fois
+     plus large que l'écran et il faut défiler de côté pour voir vendredi.
+     À la place, un plancher par jour : une semaine tient dans l'écran, une
+     période plus longue défile plutôt que de s'écraser à quelques pixels. */
+  .plan{grid-template-columns:minmax(0,1fr);min-width:calc(var(--n,7) * 40px)}
   .pl-tete-nom{display:none}
   .pl-nom{position:static;padding:16px 0 6px;border-bottom:0}
   .pl-membre > div{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;width:100%}
@@ -900,15 +905,15 @@ mark.trouve{
   .outils.decalages{grid-template-columns:repeat(2,minmax(0,1fr))}
   .recherche{gap:12px;margin-bottom:12px}
   .recherche-touche{display:none}                   /* pas de clavier physique */
-  .recherche-champ{font-size:22px}
+  .recherche-champ{font-size:22px;min-height:40px}
   .recherche-compte{font-size:11px}
   .nav-outil a{min-height:40px;display:inline-flex;align-items:center}
-  .barre-outils button{padding:10px 0;margin:-10px 0}
+  .barre-outils button{display:inline-flex;align-items:center;min-height:40px;padding:10px 0;margin:-10px 0}
   .theme-lib{display:none}
   /* trois boutons ne tiennent pas dans la barre d'un téléphone : le
      rafraîchissement se réduit à son symbole, son libellé reste pour les
      lecteurs d'écran */
-  .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0}
+  .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0;min-width:40px;justify-content:center}
   .barre-outils [data-rafraichir]::after{content:"↻";font-size:16px;letter-spacing:0}
   .theme-ico{font-size:16px}
   .barre-outils .menu-theme{right:-8px}
