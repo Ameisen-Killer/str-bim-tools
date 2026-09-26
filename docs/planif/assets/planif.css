@@ -733,9 +733,11 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 /* ------------------------------------------------------------ recherche
    Un seul trait : le champ n'a pas de cadre, seulement un filet qui passe à
    l'or quand on y entre, et au rouge quand plus rien ne correspond. */
+/* Les filtres suivent la recherche de près : ils forment un seul bloc, celui
+   par quoi on restreint la liste. */
 .recherche{
   position:relative;display:flex;align-items:center;gap:16px;
-  margin:0 0 26px;padding:6px 0 14px;border-bottom:1px solid var(--ligne);
+  margin:0 0 14px;padding:6px 0 12px;border-bottom:1px solid var(--ligne);
 }
 .recherche::after{
   content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--or);
@@ -883,7 +885,7 @@ mark.trouve{
   .bt .code{display:none}
   .bt.etroite .jr{display:none}                      /* 1 ou 2 jours : la place va au libellé */
   .outils.decalages{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .recherche{gap:12px;margin-bottom:18px}
+  .recherche{gap:12px;margin-bottom:12px}
   .recherche-touche{display:none}                   /* pas de clavier physique */
   .recherche-champ{font-size:22px}
   .recherche-compte{font-size:11px}
