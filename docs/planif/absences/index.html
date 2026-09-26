@@ -84,9 +84,6 @@
           <div class="num-section">02 — Détail</div>
           <h2 id="titre-liste">Périodes</h2>
         </div>
-        <div class="outils">
-          <button class="btn btn-or" type="button" id="btn-nouvelle"><span class="ico-txt ico-absence" aria-hidden="true"></span>Nouvelle absence</button>
-        </div>
       </div>
       <div class="defile" id="liste"></div>
     </section>
@@ -145,7 +142,6 @@
     fm.addEventListener("change", function () { vue.masque = fm.checked; memorise(); rend(); });
 
     document.getElementById("pdf").addEventListener("click", exportePdf);
-    document.getElementById("btn-nouvelle").addEventListener("click", nouvelle);
 
     D.surRechargement(rend);
     rend();

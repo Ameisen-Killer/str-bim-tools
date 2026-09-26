@@ -38,7 +38,6 @@
         </div>
         <div class="outils">
           <button class="btn" type="button" id="btn-csv"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
-          <button class="btn btn-or" type="button" id="btn-nouvelle"><span class="ico-txt ico-ajout-tache" aria-hidden="true"></span>Nouvelle tâche</button>
         </div>
       </div>
 
@@ -86,7 +85,6 @@
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    document.getElementById("btn-nouvelle").addEventListener("click", function () { formulaire(null); });
     document.getElementById("btn-csv").addEventListener("click", exporteCSV);
     document.getElementById("btn-filtres").addEventListener("click", function () {
       var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
