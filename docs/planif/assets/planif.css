@@ -331,7 +331,9 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 
 /* ------------------------------------------------------------ sections */
 .section{padding-block:clamp(26px,4vh,42px);border-top:1px solid var(--ligne)}
-.section:first-of-type{border-top:0}
+/* Première section : pas de filet au-dessus, et rien qui la repousse — le
+   contenu commence sous le trait d'or de l'en-tête, pas trois rangs plus bas. */
+.section:first-of-type{border-top:0;padding-top:clamp(12px,1.6vh,20px)}
 .tete-section{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:22px}
 /* Titre de section parti (le compte est monté dans le titre de page) : il ne
    reste que les actions de la liste, qui gardent leur place, à droite. */

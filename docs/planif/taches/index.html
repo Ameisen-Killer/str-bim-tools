@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=47">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=48">
 </head>
 <body class="large">
 
@@ -30,17 +30,17 @@
 
   <div class="wrap">
     <section class="section">
-      <div class="tete-section seule-action">
-        <div class="outils">
-          <button class="btn" type="button" id="btn-csv"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
-        </div>
-      </div>
-
       <div data-recherche></div>
       <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between;margin-bottom:16px">
         <span>Filtres</span><span id="nb-filtres" class="or"></span>
       </button>
       <div class="grille-champs" id="filtres" style="max-width:1100px;margin-bottom:26px"></div>
+      <!-- L'export au ras de la liste : c'est elle qu'il emporte, filtres compris -->
+      <div class="tete-section seule-action">
+        <div class="outils">
+          <button class="btn" type="button" id="btn-csv"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
+        </div>
+      </div>
       <div class="defile" id="liste"></div>
     </section>
   </div>
