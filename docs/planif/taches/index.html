@@ -35,12 +35,8 @@
         <span>Filtres</span><span id="nb-filtres" class="or"></span>
       </button>
       <div class="grille-champs" id="filtres" style="max-width:1100px;margin-bottom:26px"></div>
-      <!-- L'export au ras de la liste : c'est elle qu'il emporte, filtres compris -->
-      <div class="tete-section seule-action">
-        <div class="outils">
-          <button class="btn" type="button" id="btn-csv"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
-        </div>
-      </div>
+      <!-- Téléphone seulement : la barre du haut y cache ses actions -->
+      <button class="btn seul-mobile" type="button" id="btn-csv" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
       <div class="defile" id="liste"></div>
     </section>
   </div>
@@ -76,7 +72,13 @@
       if (moi) filtres.membre = moi.id;
     }
 
-    UI.chrome("taches", [{ label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }]);
+    /* L'export à gauche de « Nouvelle tâche » : les deux actions de la page
+       sont dans la barre. Sur téléphone la barre masque ses actions au profit
+       du bouton flottant — l'export y garde donc son bouton dans la page. */
+    UI.chrome("taches", [
+      { label: "Export CSV", icone: "ico-export", action: exporteCSV },
+      { label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }
+    ]);
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
