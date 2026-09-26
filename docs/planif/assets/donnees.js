@@ -722,6 +722,28 @@
     /** Après un enregistrement refusé, l'état a été relu depuis la base : la page doit se redessiner. */
     surRechargement: function (f) { rechargements.push(f); },
 
+    /**
+     * Relit la base et redessine : ce qu'un collègue vient d'enregistrer
+     * apparaît sans recharger la page. La lecture prend la file des écritures,
+     * sinon elle remplacerait l'état sous les pieds d'une écriture en route,
+     * dont l'écart se calcule justement sur l'état lu.
+     */
+    recharge: function () {
+      var lecture = file.then(function () {
+        return ADAPTATEUR.lire().then(function (brut) {
+          if (!brut) throw erreur("Lecture vide.");
+          etat = normalise(brut);
+          precedent = copie(etat);
+          version++;
+          previens();
+          rechargements.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } });
+          return etat;
+        });
+      });
+      file = lecture.catch(function () {});
+      return lecture;
+    },
+
     majReglages: function (o) {
       if (o.canton != null) etat.reglages.canton = texte(o.canton) || "VD";
       if (o.capaciteDefaut != null) etat.reglages.capaciteDefaut = nombre(o.capaciteDefaut, 5);

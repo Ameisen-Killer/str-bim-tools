@@ -874,6 +874,11 @@ mark.trouve{
   .nav-outil a{min-height:40px;display:inline-flex;align-items:center}
   .barre-outils button{padding:10px 0;margin:-10px 0}
   .theme-lib{display:none}
+  /* trois boutons ne tiennent pas dans la barre d'un téléphone : le
+     rafraîchissement se réduit à son symbole, son libellé reste pour les
+     lecteurs d'écran */
+  .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0}
+  .barre-outils [data-rafraichir]::after{content:"↻";font-size:16px;letter-spacing:0}
   .theme-ico{font-size:16px}
   .barre-outils .menu-theme{right:-8px}
   .pl-bw{padding-inline:4px}

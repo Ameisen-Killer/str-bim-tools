@@ -473,6 +473,39 @@
     return el("span", { class: "bureau choix" }, [el("span", { class: "sep", text: "·" }), bouton, menu]);
   }
 
+  /* ------------------------------------------------------ rafraîchissement
+     L'outil lit la base au chargement de la page, et l'équipe y travaille à
+     plusieurs : sans cela, une tâche confiée par un collègue n'apparaît qu'au
+     prochain F5. Le bouton relit à la demande ; revenir sur l'onglet après une
+     minute ailleurs relit aussi, sans rien dire — c'est le moment où l'on
+     découvre le travail des autres. Une fenêtre ouverte suspend le rattrapage
+     automatique : on ne redessine pas sous une saisie en cours. */
+
+  var rafraichitEnCours = false, cacheDepuis = 0;
+  var REPOS = 60000;                       // au-delà, l'onglet a eu le temps de vieillir
+
+  function rafraichit(silencieux) {
+    if (rafraichitEnCours || !D.recharge || !D.etat()) return Promise.resolve();
+    rafraichitEnCours = true;
+    var bouton = document.querySelector("[data-rafraichir]");
+    if (bouton) bouton.disabled = true;
+    return D.recharge().then(function () {
+      if (!silencieux) toast("Données à jour.");
+    }).catch(function (e) {
+      if (!silencieux) echec(e);
+    }).then(function () {
+      rafraichitEnCours = false;
+      if (bouton) bouton.disabled = false;
+    });
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { cacheDepuis = Date.now(); return; }
+    var absent = cacheDepuis && Date.now() - cacheDepuis > REPOS;
+    cacheDepuis = 0;
+    if (absent && !document.querySelector(".modale.ouverte")) rafraichit(true);
+  });
+
   /* --------------------------------------------------------- barre et menu */
 
   var PAGES = [
@@ -523,7 +556,12 @@
     var outilsHaut = el("div", { class: "barre-outils" }, [
       el("span", { class: "maj", text: etiquette }),
       menuTheme(),
-      // Pas de données du planning chargées (console) : rien à sauvegarder d'ici
+      // Pas de données du planning chargées (console) : ni à relire, ni à sauvegarder d'ici
+      D.etat() ? el("button", {
+        type: "button", dataset: { rafraichir: "" }, text: "Rafraîchir",
+        title: "Relire la base : voir ce que l'équipe a changé depuis l'ouverture de la page",
+        onclick: function () { rafraichit(false); }
+      }) : null,
       D.etat() ? el("button", { type: "button", onclick: ouvreDonnees, text: "Données" }) : null,
       avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
     ]);
@@ -1665,7 +1703,7 @@
     ouvre: ouvre, ferme: ferme, confirme: confirme,
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
-    chrome: chrome, pied: pied, bandeauDemo: bandeauDemo,
+    chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
