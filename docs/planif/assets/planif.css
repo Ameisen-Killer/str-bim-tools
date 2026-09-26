@@ -231,8 +231,8 @@ p{margin:0}
 
 /* ------------------------------------------------------------- en-tete */
 /* Le titre suit la barre de près : le surtitre « Planification » a disparu
-   (26.09.2026) et son espace avec lui. La marge haute du titre ne revient que
-   si un surtitre le précède — c'est encore le cas de l'en-tête d'impression. */
+   de partout (26.09.2026), papier compris, et son espace avec lui. La marge
+   haute du titre ne revient que derrière un surtitre, si l'on en remet un. */
 .entete{position:relative;padding-top:clamp(20px,3vh,32px);padding-bottom:clamp(18px,3vh,30px)}
 /* Tour filaire du tableau de bord (tour.js) : décor en haut à droite, jamais
    sous les mains — aucun clic ne l'atteint, et elle s'efface si la place manque. */
@@ -927,7 +927,6 @@ mark.trouve{
   .entete{display:none}
   .entete-impression{display:block;margin-bottom:10px;border-bottom:1px solid var(--ligne);padding-bottom:6px}
   .entete-impression h1{font-size:15pt;font-weight:200;line-height:1.1}
-  .entete-impression .surtitre{font-size:7pt;letter-spacing:.28em}
   .entete-impression .ligne{
     display:flex;justify-content:space-between;gap:16px;margin-top:5px;
     font-family:var(--mono);font-size:7.5pt;letter-spacing:.06em;color:var(--texte-doux);
