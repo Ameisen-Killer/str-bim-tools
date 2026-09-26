@@ -735,7 +735,13 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 
 @media (max-width:860px){
   .plan{--wnom:140px}
-  .modale-boite{margin-top:0;min-height:100dvh;max-height:none;width:100%}
+  /* Fenêtre en plein écran. `max-height` doit rester : sans elle la boîte
+     grandit avec son contenu, déborde de `.modale` (fixe, haute d'un écran) et
+     plus rien ne défile — un formulaire de tâche mesure 1100 px, ses boutons
+     tombaient 260 px sous le bas de l'écran, hors d'atteinte (corrigé le
+     26.09.2026). Ici la boîte fait exactement un écran et défile dedans. */
+  .modale-boite{margin-top:0;margin-bottom:0;min-height:100dvh;max-height:100dvh;width:100%;
+    overscroll-behavior:contain}
 }
 /* ------------------------------------------------------------ recherche
    Un seul trait : le champ n'a pas de cadre, seulement un filet qui passe à
