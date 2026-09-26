@@ -244,9 +244,9 @@ p{margin:0}
    en bas, sur le haut de l'en-tête en haut. La maison se redimensionne toute
    seule dans ce qu'on lui laisse. */
 .villa-place{position:absolute;top:5px;right:var(--g);bottom:calc(clamp(18px,3vh,30px) + 1px);
-  width:min(32vw,400px);pointer-events:none}
+  width:min(36vw,460px);pointer-events:none}
 .villa-place canvas{display:block;width:100%;height:100%}
-.avec-villa .chapeau{max-width:min(52em,calc(100% - min(32vw,400px) - 30px))}
+.avec-villa .chapeau{max-width:min(52em,calc(100% - min(36vw,460px) - 30px))}
 @media (max-width:1100px){
   .villa-place{display:none}
   .avec-villa .chapeau{max-width:52em}
