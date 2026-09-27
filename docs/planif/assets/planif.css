@@ -982,6 +982,110 @@ html.palette-ouverte{overflow:hidden}
 .pal-exemple:hover,.pal-exemple:hover span{color:var(--or)}
 
 /* =====================================================================
+   Carte de charge (/planif/charge/) — une case par personne et par semaine
+   Une seule teinte, l'accent du thème, qui fonce avec la charge : cinq
+   paliers. La surcharge prend la couleur d'alerte et porte un « ! » ; une
+   semaine sans jour travaillé est hachurée. Les chiffres ne paraissent que
+   sur la ligne survolée (et toujours en surcharge) : la carte se lit d'abord
+   en couleur, puis se vérifie en chiffres.
+   ===================================================================== */
+.carte-defile{overflow-x:auto;margin-top:28px;padding:4px 2px 8px;scrollbar-width:thin}
+.carte{
+  display:grid;gap:3px;align-items:stretch;
+  grid-template-columns:minmax(150px,210px) repeat(var(--n),minmax(46px,1fr)) minmax(96px,118px);
+  min-width:calc(210px + var(--n) * 49px + 118px);
+}
+.cc-coin,.cc-nom{position:sticky;left:0;z-index:2;background:var(--noir)}
+.cc-sem{
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;padding:0 0 8px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible);
+  border-bottom:1px solid var(--ligne-faible);transition:color .2s;
+}
+.cc-sem b{font-weight:400;font-size:11.5px;letter-spacing:.06em;color:var(--texte-doux)}
+.cc-mois{color:var(--or-doux);min-height:1.2em}
+.cc-date{font-size:9.5px;letter-spacing:.04em;text-transform:none}
+.cc-sem.actuelle b{color:var(--or)}
+.cc-sem.actuelle{border-bottom:2px solid var(--or)}
+.cc-sem.col-vue b{color:var(--or)}
+.cc-fin{justify-content:flex-end;align-items:flex-start;padding-left:10px}
+.cc-groupe{grid-column:1/-1;padding:18px 0 4px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--texte-faible)}
+.cc-nom{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;padding-right:12px}
+.cc-nom .n{font-size:14px;color:var(--texte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s}
+.cc-nom .r{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-nom.ligne-vue .n{color:var(--or)}
+.cc-synthese .n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--or)}
+.cc-synthese.a-affecter{padding-bottom:10px}
+
+.cc-case,.cc-ech{border-radius:3px;background:rgba(var(--encre),.04)}
+.cc-case{
+  position:relative;min-height:36px;margin:0;padding:0;border:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font:inherit;color:var(--texte);
+  transition:transform .15s cubic-bezier(.2,.7,.2,1),box-shadow .15s;
+}
+.cc-case.p1,.cc-ech.p1{background:rgba(var(--or-rvb),.15)}
+.cc-case.p2,.cc-ech.p2{background:rgba(var(--or-rvb),.3)}
+.cc-case.p3,.cc-ech.p3{background:rgba(var(--or-rvb),.48)}
+.cc-case.p4,.cc-ech.p4{background:rgba(var(--or-rvb),.68)}
+.cc-case.p5,.cc-ech.p5{background:rgba(var(--or-rvb),.92)}
+.cc-case.trop,.cc-ech.trop{background:var(--alerte)}
+.cc-case.ferme,.cc-ech.ferme{background:repeating-linear-gradient(135deg,rgba(var(--encre),.14) 0 1.5px,transparent 1.5px 6px)}
+.cc-case.libre{background:transparent;box-shadow:inset 0 0 0 1px rgba(var(--or-rvb),.55)}
+.cc-case .val{font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;font-variant-numeric:tabular-nums;opacity:0;transition:opacity .18s}
+.cc-case.p4 .val,.cc-case.p5 .val,.cc-case.trop .val{color:var(--noir)}
+.cc-case.ligne-vue .val,.cc-case.trop .val,.cc-synth .val{opacity:1}
+.cc-case.libre .val{color:var(--or)}
+.cc-synth{cursor:default;min-height:30px}
+.cc-synth.equipe .val{color:var(--texte-doux)}
+.cc-synth.equipe.p4 .val,.cc-synth.equipe.p5 .val,.cc-synth.equipe.trop .val{color:var(--noir)}
+.cc-alerte{position:absolute;top:2px;left:5px;font-style:normal;font-weight:600;font-size:10px;line-height:1;color:var(--noir)}
+.cc-case.col-vue{box-shadow:inset 0 0 0 1px rgba(var(--or-rvb),.4)}
+.cc-case:not(.cc-synth):hover,.cc-case:focus-visible{
+  z-index:3;transform:scale(1.1);outline:none;
+  box-shadow:0 0 0 2px var(--noir),0 0 0 3px var(--or),0 8px 22px rgba(0,0,0,.28);
+}
+.cc-libre{display:flex;align-items:center;padding-left:10px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--texte-doux);white-space:nowrap}
+.cc-libre.maintenant{color:var(--or)}
+.cc-libre.jamais{color:var(--alerte)}
+.cc-vide{grid-column:1/-1;padding:30px 0;color:var(--texte-faible)}
+
+/* Entrée : les cases s'allument colonne après colonne */
+.carte.entre .cc-case{animation:cc-entre .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i) * 26ms)}
+@keyframes cc-entre{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
+
+.legende-carte .cc-ech{display:inline-flex;align-items:center;justify-content:center;width:18px;height:12px}
+.legende-carte .cc-ech b{font-size:9px;line-height:1;color:var(--noir)}
+
+/* La bulle du survol */
+.cc-bulle{
+  position:fixed;left:0;top:0;z-index:80;min-width:230px;max-width:330px;padding:12px 14px;pointer-events:none;
+  background:var(--noir-2);border:1px solid var(--ligne);box-shadow:0 18px 50px rgba(0,0,0,.35);
+  opacity:0;transition:opacity .14s;
+}
+.cc-bulle.vue{opacity:1}
+.cc-bulle .t{font-size:14.5px;color:var(--texte)}
+.cc-bulle .s{margin-top:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible)}
+.cc-bulle .v{margin:8px 0 6px;font-size:13px;color:var(--texte-doux)}
+.cc-bulle .v b{font-weight:400;font-size:17px;color:var(--or);margin-right:6px}
+.cc-bulle .v.alerte b{color:var(--alerte)}
+.cc-bulle .p{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:12.5px;color:var(--texte-doux)}
+.cc-bulle .p .code{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.cc-bulle .p .lib{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-bulle .p .j{flex:0 0 auto;font-family:var(--mono);font-size:11px;color:var(--texte)}
+.cc-bulle .aide{margin-top:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+
+/* Le détail d'une semaine (fenêtre) */
+.cc-detail{display:flex;flex-direction:column}
+.cc-det{
+  display:flex;align-items:center;gap:14px;width:100%;padding:11px 8px;text-align:left;cursor:pointer;
+  background:none;border:0;border-bottom:1px solid var(--ligne-faible);font:inherit;color:var(--texte-doux);transition:color .2s,background .2s;
+}
+.cc-det:hover,.cc-det:focus-visible{color:var(--texte);background:rgba(var(--encre),.04);outline:none}
+.cc-det .lib{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cc-det .t{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-det .s{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible)}
+.cc-det .j{font-family:var(--mono);font-size:12px;color:var(--or)}
+
+/* =====================================================================
    Téléphone (≤ 640 px) — l'outil doit s'y utiliser, pas seulement s'y afficher.
    Cibles tactiles d'au moins 40 px, rien qui oblige à défiler de côté,
    action principale à portée de pouce.
@@ -1092,6 +1196,10 @@ html.palette-ouverte{overflow:hidden}
   .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0;min-width:40px;justify-content:center}
   .barre-outils [data-rafraichir]::after{content:"↻";font-size:16px;letter-spacing:0}
   .theme-ico{font-size:16px}
+  /* carte de charge : colonne des noms resserrée, cases un peu plus petites */
+  .carte{grid-template-columns:118px repeat(var(--n),minmax(40px,1fr)) 84px;min-width:calc(118px + var(--n) * 43px + 84px)}
+  .cc-case{min-height:34px}
+  .cc-nom .n{font-size:13px}
   /* la palette : la loupe seule dans la barre, la boîte en haut et sur toute la largeur */
   .btn-palette-lib,.btn-palette kbd{display:none}
   .barre-outils .btn-palette{border:0;padding:10px 0;min-width:32px;justify-content:center}
@@ -1135,8 +1243,14 @@ html.palette-ouverte{overflow:hidden}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{background:#fff;color:#16130F;font-size:9pt;overflow-x:visible}
 
-  [data-chrome],.fab,.toast,.modale,.palette,.bandeau,.plan-barre,.recherche,.outils,
+  [data-chrome],.fab,.toast,.modale,.palette,.cc-bulle,.bandeau,.plan-barre,.recherche,.outils,
   .seul-mobile,.suite-liste-pied,footer.pied-outil,.sans-impression{display:none!important}
+  /* Carte de charge : tout tient sur la feuille, et les chiffres s'impriment (pas de survol sur le papier) */
+  .carte-defile{overflow:visible;margin-top:12px}
+  .carte{min-width:0;gap:2px}
+  .carte.entre .cc-case{animation:none}
+  .cc-case{min-height:24px}
+  .cc-case .val{opacity:1;font-size:7.5pt}
   /* Le bloc collant ne porte que de quoi restreindre la liste (recherche,
      filtres) : hors papier. Ce qu'il retient se lit dans l'en-tête imprimé. */
   .tete-collante{display:none!important}

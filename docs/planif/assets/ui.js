@@ -620,6 +620,7 @@
 
   var PAGES = [
     { cle: "tableau", href: "/planif/", nom: "Tableau de bord", court: "Planning" },
+    { cle: "charge", href: "/planif/charge/", nom: "Charge", court: "Charge" },
     { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
     { cle: "affaires", href: "/planif/affaires/", nom: "Affaires", court: "Affaires" },
     { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" },
