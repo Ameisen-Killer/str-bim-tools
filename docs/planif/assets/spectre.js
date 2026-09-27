@@ -24,6 +24,16 @@
    droite dans l'en-tête, où le ruban sort de derrière le titre, symétrique en
    bas de la connexion.
 
+   Deux réglages, portés par le canvas :
+     data-palette="theme"  le ruban prend l'accent du thème (or sur le sombre,
+                           bronze sur le clair, vert sur AB) au lieu du spectre ;
+     data-calme            le ruban ondule à l'ouverture, puis ralentit jusqu'à
+                           presque s'arrêter.
+   Le tableau de bord porte les deux (27.09.2026) : un arc-en-ciel animé en
+   permanence au-dessus du planning faisait concurrence aux teintes des
+   affaires, et fatiguait l'œil d'un écran ouvert toute la journée. La page de
+   connexion, où l'on ne fait que passer, garde le spectre en mouvement.
+
    Le dessin s'arrête dès que le décor sort de l'écran ou que l'onglet passe
    au second plan. Il tourne même quand le système demande de réduire les
    animations : choix de Tony, dont le poste a les effets désactivés.
@@ -37,6 +47,9 @@
 
   var FONDU = (cv.getAttribute("data-fondu") || ".24,.88").split(",").map(parseFloat);
   if (!(FONDU[0] >= 0 && FONDU[1] <= 1 && FONDU[0] < FONDU[1])) FONDU = [.24, .88];
+
+  var PALETTE_THEME = cv.getAttribute("data-palette") === "theme";
+  var CALME = cv.hasAttribute("data-calme");
 
   var FILS = 60;                  // fils du ruban
   var PAS = 4;                    // px entre deux points d'un fil…
@@ -68,12 +81,28 @@
 
   /* --------------------------------------------------------- couleurs */
 
-  var CLAIR = false;
+  var CLAIR = false, ACCENT = { h: 37, s: 60, l: 60 };
+
+  function rvb(hex) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    return m ? [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255] : null;
+  }
+  function tsl(c) {                             // rouge-vert-bleu → teinte, saturation, lumière
+    var mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === c[0] ? ((c[1] - c[2]) / d) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4;
+      h *= 60;
+    }
+    return { h: h, s: s * 100, l: l * 100 };
+  }
+
   function lisTheme() {
-    var fond = (getComputedStyle(document.documentElement).getPropertyValue("--noir") || "#050505").trim();
-    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fond);
-    var lum = m ? (parseInt(m[1], 16) * .299 + parseInt(m[2], 16) * .587 + parseInt(m[3], 16) * .114) / 255 : 0;
-    CLAIR = lum > .5;
+    var st = getComputedStyle(document.documentElement);
+    var fond = rvb((st.getPropertyValue("--noir") || "#050505").trim());
+    CLAIR = fond ? (fond[0] * .299 + fond[1] * .587 + fond[2] * .114) > .5 : false;
+    var or = rvb((st.getPropertyValue("--or") || "#D6A85C").trim());
+    if (or) ACCENT = tsl(or);
   }
   lisTheme();
   if (global.MutationObserver) {
@@ -81,8 +110,9 @@
       { attributes: true, attributeFilter: ["data-theme"] });
   }
 
-  function teinte(h, lum, a) {
-    return "hsla(" + (((h % 360) + 360) % 360).toFixed(1) + "," + (CLAIR ? 78 : 92) + "%," + lum + "%," + a + ")";
+  function teinte(h, lum, a, sat) {
+    if (sat == null) sat = CLAIR ? 78 : 92;
+    return "hsla(" + (((h % 360) + 360) % 360).toFixed(1) + "," + sat.toFixed(1) + "%," + lum.toFixed(1) + "%," + a + ")";
   }
 
   /* ------------------------------------------------------------ dessin */
@@ -106,6 +136,7 @@
       froisse[i] = H * .011 * (1 - Math.abs(torsion[i]));
     }
 
+    var DISCRET = PALETTE_THEME ? .72 : 1;       // l'en-tête du planning parle plus bas
     var h0 = T * 6;                              // le spectre dérive : un tour en une minute
     var lum = CLAIR ? 44 : 62;
     ctx.globalCompositeOperation = CLAIR ? "source-over" : "lighter";
@@ -118,7 +149,18 @@
     var degrades = [];
     for (var b = 0; b < BANDES; b++) {
       var ub = (b + .5) / BANDES - .5, g = ctx.createLinearGradient(0, 0, W, 0);
-      for (var k = 0; k <= 4; k++) g.addColorStop(k / 4, teinte(h0 + 200 + k * 60 + ub * 70, lum, 1));
+      for (var k = 0; k <= 4; k++) {
+        if (PALETTE_THEME) {
+          /* Une seule teinte, celle de l'accent, à peine décalée d'un fil à
+             l'autre ; ce qui bouge, c'est la lumière qui glisse le long du
+             ruban. Sur fond sombre, un cran plus clair que l'accent : les fils
+             s'additionnent, et là où ils se serrent l'or tourne au blanc chaud. */
+          var l = ACCENT.l + (CLAIR ? 0 : 6) + 8 * Math.sin(k * 1.5 - T * .2 + ub * 2);
+          g.addColorStop(k / 4, teinte(ACCENT.h + ub * 16 + (k - 2) * 3, Math.max(15, Math.min(85, l)), 1, ACCENT.s));
+        } else {
+          g.addColorStop(k / 4, teinte(h0 + 200 + k * 60 + ub * 70, lum, 1));
+        }
+      }
       degrades.push(g);
     }
 
@@ -146,11 +188,11 @@
 
       if (!CLAIR) {                              // halo : trait large et presque transparent
         ctx.lineWidth = 3.2;
-        ctx.globalAlpha = .035 + .05 * coeur;
+        ctx.globalAlpha = (.035 + .05 * coeur) * DISCRET;
         ctx.stroke();
       }
       ctx.lineWidth = CLAIR ? .9 : 1.05;          // sous 1 px, un fil scintille en bougeant
-      ctx.globalAlpha = CLAIR ? .22 + .38 * coeur : .16 + .34 * coeur;
+      ctx.globalAlpha = (CLAIR ? .22 + .38 * coeur : .16 + .34 * coeur) * DISCRET;
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -173,11 +215,29 @@
 
   var T = 0, dernier = 0, anim = null, visible = true;
 
+  /* Le calme : pleine vitesse pendant les premières secondes, puis un
+     ralentissement en douceur (cosinus, sans cassure) jusqu'à un souffle —
+     5 % de la vitesse : le ruban vit encore, on ne le voit plus bouger qu'en
+     le regardant. Le temps de la page compte, pas celui de l'onglet caché. */
+  var VIF = 4, POSE = 6, SOUFFLE = .05;
+  var ecoule = 0, sauteImage = false;
+  function vitesse() {
+    if (!CALME) return 1;
+    var p = Math.max(0, Math.min(1, (ecoule - VIF) / POSE));
+    return SOUFFLE + (1 - SOUFFLE) * (.5 + .5 * Math.cos(Math.PI * p));
+  }
+
   function frame(now) {
     anim = null;
     var dt = dernier ? Math.min(.05, (now - dernier) / 1000) : 0;
-    dernier = now; T += dt;
-    dessiner(T);
+    dernier = now; ecoule += dt;
+    var v = vitesse();
+    T += dt * v;
+    /* Au souffle, une image sur deux suffit : le mouvement d'une image à
+       l'autre est trop petit pour qu'on voie la différence, et le planning
+       récupère la moitié du travail. */
+    sauteImage = v < .1 ? !sauteImage : false;
+    if (!sauteImage) dessiner(T);
     relance();
   }
   function relance() {
