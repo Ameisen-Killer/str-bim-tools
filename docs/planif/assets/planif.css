@@ -776,6 +776,27 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   border-bottom:1px solid var(--ligne);
 }
 .tete-collante > :last-child{margin-bottom:0}
+.tete-collante{transition:padding-bottom .18s}
+
+/* Une fois collé, le bloc se resserre : la recherche descend à une taille de
+   barre d'outils et les libellés des filtres s'effacent — les listes disent
+   déjà « Toutes les affaires », « Toute l'équipe », « Tous les statuts ». Une
+   soixantaine de pixels reviennent à la liste tant qu'on la parcourt, et tout
+   reprend sa taille dès qu'on remonte. La classe est posée par ui.js. */
+.tete-collante .recherche{transition:margin-bottom .18s,padding .18s}
+.tete-collante .recherche-champ{transition:font-size .18s}
+.tete-collante .champ select,.tete-collante .champ input{transition:padding .18s,font-size .18s,border-color .25s,background .25s}
+.tete-collante.collee{padding-bottom:10px}
+.tete-collante.collee .recherche{margin-bottom:10px;padding:2px 0 8px}
+.tete-collante.collee .recherche-champ{font-size:17px}
+.tete-collante.collee .grille-champs{gap:10px 14px}
+.tete-collante.collee .champ{gap:0}
+/* Le libellé reste lu par les lecteurs d'écran (même repli que .sr). La case
+   « Masquer les terminées » est aussi un label, mais elle porte l'action : elle
+   reste visible. */
+.tete-collante.collee .champ > label:not(.case){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tete-collante.collee .champ select,.tete-collante.collee .champ input{padding:6px 10px;font-size:14px}
+.tete-collante.collee .case{padding:5px 10px}
 
 /* Les filtres suivent la recherche de près : ils forment un seul bloc, celui
    par quoi on restreint la liste. */

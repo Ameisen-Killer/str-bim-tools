@@ -611,10 +611,11 @@
      collent sous elle (les semaines et les jours du planning) en ont besoin, et
      elle change avec la largeur de la fenêtre — la navigation passe sur deux
      lignes, l'encoche d'un téléphone ajoute sa marge. */
-  var suiviChrome = null;
+  var suiviChrome = null, hauteurChrome = 0;
   function mesureChrome(hote) {
     function pose() {
-      document.documentElement.style.setProperty("--h-chrome", Math.round(hote.getBoundingClientRect().height) + "px");
+      hauteurChrome = Math.round(hote.getBoundingClientRect().height);
+      document.documentElement.style.setProperty("--h-chrome", hauteurChrome + "px");
     }
     pose();
     if (suiviChrome) suiviChrome.disconnect();
@@ -624,6 +625,33 @@
     } else {
       window.addEventListener("resize", pose);
     }
+  }
+
+  /**
+   * Pose la classe « collee » sur un bloc collant dès qu'il a rejoint la barre
+   * du haut, et la retire quand on remonte. Ce qui s'y accroche peut alors se
+   * resserrer — les filtres de la page Tâches rendent une soixantaine de pixels
+   * à la liste tant qu'on la parcourt.
+   *
+   * Une mesure par image de défilement au plus. Rien ne peut osciller : le haut
+   * du bloc, collé, vaut la hauteur de la barre, et décollé il dépend de ce qui
+   * le précède — jamais de sa propre hauteur.
+   */
+  function colleSousBarre(bloc) {
+    if (!bloc) return;
+    var attend = false;
+    function juge() {
+      attend = false;
+      bloc.classList.toggle("collee", bloc.getBoundingClientRect().top <= hauteurChrome + 1);
+    }
+    function surDefilement() {
+      if (attend) return;
+      attend = true;
+      requestAnimationFrame(juge);
+    }
+    window.addEventListener("scroll", surDefilement, { passive: true });
+    window.addEventListener("resize", surDefilement);
+    juge();
   }
 
   /* ------------------------------------------------------------- recherche
@@ -1725,6 +1753,7 @@
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,
+    colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime,
     telecharge: telecharge, csv: csv, nomFichier: nomFichier,
