@@ -362,65 +362,82 @@ comment on column public.contacts.npa is
   'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
 
 -- -------------------------------------------------------------- présences ---
--- Dernier signe de vie de chaque adresse connectée : la barre du haut annonce
--- le nombre de personnes en ligne, et leurs noms au survol. Une ligne par
--- adresse, remplacée à chaque battement (toutes les 45 s côté page) : la table
--- reste de la taille de l'équipe, jamais un journal qui gonfle.
+-- Qui a l'outil sous les yeux : la barre du haut en annonce le nombre, et les
+-- noms au survol. Une ligne par onglet ouvert ; un onglet visible bat toutes
+-- les 45 s, un onglet qui passe derrière le dit aussitôt. Chaque message porte
+-- l'heure de l'onglet : un message arrivé en retard (le « je passe derrière »
+-- d'une page quittée, après le « je suis là » de la suivante) est ignoré.
 -- Aucune règle RLS, comme acces et bureaux : seule public.presence() y touche.
 create table if not exists public.presences (
-  email     text primary key
+  email     text not null
             constraint presences_email_minuscules check (email = lower(btrim(email))),
+  onglet    text not null
+            constraint presences_onglet_forme check (char_length(onglet) between 1 and 64),
   bureau_id uuid not null
             constraint presences_bureau_fk references public.bureaux (id) on delete cascade,
-  vu_le     timestamptz not null default now()
+  visible   boolean not null default true,
+  horloge   bigint not null default 0,
+  vu_le     timestamptz not null default now(),
+  primary key (email, onglet)
 );
 create index if not exists presences_bureau on public.presences (bureau_id, vu_le desc);
-comment on table public.presences is
-  'Dernier signe de vie de chaque adresse connectée, par bureau. Tenue par public.presence() seule ; aucune règle RLS, donc invisible depuis l''API.';
-comment on column public.presences.vu_le is
-  'Heure du dernier battement. En ligne = moins de 150 secondes (les pages battent toutes les 45 s).';
 
--- Un appel, deux effets : inscrire mon passage, dire qui est là. Le nom vient
--- de la fiche d'équipe rattachée à l'adresse ; sans fiche, c'est l'adresse
--- (super admin, accès externe). p_partir : la page se ferme ou l'on quitte —
--- la ligne s'en va tout de suite plutôt que d'attendre l'oubli.
-create or replace function public.presence(p_partir boolean default false)
+comment on table public.presences is
+  'Un onglet ouvert de l''outil par ligne : visible ou non, et son dernier battement. Tenue par public.presence() seule ; aucune règle RLS, donc invisible depuis l''API.';
+comment on column public.presences.horloge is
+  'Heure de l''onglet (ms) du dernier message retenu : un message plus ancien, arrivé en retard, est ignoré.';
+comment on column public.presences.vu_le is
+  'Heure du dernier battement. En ligne = visible et moins de 100 secondes (les onglets visibles battent toutes les 45 s).';
+
+-- p_visible : l'onglet est sous les yeux (battement) ou vient de passer derrière.
+-- p_quitter : déconnexion — tous les onglets de l'adresse s'effacent.
+create or replace function public.presence(p_onglet text, p_horloge bigint,
+                                           p_visible boolean default true,
+                                           p_quitter boolean default false)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   v_email  text := lower(coalesce(auth.jwt() ->> 'email', ''));
   v_bureau uuid := public.bureau_courant();
+  v_onglet text := left(btrim(coalesce(p_onglet, '')), 64);
 begin
   if v_email = '' or v_bureau is null then
     return jsonb_build_object('enLigne', '[]'::jsonb);
   end if;
 
-  if p_partir then
+  if p_quitter then
     delete from public.presences p where p.email = v_email;
-  else
-    insert into public.presences (email, bureau_id, vu_le)
-    values (v_email, v_bureau, now())
-    on conflict (email) do update
-      set bureau_id = excluded.bureau_id, vu_le = excluded.vu_le;
+  elsif v_onglet <> '' then
+    insert into public.presences as p (email, onglet, bureau_id, visible, horloge, vu_le)
+    values (v_email, v_onglet, v_bureau, coalesce(p_visible, true), coalesce(p_horloge, 0), now())
+    on conflict (email, onglet) do update
+      set bureau_id = excluded.bureau_id, visible = excluded.visible,
+          horloge = excluded.horloge, vu_le = excluded.vu_le
+      where p.horloge <= excluded.horloge;
   end if;
 
   -- Ménage : une ligne d'hier ne dit plus rien, et personne d'autre ne l'effacera.
   delete from public.presences p where p.vu_le < now() - interval '1 day';
 
+  -- Une personne, une fois, même avec plusieurs onglets visibles.
   return jsonb_build_object('enLigne', coalesce((
     select jsonb_agg(jsonb_build_object('nom', x.nom, 'moi', x.moi) order by lower(x.nom))
       from (
-        select case when m.id is not null then btrim(m.prenom || ' ' || m.nom) else p.email end as nom,
+        select distinct on (p.email)
+               case when m.id is not null then btrim(m.prenom || ' ' || m.nom) else p.email end as nom,
                p.email = v_email as moi
           from public.presences p
           left join public.acces a on a.email = p.email and a.actif
           left join public.membres m on m.id = a.membre_id
          where p.bureau_id = v_bureau
-           and p.vu_le > now() - interval '150 seconds'
+           and p.visible
+           and p.vu_le > now() - interval '100 seconds'
+         order by p.email
       ) x), '[]'::jsonb));
 end $$;
-comment on function public.presence(boolean) is
-  'Inscrit le passage de la personne connectée et renvoie qui est en ligne dans son bureau : { enLigne: [{ nom, moi }] }.';
+
+comment on function public.presence(text, bigint, boolean, boolean) is
+  'Inscrit l''état d''un onglet de la personne connectée et renvoie qui a l''outil sous les yeux dans son bureau : { enLigne: [{ nom, moi }] }.';
 
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).
@@ -1228,7 +1245,7 @@ begin
   foreach f in array array[
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
-    'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(boolean)',
+    'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'

@@ -308,7 +308,7 @@
         // La présence s'efface avant que le jeton ne parte : sinon on resterait
         // « en ligne » pour l'équipe jusqu'à l'oubli, deux minutes et demie plus tard.
         arretePresence();
-        bat(true)
+        bat({ quitter: true })
           .then(function () { return SB.deconnexion(); })
           .then(function () { pageConnexion(""); });
       });
@@ -505,29 +505,33 @@
   }
 
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { cacheDepuis = Date.now(); return; }
+    if (document.hidden) { cacheDepuis = Date.now(); passeDerriere(); return; }
     var absent = cacheDepuis && Date.now() - cacheDepuis > REPOS;
     cacheDepuis = 0;
-    /* Le compteur des personnes en ligne, lui, se remet à jour à chaque retour :
-       il ne coûte qu'une requête et c'est justement ce qu'on regarde en
-       revenant. Une fenêtre ouverte ne l'empêche pas — il ne redessine rien
-       d'autre que lui-même. */
-    bat(false);
+    /* Le compteur des personnes en ligne, lui, repart à chaque retour : on
+       redevient visible pour les autres, et c'est justement ce qu'on regarde
+       en revenant. Une fenêtre ouverte ne l'empêche pas — il ne redessine
+       rien d'autre que lui-même. */
+    suitPresence();
     if (absent && !document.querySelector(".modale.ouverte")) rafraichit(true);
   });
 
   /* ----------------------------------------------------- qui est en ligne
      Un compteur à gauche de l'adresse connectée : combien de personnes ont
-     l'outil ouvert en ce moment, et lesquelles au survol. Le bureau affiché
+     l'outil SOUS LES YEUX en ce moment, et lesquelles au survol. Un onglet
+     passé derrière, un téléphone en veille ne comptent pas. Le bureau affiché
      fait la limite — on ne voit pas les collègues d'un autre bureau.
 
-     Chaque page bat toutes les 45 secondes (une seule requête, qui inscrit
-     notre passage et rapporte la liste) ; la base tient pour en ligne ce
-     qu'elle a vu depuis moins de 150. Deux battements ratés sont donc tolérés,
-     et un onglet fermé s'efface en deux minutes et demie. Le battement
-     continue quand l'onglet passe derrière : « en ligne » veut dire l'outil
-     ouvert, pas les yeux sur l'écran — le navigateur ralentit de lui-même les
-     minuteries d'un onglet caché, ce que la fenêtre de 150 s absorbe.
+     Un onglet visible bat toutes les 45 secondes (une seule requête, qui
+     inscrit son état et rapporte la liste). Dès qu'il passe derrière, il le
+     dit — la requête survit à la page si c'est une fermeture — et se tait
+     jusqu'à son retour. La base oublie un onglet muet depuis 100 secondes :
+     c'est le filet pour un navigateur tué sans prévenir.
+
+     Chaque onglet a son identifiant (sessionStorage : il suit l'onglet d'une
+     page de l'outil à l'autre), et chaque message l'heure de l'onglet. En
+     changeant de page, le « je passe derrière » de l'ancienne peut arriver
+     après le « je suis là » de la nouvelle : la base l'ignore, il est plus vieux.
 
      Rien ne s'affiche en mode local, ni tant que migration-presence.sql n'a pas
      été exécutée : mieux vaut pas de compteur qu'un compteur faux. */
@@ -535,25 +539,42 @@
   var BATTEMENT = 45000;
   var enLigne = null, battement = null, presenceCoupee = false;
 
+  var ONGLET = (function () {
+    var id = null;
+    try { id = sessionStorage.getItem("planif.onglet"); } catch (e) { id = null; }
+    if (!id) {
+      id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      try { sessionStorage.setItem("planif.onglet", id); } catch (e) { /* onglet anonyme : l'id vit le temps de la page */ }
+    }
+    return id;
+  })();
+
   function suitPresence() {
-    if (!avecBase || !SB.connecte() || presenceCoupee || battement) return;
-    bat(false);
-    battement = setInterval(function () { bat(false); }, BATTEMENT);
+    if (!avecBase || !SB.connecte() || presenceCoupee || battement || document.hidden) return;
+    bat({ visible: true });
+    battement = setInterval(function () { bat({ visible: true }); }, BATTEMENT);
   }
 
   function arretePresence() {
     if (battement) { clearInterval(battement); battement = null; }
   }
 
-  function bat(partir) {
+  function passeDerriere() {
+    arretePresence();
+    bat({ visible: false });
+  }
+
+  function bat(o) {
     if (!avecBase || !SB.connecte() || presenceCoupee) return Promise.resolve();
-    return SB.presence(partir).then(function (liste) {
+    return SB.presence({
+      onglet: ONGLET, horloge: Date.now(), visible: o.visible, quitter: o.quitter
+    }).then(function (liste) {
       if (liste === null) {                 // migration pas passée : on n'insiste pas
         presenceCoupee = true;
         arretePresence();
         enLigne = null;
-      } else {
-        enLigne = partir ? null : liste;
+      } else if (o.visible && !o.quitter) {
+        enLigne = liste;
       }
       dessineEnLigne();
     }).catch(function () {

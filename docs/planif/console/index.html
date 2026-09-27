@@ -146,9 +146,9 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=16"></script>
+<script src="/planif/assets/supabase.js?v=17"></script>
 <script src="/planif/assets/donnees.js?v=23"></script>
-<script src="/planif/assets/ui.js?v=41"></script>
+<script src="/planif/assets/ui.js?v=42"></script>
 <script>
 (function () {
   "use strict";
@@ -1444,9 +1444,9 @@
         " (dépôt). Sans elle, la base refuse le geste."
       ]),
       point("verifier", "Qui est en ligne.", [
-        "La barre du haut annonce le nombre de personnes qui ont l'outil ouvert, et leurs noms au survol. ",
+        "La barre du haut annonce le nombre de personnes qui ont l'outil sous les yeux, et leurs noms au survol. ",
         lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-presence.sql" }),
-        " (dépôt). Sans elle, le compteur ne s'affiche pas et le reste fonctionne."
+        " (dépôt ; à relancer si la première version est passée). Sans elle, le compteur ne s'affiche pas et le reste fonctionne."
       ]),
       point("verifier", "Serveur d'envoi (SMTP).", [
         "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",

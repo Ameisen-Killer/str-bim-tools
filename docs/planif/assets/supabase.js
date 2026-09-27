@@ -229,6 +229,9 @@
       return fetch(URL_BASE + "/rest/v1/" + chemin, {
         method: options.methode || "GET",
         headers: entetes,
+        /* garde : l'appel doit survivre à la page qui s'en va (l'onglet qui
+           annonce qu'il passe derrière, au moment où on le ferme). */
+        keepalive: options.garde === true,
         body: options.corps ? JSON.stringify(options.corps) : undefined
       }).catch(function () { throw erreurReseau(); });
     }).then(function (r) {
@@ -267,8 +270,8 @@
   }
 
   /** Appel d'une fonction de la base (profil, console). */
-  function rpc(nom, args) {
-    return requete("rpc/" + nom, { methode: "POST", corps: args || {} });
+  function rpc(nom, args, options) {
+    return requete("rpc/" + nom, { methode: "POST", corps: args || {}, garde: !!(options && options.garde) });
   }
 
   /* Profil de la personne connectée : bureau, droits, succursales et
@@ -282,16 +285,23 @@
     });
   }
 
-  /* Qui est en ligne en ce moment, dans le bureau affiché.
-     Un seul appel fait les deux : il inscrit notre passage et renvoie la liste
-     — { enLigne: [{ nom, moi }] }. À battre toutes les 45 secondes ; la base
-     tient pour en ligne ce qu'elle a vu depuis moins de 150.
-     partir : on se déconnecte, la ligne s'efface tout de suite.
-     Tant que migration-presence.sql n'a pas été exécutée, la fonction n'existe
-     pas (PGRST202) : null, et la barre du haut se passe du compteur — pas
-     question qu'une migration en retard casse l'outil pour l'équipe. */
-  function presence(partir) {
-    return rpc("presence", { p_partir: !!partir }).then(function (r) {
+  /* Qui a l'outil sous les yeux en ce moment, dans le bureau affiché.
+     Un seul appel fait les deux : il inscrit l'état de cet onglet et renvoie
+     la liste — { enLigne: [{ nom, moi }] }.
+       o.onglet   identifiant de l'onglet (une ligne par onglet dans la base)
+       o.horloge  heure de l'onglet : la base ignore un message plus ancien que
+                  le dernier retenu (messages d'une même fenêtre en désordre)
+       o.visible  sous les yeux (battement) ou passé derrière
+       o.quitter  déconnexion : tous les onglets de l'adresse s'effacent
+     Tant que migration-presence.sql (version par onglet) n'a pas été exécutée,
+     la fonction n'existe pas sous cette forme (PGRST202) : null, et la barre du
+     haut se passe du compteur — une migration en retard ne casse rien. */
+  function presence(o) {
+    var partir = !o.visible || !!o.quitter;
+    return rpc("presence", {
+      p_onglet: o.onglet, p_horloge: o.horloge,
+      p_visible: !!o.visible, p_quitter: !!o.quitter
+    }, { garde: partir }).then(function (r) {
       return (r && r.enLigne) || [];
     }).catch(function (e) {
       if (e.code === "PGRST202" || e.code === "42883") return null;
