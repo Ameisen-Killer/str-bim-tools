@@ -1844,6 +1844,149 @@
     });
   }
 
+  /* ------------------------------------------------------------ transitions
+     Les pages reconstruisent leur contenu à chaque rendu. Pour que ce qui
+     bouge glisse au lieu de sauter, on photographie avant le rendu les
+     éléments marqués, et on anime l'écart après (la technique « FLIP ») :
+       data-anim="clé"     identité stable d'un rendu à l'autre (une barre, une ligne)
+       data-anim-etat      état visible (« fini »…) : une tâche qui se termine
+                           s'éteint en douceur au lieu de changer d'un coup
+       data-anim-taille    la largeur peut changer (barre dont la charge bouge)
+     Un élément marqué qui se trouve dans un autre élément marqué bouge avec
+     lui : on n'anime que son écart propre (une barre dans sa ligne).
+     Rien n'est animé au premier rendu, onglet caché, ni au-delà de MAX_ANIMS
+     éléments visibles — un changement si vaste se lit mieux d'un coup. */
+
+  var DUREE_FLIP = 460, COURBE = "cubic-bezier(.2,.75,.2,1)", MAX_ANIMS = 260;
+
+  function photo(hote) {
+    var p = { cles: Object.create(null), n: 0 };
+    if (!hote || !hote.animate) return p;
+    [].forEach.call(hote.querySelectorAll("[data-anim]"), function (n) {
+      var r = n.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      p.cles[n.getAttribute("data-anim")] = { r: r, etat: n.getAttribute("data-anim-etat") || "" };
+      p.n++;
+    });
+    return p;
+  }
+
+  function parentMarque(n, hote) {
+    for (var q = n.parentElement; q && q !== hote; q = q.parentElement) {
+      if (q.hasAttribute("data-anim")) return q.getAttribute("data-anim");
+    }
+    return null;
+  }
+
+  /** o.entrees : les éléments nouveaux apparaissent en fondu (sinon, rien). */
+  function joue(hote, avant, o) {
+    o = o || {};
+    if (!avant || !avant.n || !hote || !hote.animate || document.hidden) return;
+    var vh = global.innerHeight, vw = global.innerWidth;
+    function visible(r) { return r.bottom > -60 && r.top < vh + 60 && r.right > -60 && r.left < vw + 60; }
+
+    // Toutes les mesures d'abord, les animations ensuite : lire puis écrire
+    var mesures = [], parCle = Object.create(null);
+    [].forEach.call(hote.querySelectorAll("[data-anim]"), function (n) {
+      var m = { n: n, cle: n.getAttribute("data-anim"), r: n.getBoundingClientRect(), parent: parentMarque(n, hote) };
+      mesures.push(m); parCle[m.cle] = m;
+    });
+    // Déplacement visuel total d'un élément au départ de l'animation
+    function cumul(m) {
+      if (!m) return { x: 0, y: 0 };
+      if (m.c) return m.c;
+      var a = avant.cles[m.cle];
+      m.c = a ? { x: a.r.left - m.r.left, y: a.r.top - m.r.top } : cumul(parCle[m.parent]);
+      return m.c;
+    }
+    var travail = [];
+    mesures.forEach(function (m) {
+      var a = avant.cles[m.cle];
+      if (!visible(m.r) && !(a && visible(a.r))) return;
+      if (!a) { if (o.entrees) travail.push({ m: m, entree: true }); return; }
+      var c = cumul(m), pc = cumul(parCle[m.parent]);
+      var dx = c.x - pc.x, dy = c.y - pc.y;
+      var sx = m.n.hasAttribute("data-anim-taille") && m.r.width > 0 ? a.r.width / m.r.width : 1;
+      var bouge = Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5 || Math.abs(sx - 1) > 0.01;
+      var etat = m.n.getAttribute("data-anim-etat") || "";
+      if (bouge || etat !== a.etat) travail.push({ m: m, dx: dx, dy: dy, sx: sx, bouge: bouge, etat: etat !== a.etat ? etat : null });
+    });
+    if (travail.length > MAX_ANIMS) return;
+
+    travail.forEach(function (w, i) {
+      var n = w.m.n;
+      if (w.entree) {
+        n.animate([{ opacity: 0, transform: "translateY(5px) scale(.97)" }, { opacity: 1, transform: "none" }],
+                  { duration: 320, delay: Math.min(i, 12) * 14, easing: COURBE, fill: "backwards" });
+        return;
+      }
+      if (w.bouge) {
+        n.animate([
+          { transform: "translate(" + w.dx + "px," + w.dy + "px)" + (w.sx !== 1 ? " scaleX(" + w.sx + ")" : ""), transformOrigin: "left center" },
+          { transform: "none", transformOrigin: "left center" }
+        ], { duration: DUREE_FLIP, easing: COURBE });
+      }
+      if (w.etat !== null) {
+        // Une tâche qui se termine s'éteint : partie lumineuse, elle rejoint sa
+        // demi-teinte. Une tâche rouverte, elle, se rallume d'un éclat bref.
+        var fin = getComputedStyle(n).opacity;
+        n.animate(w.etat === "fini"
+          ? [{ opacity: 1, filter: "brightness(1.45) saturate(1.2)" }, { opacity: fin, filter: "none" }]
+          : [{ opacity: .45, filter: "brightness(1.6)" }, { opacity: fin, filter: "none" }],
+          { duration: w.etat === "fini" ? 900 : 520, easing: "cubic-bezier(.3,.6,.2,1)" });
+      }
+    });
+  }
+
+  /** Rendu animé : photo, rendu, puis l'écart. */
+  function animeRendu(hote, rendu, o) {
+    var avant = photo(hote);
+    rendu();
+    joue(hote, avant, o);
+  }
+
+  /* Pendant la frappe d'une recherche, rien ne glisse : la liste change à
+     chaque lettre, et des lignes en mouvement se lisent mal. */
+  function enFrappe() {
+    var a = document.activeElement;
+    return !!(a && a.classList && (a.classList.contains("recherche-champ") || a.classList.contains("pal-champ")));
+  }
+
+  /**
+   * Texte à nombres qui défilent : « 12,5 j » passe à « 14 j » en comptant.
+   * Chaque nombre du texte glisse vers sa nouvelle valeur, le reste est posé
+   * tel quel ; si la forme a changé (pas le même nombre de nombres), le texte
+   * change d'un coup. ancien : le texte d'avant, quand le nœud vient d'être recréé.
+   */
+  var NOMBRES = /\d+(?:[.,]\d+)?/g;
+  function defileTexte(noeud, texte, ancien) {
+    if (ancien == null) ancien = noeud._texte != null ? noeud._texte : noeud.textContent;
+    noeud._texte = texte;
+    cancelAnimationFrame(noeud._defile);
+    var a = String(ancien || "").match(NOMBRES) || [], b = texte.match(NOMBRES) || [];
+    if (!ancien || ancien === texte || !b.length || a.length !== b.length || document.hidden) { noeud.textContent = texte; return; }
+    var morceaux = texte.split(NOMBRES);
+    function val(x) { return parseFloat(x.replace(",", ".")); }
+    var de = a.map(val), vers = b.map(val);
+    var dec = b.map(function (x) { var i = x.search(/[.,]/); return i < 0 ? 0 : x.length - i - 1; });
+    var virgule = b.map(function (x) { return x.indexOf(",") >= 0; });
+    var t0 = null, duree = 560;
+    setTimeout(function () { if (noeud._texte === texte) { cancelAnimationFrame(noeud._defile); noeud.textContent = texte; } }, duree + 80);
+    function pas(t) {
+      if (t0 === null) t0 = t;
+      var x = Math.min(1, (t - t0) / duree), e = 1 - Math.pow(1 - x, 3), sortie = morceaux[0];
+      for (var i = 0; i < vers.length; i++) {
+        var v = de[i] + (vers[i] - de[i]) * e;
+        var f = dec[i] ? v.toFixed(dec[i]) : String(Math.round(v));
+        sortie += (virgule[i] ? f.replace(".", ",") : f) + morceaux[i + 1];
+      }
+      noeud.textContent = x < 1 ? sortie : texte;
+      if (x < 1) noeud._defile = requestAnimationFrame(pas);
+    }
+    noeud.textContent = ancien;
+    noeud._defile = requestAnimationFrame(pas);
+  }
+
   /* ------------------------------------------------------------ impression
      Pas de bibliothèque PDF : l'export passe par l'impression du navigateur,
      où « Enregistrer au format PDF » est proposé partout, y compris sur
@@ -1898,6 +2041,7 @@
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,
-    suiviApparitions: suiviApparitions
+    suiviApparitions: suiviApparitions,
+    photo: photo, joue: joue, animeRendu: animeRendu, enFrappe: enFrappe, defileTexte: defileTexte
   };
 })(window);

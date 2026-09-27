@@ -62,7 +62,7 @@
 <script src="/planif/assets/supabase.js?v=17"></script>
 <script src="/planif/assets/donnees.js?v=24"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=43"></script>
+<script src="/planif/assets/ui.js?v=44"></script>
 <script src="/planif/assets/palette.js?v=1"></script>
 <script>
 (function () {
@@ -216,6 +216,8 @@
     var mots = barre ? barre.termes() : [];
     var hote = document.getElementById("liste");
     if (affichage) affichage.fin();
+    // Les lignes glissent vers leur nouvelle place (UI.joue, en fin de rendu)
+    var avantListe = UI.enFrappe() ? null : UI.photo(hote);
     UI.vide(hote);
     suivi.debut();
     if (barre) barre.compte(taches.length, selection({ sansTexte: true }).length);
@@ -225,8 +227,8 @@
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
-    document.getElementById("titre-liste").textContent =
-      taches.length + (taches.length > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(charge) + " j";
+    UI.defileTexte(document.getElementById("titre-liste"),
+      taches.length + (taches.length > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(charge) + " j");
 
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
        Tout ce qui restreint la liste y figure, la recherche comprise. */
@@ -301,6 +303,7 @@
       }
       corps.appendChild(ligne(o.t, o.debut));
     } });
+    UI.joue(hote, avantListe);
 
     function titreGroupe(g, b) {
       var titre, sous;
@@ -312,7 +315,7 @@
         sous = (n === 0 ? "Cette semaine" : n === 1 ? "Semaine prochaine" : "Dans " + n + " semaines") +
                " · " + C.fmtCourt(g) + " → " + C.fmtCourt(C.ajoute(g, 6));
       }
-      return el("tr", { class: "groupe-taches" + (g === "retard" ? " retard" : g === lundi ? " actuelle" : "") }, [
+      return el("tr", { class: "groupe-taches" + (g === "retard" ? " retard" : g === lundi ? " actuelle" : ""), "data-anim": "g|" + g }, [
         el("td", { colspan: "6" }, [
           el("div", { class: "num-section", text: sous }),
           el("h3", {}, [
@@ -344,6 +347,7 @@
           type: "button",
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
           "aria-pressed": p.fini ? "true" : "false",
+          "data-anim": "p|" + t.id + "|" + p.role, "data-anim-etat": p.fini ? "fini" : "",
           title: (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
           onclick: function () { terminePart(t.id, p.role, !p.fini); }
         }, [
@@ -353,7 +357,10 @@
         ]));
       });
 
-      var rangee = el("tr", { class: "cliquable" + (t.statut === "termine" ? " fini" : ""), tabindex: "0" }, [
+      var rangee = el("tr", {
+        class: "cliquable" + (t.statut === "termine" ? " fini" : ""), tabindex: "0",
+        "data-anim": "t|" + t.id, "data-anim-etat": t.statut === "termine" ? "fini" : ""
+      }, [
         el("td", {}, [el("div", { class: "tache-titre" }, [
           bascules(t),
           el("div", {}, [

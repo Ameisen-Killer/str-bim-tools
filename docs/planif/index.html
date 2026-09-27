@@ -103,7 +103,7 @@
 <script src="/planif/assets/supabase.js?v=17"></script>
 <script src="/planif/assets/donnees.js?v=24"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=43"></script>
+<script src="/planif/assets/ui.js?v=44"></script>
 <script src="/planif/assets/palette.js?v=1"></script>
 <script src="/planif/assets/spectre.js?v=5"></script>
 <script>
@@ -316,7 +316,13 @@
 
     rendPeriode();
     rendCles(canton);
+    /* Le planning glisse d'un état à l'autre (UI.joue) : une barre déplacée,
+       réaffectée ou recalculée rejoint sa place, une ligne filtrée remonte,
+       une tâche terminée s'éteint. Pas pendant la frappe d'une recherche. */
+    var hotePlan = document.getElementById("plan");
+    var avantPlan = UI.enFrappe() ? null : UI.photo(hotePlan);
     rendPlan(barres, libres, canton);
+    UI.joue(hotePlan, avantPlan, { entrees: true });
     rendAlertes(canton);
   }
 
@@ -359,7 +365,11 @@
   }
 
   function rendCles(canton) {
-    var hote = UI.vide(document.getElementById("cles"));
+    var hote = document.getElementById("cles");
+    // Les valeurs d'avant, pour que les chiffres défilent jusqu'aux nouvelles
+    var anciens = [].map.call(hote.querySelectorAll(".cle .v"), function (v) { return v._texte != null ? v._texte : v.textContent; });
+    UI.vide(hote);
+    var rangCle = 0;
     var charge = 0, capacite = 0;
     membres.forEach(function (m) {
       var b = Calc.bilan(m, jours, rep[m.id], canton);
@@ -378,9 +388,11 @@
     }).length;
 
     function cle(v, l, classe) {
+      var valeur = el("div", { class: "v" });
       hote.appendChild(el("div", { class: "cle" + (classe ? " " + classe : "") }, [
-        el("div", { class: "v", text: v }), el("div", { class: "l", text: l })
+        valeur, el("div", { class: "l", text: l })
       ]));
+      UI.defileTexte(valeur, v, anciens[rangCle++]);
     }
     cle(C.fmtJours(charge), "Jours affectés", "");
     cle(C.fmtJours(capacite), "Jours disponibles", "");
@@ -481,7 +493,7 @@
     var rolesLibres = ["ingenieur", "dessinateur"].filter(function (r) { return libres[r] && libres[r].length; });
     if (rolesLibres.length) {
       var nbLibres = rolesLibres.reduce(function (s, r) { return s + libres[r].length; }, 0);
-      plan.appendChild(el("div", { class: "pl-groupe a-affecter" }, [
+      plan.appendChild(el("div", { class: "pl-groupe a-affecter", "data-anim": "g|libre" }, [
         el("div", {}, [
           el("div", { class: "num-section", text: nbLibres + (nbLibres > 1 ? " charges sans personne" : " charge sans personne") }),
           el("h3", { text: "À affecter" })
@@ -489,7 +501,7 @@
       ]));
       rolesLibres.forEach(function (r) {
         var total = libres[r].reduce(function (s, i) { return s + i.charge; }, 0);
-        plan.appendChild(el("div", { class: "pl-nom" }, [
+        plan.appendChild(el("div", { class: "pl-nom", "data-anim": "n|libre|" + r }, [
           el("div", { class: "pl-membre" }, [
             el("div", {}, [
               el("div", { class: "n", text: r === "ingenieur" ? "Charge ingénieur" : "Charge dessin" }),
@@ -499,7 +511,7 @@
           ])
         ]));
         // data-membre vide : la ligne reçoit aussi les charges qu'on veut remettre à affecter
-        plan.appendChild(el("div", { class: "pl-zone a-affecter", dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r])]));
+        plan.appendChild(el("div", { class: "pl-zone a-affecter", "data-anim": "z|libre|" + r, dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r])]));
       });
     }
 
@@ -521,7 +533,7 @@
       if (cote !== groupeCourant) {
         groupeCourant = cote;
         var nb = membres.filter(function (x) { return D.cote(x.metier) === cote; }).length;
-        plan.appendChild(el("div", { class: "pl-groupe" }, [
+        plan.appendChild(el("div", { class: "pl-groupe", "data-anim": "g|" + cote }, [
           el("div", {}, [
             el("div", { class: "num-section", text: nb + (nb > 1 ? " membres" : " membre") }),
             el("h3", { text: TITRES_GROUPES[cote] || "Autres" })
@@ -529,7 +541,7 @@
         ]));
       }
       var b = Calc.bilan(m, jours, rep[m.id], canton);
-      plan.appendChild(el("div", { class: "pl-nom" }, [
+      plan.appendChild(el("div", { class: "pl-nom", "data-anim": "n|" + m.id }, [
         el("div", { class: "pl-membre" }, [
           el("div", {}, [
             el("div", { class: "n", text: m.prenom + " " + m.nom }),
@@ -556,7 +568,7 @@
         ]));
       });
 
-      var zone = el("div", { class: "pl-zone", dataset: { membre: m.id, role: D.cote(m.metier) } }, [fond, piste, bilan]);
+      var zone = el("div", { class: "pl-zone", "data-anim": "z|" + m.id, dataset: { membre: m.id, role: D.cote(m.metier) } }, [fond, piste, bilan]);
       plan.appendChild(zone);
     });
   }
@@ -646,6 +658,9 @@
       class: classes.join(" "),
       style: "--tt:" + UI.teinte(a ? a.teinte : 1) + ";--c1:" + c1 + ";--cn:" + cn + ";--l:" + ligne + (marges || ""),
       tabindex: "0", role: "button",
+      // Une tâche n'a qu'une part par métier : (tâche, métier) suit la barre d'une ligne à l'autre
+      "data-anim": "b|" + t.id + "|" + info.role, "data-anim-taille": "",
+      "data-anim-etat": t.statut === "termine" || info.fini ? "fini" : "",
       title: (a ? a.code + " · " : "") + t.titre + "\n" +
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
