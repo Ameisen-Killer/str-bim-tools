@@ -777,6 +777,9 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   transition:padding-bottom .18s;
 }
 .tete-collante > :last-child{margin-bottom:0}
+/* Équipe : la barre de filtres se serre contre la recherche (la marge basse de
+   celle-ci suffit à les séparer) */
+.tete-collante .plan-barre{margin-top:-8px}
 
 /* Une fois collé, le bloc se resserre : la recherche descend à une taille de
    barre d'outils et les libellés des filtres s'effacent — les listes disent
@@ -944,9 +947,12 @@ mark.trouve{
   table.liste td.actions .ico + .ico,table.liste td.actions .btn + .ico{margin-left:0}   /* l'écart vient du gap */
   .defile{overflow-x:visible}
 
-  /* filtres repliés derrière un bouton */
+  /* filtres repliés derrière un bouton : la grille de champs (Tâches) comme la
+     barre de listes (Équipe), qui prendrait sinon deux rangées collée en haut */
   #filtres{display:none!important}
   #filtres.ouvert{display:grid!important;margin-top:16px}
+  .plan-barre.repliable{display:none!important}
+  .tete-collante .plan-barre.repliable.ouvert{display:flex!important;margin-top:16px}
   .tete-collante{padding-bottom:12px}
 
   /* tableau de bord : un bloc par membre, la semaine sur toute la largeur */
