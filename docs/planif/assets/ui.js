@@ -1757,17 +1757,6 @@
     ]));
   }
 
-  /* ----------------------------------------------------------- conversions */
-
-  function csv(lignes) {
-    return "﻿" + lignes.map(function (l) {
-      return l.map(function (c) {
-        var s = c == null ? "" : String(c);
-        return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-      }).join(";");
-    }).join("\r\n");
-  }
-
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
@@ -1777,7 +1766,6 @@
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime,
-    telecharge: telecharge, csv: csv, nomFichier: nomFichier,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,

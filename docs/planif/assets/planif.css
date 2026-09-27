@@ -1030,7 +1030,10 @@ mark.trouve{
   .tete-collante{display:none!important}
   /* Les bascules en tête de ligne (démarrer, terminer) sont des commandes */
   .tache-bascules{display:none!important}
-  .tache-titre{padding-left:0}
+  /* Les bascules retirées, la pastille se retrouve en tête de ligne : c'est un
+     carré tourné à 45°, dont la diagonale déborde de ~1,7 px de sa boîte. Sans
+     cette marge, sa pointe gauche tombe hors de la zone imprimable. */
+  .tache-titre{padding-left:2px}
   body.avec-fab main{padding-bottom:0}
   .wrap{max-width:none;padding-inline:0}
   a{text-decoration:none;color:inherit}
