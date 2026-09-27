@@ -282,6 +282,23 @@
     });
   }
 
+  /* Qui est en ligne en ce moment, dans le bureau affiché.
+     Un seul appel fait les deux : il inscrit notre passage et renvoie la liste
+     — { enLigne: [{ nom, moi }] }. À battre toutes les 45 secondes ; la base
+     tient pour en ligne ce qu'elle a vu depuis moins de 150.
+     partir : on se déconnecte, la ligne s'efface tout de suite.
+     Tant que migration-presence.sql n'a pas été exécutée, la fonction n'existe
+     pas (PGRST202) : null, et la barre du haut se passe du compteur — pas
+     question qu'une migration en retard casse l'outil pour l'équipe. */
+  function presence(partir) {
+    return rpc("presence", { p_partir: !!partir }).then(function (r) {
+      return (r && r.enLigne) || [];
+    }).catch(function (e) {
+      if (e.code === "PGRST202" || e.code === "42883") return null;
+      throw e;
+    });
+  }
+
   /* Réglages publics du service de connexion : inscriptions ouvertes ou non,
      confirmation de l'adresse. La console s'en sert pour signaler un réglage manquant. */
   function reglagesAuth() {
@@ -712,6 +729,7 @@
     enregistrePreferences: enregistrePreferences,
     requete: requete,
     rpc: rpc,
+    presence: presence,
     reglagesAuth: reglagesAuth,
     ADAPT: {
       nom: "supabase",

@@ -305,7 +305,12 @@
     confirme("Se déconnecter ?", "Tu devras saisir ton mot de passe pour revenir.", "Se déconnecter")
       .then(function (ok) {
         if (!ok) return;
-        SB.deconnexion().then(function () { pageConnexion(""); });
+        // La présence s'efface avant que le jeton ne parte : sinon on resterait
+        // « en ligne » pour l'équipe jusqu'à l'oubli, deux minutes et demie plus tard.
+        arretePresence();
+        bat(true)
+          .then(function () { return SB.deconnexion(); })
+          .then(function () { pageConnexion(""); });
       });
   }
 
@@ -503,8 +508,92 @@
     if (document.hidden) { cacheDepuis = Date.now(); return; }
     var absent = cacheDepuis && Date.now() - cacheDepuis > REPOS;
     cacheDepuis = 0;
+    /* Le compteur des personnes en ligne, lui, se remet à jour à chaque retour :
+       il ne coûte qu'une requête et c'est justement ce qu'on regarde en
+       revenant. Une fenêtre ouverte ne l'empêche pas — il ne redessine rien
+       d'autre que lui-même. */
+    bat(false);
     if (absent && !document.querySelector(".modale.ouverte")) rafraichit(true);
   });
+
+  /* ----------------------------------------------------- qui est en ligne
+     Un compteur à gauche de l'adresse connectée : combien de personnes ont
+     l'outil ouvert en ce moment, et lesquelles au survol. Le bureau affiché
+     fait la limite — on ne voit pas les collègues d'un autre bureau.
+
+     Chaque page bat toutes les 45 secondes (une seule requête, qui inscrit
+     notre passage et rapporte la liste) ; la base tient pour en ligne ce
+     qu'elle a vu depuis moins de 150. Deux battements ratés sont donc tolérés,
+     et un onglet fermé s'efface en deux minutes et demie. Le battement
+     continue quand l'onglet passe derrière : « en ligne » veut dire l'outil
+     ouvert, pas les yeux sur l'écran — le navigateur ralentit de lui-même les
+     minuteries d'un onglet caché, ce que la fenêtre de 150 s absorbe.
+
+     Rien ne s'affiche en mode local, ni tant que migration-presence.sql n'a pas
+     été exécutée : mieux vaut pas de compteur qu'un compteur faux. */
+
+  var BATTEMENT = 45000;
+  var enLigne = null, battement = null, presenceCoupee = false;
+
+  function suitPresence() {
+    if (!avecBase || !SB.connecte() || presenceCoupee || battement) return;
+    bat(false);
+    battement = setInterval(function () { bat(false); }, BATTEMENT);
+  }
+
+  function arretePresence() {
+    if (battement) { clearInterval(battement); battement = null; }
+  }
+
+  function bat(partir) {
+    if (!avecBase || !SB.connecte() || presenceCoupee) return Promise.resolve();
+    return SB.presence(partir).then(function (liste) {
+      if (liste === null) {                 // migration pas passée : on n'insiste pas
+        presenceCoupee = true;
+        arretePresence();
+        enLigne = null;
+      } else {
+        enLigne = partir ? null : liste;
+      }
+      dessineEnLigne();
+    }).catch(function () {
+      /* Réseau ou session : le dernier compte reste affiché, le prochain
+         battement corrigera. Ce compteur ne mérite aucun message d'erreur. */
+    });
+  }
+
+  /** L'emplacement du compteur, rempli (et vidé) par dessineEnLigne. */
+  function placeEnLigne() {
+    if (!avecBase || !SB.connecte()) return null;
+    return el("div", { class: "en-ligne", dataset: { enLigne: "" }, hidden: true });
+  }
+
+  function dessineEnLigne() {
+    var hote = document.querySelector("[data-en-ligne]");
+    if (!hote) return;
+    vide(hote);
+    if (!enLigne || !enLigne.length) { hote.hidden = true; return; }
+    hote.hidden = false;
+    var n = enLigne.length;
+    var phrase = n > 1 ? n + " personnes en ligne" : "1 personne en ligne";
+    /* Pas de title : la bulle du navigateur viendrait doubler la nôtre. Le
+       bouton n'agit pas, il se survole — et se touche, ce qui lui donne le
+       focus : c'est ce qui ouvre la bulle sur un téléphone. */
+    hote.appendChild(el("button", {
+      class: "en-ligne-btn", type: "button",
+      "aria-label": phrase, "aria-describedby": "qui-en-ligne"
+    }, [
+      el("span", { class: "puce", "aria-hidden": "true" }),
+      el("b", { text: String(n) }),
+      el("span", { class: "en-ligne-lib", text: "en ligne" })
+    ]));
+    hote.appendChild(el("div", { class: "bulle-en-ligne", role: "tooltip", id: "qui-en-ligne" }, [
+      el("p", { class: "bulle-titre", text: phrase }),
+      el("ul", {}, enLigne.map(function (q) {
+        return el("li", { class: q.moi ? "moi" : null, text: q.nom + (q.moi ? " (toi)" : "") });
+      }))
+    ]));
+  }
 
   /* --------------------------------------------------------- barre et menu */
 
@@ -554,6 +643,7 @@
       : (D.estDemo() ? "Jeu de démonstration" : "Données locales");
 
     var outilsHaut = el("div", { class: "barre-outils" }, [
+      placeEnLigne(),
       el("span", { class: "maj", text: etiquette }),
       menuTheme(),
       // Pas de données du planning chargées (console) : ni à relire, ni à sauvegarder d'ici
@@ -590,6 +680,8 @@
     }
 
     synchroniseTheme();
+    suitPresence();
+    dessineEnLigne();                       // le compte déjà connu, sans attendre le battement
 
     var ancien = document.querySelector(".fab");
     if (ancien) ancien.remove();

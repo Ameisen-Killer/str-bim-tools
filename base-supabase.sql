@@ -361,6 +361,67 @@ comment on column public.contacts.natel is
 comment on column public.contacts.npa is
   'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
 
+-- -------------------------------------------------------------- présences ---
+-- Dernier signe de vie de chaque adresse connectée : la barre du haut annonce
+-- le nombre de personnes en ligne, et leurs noms au survol. Une ligne par
+-- adresse, remplacée à chaque battement (toutes les 45 s côté page) : la table
+-- reste de la taille de l'équipe, jamais un journal qui gonfle.
+-- Aucune règle RLS, comme acces et bureaux : seule public.presence() y touche.
+create table if not exists public.presences (
+  email     text primary key
+            constraint presences_email_minuscules check (email = lower(btrim(email))),
+  bureau_id uuid not null
+            constraint presences_bureau_fk references public.bureaux (id) on delete cascade,
+  vu_le     timestamptz not null default now()
+);
+create index if not exists presences_bureau on public.presences (bureau_id, vu_le desc);
+comment on table public.presences is
+  'Dernier signe de vie de chaque adresse connectée, par bureau. Tenue par public.presence() seule ; aucune règle RLS, donc invisible depuis l''API.';
+comment on column public.presences.vu_le is
+  'Heure du dernier battement. En ligne = moins de 150 secondes (les pages battent toutes les 45 s).';
+
+-- Un appel, deux effets : inscrire mon passage, dire qui est là. Le nom vient
+-- de la fiche d'équipe rattachée à l'adresse ; sans fiche, c'est l'adresse
+-- (super admin, accès externe). p_partir : la page se ferme ou l'on quitte —
+-- la ligne s'en va tout de suite plutôt que d'attendre l'oubli.
+create or replace function public.presence(p_partir boolean default false)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_email  text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_bureau uuid := public.bureau_courant();
+begin
+  if v_email = '' or v_bureau is null then
+    return jsonb_build_object('enLigne', '[]'::jsonb);
+  end if;
+
+  if p_partir then
+    delete from public.presences p where p.email = v_email;
+  else
+    insert into public.presences (email, bureau_id, vu_le)
+    values (v_email, v_bureau, now())
+    on conflict (email) do update
+      set bureau_id = excluded.bureau_id, vu_le = excluded.vu_le;
+  end if;
+
+  -- Ménage : une ligne d'hier ne dit plus rien, et personne d'autre ne l'effacera.
+  delete from public.presences p where p.vu_le < now() - interval '1 day';
+
+  return jsonb_build_object('enLigne', coalesce((
+    select jsonb_agg(jsonb_build_object('nom', x.nom, 'moi', x.moi) order by lower(x.nom))
+      from (
+        select case when m.id is not null then btrim(m.prenom || ' ' || m.nom) else p.email end as nom,
+               p.email = v_email as moi
+          from public.presences p
+          left join public.acces a on a.email = p.email and a.actif
+          left join public.membres m on m.id = a.membre_id
+         where p.bureau_id = v_bureau
+           and p.vu_le > now() - interval '150 seconds'
+      ) x), '[]'::jsonb));
+end $$;
+comment on function public.presence(boolean) is
+  'Inscrit le passage de la personne connectée et renvoie qui est en ligne dans son bureau : { enLigne: [{ nom, moi }] }.';
+
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).
 create table if not exists public.reglages (
@@ -471,8 +532,8 @@ on conflict (bureau_id, statut) do nothing;
 -- =========================================================== sécurité (RLS) ==
 -- On repart de zéro : les politiques existantes de ces tables sont retirées.
 -- Les tables de planification ne montrent que le bureau courant. Bureaux,
--- accès, succursales et disciplines n'ont aucune politique : seules les
--- fonctions ci-dessous (security definer) les lisent et les écrivent.
+-- accès, succursales, disciplines et présences n'ont aucune politique : seules
+-- les fonctions (security definer) les lisent et les écrivent.
 do $$
 declare
   t text;
@@ -480,7 +541,7 @@ declare
 begin
   foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                           'succursale_disciplines'] loop
+                           'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -489,7 +550,7 @@ begin
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                        'succursale_disciplines')
+                        'succursale_disciplines', 'presences')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -1167,7 +1228,7 @@ begin
   foreach f in array array[
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
-    'public.mon_profil()', 'public.choisit_bureau(uuid)',
+    'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(boolean)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'

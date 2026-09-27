@@ -171,6 +171,33 @@ p{margin:0}
 .barre-outils button{background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;transition:color .3s}
 .barre-outils button:hover{color:var(--or)}
 
+/* Qui est en ligne, juste à gauche de l'adresse connectée. Le nombre au repos,
+   les noms au survol (ou au toucher : le bouton prend le focus). */
+.en-ligne{position:relative;display:inline-flex;align-items:baseline}
+.en-ligne[hidden]{display:none}
+.en-ligne-btn{display:inline-flex;align-items:baseline;gap:7px;cursor:default}
+.en-ligne-btn b{font-weight:400;font-variant-numeric:tabular-nums}
+.en-ligne .puce{
+  width:6px;height:6px;border-radius:50%;background:var(--or);
+  box-shadow:0 0 0 3px rgba(var(--or-rvb),.14);
+  align-self:center;flex:0 0 auto;animation:respire 3.2s ease-in-out infinite;
+}
+@keyframes respire{0%,100%{opacity:1}50%{opacity:.35}}
+.bulle-en-ligne{
+  position:absolute;right:-12px;top:calc(100% + 14px);z-index:50;
+  display:none;min-width:190px;max-width:min(78vw,320px);padding:12px 14px;
+  background:var(--noir-2);border:1px solid var(--ligne);
+  animation:monte .25s cubic-bezier(.2,.7,.2,1);
+}
+.en-ligne:hover .bulle-en-ligne,.en-ligne:focus-within .bulle-en-ligne{display:block}
+.bulle-en-ligne .bulle-titre{margin:0 0 9px;color:var(--or);font-size:10px;letter-spacing:.16em}
+.bulle-en-ligne ul{margin:0;padding:0;list-style:none}
+.bulle-en-ligne li{
+  padding:3px 0;color:var(--texte-doux);font-size:12px;letter-spacing:.02em;text-transform:none;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.bulle-en-ligne li.moi{color:var(--texte)}
+
 /* Menu de thème */
 .theme{position:relative}
 .theme-btn{display:inline-flex;align-items:baseline;gap:7px}
@@ -990,7 +1017,9 @@ mark.trouve{
   .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0;min-width:40px;justify-content:center}
   .barre-outils [data-rafraichir]::after{content:"↻";font-size:16px;letter-spacing:0}
   .theme-ico{font-size:16px}
-  .barre-outils .menu-theme{right:-8px}
+  /* le compteur garde sa puce et son nombre : « en ligne » se devine */
+  .en-ligne-lib{display:none}
+  .barre-outils .menu-theme,.bulle-en-ligne{right:-8px}
   .pl-bw{padding-inline:4px}
   .cles .cle{padding:14px 12px}
   .al{flex-direction:column;gap:2px}
