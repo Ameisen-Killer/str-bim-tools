@@ -367,7 +367,9 @@
           ])
         ])]),
         el("td", {}, [gens]),
-        el("td", {}, [
+        // « 0,5 j » ne se coupe pas entre le nombre et l'unité : sur le papier,
+        // la colonne est étroite et le « j » tombait à la ligne suivante.
+        el("td", { style: "white-space:nowrap" }, [
           el("div", { class: "num", text: C.fmtJours(Calc.chargeTotale(t)) + " j" })
         ]),
         el("td", { class: "num", style: "white-space:nowrap" }, [
