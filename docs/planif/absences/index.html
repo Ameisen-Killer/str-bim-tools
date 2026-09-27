@@ -122,7 +122,8 @@
   vue.mois = Math.min(3, Math.max(1, parseInt(vue.mois, 10) || 1));
 
   var jours = [], lignes = [], jaugeParJour = {}, nomsParJour = {}, joursDe = {};
-  var barre = null;                                 // recherche instantanée
+  // Nom explicite : « barre » est déjà la fonction qui dessine une barre du planning
+  var barreRecherche = null;
 
   function memorise() {
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
@@ -158,7 +159,7 @@
 
     document.getElementById("pdf").addEventListener("click", exportePdf);
 
-    barre = UI.recherche({
+    barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
       exemple: "Rechercher un nom, un métier, une succursale, un motif d'absence…",
       surSaisie: rend,
@@ -199,11 +200,11 @@
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
        du bas, clés, liste des périodes — porte donc sur ce qui reste affiché,
        comme le fait déjà le filtre par métier. */
-    var mots = barre ? barre.termes() : [];
+    var mots = barreRecherche ? barreRecherche.termes() : [];
     var membres = !mots.length ? tous : tous.filter(function (m) {
       return UI.correspond(champsMembre(m).concat(motifsDe(m, premier, dernier)), mots);
     });
-    if (barre) barre.compte(membres.length, tous.length);
+    if (barreRecherche) barreRecherche.compte(membres.length, tous.length);
 
     /* Une seule traversée pour tout ce qui suit : les jours d'absence de
        chacun, et le nombre d'absents jour par jour. Un congé posé un dimanche
@@ -261,7 +262,7 @@
     var p = UI.vide(document.getElementById("periode"));
     p.appendChild(el("b", { text: libellePeriode() }));
 
-    var cherche = barre && barre.valeur().trim();
+    var cherche = barreRecherche && barreRecherche.valeur().trim();
     document.getElementById("imp-periode").textContent =
       libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
       (cherche ? "  ·  « " + cherche + " »" : "");
@@ -367,7 +368,7 @@
     if (!lignes.length) {
       plan.appendChild(el("div", { class: "pl-nom" }));
       plan.appendChild(el("div", { class: "pl-zone" }, [
-        el("div", { class: "vide", text: barre && barre.valeur().trim() ? "Personne ne correspond à cette recherche"
+        el("div", { class: "vide", text: barreRecherche && barreRecherche.valeur().trim() ? "Personne ne correspond à cette recherche"
           : vue.masque ? "Personne n'est absent sur la période" : "Aucun membre à afficher" })
       ]));
       return;
@@ -492,7 +493,7 @@
 
     if (!periodes.length) {
       hote.appendChild(el("div", { class: "vide",
-        text: barre && barre.valeur().trim() ? "Aucune absence pour cette recherche" : "Aucune absence sur la période" }));
+        text: barreRecherche && barreRecherche.valeur().trim() ? "Aucune absence pour cette recherche" : "Aucune absence sur la période" }));
       return;
     }
 

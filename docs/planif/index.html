@@ -180,7 +180,7 @@
     fo.checked = !!vue.occupes;
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
 
-    barre = UI.recherche({
+    barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
       exemple: "Rechercher une personne, une affaire, une tâche…",
       surSaisie: rend
@@ -208,7 +208,8 @@
 
   var jours = [], sems = [], membres = [], rep = {};
   var cacheRep = { cle: null, rep: null }, cacheAlertes = { cle: null, liste: [] };
-  var barre = null;                                 // recherche instantanée
+  // Nom explicite : « barre » est déjà la fonction qui dessine une barre du planning
+  var barreRecherche = null;
   var vusRecherche = null;                          // ids retenus par la recherche, sinon null
 
   function rend() {
@@ -294,7 +295,7 @@
        sur son identité ou sur ce qu'elle porte dans la fenêtre — on garde alors
        toute sa ligne, une barre isolée ne dirait rien de sa charge. Une charge
        sans personne, elle, se retient sur sa seule tâche. */
-    var mots = barre ? barre.termes() : [];
+    var mots = barreRecherche ? barreRecherche.termes() : [];
     var nbAvantRecherche = membres.length;
     vusRecherche = null;
     if (mots.length) {
@@ -308,7 +309,7 @@
         if (!libres[r].length) delete libres[r];
       });
     }
-    if (barre) barre.compte(membres.length, nbAvantRecherche);
+    if (barreRecherche) barreRecherche.compte(membres.length, nbAvantRecherche);
 
     if (vue.occupes) membres = membres.filter(function (m) { return barres[m.id] && barres[m.id].length; });
 
@@ -506,7 +507,7 @@
       plan.appendChild(el("div", { class: "pl-nom" }));
       plan.appendChild(el("div", { class: "pl-zone" }, [
         el("div", { class: "vide",
-          text: barre && barre.valeur().trim() ? "Personne ne correspond à cette recherche" : "Aucun membre à afficher" })
+          text: barreRecherche && barreRecherche.valeur().trim() ? "Personne ne correspond à cette recherche" : "Aucun membre à afficher" })
       ]));
       return;
     }
