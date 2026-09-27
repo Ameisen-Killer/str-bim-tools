@@ -34,6 +34,11 @@
    affaires, et fatiguait l'œil d'un écran ouvert toute la journée. La page de
    connexion, où l'on ne fait que passer, garde le spectre en mouvement.
 
+   La souris l'excite (27.09.2026) : au survol, le ruban reprend de la vitesse,
+   s'éclaire et se gonfle autour du curseur ; il se recalme en douceur quand
+   elle s'en va. Le canvas reste transparent aux clics (pointer-events: none) :
+   c'est la position de la souris sur la page qui est comparée à son cadre.
+
    Le dessin s'arrête dès que le décor sort de l'écran ou que l'onglet passe
    au second plan. Il tourne même quand le système demande de réduire les
    animations : choix de Tony, dont le poste a les effets désactivés.
@@ -61,7 +66,7 @@
   /* ------------------------------------------------------------ cadre */
 
   var W = 0, H = 0, dpr = 1, n = 0;
-  var centre = [], torsion = [], froisse = [];
+  var centre = [], torsion = [], froisse = [], ampleur = [];
   function taille() {
     var r = cv.getBoundingClientRect();
     if (!r.width || !r.height) return;
@@ -77,6 +82,7 @@
     centre = new Float32Array(n + 1);
     torsion = new Float32Array(n + 1);
     froisse = new Float32Array(n + 1);
+    ampleur = new Float32Array(n + 1);
   }
 
   /* --------------------------------------------------------- couleurs */
@@ -126,17 +132,22 @@
     var mi = H * .5, ampli = H * .25, large = H * .44;
     var i, s;
 
-    // La ligne médiane, la torsion et le froissé, une fois pour tous les fils
+    // La ligne médiane, la torsion et le froissé, une fois pour tous les fils.
+    // Sous le curseur, le ruban s'élargit et frémit ; sa ligne médiane se
+    // resserre d'autant, pour que rien ne sorte du cadre.
     for (i = 0; i <= n; i++) {
       s = i / n;
-      centre[i] = mi + ampli * (
+      var bosse = excite > .002 ? excite * Math.exp(-Math.pow((s - sourisX) / .13, 2)) : 0;
+      centre[i] = mi + ampli * (1 - .25 * bosse) * (
         .64 * Math.sin(TAU * s * 1.0 + T * .36) +
         .36 * Math.sin(TAU * s * 1.9 - T * .52 + 1.7));
       torsion[i] = Math.cos(TAU * s * .8 - T * .23 + .6 * Math.sin(T * .13));
-      froisse[i] = H * .011 * (1 - Math.abs(torsion[i]));
+      froisse[i] = H * (.011 * (1 - Math.abs(torsion[i])) + .009 * bosse);
+      ampleur[i] = large * (1 + .3 * bosse);
     }
 
-    var DISCRET = PALETTE_THEME ? .72 : 1;       // l'en-tête du planning parle plus bas
+    var DISCRET = (PALETTE_THEME ? .72 : 1)      // l'en-tête du planning parle plus bas…
+                * (1 + .4 * excite);             // …sauf quand on vient le chercher
     var h0 = T * 6;                              // le spectre dérive : un tour en une minute
     var lum = CLAIR ? 44 : 62;
     ctx.globalCompositeOperation = CLAIR ? "source-over" : "lighter";
@@ -174,7 +185,7 @@
       for (i = 0; i <= n; i++) {
         s = i / n;
         xs[i] = s * W;
-        ys[i] = centre[i] + u * large * torsion[i] + froisse[i] * Math.sin(s * 9 + T * .8 + phase);
+        ys[i] = centre[i] + u * ampleur[i] * torsion[i] + froisse[i] * Math.sin(s * 9 + T * .8 + phase);
       }
       /* Courbes et non segments : chaque point sert de point de contrôle, la
          courbe passe par les milieux. Plus aucun angle, même là où le ruban
@@ -221,6 +232,20 @@
      le regardant. Le temps de la page compte, pas celui de l'onglet caché. */
   var VIF = 4, POSE = 6, SOUFFLE = .05;
   var ecoule = 0, sauteImage = false;
+
+  /* ------------------------------------------------------------ souris */
+
+  var cible = 0, excite = 0, sourisX = .5, sourisCible = .5;
+  document.addEventListener("pointermove", function (e) {
+    if (e.pointerType === "touch") return;
+    var r = cv.getBoundingClientRect();
+    var dedans = r.width > 0 && e.clientX >= r.left && e.clientX <= r.right &&
+                 e.clientY >= r.top && e.clientY <= r.bottom;
+    cible = dedans ? 1 : 0;
+    if (dedans) sourisCible = (e.clientX - r.left) / r.width;
+  }, { passive: true });
+  document.documentElement.addEventListener("mouseleave", function () { cible = 0; });
+  global.addEventListener("blur", function () { cible = 0; });
   function vitesse() {
     if (!CALME) return 1;
     var p = Math.max(0, Math.min(1, (ecoule - VIF) / POSE));
@@ -231,7 +256,12 @@
     anim = null;
     var dt = dernier ? Math.min(.05, (now - dernier) / 1000) : 0;
     dernier = now; ecoule += dt;
+    // L'excitation monte vite (une demi-seconde) et retombe lentement
+    var tau = cible > excite ? .45 : 1.6;
+    excite += (cible - excite) * (1 - Math.exp(-dt / tau));
+    sourisX += (sourisCible - sourisX) * (1 - Math.exp(-dt / .3));
     var v = vitesse();
+    v += (1.2 - v) * excite;                     // au survol, un peu plus vif qu'à l'ouverture
     T += dt * v;
     /* Au souffle, une image sur deux suffit : le mouvement d'une image à
        l'autre est trop petit pour qu'on voie la différence, et le planning
