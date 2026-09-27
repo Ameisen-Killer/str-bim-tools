@@ -18,6 +18,12 @@
        n'aurait aucun sens : trait simple, couleurs plus denses ;
      - les bords : le ruban naît et s'éteint en fondu, pas de coupure au cadre.
 
+   Deux emplacements : l'en-tête du tableau de bord, et le bas de la page de
+   connexion (sur toute la largeur). Le fondu des bouts se règle par
+   data-fondu="début,fin" sur le canvas (fractions de la largeur) : décalé à
+   droite dans l'en-tête, où le ruban sort de derrière le titre, symétrique en
+   bas de la connexion.
+
    Le dessin s'arrête dès que le décor sort de l'écran ou que l'onglet passe
    au second plan. Il tourne même quand le système demande de réduire les
    animations : choix de Tony, dont le poste a les effets désactivés.
@@ -28,6 +34,9 @@
   var cv = document.getElementById("spectre");
   if (!cv || !cv.getContext) return;
   var ctx = cv.getContext("2d");
+
+  var FONDU = (cv.getAttribute("data-fondu") || ".24,.88").split(",").map(parseFloat);
+  if (!(FONDU[0] >= 0 && FONDU[1] <= 1 && FONDU[0] < FONDU[1])) FONDU = [.24, .88];
 
   var FILS = 60;                  // fils du ruban
   var PAS = 5;                    // px entre deux points d'un fil
@@ -126,8 +135,8 @@
     ctx.globalCompositeOperation = "destination-in";
     var bord = ctx.createLinearGradient(0, 0, W, 0);
     bord.addColorStop(0, "rgba(0,0,0,0)");
-    bord.addColorStop(.24, "rgba(0,0,0,1)");
-    bord.addColorStop(.88, "rgba(0,0,0,1)");
+    bord.addColorStop(FONDU[0], "rgba(0,0,0,1)");
+    bord.addColorStop(FONDU[1], "rgba(0,0,0,1)");
     bord.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = bord;
     ctx.fillRect(0, 0, W, H);
