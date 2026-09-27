@@ -774,9 +774,9 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   background:var(--noir);
   padding-bottom:16px;margin-bottom:10px;
   border-bottom:1px solid var(--ligne);
+  transition:padding-bottom .18s;
 }
 .tete-collante > :last-child{margin-bottom:0}
-.tete-collante{transition:padding-bottom .18s}
 
 /* Une fois collé, le bloc se resserre : la recherche descend à une taille de
    barre d'outils et les libellés des filtres s'effacent — les listes disent
@@ -786,6 +786,7 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 .tete-collante .recherche{transition:margin-bottom .18s,padding .18s}
 .tete-collante .recherche-champ{transition:font-size .18s}
 .tete-collante .champ select,.tete-collante .champ input{transition:padding .18s,font-size .18s,border-color .25s,background .25s}
+.tete-collante .btn{transition:padding .18s,color .25s,border-color .25s,background .25s}
 .tete-collante.collee{padding-bottom:10px}
 .tete-collante.collee .recherche{margin-bottom:10px;padding:2px 0 8px}
 .tete-collante.collee .recherche-champ{font-size:17px}
@@ -797,6 +798,18 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 .tete-collante.collee .champ > label:not(.case){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tete-collante.collee .champ select,.tete-collante.collee .champ input{padding:6px 10px;font-size:14px}
 .tete-collante.collee .case{padding:5px 10px}
+/* Équipe : quatre listes en .btn dans une plan-barre, au lieu d'une grille de champs */
+.tete-collante.collee .plan-barre{gap:8px}
+.tete-collante.collee .btn{padding:6px 12px}
+
+/* Rien d'autre que la recherche (Annuaire) : son propre filet sépare déjà, le
+   bloc n'en remet pas un second. La marge basse de la recherche passe en marge
+   intérieure du bloc — sinon elle s'échappe par fusion des marges (le bloc
+   n'aurait plus ni bordure ni marge intérieure en bas) et une ligne de la liste
+   défilerait dans ce vide, sous le fond. Après les règles de « collee », pour
+   les couvrir. */
+.tete-collante.seule-recherche{margin-bottom:0;border-bottom:0}
+.tete-collante.seule-recherche .recherche{margin-bottom:0}
 
 /* Les filtres suivent la recherche de près : ils forment un seul bloc, celui
    par quoi on restreint la liste. */
