@@ -39,7 +39,10 @@
   if (!(FONDU[0] >= 0 && FONDU[1] <= 1 && FONDU[0] < FONDU[1])) FONDU = [.24, .88];
 
   var FILS = 60;                  // fils du ruban
-  var PAS = 5;                    // px entre deux points d'un fil
+  var PAS = 4;                    // px entre deux points d'un fil…
+  var POINTS_MAX = 280;           // …sans dépasser ce nombre, même sur un grand écran
+  var PIXELS_MAX = 1.8e6;         // surface de canvas au-delà de laquelle on baisse la densité
+  var BANDES = 12;                // dégradés de couleur par image (un pour cinq fils)
   var TAU = Math.PI * 2;
 
   /* ------------------------------------------------------------ cadre */
@@ -49,10 +52,15 @@
   function taille() {
     var r = cv.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    dpr = Math.min(global.devicePixelRatio || 1, 2);
     W = r.width; H = r.height;
+    /* Le ruban de la connexion couvre tout l'écran en largeur : en pleine
+       densité d'un écran Retina, chaque image coûterait des millions de pixels
+       et des images sauteraient. Au-delà d'une surface raisonnable, la densité
+       baisse — des fils fins et flous ne s'en ressentent pas. */
+    dpr = Math.min(global.devicePixelRatio || 1, 2, Math.sqrt(PIXELS_MAX / Math.max(1, W * H)));
+    dpr = Math.max(1, dpr);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    n = Math.ceil(W / PAS);
+    n = Math.min(POINTS_MAX, Math.ceil(W / PAS));
     centre = new Float32Array(n + 1);
     torsion = new Float32Array(n + 1);
     froisse = new Float32Array(n + 1);
@@ -92,40 +100,56 @@
     for (i = 0; i <= n; i++) {
       s = i / n;
       centre[i] = mi + ampli * (
-        .62 * Math.sin(TAU * s * 1.05 + T * .52) +
-        .38 * Math.sin(TAU * s * 2.2 - T * .77 + 1.7));
-      torsion[i] = Math.cos(TAU * s * .85 - T * .33 + .7 * Math.sin(T * .19));
-      froisse[i] = H * .018 * (1 - Math.abs(torsion[i]));
+        .64 * Math.sin(TAU * s * 1.0 + T * .36) +
+        .36 * Math.sin(TAU * s * 1.9 - T * .52 + 1.7));
+      torsion[i] = Math.cos(TAU * s * .8 - T * .23 + .6 * Math.sin(T * .13));
+      froisse[i] = H * .011 * (1 - Math.abs(torsion[i]));
     }
 
-    var h0 = T * 9;                              // le spectre dérive : un tour en 40 s
+    var h0 = T * 6;                              // le spectre dérive : un tour en une minute
     var lum = CLAIR ? 44 : 62;
     ctx.globalCompositeOperation = CLAIR ? "source-over" : "lighter";
     ctx.lineJoin = "round"; ctx.lineCap = "round";
 
+    /* Un dégradé par bande de fils voisins plutôt qu'un par fil : l'œil ne
+       distingue pas cinq fils côte à côte d'une même teinte, et l'image coûte
+       cinq fois moins d'objets à créer — autant de ramasse-miettes en moins,
+       donc d'à-coups en moins. */
+    var degrades = [];
+    for (var b = 0; b < BANDES; b++) {
+      var ub = (b + .5) / BANDES - .5, g = ctx.createLinearGradient(0, 0, W, 0);
+      for (var k = 0; k <= 4; k++) g.addColorStop(k / 4, teinte(h0 + 200 + k * 60 + ub * 70, lum, 1));
+      degrades.push(g);
+    }
+
+    var xs = [], ys = [];
     for (var f = 0; f < FILS; f++) {
       var u = f / (FILS - 1) - .5;               // -0,5 … 0,5 à travers le ruban
       var coeur = 1 - Math.abs(2 * u);           // les fils du milieu portent la lumière
-      var g = ctx.createLinearGradient(0, 0, W, 0);
-      for (var k = 0; k <= 4; k++) {
-        g.addColorStop(k / 4, teinte(h0 + 200 + k * 60 + u * 70, lum, 1));
-      }
-      ctx.strokeStyle = g;
+      ctx.strokeStyle = degrades[Math.min(BANDES - 1, Math.floor((u + .5) * BANDES))];
 
-      ctx.beginPath();
       var phase = f * .41;
       for (i = 0; i <= n; i++) {
         s = i / n;
-        var y = centre[i] + u * large * torsion[i] + froisse[i] * Math.sin(s * 19 + T * 1.25 + phase);
-        if (i === 0) ctx.moveTo(0, y); else ctx.lineTo(s * W, y);
+        xs[i] = s * W;
+        ys[i] = centre[i] + u * large * torsion[i] + froisse[i] * Math.sin(s * 9 + T * .8 + phase);
       }
+      /* Courbes et non segments : chaque point sert de point de contrôle, la
+         courbe passe par les milieux. Plus aucun angle, même là où le ruban
+         se tord le plus. */
+      ctx.beginPath();
+      ctx.moveTo(xs[0], ys[0]);
+      for (i = 1; i < n; i++) {
+        ctx.quadraticCurveTo(xs[i], ys[i], (xs[i] + xs[i + 1]) / 2, (ys[i] + ys[i + 1]) / 2);
+      }
+      ctx.lineTo(xs[n], ys[n]);
 
       if (!CLAIR) {                              // halo : trait large et presque transparent
         ctx.lineWidth = 3.2;
         ctx.globalAlpha = .035 + .05 * coeur;
         ctx.stroke();
       }
-      ctx.lineWidth = CLAIR ? .8 : .9;
+      ctx.lineWidth = CLAIR ? .9 : 1.05;          // sous 1 px, un fil scintille en bougeant
       ctx.globalAlpha = CLAIR ? .22 + .38 * coeur : .16 + .34 * coeur;
       ctx.stroke();
     }
