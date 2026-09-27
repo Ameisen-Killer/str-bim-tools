@@ -721,6 +721,11 @@
     surChangement: function (f) { abonnes.push(f); return function () { abonnes = abonnes.filter(function (x) { return x !== f; }); }; },
     /** Après un enregistrement refusé, l'état a été relu depuis la base : la page doit se redessiner. */
     surRechargement: function (f) { rechargements.push(f); },
+    /** Redessine la page sans relire la base : une écriture faite hors de la page
+     *  (la palette de commandes) passe par ici pour apparaître aussitôt. */
+    redessine: function () {
+      rechargements.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } });
+    },
 
     /**
      * Relit la base et redessine : ce qu'un collègue vient d'enregistrer

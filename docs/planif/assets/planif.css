@@ -198,6 +198,16 @@ p{margin:0}
 }
 .bulle-en-ligne li.moi{color:var(--texte)}
 
+/* Bouton de la palette de commandes (palette.js), en tête des outils du haut */
+.barre-outils .btn-palette{
+  display:inline-flex;align-items:center;gap:9px;align-self:center;
+  padding:5px 7px 5px 9px;margin:-6px 0;border:1px solid var(--ligne-faible);
+  transition:color .3s,border-color .3s;
+}
+.barre-outils .btn-palette:hover{border-color:rgba(var(--or-rvb),.45)}
+.btn-palette .recherche-loupe{width:16px;height:16px;color:inherit;transform:scale(.72);transform-origin:left center;margin-right:-4px}
+.btn-palette kbd{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:none;color:var(--texte-faible);border:1px solid var(--ligne);padding:0 5px}
+
 /* Menu de thème */
 .theme{position:relative}
 .theme-btn{display:inline-flex;align-items:baseline;gap:7px}
@@ -901,6 +911,77 @@ mark.trouve{
 .sans-resultat .btn{margin-top:18px}
 
 /* =====================================================================
+   Palette de commandes (palette.js) — Ctrl+K
+   Une boîte en haut de l'écran : la saisie, les résultats par groupes, un
+   surlignage qui glisse d'une ligne à l'autre, les touches en pied.
+   ===================================================================== */
+.palette{position:fixed;inset:0;z-index:70}
+.palette[hidden]{display:none}
+html.palette-ouverte{overflow:hidden}
+.pal-fond{position:absolute;inset:0;background:var(--voile);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:pal-fondu .18s ease-out}
+.pal-boite{
+  position:relative;margin:min(13vh,120px) auto 0;width:min(700px,calc(100vw - 32px));
+  max-height:min(72vh,660px);display:flex;flex-direction:column;
+  background:var(--noir-2);border:1px solid var(--ligne);
+  box-shadow:0 34px 90px rgba(0,0,0,.45),0 0 0 1px rgba(var(--or-rvb),.07);
+  animation:pal-entre .2s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes pal-entre{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes pal-fondu{from{opacity:0}to{opacity:1}}
+.pal-saisie{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--ligne-faible)}
+.pal-saisie .recherche-loupe{color:var(--or)}
+.pal-champ{flex:1;min-width:0;background:none;border:0;outline:none;padding:4px 0;color:var(--texte);
+  font-family:var(--sans);font-size:19px;letter-spacing:.005em}
+.pal-champ::placeholder{color:var(--texte-faible)}
+.pal-echap{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--texte-faible);border:1px solid var(--ligne);padding:1px 6px}
+
+.pal-liste{position:relative;overflow-y:auto;overscroll-behavior:contain;padding:4px 8px 10px;scroll-padding:30px 0}
+.pal-curseur{
+  position:absolute;left:8px;right:8px;top:0;height:0;z-index:0;pointer-events:none;
+  background:rgba(var(--or-rvb),.1);box-shadow:inset 2px 0 0 var(--or);
+  transition:transform .16s cubic-bezier(.2,.7,.2,1),height .16s cubic-bezier(.2,.7,.2,1),opacity .2s;
+}
+.pal-groupe{position:relative;z-index:1;padding:14px 12px 6px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--texte-faible)}
+.pal-ligne{
+  position:relative;z-index:1;display:flex;align-items:center;gap:14px;min-height:44px;padding:8px 12px;
+  cursor:pointer;color:var(--texte-doux);transition:color .15s;
+}
+.pal-ligne[aria-selected="true"]{color:var(--texte)}
+.pal-ligne.eteinte{opacity:.55}
+.pal-ico{flex:0 0 22px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;letter-spacing:0;color:var(--texte-faible)}
+.pal-ligne[aria-selected="true"] .pal-ico{color:var(--or)}
+.pal-teinte{width:8px;height:8px;transform:rotate(45deg)}
+.pal-lib{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:15px;line-height:1.3}
+.pal-lib,.pal-lib > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pal-lib mark.trouve{background:none;color:var(--or);box-shadow:none;padding:0}
+.pal-sous{font-size:12.5px;color:var(--texte-faible)}
+.pal-code{font-family:var(--mono);font-weight:400;font-size:13px;letter-spacing:.04em;color:var(--texte-doux)}
+.pal-meta{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--texte-faible);white-space:nowrap}
+.pal-ligne[aria-selected="true"] .pal-meta{color:var(--texte-doux)}
+.pal-creer,.pal-creer > span{white-space:normal;overflow:visible}
+.pal-creer b{font-weight:500;color:var(--texte)}
+.pal-etiqs{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;white-space:normal}
+.pal-etiq{
+  display:inline-flex;align-items:center;padding:3px 9px;border:1px solid var(--ligne);border-left:2px solid var(--or);
+  font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--texte-doux);white-space:nowrap;
+  animation:pal-etiq .22s cubic-bezier(.2,.7,.2,1);
+}
+.pal-etiq.manque{border-style:dashed;border-left-width:1px;color:var(--texte-faible)}
+@keyframes pal-etiq{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.pal-ligne.creer{padding-top:10px;padding-bottom:10px}
+.pal-vide{padding:26px 12px;color:var(--texte-faible);font-size:14px}
+
+.pal-pied{
+  display:flex;justify-content:space-between;align-items:center;gap:10px 18px;flex-wrap:wrap;
+  padding:10px 20px;border-top:1px solid var(--ligne-faible);
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible);
+}
+.pal-pied kbd{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:none;border:1px solid var(--ligne);padding:0 5px;margin-right:4px}
+.pal-exemple{background:none;border:0;padding:0;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;text-align:left;transition:color .25s}
+.pal-exemple span{text-transform:none;letter-spacing:.02em;color:var(--texte-doux);transition:color .25s}
+.pal-exemple:hover,.pal-exemple:hover span{color:var(--or)}
+
+/* =====================================================================
    Téléphone (≤ 640 px) — l'outil doit s'y utiliser, pas seulement s'y afficher.
    Cibles tactiles d'au moins 40 px, rien qui oblige à défiler de côté,
    action principale à portée de pouce.
@@ -1011,6 +1092,14 @@ mark.trouve{
   .barre-outils [data-rafraichir]{font-size:0;letter-spacing:0;min-width:40px;justify-content:center}
   .barre-outils [data-rafraichir]::after{content:"↻";font-size:16px;letter-spacing:0}
   .theme-ico{font-size:16px}
+  /* la palette : la loupe seule dans la barre, la boîte en haut et sur toute la largeur */
+  .btn-palette-lib,.btn-palette kbd{display:none}
+  .barre-outils .btn-palette{border:0;padding:10px 0;min-width:32px;justify-content:center}
+  .btn-palette .recherche-loupe{transform:none;margin-right:0}
+  .pal-boite{margin-top:max(8px,env(safe-area-inset-top));width:calc(100vw - 16px);max-height:calc(100dvh - 24px)}
+  .pal-champ{font-size:17px}
+  .pal-echap,.pal-touches{display:none}
+  .pal-meta{display:none}
   /* le compteur garde sa puce et son nombre : « en ligne » se devine */
   .en-ligne-lib{display:none}
   .barre-outils .menu-theme,.bulle-en-ligne{right:-8px}
@@ -1046,7 +1135,7 @@ mark.trouve{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{background:#fff;color:#16130F;font-size:9pt;overflow-x:visible}
 
-  [data-chrome],.fab,.toast,.modale,.bandeau,.plan-barre,.recherche,.outils,
+  [data-chrome],.fab,.toast,.modale,.palette,.bandeau,.plan-barre,.recherche,.outils,
   .seul-mobile,.suite-liste-pied,footer.pied-outil,.sans-impression{display:none!important}
   /* Le bloc collant ne porte que de quoi restreindre la liste (recherche,
      filtres) : hors papier. Ce qu'il retient se lit dans l'en-tête imprimé. */

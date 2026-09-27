@@ -663,7 +663,19 @@
     var etiquette = avecBase ? SB.email()
       : (D.estDemo() ? "Jeu de démonstration" : "Données locales");
 
+    /* La palette (palette.js) : le bouton la fait connaître, Ctrl+K la fait
+       aimer. Absent si le script n'est pas chargé. */
+    var palette = global.Palette ? el("button", {
+      type: "button", class: "btn-palette", onclick: function () { global.Palette.ouvre(); },
+      "aria-label": "Chercher ou agir (" + global.Palette.touche + ")", title: "Chercher, aller, agir — ou écrire une tâche"
+    }, [
+      el("span", { class: "recherche-loupe", "aria-hidden": "true" }),
+      el("span", { class: "btn-palette-lib", text: "Chercher" }),
+      el("kbd", { text: global.Palette.touche })
+    ]) : null;
+
     var outilsHaut = el("div", { class: "barre-outils" }, [
+      palette,
       placeEnLigne(),
       el("span", { class: "maj", text: etiquette }),
       menuTheme(),
@@ -787,7 +799,7 @@
      Une barre commune aux listes (tâches, affaires, équipe), filtrée à chaque
      caractère. Insensible à la casse et aux accents (« beton » trouve
      « Béton »), plusieurs mots se cumulent (« coffrage kevin »).
-     Raccourcis : « / » ou Ctrl+K pour chercher, Échap pour effacer,
+     Raccourcis : « / » pour chercher (Ctrl+K ouvre la palette de commandes), Échap pour effacer,
      Entrée pour ouvrir le résultat quand il n'en reste qu'un. */
 
   /** Forme de comparaison : minuscules, sans accents. */
@@ -962,12 +974,13 @@
     });
     effacer.addEventListener("click", function () { champ.value = ""; etat(); o.surSaisie(""); champ.focus(); });
 
-    // « / » ou Ctrl+K depuis n'importe où, sauf pendant une saisie ou avec une fenêtre ouverte
+    // « / » depuis n'importe où, sauf pendant une saisie ou avec une fenêtre ouverte.
+    // Ctrl+K appartient à la palette de commandes (palette.js), qui cherche partout.
     document.addEventListener("keydown", function (e) {
       var cible = e.target, enSaisie = /^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName) || cible.isContentEditable;
-      var fenetre = document.querySelector(".modale.ouverte");
+      var fenetre = document.querySelector(".modale.ouverte, .palette:not([hidden])");
       if (fenetre) return;
-      if ((e.key === "/" && !enSaisie) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+      if (e.key === "/" && !enSaisie) {
         e.preventDefault(); champ.focus(); champ.select();
       }
     });
@@ -1562,6 +1575,8 @@
     o = o || {};
     var Calc = global.Calc;
     var t = idTache ? D.tache(idTache) : null;
+    // Tâche neuve pré-remplie : ce que la palette a compris d'une phrase
+    var b = (!t && o.brouillon) || {};
     var affaires = D.affaires({ tous: true });
     if (!affaires.length) {
       return ouvre({
@@ -1608,8 +1623,8 @@
     var boiteDes = el("div", { class: "champ" }, [el("label", { for: "c-dessinateurId", text: "Dessinateur" })]);
     function rebranche() {
       var aff = chAffaire.querySelector("select").value;
-      var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : "");
-      var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : "");
+      var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : (b.ingenieurId || ""));
+      var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : (b.dessinateurId || ""));
       [boiteIng, boiteDes].forEach(function (b) {
         var s = b.querySelector("select"); if (s) s.remove();
         var a = b.querySelector(".aide"); if (a) a.remove();
@@ -1696,7 +1711,7 @@
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         chAffaire,
-        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : "", exemple: "Plans de coffrage niveau 1", large: true })
+        champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : (b.titre || ""), exemple: "Plans de coffrage niveau 1", large: true })
       ]),
       el("fieldset", {}, [
         el("div", { class: "legende", text: "Charges estimées et affectations" }),
@@ -1705,12 +1720,12 @@
           boiteIng,
           champ({
             nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeInge : "", exemple: "0"
+            valeur: t ? t.chargeInge : (b.chargeInge || ""), exemple: "0"
           }),
           boiteDes,
           champ({
             nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeDessin : "", exemple: "0"
+            valeur: t ? t.chargeDessin : (b.chargeDessin || ""), exemple: "0"
           })
         ])
       ]),
@@ -1718,7 +1733,7 @@
         el("div", { class: "legende", text: "Dates" }),
         el("div", { class: "grille-champs" }, [
           champ({
-            nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : "",
+            nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : (b.echeance || ""),
             aide: "C'est la date qui fait foi : le début s'en déduit."
           }),
           el("div", { class: "champ" }, [
@@ -1876,6 +1891,7 @@
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,
+    choisitTheme: choisitTheme, deconnecte: deconnecte,
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime,
