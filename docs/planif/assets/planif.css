@@ -561,6 +561,19 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .plan-periode b{color:var(--or);font-weight:400}
 
 .plan-defile{overflow-x:auto;scrollbar-width:thin;padding-bottom:6px}
+
+/* En-tête du planning (semaines et jours), collé sous la barre du haut pendant
+   qu'on descend dans la page. Il vit dans son propre conteneur, hors du
+   planning : « sticky » se raccroche au plus proche ancêtre qui défile, et le
+   planning ne défile que de côté — l'en-tête y serait resté figé en place.
+   Ici l'ancêtre est la page, donc le collage fonctionne ; le défilement latéral
+   est recopié depuis celui du planning (script du tableau de bord).
+   --h-chrome est la hauteur mesurée de la barre du haut (ui.js). */
+.plan-tete{
+  position:sticky;top:var(--h-chrome,0px);z-index:12;
+  overflow:hidden;background:var(--noir);
+  border-bottom:1px solid var(--ligne);
+}
 .plan{--wnom:186px;display:grid;grid-template-columns:var(--wnom) 1fr;min-width:760px}
 .pl-nom,.pl-zone{min-width:0}
 .pl-nom{position:sticky;left:0;z-index:2;background:var(--noir);padding:10px 14px 10px 0;border-bottom:1px solid var(--ligne-faible)}
@@ -982,6 +995,7 @@ mark.trouve{
 
   /* la grille : plus de défilement latéral, tout rentre dans la largeur */
   .defile,.plan-defile{overflow:visible!important}
+  .plan-tete{position:static;overflow:visible!important;border-bottom:0;margin-top:0!important}
   .plan{min-width:0!important;--wnom:118px}
   .pl-nom{position:static;background:none;padding:5px 8px 5px 0}
   .pl-nom,.pl-zone{break-inside:avoid}

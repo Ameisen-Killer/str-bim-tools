@@ -603,6 +603,27 @@
       ]));
       document.body.classList.add("avec-fab");
     }
+
+    mesureChrome(hote);
+  }
+
+  /* Hauteur de la barre du haut, publiée en --h-chrome : les en-têtes qui se
+     collent sous elle (les semaines et les jours du planning) en ont besoin, et
+     elle change avec la largeur de la fenêtre — la navigation passe sur deux
+     lignes, l'encoche d'un téléphone ajoute sa marge. */
+  var suiviChrome = null;
+  function mesureChrome(hote) {
+    function pose() {
+      document.documentElement.style.setProperty("--h-chrome", Math.round(hote.getBoundingClientRect().height) + "px");
+    }
+    pose();
+    if (suiviChrome) suiviChrome.disconnect();
+    if (window.ResizeObserver) {
+      suiviChrome = new ResizeObserver(pose);
+      suiviChrome.observe(hote);
+    } else {
+      window.addEventListener("resize", pose);
+    }
   }
 
   /* ------------------------------------------------------------- recherche
