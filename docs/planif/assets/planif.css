@@ -765,6 +765,18 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 /* ------------------------------------------------------------ recherche
    Un seul trait : le champ n'a pas de cadre, seulement un filet qui passe à
    l'or quand on y entre, et au rouge quand plus rien ne correspond. */
+/* Recherche et filtres collés sous la barre du haut : le bloc par quoi on
+   restreint la liste reste sous les yeux pendant qu'elle défile, alors que le
+   titre s'en va. Même mécanique que l'en-tête du planning : --h-chrome est la
+   hauteur mesurée de la barre du haut (ui.js). */
+.tete-collante{
+  position:sticky;top:var(--h-chrome,0px);z-index:12;
+  background:var(--noir);
+  padding-bottom:16px;margin-bottom:10px;
+  border-bottom:1px solid var(--ligne);
+}
+.tete-collante > :last-child{margin-bottom:0}
+
 /* Les filtres suivent la recherche de près : ils forment un seul bloc, celui
    par quoi on restreint la liste. */
 .recherche{
@@ -900,7 +912,8 @@ mark.trouve{
 
   /* filtres repliés derrière un bouton */
   #filtres{display:none!important}
-  #filtres.ouvert{display:grid!important}
+  #filtres.ouvert{display:grid!important;margin-top:16px}
+  .tete-collante{padding-bottom:12px}
 
   /* tableau de bord : un bloc par membre, la semaine sur toute la largeur */
   .plan-barre{gap:8px}
@@ -996,6 +1009,7 @@ mark.trouve{
   /* la grille : plus de défilement latéral, tout rentre dans la largeur */
   .defile,.plan-defile{overflow:visible!important}
   .plan-tete{position:static;overflow:visible!important;border-bottom:0;margin-top:0!important}
+  .tete-collante{position:static;border-bottom:0;padding-bottom:0;margin-bottom:0}
   .plan{min-width:0!important;--wnom:118px}
   .pl-nom{position:static;background:none;padding:5px 8px 5px 0}
   .pl-nom,.pl-zone{break-inside:avoid}
