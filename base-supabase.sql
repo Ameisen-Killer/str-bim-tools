@@ -565,7 +565,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'reglages',
+      and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
