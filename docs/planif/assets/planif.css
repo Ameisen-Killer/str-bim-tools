@@ -197,6 +197,11 @@ p{margin:0}
   overflow:hidden;text-overflow:ellipsis;
 }
 .bulle-en-ligne li.moi{color:var(--texte)}
+/* Le canal des mises à jour en direct (direct.js) est ouvert : la bulle le dit */
+html[data-direct="oui"] .bulle-en-ligne::after{
+  content:"Mises à jour en direct";display:block;margin-top:10px;padding-top:9px;border-top:1px solid var(--ligne-faible);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--or);
+}
 
 /* Bouton de la palette de commandes (palette.js), en tête des outils du haut */
 .barre-outils .btn-palette{

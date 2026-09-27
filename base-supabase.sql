@@ -1263,6 +1263,27 @@ revoke all on function public.garde_creation_compte(jsonb) from public, anon, au
 grant usage on schema public to supabase_auth_admin;
 grant execute on function public.garde_creation_compte(jsonb) to supabase_auth_admin;
 
+-- ==================================================== mises à jour en direct ==
+-- Les pages ouvertes se mettent à jour quand un collègue enregistre
+-- (docs/planif/assets/direct.js) : le service Realtime ne diffuse que les
+-- tables de cette publication, et à chacun seulement ce que la RLS lui laisse lire.
+do $$
+declare
+  t text;
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'contacts', 'reglages'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
 commit;
 
 -- L'API relit la forme des tables et des fonctions

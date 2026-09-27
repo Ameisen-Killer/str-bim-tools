@@ -739,6 +739,9 @@
     enregistrePreferences: enregistrePreferences,
     requete: requete,
     rpc: rpc,
+    /** Jeton valide (rafraîchi au besoin), l'adresse du projet et sa clé publiable : le direct (direct.js) s'en sert. */
+    jeton: jeton,
+    projet: function () { return { url: URL_BASE, cle: CLE }; },
     presence: presence,
     reglagesAuth: reglagesAuth,
     ADAPT: {

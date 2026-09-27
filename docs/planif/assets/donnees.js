@@ -306,12 +306,20 @@
   var file = Promise.resolve();
   var generation = 0;           // change à chaque échec : les écritures en attente qui en dépendaient sont abandonnées
 
+  /* Écritures en cours et heure de la dernière : les mises à jour en direct
+     (direct.js) reconnaissent ainsi l'écho de nos propres enregistrements. */
+  var ecrituresEnCours = 0, derniereEcriture = 0;
+
   function enFile(ecrire, instantane) {
     var gen = generation;
+    ecrituresEnCours++;
     var ecriture = file.then(function () {
       if (gen !== generation) throw erreur("Modification abandonnée : l'enregistrement précédent a échoué.");
       return ecrire();
-    }).then(function () {
+    });
+    ecriture.then(fini, fini);
+    function fini() { ecrituresEnCours--; derniereEcriture = Date.now(); }
+    ecriture = ecriture.then(function () {
       precedent = instantane;
       version++;
       previens();
@@ -721,6 +729,8 @@
     surChangement: function (f) { abonnes.push(f); return function () { abonnes = abonnes.filter(function (x) { return x !== f; }); }; },
     /** Après un enregistrement refusé, l'état a été relu depuis la base : la page doit se redessiner. */
     surRechargement: function (f) { rechargements.push(f); },
+    /** Vrai pendant une écriture de cette page, et dans les ms qui suivent sa fin. */
+    ecritureRecente: function (ms) { return ecrituresEnCours > 0 || Date.now() - derniereEcriture < (ms || 2500); },
     /** Redessine la page sans relire la base : une écriture faite hors de la page
      *  (la palette de commandes) passe par ici pour apparaître aussitôt. */
     redessine: function () {
