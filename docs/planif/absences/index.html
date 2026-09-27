@@ -64,7 +64,16 @@
 
       <div class="cles" id="cles"></div>
 
-      <div class="plan-defile" id="plan-defile" style="margin-top:28px">
+      <!-- L'en-tête du calendrier vit hors du conteneur qui défile de côté :
+           c'est la seule façon qu'il se colle sous la barre du haut quand on
+           descend dans la page (dans un conteneur à overflow, « sticky » se
+           raccroche au conteneur, qui lui ne défile pas verticalement). Son
+           défilement latéral est recopié depuis celui du calendrier. -->
+      <div class="plan-tete" id="plan-tete" style="margin-top:28px">
+        <div class="plan" id="plan-tete-grille"></div>
+      </div>
+
+      <div class="plan-defile" id="plan-defile">
         <div class="plan" id="plan"></div>
       </div>
 
@@ -155,6 +164,12 @@
   if (etroit.addEventListener) etroit.addEventListener("change", surChangement);
   else if (etroit.addListener) etroit.addListener(surChangement);
 
+  /* L'en-tête collé suit le calendrier quand on défile de côté. */
+  (function () {
+    var defile = document.getElementById("plan-defile"), tete = document.getElementById("plan-tete");
+    defile.addEventListener("scroll", function () { tete.scrollLeft = defile.scrollLeft; }, { passive: true });
+  })();
+
   /* --------------------------------------------------------------- rendu */
 
   function rend() {
@@ -241,21 +256,29 @@
 
   function rendPlan(canton) {
     var plan = UI.vide(document.getElementById("plan"));
+    var tete = UI.vide(document.getElementById("plan-tete-grille"));
     var n = jours.length, auj = C.isoAuj(), premier = jours[0];
-    plan.style.setProperty("--n", n);
-    plan.classList.toggle("dense", n > 45);
 
     // Samedi et dimanche à demi-largeur : on n'y travaille pas, la place va aux jours ouvrés.
     var nWeekend = jours.filter(C.estWeekend).length, nOuvre = n - nWeekend;
-    plan.style.setProperty("--cols", jours.map(function (j) {
+    var cols = jours.map(function (j) {
       return C.estWeekend(j) ? "minmax(0,.5fr)" : "minmax(0,1fr)";
-    }).join(" "));
-    plan.style.minWidth = etroit.matches
+    }).join(" ");
+    var mini = etroit.matches
       ? Math.max(320, nOuvre * 20 + nWeekend * 10) + "px"
       : Math.max(760, 186 + nOuvre * 26 + nWeekend * 13) + "px";
 
+    // Deux grilles, mêmes colonnes : l'en-tête reste aligné sur les barres.
+    // « dense » suit aussi : c'est lui qui, sur le papier, ne garde que les lundis.
+    [plan, tete].forEach(function (g) {
+      g.style.setProperty("--n", n);
+      g.style.setProperty("--cols", cols);
+      g.style.minWidth = mini;
+      g.classList.toggle("dense", n > 45);
+    });
+
     /* ---- en-tête : mois, semaines, puis jours ---- */
-    plan.appendChild(el("div", { class: "pl-nom pl-tete-nom" }, [
+    tete.appendChild(el("div", { class: "pl-nom pl-tete-nom" }, [
       el("div", { class: "pl-membre" }, [el("span", { class: "r", text: libelleMetier() })])
     ]));
 
@@ -294,7 +317,7 @@
       ]));
     });
 
-    plan.appendChild(el("div", { class: "pl-zone pl-tete-zone" }, [lignesMois, lignesSem, lignesJour]));
+    tete.appendChild(el("div", { class: "pl-zone pl-tete-zone" }, [lignesMois, lignesSem, lignesJour]));
 
     /* ---- une ligne par membre ---- */
     if (!lignes.length) {
