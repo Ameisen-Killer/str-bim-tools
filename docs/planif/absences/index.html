@@ -39,6 +39,7 @@
 
   <div class="wrap">
     <section class="section">
+      <div data-recherche></div>
       <div class="plan-barre">
         <button class="btn" type="button" id="prec" aria-label="Mois précédent">◀<span class="txt"> Précédent</span></button>
         <button class="btn" type="button" id="auj">Ce mois</button>
@@ -117,6 +118,7 @@
   vue.mois = Math.min(3, Math.max(1, parseInt(vue.mois, 10) || 1));
 
   var jours = [], lignes = [], jaugeParJour = {}, nomsParJour = {}, joursDe = {};
+  var barre = null;                                 // recherche instantanée
 
   function memorise() {
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
@@ -150,6 +152,13 @@
 
     document.getElementById("pdf").addEventListener("click", exportePdf);
 
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher un nom, un métier, une succursale, un motif d'absence…",
+      surSaisie: rend,
+      surEntree: function () { if (lignes.length === 1) UI.absences(lignes[0].id, rend); }
+    });
+
     D.surRechargement(rend);
     rend();
   }).catch(UI.echec);
@@ -179,7 +188,16 @@
     var premier = jours[0], dernier = jours[jours.length - 1];
 
     // Regroupés par métier, par ordre alphabétique dans chacun
-    var membres = [].concat.apply([], D.parMetier(D.membres({ metier: vue.metier || null })).map(function (g) { return g.membres; }));
+    var tous = [].concat.apply([], D.parMetier(D.membres({ metier: vue.metier || null })).map(function (g) { return g.membres; }));
+
+    /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
+       du bas, clés, liste des périodes — porte donc sur ce qui reste affiché,
+       comme le fait déjà le filtre par métier. */
+    var mots = barre ? barre.termes() : [];
+    var membres = !mots.length ? tous : tous.filter(function (m) {
+      return UI.correspond(champsMembre(m).concat(motifsDe(m, premier, dernier)), mots);
+    });
+    if (barre) barre.compte(membres.length, tous.length);
 
     /* Une seule traversée pour tout ce qui suit : les jours d'absence de
        chacun, et le nombre d'absents jour par jour. Un congé posé un dimanche
@@ -199,11 +217,29 @@
     lignes = vue.masque ? membres.filter(function (m) { return joursDe[m.id] > 0; }) : membres;
 
     var periodes = D.absences({ depuis: premier, jusqu: dernier, metier: vue.metier || null });
+    // Une période se retient sur son propre motif : chercher « vacances » ne
+    // fait pas remonter la maladie de la même personne.
+    if (mots.length) periodes = periodes.filter(function (p) {
+      return UI.correspond(champsMembre(p.membre).concat(p.absence.motif), mots);
+    });
 
     rendPeriode(membres.length);
     rendCles(membres, canton);
     rendPlan(canton);
     rendListe(periodes);
+  }
+
+  /** Ce qui, dans un membre, peut être cherché : son identité et son rattachement. */
+  function champsMembre(m) {
+    return [m.prenom + " " + m.nom, D.libelleMetier(m.metier),
+            D.SUCCURSALES[m.succursale], D.DISCIPLINES[m.discipline]];
+  }
+
+  /** Les motifs de ses absences qui touchent la période affichée. */
+  function motifsDe(m, premier, dernier) {
+    return m.absences.filter(function (a) {
+      return a.debut <= dernier && (a.fin || a.debut) >= premier;
+    }).map(function (a) { return a.motif; });
   }
 
   function libellePeriode() {
@@ -219,8 +255,10 @@
     var p = UI.vide(document.getElementById("periode"));
     p.appendChild(el("b", { text: libellePeriode() }));
 
+    var cherche = barre && barre.valeur().trim();
     document.getElementById("imp-periode").textContent =
-      libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier();
+      libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
+      (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());
   }
@@ -323,7 +361,8 @@
     if (!lignes.length) {
       plan.appendChild(el("div", { class: "pl-nom" }));
       plan.appendChild(el("div", { class: "pl-zone" }, [
-        el("div", { class: "vide", text: vue.masque ? "Personne n'est absent sur la période" : "Aucun membre à afficher" })
+        el("div", { class: "vide", text: barre && barre.valeur().trim() ? "Personne ne correspond à cette recherche"
+          : vue.masque ? "Personne n'est absent sur la période" : "Aucun membre à afficher" })
       ]));
       return;
     }
@@ -446,7 +485,8 @@
       periodes.length ? "Périodes · " + periodes.length : "Périodes";
 
     if (!periodes.length) {
-      hote.appendChild(el("div", { class: "vide", text: "Aucune absence sur la période" }));
+      hote.appendChild(el("div", { class: "vide",
+        text: barre && barre.valeur().trim() ? "Aucune absence pour cette recherche" : "Aucune absence sur la période" }));
       return;
     }
 
