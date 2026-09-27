@@ -31,6 +31,7 @@
 
   <div class="wrap">
     <section class="section">
+      <div data-recherche></div>
       <div class="plan-barre">
         <button class="btn" type="button" id="prec" aria-label="Semaine précédente">◀<span class="txt"> Précédente</span></button>
         <button class="btn" type="button" id="auj">Aujourd'hui</button>
@@ -173,6 +174,12 @@
     fo.checked = !!vue.occupes;
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
 
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher une personne, une affaire, une tâche…",
+      surSaisie: rend
+    });
+
     D.surRechargement(rend);
     rend();
   }).catch(UI.echec);
@@ -195,6 +202,8 @@
 
   var jours = [], sems = [], membres = [], rep = {};
   var cacheRep = { cle: null, rep: null }, cacheAlertes = { cle: null, liste: [] };
+  var barre = null;                                 // recherche instantanée
+  var vusRecherche = null;                          // ids retenus par la recherche, sinon null
 
   function rend() {
     var canton = D.canton();
@@ -274,12 +283,52 @@
       (libres[info.role] || (libres[info.role] = [])).push(info);
     });
 
+    /* La recherche retire des lignes, comme les filtres au-dessus : les clés et
+       les bilans portent donc sur ce qui reste affiché. Une personne se retient
+       sur son identité ou sur ce qu'elle porte dans la fenêtre — on garde alors
+       toute sa ligne, une barre isolée ne dirait rien de sa charge. Une charge
+       sans personne, elle, se retient sur sa seule tâche. */
+    var mots = barre ? barre.termes() : [];
+    var nbAvantRecherche = membres.length;
+    vusRecherche = null;
+    if (mots.length) {
+      membres = membres.filter(function (m) {
+        return UI.correspond(champsMembre(m).concat(champsDesBarres(barres[m.id])), mots);
+      });
+      vusRecherche = Object.create(null);
+      membres.forEach(function (m) { vusRecherche[m.id] = true; });
+      Object.keys(libres).forEach(function (r) {
+        libres[r] = libres[r].filter(function (info) { return UI.correspond(champsTache(info.tache), mots); });
+        if (!libres[r].length) delete libres[r];
+      });
+    }
+    if (barre) barre.compte(membres.length, nbAvantRecherche);
+
     if (vue.occupes) membres = membres.filter(function (m) { return barres[m.id] && barres[m.id].length; });
 
     rendPeriode();
     rendCles(canton);
     rendPlan(barres, libres, canton);
     rendAlertes(canton);
+  }
+
+  /** Ce qui, dans un membre, peut être cherché : son identité et son rattachement. */
+  function champsMembre(m) {
+    return [m.prenom + " " + m.nom, D.libelleMetier(m.metier),
+            D.SUCCURSALES[m.succursale], D.DISCIPLINES[m.discipline]];
+  }
+
+  /** Ce qui, dans une tâche, peut être cherché depuis le planning. */
+  function champsTache(t) {
+    var a = D.affaire(t.affaireId);
+    return [t.titre, t.note, a && a.code, a && a.nom, D.STATUTS_TACHE[t.statut]];
+  }
+
+  /** Les tâches que cette personne porte dans la fenêtre affichée. */
+  function champsDesBarres(liste) {
+    var champs = [];
+    (liste || []).forEach(function (info) { champs = champs.concat(champsTache(info.tache)); });
+    return champs;
   }
 
   /** Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte une tâche (même règle que la page Équipe). */
@@ -312,7 +361,12 @@
     var auj = C.isoAuj();
     // Les trois autres chiffres suivent le filtre : le retard aussi, sinon il compte pour toute l'équipe
     var retard = D.taches({ sansTerminees: true, membreId: vue.membre || null }).filter(function (t) {
-      return t.echeance && t.echeance < auj && (!vue.affaire || t.affaireId === vue.affaire);
+      if (!t.echeance || t.echeance >= auj) return false;
+      if (vue.affaire && t.affaireId !== vue.affaire) return false;
+      // En recherche, seuls les retards des personnes restées à l'écran
+      return !vusRecherche
+        || (t.ingenieurId && vusRecherche[t.ingenieurId])
+        || (t.dessinateurId && vusRecherche[t.dessinateurId]);
     }).length;
 
     function cle(v, l, classe) {
@@ -445,7 +499,8 @@
     if (!membres.length) {
       plan.appendChild(el("div", { class: "pl-nom" }));
       plan.appendChild(el("div", { class: "pl-zone" }, [
-        el("div", { class: "vide", text: "Aucun membre à afficher" })
+        el("div", { class: "vide",
+          text: barre && barre.valeur().trim() ? "Personne ne correspond à cette recherche" : "Aucun membre à afficher" })
       ]));
       return;
     }
