@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=62">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=63">
 </head>
 <body class="large">
 
@@ -24,6 +24,15 @@
   <div class="wrap entete">
     <h1>Tâches <span id="titre-liste" class="compte-titre"></span></h1>
     <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <!-- en-tête du papier : invisible à l'écran, imprimé en tête du PDF -->
+  <div class="wrap entete-impression">
+    <h1>Liste des tâches</h1>
+    <div class="ligne">
+      <span id="imp-filtres"></span>
+      <span id="imp-edition"></span>
+    </div>
   </div>
 
   <div class="wrap" data-bandeau></div>
@@ -40,7 +49,7 @@
         <div class="grille-champs" id="filtres" style="max-width:1100px"></div>
       </div>
       <!-- Téléphone seulement : la barre du haut y cache ses actions -->
-      <button class="btn seul-mobile" type="button" id="btn-csv" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Export CSV</button>
+      <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
       <div class="defile" id="liste"></div>
     </section>
   </div>
@@ -53,7 +62,7 @@
 <script src="/planif/assets/supabase.js?v=15"></script>
 <script src="/planif/assets/donnees.js?v=23"></script>
 <script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=38"></script>
+<script src="/planif/assets/ui.js?v=39"></script>
 <script>
 (function () {
   "use strict";
@@ -80,7 +89,7 @@
        sont dans la barre. Sur téléphone la barre masque ses actions au profit
        du bouton flottant — l'export y garde donc son bouton dans la page. */
     UI.chrome("taches", [
-      { label: "Export CSV", icone: "ico-export", action: exporteCSV },
+      { label: "Exporter en PDF", icone: "ico-export", action: exportePdf },
       { label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }
     ]);
     UI.pied();
@@ -88,7 +97,7 @@
     UI.colleSousBarre(document.querySelector(".tete-collante"));
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    document.getElementById("btn-csv").addEventListener("click", exporteCSV);
+    document.getElementById("btn-pdf").addEventListener("click", exportePdf);
     document.getElementById("btn-filtres").addEventListener("click", function () {
       var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
       this.setAttribute("aria-expanded", String(ouvert));
@@ -217,6 +226,20 @@
     var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
     document.getElementById("titre-liste").textContent =
       taches.length + (taches.length > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(charge) + " j";
+
+    /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
+       Tout ce qui restreint la liste y figure, la recherche comprise. */
+    var restreint = [];
+    if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(af.code + " · " + af.nom); }
+    if (filtres.membre) restreint.push(filtres.membre === "a-affecter" ? "À affecter" : D.nomMembre(filtres.membre));
+    if (filtres.statut) restreint.push(D.STATUTS_TACHE[filtres.statut]);
+    if (filtres.masqueTerminees) restreint.push("Terminées masquées");
+    var cherche = barre && barre.valeur().trim();
+    if (cherche) restreint.push("« " + cherche + " »");
+    document.getElementById("imp-filtres").textContent = restreint.length ? restreint.join("  ·  ") : "Toutes les tâches";
+    document.getElementById("imp-edition").textContent =
+      taches.length + (taches.length > 1 ? " tâches" : " tâche") + "  ·  " + C.fmtJours(charge) +
+      " j  ·  édité le " + C.fmtCH(C.isoAuj());
 
     if (!taches.length) {
       hote.appendChild(sansResultat(mots, actifs));
@@ -603,22 +626,12 @@
 
   /* -------------------------------------------------------------- export */
 
-  function exporteCSV() {
-    var lignes = [["Affaire", "Libellé", "Tâche", "Charge ingénieur (j)", "Ingénieur", "Calcul terminé",
-                   "Charge dessin (j)", "Dessinateur", "Dessin terminé", "Début", "Échéance", "Statut", "Avancement (%)", "Note"]];
-    var oui = function (t, cle, charge) { return t[charge] > 0 ? (t[cle] ? "oui" : "non") : ""; };
-    selection().forEach(function (t) {
-      var a = D.affaire(t.affaireId);
-      lignes.push([
-        a ? a.code : "", a ? a.nom : "", t.titre,
-        C.fmtJours(t.chargeInge), t.ingenieurId ? D.nomMembre(t.ingenieurId) : "", oui(t, "finiInge", "chargeInge"),
-        C.fmtJours(t.chargeDessin), t.dessinateurId ? D.nomMembre(t.dessinateurId) : "", oui(t, "finiDessin", "chargeDessin"),
-        C.fmtCH(Calc.debutEffectif(t, D.canton())), C.fmtCH(t.echeance),
-        D.STATUTS_TACHE[t.statut], t.avancement, t.note || ""
-      ]);
-    });
-    UI.telecharge("taches-" + C.isoAuj() + ".csv", UI.csv(lignes), "text/csv;charset=utf-8");
-    UI.toast("Export CSV généré.");
+  /* Le PDF sort de l'impression du navigateur, mise en page par la feuille
+     @media print — aucune bibliothèque. La liste s'affiche par paquets de 150 :
+     il faut la dérouler en entier d'abord, le papier ne voit que le document. */
+  function exportePdf() {
+    if (affichage && affichage.tout) affichage.tout();
+    UI.imprime("taches-" + C.isoAuj());
   }
 })();
 </script>

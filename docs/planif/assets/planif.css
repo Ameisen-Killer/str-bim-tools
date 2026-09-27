@@ -1025,6 +1025,12 @@ mark.trouve{
 
   [data-chrome],.fab,.toast,.modale,.bandeau,.plan-barre,.recherche,.outils,
   .seul-mobile,.suite-liste-pied,footer.pied-outil,.sans-impression{display:none!important}
+  /* Le bloc collant ne porte que de quoi restreindre la liste (recherche,
+     filtres) : hors papier. Ce qu'il retient se lit dans l'en-tête imprimé. */
+  .tete-collante{display:none!important}
+  /* Les bascules en tête de ligne (démarrer, terminer) sont des commandes */
+  .tache-bascules{display:none!important}
+  .tache-titre{padding-left:0}
   body.avec-fab main{padding-bottom:0}
   .wrap{max-width:none;padding-inline:0}
   a{text-decoration:none;color:inherit}

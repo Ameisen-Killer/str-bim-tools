@@ -732,7 +732,12 @@
         observateur.observe(pied);
       }
     }
-    return { fin: function () { if (observateur) observateur.disconnect(); } };
+    return {
+      fin: function () { if (observateur) observateur.disconnect(); },
+      /* Tout afficher d'un coup. L'impression ne voit que ce qui est dans le
+         document : sans ça, un export PDF s'arrêterait au premier paquet. */
+      tout: function () { while (rang < o.elements.length) suite(); }
+    };
   }
 
   /**
