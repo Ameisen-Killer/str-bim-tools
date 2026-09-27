@@ -645,8 +645,12 @@
        planning et celui du calendrier des absences — s'appuie dessus, et elle
        change quand le bloc se resserre. Sans bloc collant, la variable reste
        absente et le repli à 0 px de calc() rend l'ancien comportement. */
+    var derniere = null;
     function mesure() {
-      document.documentElement.style.setProperty("--h-collee", Math.round(bloc.getBoundingClientRect().height) + "px");
+      var h = Math.round(bloc.getBoundingClientRect().height);
+      if (h === derniere) return;        // écrire sur documentElement invalide le
+      derniere = h;                      // style de toute la page : une fois par
+      document.documentElement.style.setProperty("--h-collee", h + "px");   // changement, pas par image
     }
     function juge() {
       attend = false;
