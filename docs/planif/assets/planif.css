@@ -570,7 +570,9 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
    est recopié depuis celui du planning (script du tableau de bord).
    --h-chrome est la hauteur mesurée de la barre du haut (ui.js). */
 .plan-tete{
-  position:sticky;top:var(--h-chrome,0px);z-index:12;
+  /* Sous la barre du haut, et sous le bloc de recherche quand la page en a un
+     (tableau de bord, absences) : --h-collee est sa hauteur, publiée par ui.js. */
+  position:sticky;top:calc(var(--h-chrome,0px) + var(--h-collee,0px));z-index:12;
   overflow:hidden;background:var(--noir);
   border-bottom:1px solid var(--ligne);
 }

@@ -640,9 +640,18 @@
   function colleSousBarre(bloc) {
     if (!bloc) return;
     var attend = false;
+
+    /* Hauteur publiée en --h-collee : ce qui se colle en dessous — l'en-tête du
+       planning et celui du calendrier des absences — s'appuie dessus, et elle
+       change quand le bloc se resserre. Sans bloc collant, la variable reste
+       absente et le repli à 0 px de calc() rend l'ancien comportement. */
+    function mesure() {
+      document.documentElement.style.setProperty("--h-collee", Math.round(bloc.getBoundingClientRect().height) + "px");
+    }
     function juge() {
       attend = false;
       bloc.classList.toggle("collee", bloc.getBoundingClientRect().top <= hauteurChrome + 1);
+      mesure();
     }
     function surDefilement() {
       if (attend) return;
@@ -651,6 +660,9 @@
     }
     window.addEventListener("scroll", surDefilement, { passive: true });
     window.addEventListener("resize", surDefilement);
+    // Le resserrement dure 0,18 s : sans observateur, l'en-tête d'en dessous
+    // garderait la hauteur d'avant le temps de la transition.
+    if (window.ResizeObserver) new ResizeObserver(mesure).observe(bloc);
     juge();
   }
 
