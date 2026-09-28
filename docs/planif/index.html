@@ -100,9 +100,9 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=19"></script>
-<script src="/planif/assets/donnees.js?v=26"></script>
+<script src="/planif/assets/donnees.js?v=27"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
-<script src="/planif/assets/ui.js?v=48"></script>
+<script src="/planif/assets/ui.js?v=49"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script src="/planif/assets/spectre.js?v=5"></script>
@@ -865,13 +865,8 @@
     var metier = info.role === "ingenieur" ? "calcul" : "dessin";
     D.retoucheTache(t.id, objet(champ, charge)).then(function () {
       rend();
-      UI.toast("Charge " + metier + " : " + C.fmtJours(charge) + " j (au lieu de " + C.fmtJours(avant) + ").", {
-        label: "Annuler",
-        action: function () {
-          D.retoucheTache(t.id, objet(champ, avant)).then(function () { rend(); UI.toast("Charge rétablie."); })
-            .catch(function (err) { UI.toast(err.message); });
-        }
-      });
+      // « Annuler » vient de lui-même dans le message (UI.toast), Ctrl+Z aussi
+      UI.toast("Charge " + metier + " : " + C.fmtJours(charge) + " j (au lieu de " + C.fmtJours(avant) + ").");
     }).catch(function (err) { UI.toast(err.message); rend(); });
   }
   function objet(k, v) { var o = {}; o[k] = v; return o; }

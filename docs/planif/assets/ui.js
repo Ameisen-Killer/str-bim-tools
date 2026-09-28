@@ -62,10 +62,16 @@
 
   /* --------------------------------------------------------------- messages */
 
-  var boiteToast = null, minuterie = null;
-  /** Message bref. action facultative : { label, action } — un bouton, « Annuler » par exemple. */
+  var boiteToast = null, minuterie = null, dernierAnnonce = 0;
+  /** Message bref. action facultative : { label, action } — un bouton, « Annuler » par exemple.
+   *  Sans action, le message qui suit un enregistrement tout frais porte « Annuler » (voir annule). */
   function toast(message, action) {
     if (!boiteToast) { boiteToast = el("div", { class: "toast", role: "status" }); document.body.appendChild(boiteToast); }
+    var D = global.Donnees, geste = !action && D && D.annulable ? D.annulable() : null;
+    if (geste && geste.quand > dernierAnnonce && Date.now() - geste.quand < 2500) {
+      dernierAnnonce = geste.quand;
+      action = { label: "Annuler", action: annule };
+    }
     vide(boiteToast);
     boiteToast.appendChild(document.createTextNode(message));
     if (action) {
@@ -80,6 +86,32 @@
     // Avec un bouton, le temps de le trouver
     minuterie = setTimeout(function () { boiteToast.classList.remove("vu"); }, action ? 6000 : 3200);
   }
+
+  /* --------------------------------------------------------------- annuler
+     Le dernier enregistrement (tâche, affaire, absence, fiche d'annuaire) se
+     défait par « Annuler » dans son message ou par Ctrl+Z (⌘Z), autant de fois
+     qu'il y a de gestes dans la page. Dans un champ de saisie, Ctrl+Z reste
+     celui du navigateur ; fenêtre ou palette ouverte, il ne fait rien. */
+  function annule() {
+    var D = global.Donnees;
+    if (!D || !D.annule) return;
+    D.annule().then(function (libelle) {
+      if (!libelle) { toast("Rien à annuler."); return; }
+      D.redessine();
+      toast("Annulé : " + libelle + ".");
+    }).catch(function (e) { toast(e.message); });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== "z") return;
+    var cible = e.target;
+    if (cible && (cible.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName))) return;
+    if (document.querySelector(".modale.ouverte, .palette:not([hidden])")) return;
+    if (document.body.classList.contains("glisse-en-cours")) return;
+    var D = global.Donnees;
+    if (!D || !D.annulable || !D.annulable()) return;
+    e.preventDefault();
+    annule();
+  });
 
   /* ---------------------------------------------------------------- modale */
 
@@ -2107,7 +2139,7 @@
     choisitTheme: choisitTheme, deconnecte: deconnecte,
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
-    formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, caseLissage: caseLissage,
+    formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, caseLissage: caseLissage, annule: annule,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,

@@ -1009,14 +1009,14 @@
     },
 
     /* -------------------------------------------------------- annuaire */
-    /* La table est arrivée après les autres, et sa migration se lance à la
-       main : tant qu'elle n'est pas passée, l'annuaire se lit vide et refuse
-       d'écrire, plutôt que d'envoyer vers une table qui n'existe pas. */
     /** La base connaît-elle l'enchaînement calcul → dessin ? (migration-enchainement.sql) */
     enchainementEnBase: function () {
       return !ADAPTATEUR.enchainementEnBase || ADAPTATEUR.enchainementEnBase();
     },
 
+    /* La table est arrivée après les autres, et sa migration se lance à la
+       main : tant qu'elle n'est pas passée, l'annuaire se lit vide et refuse
+       d'écrire, plutôt que d'envoyer vers une table qui n'existe pas. */
     annuaireEnBase: function () {
       return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
     },
@@ -1097,6 +1097,125 @@
       return Promise.resolve().then(function () { etat = demo(); return sauve(); });
     },
     estDemo: function () { return !!(etat && etat.reglages.demo); }
+  };
+
+  /* ---------------------------------------------------------- annuler
+     Chaque écriture sur une tâche, une affaire, une absence ou une fiche
+     d'annuaire garde la photo de ce qu'elle touche, telle qu'avant. Annuler
+     remet ces photos en place et enregistre : l'écriture compare à l'état
+     précédent (supabase.js, ecrire), elle envoie donc exactement l'inverse —
+     champs rétablis, élément supprimé recréé sous le même identifiant,
+     élément créé retiré. Seuls les éléments touchés reviennent : ce qu'un
+     collègue a modifié ailleurs entre-temps ne bouge pas.
+     La pile vit dans la page (30 gestes) ; elle repart vide à chaque page. */
+
+  var PILE_MAX = 30, pile = [];
+
+  function trouveDans(liste, i) {
+    for (var k = 0; k < liste.length; k++) if (liste[k].id === i) return k;
+    return -1;
+  }
+  /** Photo d'un élément d'une liste de l'état (null s'il n'existe pas encore). */
+  function photo(coll, i) {
+    var liste = etat[coll] || [], k = trouveDans(liste, i);
+    return { coll: coll, id: i, avant: k >= 0 ? copie(liste[k]) : null };
+  }
+  /** Photo des absences d'un membre : elles vivent dans sa fiche. */
+  function photoAbsences(i) {
+    var m = D.membre(i);
+    return { coll: "absences", id: i, avant: copie(m ? m.absences || [] : []) };
+  }
+  function nomTache(i) { var t = D.tache(i); return t ? "« " + t.titre + " »" : "la tâche"; }
+  function nomAffaire(i) { var a = D.affaire(i); return a ? "l'affaire " + a.code : "l'affaire"; }
+  function nomContact(i) {
+    var c = D.contact(i); return c ? "la fiche " + ((c.prenom ? c.prenom + " " : "") + (c.nom || c.societe)).trim() : "la fiche";
+  }
+  function nomAbsence(i) { var m = D.membre(i); return m ? "l'absence de " + m.prenom + " " + m.nom : "l'absence"; }
+
+  /**
+   * Rend une méthode d'écriture annulable.
+   *   avant(args…)          → photos prises avant l'écriture ;
+   *   apres(résultat, args…) → photos d'un élément créé (il n'existait pas avant) ;
+   *   libelle(args…)        → ce que dira « Annulé : … », calculé avant l'écriture.
+   */
+  function annulable(nom, avant, libelle, apres) {
+    var ecrit = D[nom];
+    D[nom] = function () {
+      var args = [].slice.call(arguments), photos, dit;
+      try { photos = avant ? avant.apply(null, args) : []; dit = libelle.apply(null, args); }
+      catch (e) { photos = null; }
+      return ecrit.apply(D, args).then(function (res) {
+        if (photos) {
+          if (apres) photos = photos.concat(apres.apply(null, [res].concat(args)));
+          pile.push({ libelle: dit, photos: photos, quand: Date.now() });
+          if (pile.length > PILE_MAX) pile.shift();
+        }
+        return res;
+      });
+    };
+  }
+
+  annulable("ajouteTache", null,
+    function (o) { return "création de « " + texte(o.titre) + " »"; },
+    function (t) { return [{ coll: "taches", id: t.id, avant: null }]; });
+  annulable("majTache", function (i) { return [photo("taches", i)]; },
+    function (i) { return "modification de " + nomTache(i); });
+  annulable("retoucheTache", function (i) { return [photo("taches", i)]; },
+    function (i) { return "modification de " + nomTache(i); });
+  annulable("suppTache", function (i) { return [photo("taches", i)]; },
+    function (i) { return "suppression de " + nomTache(i); });
+
+  annulable("ajouteAffaire", null,
+    function (o) { return "création de l'affaire " + texte(o.code); },
+    function (a) { return [{ coll: "affaires", id: a.id, avant: null }]; });
+  annulable("majAffaire", function (i) { return [photo("affaires", i)]; },
+    function (i) { return "modification de " + nomAffaire(i); });
+  // Supprimer une affaire emporte ses tâches : elles reviennent avec elle
+  annulable("suppAffaire", function (i) {
+    return [photo("affaires", i)].concat(etat.taches
+      .filter(function (t) { return t.affaireId === i; })
+      .map(function (t) { return { coll: "taches", id: t.id, avant: copie(t) }; }));
+  }, function (i) { return "suppression de " + nomAffaire(i); });
+
+  annulable("ajouteAbsence", function (i) { return [photoAbsences(i)]; },
+    function (i) { return "ajout de " + nomAbsence(i); });
+  annulable("majAbsence", function (i) { return [photoAbsences(i)]; },
+    function (i) { return "modification de " + nomAbsence(i); });
+  annulable("suppAbsence", function (i) { return [photoAbsences(i)]; },
+    function (i) { return "suppression de " + nomAbsence(i); });
+
+  annulable("ajouteContact", null,
+    function (o) { return "création de la fiche " + (texte(o.nom) || texte(o.societe)); },
+    function (c) { return [{ coll: "contacts", id: c.id, avant: null }]; });
+  annulable("majContact", function (i) { return [photo("contacts", i)]; },
+    function (i) { return "modification de " + nomContact(i); });
+  annulable("suppContact", function (i) { return [photo("contacts", i)]; },
+    function (i) { return "suppression de " + nomContact(i); });
+
+  /** Le dernier geste annulable : { libelle, quand }, ou null. */
+  D.annulable = function () {
+    var g = pile[pile.length - 1];
+    return g ? { libelle: g.libelle, quand: g.quand } : null;
+  };
+
+  /** Annule le dernier geste ; la promesse rend son libellé (null s'il n'y avait rien). */
+  D.annule = function () {
+    var g = pile.pop();
+    if (!g) return Promise.resolve(null);
+    return Promise.resolve().then(function () {
+      g.photos.slice().reverse().forEach(function (p) {
+        if (p.coll === "absences") {
+          var m = D.membre(p.id);
+          if (m) m.absences = copie(p.avant);
+          return;
+        }
+        var liste = etat[p.coll] || (etat[p.coll] = []), k = trouveDans(liste, p.id);
+        if (p.avant === null) { if (k >= 0) liste.splice(k, 1); }
+        else if (k >= 0) liste[k] = copie(p.avant);
+        else liste.push(copie(p.avant));
+      });
+      return sauve().then(function () { return g.libelle; });
+    });
   };
 
   /* ------------------------------------------------------ jeu de démonstration */

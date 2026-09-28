@@ -60,9 +60,9 @@
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=19"></script>
-<script src="/planif/assets/donnees.js?v=26"></script>
+<script src="/planif/assets/donnees.js?v=27"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
-<script src="/planif/assets/ui.js?v=48"></script>
+<script src="/planif/assets/ui.js?v=49"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script>
@@ -509,8 +509,8 @@
     var retour = champs.statut;
     D.retoucheTache(id, champs).then(function () {
       dessine();
-      UI.toast(lance ? "Tâche en cours." : "Statut remis à « " + D.STATUTS_TACHE[retour] + " ».",
-        lance ? { label: "Annuler", action: function () { demarre(id, false); } } : null);
+      // « Annuler » vient de lui-même (UI.toast, annulation commune) ; Ctrl+Z aussi
+      UI.toast(lance ? "Tâche en cours." : "Statut remis à « " + D.STATUTS_TACHE[retour] + " ».");
     }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
@@ -535,8 +535,7 @@
       dessine();
       var apres = D.tache(id);
       UI.toast(fait ? label + " terminé." + (apres && apres.statut === "termine" ? " Tâche terminée." : "")
-                    : label + " rouvert.",
-        { label: "Annuler", action: function () { terminePart(id, role, !fait); } });
+                    : label + " rouvert.");
     }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
@@ -562,8 +561,7 @@
       }
       D.retoucheTache(id, deux).then(function () {
         dessine();
-        UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.",
-          { label: "Annuler", action: function () { termine(id, !fait); } });
+        UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.");
       }).catch(function (e) { dessine(); UI.toast(e.message); });
       return;
     }
@@ -579,8 +577,7 @@
     }
     D.retoucheTache(id, champs).then(function () {
       dessine();
-      UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.",
-        fait ? { label: "Annuler", action: function () { termine(id, false); } } : null);
+      UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.");
     }).catch(function (e) { dessine(); UI.toast(e.message); });
   }
 
