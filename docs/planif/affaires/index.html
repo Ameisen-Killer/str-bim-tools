@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=70">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=71">
 </head>
 <body class="large">
 
@@ -36,6 +36,7 @@
         <!-- La case est un filtre : sa place est sous la recherche, pas au-dessus -->
         <div class="tete-section seule-action">
           <div class="outils">
+            <a class="btn seul-mobile" href="/planif/carte/"><span class="ico-txt ico-carte" aria-hidden="true"></span>Carte des affaires</a>
             <label class="case" style="text-transform:none;letter-spacing:.04em">
               <input type="checkbox" id="voir-terminees"> Voir les affaires terminées
             </label>
@@ -70,9 +71,11 @@
   D.pret().then(function () {
     // Ouvrir une affaire demande le droit : sans lui, le bouton ne paraît pas.
     var peutCreer = D.aDroit("affaires_creer");
+    // La carte d'abord, à gauche de « Nouvelle affaire » ; sur téléphone, son bouton est dans la page
+    var versCarte = { label: "Carte des affaires", icone: "ico-carte", action: function () { location.href = "/planif/carte/"; } };
     UI.chrome("affaires", peutCreer
-      ? [{ label: "Nouvelle affaire", or: true, icone: "ico-ajout-affaire", action: function () { formulaire(null); } }]
-      : []);
+      ? [versCarte, { label: "Nouvelle affaire", or: true, icone: "ico-ajout-affaire", action: function () { formulaire(null); } }]
+      : [versCarte]);
     UI.pied();
     // Collé sous la barre, le bloc de recherche se resserre (planif.css)
     UI.colleSousBarre(document.querySelector(".tete-collante"));
