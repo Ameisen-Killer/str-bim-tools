@@ -82,6 +82,36 @@
     return dernierTravaille || fin;
   }
 
+  /** Dernier jour d'une charge reprise à partir d'aujourd'hui, selon les jours
+   *  travaillés de la personne (sans personne : les jours ouvrés du canton). */
+  function finReportee(charge, membre, canton) {
+    if (membre && !membre.actif) membre = null;
+    var cumul = 0, cur = C.isoAuj(), dernier = null;
+    for (var garde = 0; garde < 1500; garde++) {
+      var cap = membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0);
+      if (cap > 0) {
+        cumul += cap;
+        dernier = cur;
+        if (cumul >= charge - 1e-6) return cur;
+      }
+      cur = C.ajoute(cur, 1);
+    }
+    return dernier || C.isoAuj();
+  }
+
+  /**
+   * Fenêtre de travail d'une part encore ouverte : de son début déduit à son
+   * échéance. Échéance dépassée : le travail reste à faire, il ne peut plus se
+   * faire hier. Sa charge est reprise dès aujourd'hui et pèse sur les semaines
+   * qui viennent — sinon une tâche en retard allégeait le planning au lieu de
+   * l'alourdir. { debut, fin, reportee }
+   */
+  function fenetre(charge, fin, membre, canton) {
+    if (!fin) return { debut: null, fin: null, reportee: false };
+    if (fin < C.isoAuj()) return { debut: C.isoAuj(), fin: finReportee(charge, membre, canton), reportee: true };
+    return { debut: debutPour(charge, fin, membre, canton), fin: fin, reportee: false };
+  }
+
   function membreParDefaut(id) {
     return (global.Donnees && global.Donnees.membre) ? global.Donnees.membre(id) : null;
   }
@@ -122,9 +152,20 @@
    * Seul ce qui ne rentre vraiment pas dans la capacité libre apparaît en
    * surcharge, réparti au prorata de la capacité de chaque jour.
    *
+   * Lissage (o.lisse, par défaut le choix mémorisé — voir lissage()) : ce qui
+   * ne tient pas dans la fenêtre d'une tâche remonte d'abord dans la capacité
+   * libre des jours qui la précèdent, jamais avant aujourd'hui. Deux tâches
+   * rendues la même semaine ne font plus déborder la personne quand la semaine
+   * d'avant est vide : on commence plus tôt, comme on le ferait vraiment.
+   * Seul ce qui ne trouve aucune place d'ici l'échéance reste en surcharge.
+   *
    * Renvoie { membreId: { "AAAA-MM-JJ": { total, parts:[{tacheId, role, jours}] } } }
+   * et, hors énumération, `avances` : { "membre|tâche|métier": premier jour avancé }.
    */
-  function repartition(taches, membres, canton) {
+  function repartition(taches, membres, canton, o) {
+    o = o || {};
+    var lisse = "lisse" in o ? !!o.lisse : lissage();
+    var auj = C.isoAuj();
     var index = {}, lots = {};
     membres.forEach(function (m) { index[m.id] = m; });
 
@@ -137,17 +178,18 @@
         if (af.fini) return;                      // part bouclée : sa charge ne pèse plus sur la personne
         var membre = index[af.membreId];
         if (!membre) return;
-        // Chaque intervenant a sa propre fenêtre : 0,5 j d'ingénieur ne s'étale pas sur les 4 j du dessin
-        var debut = debutPour(af.charge, fin, membre, canton);
-        var jours = [], base = [], cur = debut, garde = 0;
+        // Chaque intervenant a sa propre fenêtre : 0,5 j d'ingénieur ne s'étale pas sur les 4 j du dessin.
+        // En retard, elle repart d'aujourd'hui (fenetre).
+        var f = fenetre(af.charge, fin, membre, canton);
+        var jours = [], base = [], cur = f.debut, garde = 0;
         while (garde++ < 800) {
           jours.push(cur);
           base.push(capaciteJour(membre, cur, canton));
-          if (cur === fin) break;
+          if (cur >= f.fin) break;
           cur = C.ajoute(cur, 1);
         }
         (lots[af.membreId] || (lots[af.membreId] = [])).push({
-          tacheId: t.id, role: af.role, charge: af.charge, fin: fin,
+          tacheId: t.id, role: af.role, charge: af.charge, fin: f.fin, retard: f.reportee,
           jours: jours, base: base,
           ouvres: base.filter(function (c) { return c > 0; }).length
         });
@@ -155,46 +197,78 @@
     });
 
     // 2. Remplissage, membre par membre
-    var parMembre = {};
+    var parMembre = {}, avances = {};
+    Object.defineProperty(parMembre, "avances", { value: avances });
     Object.keys(lots).forEach(function (mid) {
       var occupe = {};
       var cible = parMembre[mid] = {};
+      var membre = index[mid];
 
       lots[mid].sort(function (a, b) {
+        if (a.retard !== b.retard) return a.retard ? -1 : 1;   // le retard passe devant : il est déjà dû
         if (a.ouvres !== b.ouvres) return a.ouvres - b.ouvres;
         if (a.fin !== b.fin) return a.fin < b.fin ? -1 : 1;
         return a.tacheId < b.tacheId ? -1 : 1;          // ordre stable d'un rendu à l'autre
       });
 
+      // a. Chaque lot prend d'abord la capacité encore libre de sa fenêtre,
+      //    au prorata de ce qui reste chaque jour
       lots[mid].forEach(function (lot) {
-        var parts = lot.jours.map(function () { return 0; });
-        var reste = lot.charge;
-
-        // D'abord la capacité encore libre, au prorata de ce qui reste chaque jour
+        lot.parts = lot.jours.map(function () { return 0; });
+        lot.reste = lot.charge;
+        lot.avant = [];
         var libre = lot.jours.map(function (j, k) { return Math.max(0, lot.base[k] - (occupe[j] || 0)); });
         var totalLibre = somme(libre);
         if (totalLibre > 0) {
-          var place = Math.min(reste, totalLibre);
-          libre.forEach(function (l, k) { parts[k] += place * l / totalLibre; });
-          reste -= place;
+          var place = Math.min(lot.reste, totalLibre);
+          libre.forEach(function (l, k) { lot.parts[k] += place * l / totalLibre; });
+          lot.reste -= place;
         }
+        lot.jours.forEach(function (j, k) { if (lot.parts[k] > 1e-9) occupe[j] = (occupe[j] || 0) + lot.parts[k]; });
+      });
 
-        // Ce qui ne rentre pas : vraie surcharge, au prorata de la capacité du jour.
-        // Période entièrement chômée ou en congé : on répartit quand même,
-        // sinon la tâche disparaîtrait du planning sans prévenir.
-        if (reste > 1e-9) {
+      // b. Lissage : ce qui déborde remonte dans les jours libres d'avant la fenêtre,
+      //    en partant du plus proche. Une fois toutes les fenêtres servies, pour
+      //    qu'aucune tâche ne prenne la place qu'une autre avait chez elle.
+      //    L'échéance la plus proche choisit en premier.
+      if (lisse) {
+        lots[mid].filter(function (lot) { return lot.reste > 1e-9; })
+          .sort(function (a, b) { return a.fin < b.fin ? -1 : a.fin > b.fin ? 1 : a.ouvres - b.ouvres; })
+          .forEach(function (lot) {
+            var cur = C.ajoute(lot.jours[0], -1);
+            for (var garde = 0; garde < 260 && cur >= auj && lot.reste > 1e-9; garde++) {
+              var l = Math.max(0, capaciteJour(membre, cur, canton) - (occupe[cur] || 0));
+              if (l > 1e-9) {
+                var pris = Math.min(l, lot.reste);
+                lot.avant.push({ jour: cur, jours: pris });
+                occupe[cur] = (occupe[cur] || 0) + pris;
+                lot.reste -= pris;
+              }
+              cur = C.ajoute(cur, -1);
+            }
+            if (lot.avant.length) {
+              avances[mid + "|" + lot.tacheId + "|" + lot.role] = lot.avant[lot.avant.length - 1].jour;
+            }
+          });
+      }
+
+      // c. Ce qui ne rentre toujours pas : vraie surcharge, au prorata de la capacité du jour.
+      //    Période entièrement chômée ou en congé : on répartit quand même,
+      //    sinon la tâche disparaîtrait du planning sans prévenir.
+      lots[mid].forEach(function (lot) {
+        if (lot.reste > 1e-9) {
           var poids = lot.base.slice(), s = somme(poids);
           if (s <= 0) { poids = lot.jours.map(function () { return 1; }); s = poids.length; }
-          poids.forEach(function (p, k) { parts[k] += reste * p / s; });
+          poids.forEach(function (p, k) { lot.parts[k] += lot.reste * p / s; });
         }
-
-        lot.jours.forEach(function (j, k) {
-          if (parts[k] <= 1e-9) return;
-          occupe[j] = (occupe[j] || 0) + parts[k];
+        function pose(j, v) {
+          if (v <= 1e-9) return;
           var cell = cible[j] || (cible[j] = { total: 0, parts: [] });
-          cell.total += parts[k];
-          cell.parts.push({ tacheId: lot.tacheId, role: lot.role, jours: parts[k] });
-        });
+          cell.total += v;
+          cell.parts.push({ tacheId: lot.tacheId, role: lot.role, jours: v });
+        }
+        lot.avant.forEach(function (a) { pose(a.jour, a.jours); });
+        lot.jours.forEach(function (j, k) { pose(j, lot.parts[k]); });
       });
     });
     return parMembre;
@@ -270,7 +344,26 @@
     return out.sort(function (a, b) { return a.rang - b.rang; });
   }
 
+  /* Lissage de la charge : un choix de lecture, mémorisé dans le navigateur et
+     suivi par toutes les pages (planning, carte de charge, équipe, alertes).
+     Rien n'est écrit en base : l'échéance fait toujours foi. */
+  var CLE_LISSAGE = "planif.lissage";
+  function lissage() {
+    try { return global.localStorage.getItem(CLE_LISSAGE) === "1"; } catch (e) { return false; }
+  }
+  function poseLissage(actif) {
+    try { global.localStorage.setItem(CLE_LISSAGE, actif ? "1" : "0"); } catch (e) {}
+  }
+
+  /** Premier jour avancé par le lissage pour cette affectation, sinon null. */
+  function avance(rep, membreId, tacheId, role) {
+    return (rep && rep.avances && rep.avances[membreId + "|" + tacheId + "|" + role]) || null;
+  }
+
   global.Calc = {
+    lissage: lissage,
+    poseLissage: poseLissage,
+    avance: avance,
     capaciteJour: capaciteJour,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
@@ -280,6 +373,7 @@
     debutEffectif: debutEffectif,
     debutAffectation: debutAffectation,
     debutPour: debutPour,
+    fenetre: fenetre,
     finEffective: finEffective,
     repartition: repartition,
     bilan: bilan,

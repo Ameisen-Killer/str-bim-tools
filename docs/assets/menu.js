@@ -3,7 +3,7 @@
 // - À chaque publication : mettre MISE_A_JOUR à la date du jour (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-09-15";
+  var MISE_A_JOUR = "2026-09-28";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},

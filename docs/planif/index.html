@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=69">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=70">
 </head>
 <body class="large">
 
@@ -57,6 +57,7 @@
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
         </label>
+        <span id="f-lisse"></span>
       </div>
 
       <div class="cles" id="cles"></div>
@@ -80,6 +81,7 @@
         <span><i class="dash" aria-hidden="true"></i> Charge ingénieur</span>
         <span><i class="coche" aria-hidden="true"></i> Part terminée</span>
         <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
+        <span id="leg-lis" hidden><i class="lis" aria-hidden="true"></i> Commence plus tôt (lissage)</span>
         <span>Fond hachuré : absence</span>
       </div>
     </section>
@@ -99,8 +101,8 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=18"></script>
 <script src="/planif/assets/donnees.js?v=25"></script>
-<script src="/planif/assets/calculs.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=45"></script>
+<script src="/planif/assets/calculs.js?v=7"></script>
+<script src="/planif/assets/ui.js?v=46"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script src="/planif/assets/spectre.js?v=5"></script>
@@ -178,6 +180,7 @@
     var fo = document.getElementById("f-occupes");
     fo.checked = !!vue.occupes;
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
+    document.getElementById("f-lisse").replaceWith(UI.caseLissage(rend));
 
     barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -224,39 +227,52 @@
     membres = D.membres({ planifies: true }).slice();   // administrateurs, administratifs et non désignés n'ont pas de planning
     // La répartition ne dépend ni de la semaine affichée ni de la durée : changer
     // de semaine ne la recalcule pas. Seuls les données, le filtre d'affaire ou le canton la périment.
-    var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton;
+    var lisse = Calc.lissage();
+    var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton + "|" + lisse + "|" + C.isoAuj();
     if (cacheRep.cle !== cle) {
-      // Toutes les affectations et leur début, calculés une fois ; chaque semaine affichée n'en garde que ce qui la touche
+      // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
+      // comme sur la page Équipe et dans les alertes
+      var enCours = taches.filter(function (t) { return t.statut !== "termine"; });
+      var repartie = Calc.repartition(enCours, membres, canton, { lisse: lisse });
+
+      // Toutes les affectations et leur fenêtre, calculées une fois ; chaque semaine affichée n'en garde que ce qui la touche.
+      // Une part ouverte en retard repart d'aujourd'hui (Calc.fenetre) : elle pèse là où le travail se fera.
+      // Lissée, une barre commence au premier jour que la répartition lui a avancé.
       var affectations = [];
       taches.forEach(function (t) {
         var fin = Calc.finEffective(t);
         if (!fin) return;
         Calc.affectations(t).forEach(function (af) {
-          // Chaque barre a son propre début : celui de la personne, selon ses jours travaillés
-          affectations.push({
-            tache: t, role: af.role, charge: af.charge, fin: fin, membreId: af.membreId,
+          var info = {
+            tache: t, role: af.role, charge: af.charge, fin: fin, membreId: af.membreId, fini: af.fini,
             debut: Calc.debutAffectation(t, af, canton)
-          });
+          };
+          if (t.statut !== "termine" && !af.fini) {
+            var f = Calc.fenetre(af.charge, fin, D.membre(af.membreId), canton);
+            if (f.reportee) { info.debut = f.debut; info.fin = f.fin; info.reportee = true; }
+            var av = Calc.avance(repartie, af.membreId, t.id, af.role);
+            if (av && av < info.debut) { info.debut = av; info.avancee = true; }
+          }
+          affectations.push(info);
         });
       });
-      // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
-      // comme sur la page Équipe et dans les alertes
-      var enCours = taches.filter(function (t) { return t.statut !== "termine"; });
       // Charges sans personne : placées sur le seul calendrier du canton, en attendant quelqu'un
       var aAffecter = [];
       enCours.forEach(function (t) {
         var fin = Calc.finEffective(t);
         if (!fin) return;
         Calc.nonAffectees(t).forEach(function (na) {
+          var f = Calc.fenetre(na.charge, fin, null, canton);
           aAffecter.push({
-            tache: t, role: na.role, charge: na.charge, fin: fin, membreId: null,
-            debut: Calc.debutPour(na.charge, fin, null, canton)
+            tache: t, role: na.role, charge: na.charge, fin: f.fin, membreId: null,
+            debut: f.debut, reportee: f.reportee
           });
         });
       });
-      cacheRep = { cle: cle, rep: Calc.repartition(enCours, membres, canton), affectations: affectations, aAffecter: aAffecter };
+      cacheRep = { cle: cle, rep: repartie, affectations: affectations, aAffecter: aAffecter };
     }
     rep = cacheRep.rep;
+    document.getElementById("leg-lis").hidden = !lisse;
 
     // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe.
     // Un administratif ne porte pas de tâches : il ne paraît pas ici.
@@ -600,6 +616,7 @@
         if (finOuvre && front > iFin + 0.001) { fin = front; break; }
       }
       var debut = debutPosition(info, iFin, fin - iFin, cap);
+      if (info.avancee) debut = Math.min(debut, C.diff(jours[0], info.debut));
       fronts[l] = debut;
 
       // Découpage aux bords de la fenêtre
@@ -650,7 +667,10 @@
     if (t.statut === "termine") classes.push("termine");
     else if (info.fini) classes.push("part-finie");
     else if (t.echeance < auj) classes.push("retard");
-    if (C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
+    if (info.avancee) classes.push("lissee");
+    // Le filet d'or marque l'échéance : une part reportée ne finit pas à la sienne
+    if (!info.reportee && C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
+    var etirable = !info.fini && t.statut !== "termine" && D.peutEcrireTache(t);
 
     var n = el("div", {
       class: classes.join(" "),
@@ -663,8 +683,12 @@
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
              (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
-             (t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "")
+             (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(t.echeance) + " dépassée, charge reprise dès aujourd'hui"
+               : t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "") +
+             (info.avancee ? "\nCommence plus tôt : charge lissée" : "") +
+             (etirable ? "\nBord gauche : étirer pour changer la charge (Maj + flèches au clavier)" : "")
     }, [
+      etirable ? el("i", { class: "poignee", "aria-hidden": "true" }) : null,
       info.fini ? el("i", { class: "coche", "aria-hidden": "true" }) : null,
       el("span", { class: "code", text: a ? a.code : "—" }),
       el("span", { class: "lib", text: t.titre }),
@@ -673,7 +697,11 @@
 
     activeGlissement(n, info, canton);
     n.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && e.shiftKey) {
+        // Maj + flèche : la barre s'allonge (←) ou se raccourcit (→) d'une demi-journée
+        e.preventDefault();
+        if (etirable) changeCharge(info, info.charge + (e.key === "ArrowLeft" ? 0.5 : -0.5));
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
         applique(info, e.key === "ArrowLeft" ? -1 : 1, null);
       } else if (e.key === "Enter" || e.key === " ") {
@@ -710,6 +738,7 @@
       var zone = n.closest(".pl-zone");
       if (!zone) return;
       e.preventDefault();
+      if (e.target.closest(".poignee")) { etire(e, n, zone, info, canton); return; }
       // Colonnes de largeurs inégales (week-ends resserrés) : on lit leurs bords réels.
       var bords = [].map.call(zone.querySelectorAll(".pl-fond i"), function (c) {
         var r = c.getBoundingClientRect(); return { g: r.left, d: r.right };
@@ -765,6 +794,83 @@
       n.addEventListener("pointercancel", fin);
     });
   }
+
+  /* Étirer une barre par son bord gauche : l'échéance reste, la charge suit.
+     Elle devient la capacité de la personne entre le jour visé et la fin de la
+     barre (jours travaillés, absences, temps partiel), arrondie à la demi-journée —
+     l'inverse exact du calcul qui avait placé le début. */
+  function etire(e, n, zone, info, canton) {
+    var bords = [].map.call(zone.querySelectorAll(".pl-fond i"), function (c) {
+      var r = c.getBoundingClientRect(); return { g: r.left, d: r.right };
+    });
+    function colonne(x) {
+      for (var k = 0; k < bords.length; k++) if (x < bords[k].d) return k;
+      return bords.length - 1;
+    }
+    var m = info.membreId ? D.membre(info.membreId) : null;
+    if (m && !m.actif) m = null;
+    function cap(j) { return m ? Calc.capaciteJour(m, j, canton) : (C.estOuvre(j, canton) ? 1 : 0); }
+    var finCol = C.diff(jours[0], info.fin);                     // peut tomber hors de la fenêtre
+    var derniere = Math.min(finCol, jours.length - 1);
+    var jr = n.querySelector(".jr"), texte0 = jr ? jr.textContent : "";
+    var style0 = n.getAttribute("style"), charge = info.charge, bouge = false;
+
+    try { n.setPointerCapture(e.pointerId); } catch (err) {}
+    n.classList.add("etire");
+    document.body.classList.add("glisse-en-cours");
+
+    function suit(ev) {
+      var col = Math.min(colonne(ev.clientX), derniere);
+      var dispo = 0;
+      for (var j = jours[col]; j <= info.fin; j = C.ajoute(j, 1)) dispo += cap(j);
+      charge = Math.max(0.5, Math.round(dispo * 2) / 2);
+      bouge = bouge || charge !== info.charge;
+      var fin = Math.min(finCol, jours.length - 1);
+      n.style.setProperty("--c1", col + 1);
+      n.style.setProperty("--cn", Math.max(1, fin - col + 1));
+      n.style.marginLeft = "2px";
+      if (jr) jr.textContent = C.fmtJours(charge) + " j";
+    }
+    function fin() {
+      n.removeEventListener("pointermove", suit);
+      n.removeEventListener("pointerup", fin);
+      n.removeEventListener("pointercancel", fin);
+      try { n.releasePointerCapture(e.pointerId); } catch (err) {}
+      n.classList.remove("etire");
+      document.body.classList.remove("glisse-en-cours");
+      if (!bouge || charge === info.charge) {
+        n.setAttribute("style", style0);
+        if (jr) jr.textContent = texte0;
+        return;
+      }
+      changeCharge(info, charge);
+    }
+    n.addEventListener("pointermove", suit);
+    n.addEventListener("pointerup", fin);
+    n.addEventListener("pointercancel", fin);
+  }
+
+  /** Nouvelle charge d'une part, avec « Annuler » dans le message. */
+  function changeCharge(info, charge) {
+    var t = D.tache(info.tache.id);
+    if (!t) return;
+    charge = Math.max(0.5, Math.round(charge * 2) / 2);
+    var champ = info.role === "ingenieur" ? "chargeInge" : "chargeDessin";
+    var avant = t[champ];
+    if (charge === avant) return;
+    var metier = info.role === "ingenieur" ? "calcul" : "dessin";
+    D.retoucheTache(t.id, objet(champ, charge)).then(function () {
+      rend();
+      UI.toast("Charge " + metier + " : " + C.fmtJours(charge) + " j (au lieu de " + C.fmtJours(avant) + ").", {
+        label: "Annuler",
+        action: function () {
+          D.retoucheTache(t.id, objet(champ, avant)).then(function () { rend(); UI.toast("Charge rétablie."); })
+            .catch(function (err) { UI.toast(err.message); });
+        }
+      });
+    }).catch(function (err) { UI.toast(err.message); rend(); });
+  }
+  function objet(k, v) { var o = {}; o[k] = v; return o; }
 
   /** Décale la tâche de `delta` jours et, si demandé, la réaffecte à un autre membre.
    *  membreCible vide ("") : la ligne « À affecter » du métier roleCible — la charge redevient libre. */
@@ -822,7 +928,7 @@
 
   function rendAlertes(canton) {
     var hote = UI.vide(document.getElementById("alertes"));
-    var cle = D.version() + "|" + canton;
+    var cle = D.version() + "|" + canton + "|" + Calc.lissage() + "|" + C.isoAuj();
     if (cacheAlertes.cle !== cle) cacheAlertes = { cle: cle, liste: Calc.alertes(D.etat(), canton) };
     var liste = cacheAlertes.liste.filter(function (al) {
       if (!vue.affaire) return true;
