@@ -1664,6 +1664,12 @@
       return p;
     });
     var casesParts = el("div", { class: "cases" }, parts.map(function (p) { return p.etiquette; }));
+    function partsPortees() { return parts.filter(function (p) { return !p.input.disabled; }); }
+    /** Toutes les parts qui existent sont cochées — et il en existe au moins une. */
+    function partsFinies() {
+      var portees = partsPortees();
+      return portees.length > 0 && portees.every(function (p) { return p.input.checked; });
+    }
 
     // Début recalculé à chaque frappe : durée, échéance ou intervenant
     var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:7px" });
@@ -1677,9 +1683,11 @@
         if (!porte) p.input.checked = false;
         p.etiquette.style.opacity = porte ? "" : ".4";
       });
-      // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir
-      if (selStatut) {
-        if (parts.every(function (p) { return p.input.disabled || p.input.checked; })) selStatut.value = "termine";
+      // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir.
+      // Sans aucune charge, il n'y a pas encore de part : rien à conclure (une tâche
+      // neuve s'ouvrait « Terminé », toutes ses parts… inexistantes étant finies).
+      if (selStatut && partsPortees().length) {
+        if (partsFinies()) selStatut.value = "termine";
         else if (selStatut.value === "termine") selStatut.value = "en_cours";
       }
 
@@ -1764,9 +1772,7 @@
     // coche les parts portées, cocher la dernière passe le statut à « Terminé ».
     var selStatut = corps.querySelector("select[name=statut]");
     corps.addEventListener("change", function (e) {
-      var toutes = function () {
-        return parts.every(function (p) { return p.input.disabled || p.input.checked; });
-      };
+      var toutes = partsFinies;
       if (e.target === selStatut) {
         var fini = selStatut.value === "termine";
         if (fini || toutes()) {
