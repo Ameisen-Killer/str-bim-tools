@@ -51,8 +51,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=20"></script>
-<script src="/planif/assets/donnees.js?v=28"></script>
+<script src="/planif/assets/supabase.js?v=21"></script>
+<script src="/planif/assets/donnees.js?v=29"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=49"></script>
 <script src="/planif/assets/palette.js?v=3"></script>
@@ -92,7 +92,7 @@
   /* ------------------------------------------------------------- affichage */
 
   function champsCherches(a) {
-    return [a.code, a.nom, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase)]
+    return [a.code, a.nom, a.adresse, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase)]
       .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre));
   }
 
@@ -129,7 +129,7 @@
           onclick: function () { document.getElementById("voir-terminees").checked = true; dessine(); }
         }));
       } else {
-        bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, la note, la phase, le statut et l'équipe." }));
+        bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, l'adresse, la note, la phase, le statut et l'équipe." }));
       }
       hote.appendChild(bloc);
       return;
@@ -165,6 +165,7 @@
             el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [UI.surligne(a.code, mots)])
           ]),
           el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(a.nom, mots)]),
+          a.adresse ? el("div", { class: "secondaire" }, [UI.surligne(a.adresse, mots)]) : null,
           a.note ? el("div", { class: "secondaire" }, [UI.surligne(a.note, mots)]) : null
         ]),
         el("td", {}, [equipe]),
@@ -185,6 +186,8 @@
         ]),
         el("td", { class: "actions" }, [
           UI.lienIcone("taches", "Tâches", a.code + " · " + a.nom, "/planif/taches/?affaire=" + encodeURIComponent(a.id)),
+          // Sans adresse, pas de carte : le bouton ne paraît pas
+          a.adresse ? UI.lienIcone("carte", "Voir sur Google Maps", a.code + " · " + a.adresse, D.lienCarte(a), true) : null,
           UI.boutonIcone("modifier", "Modifier", a.code + " · " + a.nom, function () { formulaire(a.id); }),
           // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
           D.aDroit("affaires_creer")
@@ -251,6 +254,8 @@
             .concat(D.ORDRE_PHASES.map(function (p) { return { valeur: p, label: D.libellePhase(p) }; }))
         }) : null,
         UI.champ({ nom: "nom", label: "Libellé", valeur: a ? a.nom : "", exemple: "Immeuble de logements — gros œuvre", large: true }),
+        // Un seul champ, tel qu'on le taperait dans Google Maps (absent tant que la migration n'est pas passée)
+        D.adresseEnBase() ? UI.champ({ nom: "adresse", label: "Adresse", valeur: a ? a.adresse : "", exemple: "Rue du Lac 12, 1201 Genève", large: true }) : null,
         UI.champ({
           nom: "statut", label: "Statut", type: "select", valeur: a ? a.statut : "active",
           options: Object.keys(D.STATUTS_AFFAIRE).map(function (k) { return { valeur: k, label: D.STATUTS_AFFAIRE[k] }; })

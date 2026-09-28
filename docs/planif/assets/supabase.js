@@ -413,6 +413,8 @@
   /* Idem pour la phase des affaires (28.09.2026) : migration-phase-affaires.sql.
      À simplifier une fois la migration en place. */
   var phaseEnBase = true;
+  /* Idem pour l'adresse des affaires : migration-adresse-affaires.sql. */
+  var adresseEnBase = true;
 
   /* Idem pour metier / statuts, arrivés quand le rôle unique s'est scindé en
      métier et statuts cumulables : tant que migration-roles-statuts.sql n'est
@@ -474,6 +476,7 @@
       var o = { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
       if (phaseEnBase) o.phase = a.phase || null;
+      if (adresseEnBase) o.adresse = a.adresse || "";
       return o;
     },
     taches: function (t) {
@@ -516,6 +519,7 @@
       enchaineEnBase = !taches.length || ("enchaine" in taches[0]);
       // … et la phase des affaires ? (colonne phase)
       phaseEnBase = !affaires.length || ("phase" in affaires[0]);
+      adresseEnBase = !affaires.length || ("adresse" in affaires[0]);
       // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
       metiersEnBase = !membres.length || ("metier" in membres[0]);
 
@@ -555,7 +559,7 @@
           var equipe = liens.filter(function (l) { return l.affaire_id === a.id; });
           return {
             id: a.id, code: a.code, nom: a.nom, note: a.note || "",
-            teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null,
+            teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
             ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
               .map(function (l) { return l.membre_id; }),
             dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
@@ -769,7 +773,8 @@
       profil: profil,
       annuaireEnBase: function () { return annuaireEnBase; },
       enchainementEnBase: function () { return enchaineEnBase; },
-      phaseEnBase: function () { return phaseEnBase; }
+      phaseEnBase: function () { return phaseEnBase; },
+      adresseEnBase: function () { return adresseEnBase; }
     }
   };
 })(window);

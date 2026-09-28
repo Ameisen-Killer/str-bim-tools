@@ -453,6 +453,7 @@
         statut: STATUTS_AFFAIRE[a.statut] ? a.statut : "active",
         echeance: texte(a.echeance) || null,
         phase: texte(a.phase) || null,
+        adresse: texte(a.adresse),
         ingenieurs: (a.ingenieurs || []).map(texte),
         dessinateurs: (a.dessinateurs || []).map(texte)
       });
@@ -655,6 +656,7 @@
       echeance: texte(o.echeance) || null,
       // Tant que la base ignore la colonne, la phase n'est pas retenue : elle se perdrait au rechargement
       phase: D.phaseEnBase() ? (texte(o.phase) || null) : null,
+      adresse: D.adresseEnBase() ? texte(o.adresse).replace(/\s+/g, " ") : "",
       ingenieurs: (o.ingenieurs || []).filter(Boolean),
       dessinateurs: (o.dessinateurs || []).filter(Boolean)
     };
@@ -1031,6 +1033,15 @@
     },
 
     /* -------------------------------------------------------- annuaire */
+    /** La base connaît-elle l'adresse des affaires ? (migration-adresse-affaires.sql) */
+    adresseEnBase: function () {
+      return !ADAPTATEUR.adresseEnBase || ADAPTATEUR.adresseEnBase();
+    },
+    /** Lien Google Maps de l'adresse d'une affaire, ou "" sans adresse. */
+    lienCarte: function (a) {
+      return a && a.adresse ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(a.adresse) : "";
+    },
+
     /** La base connaît-elle la phase des affaires ? (migration-phase-affaires.sql) */
     phaseEnBase: function () {
       return !ADAPTATEUR.phaseEnBase || ADAPTATEUR.phaseEnBase();
@@ -1268,13 +1279,13 @@
     var d3 = m("Keller", "Sophie", "dessinateur", 3);
     m("Nicolet", "Fabienne", "administratif", 4);
 
-    function a(code, nom, teinte, ings, dess, phase) {
+    function a(code, nom, teinte, ings, dess, phase, adresse) {
       var o = { id: id(), code: code, nom: nom, note: "", teinte: teinte, statut: "active",
-                echeance: null, phase: phase, ingenieurs: ings, dessinateurs: dess };
+                echeance: null, phase: phase, adresse: adresse || "", ingenieurs: ings, dessinateurs: dess };
       e.affaires.push(o); return o.id;
     }
-    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2], "51");
-    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3], "32");
+    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2], "51", "Avenue de la Gare 10, 1003 Lausanne");
+    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3], "32", "Route de Divonne 50, 1260 Nyon");
     var a3 = a("25-031", "Passerelle piétonne", 3, [i1, i2], [d1], "31");
 
     function t(aff, titre, ci, cd, ing, des, debut, ech, statut, av) {
