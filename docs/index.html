@@ -52,9 +52,6 @@ h1{
 
 .fade{opacity:0;transform:translateY(8px);transition:opacity 1.6s ease var(--d,0s),transform 1.6s ease var(--d,0s)}
 .go .fade{opacity:1;transform:none}
-canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
-/* Plongée vers CAN 241 : les textes s'effacent, la scène reste seule */
-.go.plonge .titre .fade,.go.plonge .bas{opacity:0;transform:translateY(-8px);transition:opacity .5s ease,transform .5s ease}
 
 @media (max-width:560px){
   .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));height:min(58svh,125vw)}
@@ -68,14 +65,14 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
   .sous{display:none}
 }
 </style>
-<link rel="stylesheet" href="/assets/menu.css?v=3">
+<link rel="stylesheet" href="/assets/menu.css?v=4">
 </head>
 <body>
 <div class="page" id="page">
   <header class="haut fade" style="--d:4.8s" data-menu-hote><span>STR Bim Tools</span><button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button></header>
   <main class="scene">
     <div class="stage">
-      <canvas id="bat" role="link" tabindex="0" aria-label="Maquette filaire d'un bâtiment inventé qui se construit puis tourne lentement. Ouvrir la présentation de CAN 241"></canvas>
+      <canvas id="bat" role="img" aria-label="Maquette filaire d'un bâtiment inventé qui se construit puis tourne lentement"></canvas>
     </div>
     <div class="titre">
       <h1 class="fade" style="--d:5.2s">STR Bim Tools</h1>
@@ -108,12 +105,9 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
   // ---------- Maquettes : bâtiments inventés, l'un d'eux est tiré au sort à chaque visite ----------
   // (?batiment=1, 2 ou 3 force un modèle, pour les tests)
   var faces = [], loggias = [];
-  // Trame des niveaux de la façade en cours de création (base, hauteur d'étage) : c'est elle que
-  // le survol allume. Chaque maquette la règle avant de monter ses volumes.
-  var grille = {b:0, p:4};
 
   function Face(O, a, n, W, H){
-    var f = {O:O, a:a, n:n, W:W, H:H, g:grille, glass:false, lines:[], quads:[], dep:D(O[1])};   // le reflet du verre suit la montée
+    var f = {O:O, a:a, n:n, W:W, H:H, glass:false, lines:[], quads:[], dep:D(O[1])};   // le reflet du verre suit la montée
     f.P = function(s,t){return [O[0]+a[0]*s, O[1]+t, O[2]+a[2]*s]};
     f.c = [O[0]+a[0]*W/2, O[1]+H/2, O[2]+a[2]*W/2];
     faces.push(f); return f;
@@ -258,7 +252,6 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
         }
 
         // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
-        grille = {b:RDC, p:ETAGE};
         volume(40,0, 70,42, function(O,a,n,W,cote){
           if (cote === "s") socle(O,a,n,W, .2);
           else if (cote === "e") socle(O,a,n,W, .35, [[0,28,"log"],[28,29.6,"fente"],[29.6,W,"verre"]]);
@@ -272,7 +265,6 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
           else socle(O,a,n,W, .6);
         }, "e");
         // Tour en retrait
-        grille = {b:0, p:T_ETAGE};
         volume(6,22, 32,48, function(O,a,n,W){ tourVerre(O,a,n,W, 2.6) });
       }}
   ];
@@ -281,7 +273,7 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
   var numero = (choix >= 1 && choix <= BATIMENTS.length) ? choix - 1 : Math.floor(Math.random()*BATIMENTS.length);
   var BAT = BATIMENTS[numero];
   BAT.construire();
-  cv.setAttribute("aria-label", "Maquette filaire qui se construit puis tourne lentement : " + BAT.aria + ". Ouvrir la présentation de CAN 241");
+  cv.setAttribute("aria-label", "Maquette filaire qui se construit puis tourne lentement : " + BAT.aria);
 
   // Centre, taille et cercle d'implantation déduits de la maquette tirée
   var bx0=1e9, bz0=1e9, bx1=-1e9, bz1=-1e9, hmax=0;
@@ -335,51 +327,7 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
     S = RECUL * Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
     CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
   }
-  var dCY = 0;                              // décalage vertical du cadrage, pendant la plongée
-  function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + dCY + S*q[1]] }
-
-  // ---------- Niveau allumé : survol, balayage d'invitation, plongée ----------
-  var niv = {y:0, a:0, cible:0, mx:0, my:0, libelle:false};
-  var visibles = [];                        // faces vues à la dernière image, de la plus lointaine à la plus proche
-
-  /** Le niveau de la façade f qui contient la cote y, en cotes locales [t0, t1], ou null. */
-  function niveauDe(f, y){
-    var y0 = f.O[1], y1 = f.O[1] + f.H;
-    if (y < y0 - 1e-6 || y > y1 + 1e-6) return null;
-    var g = f.g, a, b;
-    if (y < g.b){ a = 0; b = g.b; }
-    else { var k = Math.floor((y - g.b)/g.p); a = g.b + k*g.p; b = a + g.p; }
-    a = Math.max(a, y0); b = Math.min(b, y1);
-    return b - a > .3 ? [a - y0, b - y0] : null;
-  }
-
-  /** Façade la plus proche sous le point d'écran (x, y) et cote du bâtiment visée, ou null. */
-  function vise(x, y){
-    for (var k = visibles.length - 1; k >= 0; k--){
-      var f = visibles[k], q = f.ecr;
-      if (!q || !dansQuad(x, y, q)) continue;
-      // Rayon de l'œil par ce point, coupé par le plan de la façade
-      var qx = (x - CX)/S, qy = (y - CY - dCY)/S;
-      var d = [cam.fw[0] + qx*cam.rt[0], -qy, cam.fw[2] + qx*cam.rt[2]];
-      var nd = f.n[0]*d[0] + f.n[2]*d[2];
-      if (Math.abs(nd) < 1e-9) continue;
-      var lam = (f.n[0]*(f.O[0] - cam.eye[0]) + f.n[2]*(f.O[2] - cam.eye[2]))/nd;
-      return {f:f, y:EH + lam*d[1]};
-    }
-    return null;
-  }
-  function dansQuad(x, y, q){
-    var signe = 0;
-    for (var i = 0; i < 4; i++){
-      var a = q[i], b = q[(i+1)%4];
-      var c = (b[0]-a[0])*(y-a[1]) - (b[1]-a[1])*(x-a[0]);
-      if (Math.abs(c) < 1e-9) continue;
-      var s = c > 0 ? 1 : -1;
-      if (signe && s !== signe) return false;
-      signe = s;
-    }
-    return true;
-  }
+  function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + S*q[1]] }
 
   var COUL = {"":"236,232,224", f:"236,232,224", v:"170,192,214", vf:"170,192,214"};
   var ALPHA = {"":.62, f:.2, v:.5, vf:.16};
@@ -412,12 +360,10 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
       vis.push(f);
     }
     vis.sort(function(a,b){ return b.z - a.z });
-    visibles = vis;
 
     for (var m=0;m<vis.length;m++){
       var f = vis[m];
       var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,f.H)), c3 = ecran(f.P(0,f.H));
-      f.ecr = [c0, c1, c2, c3];
       ctx.beginPath(); ctx.moveTo(c0[0],c0[1]); ctx.lineTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.closePath();
       ctx.fillStyle = "#050505"; ctx.fill();
 
@@ -459,36 +405,6 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
         }
         if (n){ ctx.strokeStyle = "rgba(" + COUL[cls] + "," + Math.min(1, ALPHA[cls]*eclat).toFixed(3) + ")"; ctx.stroke(); }
       }
-
-      // Niveau allumé : un bandeau d'or qui fait le tour du bâtiment, masqué comme le reste
-      // par les façades plus proches, dessinées ensuite
-      if (niv.a > .01){
-        var nt = niveauDe(f, niv.y);
-        if (nt){
-          var b0 = ecran(f.P(0,nt[0])), b1 = ecran(f.P(f.W,nt[0])), b2 = ecran(f.P(f.W,nt[1])), b3 = ecran(f.P(0,nt[1]));
-          ctx.beginPath(); ctx.moveTo(b0[0],b0[1]); ctx.lineTo(b1[0],b1[1]); ctx.lineTo(b2[0],b2[1]); ctx.lineTo(b3[0],b3[1]); ctx.closePath();
-          ctx.fillStyle = "rgba(214,168,92," + (.13*niv.a*(.8 + .3*lam)).toFixed(3) + ")"; ctx.fill();
-          ctx.beginPath(); ctx.moveTo(b0[0],b0[1]); ctx.lineTo(b1[0],b1[1]); ctx.moveTo(b3[0],b3[1]); ctx.lineTo(b2[0],b2[1]);
-          ctx.strokeStyle = "rgba(214,168,92," + (.9*niv.a).toFixed(3) + ")"; ctx.stroke();
-        }
-      }
-    }
-
-    // Invitation au survol : où mène le clic
-    if (niv.libelle && niv.a > .05){
-      ctx.font = "400 11px 'IBM Plex Mono', ui-monospace, Consolas, monospace";
-      if ("letterSpacing" in ctx) ctx.letterSpacing = "2px";
-      ctx.fillStyle = "rgba(214,168,92," + (.95*niv.a).toFixed(3) + ")";
-      var txt = "MÉTRÉ CAN 241 →", lx = niv.mx + 18, ly = niv.my - 12;
-      if (lx + ctx.measureText(txt).width > W - 8) lx = niv.mx - 18 - ctx.measureText(txt).width;
-      ctx.fillText(txt, lx, Math.max(14, ly));
-      if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
-    }
-
-    // Plongée : la scène s'assombrit avant de céder la place à CAN 241
-    if (plonge && plonge.p > .55){
-      ctx.fillStyle = "rgba(5,5,5," + (Math.min(1, (plonge.p - .55)/.45)*.7).toFixed(3) + ")";
-      ctx.fillRect(0, 0, W, H);
     }
   }
 
@@ -525,92 +441,29 @@ canvas:focus-visible{outline:1px solid rgba(214,168,92,.5);outline-offset:-1px}
       lq.cur = Math.abs(d) <= pas ? lq.o : lq.cur + Math.sign(d)*pas;
     }
 
-    // Une fois le bâtiment monté, un niveau d'or le parcourt du pied au sommet :
-    // il dit, sans un mot, qu'on peut le toucher
-    var bal = (T - BALAYAGE)/2.6;
-    if (!survole && !plonge && bal > 0 && bal < 1){
-      niv.y = hmax*ease(bal); niv.cible = Math.sin(Math.PI*bal)*.75; niv.libelle = false;
-    } else if (!survole && !plonge && bal >= 1) niv.cible = 0;
-
-    // Plongée : la caméra descend vers le niveau choisi et s'en approche
-    if (plonge){
-      plonge.p = ease(clamp((now - plonge.t0)/1150));
-      R = R0 + (R1 - R0)*plonge.p;
-      EH = EH0 + (plonge.y - EH0)*plonge.p;
-      dCY = (H/2 - CY)*plonge.p;
-      niv.y = plonge.y; niv.cible = 1;
-      if (plonge.p >= .999 && !plonge.parti){ plonge.parti = true; location.href = "/can241/"; }
-    }
-    niv.a += (niv.cible - niv.a)*Math.min(1, dt*(niv.cible > niv.a ? 9 : 5));
-
     dessiner(T, th);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
-  // ---------- Le bâtiment mène à CAN 241 ----------
-  // Survol : le niveau visé s'allume ; clic ou appui : la caméra plonge vers lui, puis la page CAN 241
-  // s'ouvre (et, dans les navigateurs qui savent le faire, la scène se fond dans la travée).
-  var R0 = R, R1 = 1.3*TAILLE, EH0 = EH, BALAYAGE = loggiaFin + .6;
-  var survole = false, plonge = null, appui = null;
-  function construit(){ return t0 !== null && (performance.now() - t0)/1000 > DEBUT_ROT }
-  function point(e){ var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] }
-  function plonger(y){
-    if (plonge) return;
-    plonge = {t0: performance.now(), y: Math.max(2, Math.min(hmax - 2, y)), p: 0};
-    page.classList.add("plonge");
-    cv.style.cursor = "default";
-  }
-  // Retour arrière depuis CAN 241 : la page revient du cache telle qu'on l'avait quittée
-  window.addEventListener("pageshow", function(e){
-    if (!e.persisted || !plonge) return;
-    plonge = null; R = R0; EH = EH0; dCY = 0; niv.cible = 0; survole = false;
-    page.classList.remove("plonge"); cv.style.cursor = "";
-  });
-
   // On peut aussi faire tourner le bâtiment à la main, puis il reprend sa course
   cv.addEventListener("pointerdown", function(e){
-    if (plonge) return;
     glisse = true; gx = e.clientX; gt = performance.now(); gv = 0;
-    appui = {x: e.clientX, y: e.clientY, t: gt};
     cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener("pointermove", function(e){
-    if (!glisse){
-      if (e.pointerType === "touch" || plonge || !construit()) return;
-      var p = point(e), v = vise(p[0], p[1]);
-      survole = !!v;
-      if (v){ niv.y = v.y; niv.cible = 1; niv.libelle = true; niv.mx = p[0]; niv.my = p[1]; }
-      else { niv.cible = 0; niv.libelle = false; }
-      cv.style.cursor = v ? "pointer" : "";
-      return;
-    }
+    if (!glisse) return;
     var now = performance.now(), dth = -(e.clientX - gx) * 3.2 / Math.max(W, 320);
     th += dth; gv = dth / Math.max(.008, (now - gt)/1000);
     gx = e.clientX; gt = now;
   });
-  function relacher(e){
+  function relacher(){
     if (!glisse) return;
     glisse = false; cv.classList.remove("drag");
     omega = Math.max(-2.5, Math.min(2.5, gv));
-    // Un appui bref, sans glisser : c'est un clic
-    if (e && e.type === "pointerup" && appui && construit() &&
-        Math.hypot(e.clientX - appui.x, e.clientY - appui.y) < 8 && performance.now() - appui.t < 600){
-      var p = point(e), v = vise(p[0], p[1]);
-      if (v) plonger(v.y);
-    }
-    appui = null;
   }
   cv.addEventListener("pointerup", relacher);
   cv.addEventListener("pointercancel", relacher);
-  cv.addEventListener("pointerleave", function(e){
-    if (glisse || plonge || e.pointerType === "touch") return;
-    survole = false; niv.cible = 0; niv.libelle = false; cv.style.cursor = "";
-  });
-  // Au clavier : le bâtiment est un lien
-  cv.addEventListener("keydown", function(e){
-    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); plonger(hmax*.42); }
-  });
 })();
 </script>
 <script src="/assets/menu.js?v=4"></script>

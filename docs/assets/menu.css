@@ -80,22 +80,6 @@
   .menu .desc{grid-column:2;text-align:left}
 }
 
-/* ---------- Transitions d'une page à l'autre ----------
-   Sans une ligne de script : le navigateur photographie la page qu'on quitte et
-   celle qui arrive. La barre du haut reste en place, la scène animée d'une page
-   se fond dans celle de la suivante (le bâtiment de l'accueil dans la travée de
-   CAN 241), le reste glisse en fondu. Un navigateur qui ne sait pas le faire
-   change simplement de page. /planif/ ne charge pas cette feuille : pas concerné. */
-@view-transition{navigation:auto}
-[data-menu-hote]{view-transition-name:barre}
-.stage,.hero-scene{view-transition-name:scene}
-::view-transition-group(*){animation-duration:.9s;animation-timing-function:cubic-bezier(.76,0,.24,1)}
-::view-transition-old(scene),::view-transition-new(scene){height:100%;object-fit:contain}
-::view-transition-old(root){animation:vt-sort .45s cubic-bezier(.76,0,.24,1) both}
-::view-transition-new(root){animation:vt-entre .8s cubic-bezier(.2,.7,.2,1) .12s both}
-@keyframes vt-sort{to{opacity:0;transform:translateY(-14px)}}
-@keyframes vt-entre{from{opacity:0;transform:translateY(18px)}}
-
 /* ---------- Pied de page commun ---------- */
 .pied{flex-wrap:wrap;align-items:baseline}
 .pied a{text-decoration:none;color:inherit;transition:color .3s ease}
