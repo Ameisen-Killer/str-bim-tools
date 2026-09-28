@@ -260,6 +260,7 @@ create table if not exists public.affaires (
   teinte     smallint not null default 1 check (teinte between 1 and 8),
   statut     text not null default 'active' check (statut in ('active', 'suspendue', 'terminee')),
   echeance   date,
+  phase      text,          -- phase SIA 112 par son numéro (31, 32…), vide : non renseignée
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
   constraint affaires_id_bureau_key   unique (id, bureau_id),

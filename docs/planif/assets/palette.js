@@ -391,7 +391,7 @@
     return {
       noeud: [pastille(a.teinte), el("span", { class: "pal-lib" }, [
         el("b", { class: "pal-code" }, [UI.surligne(a.code, mots || [])]), " ", UI.surligne(a.nom, mots || [])]),
-        meta((a.statut !== "active" ? D.STATUTS_AFFAIRE[a.statut] + " · " : "") + n + (n > 1 ? " tâches ouvertes" : " tâche ouverte"))],
+        meta((a.phase ? "Phase " + a.phase + " · " : "") + (a.statut !== "active" ? D.STATUTS_AFFAIRE[a.statut] + " · " : "") + n + (n > 1 ? " tâches ouvertes" : " tâche ouverte"))],
       action: function () { va("/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre="); }
     };
   }

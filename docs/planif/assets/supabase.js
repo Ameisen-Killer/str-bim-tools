@@ -410,6 +410,10 @@
      migration-enchainement.sql. À simplifier une fois la migration en place. */
   var enchaineEnBase = true;
 
+  /* Idem pour la phase des affaires (28.09.2026) : migration-phase-affaires.sql.
+     À simplifier une fois la migration en place. */
+  var phaseEnBase = true;
+
   /* Idem pour metier / statuts, arrivés quand le rôle unique s'est scindé en
      métier et statuts cumulables : tant que migration-roles-statuts.sql n'est
      pas passée, la base ne connaît que « role ». La lecture le dit.
@@ -467,8 +471,10 @@
       return o;
     },
     affaires: function (a) {
-      return { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
-               teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
+      var o = { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
+                teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
+      if (phaseEnBase) o.phase = a.phase || null;
+      return o;
     },
     taches: function (t) {
       var o = { id: t.id, affaire_id: t.affaireId, titre: t.titre, note: t.note || "",
@@ -508,6 +514,8 @@
       partsEnBase = !taches.length || ("fini_inge" in taches[0]);
       // … et l'enchaînement calcul → dessin ? (colonne enchaine)
       enchaineEnBase = !taches.length || ("enchaine" in taches[0]);
+      // … et la phase des affaires ? (colonne phase)
+      phaseEnBase = !affaires.length || ("phase" in affaires[0]);
       // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
       metiersEnBase = !membres.length || ("metier" in membres[0]);
 
@@ -547,7 +555,7 @@
           var equipe = liens.filter(function (l) { return l.affaire_id === a.id; });
           return {
             id: a.id, code: a.code, nom: a.nom, note: a.note || "",
-            teinte: a.teinte, statut: a.statut, echeance: a.echeance,
+            teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null,
             ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
               .map(function (l) { return l.membre_id; }),
             dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
@@ -760,7 +768,8 @@
       videTout: videTout,
       profil: profil,
       annuaireEnBase: function () { return annuaireEnBase; },
-      enchainementEnBase: function () { return enchaineEnBase; }
+      enchainementEnBase: function () { return enchaineEnBase; },
+      phaseEnBase: function () { return phaseEnBase; }
     }
   };
 })(window);

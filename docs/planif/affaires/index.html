@@ -51,11 +51,11 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=19"></script>
-<script src="/planif/assets/donnees.js?v=27"></script>
+<script src="/planif/assets/supabase.js?v=20"></script>
+<script src="/planif/assets/donnees.js?v=28"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=49"></script>
-<script src="/planif/assets/palette.js?v=2"></script>
+<script src="/planif/assets/palette.js?v=3"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script>
 (function () {
@@ -92,7 +92,7 @@
   /* ------------------------------------------------------------- affichage */
 
   function champsCherches(a) {
-    return [a.code, a.nom, a.note, D.STATUTS_AFFAIRE[a.statut]]
+    return [a.code, a.nom, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase)]
       .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre));
   }
 
@@ -129,7 +129,7 @@
           onclick: function () { document.getElementById("voir-terminees").checked = true; dessine(); }
         }));
       } else {
-        bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, la note, le statut et l'équipe." }));
+        bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, la note, la phase, le statut et l'équipe." }));
       }
       hote.appendChild(bloc);
       return;
@@ -174,6 +174,10 @@
           enRetard ? el("div", { class: "secondaire", style: "color:var(--alerte)", text: enRetard + (enRetard > 1 ? " en retard" : " en retard") }) : null
         ]),
         el("td", { class: "num", text: a.echeance ? C.fmtCH(a.echeance) : "—" }),
+        el("td", {}, a.phase ? [
+          el("div", { class: "num" }, [UI.surligne(a.phase, mots)]),
+          D.PHASES[a.phase] ? el("div", { class: "secondaire" }, [UI.surligne(D.PHASES[a.phase], mots)]) : null
+        ] : [el("span", { class: "secondaire", text: "—" })]),
         el("td", {}, [
           el("span", { class: "statut s-" + (a.statut === "active" ? "en_cours" : a.statut === "terminee" ? "termine" : "attente") }, [
             el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_AFFAIRE[a.statut], mots)
@@ -190,12 +194,13 @@
       ]), a.id));
     });
 
-    hote.appendChild(el("table", { class: "liste", style: "min-width:860px" }, [
+    hote.appendChild(el("table", { class: "liste", style: "min-width:940px" }, [
       el("thead", {}, [el("tr", {}, [
         el("th", { text: "Affaire" }),
         el("th", { text: "Équipe" }),
         el("th", { text: "Charge" }),
         el("th", { text: "Échéance" }),
+        el("th", { text: "Phase SIA" }),
         el("th", { text: "Statut" }),
         el("th", { text: "" })
       ])]),
@@ -238,13 +243,20 @@
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042" }),
+        // Phase SIA 112 : absente tant que la base ne connaît pas la colonne (migration-phase-affaires.sql)
+        D.phaseEnBase() ? UI.champ({
+          nom: "phase", label: "Phase SIA", type: "select", valeur: a && a.phase ? a.phase : "",
+          options: [{ valeur: "", label: "— Non renseignée —" }]
+            .concat(a && a.phase && !D.PHASES[a.phase] ? [{ valeur: a.phase, label: a.phase }] : [])
+            .concat(D.ORDRE_PHASES.map(function (p) { return { valeur: p, label: D.libellePhase(p) }; }))
+        }) : null,
         UI.champ({ nom: "nom", label: "Libellé", valeur: a ? a.nom : "", exemple: "Immeuble de logements — gros œuvre", large: true }),
         UI.champ({
           nom: "statut", label: "Statut", type: "select", valeur: a ? a.statut : "active",
           options: Object.keys(D.STATUTS_AFFAIRE).map(function (k) { return { valeur: k, label: D.STATUTS_AFFAIRE[k] }; })
         }),
         UI.champ({ nom: "echeance", label: "Échéance générale", type: "date", valeur: a ? a.echeance : "", aide: "Facultative : repère d'ensemble." }),
-        UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, phase, points de vigilance…", large: true })
+        UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, points de vigilance…", large: true })
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
         el("div", { class: "legende", text: "Teinte de l'affaire" }),

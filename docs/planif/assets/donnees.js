@@ -166,6 +166,22 @@
   };
   var STATUTS_AFFAIRE = { active: "Active", suspendue: "Suspendue", terminee: "Terminée" };
 
+  /* Phases SIA 112 (modèle de prestations), par leur numéro : celles où un bureau
+     d'ingénieurs structure intervient. Rangées par numéro dans la base. */
+  var PHASES = {
+    "21": "Étude de faisabilité",
+    "31": "Avant-projet",
+    "32": "Projet de l'ouvrage",
+    "33": "Demande d'autorisation",
+    "41": "Appel d'offres",
+    "51": "Projet d'exécution",
+    "52": "Exécution de l'ouvrage",
+    "53": "Mise en service, achèvement"
+  };
+  var ORDRE_PHASES = Object.keys(PHASES).sort();
+  /** « 32 · Projet de l'ouvrage », ou "" sans phase. Un numéro inconnu reste lisible tel quel. */
+  function libellePhase(p) { return p ? p + (PHASES[p] ? " · " + PHASES[p] : "") : ""; }
+
   /* Les deux parts d'une tâche : le calcul, côté ingénieur, et le dessin.
      Chacune se termine de son côté — l'ingénieur qui boucle sa note libère sa
      charge sans fermer le dessin qui suit. Le statut n'en est que la synthèse. */
@@ -436,6 +452,7 @@
         teinte: Math.min(8, Math.max(1, parseInt(a.teinte, 10) || 1)),
         statut: STATUTS_AFFAIRE[a.statut] ? a.statut : "active",
         echeance: texte(a.echeance) || null,
+        phase: texte(a.phase) || null,
         ingenieurs: (a.ingenieurs || []).map(texte),
         dessinateurs: (a.dessinateurs || []).map(texte)
       });
@@ -636,6 +653,8 @@
       teinte: Math.min(8, Math.max(1, parseInt(o.teinte, 10) || 1)),
       statut: STATUTS_AFFAIRE[o.statut] ? o.statut : "active",
       echeance: texte(o.echeance) || null,
+      // Tant que la base ignore la colonne, la phase n'est pas retenue : elle se perdrait au rechargement
+      phase: D.phaseEnBase() ? (texte(o.phase) || null) : null,
       ingenieurs: (o.ingenieurs || []).filter(Boolean),
       dessinateurs: (o.dessinateurs || []).filter(Boolean)
     };
@@ -696,6 +715,9 @@
     disciplinesDe: disciplinesDe,
     STATUTS_TACHE: STATUTS_TACHE,
     STATUTS_AFFAIRE: STATUTS_AFFAIRE,
+    PHASES: PHASES,
+    ORDRE_PHASES: ORDRE_PHASES,
+    libellePhase: libellePhase,
     PARTS: PARTS,
     source: ADAPTATEUR.nom,
 
@@ -1009,6 +1031,11 @@
     },
 
     /* -------------------------------------------------------- annuaire */
+    /** La base connaît-elle la phase des affaires ? (migration-phase-affaires.sql) */
+    phaseEnBase: function () {
+      return !ADAPTATEUR.phaseEnBase || ADAPTATEUR.phaseEnBase();
+    },
+
     /** La base connaît-elle l'enchaînement calcul → dessin ? (migration-enchainement.sql) */
     enchainementEnBase: function () {
       return !ADAPTATEUR.enchainementEnBase || ADAPTATEUR.enchainementEnBase();
@@ -1241,14 +1268,14 @@
     var d3 = m("Keller", "Sophie", "dessinateur", 3);
     m("Nicolet", "Fabienne", "administratif", 4);
 
-    function a(code, nom, teinte, ings, dess) {
+    function a(code, nom, teinte, ings, dess, phase) {
       var o = { id: id(), code: code, nom: nom, note: "", teinte: teinte, statut: "active",
-                echeance: null, ingenieurs: ings, dessinateurs: dess };
+                echeance: null, phase: phase, ingenieurs: ings, dessinateurs: dess };
       e.affaires.push(o); return o.id;
     }
-    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2]);
-    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3]);
-    var a3 = a("25-031", "Passerelle piétonne", 3, [i1, i2], [d1]);
+    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2], "51");
+    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3], "32");
+    var a3 = a("25-031", "Passerelle piétonne", 3, [i1, i2], [d1], "31");
 
     function t(aff, titre, ci, cd, ing, des, debut, ech, statut, av) {
       e.taches.push({
