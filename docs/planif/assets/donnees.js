@@ -456,6 +456,7 @@
         avancement: Math.min(100, Math.max(0, nombre(t.avancement, 0))),
         finiInge: t.finiInge === true,
         finiDessin: t.finiDessin === true,
+        enchaine: t.enchaine === true,
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
         // À la lecture, « Terminé » prime : une tâche d'avant les parts, ou
@@ -661,7 +662,10 @@
       statut: STATUTS_TACHE[o.statut] ? o.statut : "a_faire",
       avancement: Math.min(100, Math.max(0, nombre(o.avancement, 0))),
       finiInge: o.finiInge === true,
-      finiDessin: o.finiDessin === true
+      finiDessin: o.finiDessin === true,
+      // Le dessin attend le calcul (calculs.js, finPart). Une tâche neuve est enchaînée
+      // sauf avis contraire ; tant que la base ignore la colonne, rien n'est enchaîné.
+      enchaine: D.enchainementEnBase() && ("enchaine" in o ? o.enchaine === true : true)
     };
   }
 
@@ -1008,6 +1012,11 @@
     /* La table est arrivée après les autres, et sa migration se lance à la
        main : tant qu'elle n'est pas passée, l'annuaire se lit vide et refuse
        d'écrire, plutôt que d'envoyer vers une table qui n'existe pas. */
+    /** La base connaît-elle l'enchaînement calcul → dessin ? (migration-enchainement.sql) */
+    enchainementEnBase: function () {
+      return !ADAPTATEUR.enchainementEnBase || ADAPTATEUR.enchainementEnBase();
+    },
+
     annuaireEnBase: function () {
       return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
     },
@@ -1127,7 +1136,7 @@
         id: id(), affaireId: aff, titre: titre, note: "",
         chargeInge: ci, chargeDessin: cd,
         debut: null, echeance: ech, ingenieurId: ing, dessinateurId: des,
-        statut: statut, avancement: av, finiInge: false, finiDessin: false,
+        statut: statut, avancement: av, finiInge: false, finiDessin: false, enchaine: true,
         cree: new Date().toISOString(), maj: new Date().toISOString()
       });
     }

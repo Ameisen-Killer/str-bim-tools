@@ -146,9 +146,9 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=18"></script>
-<script src="/planif/assets/donnees.js?v=25"></script>
-<script src="/planif/assets/ui.js?v=47"></script>
+<script src="/planif/assets/supabase.js?v=19"></script>
+<script src="/planif/assets/donnees.js?v=26"></script>
+<script src="/planif/assets/ui.js?v=48"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script>
 (function () {
@@ -1453,6 +1453,11 @@
         "Quand un collègue enregistre, les pages ouvertes se mettent à jour d'elles-mêmes. ",
         lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-temps-reel.sql" }),
         " (dépôt). Sans elle, l'outil relit la base toutes les minutes. La bulle du compteur « en ligne » dit si le direct est actif."
+      ]),
+      point("verifier", "Le dessin attend le calcul.", [
+        "Une tâche enchaînée fait rendre le calcul la veille du jour où le dessin commence. ",
+        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-enchainement.sql" }),
+        " (dépôt). Sans elle, la case n'apparaît pas dans le formulaire et calcul et dessin restent en parallèle."
       ]),
       point("verifier", "Serveur d'envoi (SMTP).", [
         "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",

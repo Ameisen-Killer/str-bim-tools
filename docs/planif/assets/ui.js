@@ -1409,9 +1409,11 @@
       return horsFiche.some(function (r) { return !t[D.PARTS[r].fini]; });
     }
 
-    function periode(charge, idMembre) {
-      var d = Calc.debutPour(charge, t.echeance, idMembre ? D.membre(idMembre) : null, canton);
-      return "  ·  " + C.fmtCH(d) + " → " + C.fmtCH(t.echeance);
+    // Tâche enchaînée : le calcul a sa propre fin, la veille du début du dessin
+    function periode(charge, idMembre, role) {
+      var fin = Calc.finPart(t, role, canton);
+      var d = Calc.debutPour(charge, fin, idMembre ? D.membre(idMembre) : null, canton);
+      return "  ·  " + C.fmtCH(d) + " → " + C.fmtCH(fin);
     }
 
     function ligne(cle, valeur) {
@@ -1507,8 +1509,8 @@
 
     var corps = el("div", {}, [
       ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
-      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId)) : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId)) : "—"),
+      ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId, "ingenieur")) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId, "dessinateur")) : "—"),
       ligne("Échéance", C.fmtLong(t.echeance)),
       lectureSeule
         ? el("p", { class: "aide", style: "margin-top:20px;font-size:14px;color:var(--texte-doux)", text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier." })
@@ -1664,6 +1666,16 @@
       return p;
     });
     var casesParts = el("div", { class: "cases" }, parts.map(function (p) { return p.etiquette; }));
+
+    /* Le dessin attend-il le calcul ? Cochée, la part calcul doit être rendue la
+       veille du jour où le dessin commence (Calc.finPart). Une tâche neuve l'est
+       d'office. N'a de sens qu'avec les deux charges ; absente tant que la base
+       ne connaît pas la colonne (migration-enchainement.sql). */
+    var entreeEnchaine = el("input", { type: "checkbox", name: "enchaine", value: "1" });
+    entreeEnchaine.checked = t ? !!t.enchaine : !("enchaine" in b) || !!b.enchaine;
+    var caseEnchaine = D.enchainementEnBase() ? el("label", {
+      class: "case", title: "Décoché : calcul et dessin avancent en parallèle jusqu'à l'échéance."
+    }, [entreeEnchaine, "Le dessin commence quand le calcul est rendu"]) : null;
     function partsPortees() { return parts.filter(function (p) { return !p.input.disabled; }); }
     /** Toutes les parts qui existent sont cochées — et il en existe au moins une. */
     function partsFinies() {
@@ -1683,6 +1695,9 @@
         if (!porte) p.input.checked = false;
         p.etiquette.style.opacity = porte ? "" : ".4";
       });
+      var deuxParts = parts.every(function (p) { return !p.input.disabled; });
+      if (caseEnchaine) caseEnchaine.style.opacity = deuxParts ? "" : ".4";
+      entreeEnchaine.disabled = !deuxParts;
       // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir.
       // Sans aucune charge, il n'y a pas encore de part : rien à conclure (une tâche
       // neuve s'ouvrait « Terminé », toutes ses parts… inexistantes étant finies).
@@ -1703,14 +1718,25 @@
         apercu.appendChild(el("span", { class: "aide", text: "Saisis une charge." }));
         return;
       }
+      // Même règle que le planning : la part calcul d'une tâche enchaînée finit
+      // la veille du début du dessin
+      var brouillon = {
+        echeance: v.echeance, enchaine: !!caseEnchaine && entreeEnchaine.checked,
+        chargeInge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0,
+        chargeDessin: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0,
+        dessinateurId: v.dessinateurId || null, statut: "a_faire",
+        finiDessin: parts[1].input.checked
+      };
       lignes.forEach(function (x) {
         var m = x.id ? D.membre(x.id) : null;
-        var debut = Calc.debutPour(x.charge, v.echeance, m, D.canton());
-        var ouvres = C.nbOuvres(debut, v.echeance, D.canton());
+        var fin = Calc.finPart(brouillon, x.role === "Ingénieur" ? "ingenieur" : "dessinateur", D.canton());
+        var debut = Calc.debutPour(x.charge, fin, m, D.canton());
+        var ouvres = C.nbOuvres(debut, fin, D.canton());
         apercu.appendChild(el("div", {}, [
           el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
           el("span", { class: "or", text: C.fmtLong(debut) }),
-          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") + (m ? "" : " · à affecter") })
+          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") +
+            (fin !== v.echeance ? " · rendu le " + C.fmtCourt(fin) : "") + (m ? "" : " · à affecter") })
         ]));
       });
     }
@@ -1735,7 +1761,8 @@
           champ({
             nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
             valeur: t ? t.chargeDessin : (b.chargeDessin || ""), exemple: "0"
-          })
+          }),
+          caseEnchaine ? el("div", { class: "champ large" }, [caseEnchaine]) : null
         ])
       ]),
       el("fieldset", {}, [
@@ -1833,6 +1860,8 @@
             var v = lit(corps);
             v.finiInge = (v.parts || []).indexOf("finiInge") >= 0;
             v.finiDessin = (v.parts || []).indexOf("finiDessin") >= 0;
+            // Case grisée (une seule part) : on garde le choix, il resservira si la seconde revient
+            v.enchaine = entreeEnchaine.checked;
             if (!t && !resteMienne(v)) {
               toast(maCote === "dessinateur"
                 ? "Une tâche que tu crées porte ta part : saisis une charge de dessin, et laisse-toi comme dessinateur."

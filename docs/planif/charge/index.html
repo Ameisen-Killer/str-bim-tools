@@ -75,10 +75,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=18"></script>
-<script src="/planif/assets/donnees.js?v=25"></script>
-<script src="/planif/assets/calculs.js?v=7"></script>
-<script src="/planif/assets/ui.js?v=47"></script>
+<script src="/planif/assets/supabase.js?v=19"></script>
+<script src="/planif/assets/donnees.js?v=26"></script>
+<script src="/planif/assets/calculs.js?v=8"></script>
+<script src="/planif/assets/ui.js?v=48"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script>
@@ -258,7 +258,7 @@
       Calc.nonAffectees(t).forEach(function (na) {
         if (vue.metier && na.role !== vue.metier) return;
         // En retard : la charge repart d'aujourd'hui, comme au planning (Calc.fenetre)
-        var f = Calc.fenetre(na.charge, fin, null, canton);
+        var f = Calc.fenetre(na.charge, Calc.finPart(t, na.role, canton), null, canton);
         var ouvres = [], j = f.debut, g = 0;
         while (g++ < 800) { if (C.estOuvre(j, canton)) ouvres.push(j); if (j >= f.fin) break; j = C.ajoute(j, 1); }
         if (!ouvres.length) ouvres = [f.fin];

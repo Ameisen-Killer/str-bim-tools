@@ -116,9 +116,29 @@
     return (global.Donnees && global.Donnees.membre) ? global.Donnees.membre(id) : null;
   }
 
+  /**
+   * Tâche enchaînée : le dessinateur attend le calcul. La part calcul doit donc
+   * être rendue la veille du jour où le dessin commence, et seul le dessin garde
+   * l'échéance de la tâche. Sans objet quand une des deux parts manque, quand
+   * le dessin est déjà rendu ou la tâche terminée.
+   */
+  function enchainee(t) {
+    return !!t.enchaine && t.chargeInge > 0 && t.chargeDessin > 0 && !t.finiDessin && t.statut !== "termine";
+  }
+
+  /** Échéance propre d'une part (métier « ingenieur » ou « dessinateur »). */
+  function finPart(t, role, canton, trouve) {
+    if (!t.echeance) return null;
+    if (role !== "ingenieur" || !enchainee(t)) return t.echeance;
+    trouve = trouve || membreParDefaut;
+    var debutDessin = debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton);
+    return C.ajoute(debutDessin, -1);
+  }
+
   /** Début de l'affectation d'un membre sur une tâche. */
   function debutAffectation(t, af, canton, trouve) {
-    return debutPour(af.charge, t.echeance, (trouve || membreParDefaut)(af.membreId), canton);
+    trouve = trouve || membreParDefaut;
+    return debutPour(af.charge, finPart(t, af.role, canton, trouve), trouve(af.membreId), canton);
   }
 
   /**
@@ -129,7 +149,7 @@
     if (!t.echeance) return null;
     trouve = trouve || membreParDefaut;
     var debuts = [];
-    if (t.chargeInge > 0) debuts.push(debutPour(t.chargeInge, t.echeance, t.ingenieurId ? trouve(t.ingenieurId) : null, canton));
+    if (t.chargeInge > 0) debuts.push(debutPour(t.chargeInge, finPart(t, "ingenieur", canton, trouve), t.ingenieurId ? trouve(t.ingenieurId) : null, canton));
     if (t.chargeDessin > 0) debuts.push(debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton));
     if (!debuts.length) return t.echeance;
     return debuts.sort()[0];
@@ -168,16 +188,17 @@
     var auj = C.isoAuj();
     var index = {}, lots = {};
     membres.forEach(function (m) { index[m.id] = m; });
+    function trouve(id) { return index[id] || membreParDefaut(id); }
 
     // 1. Chaque affectation devient un lot : sa période, et la capacité de chaque jour
     taches.forEach(function (t) {
-      var fin = finEffective(t);
-      if (!fin) return;
+      if (!finEffective(t)) return;
 
       affectations(t).forEach(function (af) {
         if (af.fini) return;                      // part bouclée : sa charge ne pèse plus sur la personne
         var membre = index[af.membreId];
         if (!membre) return;
+        var fin = finPart(t, af.role, canton, trouve);   // tâche enchaînée : le calcul finit avant le dessin
         // Chaque intervenant a sa propre fenêtre : 0,5 j d'ingénieur ne s'étale pas sur les 4 j du dessin.
         // En retard, elle repart d'aujourd'hui (fenetre).
         var f = fenetre(af.charge, fin, membre, canton);
@@ -306,9 +327,13 @@
       if (t.statut === "termine") return;
       var aff = affaires[t.affaireId];
       var libelle = (aff ? aff.code + " · " : "") + t.titre;
+      var finCalcul = !t.finiInge ? finPart(t, "ingenieur", canton) : null;
       if (t.echeance && t.echeance < auj) {
         out.push({ rang: 0, type: "grave", quoi: "En retard",
           texte: libelle, detail: "échéance du " + C.fmtCH(t.echeance), tacheId: t.id });
+      } else if (finCalcul && finCalcul !== t.echeance && finCalcul < auj) {
+        out.push({ rang: 0, type: "grave", quoi: "Calcul en retard",
+          texte: libelle, detail: "à rendre le " + C.fmtCH(finCalcul) + " pour que le dessin tienne l'échéance", tacheId: t.id });
       } else if (t.echeance && C.diff(auj, t.echeance) <= 5) {
         out.push({ rang: 1, type: "proche", quoi: "Échéance proche",
           texte: libelle, detail: C.fmtLong(t.echeance), tacheId: t.id });
@@ -374,6 +399,8 @@
     debutAffectation: debutAffectation,
     debutPour: debutPour,
     fenetre: fenetre,
+    enchainee: enchainee,
+    finPart: finPart,
     finEffective: finEffective,
     repartition: repartition,
     bilan: bilan,

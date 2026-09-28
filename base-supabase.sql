@@ -303,6 +303,8 @@ create table if not exists public.taches (
   -- est la synthèse : « termine » quand toutes les parts existantes le sont.
   fini_inge      boolean not null default false,
   fini_dessin    boolean not null default false,
+  -- Le dessin attend le calcul : la part calcul finit la veille du début du dessin.
+  enchaine       boolean not null default false,
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),

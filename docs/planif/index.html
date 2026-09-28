@@ -99,10 +99,10 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=18"></script>
-<script src="/planif/assets/donnees.js?v=25"></script>
-<script src="/planif/assets/calculs.js?v=7"></script>
-<script src="/planif/assets/ui.js?v=47"></script>
+<script src="/planif/assets/supabase.js?v=19"></script>
+<script src="/planif/assets/donnees.js?v=26"></script>
+<script src="/planif/assets/calculs.js?v=8"></script>
+<script src="/planif/assets/ui.js?v=48"></script>
 <script src="/planif/assets/palette.js?v=2"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script src="/planif/assets/spectre.js?v=5"></script>
@@ -243,12 +243,14 @@
         var fin = Calc.finEffective(t);
         if (!fin) return;
         Calc.affectations(t).forEach(function (af) {
+          // Tâche enchaînée : la barre du calcul s'arrête la veille du début du dessin
+          var finAf = Calc.finPart(t, af.role, canton);
           var info = {
-            tache: t, role: af.role, charge: af.charge, fin: fin, membreId: af.membreId, fini: af.fini,
+            tache: t, role: af.role, charge: af.charge, fin: finAf, echeancePart: finAf, membreId: af.membreId, fini: af.fini,
             debut: Calc.debutAffectation(t, af, canton)
           };
           if (t.statut !== "termine" && !af.fini) {
-            var f = Calc.fenetre(af.charge, fin, D.membre(af.membreId), canton);
+            var f = Calc.fenetre(af.charge, finAf, D.membre(af.membreId), canton);
             if (f.reportee) { info.debut = f.debut; info.fin = f.fin; info.reportee = true; }
             var av = Calc.avance(repartie, af.membreId, t.id, af.role);
             if (av && av < info.debut) { info.debut = av; info.avancee = true; }
@@ -262,7 +264,7 @@
         var fin = Calc.finEffective(t);
         if (!fin) return;
         Calc.nonAffectees(t).forEach(function (na) {
-          var f = Calc.fenetre(na.charge, fin, null, canton);
+          var f = Calc.fenetre(na.charge, Calc.finPart(t, na.role, canton), null, canton);
           aAffecter.push({
             tache: t, role: na.role, charge: na.charge, fin: f.fin, membreId: null,
             debut: f.debut, reportee: f.reportee
@@ -666,7 +668,7 @@
        L'autre métier, lui, garde sa barre pleine tant qu'il n'a pas fini. */
     if (t.statut === "termine") classes.push("termine");
     else if (info.fini) classes.push("part-finie");
-    else if (t.echeance < auj) classes.push("retard");
+    else if ((info.echeancePart || t.echeance) < auj) classes.push("retard");
     if (info.avancee) classes.push("lissee");
     // Le filet d'or marque l'échéance : une part reportée ne finit pas à la sienne
     if (!info.reportee && C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
@@ -683,8 +685,10 @@
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
              (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
-             (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(t.echeance) + " dépassée, charge reprise dès aujourd'hui"
+             (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(info.echeancePart || t.echeance) + " dépassée, charge reprise dès aujourd'hui"
                : t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "") +
+             (info.role === "ingenieur" && !info.fini && Calc.enchainee(t)
+               ? "\nCalcul à rendre avant le dessin (échéance de la tâche : " + C.fmtCH(t.echeance) + ")" : "") +
              (info.avancee ? "\nCommence plus tôt : charge lissée" : "") +
              (etirable ? "\nBord gauche : étirer pour changer la charge (Maj + flèches au clavier)" : "")
     }, [

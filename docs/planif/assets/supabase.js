@@ -406,6 +406,10 @@
      dit si la base les connaît. À simplifier une fois la migration en place. */
   var partsEnBase = true;
 
+  /* Idem pour « enchaine » (le dessin attend le calcul), arrivée le 28.09.2026 :
+     migration-enchainement.sql. À simplifier une fois la migration en place. */
+  var enchaineEnBase = true;
+
   /* Idem pour metier / statuts, arrivés quand le rôle unique s'est scindé en
      métier et statuts cumulables : tant que migration-roles-statuts.sql n'est
      pas passée, la base ne connaît que « role ». La lecture le dit.
@@ -473,6 +477,7 @@
                 ingenieur_id: vide(t.ingenieurId), dessinateur_id: vide(t.dessinateurId),
                 statut: t.statut, avancement: t.avancement };
       if (partsEnBase) { o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true; }
+      if (enchaineEnBase) o.enchaine = t.enchaine === true;
       return o;
     },
     contacts: function (c) {
@@ -501,6 +506,8 @@
 
       // La base connaît-elle déjà les parts terminées ? (colonnes fini_inge / fini_dessin)
       partsEnBase = !taches.length || ("fini_inge" in taches[0]);
+      // … et l'enchaînement calcul → dessin ? (colonne enchaine)
+      enchaineEnBase = !taches.length || ("enchaine" in taches[0]);
       // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
       metiersEnBase = !membres.length || ("metier" in membres[0]);
 
@@ -555,6 +562,7 @@
             ingenieurId: t.ingenieur_id, dessinateurId: t.dessinateur_id,
             statut: t.statut, avancement: t.avancement,
             finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
+            enchaine: t.enchaine === true,
             cree: t.cree_le, maj: t.maj_le
           };
         }),
@@ -751,7 +759,8 @@
       ecrire: ecrire,
       videTout: videTout,
       profil: profil,
-      annuaireEnBase: function () { return annuaireEnBase; }
+      annuaireEnBase: function () { return annuaireEnBase; },
+      enchainementEnBase: function () { return enchaineEnBase; }
     }
   };
 })(window);
