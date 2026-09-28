@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=71">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=72">
 </head>
 <body class="large">
 
@@ -48,6 +48,7 @@
           <button type="button" id="moins" aria-label="Dézoomer">−</button>
           <button type="button" id="cadre" aria-label="Voir toutes les affaires" title="Voir toutes les affaires">⌖</button>
         </div>
+        <div class="ca-fonds" role="group" aria-label="Fond de carte" id="fonds"></div>
         <div class="ca-credit">Carte © <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener noreferrer">swisstopo</a> · adresses geo.admin.ch</div>
       </div>
       <div class="ca-manque" id="manque"></div>
@@ -84,7 +85,15 @@
   var D = window.Donnees, el = UI.el;
 
   var TUILE = 256, ZMIN = 6, ZMAX = 18;
-  var FOND = "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/";
+  var WMTS = "https://wmts.geo.admin.ch/1.0.0/";
+  // Trois fonds swisstopo, au choix ; le choix est gardé dans le navigateur (planif.carte.fond)
+  var FONDS = [
+    { cle: "plan", nom: "Plan", couche: "ch.swisstopo.pixelkarte-grau" },
+    { cle: "couleur", nom: "Couleur", couche: "ch.swisstopo.pixelkarte-farbe" },
+    { cle: "photo", nom: "Photo", couche: "ch.swisstopo.swissimage" }
+  ];
+  var fond = FONDS[0];
+  try { fond = FONDS.filter(function (f) { return f.cle === localStorage.getItem("planif.carte.fond"); })[0] || FONDS[0]; } catch (e) {}
   var RECHERCHE = "https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&limit=1&sr=4326&searchText=";
   var CLE_GEO = "planif.geo";
   var OUBLI = 7 * 864e5;                       // une adresse introuvable est redemandée au bout d'une semaine
@@ -173,7 +182,7 @@
       voulues[cle] = true;
       var img = tuiles.querySelector('img[data-t="' + cle + '"]');
       if (!img) {
-        img = el("img", { alt: "", draggable: "false", "data-t": cle, src: FOND + cle + ".jpeg" });
+        img = el("img", { alt: "", draggable: "false", "data-t": cle, src: WMTS + fond.couche + "/default/current/3857/" + cle + ".jpeg" });
         img.onerror = function () { this.style.visibility = "hidden"; };
         tuiles.appendChild(img);
       }
@@ -269,6 +278,26 @@
     centreSur((la0 + la1) / 2, (lo0 + lo1) / 2, z);
     dessine();
   }
+
+  /* Choix du fond : les tuiles déjà posées partent, les nouvelles arrivent */
+  function dessineFonds() {
+    var hote = UI.vide(document.getElementById("fonds"));
+    carte.setAttribute("data-fond", fond.cle);
+    FONDS.forEach(function (f) {
+      var b = el("button", { type: "button", "aria-pressed": f === fond ? "true" : "false", text: f.nom });
+      b.addEventListener("pointerdown", function (e) { e.stopPropagation(); });
+      b.addEventListener("click", function () {
+        if (f === fond) return;
+        fond = f;
+        try { localStorage.setItem("planif.carte.fond", f.cle); } catch (e) {}
+        UI.vide(tuiles);
+        dessineFonds();
+        dessine();
+      });
+      hote.appendChild(b);
+    });
+  }
+  dessineFonds();
 
   document.getElementById("plus").addEventListener("click", function () { zoome(1); });
   document.getElementById("moins").addEventListener("click", function () { zoome(-1); });

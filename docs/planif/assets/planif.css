@@ -1253,22 +1253,31 @@ html.palette-ouverte{overflow:hidden}
 .carte-aff .ca-scene{position:absolute;inset:0;transform-origin:0 0}
 .carte-aff .ca-tuiles{position:absolute;inset:0}
 .carte-aff .ca-tuiles img{position:absolute;width:256px;height:256px;max-width:none;pointer-events:none}
-:root[data-theme="sombre"] .carte-aff .ca-tuiles{filter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.92)}
-:root[data-theme="clair"] .carte-aff .ca-tuiles{filter:sepia(.18) contrast(.95)}
+/* Le fond reste en retrait : c'est aux losanges de ressortir. Trois fonds (data-fond),
+   atténués selon le thème — le plan gris inversé brut était trop dur, il noyait les points. */
+.carte-aff[data-fond="plan"] .ca-tuiles{filter:grayscale(1) contrast(.7) brightness(1.08);opacity:.72}
+.carte-aff[data-fond="couleur"] .ca-tuiles{filter:saturate(.7) contrast(.85);opacity:.85}
+.carte-aff[data-fond="photo"] .ca-tuiles{filter:saturate(.8) brightness(.9)}
+:root[data-theme="sombre"] .carte-aff[data-fond="plan"] .ca-tuiles{filter:grayscale(1) invert(1) contrast(.55) brightness(.75);opacity:.8}
+:root[data-theme="sombre"] .carte-aff[data-fond="couleur"] .ca-tuiles{filter:saturate(.65) brightness(.62) contrast(.85);opacity:1}
+:root[data-theme="sombre"] .carte-aff[data-fond="photo"] .ca-tuiles{filter:saturate(.75) brightness(.62)}
+/* Losange plein à la teinte de l'affaire, cerné de fond puis d'or : il se lit sur
+   n'importe quel fond, clair, sombre ou photo */
 .ca-point{
-  position:absolute;left:0;top:0;display:flex;align-items:center;gap:7px;padding:0;border:0;background:none;
-  color:var(--texte);cursor:pointer;transform:translate(-7px,-7px);white-space:nowrap
+  position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;padding:0;border:0;background:none;
+  color:var(--texte);cursor:pointer;transform:translate(-11px,-11px);white-space:nowrap;z-index:1
 }
 .ca-point i{
-  width:12px;height:12px;flex:0 0 auto;transform:rotate(45deg);
-  background:color-mix(in srgb,var(--tt) 55%,transparent);border:1.5px solid var(--tt);
-  box-shadow:0 0 0 3px rgba(var(--fond-rvb),.75)
+  width:18px;height:18px;flex:0 0 auto;transform:rotate(45deg);margin:2px;
+  background:var(--tt);border:2px solid rgb(var(--fond-rvb));
+  box-shadow:0 0 0 2px var(--or),0 3px 12px rgba(0,0,0,.55);transition:transform .15s
 }
 .ca-point b{
-  font:500 11px/1 var(--mono);letter-spacing:.08em;color:var(--texte);padding:3px 5px;
-  background:rgba(var(--fond-rvb),.82);border:1px solid var(--ligne-faible)
+  font:600 12px/1 var(--mono);letter-spacing:.08em;color:var(--texte);padding:4px 7px;
+  background:rgb(var(--fond-rvb));border:1px solid rgba(var(--or-rvb),.55);box-shadow:0 2px 8px rgba(0,0,0,.4)
 }
-.ca-point:hover i,.ca-point:focus-visible i,.ca-point.choisi i{background:var(--tt);transform:rotate(45deg) scale(1.25)}
+.ca-point:hover,.ca-point:focus-visible,.ca-point.choisi{z-index:2}
+.ca-point:hover i,.ca-point:focus-visible i,.ca-point.choisi i{transform:rotate(45deg) scale(1.3)}
 .ca-point:focus-visible{outline:none}
 .ca-point:focus-visible b,.ca-point.choisi b{border-color:var(--or);color:var(--or)}
 .ca-bulle{
@@ -1291,6 +1300,17 @@ html.palette-ouverte{overflow:hidden}
   color:var(--texte-faible);background:rgba(var(--fond-rvb),.8)
 }
 .ca-credit a{color:inherit}
+.ca-fonds{
+  position:absolute;left:10px;bottom:10px;z-index:4;display:flex;
+  background:rgba(var(--fond-rvb),.9);border:1px solid var(--ligne)
+}
+.ca-fonds button{
+  padding:7px 11px;border:0;background:none;cursor:pointer;
+  font:400 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)
+}
+.ca-fonds button + button{border-left:1px solid var(--ligne-faible)}
+.ca-fonds button:hover{color:var(--texte)}
+.ca-fonds button[aria-pressed="true"]{color:var(--or);background:rgba(var(--or-rvb),.1)}
 .ca-etat{
   position:absolute;left:10px;top:10px;z-index:4;padding:7px 10px;font:400 11px var(--mono);letter-spacing:.1em;
   color:var(--texte-faible);background:rgba(var(--fond-rvb),.88);border:1px solid var(--ligne-faible)
@@ -1300,7 +1320,8 @@ html.palette-ouverte{overflow:hidden}
 .ca-manque ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
 @media (max-width:640px){
   .carte-aff{height:calc(100svh - var(--h-chrome,110px) - 150px);min-height:360px;margin-inline:calc(-1*var(--g,16px))}
-  .ca-point b{display:none}
+  .ca-point b{font-size:11px;padding:3px 5px}
+  .ca-fonds{bottom:30px}                 /* au-dessus du crédit swisstopo, qui prend le bas */
 }
 
 @media print{
