@@ -370,7 +370,7 @@ table.liste td.v-auteur{white-space:nowrap}
   var D = window.Donnees, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: false, statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -660,12 +660,14 @@ table.liste td.v-auteur{white-space:nowrap}
   $("f-circuit").addEventListener("change", function () { etat.circuit = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-type").addEventListener("change", function () { etat.type = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-fantomes").addEventListener("change", function () { etat.fantomes = this.checked; rendAttente(); });
-  /* Masquer les indices remplacés : choix retenu dans ce navigateur, comme une
-     préférence d'affichage. La liste et l'état des plans n'en changent pas
-     (un plan y est déjà pris à son dernier indice) ; le parcours jusqu'à la
-     validation garde tout l'historique, c'est son sujet. */
-  var CLE_DERNIER = "planif.visas.dernier";
-  try { etat.dernierSeul = localStorage.getItem(CLE_DERNIER) === "1"; } catch (e) {}
+  /* Masquer les indices et plans remplacés : les indices remplacés sortent des
+     délais, des graphiques et des motifs ; les plans refaits sous un autre numéro
+     sortent de partout, liste comprise. Le parcours jusqu'à la validation garde
+     tout l'historique des indices, c'est son sujet. Choix retenu dans ce navigateur. */
+  // Cochée par défaut (30.09.2026) : seule une case décochée à la main est retenue.
+  // Nouvelle clé : l'ancienne gardait « décochée » pour qui l'avait essayée.
+  var CLE_DERNIER = "planif.visas.masquer";
+  try { etat.dernierSeul = localStorage.getItem(CLE_DERNIER) !== "0"; } catch (e) {}
   $("f-dernier").checked = etat.dernierSeul;
   $("f-dernier").addEventListener("change", function () {
     etat.dernierSeul = this.checked;
@@ -686,7 +688,7 @@ table.liste td.v-auteur{white-space:nowrap}
     rendAttente(); rendListe(); rendVigilance(); rendCodes();
   }
 
-  /* Ce que la case « Masquer les indices remplacés » retire, dit à côté d'elle :
+  /* Ce que la case « Masquer les indices et plans remplacés » retire, dit à côté d'elle :
      sans cela, rien ne bouge en haut de page (plans et chiffres clés prennent
      déjà le dernier indice) et la case semble sans effet. */
   function rendEffetDernier() {
