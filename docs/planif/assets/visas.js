@@ -475,6 +475,23 @@
       if (!R.moRelais && refSeul && rr > ref) R.moRelais = { mois: o.mois, de: "REF", vers: "R&R" };
     });
 
+    // Plans déposés par mois et par personne (« Ajouté par ») : tous les dépôts comptent,
+    // anciens indices et plans remplacés compris — c'est l'activité de l'équipe qu'on mesure.
+    var depMois = {}, depQui = {}, depTotal = 0;
+    D.docs.forEach(function (d) {
+      if (!okBase(d) || d.dep === null) return;
+      var m = mois(d.dep), a = auteurDe(d);
+      var o = depMois[m] = depMois[m] || { mois: m, n: 0, par: {} };
+      o.n++; o.par[a] = (o.par[a] || 0) + 1;
+      depQui[a] = (depQui[a] || 0) + 1;
+      depTotal++;
+    });
+    R.depots = {
+      total: depTotal,
+      mois: Object.keys(depMois).sort().map(function (k) { return depMois[k]; }),
+      parQui: depQui
+    };
+
     // Parcours jusqu'à la validation du MO
     var cycles = [], refusAvant = [0, 0, 0, 0], premier = {}, nbAvecMo = 0;
     plans.forEach(function (p) {

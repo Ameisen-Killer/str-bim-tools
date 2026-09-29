@@ -24,12 +24,17 @@
   --v-bon:#008300; --v-obs:#c98500; --v-cours:#3987e5; --v-mauvais:#e66767; --v-neutre:#6f6c66;
   --v-r1:#7a3a2c; --v-r2:#a84a35; --v-r3:#d9654a; --v-r4:#f59a80;   /* retard, du plus léger au plus lourd */
   --v-serie:rgba(var(--encre),.55);
+  /* dépôts par personne : toi dans la teinte d'accent, puis cinq collègues,
+     sans reprendre les couleurs de statut de la page (vert, jaune, rouge, bleu) */
+  --p-moi:#B8862B; --p1:#199e70; --p2:#d95926; --p3:#9085e9; --p4:#d55181; --p5:#3987e5;
 }
 :root[data-theme="clair"],:root[data-theme="ab"]{
   --v-obs:#eda100; --v-cours:#2a78d6; --v-mauvais:#e34948; --v-neutre:#a8a49b;
   --v-r1:#e59a85; --v-r2:#cc6a50; --v-r3:#a8432d; --v-r4:#742414;
   --v-serie:rgba(var(--encre),.5);
+  --p-moi:#9A6200; --p1:#1baf7a; --p2:#eb6834; --p3:#4a3aa7; --p4:#e87ba4; --p5:#2a78d6;
 }
+:root[data-theme="ab"]{--p-moi:#5C7722}
 
 .v-intro{color:var(--texte-doux);max-width:62em;margin:-8px 0 20px}
 .v-note{font-size:13px;color:var(--texte-faible);margin-top:10px}
@@ -156,6 +161,7 @@ table.liste td.v-auteur{white-space:nowrap}
     --v-obs:#eda100; --v-cours:#2a78d6; --v-mauvais:#e34948; --v-neutre:#a8a49b;
     --v-r1:#e59a85; --v-r2:#cc6a50; --v-r3:#a8432d; --v-r4:#742414;
     --v-serie:rgba(22,19,15,.5);
+    --p-moi:#9A6200; --p1:#1baf7a; --p2:#eb6834; --p3:#4a3aa7; --p4:#e87ba4; --p5:#2a78d6;
   }
   #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases{display:none!important}
   .v-intro{font-size:8.5pt;margin:0 0 8px}
@@ -282,6 +288,14 @@ table.liste td.v-auteur{white-space:nowrap}
       </section>
 
       <section class="section">
+        <div class="tete-section"><h2>Plans déposés, mois par mois</h2></div>
+        <p class="v-intro" id="depots-intro"></p>
+        <div class="v-choix" id="legende-depots" style="margin:0 0 14px"></div>
+        <div class="v-graphe" id="graphe-depots"></div>
+        <details class="v-chiffres"><summary>Voir les chiffres</summary><div class="defile"><table class="liste" id="table-depots"></table></div></details>
+      </section>
+
+      <section class="section">
         <div class="v-deux">
           <div>
             <div class="tete-section"><h2>Pourquoi le Doc Control rejette</h2></div>
@@ -363,7 +377,7 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=6"></script>
+<script src="/planif/assets/visas.js?v=7"></script>
 <script>
 (function () {
   "use strict";
@@ -638,6 +652,7 @@ table.liste td.v-auteur{white-space:nowrap}
     donnees = V.inflate(o.jeu);
     etat.circuit = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe();
+    series();
     filtres();
     $("accueil").hidden = true; $("analyse").hidden = false;
     var projet = (donnees.docs[0] && donnees.docs[0].code.split("-")[0]) || "";
@@ -685,7 +700,7 @@ table.liste td.v-auteur{white-space:nowrap}
     R = V.analyse(donnees, etat);
     rendEffetDernier();
     rendCartouche(); rendTuiles(); rendEtat(); rendInter(); rendMO(); rendDC(); rendParcours();
-    rendAttente(); rendListe(); rendVigilance(); rendCodes();
+    rendDepots(); rendAttente(); rendListe(); rendVigilance(); rendCodes();
   }
 
   /* Ce que la case « Masquer les indices et plans remplacés » retire, dit à côté d'elle :
@@ -836,7 +851,105 @@ table.liste td.v-auteur{white-space:nowrap}
       M.map(function (m) { return "<tr><td>" + moisLib(m.mois) + '</td><td class="n">' + n(m.n) + '</td><td class="n">' + n(m.VSO) + '</td><td class="n">' + n(m.VAO) + '</td><td class="n">' + n(m.mauvais) + '</td><td class="n">' + n(m.neutre) + '</td><td class="n">' + pc(m.mauvais / m.n) + "</td></tr>"; }).join("") + "</tbody>");
   }
   var attenteRedim;
-  addEventListener("resize", function () { clearTimeout(attenteRedim); attenteRedim = setTimeout(function () { if (R) rendMO(); }, 150); });
+  addEventListener("resize", function () { clearTimeout(attenteRedim); attenteRedim = setTimeout(function () { if (R) { rendMO(); rendDepots(); } }, 150); });
+
+  /* ------------------------------------------------------------ plans déposés
+     Une colonne par mois, empilée par personne (« Ajouté par » de Kairnial).
+     Les couleurs suivent la personne, pas son rang du moment : elles sont fixées
+     à l'ouverture de l'export, sur l'ensemble des dépôts, et ne bougent pas avec
+     les filtres. Toi en bas, posé sur la ligne de base, pour lire ton nombre
+     d'un coup d'œil ; les plus petits déposants se regroupent en « Autres ». */
+  var SERIES = { noms: [], couleur: {}, moi: null };
+  var AUTRES = "Autres";
+  function plie(t) { return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim(); }
+  function trouveMoi(noms) {
+    var p = D.profil && D.profil(), m = p && p.membreId && D.membre ? D.membre(p.membreId) : null;
+    if (!m) return null;
+    var a = plie(m.prenom + " " + m.nom), b = plie(m.nom + " " + m.prenom);
+    return noms.filter(function (x) { var k = plie(x); return k === a || k === b; })[0] || null;
+  }
+  function series() {
+    var nb = {};
+    donnees.docs.forEach(function (d) { var a = V.auteurDe(d); nb[a] = (nb[a] || 0) + 1; });
+    var tri = Object.keys(nb).sort(function (a, b) { return nb[b] - nb[a]; });
+    var moi = trouveMoi(tri);
+    var autres = tri.filter(function (a) { return a !== moi && a !== SANS_NOM; }).slice(0, 5);   // toi + cinq collègues, au plus
+    var noms = (moi ? [moi] : []).concat(autres), couleur = {};
+    autres.forEach(function (a, i) { couleur[a] = "var(--p" + (i + 1) + ")"; });
+    if (moi) couleur[moi] = "var(--p-moi)";
+    couleur[AUTRES] = "var(--v-neutre)";
+    SERIES = { noms: noms, couleur: couleur, moi: moi };
+  }
+  function nomSerie(a) { return a === SERIES.moi ? a + " (toi)" : a === SANS_NOM ? "Sans nom" : a; }
+  function parSerie(par) {
+    var o = {}, reste = 0;
+    SERIES.noms.forEach(function (a) { o[a] = par[a] || 0; });
+    Object.keys(par).forEach(function (a) { if (!(a in o)) reste += par[a]; });
+    o[AUTRES] = reste;
+    return o;
+  }
+  function rondeur(v) {
+    if (v <= 0) return 1;
+    var e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+  }
+
+  function rendDepots() {
+    var Dp = R.depots, M = Dp.mois, box = $("graphe-depots");
+    var pile = SERIES.noms.concat([AUTRES]);
+    var totaux = parSerie(Dp.parQui);
+    $("depots-intro").textContent = n(Dp.total) + " indices déposés" + (Dp.mois.length ? " de " + moisLong(Dp.mois[0].mois) + " à " + moisLong(Dp.mois[Dp.mois.length - 1].mois) : "") +
+      ", par personne (« Ajouté par » de Kairnial). Tous les dépôts comptent, anciens indices et plans remplacés compris : c'est l'activité qu'on mesure. Un nom cliqué filtre toute la page sur cette personne.";
+    $("legende-depots").innerHTML = pile.filter(function (a) { return totaux[a] > 0 || a === SERIES.moi; }).map(function (a) {
+      var bouton = a !== AUTRES;
+      return (bouton ? '<button type="button" data-qui="' + esc(a) + '" aria-pressed="' + (etat.auteur === a) + '"' : "<span") +
+        ' style="--c:' + SERIES.couleur[a] + (bouton ? "" : ";display:inline-flex;align-items:center;gap:8px;padding:7px 11px;font-size:13.5px;color:var(--texte-doux)") + '"><i></i>' +
+        esc(nomSerie(a)) + " <b>" + n(totaux[a]) + "</b>" + (bouton ? "</button>" : "</span>");
+    }).join("");
+    if (!M.length) { box.innerHTML = '<p class="vide">Aucun dépôt dans cette sélection</p>'; tableau("table-depots", ""); return; }
+    var W = largeurPapier || Math.max(300, Math.round(box.clientWidth || 760)), H = 270, h0 = 26, bas = 44, g0 = 40, d0 = 6;
+    var pw = W - g0 - d0, ph = H - h0 - bas, bande = pw / M.length, bl = Math.min(34, bande * 0.64);
+    var pas = bande >= 58 ? 1 : bande >= 30 ? 2 : 3, voirN = bande >= 30, y0 = h0 + ph;
+    var haut = rondeur(Math.max.apply(null, M.map(function (m) { return m.n; })));
+    var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Indices déposés par mois et par personne">';
+    [0, 0.5, 1].forEach(function (t) {
+      var y = h0 + ph * (1 - t);
+      s += '<line class="' + (t === 0 ? "v-base" : "v-grille") + '" x1="' + g0 + '" x2="' + (W - d0) + '" y1="' + y + '" y2="' + y + '"/>';
+      s += '<text x="' + (g0 - 8) + '" y="' + (y + 4) + '" text-anchor="end">' + n(haut * t) + "</text>";
+    });
+    M.forEach(function (m, i) {
+      var x = g0 + i * bande + (bande - bl) / 2, cum = 0, v = parSerie(m.par);
+      var vis = pile.filter(function (a) { return v[a] > 0; });
+      vis.forEach(function (a, j) {
+        var h = ph * v[a] / haut, y = y0 - cum - h, dernier = j === vis.length - 1;
+        cum += h;
+        if (dernier) {
+          var r = Math.min(3, h, bl / 2);
+          s += '<path style="fill:' + SERIES.couleur[a] + '" d="M' + x + " " + (y + h) + "V" + (y + r) + "Q" + x + " " + y + " " + (x + r) + " " + y + "H" + (x + bl - r) + "Q" + (x + bl) + " " + y + " " + (x + bl) + " " + (y + r) + "V" + (y + h) + 'Z"/>';
+        } else s += '<rect style="fill:' + SERIES.couleur[a] + '" x="' + x + '" y="' + (y + 2) + '" width="' + bl + '" height="' + Math.max(0, h - 2) + '"/>';
+      });
+      if (i % pas === 0) s += '<text x="' + (x + bl / 2) + '" y="' + (y0 + 17) + '" text-anchor="middle">' + moisLib(m.mois) + "</text>";
+      if (voirN) s += '<text x="' + (x + bl / 2) + '" y="' + (y0 + 33) + '" text-anchor="middle" style="opacity:.75">' + m.n + "</text>";
+      var b = moisLib(m.mois) + " · " + n(m.n) + " indices déposés\n" + pile.filter(function (a) { return v[a] > 0; }).map(function (a) {
+        return nomSerie(a) + " : " + n(v[a]) + " (" + pc(v[a] / m.n) + ")";
+      }).join("\n");
+      s += '<rect class="v-cible" x="' + (g0 + i * bande) + '" y="' + h0 + '" width="' + bande + '" height="' + (ph + 36) + '" tabindex="0" data-bulle="' + esc(b) + '"/>';
+    });
+    if (voirN) s += '<text x="' + (g0 - 8) + '" y="' + (y0 + 33) + '" text-anchor="end" style="opacity:.75">n</text>';
+    box.innerHTML = s + "</svg>";
+    tableau("table-depots", "<thead><tr><th>Mois</th>" + pile.map(function (a) { return '<th class="n">' + esc(nomSerie(a)) + "</th>"; }).join("") + '<th class="n">Total</th></tr></thead><tbody>' +
+      M.map(function (m) {
+        var v = parSerie(m.par);
+        return "<tr><td>" + moisLib(m.mois) + "</td>" + pile.map(function (a) { return '<td class="n">' + (v[a] ? n(v[a]) : '<span class="v-faible">0</span>') + "</td>"; }).join("") + '<td class="n">' + n(m.n) + "</td></tr>";
+      }).join("") + "</tbody>");
+  }
+  $("legende-depots").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-qui]"); if (!b) return;
+    var a = b.getAttribute("data-qui");
+    etat.auteur = etat.auteur === a ? "tous" : a;
+    etat.limite = 60; etat.ouvert = null;
+    rend();
+  });
 
   function barres(hote, l, total) {
     var mx = Math.max.apply(null, l.map(function (x) { return x.n; }).concat([1]));
@@ -1080,11 +1193,11 @@ table.liste td.v-auteur{white-space:nowrap}
   addEventListener("beforeprint", function () {
     if (!donnees) return;
     enteteImpression();
-    largeurPapier = 1000; rendMO();
+    largeurPapier = 1000; rendMO(); rendDepots();
   });
   addEventListener("afterprint", function () {
     if (!donnees) return;
-    largeurPapier = 0; rendMO();
+    largeurPapier = 0; rendMO(); rendDepots();
     if (limiteAvant !== null) { etat.limite = limiteAvant; limiteAvant = null; rendListe(); }
   });
 
