@@ -128,6 +128,7 @@ details.v-chiffres .defile{margin-top:12px}
 table.liste tr.v-plan td{cursor:pointer}
 table.liste tr.v-plan[aria-expanded="true"] td{background:rgba(var(--encre),.05)}
 table.liste tr.v-detail:hover td{background:none}
+table.liste td.v-auteur{white-space:nowrap}
 .v-histo{display:flex;flex-direction:column;gap:16px;padding:4px 0 8px}
 .v-indice{display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--ligne);padding-left:14px}
 .v-indice.dernier{border-left-color:var(--or)}
@@ -248,7 +249,8 @@ table.liste tr.v-detail:hover td{background:none}
       <section class="section" id="liste-plans">
         <div class="tete-section"><h2>Liste des plans</h2></div>
         <div data-recherche></div>
-        <div class="grille-champs" style="margin:16px 0 4px;max-width:420px">
+        <div class="grille-champs" style="margin:16px 0 4px;max-width:720px">
+          <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
               <option value="statut">Statut, puis plus ancien</option>
@@ -300,7 +302,7 @@ table.liste tr.v-detail:hover td{background:none}
   var D = window.Donnees, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -433,7 +435,7 @@ table.liste tr.v-detail:hover td{background:none}
   function affiche(o) {
     source = o;
     donnees = V.inflate(o.jeu);
-    etat.circuit = "tous"; etat.type = "tous"; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
+    etat.circuit = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe();
     filtres();
     $("accueil").hidden = true; $("analyse").hidden = false;
@@ -458,6 +460,7 @@ table.liste tr.v-detail:hover td{background:none}
   $("f-type").addEventListener("change", function () { etat.type = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-fantomes").addEventListener("change", function () { etat.fantomes = this.checked; rendAttente(); });
   $("f-tri").addEventListener("change", function () { etat.tri = this.value; rendListe(); });
+  $("f-auteur").addEventListener("change", function () { etat.auteur = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
   $("plus").addEventListener("click", function () { etat.limite += 60; rendListe(); });
 
   /* ------------------------------------------------------------ rendu */
@@ -679,14 +682,34 @@ table.liste tr.v-detail:hover td{background:none}
     }).join("") + "</div>";
   }
 
+  /* « Déposé par » : la personne qui a déposé le dernier indice du plan (colonne
+     « Ajouté par » de Kairnial). Le menu se recompose avec les filtres du haut,
+     sans perdre la personne choisie même si elle n'a plus de plan dans la sélection. */
+  var SANS_NOM = "(sans-nom)";
+  function auteurDe(p) { return p.doc.auteur || SANS_NOM; }
+  function menuAuteurs() {
+    var nb = {};
+    R.plans.forEach(function (p) { var a = auteurDe(p); nb[a] = (nb[a] || 0) + 1; });
+    if (etat.auteur !== "tous" && !nb[etat.auteur]) nb[etat.auteur] = 0;
+    $("f-auteur").innerHTML = '<option value="tous">Tout le monde</option>' + Object.keys(nb).sort(function (a, b) {
+      return a === SANS_NOM ? 1 : b === SANS_NOM ? -1 : a.localeCompare(b, "fr");
+    }).map(function (a) {
+      return '<option value="' + esc(a) + '"' + (a === etat.auteur ? " selected" : "") + ">" + (a === SANS_NOM ? "Sans nom" : esc(a)) + " · " + n(nb[a]) + " plan" + (nb[a] > 1 ? "s" : "") + "</option>";
+    }).join("");
+  }
+
   function rendListe() {
     var mots = barre ? barre.termes() : [], fs = Object.keys(etat.statuts);
+    menuAuteurs();
+    var siens = etat.auteur === "tous" ? R.plans : R.plans.filter(function (p) { return auteurDe(p) === etat.auteur; });
+    var nbStatut = {};
+    siens.forEach(function (p) { nbStatut[p.statut] = (nbStatut[p.statut] || 0) + 1; });
     $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
-      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
+      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(nbStatut[s.id] || 0) + "</b></button>";
     }).join("");
-    var l = R.plans.filter(function (p) {
+    var l = siens.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
-      return !mots.length || UI.correspond([p.code, p.doc.lib], mots);
+      return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
     });
     l.sort({
       statut: function (a, b) { return ORDRE[a.statut] - ORDRE[b.statut] || (a.doc.dep || 0) - (b.doc.dep || 0); },
@@ -696,14 +719,14 @@ table.liste tr.v-detail:hover td{background:none}
     }[etat.tri]);
     if (barre) barre.compte(l.length, R.plans.length);
     var vis = l.slice(0, etat.limite), ed = donnees.edition || 0;
-    tableau("table-plans", "<thead><tr><th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th class="n">Dépôt</th><th class="n">Âge</th></tr></thead><tbody>' +
+    tableau("table-plans", "<thead><tr><th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th>Déposé par</th><th class="n">Dépôt</th><th class="n">Âge</th></tr></thead><tbody>' +
       (vis.length ? vis.map(function (p) {
         var d = p.doc, ouvert = etat.ouvert === p.code;
         return '<tr class="v-plan" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '"><td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
           '</td><td class="n">' + ind(d.ind) + '</td><td><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + "</div></td><td>" + pastille(p.statut) +
-          "</td><td>" + visasCourts(d) + '</td><td class="n">' + date(d.dep) + '</td><td class="n">' + (d.dep ? n(Math.floor(ed - d.dep)) + " j" : "—") + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="7">' + historique(p) + "</td></tr>" : "");
-      }).join("") : '<tr><td colspan="7" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
+          "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + '</td><td class="n">' + (d.dep ? n(Math.floor(ed - d.dep)) + " j" : "—") + "</td></tr>" +
+          (ouvert ? '<tr class="v-detail"><td colspan="8">' + historique(p) + "</td></tr>" : "");
+      }).join("") : '<tr><td colspan="8" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     var reste = l.length - vis.length;
     $("plus").hidden = reste <= 0;
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
@@ -791,7 +814,7 @@ table.liste tr.v-detail:hover td{background:none}
     document.querySelector(".entete").classList.add("vu");
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un numéro ou un libellé de plan…",
+      exemple: "Rechercher un numéro, un libellé ou une personne…",
       surSaisie: function () { etat.limite = 60; if (donnees) rendListe(); },
       surEntree: function () { var t = document.querySelector("tr.v-plan"); if (t && document.querySelectorAll("tr.v-plan").length === 1) bascule(t); }
     });
