@@ -147,6 +147,48 @@ table.liste td.v-auteur{white-space:nowrap}
 #v-bulle{position:fixed;z-index:75;pointer-events:none;background:var(--noir-2);border:1px solid var(--ligne);padding:8px 10px;font-size:12.5px;line-height:1.45;white-space:pre-line;max-width:290px;box-shadow:0 8px 28px rgba(0,0,0,.3)}
 .v-pied{font-size:13px;color:var(--texte-faible);max-width:62em;display:grid;gap:6px}
 
+/* Papier : planif.css pose l'A4 paysage, la palette claire, cache la barre et les filtres.
+   Ici : les couleurs des familles en version claire, des tailles de papier, et les
+   blocs de graphique qui ne se coupent pas entre deux pages. */
+@media print{
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"],:root[data-theme="ab"]{
+    --v-obs:#eda100; --v-cours:#2a78d6; --v-mauvais:#e34948; --v-neutre:#a8a49b;
+    --v-r1:#e59a85; --v-r2:#cc6a50; --v-r3:#a8432d; --v-r4:#742414;
+    --v-serie:rgba(22,19,15,.5);
+  }
+  #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases{display:none!important}
+  .v-intro{font-size:8.5pt;margin:0 0 8px}
+  .v-note{font-size:7.5pt;margin-top:4px}
+  .v-cartouche{margin-bottom:10px}
+  .v-cartouche div{padding:4px 8px}
+  .v-cartouche span{font-size:6pt}
+  .v-cartouche b{font-size:8.5pt}
+  .v-tuiles,.v-graphe,.v-deux > div,.v-attente,.v-vigil{break-inside:avoid}
+  .v-tuile{padding:8px 10px;gap:3px}
+  .v-tuile .v-lib{font-size:6pt}
+  .v-tuile .v-val{font-size:20pt}
+  .v-tuile .v-val small{font-size:8pt}
+  .v-tuile p{font-size:7.5pt}
+  .v-barre{height:18px}
+  .v-choix{margin-top:8px;gap:4px}
+  .v-choix button{padding:3px 7px;font-size:7.5pt}
+  .v-legende{font-size:7.5pt;margin-bottom:6px}
+  .v-deux{grid-template-columns:1fr 1fr;gap:12px 28px}
+  .v-deux h3{font-size:9.5pt;margin:10px 0 6px}
+  .v-barres{font-size:7.5pt;gap:4px 10px}
+  .v-barres .v-n{font-size:7.5pt}
+  .v-cols{height:90px}
+  .v-cols b{font-size:7pt}
+  .v-attente{font-size:8pt;gap:5px 12px}
+  .v-attente .v-q small{font-size:6.5pt}
+  .v-vigil div{padding:6px 8px}
+  .v-vigil b{font-size:14pt}
+  .v-vigil p{font-size:7.5pt}
+  .v-indice header,.v-indice li{font-size:7.5pt}
+  .v-indice blockquote{font-size:7pt}
+  .v-pied{font-size:7pt}
+}
+
 @media (max-width:640px){
   .v-attente{grid-template-columns:minmax(0,1fr) 48px}
   .v-attente .v-p{grid-column:1/-1;order:3;margin-bottom:6px}
@@ -165,6 +207,15 @@ table.liste td.v-auteur{white-space:nowrap}
     <h1>Visas <span id="titre-compte" class="compte-titre"></span></h1>
     <p class="chapeau">Où en sont les plans, qui tarde à viser, et pourquoi des plans reviennent. Analyse de l'export « Tableau de suivi » de la GED Kairnial, faite dans ton navigateur.</p>
     <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <!-- en-tête du papier : invisible à l'écran, imprimé en tête du PDF -->
+  <div class="wrap entete-impression">
+    <h1 id="imp-titre">Visas</h1>
+    <div class="ligne">
+      <span id="imp-filtres"></span>
+      <span id="imp-edition"></span>
+    </div>
   </div>
 
   <div class="wrap">
@@ -192,6 +243,7 @@ table.liste td.v-auteur{white-space:nowrap}
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
       </div>
+      <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
       <section class="section">
         <div class="v-cartouche" id="cartouche" aria-label="Informations de l'export"></div>
@@ -421,8 +473,8 @@ table.liste td.v-auteur{white-space:nowrap}
   }
 
   function barreOutil() {
-    var actions = [{ label: "Charger un export", or: true, icone: "ico-export", action: choisir }];
-    if (donnees) actions.push({ label: "Oublier l'export", action: oublier });
+    var actions = donnees ? [{ label: "Exporter en PDF", icone: "ico-export", action: exportePdf }, { label: "Oublier l'export", action: oublier }] : [];
+    actions.push({ label: "Charger un export", or: true, action: choisir });
     UI.chrome("visas", actions);
   }
 
@@ -566,7 +618,7 @@ table.liste td.v-auteur{white-space:nowrap}
       (R.moRelais ? " En " + moisLong(R.moRelais.mois) + ", le code R&R prend la place de REF : les deux sont regroupés en « refusé »." : " REF et R&R sont regroupés en « refusé ».");
     $("legende-mo").innerHTML = PILE.map(function (p) { return '<span><i style="--c:' + COULEUR[p.c] + '"></i>' + esc(p.nom) + "</span>"; }).join("");
     if (!M.length) { box.innerHTML = '<p class="vide">Aucun visa du MO dans cette sélection</p>'; tableau("table-mo", ""); return; }
-    var W = Math.max(300, Math.round(box.clientWidth || 760)), H = 270, h0 = 26, bas = 44, g0 = 40, d0 = 6;
+    var W = largeurPapier || Math.max(300, Math.round(box.clientWidth || 760)), H = 270, h0 = 26, bas = 44, g0 = 40, d0 = 6;
     var pw = W - g0 - d0, ph = H - h0 - bas, bande = pw / M.length, bl = Math.min(34, bande * 0.64);
     var pas = bande >= 58 ? 1 : bande >= 30 ? 2 : 3, voirN = bande >= 30, y0 = h0 + ph;
     var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Répartition mensuelle des visas du MO">';
@@ -703,11 +755,8 @@ table.liste td.v-auteur{white-space:nowrap}
     }).join("");
   }
 
-  function rendListe() {
+  function listeFiltree() {
     var mots = barre ? barre.termes() : [], fs = Object.keys(etat.statuts);
-    $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
-      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
-    }).join("");
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
@@ -718,6 +767,14 @@ table.liste td.v-auteur{white-space:nowrap}
       recent: function (a, b) { return (b.doc.dep || 0) - (a.doc.dep || 0); },
       numero: function (a, b) { return a.code.localeCompare(b.code); }
     }[etat.tri]);
+    return l;
+  }
+
+  function rendListe() {
+    $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
+      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
+    }).join("");
+    var l = listeFiltree();
     if (barre) barre.compte(l.length, R.plans.length);
     var vis = l.slice(0, etat.limite), ed = donnees.edition || 0;
     tableau("table-plans", "<thead><tr><th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th>Déposé par</th><th class="n">Dépôt</th><th class="n">Âge</th></tr></thead><tbody>' +
@@ -804,6 +861,66 @@ table.liste td.v-auteur{white-space:nowrap}
           '</td><td class="n">' + n(c[k].n) + '</td><td class="v-faible">' + esc(Object.keys(c[k].qui).join(", ")) + "</td></tr>";
       }).join("") + "</tbody>");
   }
+
+  /* ------------------------------------------------------------ export PDF
+     Comme ailleurs dans l'outil, le PDF sort de l'impression du navigateur (aucune
+     bibliothèque) : la page telle qu'elle est filtrée, avec un en-tête de papier qui
+     dit quels filtres sont posés. Le graphique du MO est redessiné à la largeur de
+     la feuille, puis rendu à l'écran après l'impression — Ctrl+P compris. */
+  var largeurPapier = 0, limiteAvant = null;
+
+  function projet() { return (donnees.docs[0] && donnees.docs[0].code.split("-")[0]) || ""; }
+  function enteteImpression() {
+    var f = [
+      etat.circuit === "tous" ? "Tous les circuits" : "Circuit " + etat.circuit,
+      etat.type === "tous" ? "Tous les types" : "Type " + etat.type,
+      etat.auteur === "tous" ? "Tout le monde" : "Déposé par " + (etat.auteur === SANS_NOM ? "sans nom" : etat.auteur)
+    ];
+    var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
+    if (st.length) f.push("Liste : " + st.join(", "));
+    var q = barre && barre.valeur().trim();
+    if (q) f.push("« " + q + " »");
+    $("imp-titre").textContent = "Visas" + (projet() ? " · " + projet() : "");
+    $("imp-filtres").textContent = f.join("  ·  ");
+    $("imp-edition").textContent = (donnees.edition ? "Export Kairnial du " + date(donnees.edition) + "  ·  " : "") + "édité le " + new Date().toLocaleDateString("fr-CH");
+  }
+  function nomFichier() {
+    var e = donnees.edition ? V.serialVersDate(donnees.edition).toISOString().slice(0, 10) : "";
+    var qui = etat.auteur !== "tous" && etat.auteur !== SANS_NOM
+      ? "-" + etat.auteur.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() : "";
+    return "visas" + (projet() ? "-" + projet() : "") + (e ? "-" + e : "") + qui;
+  }
+  addEventListener("beforeprint", function () {
+    if (!donnees) return;
+    enteteImpression();
+    largeurPapier = 1000; rendMO();
+  });
+  addEventListener("afterprint", function () {
+    if (!donnees) return;
+    largeurPapier = 0; rendMO();
+    if (limiteAvant !== null) { etat.limite = limiteAvant; limiteAvant = null; rendListe(); }
+  });
+
+  function exportePdf() {
+    if (!donnees) return;
+    var total = listeFiltree().length, vus = Math.min(total, etat.limite);
+    function lance(tout) {
+      if (tout && total > etat.limite) { limiteAvant = etat.limite; etat.limite = total; rendListe(); }
+      enteteImpression();
+      UI.imprime(nomFichier());
+    }
+    if (total <= etat.limite) { lance(false); return; }
+    UI.ouvre({
+      surtitre: "Export PDF", titre: "Quelle liste de plans ?", compacte: true,
+      corps: UI.el("p", { text: "La liste compte " + n(total) + " plans avec les filtres choisis. Tout imprimer donne un long PDF : filtre par statut ou par personne pour le raccourcir." }),
+      boutons: [
+        { label: "Annuler" },
+        { label: "Les " + n(vus) + " affichés", action: function () { lance(false); } },
+        { label: "Les " + n(total) + " plans", or: true, entree: true, action: function () { lance(true); } }
+      ]
+    });
+  }
+  $("btn-pdf").addEventListener("click", exportePdf);
 
   /* ------------------------------------------------------------ démarrage */
   if (!UI.session()) return;
