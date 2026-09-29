@@ -169,7 +169,9 @@
           if (/^Date .dition/i.test(a[0])) meta.edition = num(a[1]);
         }
       }
-      if (meta.edition && (edition === null || meta.edition > edition)) edition = meta.edition;
+      // L'export porte l'heure de sa première feuille (cellule B4) : Kairnial écrit les
+      // feuilles l'une après l'autre, la dernière peut avoir une minute de plus.
+      if (meta.edition && edition === null) edition = meta.edition;
       var h = -1;
       for (r = 0; r < Math.min(rows.length, 20); r++) if ((rows[r] || []).indexOf("Libellé du document") >= 0) { h = r; break; }
       if (h < 0) return;
@@ -193,7 +195,7 @@
       var nomenc = [];
       for (j = 0; j < iInd; j++) if (entete[j]) nomenc.push(j);
       var ci = circuits.length;
-      circuits.push({ nom: meta.circuit || fe.nom, feuille: fe.nom, charte: meta.charte, inters: ordre.map(S) });
+      circuits.push({ nom: meta.circuit || fe.nom, feuille: fe.nom, charte: meta.charte, inters: ordre.map(S), edition: meta.edition });
       var iType = col["Type de Document"], iNiv = col["Niveau"], iZone = col["Zone"];
       for (r = h + 1; r < rows.length; r++) {
         var a = rows[r];
@@ -220,7 +222,7 @@
 
   function inflate(J) {
     var s = function (i) { return i < 0 ? null : J.strs[i]; };
-    var circuits = J.circuits.map(function (c) { return { nom: c.nom, feuille: c.feuille, inters: c.inters.map(s) }; });
+    var circuits = J.circuits.map(function (c) { return { nom: c.nom, feuille: c.feuille, inters: c.inters.map(s), edition: c.edition || null }; });
     var docs = J.docs.map(function (d, i) {
       return { id: i, circuit: circuits[d[0]].nom, circ: circuits[d[0]], code: d[1], type: d[2], niveau: d[3], zone: d[4],
         ind: d[5], lib: s(d[6]), di: !!d[7], dep: d[8], auteur: s(d[9]), comLibre: s(d[10]), visas: [] };
@@ -260,7 +262,10 @@
     D.visas.forEach(function (v) {
       var k = v.doc.circuit + "|" + v.qui;
       if (v.etat === "rendu" && v.dd !== null && v.dv !== null && v.ret !== null) (cand[k] = cand[k] || []).push(v.ret + Math.floor(v.dv - v.dd));
-      else if (v.etat === "attente" && v.dd !== null && D.edition) (cand[k] = cand[k] || []).push(v.cpt + Math.floor(D.edition - v.dd));
+      else if (v.etat === "attente" && v.dd !== null && (v.doc.circ.edition || D.edition)) {
+        // le compte à rebours date de l'écriture de SA feuille
+        (cand[k] = cand[k] || []).push(v.cpt + Math.floor((v.doc.circ.edition || D.edition) - v.dd));
+      }
     });
     D.delai = {};
     Object.keys(cand).forEach(function (k) { D.delai[k] = mode(cand[k]); });

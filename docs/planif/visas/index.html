@@ -361,7 +361,7 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=2"></script>
+<script src="/planif/assets/visas.js?v=3"></script>
 <script>
 (function () {
   "use strict";
@@ -435,13 +435,41 @@ table.liste td.v-auteur{white-space:nowrap}
     var d = new Date(x.deposeLe);
     return isNaN(d) ? "—" : d.toLocaleDateString("fr-CH") + " à " + d.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" });
   }
+  /* L'horodatage d'un export est sa « Date édition » : l'heure à laquelle Kairnial
+     l'a tiré, écrite en tête de chaque feuille (B4). Elle est gardée à la seconde,
+     comme Excel l'affiche ; l'heure du dépôt ne vient qu'en second. */
+  function instant(s) { return new Date(Math.round((s - 25569) * 86400) * 1000); }        // heure locale lue telle quelle
+  function isoEdition(s) { return s ? instant(s).toISOString().slice(0, 19) : null; }
+  function dateHeure(s) {
+    if (!s) return "—";
+    var d = instant(s);
+    return ("0" + d.getUTCDate()).slice(-2) + "." + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "." + d.getUTCFullYear() +
+      " à " + ("0" + d.getUTCHours()).slice(-2) + ":" + ("0" + d.getUTCMinutes()).slice(-2);
+  }
   function editionTxt(x) {
     var m = x.edition && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(x.edition);
-    return m ? m[3] + "." + m[2] + "." + m[1] + " " + m[4] + ":" + m[5] : "—";
+    return m ? m[3] + "." + m[2] + "." + m[1] + " à " + m[4] + ":" + m[5] : "";
   }
+  function nomExport(x) { return editionTxt(x) ? "l'export du " + editionTxt(x) : "l'export déposé le " + heureDepot(x); }
   function parQui(x) { return x.deposeNom || x.deposePar || ""; }
-  function libelleExport(x) { return "Déposé le " + heureDepot(x) + (x.projet ? " · " + x.projet : "") + (parQui(x) ? " · " + parQui(x) : ""); }
-  function isoEdition(s) { return s ? V.serialVersDate(s).toISOString().slice(0, 19) : null; }
+  function libelleExport(x) {
+    return (editionTxt(x) ? "Export du " + editionTxt(x) : "Déposé le " + heureDepot(x)) + (x.projet ? " · " + x.projet : "") + (parQui(x) ? " · " + parQui(x) : "");
+  }
+  // Du plus récent au plus ancien, selon Kairnial ; l'heure du dépôt départage
+  function trieExports() {
+    exportsListe.sort(function (a, b) {
+      var ea = a.edition || "", eb = b.edition || "";
+      return ea !== eb ? (ea < eb ? 1 : -1) : (a.deposeLe < b.deposeLe ? 1 : -1);
+    });
+  }
+  /* Même export si même projet, même nombre d'indices, et édition à cinq minutes
+     près : deux tirages de Kairnial aussi rapprochés et de même taille sont le même
+     état de la GED. La marge couvre aussi les exports gardés avant le 30.09.2026,
+     horodatés à l'heure de la dernière feuille plutôt qu'à celle de la première. */
+  function memeExport(x, m) {
+    if (x.projet !== m.projet || x.nbIndices !== m.nbIndices || !x.edition || !m.edition) return false;
+    return Math.abs(Date.parse(x.edition + "Z") - Date.parse(m.edition + "Z")) <= 300000;
+  }
 
   function messageLecture(e) {
     if (e && e.metier) return e.message;
@@ -460,6 +488,7 @@ table.liste td.v-auteur{white-space:nowrap}
       return ok ? D.exportsVisas.liste() : [];
     }).then(function (l) {
       exportsListe = l;
+      trieExports();
       menuExports(); rendExports(); barreOutil();
       return l;
     });
@@ -480,11 +509,13 @@ table.liste td.v-auteur{white-space:nowrap}
 
   function ouvre(x) {
     if (jeux[x.id]) { affiche({ ligne: x, nom: x.nom, jeu: jeux[x.id] }); return Promise.resolve(); }
-    UI.toast("Ouverture de l'export déposé le " + heureDepot(x) + "…");
+    UI.toast("Ouverture de " + nomExport(x) + "…");
     return D.exportsVisas.lit(x).then(V.lire).then(function (classeur) {
       var J = V.parse(classeur);
       if (!J.docs.length) throw new Error("vide");
       jeux[x.id] = J;
+      if (J.edition) x.edition = isoEdition(J.edition);    // un export gardé avant le 30.09 portait l'heure de sa dernière feuille
+      trieExports();
       affiche({ ligne: x, nom: x.nom, jeu: J });
     }).catch(function (e) {
       UI.toast(messageLecture(e));
@@ -522,11 +553,11 @@ table.liste td.v-auteur{white-space:nowrap}
       J.docs.forEach(function (d) { codes[d[1]] = 1; });
       var m = { nom: f.name, taille: f.size || 0, edition: isoEdition(J.edition), projet: String(J.docs[0][1] || "").split("-")[0],
         nbPlans: Object.keys(codes).length, nbIndices: J.docs.length, nbVisas: J.visas.filter(function (v) { return v[4] >= 0; }).length };
-      var deja = exportsListe.filter(function (x) { return x.edition === m.edition && x.projet === m.projet && x.nbIndices === m.nbIndices; })[0];
+      var deja = exportsListe.filter(function (x) { return memeExport(x, m); })[0];
       if (deja) {
         jeux[deja.id] = J;
         affiche({ ligne: deja, nom: deja.nom, jeu: J });
-        UI.toast("Cet export est déjà déposé (le " + heureDepot(deja) + ") : c'est lui qui est ouvert.");
+        UI.toast("L'export du " + dateHeure(J.edition) + " est déjà déposé (le " + heureDepot(deja) + ") : c'est lui qui est ouvert.");
         return;
       }
       if (!stockageOk) {
@@ -537,9 +568,10 @@ table.liste td.v-auteur{white-space:nowrap}
       UI.toast("Dépôt de « " + f.name + " »…");
       return D.exportsVisas.depose(f, m).then(function (x) {
         exportsListe.unshift(x);
+        trieExports();
         jeux[x.id] = J;
         affiche({ ligne: x, nom: x.nom, jeu: J });
-        UI.toast("Export déposé le " + heureDepot(x) + " et analysé.");
+        UI.toast("Export du " + (editionTxt(x) || dateHeure(J.edition)) + " déposé et analysé.");
       }, function (e) {
         affiche({ ligne: null, nom: f.name, jeu: J });
         UI.toast("Analyse affichée, mais le dépôt a échoué : " + ((e && e.message) || "erreur inconnue."));
@@ -548,7 +580,8 @@ table.liste td.v-auteur{white-space:nowrap}
   }
 
   function retire(x) {
-    UI.confirme("Retirer cet export ?", "« " + x.nom + " », déposé le " + heureDepot(x) + (parQui(x) ? " par " + parQui(x) : "") +
+    UI.confirme("Retirer cet export ?", (editionTxt(x) ? "Export Kairnial du " + editionTxt(x) + " (« " + x.nom + " »)" : "« " + x.nom + " »") +
+      ", déposé le " + heureDepot(x) + (parQui(x) ? " par " + parQui(x) : "") +
       ". Il disparaît pour tout le bureau ; le fichier sur ton disque ne change pas.", "Retirer", true).then(function (ok) {
       if (!ok) return;
       D.exportsVisas.supprime(x).then(function () {
@@ -567,11 +600,11 @@ table.liste td.v-auteur{white-space:nowrap}
 
   function rendExports() {
     $("exports-deposes").hidden = !exportsListe.length;
-    tableau("table-exports", '<thead><tr><th>Déposé le</th><th>Fichier</th><th>Projet</th><th>Édition Kairnial</th><th class="n">Plans</th><th>Déposé par</th><th></th></tr></thead><tbody>' +
+    tableau("table-exports", '<thead><tr><th>Export Kairnial du</th><th>Projet</th><th>Fichier</th><th class="n">Plans</th><th>Déposé</th><th></th></tr></thead><tbody>' +
       exportsListe.map(function (x) {
         var ici = !!(courant && courant.id === x.id);
-        return "<tr><td class=\"n\">" + esc(heureDepot(x)) + "</td><td>" + esc(x.nom) + (ici ? ' <span class="v-code" style="--c:var(--or)">analysé</span>' : "") +
-          "</td><td>" + esc(x.projet || "—") + '</td><td class="n">' + esc(editionTxt(x)) + '</td><td class="n">' + n(x.nbPlans) + "</td><td>" + esc(parQui(x) || "—") +
+        return '<tr><td class="n">' + esc(editionTxt(x) || "—") + (ici ? ' <span class="v-code" style="--c:var(--or)">analysé</span>' : "") + "</td><td>" + esc(x.projet || "—") +
+          "</td><td>" + esc(x.nom) + '</td><td class="n">' + n(x.nbPlans) + '</td><td><span class="v-faible">le ' + esc(heureDepot(x)) + (parQui(x) ? " par " + esc(parQui(x)) : "") + "</span>" +
           '</td><td class="actions">' + (ici ? "" : '<button class="btn btn-nu" type="button" data-ouvre="' + esc(x.id) + '">Analyser</button> ') +
           '<button class="btn btn-nu btn-rouge" type="button" data-retire="' + esc(x.id) + '">Retirer</button></td></tr>';
       }).join("") + "</tbody>");
@@ -606,7 +639,7 @@ table.liste td.v-auteur{white-space:nowrap}
     filtres();
     $("accueil").hidden = true; $("analyse").hidden = false;
     var projet = (donnees.docs[0] && donnees.docs[0].code.split("-")[0]) || "";
-    $("titre-compte").textContent = (projet ? projet + " · " : "") + (donnees.edition ? "export du " + date(donnees.edition) : "");
+    $("titre-compte").textContent = (projet ? projet + " · " : "") + (donnees.edition ? "export du " + dateHeure(donnees.edition) : "");
     menuExports(); rendExports(); barreOutil();
     rend();
   }
@@ -640,10 +673,10 @@ table.liste td.v-auteur{white-space:nowrap}
   function rendCartouche() {
     var c = (donnees.docs[0] || { code: "" }).code.split("-");
     var champs = [["Projet", c[0]], ["Discipline", c[1]], ["Émetteur", c[2]], ["Phase", c[3]],
-      ["Édition Kairnial", donnees.edition ? date(donnees.edition) : "—"], ["Déposé le", source.ligne ? heureDepot(source.ligne) : "non gardé"],
+      ["Export Kairnial du", dateHeure(donnees.edition)], ["Déposé le", source.ligne ? heureDepot(source.ligne) : "non gardé"],
       ["Plans", n(donnees.plans.length)], ["Indices", n(donnees.docs.length)]];
     $("cartouche").innerHTML = champs.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + esc(x[1] || "—") + "</b></div>"; }).join("");
-    $("pied-source").textContent = "Source : « " + source.nom + " », " + (source.ligne ? "déposé le " + heureDepot(source.ligne) + (parQui(source.ligne) ? " par " + parQui(source.ligne) : "") : "analysé sans être gardé") +
+    $("pied-source").textContent = "Source : export Kairnial du " + dateHeure(donnees.edition) + ", « " + source.nom + " », " + (source.ligne ? "déposé le " + heureDepot(source.ligne) + (parQui(source.ligne) ? " par " + parQui(source.ligne) : "") : "analysé sans être gardé") +
       (donnees.extras ? ". " + n(donnees.extras) + " dépôts hors charte et sans visa ne sont pas analysés." : ".");
   }
 
@@ -996,11 +1029,11 @@ table.liste td.v-auteur{white-space:nowrap}
     if (q) f.push("« " + q + " »");
     $("imp-titre").textContent = "Visas" + (projet() ? " · " + projet() : "");
     $("imp-filtres").textContent = f.join("  ·  ");
-    $("imp-edition").textContent = (donnees.edition ? "Export Kairnial du " + date(donnees.edition) + "  ·  " : "") +
+    $("imp-edition").textContent = (donnees.edition ? "Export Kairnial du " + dateHeure(donnees.edition) + "  ·  " : "") +
       (source.ligne ? "déposé le " + heureDepot(source.ligne) + "  ·  " : "") + "édité le " + new Date().toLocaleDateString("fr-CH");
   }
   function nomFichier() {
-    var e = donnees.edition ? V.serialVersDate(donnees.edition).toISOString().slice(0, 10) : "";
+    var e = donnees.edition ? isoEdition(donnees.edition).slice(0, 16).replace("T", "-").replace(":", "") : "";
     var qui = etat.auteur !== "tous" && etat.auteur !== SANS_NOM
       ? "-" + etat.auteur.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() : "";
     return "visas" + (projet() ? "-" + projet() : "") + (e ? "-" + e : "") + qui;
