@@ -254,6 +254,66 @@
   // La base l'emporte dès qu'elle est configurée ; sinon, le navigateur.
   var ADAPTATEUR = (global.Sb && global.Sb.configure) ? global.Sb.ADAPT : ADAPTATEUR_LOCAL;
 
+  /* ------------------------------------------ exports Kairnial (page Visas)
+     Les exports « Tableau de suivi » que la page Visas garde et analyse. Avec
+     la base, le fichier va dans Supabase Storage (supabase.js) ; en mode local,
+     dans IndexedDB : un classeur de quelques Mo n'a pas sa place dans
+     localStorage. Même description des deux côtés : id, nom, taille, deposeLe,
+     deposePar, deposeNom, edition, projet, nbPlans, nbIndices, nbVisas. */
+  var EXPORTS_LOCAL = (function () {
+    var BASE = "planif.exports", MAGASIN = "exports";
+    function ouvre() {
+      return new Promise(function (ok, ko) {
+        if (!global.indexedDB) { ko(erreur("Ce navigateur ne sait pas garder de fichier.")); return; }
+        var r = global.indexedDB.open(BASE, 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore(MAGASIN, { keyPath: "id" }); };
+        r.onsuccess = function () { ok(r.result); };
+        r.onerror = function () { ko(r.error); };
+      });
+    }
+    function magasin(mode, fn) {
+      return ouvre().then(function (db) {
+        return new Promise(function (ok, ko) {
+          var tx = db.transaction(MAGASIN, mode), req = fn(tx.objectStore(MAGASIN));
+          tx.oncomplete = function () { ok(req && req.result); };
+          tx.onerror = function () { ko(tx.error); };
+        });
+      });
+    }
+    function sansFichier(x) {
+      var o = {};
+      Object.keys(x).forEach(function (k) { if (k !== "fichier") o[k] = x[k]; });
+      return o;
+    }
+    return {
+      disponible: function () { return Promise.resolve(!!global.indexedDB); },
+      liste: function () {
+        return magasin("readonly", function (s) { return s.getAll(); }).then(function (l) {
+          return (l || []).map(sansFichier).sort(function (a, b) { return a.deposeLe < b.deposeLe ? 1 : -1; });
+        });
+      },
+      depose: function (fichier, m) {
+        return fichier.arrayBuffer().then(function (octets) {
+          var x = { id: m.id, chemin: "local/" + m.id + ".xlsx", nom: m.nom, taille: m.taille,
+            deposeLe: new Date().toISOString(), deposePar: "", deposeNom: m.deposeNom || "",
+            edition: m.edition, projet: m.projet, nbPlans: m.nbPlans, nbIndices: m.nbIndices, nbVisas: m.nbVisas,
+            fichier: octets };
+          return magasin("readwrite", function (s) { return s.put(x); }).then(function () { return sansFichier(x); });
+        });
+      },
+      lit: function (x) {
+        return magasin("readonly", function (s) { return s.get(x.id); }).then(function (r) {
+          if (!r) throw erreur("Fichier introuvable dans ce navigateur.");
+          return r.fichier;
+        });
+      },
+      supprime: function (x) {
+        return magasin("readwrite", function (s) { return s.delete(x.id); }).then(function () {});
+      }
+    };
+  })();
+  var EXPORTS = ADAPTATEUR.exportsVisas || EXPORTS_LOCAL;
+
   var etat = null;
   var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
   var abonnes = [], rechargements = [];
@@ -1098,6 +1158,29 @@
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
         return sauve();
       });
+    },
+
+    /* ------------------------------------------ exports Kairnial (Visas)
+       depose() complète la description : identifiant, bureau (le dossier du
+       fichier dans le seau) et nom affiché de la personne, tiré de sa fiche. */
+    exportsVisas: {
+      disponible: function () { return EXPORTS.disponible(); },
+      liste: function () { return EXPORTS.liste(); },
+      depose: function (fichier, m) {
+        return Promise.resolve().then(function () {
+          var p = profil || {}, fiche = p.membreId && etat ? D.membre(p.membreId) : null, o = {};
+          Object.keys(m || {}).forEach(function (k) { o[k] = m[k]; });
+          o.id = id();
+          o.bureau = p.bureau ? p.bureau.id : null;
+          o.deposeNom = fiche ? (fiche.prenom + " " + fiche.nom).trim() : "";
+          if (ADAPTATEUR.exportsVisas && !o.bureau) {
+            throw erreur("La base n'est pas encore passée en multi-bureaux : les exports ne peuvent pas y être rangés.");
+          }
+          return EXPORTS.depose(fichier, o);
+        });
+      },
+      lit: function (x) { return EXPORTS.lit(x); },
+      supprime: function (x) { return EXPORTS.supprime(x); }
     },
 
     /* ------------------------------------------------ sauvegarde / reprise */

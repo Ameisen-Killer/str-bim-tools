@@ -218,6 +218,13 @@ table.liste td.v-auteur{white-space:nowrap}
     </div>
   </div>
 
+  <div class="wrap" id="migration-visas" hidden>
+    <div class="bandeau">
+      <span class="losange" aria-hidden="true"></span>
+      <div><strong>Stockage des exports pas encore installé. </strong>La base n'a pas encore le seau ni la table des exports. Exécute <code>migration-visas.sql</code> dans Supabase (SQL Editor), puis recharge cette page. En attendant, l'export glissé ici est analysé sans être gardé.</div>
+    </div>
+  </div>
+
   <div class="wrap">
     <input type="file" id="fichier" accept=".xlsx" hidden>
 
@@ -225,7 +232,7 @@ table.liste td.v-auteur{white-space:nowrap}
       <label class="v-depot" for="fichier" tabindex="0" id="depot">
         <span class="mono">Export Kairnial · .xlsx</span>
         <strong>Glisse l'export « Tableau de suivi » ici, ou clique pour le choisir.</strong>
-        <span>Le fichier est lu dans ce navigateur : rien n'est envoyé, ni à la base de l'équipe ni ailleurs. Le dernier export chargé reste disponible dans ce navigateur jusqu'à ce que tu l'oublies.</span>
+        <span id="depot-note">Il est rangé dans la base de l'équipe avec l'heure du dépôt : chacun du bureau peut ensuite le rouvrir et l'analyser.</span>
       </label>
       <ul class="v-liste-points">
         <li>État de chaque plan, avec son indice le plus élevé tous circuits confondus.</li>
@@ -238,6 +245,7 @@ table.liste td.v-auteur{white-space:nowrap}
     <div id="analyse" hidden>
       <div class="tete-collante">
         <div class="grille-champs">
+          <div class="champ" id="champ-export" hidden><label for="f-export">Export analysé</label><select id="f-export"></select></div>
           <div class="champ"><label for="f-circuit">Circuit</label><select id="f-circuit"></select></div>
           <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
@@ -334,6 +342,12 @@ table.liste td.v-auteur{white-space:nowrap}
         <p id="pied-source"></p>
       </section>
     </div>
+
+    <section class="section sans-impression" id="exports-deposes" hidden>
+      <div class="tete-section"><h2>Exports déposés</h2></div>
+      <p class="v-intro">Les exports gardés dans la base de l'équipe, du plus récent au plus ancien. Chacun du bureau peut en analyser un autre ou en retirer un.</p>
+      <div class="defile"><table class="liste" id="table-exports"></table></div>
+    </section>
   </div>
 </main>
 
@@ -342,8 +356,8 @@ table.liste td.v-auteur{white-space:nowrap}
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=21"></script>
-<script src="/planif/assets/donnees.js?v=29"></script>
+<script src="/planif/assets/supabase.js?v=22"></script>
+<script src="/planif/assets/donnees.js?v=30"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
@@ -406,33 +420,81 @@ table.liste td.v-auteur{white-space:nowrap}
   });
   addEventListener("scroll", function () { bulle.hidden = true; }, { passive: true });
 
-  /* ------------------------------------------------------------ mémoire du navigateur
-     Le dernier export reste dans IndexedDB : il revient à la prochaine visite,
-     sur ce navigateur seulement. Rien ne part vers la base de l'équipe. */
-  function base() {
-    return new Promise(function (ok, ko) {
-      var r = indexedDB.open("planif.visas", 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore("exports"); };
-      r.onsuccess = function () { ok(r.result); };
-      r.onerror = function () { ko(r.error); };
-    });
-  }
-  function magasin(mode, fn) {
-    return base().then(function (db) {
-      return new Promise(function (ok, ko) {
-        var tx = db.transaction("exports", mode), req = fn(tx.objectStore("exports"));
-        tx.oncomplete = function () { ok(req && req.result); };
-        tx.onerror = function () { ko(tx.error); };
-      });
-    });
-  }
-  function relit() { try { return magasin("readonly", function (s) { return s.get("dernier"); }).catch(function () { return null; }); } catch (e) { return Promise.resolve(null); } }
-  function garde(o) { try { return magasin("readwrite", function (s) { return s.put(o, "dernier"); }).catch(function () {}); } catch (e) { return Promise.resolve(); } }
-  function oublie() { try { return magasin("readwrite", function (s) { return s.delete("dernier"); }).catch(function () {}); } catch (e) { return Promise.resolve(); } }
+  /* ------------------------------------------------------------ exports déposés
+     Un export déposé est gardé dans la base de l'équipe (Supabase Storage, par
+     donnees.js ; migration-visas.sql) avec l'heure du dépôt : chacun du bureau
+     le rouvre ensuite, depuis le menu « Export analysé » ou le tableau des
+     exports. Sans la migration, l'export glissé ici est seulement analysé.
+     Le dernier export ouvert est retenu dans ce navigateur, pour la visite suivante. */
+  var exportsListe = [], stockageOk = false, courant = null, jeux = {};
+  var CLE_CHOIX = "planif.visas.choix";
+  function retiens(i) { try { if (i) localStorage.setItem(CLE_CHOIX, i); else localStorage.removeItem(CLE_CHOIX); } catch (e) {} }
+  function retenu() { try { return localStorage.getItem(CLE_CHOIX); } catch (e) { return null; } }
 
-  /* ------------------------------------------------------------ chargement */
+  function heureDepot(x) {
+    var d = new Date(x.deposeLe);
+    return isNaN(d) ? "—" : d.toLocaleDateString("fr-CH") + " à " + d.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" });
+  }
+  function editionTxt(x) {
+    var m = x.edition && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(x.edition);
+    return m ? m[3] + "." + m[2] + "." + m[1] + " " + m[4] + ":" + m[5] : "—";
+  }
+  function parQui(x) { return x.deposeNom || x.deposePar || ""; }
+  function libelleExport(x) { return "Déposé le " + heureDepot(x) + (x.projet ? " · " + x.projet : "") + (parQui(x) ? " · " + parQui(x) : ""); }
+  function isoEdition(s) { return s ? V.serialVersDate(s).toISOString().slice(0, 19) : null; }
+
+  function messageLecture(e) {
+    if (e && e.metier) return e.message;
+    return e && e.message === "navigateur" ? "Ton navigateur ne sait pas décompresser ce fichier. Mets-le à jour (Chrome, Edge, Firefox ou Safari récent)."
+      : e && e.message === "vide" ? "Aucun tableau de visas dans ce fichier : il faut l'export « Tableau de suivi » de la GED Kairnial."
+      : "Ce fichier n'est pas un classeur Excel lisible. Exporte à nouveau le « Tableau de suivi » depuis Kairnial.";
+  }
+
+  function chargeListe() {
+    return D.exportsVisas.disponible().then(function (ok) {
+      stockageOk = ok;
+      $("migration-visas").hidden = ok;
+      $("depot-note").textContent = ok
+        ? "Il est rangé dans la base de l'équipe avec l'heure du dépôt : chacun du bureau peut ensuite le rouvrir et l'analyser."
+        : "Il est analysé dans ce navigateur, sans être gardé, tant que le stockage des exports n'est pas installé.";
+      return ok ? D.exportsVisas.liste() : [];
+    }).then(function (l) {
+      exportsListe = l;
+      menuExports(); rendExports(); barreOutil();
+      return l;
+    });
+  }
+
+  function menuExports() {
+    var html = exportsListe.map(function (x) {
+      return '<option value="' + esc(x.id) + '"' + (courant && courant.id === x.id ? " selected" : "") + ">" + esc(libelleExport(x)) + "</option>";
+    }).join("");
+    if (courant && !courant.id) html = '<option value="" selected>' + esc(courant.nom) + " · non gardé</option>" + html;
+    $("f-export").innerHTML = html;
+    $("champ-export").hidden = !html;
+  }
+  $("f-export").addEventListener("change", function () {
+    var v = this.value, x = exportsListe.filter(function (e) { return e.id === v; })[0];
+    if (x) ouvre(x);
+  });
+
+  function ouvre(x) {
+    if (jeux[x.id]) { affiche({ ligne: x, nom: x.nom, jeu: jeux[x.id] }); return Promise.resolve(); }
+    UI.toast("Ouverture de l'export déposé le " + heureDepot(x) + "…");
+    return D.exportsVisas.lit(x).then(V.lire).then(function (classeur) {
+      var J = V.parse(classeur);
+      if (!J.docs.length) throw new Error("vide");
+      jeux[x.id] = J;
+      affiche({ ligne: x, nom: x.nom, jeu: J });
+    }).catch(function (e) {
+      UI.toast(messageLecture(e));
+      menuExports();
+      if (!donnees) montreAccueil();
+    });
+  }
+
   function choisir() { $("fichier").click(); }
-  $("fichier").addEventListener("change", function () { if (this.files[0]) charge(this.files[0]); this.value = ""; });
+  $("fichier").addEventListener("change", function () { if (this.files[0]) depose(this.files[0]); this.value = ""; });
   $("depot").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choisir(); } });
 
   var profondeur = 0;
@@ -443,49 +505,101 @@ table.liste td.v-auteur{white-space:nowrap}
   document.addEventListener("drop", function (e) {
     if (!avecFichier(e)) return;
     e.preventDefault(); profondeur = 0; document.body.classList.remove("v-glisse");
-    if (e.dataTransfer.files[0]) charge(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files[0]) depose(e.dataTransfer.files[0]);
   });
 
-  function charge(f) {
+  /* Le fichier est d'abord lu ici : un classeur qui n'est pas un export Kairnial
+     n'encombre pas la base. Le même export (même édition, même projet, même
+     nombre d'indices) n'est pas gardé deux fois : c'est l'existant qui s'ouvre. */
+  function depose(f) {
     if (!/\.xlsx$/i.test(f.name)) { UI.toast("« " + f.name + " » n'est pas un fichier .xlsx. Exporte le « Tableau de suivi » de la GED Kairnial au format Excel."); return; }
     UI.toast("Lecture de « " + f.name + " »…");
+    var J;
     f.arrayBuffer().then(V.lire).then(function (classeur) {
-      var J = V.parse(classeur);
+      J = V.parse(classeur);
       if (!J.docs.length) throw new Error("vide");
-      var o = { nom: f.name, charge: Date.now(), jeu: J };
-      affiche(o);
-      garde(o);
-      UI.toast("Export chargé : " + n(donnees.plans.length) + " plans, " + n(donnees.docs.length) + " indices.");
-    }).catch(function (e) {
-      UI.toast(e && e.message === "navigateur"
-        ? "Ton navigateur ne sait pas décompresser ce fichier. Mets-le à jour (Chrome, Edge, Firefox ou Safari récent)."
-        : e && e.message === "vide"
-          ? "Aucun tableau de visas dans ce fichier : il faut l'export « Tableau de suivi » de la GED Kairnial."
-          : "Ce fichier n'est pas un classeur Excel lisible. Exporte à nouveau le « Tableau de suivi » depuis Kairnial.");
+      var codes = {};
+      J.docs.forEach(function (d) { codes[d[1]] = 1; });
+      var m = { nom: f.name, taille: f.size || 0, edition: isoEdition(J.edition), projet: String(J.docs[0][1] || "").split("-")[0],
+        nbPlans: Object.keys(codes).length, nbIndices: J.docs.length, nbVisas: J.visas.filter(function (v) { return v[4] >= 0; }).length };
+      var deja = exportsListe.filter(function (x) { return x.edition === m.edition && x.projet === m.projet && x.nbIndices === m.nbIndices; })[0];
+      if (deja) {
+        jeux[deja.id] = J;
+        affiche({ ligne: deja, nom: deja.nom, jeu: J });
+        UI.toast("Cet export est déjà déposé (le " + heureDepot(deja) + ") : c'est lui qui est ouvert.");
+        return;
+      }
+      if (!stockageOk) {
+        affiche({ ligne: null, nom: f.name, jeu: J });
+        UI.toast("Export analysé, sans être gardé : le stockage des exports n'est pas encore installé.");
+        return;
+      }
+      UI.toast("Dépôt de « " + f.name + " »…");
+      return D.exportsVisas.depose(f, m).then(function (x) {
+        exportsListe.unshift(x);
+        jeux[x.id] = J;
+        affiche({ ligne: x, nom: x.nom, jeu: J });
+        UI.toast("Export déposé le " + heureDepot(x) + " et analysé.");
+      }, function (e) {
+        affiche({ ligne: null, nom: f.name, jeu: J });
+        UI.toast("Analyse affichée, mais le dépôt a échoué : " + ((e && e.message) || "erreur inconnue."));
+      });
+    }).catch(function (e) { UI.toast(messageLecture(e)); });
+  }
+
+  function retire(x) {
+    UI.confirme("Retirer cet export ?", "« " + x.nom + " », déposé le " + heureDepot(x) + (parQui(x) ? " par " + parQui(x) : "") +
+      ". Il disparaît pour tout le bureau ; le fichier sur ton disque ne change pas.", "Retirer", true).then(function (ok) {
+      if (!ok) return;
+      D.exportsVisas.supprime(x).then(function () {
+        exportsListe = exportsListe.filter(function (e) { return e.id !== x.id; });
+        delete jeux[x.id];
+        UI.toast("Export retiré.");
+        if (courant && courant.id === x.id) {
+          if (exportsListe[0]) return ouvre(exportsListe[0]);
+          courant = null; donnees = null; source = null; retiens(null);
+          montreAccueil();
+        }
+        menuExports(); rendExports();
+      }).catch(function (e) { UI.toast(e.message); });
     });
   }
 
-  function oublier() {
-    UI.confirme("Oublier cet export ?", "Il sera retiré de ce navigateur. Le fichier sur ton disque ne change pas.", "Oublier").then(function (ok) {
-      if (!ok) return;
-      oublie().then(function () { donnees = null; source = null; montreAccueil(); UI.toast("Export oublié."); });
-    });
+  function rendExports() {
+    $("exports-deposes").hidden = !exportsListe.length;
+    tableau("table-exports", '<thead><tr><th>Déposé le</th><th>Fichier</th><th>Projet</th><th>Édition Kairnial</th><th class="n">Plans</th><th>Déposé par</th><th></th></tr></thead><tbody>' +
+      exportsListe.map(function (x) {
+        var ici = !!(courant && courant.id === x.id);
+        return "<tr><td class=\"n\">" + esc(heureDepot(x)) + "</td><td>" + esc(x.nom) + (ici ? ' <span class="v-code" style="--c:var(--or)">analysé</span>' : "") +
+          "</td><td>" + esc(x.projet || "—") + '</td><td class="n">' + esc(editionTxt(x)) + '</td><td class="n">' + n(x.nbPlans) + "</td><td>" + esc(parQui(x) || "—") +
+          '</td><td class="actions">' + (ici ? "" : '<button class="btn btn-nu" type="button" data-ouvre="' + esc(x.id) + '">Analyser</button> ') +
+          '<button class="btn btn-nu btn-rouge" type="button" data-retire="' + esc(x.id) + '">Retirer</button></td></tr>';
+      }).join("") + "</tbody>");
   }
+  $("table-exports").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var i = b.getAttribute("data-ouvre") || b.getAttribute("data-retire");
+    var x = exportsListe.filter(function (y) { return y.id === i; })[0];
+    if (!x) return;
+    if (b.hasAttribute("data-ouvre")) { ouvre(x); scrollTo({ top: 0, behavior: "smooth" }); } else retire(x);
+  });
 
   function barreOutil() {
-    var actions = donnees ? [{ label: "Exporter en PDF", icone: "ico-export", action: exportePdf }, { label: "Oublier l'export", action: oublier }] : [];
-    actions.push({ label: "Charger un export", or: true, action: choisir });
+    var actions = donnees ? [{ label: "Exporter en PDF", icone: "ico-export", action: exportePdf }] : [];
+    actions.push({ label: stockageOk ? "Déposer un export" : "Analyser un export", or: true, action: choisir });
     UI.chrome("visas", actions);
   }
 
   function montreAccueil() {
     $("analyse").hidden = true; $("accueil").hidden = false;
     $("titre-compte").textContent = "";
-    barreOutil();
+    menuExports(); rendExports(); barreOutil();
   }
 
   function affiche(o) {
     source = o;
+    courant = o.ligne || { id: null, nom: o.nom };
+    retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
     etat.circuit = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe();
@@ -493,7 +607,7 @@ table.liste td.v-auteur{white-space:nowrap}
     $("accueil").hidden = true; $("analyse").hidden = false;
     var projet = (donnees.docs[0] && donnees.docs[0].code.split("-")[0]) || "";
     $("titre-compte").textContent = (projet ? projet + " · " : "") + (donnees.edition ? "export du " + date(donnees.edition) : "");
-    barreOutil();
+    menuExports(); rendExports(); barreOutil();
     rend();
   }
 
@@ -526,10 +640,10 @@ table.liste td.v-auteur{white-space:nowrap}
   function rendCartouche() {
     var c = (donnees.docs[0] || { code: "" }).code.split("-");
     var champs = [["Projet", c[0]], ["Discipline", c[1]], ["Émetteur", c[2]], ["Phase", c[3]],
-      ["Édition", donnees.edition ? date(donnees.edition) : "—"], ["Plans", n(donnees.plans.length)],
-      ["Indices", n(donnees.docs.length)], ["Visas rendus", n(donnees.visas.filter(function (v) { return v.etat === "rendu"; }).length)]];
+      ["Édition Kairnial", donnees.edition ? date(donnees.edition) : "—"], ["Déposé le", source.ligne ? heureDepot(source.ligne) : "non gardé"],
+      ["Plans", n(donnees.plans.length)], ["Indices", n(donnees.docs.length)]];
     $("cartouche").innerHTML = champs.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + esc(x[1] || "—") + "</b></div>"; }).join("");
-    $("pied-source").textContent = "Source : « " + source.nom + " », chargé le " + new Date(source.charge).toLocaleDateString("fr-CH") +
+    $("pied-source").textContent = "Source : « " + source.nom + " », " + (source.ligne ? "déposé le " + heureDepot(source.ligne) + (parQui(source.ligne) ? " par " + parQui(source.ligne) : "") : "analysé sans être gardé") +
       (donnees.extras ? ". " + n(donnees.extras) + " dépôts hors charte et sans visa ne sont pas analysés." : ".");
   }
 
@@ -882,7 +996,8 @@ table.liste td.v-auteur{white-space:nowrap}
     if (q) f.push("« " + q + " »");
     $("imp-titre").textContent = "Visas" + (projet() ? " · " + projet() : "");
     $("imp-filtres").textContent = f.join("  ·  ");
-    $("imp-edition").textContent = (donnees.edition ? "Export Kairnial du " + date(donnees.edition) + "  ·  " : "") + "édité le " + new Date().toLocaleDateString("fr-CH");
+    $("imp-edition").textContent = (donnees.edition ? "Export Kairnial du " + date(donnees.edition) + "  ·  " : "") +
+      (source.ligne ? "déposé le " + heureDepot(source.ligne) + "  ·  " : "") + "édité le " + new Date().toLocaleDateString("fr-CH");
   }
   function nomFichier() {
     var e = donnees.edition ? V.serialVersDate(donnees.edition).toISOString().slice(0, 10) : "";
@@ -936,10 +1051,13 @@ table.liste td.v-auteur{white-space:nowrap}
       surSaisie: function () { etat.limite = 60; if (donnees) rendListe(); },
       surEntree: function () { var t = document.querySelector("tr.v-plan"); if (t && document.querySelectorAll("tr.v-plan").length === 1) bascule(t); }
     });
-    return relit().then(function (o) {
-      if (o && o.jeu) { try { affiche(o); return; } catch (e) { oublie(); } }
+    // Relire la base (bouton Rafraîchir, retour sur l'onglet) relit aussi la liste des exports
+    D.surRechargement(function () { chargeListe().catch(function () {}); });
+    return chargeListe().then(function (l) {
+      var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];
+      if (x) return ouvre(x);
       montreAccueil();
-    });
+    }, function (e) { UI.toast(e.message); montreAccueil(); });
   }).catch(UI.echec);
 })();
 </script>
