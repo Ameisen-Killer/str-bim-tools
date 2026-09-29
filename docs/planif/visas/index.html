@@ -33,6 +33,7 @@
 
 .v-intro{color:var(--texte-doux);max-width:62em;margin:-8px 0 20px}
 .v-note{font-size:13px;color:var(--texte-faible);margin-top:10px}
+#dernier-effet{margin-top:0;align-self:center;max-width:70em}
 
 /* dépôt du fichier : toute la zone est cliquable, et la page entière accepte le glisser */
 .v-depot{display:flex;flex-direction:column;align-items:flex-start;gap:10px;border:1px dashed rgba(var(--or-rvb),.5);padding:clamp(22px,4vw,40px);cursor:pointer;transition:border-color .25s,background .25s}
@@ -250,7 +251,7 @@ table.liste td.v-auteur{white-space:nowrap}
           <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
-        <div class="cases"><label class="case" title="Ne compter que les visas du dernier indice de chaque plan : les visas d'un indice remplacé depuis, dans ce circuit ou un autre, sortent des délais, des graphiques et des motifs."><input type="checkbox" id="f-dernier"> Masquer les indices remplacés</label></div>
+        <div class="cases"><label class="case" title="Ne compter que les visas du dernier indice de chaque plan : les visas d'un indice remplacé depuis, dans ce circuit ou un autre, sortent des délais, des graphiques et des motifs."><input type="checkbox" id="f-dernier"> Masquer les indices remplacés</label><span class="v-note" id="dernier-effet" aria-live="polite"></span></div>
       </div>
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
@@ -362,7 +363,7 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=4"></script>
+<script src="/planif/assets/visas.js?v=5"></script>
 <script>
 (function () {
   "use strict";
@@ -680,8 +681,20 @@ table.liste td.v-auteur{white-space:nowrap}
   function rend() {
     menuAuteurs();
     R = V.analyse(donnees, etat);
+    rendEffetDernier();
     rendCartouche(); rendTuiles(); rendEtat(); rendInter(); rendMO(); rendDC(); rendParcours();
     rendAttente(); rendListe(); rendVigilance(); rendCodes();
+  }
+
+  /* Ce que la case « Masquer les indices remplacés » retire, dit à côté d'elle :
+     sans cela, rien ne bouge en haut de page (plans et chiffres clés prennent
+     déjà le dernier indice) et la case semble sans effet. */
+  function rendEffetDernier() {
+    var Q = R.qualite;
+    $("dernier-effet").textContent = etat.dernierSeul
+      ? n(Q.indicesComptes) + " indices sur " + n(Q.lignes) + " et " + n(Q.renduTotal) + " visas rendus sur " + n(Q.renduTous) +
+        " comptés : délais, réponses du MO et motifs du Doc Control ne portent plus que sur le dernier indice de chaque plan."
+      : "Délais, réponses du MO et motifs du Doc Control comptent les " + n(Q.renduTous) + " visas rendus, anciens indices compris.";
   }
 
   function rendCartouche() {

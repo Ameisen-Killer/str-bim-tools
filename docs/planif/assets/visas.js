@@ -499,6 +499,8 @@
       }).length,
       visaAvantDemande: visasB.filter(function (v) { return v.etat === "rendu" && v.dd !== null && v.dv !== null && v.dv < v.dd; }).length,
       renduTotal: visas.filter(function (v) { return v.etat === "rendu"; }).length,
+      renduTous: visasB.filter(function (v) { return v.etat === "rendu"; }).length,
+      indicesComptes: f.dernierSeul ? docsF.filter(function (d) { return !d.depasse; }).length : docsF.length,
       lignes: docsF.length
     };
     return R;
