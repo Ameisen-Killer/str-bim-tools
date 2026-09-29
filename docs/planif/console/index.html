@@ -146,8 +146,8 @@
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=22"></script>
-<script src="/planif/assets/donnees.js?v=30"></script>
+<script src="/planif/assets/supabase.js?v=23"></script>
+<script src="/planif/assets/donnees.js?v=31"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
 <script>
@@ -1470,9 +1470,10 @@
         " (dépôt). Sans elle, le champ n'apparaît pas dans la fiche affaire."
       ]),
       point("verifier", "Exports Kairnial (page Visas).", [
-        "Les exports « Tableau de suivi » déposés dans la page Visas sont gardés avec l'heure du dépôt, et chacun du bureau peut les rouvrir. ",
+        "Les exports « Tableau de suivi » déposés dans la page Visas sont gardés avec l'heure du dépôt, et chacun du bureau peut les rouvrir ; ",
+        "les plans cochés « Traité » dans la liste sont partagés par le bureau. ",
         lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-visas.sql" }),
-        " (dépôt). Sans elle, la page analyse l'export qu'on y glisse, sans le garder."
+        " (dépôt), à relancer si les coches « Traité » manquent. Sans elle, la page analyse l'export qu'on y glisse, sans le garder."
       ]),
       point("verifier", "Serveur d'envoi (SMTP).", [
         "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",

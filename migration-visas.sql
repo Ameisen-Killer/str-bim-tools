@@ -21,6 +21,14 @@
 --
 --  Sans cette migration, la page analyse l'export qu'on y glisse, sans le garder.
 --
+--  PLANS TRAITÉS
+--    La liste des plans de la page a une coche « Traité » : on la coche quand
+--    on a repris le plan d'après ses visas. La coche est rangée dans la table
+--    visas_traites, par numéro de plan et indice, avec qui l'a posée et quand :
+--    tout le bureau la voit, et elle reste d'un export à l'autre. Quand un
+--    nouvel indice arrive, le plan redevient « à traiter ». La table s'ajoute
+--    en relançant ce fichier ; les exports déjà déposés ne sont pas touchés.
+--
 --  ORDRE À RESPECTER
 --    migration-multi-bureaux.sql d'abord (c'est elle qui pose bureau_par_defaut
 --    et bureau_courant).
@@ -112,6 +120,41 @@ create policy "visas : retrait dans le bureau" on storage.objects for delete to 
   using (bucket_id = 'visas'
          and (storage.foldername(name))[1] = (select public.bureau_courant())::text);
 
+-- ---------------------------------------------------------- plans traités ---
+-- Une ligne par plan repris : numéro de plan (tel que la page l'assemble à partir
+-- de la nomenclature) et indice. Décocher efface la ligne.
+create table if not exists public.visas_traites (
+  bureau_id   uuid not null default public.bureau_par_defaut()
+              constraint visas_traites_bureau_fk references public.bureaux (id) on delete cascade,
+  code        text not null,
+  indice      integer not null default 0,
+  traite_le   timestamptz not null default now(),
+  traite_par  text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
+  traite_nom  text not null default '',
+  primary key (bureau_id, code, indice)
+);
+
+comment on table  public.visas_traites is
+  'Plans cochés « Traité » dans la page Visas : repris d''après leurs visas, pour cet indice.';
+comment on column public.visas_traites.code is
+  'Numéro du plan, les champs de nomenclature de l''export Kairnial joints par des tirets.';
+comment on column public.visas_traites.traite_par is
+  'Adresse de la personne qui a coché, posée par la base (contrôlée à l''arrivée).';
+
+alter table public.visas_traites enable row level security;
+
+drop policy if exists "bureau courant (lecture)"     on public.visas_traites;
+drop policy if exists "bureau courant (coche)"       on public.visas_traites;
+drop policy if exists "bureau courant (suppression)" on public.visas_traites;
+
+create policy "bureau courant (lecture)" on public.visas_traites for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (coche)" on public.visas_traites for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and traite_par = lower(coalesce(auth.jwt() ->> 'email', '')));
+create policy "bureau courant (suppression)" on public.visas_traites for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+
 commit;
 
 -- ==================================================================== rapport ==
@@ -124,6 +167,6 @@ select p.tablename                                        as sur,
        p.cmd                                              as commande,
        p.policyname                                       as regle
   from pg_policies p
- where (p.schemaname = 'public' and p.tablename = 'exports_visas')
+ where (p.schemaname = 'public' and p.tablename in ('exports_visas', 'visas_traites'))
     or (p.schemaname = 'storage' and p.tablename = 'objects' and p.policyname like 'visas :%')
  order by p.tablename, p.cmd, p.policyname;

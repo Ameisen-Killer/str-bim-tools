@@ -827,6 +827,34 @@
     }
   };
 
+  /* Plans cochés « Traité » dans la liste de la page Visas (table visas_traites,
+     migration-visas.sql) : une ligne par numéro de plan et indice. Cocher un plan
+     qu'un collègue vient de cocher ne change rien : la première coche reste. */
+  function versTraite(l) {
+    return { code: l.code, indice: +l.indice || 0, traiteLe: l.traite_le, traitePar: l.traite_par || "", traiteNom: l.traite_nom || "" };
+  }
+  var TRAITES = {
+    disponible: function () {
+      return requete("visas_traites?select=code&limit=1").then(function () { return true; }, function (e) {
+        if (tableAbsente(e)) return false;
+        throw e;
+      });
+    },
+    liste: function () {
+      return litTout("visas_traites", "traite_le.desc").then(function (l) { return (l || []).map(versTraite); });
+    },
+    marque: function (t) {
+      return requete("visas_traites", {
+        methode: "POST", prefer: "resolution=ignore-duplicates,return=representation",
+        corps: { code: t.code, indice: t.indice, traite_nom: t.traiteNom || "" }
+      }).then(function (l) { return l && l[0] ? versTraite(l[0]) : null; });
+    },
+    demarque: function (t) {
+      return requete("visas_traites?code=eq." + encodeURIComponent(t.code) + "&indice=eq." + (+t.indice || 0),
+        { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
+
   global.Sb = {
     configure: configure,
     session: function () { return session; },
@@ -858,7 +886,8 @@
       enchainementEnBase: function () { return enchaineEnBase; },
       phaseEnBase: function () { return phaseEnBase; },
       adresseEnBase: function () { return adresseEnBase; },
-      exportsVisas: EXPORTS_VISAS
+      exportsVisas: EXPORTS_VISAS,
+      visasTraites: TRAITES
     }
   };
 })(window);

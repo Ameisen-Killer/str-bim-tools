@@ -30,26 +30,36 @@
   function u16(b, o) { return b[o] | (b[o + 1] << 8); }
   function u32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
 
-  function entrees(u8) {
+  // Répertoire du zip, dans l'ordre du fichier : de quoi lire chaque élément, et le recopier tel quel
+  function repertoire(u8) {
     var i = u8.length - 22, fin = Math.max(0, u8.length - 22 - 65535);
     while (i >= fin && u32(u8, i) !== 0x06054b50) i--;
     if (i < fin) throw new Error("pas-xlsx");
-    var n = u16(u8, i + 10), o = u32(u8, i + 16), td = new TextDecoder("utf-8"), f = {};
+    var n = u16(u8, i + 10), o = u32(u8, i + 16), td = new TextDecoder("utf-8"), l = [];
     for (var k = 0; k < n; k++) {
       if (u32(u8, o) !== 0x02014b50) throw new Error("pas-xlsx");
       var ln = u16(u8, o + 28), le = u16(u8, o + 30), lc = u16(u8, o + 32);
-      var nom = td.decode(u8.subarray(o + 46, o + 46 + ln)).replace(/^\/+/, "");
-      f[nom.toLowerCase()] = { meth: u16(u8, o + 10), taille: u32(u8, o + 20), local: u32(u8, o + 42) };
+      l.push({ nom: td.decode(u8.subarray(o + 46, o + 46 + ln)).replace(/^\/+/, ""), meth: u16(u8, o + 10),
+        crc: u32(u8, o + 16), taille: u32(u8, o + 20), usz: u32(u8, o + 24), local: u32(u8, o + 42) });
       o += 46 + ln + le + lc;
     }
+    return l;
+  }
+  function entrees(u8) {
+    var f = {};
+    repertoire(u8).forEach(function (e) { f[e.nom.toLowerCase()] = e; });
     return f;
+  }
+  function donnees(u8, e) {
+    var o = e.local;
+    if (u32(u8, o) !== 0x04034b50) throw new Error("pas-xlsx");
+    var d = o + 30 + u16(u8, o + 26) + u16(u8, o + 28);
+    return u8.subarray(d, d + e.taille);
   }
 
   function extrait(u8, e) {
-    var o = e.local;
-    if (u32(u8, o) !== 0x04034b50) return Promise.reject(new Error("pas-xlsx"));
-    var d = o + 30 + u16(u8, o + 26) + u16(u8, o + 28);
-    var brut = u8.subarray(d, d + e.taille);
+    var brut;
+    try { brut = donnees(u8, e); } catch (err) { return Promise.reject(err); }
     if (e.meth === 0) return Promise.resolve(brut);
     if (e.meth !== 8) return Promise.reject(new Error("pas-xlsx"));
     if (typeof DecompressionStream === "undefined") return Promise.reject(new Error("navigateur"));
@@ -103,8 +113,9 @@
     return lignes;
   }
 
-  function lire(octets) {
-    var u8 = octets instanceof Uint8Array ? octets : new Uint8Array(octets), f;
+  // Le classeur tel qu'il est écrit : ses feuilles (nom, chemin, XML) et ses chaînes partagées
+  function classeurBrut(u8) {
+    var f;
     try { f = entrees(u8); } catch (e) { return Promise.reject(e); }
     var td = new TextDecoder("utf-8");
     function xml(nom) {
@@ -126,10 +137,135 @@
         feuilles.push({ nom: attr(m[1], "name"), chemin: id ? cibles[id[1]] : null });
       }
       return Promise.all(feuilles.map(function (s) {
-        return s.chemin ? xml(s.chemin).then(function (x) { return { nom: s.nom, lignes: x ? feuille(x, partages) : [] }; })
-          : { nom: s.nom, lignes: [] };
-      }));
-    }).then(function (feuilles) { return { feuilles: feuilles }; });
+        return s.chemin ? xml(s.chemin).then(function (x) { s.xml = x; return s; }) : s;
+      })).then(function (fs) { return { feuilles: fs, partages: partages }; });
+    });
+  }
+
+  function lire(octets) {
+    var u8 = octets instanceof Uint8Array ? octets : new Uint8Array(octets);
+    return classeurBrut(u8).then(function (cb) {
+      return { feuilles: cb.feuilles.map(function (s) { return { nom: s.nom, lignes: s.xml ? feuille(s.xml, cb.partages) : [] }; }) };
+    });
+  }
+
+  /* ============================================================ écriture .xlsx
+     annote(octets, marque, titre) : le même classeur, avec une colonne de plus
+     (« Traité ») au bout de chaque feuille de nomenclature. marque(code, indice)
+     donne le texte de la cellule, ou rien. Tout le reste est recopié octet pour
+     octet ; seules les feuilles touchées sont réécrites, puis recompressées
+     (CompressionStream). Les lignes sont reconnues comme à la lecture : même
+     en-tête (« Libellé du document »), même numéro de plan, même indice. */
+  function lettres(i) { var s = ""; i++; while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function echappe(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function ecritFeuille(xml, h, marques, col, titre) {
+    var L = lettres(col), suite = 0;
+    var out = xml.replace(/(<(\w+:)?row\b)([^>]*?)(\/>|>([\s\S]*?)(<\/(?:\w+:)?row>))/g, function (tout, debut, p, attrs, fin, corps, ferme) {
+      var n = attr(attrs, "r"), li = n ? parseInt(n, 10) - 1 : suite, num = li + 1;
+      suite = li + 1;
+      var txt = li === h ? titre : marques[li];
+      if (!txt || fin === "/>") return tout;
+      p = p || "";
+      var a2 = attrs.replace(/spans="(\d+):(\d+)"/, function (m, x, y) { return 'spans="' + x + ":" + Math.max(+y, col + 1) + '"'; });
+      // la cellule prend le style de sa voisine : l'en-tête reste un en-tête
+      var cs = corps.match(/<(?:\w+:)?c\b[^>]*>/g), s = cs ? attr(cs[cs.length - 1], "s") : null;
+      return debut + a2 + ">" + corps + "<" + p + 'c r="' + L + num + '"' + (s ? ' s="' + s + '"' : "") + ' t="inlineStr"><' + p + "is><" + p + 't xml:space="preserve">' +
+        echappe(txt) + "</" + p + "t></" + p + "is></" + p + "c>" + ferme;
+    });
+    out = out.replace(/(<(?:\w+:)?dimension\s+ref="[A-Z]+\d+:)([A-Z]+)(\d+")/, function (m, a, c, d) { return colonne(c) < col ? a + L + d : m; });
+    // Largeur de la nouvelle colonne, si le classeur déclare les siennes et qu'aucune ne la couvre déjà
+    var cols = /<((?:\w+:)?)cols>([\s\S]*?)<\/(?:\w+:)?cols>/.exec(out);
+    if (cols) {
+      var maxi = 0, rM = /\bmax="(\d+)"/g, mm;
+      while ((mm = rM.exec(cols[2]))) maxi = Math.max(maxi, +mm[1]);
+      if (maxi < col + 1) out = out.replace(/<\/((?:\w+:)?)cols>/, '<$1col min="' + (col + 1) + '" max="' + (col + 1) + '" width="38" customWidth="1"/></$1cols>');
+    }
+    return out;
+  }
+
+  var TABLE_CRC = null;
+  function crc32(u8) {
+    if (!TABLE_CRC) {
+      TABLE_CRC = new Uint32Array(256);
+      for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; TABLE_CRC[n] = c >>> 0; }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < u8.length; i++) crc = TABLE_CRC[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function comprime(brut) {
+    if (typeof CompressionStream === "undefined") return Promise.resolve({ meth: 0, data: brut });   // stocké tel quel : plus lourd, mais valable
+    var flux = new Blob([brut]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    return new Response(flux).arrayBuffer().then(function (b) { return { meth: 8, data: new Uint8Array(b) }; });
+  }
+  function zippe(els) {
+    var te = new TextEncoder(), noms = els.map(function (e) { return te.encode(e.nom); }), total = 22;
+    els.forEach(function (e, i) { total += 30 + 46 + 2 * noms[i].length + e.data.length; });
+    var out = new Uint8Array(total), dv = new DataView(out.buffer), o = 0, offs = [];
+    els.forEach(function (e, i) {
+      offs.push(o);
+      dv.setUint32(o, 0x04034b50, true); dv.setUint16(o + 4, 20, true); dv.setUint16(o + 6, 0x0800, true);
+      dv.setUint16(o + 8, e.meth, true); dv.setUint16(o + 10, 0, true); dv.setUint16(o + 12, 0x21, true);
+      dv.setUint32(o + 14, e.crc, true); dv.setUint32(o + 18, e.data.length, true); dv.setUint32(o + 22, e.usz, true);
+      dv.setUint16(o + 26, noms[i].length, true); dv.setUint16(o + 28, 0, true);
+      out.set(noms[i], o + 30); out.set(e.data, o + 30 + noms[i].length);
+      o += 30 + noms[i].length + e.data.length;
+    });
+    var debut = o;
+    els.forEach(function (e, i) {
+      dv.setUint32(o, 0x02014b50, true); dv.setUint16(o + 4, 20, true); dv.setUint16(o + 6, 20, true); dv.setUint16(o + 8, 0x0800, true);
+      dv.setUint16(o + 10, e.meth, true); dv.setUint16(o + 12, 0, true); dv.setUint16(o + 14, 0x21, true);
+      dv.setUint32(o + 16, e.crc, true); dv.setUint32(o + 20, e.data.length, true); dv.setUint32(o + 24, e.usz, true);
+      dv.setUint16(o + 28, noms[i].length, true);
+      out.set(noms[i], o + 46);
+      dv.setUint32(o + 42, offs[i], true);
+      o += 46 + noms[i].length;
+    });
+    dv.setUint32(o, 0x06054b50, true); dv.setUint16(o + 8, els.length, true); dv.setUint16(o + 10, els.length, true);
+    dv.setUint32(o + 12, o - debut, true); dv.setUint32(o + 16, debut, true);
+    return out;
+  }
+
+  function annote(octets, marque, titre) {
+    var u8 = octets instanceof Uint8Array ? octets : new Uint8Array(octets);
+    var liste;
+    try { liste = repertoire(u8); } catch (e) { return Promise.reject(e); }
+    return classeurBrut(u8).then(function (cb) {
+      var modifs = {}, nbMarques = 0;
+      cb.feuilles.forEach(function (s) {
+        if (!s.xml || !s.chemin) return;
+        var rows = feuille(s.xml, cb.partages), h = -1, r, j;
+        for (r = 0; r < Math.min(rows.length, 20); r++) if ((rows[r] || []).indexOf("Libellé du document") >= 0) { h = r; break; }
+        if (h < 0) return;
+        var entete = rows[h], iInd = -1, iLib = -1, visas = false;
+        entete.forEach(function (c, j) {
+          if (typeof c !== "string") return;
+          if (c.indexOf("\n") > 0) visas = true;
+          else if (c.trim() === "Indice") iInd = j;
+          else if (c.trim() === "Libellé du document") iLib = j;
+        });
+        if (iInd < 0 || !visas) return;                         // feuille hors circuit : ses plans ne sont pas dans la liste
+        var nomenc = [], col = 0, marques = {};
+        for (j = 0; j < iInd; j++) if (entete[j]) nomenc.push(j);
+        rows.forEach(function (a) { if (a && a.length > col) col = a.length; });
+        for (r = h + 1; r < rows.length; r++) {
+          var a = rows[r];
+          if (!a || vide(a[iLib])) continue;
+          var code = nomenc.map(function (j) { return a[j] === null || a[j] === undefined ? "" : String(a[j]); }).join("-");
+          var t = marque(code, parseInt(a[iInd], 10) || 0);
+          if (t) { marques[r] = t; nbMarques++; }
+        }
+        modifs[s.chemin.toLowerCase()] = ecritFeuille(s.xml, h, marques, col, titre || "Traité");
+      });
+      var te = new TextEncoder();
+      return Promise.all(liste.map(function (e) {
+        var neuf = modifs[e.nom.toLowerCase()];
+        if (neuf === undefined) return { nom: e.nom, meth: e.meth, crc: e.crc, usz: e.usz, data: donnees(u8, e) };
+        var brut = te.encode(neuf);
+        return comprime(brut).then(function (c) { return { nom: e.nom, meth: c.meth, crc: crc32(brut), usz: brut.length, data: c.data }; });
+      })).then(function (els) { return { octets: zippe(els), marques: nbMarques }; });
+    });
   }
 
   /* ============================================================ jeu de données */
@@ -559,6 +695,6 @@
   }
 
   global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
-    SANS_NOM: SANS_NOM, auteurDe: auteurDe };
+    SANS_NOM: SANS_NOM, auteurDe: auteurDe, annote: annote };
   if (typeof module !== "undefined" && module.exports) module.exports = global.Visas;
 })(typeof window !== "undefined" ? window : globalThis);

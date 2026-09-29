@@ -314,6 +314,35 @@
   })();
   var EXPORTS = ADAPTATEUR.exportsVisas || EXPORTS_LOCAL;
 
+  /* Plans cochés « Traité » dans la page Visas : { code, indice, traiteLe,
+     traitePar, traiteNom }. En mode local, une liste dans localStorage. */
+  var TRAITES_LOCAL = (function () {
+    var CLE = "planif.visas.traites";
+    function lit() {
+      try { var l = JSON.parse(global.localStorage.getItem(CLE) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+    }
+    function ecrit(l) {
+      try { global.localStorage.setItem(CLE, JSON.stringify(l)); } catch (e) { throw erreur("Ce navigateur ne peut pas garder les coches."); }
+    }
+    function autre(t) { return function (x) { return x.code !== t.code || x.indice !== t.indice; }; }
+    return {
+      disponible: function () { return Promise.resolve(true); },
+      liste: function () { return Promise.resolve(lit()); },
+      marque: function (t) {
+        return Promise.resolve().then(function () {
+          var l = lit(), deja = l.filter(function (x) { return !autre(t)(x); })[0];
+          if (deja) return deja;
+          var x = { code: t.code, indice: t.indice, traiteLe: new Date().toISOString(), traitePar: "", traiteNom: t.traiteNom || "" };
+          l.unshift(x);
+          ecrit(l);
+          return x;
+        });
+      },
+      demarque: function (t) { return Promise.resolve().then(function () { ecrit(lit().filter(autre(t))); }); }
+    };
+  })();
+  var TRAITES = ADAPTATEUR.visasTraites || TRAITES_LOCAL;
+
   var etat = null;
   var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
   var abonnes = [], rechargements = [];
@@ -1181,6 +1210,20 @@
       },
       lit: function (x) { return EXPORTS.lit(x); },
       supprime: function (x) { return EXPORTS.supprime(x); }
+    },
+
+    /* Plans « Traité » (page Visas) : marque() signe la coche du nom affiché de
+       la personne, tiré de sa fiche. Un plan est désigné par { code, indice }. */
+    visasTraites: {
+      disponible: function () { return TRAITES.disponible(); },
+      liste: function () { return TRAITES.liste(); },
+      marque: function (t) {
+        return Promise.resolve().then(function () {
+          var p = profil || {}, fiche = p.membreId && etat ? D.membre(p.membreId) : null;
+          return TRAITES.marque({ code: t.code, indice: +t.indice || 0, traiteNom: fiche ? (fiche.prenom + " " + fiche.nom).trim() : "" });
+        });
+      },
+      demarque: function (t) { return TRAITES.demarque({ code: t.code, indice: +t.indice || 0 }); }
     },
 
     /* ------------------------------------------------ sauvegarde / reprise */

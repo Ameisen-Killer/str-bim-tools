@@ -395,6 +395,19 @@ values ('visas', 'visas', false, 26214400,
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
+-- Plans cochés « Traité » dans la liste de la page Visas, par numéro et indice :
+-- un nouvel indice redevient « à traiter ». Décocher efface la ligne.
+create table if not exists public.visas_traites (
+  bureau_id   uuid not null default public.bureau_par_defaut()
+              constraint visas_traites_bureau_fk references public.bureaux (id) on delete cascade,
+  code        text not null,
+  indice      integer not null default 0,
+  traite_le   timestamptz not null default now(),
+  traite_par  text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
+  traite_nom  text not null default '',
+  primary key (bureau_id, code, indice)
+);
+
 -- -------------------------------------------------------------- présences ---
 -- Qui a l'outil sous les yeux : la barre du haut en annonce le nombre, et les
 -- noms au survol. Une ligne par onglet ouvert ; un onglet visible bat toutes
@@ -592,7 +605,7 @@ declare
 begin
   foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                           'succursale_disciplines', 'presences', 'exports_visas'] loop
+                           'succursale_disciplines', 'presences', 'exports_visas', 'visas_traites'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -601,7 +614,7 @@ begin
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                        'succursale_disciplines', 'presences', 'exports_visas')
+                        'succursale_disciplines', 'presences', 'exports_visas', 'visas_traites')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -703,6 +716,15 @@ create policy "bureau courant (dépôt)" on public.exports_visas for insert to a
               and depose_par = lower(coalesce(auth.jwt() ->> 'email', ''))
               and split_part(chemin, '/', 1) = (select public.bureau_courant())::text);
 create policy "bureau courant (suppression)" on public.exports_visas for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+
+-- Plans traités : tout le bureau coche et décoche ; l'adresse est celle de la session.
+create policy "bureau courant (lecture)" on public.visas_traites for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (coche)" on public.visas_traites for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and traite_par = lower(coalesce(auth.jwt() ->> 'email', '')));
+create policy "bureau courant (suppression)" on public.visas_traites for delete to authenticated
   using (bureau_id = (select public.bureau_courant()));
 
 -- Leurs fichiers : le premier dossier du chemin est le bureau.

@@ -138,6 +138,14 @@ table.liste tr.v-plan td{cursor:pointer}
 table.liste tr.v-plan[aria-expanded="true"] td{background:rgba(var(--encre),.05)}
 table.liste tr.v-detail:hover td{background:none}
 table.liste td.v-auteur{white-space:nowrap}
+/* coche « Traité » : une case large à viser, qui n'ouvre pas la ligne ; le plan traité s'efface à demi */
+table.liste th.v-coche,table.liste td.v-coche{width:1%;text-align:center;padding-inline:6px}
+td.v-coche label{display:inline-grid;place-items:center;width:36px;height:36px;margin:-8px 0;cursor:pointer}
+td.v-coche input{width:17px;height:17px;margin:0;accent-color:var(--v-bon);cursor:pointer}
+table.liste tr.v-fait td:not(.v-coche){opacity:.55}
+table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded="true"] td:not(.v-coche){opacity:.85}
+.v-traite-txt{color:var(--v-bon)}
+.v-outils-liste{display:flex;flex-wrap:wrap;gap:8px}
 .v-histo{display:flex;flex-direction:column;gap:16px;padding:4px 0 8px}
 .v-indice{display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--ligne);padding-left:14px}
 .v-indice.dernier{border-left-color:var(--or)}
@@ -166,7 +174,9 @@ table.liste td.v-auteur{white-space:nowrap}
     --v-serie:rgba(22,19,15,.5);
     --p-moi:#9A6200; --p1:#1baf7a; --p2:#eb6834; --p3:#4a3aa7; --p4:#e87ba4; --p5:#2a78d6;
   }
-  #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases{display:none!important}
+  #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases,.v-outils-liste,#note-traites{display:none!important}
+  td.v-coche label{width:auto;height:auto;margin:0}
+  table.liste tr.v-fait td:not(.v-coche){opacity:1}
   .v-intro{font-size:8.5pt;margin:0 0 8px}
   .v-note{font-size:7.5pt;margin-top:4px}
   .v-cartouche{margin-bottom:10px}
@@ -205,6 +215,11 @@ table.liste td.v-auteur{white-space:nowrap}
   .v-indice li{grid-template-columns:1fr}
   .v-barres{grid-template-columns:minmax(0,1fr) auto}
   .v-barres .v-p{grid-column:1/-1;order:3;margin-bottom:4px}
+  /* fiche d'un plan : la coche dans le coin, à portée du pouce */
+  table.liste tr.v-plan{position:relative}
+  table.liste td.v-coche{position:absolute;top:8px;right:0;width:auto;padding:0}
+  td.v-coche label{margin:0;width:44px;height:44px}
+  table.liste td.v-coche + td{padding-right:48px}
 }
 </style>
 </head>
@@ -327,9 +342,17 @@ table.liste td.v-auteur{white-space:nowrap}
       </section>
 
       <section class="section" id="liste-plans">
-        <div class="tete-section"><h2>Liste des plans</h2></div>
+        <div class="tete-section"><h2>Liste des plans</h2>
+          <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout de chaque feuille : qui a traité le plan, et quand."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
+        </div>
+        <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et tout le bureau la voit ; quand un nouvel indice arrive, le plan repasse « à traiter ».</p>
+        <div class="bandeau" id="note-traites" hidden style="margin-bottom:16px">
+          <span class="losange" aria-hidden="true"></span>
+          <div><strong>Coches « Traité » pas encore installées. </strong>Relance <code>migration-visas.sql</code> dans Supabase (SQL Editor), puis recharge cette page : elle ajoute la table des plans traités, sans toucher aux exports déjà déposés.</div>
+        </div>
         <div data-recherche></div>
-        <div class="grille-champs" style="margin:16px 0 4px;max-width:720px">
+        <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
+          <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
           <div class="champ"><label for="f-visa">Visa reçu</label><select id="f-visa"></select></div>
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
@@ -376,19 +399,19 @@ table.liste td.v-auteur{white-space:nowrap}
 
 <script src="/planif/assets/calendrier.js?v=4"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=22"></script>
-<script src="/planif/assets/donnees.js?v=30"></script>
+<script src="/planif/assets/supabase.js?v=23"></script>
+<script src="/planif/assets/donnees.js?v=31"></script>
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=7"></script>
+<script src="/planif/assets/visas.js?v=8"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", traite: "tous", statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -446,7 +469,7 @@ table.liste td.v-auteur{white-space:nowrap}
      le rouvre ensuite, depuis le menu « Export analysé » ou le tableau des
      exports. Sans la migration, l'export glissé ici est seulement analysé.
      Le dernier export ouvert est retenu dans ce navigateur, pour la visite suivante. */
-  var exportsListe = [], stockageOk = false, courant = null, jeux = {};
+  var exportsListe = [], stockageOk = false, courant = null, jeux = {}, bruts = {};   // bruts : le fichier lu, pour l'Excel annoté
   var CLE_CHOIX = "planif.visas.choix";
   function retiens(i) { try { if (i) localStorage.setItem(CLE_CHOIX, i); else localStorage.removeItem(CLE_CHOIX); } catch (e) {} }
   function retenu() { try { return localStorage.getItem(CLE_CHOIX); } catch (e) { return null; } }
@@ -498,6 +521,53 @@ table.liste td.v-auteur{white-space:nowrap}
       : "Ce fichier n'est pas un classeur Excel lisible. Exporte à nouveau le « Tableau de suivi » depuis Kairnial.";
   }
 
+  /* ------------------------------------------------------------ plans traités
+     La coche « Traité » de la liste : le plan a été repris d'après ses visas.
+     Elle est rangée par numéro de plan et indice (table visas_traites, par
+     donnees.js), partagée par le bureau et gardée d'un export à l'autre : un
+     nouvel indice redevient « à traiter ». Tant que la table manque, la colonne
+     n'apparaît pas et une note dit quoi relancer. */
+  var traites = {}, traitesOk = false, traitesLus = false;
+  function cleTraite(code, indice) { return code + "|" + (+indice || 0); }
+  function traiteDe(p) { return traitesOk ? traites[cleTraite(p.code, p.doc.ind)] || null : null; }
+  function jourTraite(t) { var d = new Date(t.traiteLe); return isNaN(d) ? "" : d.toLocaleDateString("fr-CH"); }
+  function quiTraite(t) { return t.traiteNom || t.traitePar || ""; }
+  function texteTraite(t) { return "Traité" + (jourTraite(t) ? " le " + jourTraite(t) : "") + (quiTraite(t) ? " par " + quiTraite(t) : ""); }
+
+  function chargeTraites() {
+    return D.visasTraites.disponible().then(function (ok) {
+      traitesOk = ok;
+      return ok ? D.visasTraites.liste() : [];
+    }).then(function (l) {
+      traites = {};
+      l.forEach(function (t) { traites[cleTraite(t.code, t.indice)] = t; });
+      traitesLus = true;
+      if (donnees) { rendTuiles(); rendListe(); }
+    }, function (e) {
+      traitesLus = true;
+      UI.toast("Coches « Traité » : " + ((e && e.message) || "lecture impossible."));
+    });
+  }
+
+  function coche(code, indice, oui) {
+    var k = cleTraite(code, indice), avant = traites[k];
+    if (oui && avant) return;
+    if (oui) traites[k] = { code: code, indice: indice, traiteLe: new Date().toISOString(), traitePar: "", traiteNom: "" };   // en attendant la base
+    else delete traites[k];
+    rendTuiles(); rendListe();
+    (oui ? D.visasTraites.marque({ code: code, indice: indice }) : D.visasTraites.demarque({ code: code, indice: indice })).then(function (t) {
+      if (oui && t) { traites[k] = t; rendListe(); }   // la ligne de la base : son heure, son nom
+      else if (oui) chargeTraites();                   // un collègue l'avait cochée juste avant : c'est sa coche qui reste
+      UI.toast(court(code) + " (indice " + ind(indice) + ") " + (oui ? "marqué traité." : "remis à traiter."), {
+        label: "Annuler", action: function () { coche(code, indice, !oui); }
+      });
+    }, function (e) {
+      if (avant) traites[k] = avant; else delete traites[k];
+      rendTuiles(); rendListe();
+      UI.toast("La coche n'est pas enregistrée : " + ((e && e.message) || "erreur inconnue."));
+    });
+  }
+
   function chargeListe() {
     return D.exportsVisas.disponible().then(function (ok) {
       stockageOk = ok;
@@ -528,15 +598,16 @@ table.liste td.v-auteur{white-space:nowrap}
   });
 
   function ouvre(x) {
-    if (jeux[x.id]) { affiche({ ligne: x, nom: x.nom, jeu: jeux[x.id] }); return Promise.resolve(); }
+    if (jeux[x.id]) { affiche({ ligne: x, nom: x.nom, jeu: jeux[x.id], octets: bruts[x.id] }); return Promise.resolve(); }
     UI.toast("Ouverture de " + nomExport(x) + "…");
-    return D.exportsVisas.lit(x).then(V.lire).then(function (classeur) {
+    var brut;
+    return D.exportsVisas.lit(x).then(function (b) { brut = b; return V.lire(b); }).then(function (classeur) {
       var J = V.parse(classeur);
       if (!J.docs.length) throw new Error("vide");
-      jeux[x.id] = J;
+      jeux[x.id] = J; bruts[x.id] = brut;
       if (J.edition) x.edition = isoEdition(J.edition);    // un export gardé avant le 30.09 portait l'heure de sa dernière feuille
       trieExports();
-      affiche({ ligne: x, nom: x.nom, jeu: J });
+      affiche({ ligne: x, nom: x.nom, jeu: J, octets: brut });
     }).catch(function (e) {
       UI.toast(messageLecture(e));
       menuExports();
@@ -565,8 +636,8 @@ table.liste td.v-auteur{white-space:nowrap}
   function depose(f) {
     if (!/\.xlsx$/i.test(f.name)) { UI.toast("« " + f.name + " » n'est pas un fichier .xlsx. Exporte le « Tableau de suivi » de la GED Kairnial au format Excel."); return; }
     UI.toast("Lecture de « " + f.name + " »…");
-    var J;
-    f.arrayBuffer().then(V.lire).then(function (classeur) {
+    var J, brut;
+    f.arrayBuffer().then(function (b) { brut = b; return V.lire(b); }).then(function (classeur) {
       J = V.parse(classeur);
       if (!J.docs.length) throw new Error("vide");
       var codes = {};
@@ -575,13 +646,13 @@ table.liste td.v-auteur{white-space:nowrap}
         nbPlans: Object.keys(codes).length, nbIndices: J.docs.length, nbVisas: J.visas.filter(function (v) { return v[4] >= 0; }).length };
       var deja = exportsListe.filter(function (x) { return memeExport(x, m); })[0];
       if (deja) {
-        jeux[deja.id] = J;
-        affiche({ ligne: deja, nom: deja.nom, jeu: J });
+        jeux[deja.id] = J; bruts[deja.id] = brut;
+        affiche({ ligne: deja, nom: deja.nom, jeu: J, octets: brut });
         UI.toast("L'export du " + dateHeure(J.edition) + " est déjà déposé (le " + heureDepot(deja) + ") : c'est lui qui est ouvert.");
         return;
       }
       if (!stockageOk) {
-        affiche({ ligne: null, nom: f.name, jeu: J });
+        affiche({ ligne: null, nom: f.name, jeu: J, octets: brut });
         UI.toast("Export analysé, sans être gardé : le stockage des exports n'est pas encore installé.");
         return;
       }
@@ -589,11 +660,11 @@ table.liste td.v-auteur{white-space:nowrap}
       return D.exportsVisas.depose(f, m).then(function (x) {
         exportsListe.unshift(x);
         trieExports();
-        jeux[x.id] = J;
-        affiche({ ligne: x, nom: x.nom, jeu: J });
+        jeux[x.id] = J; bruts[x.id] = brut;
+        affiche({ ligne: x, nom: x.nom, jeu: J, octets: brut });
         UI.toast("Export du " + (editionTxt(x) || dateHeure(J.edition)) + " déposé et analysé.");
       }, function (e) {
-        affiche({ ligne: null, nom: f.name, jeu: J });
+        affiche({ ligne: null, nom: f.name, jeu: J, octets: brut });
         UI.toast("Analyse affichée, mais le dépôt a échoué : " + ((e && e.message) || "erreur inconnue."));
       });
     }).catch(function (e) { UI.toast(messageLecture(e)); });
@@ -606,7 +677,7 @@ table.liste td.v-auteur{white-space:nowrap}
       if (!ok) return;
       D.exportsVisas.supprime(x).then(function () {
         exportsListe = exportsListe.filter(function (e) { return e.id !== x.id; });
-        delete jeux[x.id];
+        delete jeux[x.id]; delete bruts[x.id];
         UI.toast("Export retiré.");
         if (courant && courant.id === x.id) {
           if (exportsListe[0]) return ouvre(exportsListe[0]);
@@ -735,9 +806,11 @@ table.liste td.v-auteur{white-space:nowrap}
     var retard = R.inters.reduce(function (s, o) { return s + o.attenteRetard; }, 0);
     var pire = R.inters.slice().sort(function (a, b) { return b.attenteRetard - a.attenteRetard; })[0];
     var P = R.parcours;
+    var repris = traitesOk ? R.plans.filter(function (p) { return (p.statut === "reprendre" || p.statut === "sas_rejet") && traiteDe(p); }).length : 0;
     var t = [
       { lib: "Validés par le MO", val: n(v + vo), sm: R.nbPlans ? pc((v + vo) / R.nbPlans) : "", txt: n(v) + " en VSO, " + n(vo) + " en VAO, sur " + n(R.nbPlans) + " plans." },
-      { lib: "À reprendre", val: n(ref + rej), txt: n(ref) + " refusés par le MO, " + n(rej) + " rejetés au SAS, sur leur dernier indice." },
+      { lib: "À reprendre", val: n(ref + rej), sm: !traitesOk || !(ref + rej) ? "" : repris ? "dont " + n(repris) + " traité" + (repris > 1 ? "s" : "") : "aucun traité",
+        txt: n(ref) + " refusés par le MO, " + n(rej) + " rejetés au SAS, sur leur dernier indice." },
       { lib: "Visas en retard", val: n(retard), txt: pire && pire.attenteRetard ? "Dont " + n(pire.attenteRetard) + " chez " + pire.qui + " (" + pire.circuit + ")." : "Aucun visa en attente hors délai." },
       { lib: "Dépôt → validation MO", val: P.mediane === null ? "—" : n(P.mediane), sm: P.mediane === null ? "" : "jours",
         txt: P.mediane === null ? "Pas de validation du MO dans cette sélection." : "Médiane. La moitié des plans est validée entre " + n(P.q1) + " et " + n(P.q3) + " jours." }
@@ -1050,6 +1123,24 @@ table.liste td.v-auteur{white-space:nowrap}
   }
   $("f-visa").addEventListener("change", function () { etat.visa = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
 
+  /* Traitement : tous les plans, ceux qui restent à reprendre, ceux déjà repris.
+     Le choix est retenu dans ce navigateur : on revient d'ordinaire à sa pile. */
+  var CLE_TRAITE = "planif.visas.traitement";
+  try { var t0 = localStorage.getItem(CLE_TRAITE); if (t0 === "a-traiter" || t0 === "traites") etat.traite = t0; } catch (e) {}
+  function menuTraite() {
+    $("champ-traite").hidden = !traitesOk;
+    if (!traitesOk) return;
+    var fait = R.plans.filter(traiteDe).length;
+    $("f-traite").innerHTML = [["tous", "Tous les plans · " + n(R.plans.length)], ["a-traiter", "À traiter · " + n(R.plans.length - fait)], ["traites", "Traités · " + n(fait)]].map(function (o) {
+      return '<option value="' + o[0] + '"' + (o[0] === etat.traite ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("");
+  }
+  $("f-traite").addEventListener("change", function () {
+    etat.traite = this.value; etat.limite = 60; etat.ouvert = null;
+    try { localStorage.setItem(CLE_TRAITE, etat.traite); } catch (e) {}
+    rendListe();
+  });
+
   function visasCourts(d) {
     var l = d.visas.filter(function (v) { return v.etat !== "abandon"; });
     var mo = l.filter(function (v) { return v.qui === "MO"; });
@@ -1091,6 +1182,7 @@ table.liste td.v-auteur{white-space:nowrap}
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
+      if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
       return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
     });
     l.sort({
@@ -1103,22 +1195,27 @@ table.liste td.v-auteur{white-space:nowrap}
   }
 
   function rendListe() {
-    menuVisas();
+    menuVisas(); menuTraite();
+    $("outils-liste").hidden = !traitesOk;
+    $("intro-traites").hidden = !traitesOk;
+    $("note-traites").hidden = traitesOk || !traitesLus || !stockageOk;     // stockage absent : le bandeau du haut le dit déjà
     $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
       return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
     }).join("");
     var l = listeFiltree();
     if (barre) barre.compte(l.length, R.plans.length);
-    var vis = l.slice(0, etat.limite), ed = donnees.edition || 0;
-    tableau("table-plans", "<thead><tr><th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th>Déposé par</th><th class="n">Dépôt</th><th class="n">Âge</th></tr></thead><tbody>' +
+    var vis = l.slice(0, etat.limite), ed = donnees.edition || 0, nc = traitesOk ? 9 : 8;
+    tableau("table-plans", "<thead><tr>" + (traitesOk ? '<th class="v-coche">Traité</th>' : "") + "<th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th>Déposé par</th><th class="n">Dépôt</th><th class="n">Âge</th></tr></thead><tbody>' +
       (vis.length ? vis.map(function (p) {
-        var d = p.doc, ouvert = etat.ouvert === p.code;
-        return '<tr class="v-plan" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '"><td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
+        var d = p.doc, ouvert = etat.ouvert === p.code, t = traiteDe(p);
+        var caseT = traitesOk ? '<td class="v-coche"><label title="' + esc(t ? texteTraite(t) + " (décocher pour le remettre à traiter)" : "Marquer ce plan comme traité") + '"><input type="checkbox" data-traite="' + esc(p.code) + '" data-indice="' + d.ind + '"' + (t ? " checked" : "") +
+          ' aria-label="' + esc(court(p.code)) + " traité" + '"></label></td>' : "";
+        return '<tr class="v-plan' + (t ? " v-fait" : "") + '" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '">' + caseT + '<td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
           '</td><td class="n">' + ind(d.ind) + '</td><td><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
-          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + "</div></td><td>" + pastille(p.statut) +
+          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + "</div></td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + '</td><td class="n">' + (d.dep ? n(Math.floor(ed - d.dep)) + " j" : "—") + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="8">' + historique(p) + "</td></tr>" : "");
-      }).join("") : '<tr><td colspan="8" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + historique(p) + "</td></tr>" : "");
+      }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     var reste = l.length - vis.length;
     $("plus").hidden = reste <= 0;
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
@@ -1155,7 +1252,12 @@ table.liste td.v-auteur{white-space:nowrap}
     var t = document.querySelector('tr.v-plan[data-code="' + CSS.escape(c) + '"]');
     if (t) t.focus({ preventScroll: true });
   }
+  $("table-plans").addEventListener("change", function (e) {
+    var c = e.target.closest("input[data-traite]");
+    if (c) coche(c.getAttribute("data-traite"), +c.getAttribute("data-indice") || 0, c.checked);
+  });
   $("table-plans").addEventListener("click", function (e) {
+    if (e.target.closest("td.v-coche")) return;                          // la coche n'ouvre pas la ligne
     var b = e.target.closest("button[data-visa]");
     if (b) {
       var k = b.getAttribute("data-visa");
@@ -1170,7 +1272,7 @@ table.liste td.v-auteur{white-space:nowrap}
   });
   $("table-plans").addEventListener("keydown", function (e) {
     if (e.key !== "Enter" && e.key !== " ") return;
-    if (e.target.closest("button")) return;                               // le bouton fait son propre travail
+    if (e.target.closest("button, input")) return;                        // le bouton et la coche font leur propre travail
     var tr = e.target.closest("tr.v-plan"); if (tr) { e.preventDefault(); bascule(tr); }
   });
 
@@ -1226,6 +1328,7 @@ table.liste td.v-auteur{white-space:nowrap}
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
     if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
+    if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
     if (st.length) f.push("Liste : " + st.join(", "));
     var q = barre && barre.valeur().trim();
     if (q) f.push("« " + q + " »");
@@ -1272,6 +1375,41 @@ table.liste td.v-auteur{white-space:nowrap}
   }
   $("btn-pdf").addEventListener("click", exportePdf);
 
+  /* ------------------------------------------------------------ Excel annoté
+     Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout
+     de chaque feuille de circuit : « Traité le … par … » sur les lignes cochées
+     (même numéro de plan, même indice). Elle est faite dans le navigateur par
+     visas.js ; le fichier déposé ne change pas. */
+  function octetsSource() {
+    if (source.octets) return Promise.resolve(source.octets);
+    if (!source.ligne) { var e = new Error("Le fichier de cet export n'est plus disponible : glisse-le à nouveau."); e.metier = true; return Promise.reject(e); }
+    return D.exportsVisas.lit(source.ligne).then(function (b) { source.octets = b; return b; });
+  }
+  function telechargeExcel() {
+    if (!donnees) return;
+    var b = $("btn-excel");
+    b.disabled = true;
+    UI.toast("Préparation de l'Excel annoté…");
+    octetsSource().then(function (octets) {
+      return V.annote(octets, function (code, indice) {
+        var t = traites[cleTraite(code, indice)];
+        return t ? texteTraite(t) : "";
+      }, "Traité");
+    }).then(function (r) {
+      var url = URL.createObjectURL(new Blob([r.octets], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      var e = donnees.edition ? isoEdition(donnees.edition).slice(0, 16).replace("T", "-").replace(":", "") : "";
+      var a = document.createElement("a");
+      a.href = url; a.download = "visas" + (projet() ? "-" + projet() : "") + (e ? "-" + e : "") + "-traites.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      UI.toast(r.marques ? "Excel annoté : " + n(r.marques) + " ligne" + (r.marques > 1 ? "s" : "") + " marquée" + (r.marques > 1 ? "s" : "") + " « Traité »."
+        : "Excel annoté téléchargé : aucun plan de cet export n'est encore coché, la colonne « Traité » est vide.");
+    }).catch(function (e) {
+      UI.toast(e && e.metier ? e.message : "L'Excel annoté n'a pas pu être fait. " + messageLecture(e));
+    }).then(function () { b.disabled = false; });
+  }
+  $("btn-excel").addEventListener("click", telechargeExcel);
+
   /* ------------------------------------------------------------ démarrage */
   if (!UI.session()) return;
 
@@ -1287,7 +1425,8 @@ table.liste td.v-auteur{white-space:nowrap}
       surEntree: function () { var t = document.querySelector("tr.v-plan"); if (t && document.querySelectorAll("tr.v-plan").length === 1) bascule(t); }
     });
     // Relire la base (bouton Rafraîchir, retour sur l'onglet) relit aussi la liste des exports
-    D.surRechargement(function () { chargeListe().catch(function () {}); });
+    D.surRechargement(function () { chargeListe().catch(function () {}); chargeTraites(); });
+    chargeTraites();
     return chargeListe().then(function (l) {
       var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];
       if (x) return ouvre(x);
