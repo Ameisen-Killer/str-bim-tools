@@ -286,6 +286,40 @@
       p.premierDepot = Math.min.apply(null, l.map(function (x) { return x.dep || Infinity; }));
       return p;
     });
+    renumerotes(D);
+  }
+
+  /* Plans refaits sous un autre numéro : même type, même niveau, même zone et
+     même libellé, mais un autre numéro à quatre chiffres. Kairnial y voit deux
+     plans, et l'ancien garde ses visas (souvent un refus). Le plus récemment
+     déposé est tenu pour le plan en cours ; les autres sont marqués remplacés,
+     indices compris, et sortent des comptes quand on masque ce qui est remplacé. */
+  function libelleNormalise(s) {
+    return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\.(pdf|dwg|zip|xlsx?)$/, "")
+      .replace(/^[a-z0-9]+(?:[-_][a-z0-9]+){4,}\s*-\s*/, "")        // numéro GED recopié en tête du libellé
+      .replace(/[^a-z0-9]+/g, " ").trim();
+  }
+  function renumerotes(D) {
+    var groupes = {};
+    D.plans.forEach(function (p) {
+      var lib = libelleNormalise(p.doc.lib);
+      if (!lib) return;
+      var k = [p.doc.type, p.doc.niveau, p.doc.zone, lib].join("|");
+      (groupes[k] = groupes[k] || []).push(p);
+    });
+    Object.keys(groupes).forEach(function (k) {
+      var l = groupes[k];
+      if (l.length < 2) return;
+      l.sort(function (a, b) { return (b.doc.dep || 0) - (a.doc.dep || 0) || (a.code < b.code ? -1 : 1); });
+      var actuel = l[0];
+      actuel.remplace = l.slice(1).map(function (p) { return p.code; });
+      l.slice(1).forEach(function (p) {
+        p.renumerote = true;
+        p.remplacePar = actuel.code;
+        p.versions.forEach(function (d) { d.renumerote = true; });
+      });
+    });
   }
 
   function trouver(d, qui) {
@@ -378,7 +412,7 @@
       return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type) &&
         (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur);
     };
-    var ok = function (d) { return okBase(d) && (!f.dernierSeul || !d.depasse); };
+    var ok = function (d) { return okBase(d) && (!f.dernierSeul || (!d.depasse && !d.renumerote)); };
     var R = { edition: D.edition };
     var plans = D.plans.filter(function (p) { return ok(p.doc); });
     R.plans = plans;
@@ -500,7 +534,8 @@
       visaAvantDemande: visasB.filter(function (v) { return v.etat === "rendu" && v.dd !== null && v.dv !== null && v.dv < v.dd; }).length,
       renduTotal: visas.filter(function (v) { return v.etat === "rendu"; }).length,
       renduTous: visasB.filter(function (v) { return v.etat === "rendu"; }).length,
-      indicesComptes: f.dernierSeul ? docsF.filter(function (d) { return !d.depasse; }).length : docsF.length,
+      indicesComptes: f.dernierSeul ? docsF.filter(function (d) { return !d.depasse && !d.renumerote; }).length : docsF.length,
+      renumerotes: D.plans.filter(function (p) { return p.renumerote && okBase(p.doc); }).length,
       lignes: docsF.length
     };
     return R;

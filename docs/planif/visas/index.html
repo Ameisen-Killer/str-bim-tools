@@ -251,7 +251,7 @@ table.liste td.v-auteur{white-space:nowrap}
           <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
-        <div class="cases"><label class="case" title="Ne compter que les visas du dernier indice de chaque plan : les visas d'un indice remplacé depuis, dans ce circuit ou un autre, sortent des délais, des graphiques et des motifs."><input type="checkbox" id="f-dernier"> Masquer les indices remplacés</label><span class="v-note" id="dernier-effet" aria-live="polite"></span></div>
+        <div class="cases"><label class="case" title="Ne garder que ce qui est en cours : le dernier indice de chaque plan, et pas les plans refaits depuis sous un autre numéro (même type, niveau, zone et libellé)."><input type="checkbox" id="f-dernier"> Masquer les indices et plans remplacés</label><span class="v-note" id="dernier-effet" aria-live="polite"></span></div>
       </div>
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
@@ -329,7 +329,7 @@ table.liste td.v-auteur{white-space:nowrap}
 
       <section class="section">
         <div class="tete-section"><h2>Points de vigilance sur les données</h2></div>
-        <p class="v-intro">Ce qui fausse les chiffres de Kairnial s'ils sont pris tels quels. Cette page corrige les deux premiers.</p>
+        <p class="v-intro">Ce qui fausse les chiffres de Kairnial s'ils sont pris tels quels. Cette page corrige les deux premiers ; la case « Masquer les indices et plans remplacés » écarte aussi le dernier.</p>
         <div class="v-vigil" id="vigilance"></div>
       </section>
 
@@ -363,7 +363,7 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=5"></script>
+<script src="/planif/assets/visas.js?v=6"></script>
 <script>
 (function () {
   "use strict";
@@ -690,11 +690,13 @@ table.liste td.v-auteur{white-space:nowrap}
      sans cela, rien ne bouge en haut de page (plans et chiffres clés prennent
      déjà le dernier indice) et la case semble sans effet. */
   function rendEffetDernier() {
-    var Q = R.qualite;
+    var Q = R.qualite, k = Q.renumerotes;
+    var plans = k ? (k > 1 ? k + " plans refaits sous un autre numéro" : "1 plan refait sous un autre numéro") : "";
     $("dernier-effet").textContent = etat.dernierSeul
-      ? n(Q.indicesComptes) + " indices sur " + n(Q.lignes) + " et " + n(Q.renduTotal) + " visas rendus sur " + n(Q.renduTous) +
-        " comptés : délais, réponses du MO et motifs du Doc Control ne portent plus que sur le dernier indice de chaque plan."
-      : "Délais, réponses du MO et motifs du Doc Control comptent les " + n(Q.renduTous) + " visas rendus, anciens indices compris.";
+      ? n(Q.indicesComptes) + " indices sur " + n(Q.lignes) + " et " + n(Q.renduTotal) + " visas rendus sur " + n(Q.renduTous) + " comptés" +
+        (plans ? " ; " + plans + " masqu" + (k > 1 ? "és" : "é") + " partout" : "") + "."
+      : "Tout compte : " + n(Q.renduTous) + " visas rendus, anciens indices compris" +
+        (plans ? ", et " + plans + " (marqu" + (k > 1 ? "és" : "é") + " « remplacé par » dans la liste)" : "") + ".";
   }
 
   function rendCartouche() {
@@ -921,6 +923,7 @@ table.liste td.v-auteur{white-space:nowrap}
     var nb = {};
     donnees.plans.forEach(function (p) {
       if ((etat.circuit !== "tous" && p.doc.circuit !== etat.circuit) || (etat.type !== "tous" && p.doc.type !== etat.type)) return;
+      if (etat.dernierSeul && p.renumerote) return;
       var a = V.auteurDe(p.doc); nb[a] = (nb[a] || 0) + 1;
     });
     if (etat.auteur !== "tous" && !nb[etat.auteur]) nb[etat.auteur] = 0;
@@ -957,7 +960,8 @@ table.liste td.v-auteur{white-space:nowrap}
       (vis.length ? vis.map(function (p) {
         var d = p.doc, ouvert = etat.ouvert === p.code;
         return '<tr class="v-plan" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '"><td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
-          '</td><td class="n">' + ind(d.ind) + '</td><td><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + "</div></td><td>" + pastille(p.statut) +
+          '</td><td class="n">' + ind(d.ind) + '</td><td><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
+          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + "</div></td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + '</td><td class="n">' + (d.dep ? n(Math.floor(ed - d.dep)) + " j" : "—") + "</td></tr>" +
           (ouvert ? '<tr class="v-detail"><td colspan="8">' + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="8" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
@@ -967,7 +971,9 @@ table.liste td.v-auteur{white-space:nowrap}
   }
 
   function historique(p) {
-    return '<div class="v-histo">' + p.versions.slice().reverse().map(function (d, i) {
+    var lien = p.remplacePar ? '<p class="v-faible">Refait sous le numéro ' + esc(p.remplacePar) + " (même type, niveau, zone et libellé, déposé plus récemment).</p>"
+      : p.remplace ? '<p class="v-faible">Reprend ' + p.remplace.map(esc).join(", ") + ", refait sous ce numéro.</p>" : "";
+    return '<div class="v-histo">' + lien + p.versions.slice().reverse().map(function (d, i) {
       var vs = d.visas.map(function (v) {
         var e;
         if (v.etat === "rendu") e = code(v.code) + " le " + date(v.dv) + (v.jours !== null ? " · " + n(v.jours) + " j" : "") + (v.retard > 0 ? ' · <span style="color:var(--alerte)">' + n(v.retard) + " j de retard</span>" : "");
@@ -1013,7 +1019,8 @@ table.liste td.v-auteur{white-space:nowrap}
       [Q.aSupprimer, "plans signalés « à supprimer » ou « obsolète » en commentaire, toujours actifs."],
       [Q.libellesVariables, "plans dont le libellé change d'un indice à l'autre."],
       [Q.indicesManquants, "plans dont certains indices manquent dans l'export."],
-      [Q.visaAvantDemande, "visas datés avant leur demande, à cause des décalages horaires de l'export."]
+      [Q.visaAvantDemande, "visas datés avant leur demande, à cause des décalages horaires de l'export."],
+      [Q.renumerotes, "plans refaits sous un autre numéro (même type, niveau, zone et libellé). L'ancien garde ses visas ; la case « Masquer les indices et plans remplacés » le retire."]
     ].map(function (x) { return "<div><b>" + n(x[0]) + "</b><p>" + esc(x[1]) + "</p></div>"; }).join("");
   }
 
@@ -1053,7 +1060,7 @@ table.liste td.v-auteur{white-space:nowrap}
       etat.auteur === "tous" ? "Tout le monde" : "Déposé par " + (etat.auteur === SANS_NOM ? "sans nom" : etat.auteur)
     ];
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
-    if (etat.dernierSeul) f.push("Indices remplacés masqués");
+    if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
     if (st.length) f.push("Liste : " + st.join(", "));
     var q = barre && barre.valeur().trim();
     if (q) f.push("« " + q + " »");
