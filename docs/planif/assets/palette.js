@@ -230,7 +230,8 @@
     { nom: "Affaires", href: "/planif/affaires/", mots: "projets" },
     { nom: "Équipe", href: "/planif/equipe/", mots: "membres personnes" },
     { nom: "Absences", href: "/planif/absences/", mots: "vacances conges calendrier" },
-    { nom: "Annuaire", href: "/planif/annuaire/", mots: "contacts adresses carnet" }
+    { nom: "Annuaire", href: "/planif/annuaire/", mots: "contacts adresses carnet" },
+    { nom: "Visas", href: "/planif/visas/", mots: "kairnial ged plans export retards mo doc control" }
   ];
 
   function commandes() {
