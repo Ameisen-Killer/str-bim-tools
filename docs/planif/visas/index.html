@@ -189,6 +189,7 @@ table.liste td.v-auteur{white-space:nowrap}
         <div class="grille-champs">
           <div class="champ"><label for="f-circuit">Circuit</label><select id="f-circuit"></select></div>
           <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
+          <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
       </div>
 
@@ -249,8 +250,7 @@ table.liste td.v-auteur{white-space:nowrap}
       <section class="section" id="liste-plans">
         <div class="tete-section"><h2>Liste des plans</h2></div>
         <div data-recherche></div>
-        <div class="grille-champs" style="margin:16px 0 4px;max-width:720px">
-          <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
+        <div class="grille-champs" style="margin:16px 0 4px;max-width:420px">
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
               <option value="statut">Statut, puis plus ancien</option>
@@ -295,7 +295,7 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=1"></script>
+<script src="/planif/assets/visas.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -460,11 +460,12 @@ table.liste td.v-auteur{white-space:nowrap}
   $("f-type").addEventListener("change", function () { etat.type = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-fantomes").addEventListener("change", function () { etat.fantomes = this.checked; rendAttente(); });
   $("f-tri").addEventListener("change", function () { etat.tri = this.value; rendListe(); });
-  $("f-auteur").addEventListener("change", function () { etat.auteur = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
+  $("f-auteur").addEventListener("change", function () { etat.auteur = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("plus").addEventListener("click", function () { etat.limite += 60; rendListe(); });
 
   /* ------------------------------------------------------------ rendu */
   function rend() {
+    menuAuteurs();
     R = V.analyse(donnees, etat);
     rendCartouche(); rendTuiles(); rendEtat(); rendInter(); rendMO(); rendDC(); rendParcours();
     rendAttente(); rendListe(); rendVigilance(); rendCodes();
@@ -682,14 +683,18 @@ table.liste td.v-auteur{white-space:nowrap}
     }).join("") + "</div>";
   }
 
-  /* « Déposé par » : la personne qui a déposé le dernier indice du plan (colonne
-     « Ajouté par » de Kairnial). Le menu se recompose avec les filtres du haut,
-     sans perdre la personne choisie même si elle n'a plus de plan dans la sélection. */
-  var SANS_NOM = "(sans-nom)";
-  function auteurDe(p) { return p.doc.auteur || SANS_NOM; }
+  /* « Déposé par » : la personne qui a déposé l'indice (colonne « Ajouté par » de
+     Kairnial). Un plan suit son dernier indice, un visa l'indice qu'il vise : les
+     délais d'une personne sont ceux des visas sur ce qu'elle a déposé. Le menu compte
+     les plans de chacun dans le circuit et le type choisis, et garde la personne
+     choisie même si elle n'a plus de plan dans cette sélection. */
+  var SANS_NOM = V.SANS_NOM;
   function menuAuteurs() {
     var nb = {};
-    R.plans.forEach(function (p) { var a = auteurDe(p); nb[a] = (nb[a] || 0) + 1; });
+    donnees.plans.forEach(function (p) {
+      if ((etat.circuit !== "tous" && p.doc.circuit !== etat.circuit) || (etat.type !== "tous" && p.doc.type !== etat.type)) return;
+      var a = V.auteurDe(p.doc); nb[a] = (nb[a] || 0) + 1;
+    });
     if (etat.auteur !== "tous" && !nb[etat.auteur]) nb[etat.auteur] = 0;
     $("f-auteur").innerHTML = '<option value="tous">Tout le monde</option>' + Object.keys(nb).sort(function (a, b) {
       return a === SANS_NOM ? 1 : b === SANS_NOM ? -1 : a.localeCompare(b, "fr");
@@ -700,14 +705,10 @@ table.liste td.v-auteur{white-space:nowrap}
 
   function rendListe() {
     var mots = barre ? barre.termes() : [], fs = Object.keys(etat.statuts);
-    menuAuteurs();
-    var siens = etat.auteur === "tous" ? R.plans : R.plans.filter(function (p) { return auteurDe(p) === etat.auteur; });
-    var nbStatut = {};
-    siens.forEach(function (p) { nbStatut[p.statut] = (nbStatut[p.statut] || 0) + 1; });
     $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
-      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(nbStatut[s.id] || 0) + "</b></button>";
+      return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
     }).join("");
-    var l = siens.filter(function (p) {
+    var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
     });

@@ -6,7 +6,8 @@
                      le XML lu par expressions régulières.
    parse(classeur)   classeur -> jeu compact (tableaux, chaînes mises en commun), à garder tel quel
    inflate(jeu)      jeu compact -> objets de travail
-   analyse(D, f)     indicateurs, selon le filtre { circuit, type }
+   analyse(D, f)     indicateurs, selon le filtre { circuit, type, auteur } ; l'auteur est celui
+                     qui a déposé l'indice : un plan suit son dernier indice, un visa l'indice visé
 
    Les dates restent en numéros de série Excel (jours) : Kairnial compte ses délais
    en jours entiers, et l'export porte des décalages de quelques heures selon les
@@ -361,10 +362,14 @@
 
   var TRANCHES = [["Dans le délai", 0, 0], ["1 à 7 j de retard", 1, 7], ["8 à 30 j", 8, 30], ["31 à 90 j", 31, 90], ["Plus de 90 j", 91, 1e9]];
 
+  var SANS_NOM = "(sans-nom)";                          // dépôt sans « Ajouté par »
+  function auteurDe(d) { return d.auteur || SANS_NOM; }
+
   function analyse(D, f) {
     f = f || {};
     var ok = function (d) {
-      return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type);
+      return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type) &&
+        (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur);
     };
     var R = { edition: D.edition };
     var plans = D.plans.filter(function (p) { return ok(p.doc); });
@@ -490,6 +495,7 @@
     return R;
   }
 
-  global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate };
+  global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
+    SANS_NOM: SANS_NOM, auteurDe: auteurDe };
   if (typeof module !== "undefined" && module.exports) module.exports = global.Visas;
 })(typeof window !== "undefined" ? window : globalThis);
