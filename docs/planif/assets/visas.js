@@ -138,7 +138,7 @@
       }
       return Promise.all(feuilles.map(function (s) {
         return s.chemin ? xml(s.chemin).then(function (x) { s.xml = x; return s; }) : s;
-      })).then(function (fs) { return { feuilles: fs, partages: partages }; });
+      })).then(function (fs) { return { feuilles: fs, partages: partages, classeur: r[0] }; });
     });
   }
 
@@ -154,8 +154,10 @@
      (« Traité ») au bout de chaque feuille de nomenclature. marque(code, indice)
      donne le texte de la cellule, ou rien. Tout le reste est recopié octet pour
      octet ; seules les feuilles touchées sont réécrites, puis recompressées
-     (CompressionStream). Les lignes sont reconnues comme à la lecture : même
-     en-tête (« Libellé du document »), même numéro de plan, même indice. */
+     (CompressionStream), et le classeur, dont les noms de plage suivent le
+     filtre automatique. Les lignes sont reconnues comme à la lecture : même
+     en-tête (« Libellé du document »), même numéro de plan, même indice.
+     Rend { octets, marques, feuilles: [{ nom, marques }] }. */
   function lettres(i) { var s = ""; i++; while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
   function echappe(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
@@ -173,7 +175,8 @@
       return debut + a2 + ">" + corps + "<" + p + 'c r="' + L + num + '"' + (s ? ' s="' + s + '"' : "") + ' t="inlineStr"><' + p + "is><" + p + 't xml:space="preserve">' +
         echappe(txt) + "</" + p + "t></" + p + "is></" + p + "c>" + ferme;
     });
-    out = out.replace(/(<(?:\w+:)?dimension\s+ref="[A-Z]+\d+:)([A-Z]+)(\d+")/, function (m, a, c, d) { return colonne(c) < col ? a + L + d : m; });
+    // Étendue de la feuille et filtre automatique : jusqu'à la nouvelle colonne, pour pouvoir filtrer « Traité » dans Excel
+    out = out.replace(/(<(?:\w+:)?(?:dimension|autoFilter)\s+ref="\$?[A-Z]+\$?\d+:\$?)([A-Z]+)(\$?\d+")/g, function (m, a, c, d) { return colonne(c) < col ? a + L + d : m; });
     // Largeur de la nouvelle colonne, si le classeur déclare les siennes et qu'aucune ne la couvre déjà
     var cols = /<((?:\w+:)?)cols>([\s\S]*?)<\/(?:\w+:)?cols>/.exec(out);
     if (cols) {
@@ -182,6 +185,19 @@
       if (maxi < col + 1) out = out.replace(/<\/((?:\w+:)?)cols>/, '<$1col min="' + (col + 1) + '" max="' + (col + 1) + '" width="38" customWidth="1"/></$1cols>');
     }
     return out;
+  }
+
+  /* Les noms que le classeur tient pour une feuille (plage du filtre, zone
+     d'impression) : même extension, sinon Excel garde l'ancien filtre. */
+  function ecritClasseur(xml, etendues) {
+    return xml.replace(/(<(?:\w+:)?definedName\b)([^>]*)>([^<]*)(<\/(?:\w+:)?definedName>)/g, function (tout, debut, attrs, plage, fin) {
+      var i = attr(attrs, "localSheetId"), nom = attr(attrs, "name");
+      if (i === null || !etendues[i] || !/^_xlnm\.(_FilterDatabase|Print_Area)$/.test(nom || "")) return tout;
+      var col = etendues[i];
+      return debut + attrs + ">" + plage.replace(/(![$]?[A-Z]+[$]?\d+:[$]?)([A-Z]+)(?=[$]?\d)/, function (m, a, c) {
+        return colonne(c) < col ? a + lettres(col) : m;
+      }) + fin;
+    });
   }
 
   var TABLE_CRC = null;
@@ -232,8 +248,8 @@
     var liste;
     try { liste = repertoire(u8); } catch (e) { return Promise.reject(e); }
     return classeurBrut(u8).then(function (cb) {
-      var modifs = {}, nbMarques = 0;
-      cb.feuilles.forEach(function (s) {
+      var modifs = {}, nbMarques = 0, parFeuille = [], etendues = {};
+      cb.feuilles.forEach(function (s, iF) {
         if (!s.xml || !s.chemin) return;
         var rows = feuille(s.xml, cb.partages), h = -1, r, j;
         for (r = 0; r < Math.min(rows.length, 20); r++) if ((rows[r] || []).indexOf("Libellé du document") >= 0) { h = r; break; }
@@ -246,7 +262,7 @@
           else if (c.trim() === "Libellé du document") iLib = j;
         });
         if (iInd < 0 || !visas) return;                         // feuille hors circuit : ses plans ne sont pas dans la liste
-        var nomenc = [], col = 0, marques = {};
+        var nomenc = [], col = 0, marques = {}, n = 0;
         for (j = 0; j < iInd; j++) if (entete[j]) nomenc.push(j);
         rows.forEach(function (a) { if (a && a.length > col) col = a.length; });
         for (r = h + 1; r < rows.length; r++) {
@@ -254,17 +270,21 @@
           if (!a || vide(a[iLib])) continue;
           var code = nomenc.map(function (j) { return a[j] === null || a[j] === undefined ? "" : String(a[j]); }).join("-");
           var t = marque(code, parseInt(a[iInd], 10) || 0);
-          if (t) { marques[r] = t; nbMarques++; }
+          if (t) { marques[r] = t; n++; }
         }
+        nbMarques += n;
+        parFeuille.push({ nom: s.nom, marques: n });
+        etendues[iF] = col;
         modifs[s.chemin.toLowerCase()] = ecritFeuille(s.xml, h, marques, col, titre || "Traité");
       });
+      if (Object.keys(etendues).length) modifs["xl/workbook.xml"] = ecritClasseur(cb.classeur, etendues);
       var te = new TextEncoder();
       return Promise.all(liste.map(function (e) {
         var neuf = modifs[e.nom.toLowerCase()];
         if (neuf === undefined) return { nom: e.nom, meth: e.meth, crc: e.crc, usz: e.usz, data: donnees(u8, e) };
         var brut = te.encode(neuf);
         return comprime(brut).then(function (c) { return { nom: e.nom, meth: c.meth, crc: crc32(brut), usz: brut.length, data: c.data }; });
-      })).then(function (els) { return { octets: zippe(els), marques: nbMarques }; });
+      })).then(function (els) { return { octets: zippe(els), marques: nbMarques, feuilles: parFeuille }; });
     });
   }
 

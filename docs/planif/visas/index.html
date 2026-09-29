@@ -404,7 +404,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=8"></script>
+<script src="/planif/assets/visas.js?v=9"></script>
 <script>
 (function () {
   "use strict";
@@ -1377,9 +1377,26 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   /* ------------------------------------------------------------ Excel annoté
      Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout
-     de chaque feuille de circuit : « Traité le … par … » sur les lignes cochées
-     (même numéro de plan, même indice). Elle est faite dans le navigateur par
-     visas.js ; le fichier déposé ne change pas. */
+     de chaque feuille de circuit, prise dans le filtre automatique. Un plan
+     coché est marqué sur toutes ses lignes, dans toutes les feuilles, jusqu'à
+     l'indice coché : « Traité le … par … » sur cet indice, « Traité à l'indice
+     05 le … » sur les précédents (un plan passe d'un circuit à l'autre, son
+     dernier indice n'est souvent que dans l'une des feuilles). Un indice plus
+     récent que la coche reste vide : il est à traiter. Fait dans le navigateur
+     par visas.js ; le fichier déposé ne change pas. */
+  function marqueExcel() {
+    var dernier = {};                               // par plan, la coche de l'indice le plus élevé
+    Object.keys(traites).forEach(function (k) {
+      var t = traites[k];
+      if (!dernier[t.code] || dernier[t.code].indice < t.indice) dernier[t.code] = t;
+    });
+    return function (code, indice) {
+      var t = dernier[code];
+      if (!t || t.indice < indice) return "";
+      return t.indice === indice ? texteTraite(t)
+        : "Traité à l'indice " + ind(t.indice) + (jourTraite(t) ? " le " + jourTraite(t) : "") + (quiTraite(t) ? " par " + quiTraite(t) : "");
+    };
+  }
   function octetsSource() {
     if (source.octets) return Promise.resolve(source.octets);
     if (!source.ligne) { var e = new Error("Le fichier de cet export n'est plus disponible : glisse-le à nouveau."); e.metier = true; return Promise.reject(e); }
@@ -1391,10 +1408,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     b.disabled = true;
     UI.toast("Préparation de l'Excel annoté…");
     octetsSource().then(function (octets) {
-      return V.annote(octets, function (code, indice) {
-        var t = traites[cleTraite(code, indice)];
-        return t ? texteTraite(t) : "";
-      }, "Traité");
+      return V.annote(octets, marqueExcel(), "Traité");
     }).then(function (r) {
       var url = URL.createObjectURL(new Blob([r.octets], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       var e = donnees.edition ? isoEdition(donnees.edition).slice(0, 16).replace("T", "-").replace(":", "") : "";
@@ -1402,8 +1416,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       a.href = url; a.download = "visas" + (projet() ? "-" + projet() : "") + (e ? "-" + e : "") + "-traites.xlsx";
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-      UI.toast(r.marques ? "Excel annoté : " + n(r.marques) + " ligne" + (r.marques > 1 ? "s" : "") + " marquée" + (r.marques > 1 ? "s" : "") + " « Traité »."
-        : "Excel annoté téléchargé : aucun plan de cet export n'est encore coché, la colonne « Traité » est vide.");
+      // Où chercher : les feuilles qui ont des lignes marquées (onglets « Nomenclatur - MO-AMO »…)
+      var ou = r.feuilles.filter(function (f) { return f.marques; }).map(function (f) { return f.nom.replace(/^.*? - /, "") + " : " + n(f.marques); });
+      UI.toast(r.marques ? "Excel annoté : " + n(r.marques) + " ligne" + (r.marques > 1 ? "s" : "") + " « Traité » (" + ou.join(", ") + "). Dernière colonne de chaque feuille, dans le filtre."
+        : "Excel annoté téléchargé : aucun plan de cet export n'est encore coché, la colonne « Traité » est vide.", { label: "OK", action: function () {} });
     }).catch(function (e) {
       UI.toast(e && e.metier ? e.message : "L'Excel annoté n'a pas pu être fait. " + messageLecture(e));
     }).then(function () { b.disabled = false; });
