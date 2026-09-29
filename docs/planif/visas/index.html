@@ -250,6 +250,7 @@ table.liste td.v-auteur{white-space:nowrap}
           <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
+        <div class="cases"><label class="case" title="Ne compter que les visas du dernier indice de chaque plan : les visas d'un indice remplacé depuis, dans ce circuit ou un autre, sortent des délais, des graphiques et des motifs."><input type="checkbox" id="f-dernier"> Masquer les indices remplacés</label></div>
       </div>
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
@@ -302,7 +303,7 @@ table.liste td.v-auteur{white-space:nowrap}
       <section class="section">
         <div class="tete-section"><h2>Visas en attente</h2></div>
         <p class="v-intro">Visas demandés et pas encore rendus, sur le dernier indice de chaque plan. La barre montre la répartition par retard sur le délai contractuel ; le nombre à droite est le total en attente.</p>
-        <div class="cases" style="margin:0 0 16px"><label class="case"><input type="checkbox" id="f-fantomes"> Compter aussi les indices déjà remplacés</label></div>
+        <div class="cases" id="cases-fantomes" style="margin:0 0 16px"><label class="case"><input type="checkbox" id="f-fantomes"> Compter aussi les indices déjà remplacés</label></div>
         <div class="v-legende" id="legende-attente"></div>
         <div class="v-attente" id="attente"></div>
       </section>
@@ -361,14 +362,14 @@ table.liste td.v-auteur{white-space:nowrap}
 <script src="/planif/assets/calculs.js?v=8"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
-<script src="/planif/assets/visas.js?v=3"></script>
+<script src="/planif/assets/visas.js?v=4"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", auteur: "tous", statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: false, statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -658,6 +659,19 @@ table.liste td.v-auteur{white-space:nowrap}
   $("f-circuit").addEventListener("change", function () { etat.circuit = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-type").addEventListener("change", function () { etat.type = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("f-fantomes").addEventListener("change", function () { etat.fantomes = this.checked; rendAttente(); });
+  /* Masquer les indices remplacés : choix retenu dans ce navigateur, comme une
+     préférence d'affichage. La liste et l'état des plans n'en changent pas
+     (un plan y est déjà pris à son dernier indice) ; le parcours jusqu'à la
+     validation garde tout l'historique, c'est son sujet. */
+  var CLE_DERNIER = "planif.visas.dernier";
+  try { etat.dernierSeul = localStorage.getItem(CLE_DERNIER) === "1"; } catch (e) {}
+  $("f-dernier").checked = etat.dernierSeul;
+  $("f-dernier").addEventListener("change", function () {
+    etat.dernierSeul = this.checked;
+    try { localStorage.setItem(CLE_DERNIER, this.checked ? "1" : "0"); } catch (e) {}
+    etat.limite = 60; etat.ouvert = null;
+    rend();
+  });
   $("f-tri").addEventListener("change", function () { etat.tri = this.value; rendListe(); });
   $("f-auteur").addEventListener("change", function () { etat.auteur = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   $("plus").addEventListener("click", function () { etat.limite += 60; rendListe(); });
@@ -836,7 +850,8 @@ table.liste td.v-auteur{white-space:nowrap}
   function rendParcours() {
     var P = R.parcours, pr = P.premier, prem = (pr.VSO || 0) + (pr.VAO || 0);
     $("parcours-intro").textContent = P.nbAvecMo
-      ? n(P.nbAvecMo) + " plans ont reçu au moins un visa du MO. Au premier passage, " + pc(prem / P.nbAvecMo) + " sont acceptés (VSO ou VAO) ; " + n(P.nbValides) + " ont fini par être validés."
+      ? n(P.nbAvecMo) + " plans ont reçu au moins un visa du MO. Au premier passage, " + pc(prem / P.nbAvecMo) + " sont acceptés (VSO ou VAO) ; " + n(P.nbValides) + " ont fini par être validés." +
+        (etat.dernierSeul ? " Cette section suit tout l'historique des indices, même masqués ailleurs." : "")
       : "Aucun visa du MO dans cette sélection.";
     var labs = ["≤ 20 j", "21–40 j", "41–90 j", "91–180 j", "> 180 j"];
     $("histo").innerHTML = P.nbValides ? colonnes(P.histo.map(function (v, i) {
@@ -850,7 +865,8 @@ table.liste td.v-auteur{white-space:nowrap}
   var TR_COUL = ["var(--v-cours)", "var(--v-r1)", "var(--v-r2)", "var(--v-r3)", "var(--v-r4)"];
   function rendAttente() {
     $("legende-attente").innerHTML = R.tranches.map(function (t, i) { return '<span><i style="--c:' + TR_COUL[i] + '"></i>' + esc(t) + "</span>"; }).join("");
-    var cle = etat.fantomes ? "toutes" : "valides";
+    $("cases-fantomes").hidden = etat.dernierSeul;             // plus rien à recompter : ils sont déjà masqués
+    var cle = etat.fantomes && !etat.dernierSeul ? "toutes" : "valides";
     var l = R.attente.map(function (o) { return { o: o, v: o[cle], tot: o[cle].reduce(function (a, b) { return a + b; }, 0) }; })
       .filter(function (x) { return x.tot > 0; }).sort(function (a, b) { return b.tot - a.tot; });
     $("attente").innerHTML = l.length ? l.map(function (x) {
@@ -1024,6 +1040,7 @@ table.liste td.v-auteur{white-space:nowrap}
       etat.auteur === "tous" ? "Tout le monde" : "Déposé par " + (etat.auteur === SANS_NOM ? "sans nom" : etat.auteur)
     ];
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
+    if (etat.dernierSeul) f.push("Indices remplacés masqués");
     if (st.length) f.push("Liste : " + st.join(", "));
     var q = barre && barre.valeur().trim();
     if (q) f.push("« " + q + " »");

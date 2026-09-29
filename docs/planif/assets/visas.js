@@ -6,7 +6,7 @@
                      le XML lu par expressions régulières.
    parse(classeur)   classeur -> jeu compact (tableaux, chaînes mises en commun), à garder tel quel
    inflate(jeu)      jeu compact -> objets de travail
-   analyse(D, f)     indicateurs, selon le filtre { circuit, type, auteur } ; l'auteur est celui
+   analyse(D, f)     indicateurs, selon le filtre { circuit, type, auteur, dernierSeul } ; l'auteur est celui
                      qui a déposé l'indice : un plan suit son dernier indice, un visa l'indice visé
 
    Les dates restent en numéros de série Excel (jours) : Kairnial compte ses délais
@@ -372,10 +372,13 @@
 
   function analyse(D, f) {
     f = f || {};
-    var ok = function (d) {
+    // dernierSeul : les indices remplacés (un indice plus élevé existe, dans ce circuit ou un autre)
+    // sortent de tous les comptes ; un plan, lui, est toujours pris à son dernier indice.
+    var okBase = function (d) {
       return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type) &&
         (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur);
     };
+    var ok = function (d) { return okBase(d) && (!f.dernierSeul || !d.depasse); };
     var R = { edition: D.edition };
     var plans = D.plans.filter(function (p) { return ok(p.doc); });
     R.plans = plans;
@@ -477,15 +480,16 @@
     }).sort(function (a, b) { return b.n - a.n; });
     R.motifsAutres = dcRet.filter(function (v) { return !MOTIFS.some(function (m) { return v.com && m[1].test(v.com); }); }).length;
 
-    // Points de vigilance
-    var docsF = D.docs.filter(ok), circuitsParCode = {}, libs = {}, indices = {};
+    // Points de vigilance : la qualité de tout l'export, indices remplacés compris
+    var docsF = D.docs.filter(okBase), circuitsParCode = {}, libs = {}, indices = {};
+    var visasB = f.dernierSeul ? D.visas.filter(function (v) { return okBase(v.doc); }) : visas;
     docsF.forEach(function (d) {
       (circuitsParCode[d.code] = circuitsParCode[d.code] || {})[d.circuit] = 1;
       (libs[d.code] = libs[d.code] || {})[d.lib] = 1;
       (indices[d.code] = indices[d.code] || {})[d.ind] = 1;
     });
     R.qualite = {
-      attenteFantomes: visas.filter(function (v) { return v.etat === "attente" && v.doc.depasse; }).length,
+      attenteFantomes: visasB.filter(function (v) { return v.etat === "attente" && v.doc.depasse; }).length,
       diFaux: docsF.filter(function (d) { return d.di && d.depasse; }).length,
       aSupprimer: docsF.filter(function (d) { return d.di && !d.depasse && d.comLibre && /supprimer|obsol/i.test(d.comLibre); }).length,
       deuxCircuits: Object.keys(circuitsParCode).filter(function (c) { return Object.keys(circuitsParCode[c]).length > 1; }).length,
@@ -493,7 +497,7 @@
       indicesManquants: Object.keys(indices).filter(function (c) {
         var k = Object.keys(indices[c]).map(Number); return k.length < Math.max.apply(null, k) + 1;
       }).length,
-      visaAvantDemande: visas.filter(function (v) { return v.etat === "rendu" && v.dd !== null && v.dv !== null && v.dv < v.dd; }).length,
+      visaAvantDemande: visasB.filter(function (v) { return v.etat === "rendu" && v.dd !== null && v.dv !== null && v.dv < v.dd; }).length,
       renduTotal: visas.filter(function (v) { return v.etat === "rendu"; }).length,
       lignes: docsF.length
     };
