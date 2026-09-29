@@ -81,6 +81,9 @@ body.v-glisse::after{content:"Dépose l'export Kairnial";position:fixed;inset:12
 .v-pastille{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;white-space:nowrap}
 .v-pastille i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .v-code{font-family:var(--mono);font-size:11.5px;padding:1px 6px;border:1px solid var(--c,var(--ligne));background:color-mix(in srgb,var(--c,transparent) 14%,transparent);white-space:nowrap}
+button.v-code{color:var(--texte);line-height:inherit;cursor:pointer;margin:0}
+button.v-code:hover{background:color-mix(in srgb,var(--c,transparent) 30%,transparent)}
+button.v-code[aria-pressed="true"]{outline:1px solid var(--or);outline-offset:1px}
 .v-codes{display:flex;flex-wrap:wrap;gap:4px}
 
 /* tableau des intervenants */
@@ -326,7 +329,8 @@ table.liste td.v-auteur{white-space:nowrap}
       <section class="section" id="liste-plans">
         <div class="tete-section"><h2>Liste des plans</h2></div>
         <div data-recherche></div>
-        <div class="grille-champs" style="margin:16px 0 4px;max-width:420px">
+        <div class="grille-champs" style="margin:16px 0 4px;max-width:720px">
+          <div class="champ"><label for="f-visa">Visa reçu</label><select id="f-visa"></select></div>
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
               <option value="statut">Statut, puis plus ancien</option>
@@ -384,7 +388,7 @@ table.liste td.v-auteur{white-space:nowrap}
   var D = window.Donnees, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -650,7 +654,7 @@ table.liste td.v-auteur{white-space:nowrap}
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    etat.circuit = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
+    etat.circuit = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe();
     series();
     filtres();
@@ -1018,13 +1022,46 @@ table.liste td.v-auteur{white-space:nowrap}
   function court(c) { return PREFIXE && c.indexOf(PREFIXE) === 0 ? c.slice(PREFIXE.length) : c; }
   var ORDRE = { reprendre: 0, sas_rejet: 1, attente: 2, sas_cours: 3, valide_obs: 4, valide: 5, autre: 6 };
 
+  /* Filtre « Visa reçu » : un intervenant et ce qu'il a répondu sur le dernier indice
+     du plan — un code rendu (BURCKHARDT · REF), ou un visa encore attendu, dans le
+     délai ou en retard. Les étiquettes de la colonne « Derniers visas » posent ce
+     même filtre d'un clic, et le retirent au second. */
+  function cleVisa(v) { return v.qui + "|" + (v.etat === "attente" ? (v.cpt < 0 ? "~retard" : "~attente") : v.code); }
+  function libelleCle(k) {
+    var i = k.lastIndexOf("|"), c = k.slice(i + 1);
+    return k.slice(0, i) + " · " + (c === "~retard" ? "en retard" : c === "~attente" ? "attendu, dans le délai" : c);
+  }
+  function clesVisas(d) { return d.visas.filter(function (v) { return v.etat !== "abandon"; }).map(cleVisa); }
+
+  function menuVisas() {
+    var nb = {};
+    R.plans.forEach(function (p) {
+      clesVisas(p.doc).filter(function (k, i, l) { return l.indexOf(k) === i; }).forEach(function (k) { nb[k] = (nb[k] || 0) + 1; });
+    });
+    if (etat.visa && !nb[etat.visa]) nb[etat.visa] = 0;
+    var parQui = {};
+    Object.keys(nb).forEach(function (k) { var q = k.slice(0, k.lastIndexOf("|")); (parQui[q] = parQui[q] || []).push(k); });
+    var quis = Object.keys(parQui).sort(function (a, b) { return a === "MO" ? -1 : b === "MO" ? 1 : a.localeCompare(b, "fr"); });
+    $("f-visa").innerHTML = '<option value="">Tous les visas</option>' + quis.map(function (q) {
+      return '<optgroup label="' + esc(q) + '">' + parQui[q].sort(function (a, b) { return nb[b] - nb[a]; }).map(function (k) {
+        return '<option value="' + esc(k) + '"' + (k === etat.visa ? " selected" : "") + ">" + esc(libelleCle(k)) + " · " + n(nb[k]) + " plan" + (nb[k] > 1 ? "s" : "") + "</option>";
+      }).join("") + "</optgroup>";
+    }).join("");
+  }
+  $("f-visa").addEventListener("change", function () { etat.visa = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
+
   function visasCourts(d) {
     var l = d.visas.filter(function (v) { return v.etat !== "abandon"; });
     var mo = l.filter(function (v) { return v.qui === "MO"; });
     if (mo.length) l = mo.concat(l.filter(function (v) { return v.qui !== "MO" && (v.etat === "attente" || v.famille === "mauvais"); }));
+    var choisi = etat.visa ? d.visas.filter(function (v) { return v.etat !== "abandon" && cleVisa(v) === etat.visa; })[0] : null;
+    if (choisi) l = [choisi].concat(l.filter(function (v) { return v !== choisi; }));
     return '<div class="v-codes">' + l.slice(0, 3).map(function (v) {
-      if (v.etat === "attente") return '<span class="v-code" style="--c:var(--v-cours)">' + esc(v.qui) + " · " + (v.cpt < 0 ? -v.cpt + " j de retard" : "attendu") + "</span>";
-      return '<span class="v-code" style="--c:' + couleurCode(v.code) + '">' + esc(v.qui) + " · " + esc(v.code) + "</span>";
+      var k = cleVisa(v), actif = k === etat.visa;
+      var c = v.etat === "attente" ? "var(--v-cours)" : couleurCode(v.code);
+      var t = v.etat === "attente" ? (v.cpt < 0 ? -v.cpt + " j de retard" : "attendu") : v.code;
+      return '<button type="button" class="v-code" data-visa="' + esc(k) + '" aria-pressed="' + actif + '" style="--c:' + c + '" title="' +
+        (actif ? "Retirer le filtre" : "Ne montrer que les plans « " + esc(libelleCle(k)) + " »") + '">' + esc(v.qui) + " · " + esc(t) + "</button>";
     }).join("") + "</div>";
   }
 
@@ -1053,6 +1090,7 @@ table.liste td.v-auteur{white-space:nowrap}
     var mots = barre ? barre.termes() : [], fs = Object.keys(etat.statuts);
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
+      if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
       return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
     });
     l.sort({
@@ -1065,6 +1103,7 @@ table.liste td.v-auteur{white-space:nowrap}
   }
 
   function rendListe() {
+    menuVisas();
     $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
       return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
     }).join("");
@@ -1117,11 +1156,21 @@ table.liste td.v-auteur{white-space:nowrap}
     if (t) t.focus({ preventScroll: true });
   }
   $("table-plans").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-visa]");
+    if (b) {
+      var k = b.getAttribute("data-visa");
+      etat.visa = etat.visa === k ? "" : k;
+      etat.limite = 60; etat.ouvert = null;
+      rendListe();
+      UI.toast(etat.visa ? "Plans « " + libelleCle(k) + " » : " + n(listeFiltree().length) + "." : "Filtre de visa retiré.");
+      return;
+    }
     if (String(getSelection && getSelection()).length) return;          // une sélection de texte n'ouvre rien
     var tr = e.target.closest("tr.v-plan"); if (tr) bascule(tr);
   });
   $("table-plans").addEventListener("keydown", function (e) {
     if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.target.closest("button")) return;                               // le bouton fait son propre travail
     var tr = e.target.closest("tr.v-plan"); if (tr) { e.preventDefault(); bascule(tr); }
   });
 
@@ -1176,6 +1225,7 @@ table.liste td.v-auteur{white-space:nowrap}
     ];
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
     if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
+    if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
     if (st.length) f.push("Liste : " + st.join(", "));
     var q = barre && barre.valeur().trim();
     if (q) f.push("« " + q + " »");
