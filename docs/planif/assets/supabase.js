@@ -744,6 +744,89 @@
     return suite.then(function () {});
   }
 
+  /* ---------------------------------------------- exports Kairnial (Visas)
+     La page Visas garde les exports « Tableau de suivi » de Kairnial : le fichier
+     va dans le seau privé « visas » de Supabase Storage, sous <bureau>/<id>.xlsx,
+     et une ligne de exports_visas le décrit (migration-visas.sql). L'heure du
+     dépôt et l'adresse de la personne sont posées par la base.
+     Tant que la migration n'est pas passée, la table manque : disponible()
+     répond non, et la page se contente d'analyser le fichier glissé. */
+  var SEAU_VISAS = "visas";
+  var TYPE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+  function stockage(methode, chemin, corps, type) {
+    return jeton().then(function (t) {
+      var entetes = { apikey: CLE, Authorization: "Bearer " + t };
+      if (type) entetes["Content-Type"] = type;
+      return fetch(URL_BASE + "/storage/v1/" + chemin, { method: methode, headers: entetes, body: corps })
+        .catch(function () { throw erreurReseau(); });
+    }).then(function (r) {
+      if (r.ok) return r;
+      return r.text().then(function (txt) {
+        var j = {};
+        try { j = txt ? JSON.parse(txt) : {}; } catch (e) { j = {}; }
+        var brut = String(j.message || j.error || "");
+        var m = /bucket not found/i.test(brut) ? "Le stockage des exports n'est pas installé : exécute migration-visas.sql dans Supabase."
+          : /not.?found/i.test(brut) || r.status === 404 ? "Fichier introuvable dans le stockage : il a peut-être été retiré par un collègue."
+          : /row-level security|unauthorized|forbidden/i.test(brut) || r.status === 401 || r.status === 403 ? "Stockage refusé : ton accès ne permet pas cette opération sur les exports de ce bureau."
+          : /payload too large|maximum allowed size|exceeded/i.test(brut) || r.status === 413 ? "Fichier trop lourd : 25 Mo au plus."
+          : /mime/i.test(brut) ? "Seuls les classeurs Excel (.xlsx) peuvent être déposés."
+          : "Stockage : " + (brut || "erreur " + r.status) + ".";
+        var e = erreur(m, j.statusCode || j.error);
+        e.statut = r.status;
+        e.introuvable = /not.?found/i.test(brut) || r.status === 404;
+        throw e;
+      });
+    });
+  }
+  function encodeChemin(c) { return c.split("/").map(encodeURIComponent).join("/"); }
+
+  function versExport(l) {
+    return {
+      id: l.id, chemin: l.chemin, nom: l.nom, taille: +l.taille || 0,
+      deposeLe: l.depose_le, deposePar: l.depose_par || "", deposeNom: l.depose_nom || "",
+      edition: l.edition || null, projet: l.projet || "",
+      nbPlans: l.nb_plans || 0, nbIndices: l.nb_indices || 0, nbVisas: l.nb_visas || 0
+    };
+  }
+
+  var EXPORTS_VISAS = {
+    disponible: function () {
+      return requete("exports_visas?select=id&limit=1").then(function () { return true; }, function (e) {
+        if (tableAbsente(e)) return false;
+        throw e;
+      });
+    },
+    liste: function () {
+      return requete("exports_visas?select=*&order=depose_le.desc").then(function (l) { return (l || []).map(versExport); });
+    },
+    /* Le fichier d'abord, la ligne ensuite ; si la ligne est refusée, le fichier
+       repart : pas de fichier orphelin dans le seau. */
+    depose: function (fichier, m) {
+      var chemin = m.bureau + "/" + m.id + ".xlsx";
+      return stockage("POST", "object/" + SEAU_VISAS + "/" + encodeChemin(chemin), fichier, TYPE_XLSX).then(function () {
+        return requete("exports_visas", {
+          methode: "POST", prefer: "return=representation",
+          corps: { id: m.id, chemin: chemin, nom: m.nom, taille: m.taille, depose_nom: m.deposeNom || "",
+                   edition: m.edition, projet: m.projet, nb_plans: m.nbPlans, nb_indices: m.nbIndices, nb_visas: m.nbVisas }
+        }).catch(function (e) {
+          return stockage("DELETE", "object/" + SEAU_VISAS + "/" + encodeChemin(chemin)).catch(function () {}).then(function () { throw e; });
+        });
+      }).then(function (l) { return versExport(l[0]); });
+    },
+    lit: function (x) {
+      return stockage("GET", "object/authenticated/" + SEAU_VISAS + "/" + encodeChemin(x.chemin)).then(function (r) { return r.arrayBuffer(); });
+    },
+    /* Un fichier déjà parti (retiré par un collègue) n'empêche pas d'effacer la ligne. */
+    supprime: function (x) {
+      return stockage("DELETE", "object/" + SEAU_VISAS + "/" + encodeChemin(x.chemin)).catch(function (e) {
+        if (!e.introuvable) throw e;
+      }).then(function () {
+        return requete("exports_visas?id=eq." + encodeURIComponent(x.id), { methode: "DELETE", prefer: "return=minimal" });
+      });
+    }
+  };
+
   global.Sb = {
     configure: configure,
     session: function () { return session; },
@@ -774,7 +857,8 @@
       annuaireEnBase: function () { return annuaireEnBase; },
       enchainementEnBase: function () { return enchaineEnBase; },
       phaseEnBase: function () { return phaseEnBase; },
-      adresseEnBase: function () { return adresseEnBase; }
+      adresseEnBase: function () { return adresseEnBase; },
+      exportsVisas: EXPORTS_VISAS
     }
   };
 })(window);
