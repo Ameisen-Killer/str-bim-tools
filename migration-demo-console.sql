@@ -12,13 +12,13 @@
 --    - efface toutes ses affaires (avec leurs tâches et leurs équipes), toutes
 --      ses absences, tout son annuaire et les plans cochés « Traité » de Visas ;
 --    - efface les 25 membres fictifs (@demo.exemple.ch), puis recharge le jeu
---      de démonstration (mêmes données que jeu-demo.sql) ;
+--      de démonstration ;
 --    - rattache de nouveau le compte « demo » à Laurent Mercier.
 --  Restent : le bureau, ses réglages, ses succursales et disciplines, les
 --  fiches ajoutées à la main et leurs accès, les exports Kairnial de Visas.
 --
---  Données du jeu : copie de jeu-demo.sql. Retoucher l'un, c'est retoucher
---  l'autre.
+--  Données du jeu : remplit_demo(), ici et dans base-supabase.sql. Retoucher
+--  l'un, c'est retoucher l'autre.
 -- ============================================================================
 
 begin;

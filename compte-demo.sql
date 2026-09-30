@@ -10,17 +10,17 @@
 --      Supabase exige six caractères quand on choisit un mot de passe depuis
 --      l'outil, mais un compte créé par SQL n'y est pas soumis ;
 --    - il est rattaché à Laurent Mercier, associé fictif du jeu de
---      démonstration (jeu-demo.sql) : il a donc tous les droits du bureau ;
+--      démonstration (chargé par « Réinitialiser la démo » dans la console) :
+--      il a donc tous les droits du bureau ;
 --    - son mot de passe et son adresse sont figés : un visiteur connecté ne
 --      peut pas les changer et fermer la démonstration aux suivants.
 --
 --  Relançable : remet le mot de passe « demo » et refait le rattachement.
---  À relancer après purge-jeu-demo.sql + jeu-demo.sql (la purge supprime la
---  fiche de Laurent Mercier, l'accès se retrouve alors sans fiche).
 --
 --  Attention : « demo / demo » se devine. Le compte ne voit que le Bureau de
---  test, mais il peut y tout modifier. En cas de dégâts : purge-jeu-demo.sql,
---  jeu-demo.sql, puis ce script.
+--  test, mais il peut y tout modifier. En cas de dégâts : console, section
+--  Bureaux, « Réinitialiser la démo » sur la ligne du Bureau de test — le jeu
+--  est rechargé et le compte de nouveau rattaché à Laurent Mercier.
 --  Retrait : purge-compte-demo.sql.
 -- ============================================================================
 
@@ -85,7 +85,7 @@ begin
   end if;
 
   if v_membre is null then
-    raise notice 'Compte créé sans fiche : charge jeu-demo.sql puis relance ce script pour le rattacher à Laurent Mercier.';
+    raise notice 'Compte créé sans fiche : dans la console, « Réinitialiser la démo » sur le Bureau de test charge le jeu et le rattache à Laurent Mercier.';
   end if;
 end $$;
 
