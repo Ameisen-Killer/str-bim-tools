@@ -422,10 +422,6 @@
      À simplifier une fois la migration en place. */
   var metiersEnBase = true;
 
-  /* Idem pour les jours travaillés de chacun (30.09.2026) : migration-jours-travailles.sql.
-     À simplifier une fois la migration en place. */
-  var joursEnBase = true;
-
   /* L'annuaire est arrivé après coup, et sa migration se lance à la main :
      tant que la table manque, PostgREST répond « table inconnue » (PGRST205,
      ou 42P01 sur les versions plus anciennes). Faire échouer toute la lecture
@@ -474,7 +470,7 @@
                 capacite: m.capacite, actif: m.actif };
       if (metiersEnBase) { o.metier = vide(m.metier); o.statuts = m.statuts || []; }
       else o.role = vide(m.metier);
-      if (joursEnBase) o.jours = m.jours || null;
+      o.jours = m.jours || null;
       return o;
     },
     affaires: function (a) {
@@ -527,8 +523,6 @@
       adresseEnBase = !affaires.length || ("adresse" in affaires[0]);
       // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
       metiersEnBase = !membres.length || ("metier" in membres[0]);
-      // … et la semaine type de chacun ? (colonne jours)
-      joursEnBase = !membres.length || ("jours" in membres[0]);
 
       // Avant la migration, « administrateur » était un rôle, planifié du côté ingénieur
       function metierDe(m) {
@@ -601,13 +595,9 @@
   /* Semaine type d'un membre. L'outil n'écrit pas les fiches de membres (la
      RLS les laisse en lecture) : la fonction regle_jours ne touche que les
      jours et la capacité, et vérifie que ce sont les siens ou qu'on a le
-     droit. Absente (PGRST202) : migration pas encore relancée. */
+     droit. */
   function regleJours(idMembre, jours) {
-    if (!joursEnBase) return Promise.reject(erreur("Les jours travaillés ne sont pas encore installés dans la base : migration-jours-travailles.sql reste à exécuter dans Supabase."));
-    return rpc("regle_jours", { p_membre: idMembre, p_jours: jours || null }).catch(function (e) {
-      if (e.code === "PGRST202") throw erreur("Régler ses jours depuis l'outil demande de relancer migration-jours-travailles.sql dans Supabase.", e.code);
-      throw e;
-    });
+    return rpc("regle_jours", { p_membre: idMembre, p_jours: jours || null });
   }
 
   /* ------------------------------------------------------------ écriture
@@ -905,7 +895,6 @@
       enchainementEnBase: function () { return enchaineEnBase; },
       phaseEnBase: function () { return phaseEnBase; },
       adresseEnBase: function () { return adresseEnBase; },
-      joursEnBase: function () { return joursEnBase; },
       regleJours: regleJours,
       exportsVisas: EXPORTS_VISAS,
       visasTraites: TRAITES

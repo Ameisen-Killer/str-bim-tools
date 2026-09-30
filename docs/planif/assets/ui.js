@@ -1363,7 +1363,7 @@
     var previent = surChangement || function () {};
     var moi = D.monMembre();
     var soi = !!(moi && moi.id === m.id);
-    var peut = D.peutJours(m.id) && D.joursEnBase();
+    var peut = D.peutJours(m.id);
 
     var capacite = el("b", { class: "num" });
     var detail = el("span", {});
@@ -1381,11 +1381,9 @@
         "Capacité : ", capacite, detail
       ]),
       el("p", { class: "aide", style: "margin:8px 0 0;font-size:12.5px;color:var(--texte-faible);line-height:1.5",
-        text: !D.joursEnBase()
-          ? "Les jours travaillés ne sont pas encore installés dans la base : migration-jours-travailles.sql reste à exécuter dans Supabase."
-          : !peut
-            ? "Seuls " + m.prenom + " et les personnes qui posent les absences des autres règlent ces jours."
-            : "Un clic par jour : plein, demi-journée, puis non travaillé. Aucune tâche ne se pose un jour non travaillé. Un changement de taux d'activité passe par l'administrateur de l'outil."
+        text: !peut
+          ? "Seuls " + m.prenom + " et les personnes qui posent les absences des autres règlent ces jours."
+          : "Un clic par jour : plein, demi-journée, puis non travaillé. Aucune tâche ne se pose un jour non travaillé. Un changement de taux d'activité passe par l'administrateur de l'outil."
       })
     ]);
 

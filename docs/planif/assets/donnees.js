@@ -1012,8 +1012,6 @@
     /** Puis-je régler les jours travaillés de ce membre ? Les siens, toujours ;
      *  ceux d'un collègue avec le même droit que ses absences. */
     peutJours: function (idMembre) { return D.peutAbsences(idMembre); },
-    /** La base connaît-elle la semaine type ? (migration-jours-travailles.sql) */
-    joursEnBase: function () { return !ADAPTATEUR.joursEnBase || ADAPTATEUR.joursEnBase(); },
     capaciteApres: capaciteApres,
 
     /**

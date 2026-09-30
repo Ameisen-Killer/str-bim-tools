@@ -147,9 +147,9 @@
 
 <script src="/planif/assets/calendrier.js?v=5"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=25"></script>
-<script src="/planif/assets/donnees.js?v=33"></script>
-<script src="/planif/assets/ui.js?v=52"></script>
+<script src="/planif/assets/supabase.js?v=26"></script>
+<script src="/planif/assets/donnees.js?v=34"></script>
+<script src="/planif/assets/ui.js?v=53"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
 <script>
 (function () {
@@ -822,11 +822,6 @@
     return !(etat && etat.membres && etat.membres.length) || ("metier" in etat.membres[0]);
   }
 
-  /* Idem pour la semaine type (migration-jours-travailles.sql) : l'ancienne
-     fonction d'enregistrement ignorerait les jours sans le dire. */
-  function joursEnBase() {
-    return !(etat && etat.membres && etat.membres.length) || ("jours" in etat.membres[0]);
-  }
 
   function dessineUtilisateurs() {
     if (!etat) return;
@@ -1254,15 +1249,11 @@
     var jours = (p && D.reprisJours(p.jours)) || [1, 1, 1, 1, 1];
     var inCap = chCap.querySelector("input");
     var chJours = el("div", { class: "champ large" }, [el("label", { text: "Jours travaillés" })]);
-    if (joursEnBase()) {
-      chJours.appendChild(UI.choixJours(jours, function (j) {
-        jours = j;
-        inCap.value = String(D.sommeJours(jours));
-      }).noeud);
-      chJours.appendChild(el("div", { class: "aide", text: "Un clic par jour : plein, demi-journée, puis non travaillé. La capacité se répartit sur les jours travaillés : aucune tâche ne se pose un jour off. Chacun peut aussi régler les siens depuis la page Équipe." }));
-    } else {
-      chJours.appendChild(el("div", { class: "aide", text: "Exécute migration-jours-travailles.sql dans Supabase pour régler les jours de chacun." }));
-    }
+    chJours.appendChild(UI.choixJours(jours, function (j) {
+      jours = j;
+      inCap.value = String(D.sommeJours(jours));
+    }).noeud);
+    chJours.appendChild(el("div", { class: "aide", text: "Un clic par jour : plein, demi-journée, puis non travaillé. La capacité se répartit sur les jours travaillés : aucune tâche ne se pose un jour off. Chacun peut aussi régler les siens depuis la page Équipe." }));
     var chActif  = UI.champ({
       nom: "actif", label: "Présence à l'effectif", type: "select", valeur: p && p.fiche ? String(p.actif) : "true",
       options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Inactif — masqué du planning" }]
@@ -1383,7 +1374,7 @@
             if (!String(v.nom || "").trim())    { UI.toast("Le nom est obligatoire."); return false; }
             if (veutAcces && !RE_MAIL.test(adresse)) { UI.toast("Cette adresse e-mail n'est pas valide."); return false; }
             var capSaisie = parseFloat(String(v.capacite).replace(",", "."));
-            if (joursEnBase() && capSaisie > D.sommeJours(jours) + 1e-9) {
+            if (capSaisie > D.sommeJours(jours) + 1e-9) {
               UI.toast("La capacité dépasse les jours travaillés (" + C.fmtJours(D.sommeJours(jours)) + " j par semaine).");
               return false;
             }
@@ -1396,7 +1387,7 @@
               email: veutAcces ? adresse : "", avecAcces: veutAcces,
               accesActif: veutAcces && v.accesActif === "true"
             };
-            if (joursEnBase()) donnees.jours = D.reprisJours(jours);
+            donnees.jours = D.reprisJours(jours);
             return SB.rpc("console_enregistre_personne", { p: donnees }).then(function () {
               var envoyer = veutAcces && envoi.checked && boiteEnvoi.style.display !== "none";
               if (!envoyer) {
@@ -1525,11 +1516,6 @@
         "Quand un collègue enregistre, les pages ouvertes se mettent à jour d'elles-mêmes. ",
         lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-temps-reel.sql" }),
         " (dépôt). Sans elle, l'outil relit la base toutes les minutes. La bulle du compteur « en ligne » dit si le direct est actif."
-      ]),
-      point(joursEnBase() && (etat.membres || []).length ? "fait" : "verifier", "Jours travaillés de chacun.", [
-        "Chaque fiche porte sa semaine type (un jour non travaillé, une demi-journée) et les tâches se calent dessus. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-jours-travailles.sql" }),
-        " (dépôt). Sans elle, la capacité se répartit à parts égales sur les cinq jours."
       ]),
       point("verifier", "Le dessin attend le calcul.", [
         "Une tâche enchaînée fait rendre le calcul la veille du jour où le dessin commence. ",
