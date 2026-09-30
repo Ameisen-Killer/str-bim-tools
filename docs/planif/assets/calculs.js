@@ -6,12 +6,47 @@
 
   var C = global.Cal;
 
-  /** Capacité d'un membre, en jours, pour une date donnée. 0 si chômé ou absent. */
+  /**
+   * Jours travaillés d'une semaine type, du lundi au vendredi : 1 jour plein,
+   * 0,5 une demi-journée, 0 un jour où la personne ne travaille jamais.
+   * Sans réglage, les cinq jours comptent pareil.
+   */
+  var SEMAINE_PLEINE = [1, 1, 1, 1, 1];
+  function joursDe(membre) {
+    var j = membre && membre.jours;
+    return Array.isArray(j) && j.length === 5 ? j : SEMAINE_PLEINE;
+  }
+
+  /**
+   * Capacité d'un membre pour chaque jour de sa semaine type : sa capacité
+   * hebdomadaire répartie sur ses jours travaillés, au poids de chacun.
+   * Un 80 % sans jour fixe fait 0,8 j chaque jour ; un 80 % qui ne vient pas
+   * le mercredi fait 1 j les quatre autres jours et rien le mercredi.
+   */
+  function capacitesSemaine(membre) {
+    var j = joursDe(membre), cap = membre.capacite || 5;
+    var cle = cap + "|" + j.join(",");
+    if (membre._capSem && membre._capSem.cle === cle) return membre._capSem.v;
+    var s = 0;
+    for (var i = 0; i < 5; i++) s += j[i];
+    var v = j.map(function (p) { return s > 0 ? cap * p / s : 0; });
+    try { Object.defineProperty(membre, "_capSem", { value: { cle: cle, v: v }, configurable: true, writable: true }); } catch (e) {}
+    return v;
+  }
+
+  /** Vrai si la personne ne travaille jamais ce jour de la semaine. */
+  function jourOff(membre, jour) {
+    var r = C.rangJour(jour);
+    return r >= 1 && r <= 5 && joursDe(membre)[r - 1] <= 0;
+  }
+
+  /** Capacité d'un membre, en jours, pour une date donnée. 0 si chômé, absent ou jour non travaillé. */
   function capaciteJour(membre, jour, canton) {
     if (!membre || !membre.actif) return 0;
     if (C.chome(jour, canton)) return 0;
     if (absenceLe(membre, jour)) return 0;
-    return (membre.capacite || 5) / 5;
+    var r = C.rangJour(jour);
+    return r >= 1 && r <= 5 ? capacitesSemaine(membre)[r - 1] : 0;
   }
 
   /** L'absence couvrant ce jour, ou null. */
@@ -61,8 +96,9 @@
   /**
    * L'échéance fait foi ; le début s'en déduit.
    * On remonte le temps depuis l'échéance, jour par jour, en cumulant la
-   * capacité réelle de la personne (0 le week-end, les jours fériés et pendant
-   * ses absences, 0,8 par jour pour un 80 %) jusqu'à couvrir sa charge.
+   * capacité réelle de la personne (0 le week-end, les jours fériés, pendant
+   * ses absences et les jours où elle ne travaille pas, 0,8 par jour pour un
+   * 80 % sans jour fixe) jusqu'à couvrir sa charge.
    * Changer la durée, l'échéance ou une absence redonne donc toujours un début juste.
    * Sans personne affectée (ou inactive), on compte un jour ouvré = un jour de travail.
    */
@@ -390,6 +426,8 @@
     poseLissage: poseLissage,
     avance: avance,
     capaciteJour: capaciteJour,
+    joursDe: joursDe,
+    jourOff: jourOff,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
     chargeOuverte: chargeOuverte,

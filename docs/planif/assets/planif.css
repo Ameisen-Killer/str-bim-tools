@@ -353,6 +353,20 @@ select option:checked{background:var(--option-choisie);color:var(--or)}
 .champ .aide{font-size:12px;color:var(--texte-faible);line-height:1.4}
 .champ.erreur input,.champ.erreur select{border-color:rgba(var(--alerte-rvb),.7)}
 .champ .msg{font-family:var(--mono);font-size:11px;color:var(--alerte)}
+/* Semaine type d'un membre (console) : un bouton par jour, qui passe de plein
+   à demi-journée, puis à non travaillé */
+.semaine{display:flex;gap:6px;max-width:420px}
+.semaine button{
+  flex:1 1 0;min-width:0;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;cursor:pointer;color:var(--or);
+  background:rgba(var(--or-rvb),.12);border:1px solid rgba(var(--or-rvb),.55);border-radius:0;
+  transition:background .2s,border-color .2s,color .2s;
+}
+.semaine button small{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-doux)}
+.semaine button.demi{background:linear-gradient(to top,rgba(var(--or-rvb),.16) 50%,transparent 50%);border-color:rgba(var(--or-rvb),.4)}
+.semaine button.off{background:repeating-linear-gradient(135deg,rgba(var(--encre),.06) 0 3px,transparent 3px 7px);border-color:var(--ligne);color:var(--texte-faible)}
+.semaine button.off small{color:var(--texte-faible)}
+.semaine button:hover,.semaine button:focus-visible{border-color:var(--or);outline:none}
 fieldset{border:0;margin:0;padding:0;min-width:0}
 .cases{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
 .case{
@@ -645,7 +659,7 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 /* fond des colonnes */
 .pl-fond{position:absolute;inset:0;display:grid;grid-template-columns:var(--cols,repeat(var(--n),minmax(0,1fr)));pointer-events:none}
 .pl-fond i{border-left:1px solid var(--ligne-faible)}
-.pl-fond i.chome{background:rgba(var(--encre),.035)}
+.pl-fond i.chome,.pl-fond i.off{background:rgba(var(--encre),.035)}
 .pl-fond i.abs{background:repeating-linear-gradient(135deg,rgba(var(--encre),.06) 0 3px,transparent 3px 7px)}
 .pl-fond i.auj{background:rgba(var(--or-rvb),.08);border-left-color:rgba(var(--or-rvb),.4)}
 

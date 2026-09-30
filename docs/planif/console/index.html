@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=72">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=73">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -79,6 +79,7 @@
   .sel-ligne.vide{color:var(--texte-faible)}
   .sel-ligne.suspendu{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45)}
   .mail-ligne{font-family:var(--mono);font-size:12.5px;color:var(--texte-doux);word-break:break-all}
+  .jours-ligne{font-size:10.5px;letter-spacing:.06em;color:var(--texte-faible);margin-top:3px;white-space:nowrap}
   .quand-ligne{font-family:var(--mono);font-size:12px;color:var(--texte-faible);white-space:nowrap}
   @media (max-width:640px){
     .sel-ligne{max-width:none;height:40px;font-size:16px}
@@ -144,10 +145,10 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=4"></script>
+<script src="/planif/assets/calendrier.js?v=5"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=23"></script>
-<script src="/planif/assets/donnees.js?v=31"></script>
+<script src="/planif/assets/supabase.js?v=24"></script>
+<script src="/planif/assets/donnees.js?v=32"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
 <script>
@@ -762,6 +763,7 @@
         id: m.id, bureauId: m.bureauId, prenom: m.prenom, nom: m.nom,
         metier: m.metier, statuts: m.statuts || [],
         succursale: m.succursale, discipline: m.discipline, capacite: m.capacite,
+        jours: D.reprisJours(m.jours),
         actif: m.actif, taches: m.taches || 0, fiche: true,
         email: m.email || "", accesActif: !!m.accesActif, superAdmin: !!m.superAdmin,
         compte: !!m.compte, confirme: !!m.confirme, derniereConnexion: m.derniereConnexion
@@ -771,7 +773,7 @@
       if (u.membreId) return;
       liste.push({
         id: null, bureauId: u.bureauId, prenom: "", nom: "", metier: null, statuts: [],
-        succursale: null, discipline: null, capacite: null,
+        succursale: null, discipline: null, capacite: null, jours: null,
         actif: true, taches: 0, fiche: false,
         email: u.email, accesActif: !!u.actif, superAdmin: !!u.superAdmin,
         compte: !!u.compte, confirme: !!u.confirme, derniereConnexion: u.derniereConnexion,
@@ -818,6 +820,12 @@
      casquette. On le dit plutôt que de le laisser croire. */
   function statutsEnBase() {
     return !(etat && etat.membres && etat.membres.length) || ("metier" in etat.membres[0]);
+  }
+
+  /* Idem pour la semaine type (migration-jours-travailles.sql) : l'ancienne
+     fonction d'enregistrement ignorerait les jours sans le dire. */
+  function joursEnBase() {
+    return !(etat && etat.membres && etat.membres.length) || ("jours" in etat.membres[0]);
   }
 
   function dessineUtilisateurs() {
@@ -883,7 +891,10 @@
         el("td", {}, [selDiscipline(p)]),
         el("td", {}, [selMetier(p)]),
         el("td", {}, [basculesStatuts(p)]),
-        el("td", { class: "num", text: p.fiche ? C.fmtJours(p.capacite) : "—" }),
+        el("td", { class: "num", title: p.fiche ? D.detailJours(p) : null }, p.fiche ? [
+          C.fmtJours(p.capacite),
+          D.libelleJours(p) ? el("div", { class: "jours-ligne", text: D.libelleJours(p) }) : null
+        ] : ["—"]),
         el("td", {}, [selAcces(p)]),
         el("td", {}, [el("span", { class: "quand-ligne" }, [UI.surligne(connexionTexte(p), mots)])])
       ];
@@ -1235,8 +1246,42 @@
     var chCap    = UI.champ({
       nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
       valeur: p && p.capacite != null ? p.capacite : capDefaut,
-      aide: "5 pour un plein temps, 4 pour un 80 %."
+      aide: "Suit les jours travaillés. À baisser pour un temps partiel sans jour fixe : 4 pour un 80 %."
     });
+
+    /* La semaine type : un bouton par jour, qui passe de plein à demi-journée,
+       puis à non travaillé. Les tâches se calent sur ces jours-là. */
+    var jours = (p && D.reprisJours(p.jours)) || [1, 1, 1, 1, 1];
+    var inCap = chCap.querySelector("input");
+    var boutonsJours = [];
+    var ETATS_JOUR = { 1: ["", "plein"], 0.5: ["demi", "½ j"], 0: ["off", "—"] };
+    function peintJour(b, i) {
+      var e = ETATS_JOUR[jours[i]];
+      b.className = e[0];
+      b.lastChild.textContent = e[1];
+      b.setAttribute("aria-label", D.JOURS_SEMAINE[i] + " : " +
+        (jours[i] === 1 ? "jour plein" : jours[i] > 0 ? "demi-journée" : "non travaillé"));
+    }
+    var chJours = el("div", { class: "champ large" }, [el("label", { text: "Jours travaillés" })]);
+    if (joursEnBase()) {
+      var rangee = el("div", { class: "semaine" });
+      D.JOURS_COURTS.forEach(function (court, i) {
+        var b = el("button", { type: "button", title: "Cliquer : plein → demi-journée → non travaillé" }, [court, el("small")]);
+        peintJour(b, i);
+        b.addEventListener("click", function () {
+          jours[i] = jours[i] === 1 ? 0.5 : jours[i] > 0 ? 0 : 1;
+          if (!jours.some(function (x) { return x > 0; })) jours[i] = 1;   // au moins un jour
+          peintJour(b, i);
+          inCap.value = String(D.sommeJours(jours));
+        });
+        boutonsJours.push(b);
+        rangee.appendChild(b);
+      });
+      chJours.appendChild(rangee);
+      chJours.appendChild(el("div", { class: "aide", text: "Un clic par jour : plein, demi-journée, puis non travaillé. La capacité se répartit sur les jours travaillés : aucune tâche ne se pose un jour off." }));
+    } else {
+      chJours.appendChild(el("div", { class: "aide", text: "Exécute migration-jours-travailles.sql dans Supabase pour régler les jours de chacun." }));
+    }
     var chActif  = UI.champ({
       nom: "actif", label: "Présence à l'effectif", type: "select", valeur: p && p.fiche ? String(p.actif) : "true",
       options: [{ valeur: "true", label: "Actif" }, { valeur: "false", label: "Inactif — masqué du planning" }]
@@ -1244,7 +1289,7 @@
 
     var fiche = el("fieldset", {}, [
       el("div", { class: "legende", text: "Au planning" }),
-      el("div", { class: "grille-champs" }, [chBureau, chMetier, chPrenom, chNom, chSucc, chDisc, chCap, chActif])
+      el("div", { class: "grille-champs" }, [chBureau, chMetier, chPrenom, chNom, chSucc, chDisc, chCap, chActif, chJours])
     ]);
 
     var statuts = el("fieldset", {}, [
@@ -1356,6 +1401,11 @@
             if (!String(v.prenom || "").trim()) { UI.toast("Le prénom est obligatoire."); return false; }
             if (!String(v.nom || "").trim())    { UI.toast("Le nom est obligatoire."); return false; }
             if (veutAcces && !RE_MAIL.test(adresse)) { UI.toast("Cette adresse e-mail n'est pas valide."); return false; }
+            var capSaisie = parseFloat(String(v.capacite).replace(",", "."));
+            if (joursEnBase() && capSaisie > D.sommeJours(jours) + 1e-9) {
+              UI.toast("La capacité dépasse les jours travaillés (" + C.fmtJours(D.sommeJours(jours)) + " j par semaine).");
+              return false;
+            }
 
             var donnees = {
               id: p && p.id ? p.id : null, bureauId: v.bureauId,
@@ -1365,6 +1415,7 @@
               email: veutAcces ? adresse : "", avecAcces: veutAcces,
               accesActif: veutAcces && v.accesActif === "true"
             };
+            if (joursEnBase()) donnees.jours = D.reprisJours(jours);
             return SB.rpc("console_enregistre_personne", { p: donnees }).then(function () {
               var envoyer = veutAcces && envoi.checked && boiteEnvoi.style.display !== "none";
               if (!envoyer) {
@@ -1493,6 +1544,11 @@
         "Quand un collègue enregistre, les pages ouvertes se mettent à jour d'elles-mêmes. ",
         lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-temps-reel.sql" }),
         " (dépôt). Sans elle, l'outil relit la base toutes les minutes. La bulle du compteur « en ligne » dit si le direct est actif."
+      ]),
+      point(joursEnBase() && (etat.membres || []).length ? "fait" : "verifier", "Jours travaillés de chacun.", [
+        "Chaque fiche porte sa semaine type (un jour non travaillé, une demi-journée) et les tâches se calent dessus. ",
+        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-jours-travailles.sql" }),
+        " (dépôt). Sans elle, la capacité se répartit à parts égales sur les cinq jours."
       ]),
       point("verifier", "Le dessin attend le calcul.", [
         "Une tâche enchaînée fait rendre le calcul la veille du jour où le dessin commence. ",

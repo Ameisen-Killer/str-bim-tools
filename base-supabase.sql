@@ -196,6 +196,14 @@ create table if not exists public.membres (
   succursale text,
   discipline text,
   capacite   numeric(3,1) not null default 5 check (capacite > 0 and capacite <= 7),
+  -- Semaine type, du lundi au vendredi : 1 jour plein, 0.5 demi-journée, 0 jour
+  -- non travaillé. Nul : les cinq jours se valent.
+  jours      numeric(2,1)[] constraint membres_jours_check
+               check (jours is null
+                      or (cardinality(jours) = 5
+                          and array_position(jours, null::numeric) is null
+                          and jours <@ array[0, 0.5, 1]::numeric[]
+                          and jours && array[0.5, 1]::numeric[])),
   actif      boolean not null default true,
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
@@ -224,6 +232,8 @@ create unique index if not exists acces_membre_unique
   on public.acces (membre_id) where membre_id is not null;
 
 comment on column public.membres.capacite is 'Jours travaillés par semaine : 5 pour un plein temps.';
+comment on column public.membres.jours is
+  'Semaine type du lundi au vendredi (1 plein, 0.5 demi-journée, 0 non travaillé). La capacité se répartit sur ces jours, au poids de chacun. Nul : les cinq jours se valent.';
 comment on column public.membres.email is
   'Adresse d''annuaire, facultative. Ce n''est PAS l''adresse de connexion (elle vit dans acces) : elle sert de repère aux jeux d''essai.';
 comment on column public.membres.metier is
@@ -892,7 +902,7 @@ begin
           'id', m.id, 'bureauId', m.bureau_id, 'prenom', m.prenom, 'nom', m.nom,
           'metier', m.metier, 'statuts', to_jsonb(m.statuts),
           'succursale', m.succursale, 'discipline', m.discipline,
-          'capacite', m.capacite, 'actif', m.actif,
+          'capacite', m.capacite, 'jours', to_jsonb(m.jours), 'actif', m.actif,
           'email', a.email, 'accesActif', a.actif, 'superAdmin', coalesce(a.super_admin, false),
           'compte', u.id is not null,
           'confirme', u.email_confirmed_at is not null,
@@ -1071,7 +1081,9 @@ $$;
 -- Fiche du membre et accès en une fois. Renvoie l'id du membre (nul si la
 -- ligne n'est qu'un accès, sans fiche au planning).
 --   { id, bureauId, prenom, nom, metier, statuts, succursale, discipline,
---     capacite, actif, avecFiche, email, avecAcces, accesActif }
+--     capacite, jours, actif, avecFiche, email, avecAcces, accesActif }
+-- « jours » : cinq poids du lundi au vendredi (1, 0.5 ou 0), ou nul pour une
+-- semaine pleine. Sans la clé, la semaine type reste en place.
 -- « metier » est accepté sous son ancien nom « role » : une console restée en
 -- cache dans un navigateur continue d'enregistrer sans rien effacer. De même,
 -- l'absence de la clé « statuts » laisse les statuts en place ; une liste vide
@@ -1094,6 +1106,7 @@ declare
   v_acces     boolean := coalesce((p ->> 'avecAcces')::boolean, false);
   v_ac_actif  boolean := coalesce((p ->> 'accesActif')::boolean, false);
   v_statuts   text[];
+  v_jours     numeric[];
   v_ancien    text;
 begin
   if not public.est_super_admin() then
@@ -1137,6 +1150,25 @@ begin
     if not (v_capacite >= 0.5 and v_capacite <= 7) then
       raise exception 'La capacité doit être comprise entre 0,5 et 7 jours par semaine.';
     end if;
+    -- La semaine type : cinq poids, une semaine pleine ne se retient pas
+    if jsonb_typeof(p -> 'jours') = 'array' then
+      select array_agg(case when x.v::numeric >= 0.75 then 1 when x.v::numeric >= 0.25 then 0.5 else 0 end
+                       order by x.n)
+        into v_jours
+        from jsonb_array_elements_text(p -> 'jours') with ordinality as x(v, n);
+      if cardinality(v_jours) <> 5 then
+        raise exception 'La semaine type compte cinq jours, du lundi au vendredi.';
+      end if;
+      if v_jours <@ array[1]::numeric[] then
+        v_jours := null;
+      elsif not v_jours && array[0.5, 1]::numeric[] then
+        raise exception 'Coche au moins un jour travaillé.';
+      end if;
+    end if;
+    if v_jours is not null
+       and v_capacite > (select sum(x) from unnest(v_jours) as x) then
+      raise exception 'La capacité dépasse les jours travaillés.';
+    end if;
     if v_succ is not null and not exists (
          select 1 from public.succursales s where s.bureau_id = v_bureau and s.code = v_succ) then
       raise exception 'Cette succursale n''existe pas dans ce bureau.';
@@ -1147,15 +1179,17 @@ begin
     end if;
 
     if v_id is null then
-      insert into public.membres (bureau_id, prenom, nom, metier, statuts, succursale, discipline, capacite, actif)
+      insert into public.membres (bureau_id, prenom, nom, metier, statuts, succursale, discipline, capacite, jours, actif)
       values (v_bureau, v_prenom, v_nom, v_metier, coalesce(v_statuts, '{}'),
-              v_succ, v_disc, round(v_capacite, 1), v_actif)
+              v_succ, v_disc, round(v_capacite, 1), v_jours, v_actif)
       returning id into v_id;
     else
       update public.membres m
          set bureau_id = v_bureau, prenom = v_prenom, nom = v_nom, metier = v_metier,
              statuts = coalesce(v_statuts, m.statuts),
-             succursale = v_succ, discipline = v_disc, capacite = round(v_capacite, 1), actif = v_actif
+             succursale = v_succ, discipline = v_disc, capacite = round(v_capacite, 1),
+             jours = case when p ? 'jours' then v_jours else m.jours end,
+             actif = v_actif
        where m.id = v_id;
       if not found then
         raise exception 'Cette personne n''existe plus.';

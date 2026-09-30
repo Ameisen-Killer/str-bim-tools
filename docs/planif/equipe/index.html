@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=72">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=73">
 </head>
 <body class="large">
 
@@ -50,11 +50,11 @@
 
 <div data-pied></div>
 
-<script src="/planif/assets/calendrier.js?v=4"></script>
+<script src="/planif/assets/calendrier.js?v=5"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=23"></script>
-<script src="/planif/assets/donnees.js?v=31"></script>
-<script src="/planif/assets/calculs.js?v=8"></script>
+<script src="/planif/assets/supabase.js?v=24"></script>
+<script src="/planif/assets/donnees.js?v=32"></script>
+<script src="/planif/assets/calculs.js?v=9"></script>
 <script src="/planif/assets/ui.js?v=50"></script>
 <script src="/planif/assets/palette.js?v=4"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
@@ -278,7 +278,10 @@
             ? el("div", { class: "statuts-ligne", style: "margin-top:5px" }, UI.etiquettesStatuts(m))
             : null
         ]),
-        el("td", { class: "num", text: C.fmtJours(m.capacite) + " j/sem." }),
+        el("td", { class: "num", title: D.detailJours(m) }, [
+          C.fmtJours(m.capacite) + " j/sem.",
+          D.libelleJours(m) ? el("div", { class: "secondaire", text: D.libelleJours(m) }) : null
+        ]),
         el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
           el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])

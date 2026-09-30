@@ -78,6 +78,15 @@
     return out;
   }
 
+  /** Rang du jour dans la semaine : 1 lundi … 7 dimanche. */
+  var memoRang = Object.create(null);
+  function rangJour(s) {
+    var r = memoRang[s];
+    if (r !== undefined) return r;
+    var d = dt(s); if (!d) return 0;
+    return (memoRang[s] = d.getDay() || 7);
+  }
+
   function estWeekend(s) { var d = dt(s); if (!d) return false; var j = d.getDay(); return j === 0 || j === 6; }
 
   /** Premier jour du mois contenant la date. */
@@ -315,7 +324,7 @@
   global.Cal = {
     iso: iso, dt: dt, ajoute: ajoute, diff: diff, lundi: lundi,
     aujourdhui: aujourdhui, isoAuj: isoAuj, serie: serie,
-    semaineISO: semaineISO, estWeekend: estWeekend,
+    semaineISO: semaineISO, estWeekend: estWeekend, rangJour: rangJour,
     premierMois: premierMois, nbJoursMois: nbJoursMois, ajouteMois: ajouteMois, mois: mois,
     jourCourt: jourCourt, quantieme: quantieme,
     fmtCourt: fmtCourt, fmtLong: fmtLong, fmtCH: fmtCH, fmtJours: fmtJours,

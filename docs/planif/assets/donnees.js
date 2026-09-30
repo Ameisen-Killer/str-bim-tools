@@ -33,6 +33,45 @@
   function dixieme(n) { return Math.round(n * 10) / 10; }
   var CHARGE_MAX = 999.9;                          // plafond de numeric(4,1) en base
 
+  /* Semaine type d'un membre : un poids par jour, du lundi au vendredi —
+     1 jour plein, 0,5 une demi-journée, 0 un jour où il ne travaille jamais.
+     null : les cinq jours se valent, la capacité s'y répartit à parts égales
+     (un 80 % sans jour fixe fait 0,8 j chaque jour). calculs.js s'en sert pour
+     caler les tâches sur les vrais jours de chacun. */
+  var JOURS_SEMAINE = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
+  var JOURS_COURTS = ["Lu", "Ma", "Me", "Je", "Ve"];
+  function reprisJours(v) {
+    if (!Array.isArray(v) || v.length !== 5) return null;
+    var j = v.map(function (x) { var n = nombre(x, 1); return n >= 0.75 ? 1 : n >= 0.25 ? 0.5 : 0; });
+    if (j.every(function (x) { return x === 1; })) return null;    // semaine pleine : rien à retenir
+    if (!j.some(function (x) { return x > 0; })) return null;
+    return j;
+  }
+  function sommeJours(j) {
+    return (j || [1, 1, 1, 1, 1]).reduce(function (a, b) { return a + b; }, 0);
+  }
+  /** « Lu Ma Je Ve », « Lu Ma Me½ Je Ve » ; vide pour une semaine pleine. */
+  function libelleJours(m) {
+    var j = reprisJours(m && m.jours);
+    if (!j) return "";
+    return j.map(function (p, i) { return p >= 1 ? JOURS_COURTS[i] : p > 0 ? JOURS_COURTS[i] + "½" : ""; })
+      .filter(Boolean).join(" ");
+  }
+  /** « Ne travaille pas le mercredi. Demi-journée le vendredi. » */
+  function detailJours(m) {
+    var j = reprisJours(m && m.jours);
+    if (!j) return "Travaille du lundi au vendredi.";
+    function liste(p) {
+      var l = JOURS_SEMAINE.filter(function (x, i) { return j[i] === p; })
+        .map(function (x) { return "le " + x; });
+      return l.length > 1 ? l.slice(0, -1).join(", ") + " et " + l[l.length - 1] : l[0];
+    }
+    var out = [];
+    if (j.indexOf(0) >= 0) out.push("Ne travaille pas " + liste(0) + ".");
+    if (j.indexOf(0.5) >= 0) out.push("Demi-journée " + liste(0.5) + ".");
+    return out.join(" ");
+  }
+
   /* Deux choses distinctes, et qui se cumulent :
      · le MÉTIER qu'on exerce — un seul, c'est lui qui décide de la place au
        planning (un ingénieur porte les charges de calcul, un dessinateur celles
@@ -528,6 +567,7 @@
         succursale: SUCCURSALES[m.succursale] ? m.succursale : "",
         discipline: DISCIPLINES[m.discipline] ? m.discipline : "",
         capacite: nombre(m.capacite, e.reglages.capaciteDefaut),
+        jours: reprisJours(m.jours),
         actif: m.actif !== false,
         absences: (m.absences || []).map(function (a) {
           return { id: texte(a.id) || id(), debut: texte(a.debut), fin: texte(a.fin) || texte(a.debut), motif: texte(a.motif) };
@@ -660,10 +700,14 @@
     if (double) throw erreur("Un membre utilise déjà cette adresse e-mail.");
     var cap = dixieme(nombre(o.capacite, etat.reglages.capaciteDefaut));
     if (!(cap >= 0.5 && cap <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
+    var jours = reprisJours(o.jours);
+    if (jours && cap > sommeJours(jours) + 1e-9) {
+      throw erreur("La capacité dépasse les jours travaillés (" + global.Cal.fmtJours(sommeJours(jours)) + " j par semaine).");
+    }
     return {
       nom: texte(o.nom), prenom: texte(o.prenom), email: mail,
       metier: metier, statuts: statuts,
-      succursale: succ, discipline: disc, capacite: cap, actif: o.actif !== false
+      succursale: succ, discipline: disc, capacite: cap, jours: jours, actif: o.actif !== false
     };
   }
 
@@ -788,6 +832,12 @@
     PLANIFIES: PLANIFIES,
     cote: cote,
     libelleMetier: libelleMetier,
+    JOURS_SEMAINE: JOURS_SEMAINE,
+    JOURS_COURTS: JOURS_COURTS,
+    reprisJours: reprisJours,
+    sommeJours: sommeJours,
+    libelleJours: libelleJours,
+    detailJours: detailJours,
     STATUTS: STATUTS,
     STATUTS_COURTS: STATUTS_COURTS,
     STATUTS_PLURIEL: STATUTS_PLURIEL,
@@ -1403,6 +1453,11 @@
     var d1 = m("Favre", "Léa", "dessinateur", 5);
     var d2 = m("Dubois", "Yann", "dessinateur", 5, ["chef_projet"]);
     var d3 = m("Keller", "Sophie", "dessinateur", 3);
+    // Marc est à 80 % et ne vient jamais le mercredi ; Sophie ne travaille que trois jours
+    e.membres.forEach(function (x) {
+      if (x.id === i2) x.jours = [1, 1, 0, 1, 1];
+      if (x.id === d3) x.jours = [1, 1, 0, 1, 0];
+    });
     m("Nicolet", "Fabienne", "administratif", 4);
 
     function a(code, nom, teinte, ings, dess, phase, adresse) {

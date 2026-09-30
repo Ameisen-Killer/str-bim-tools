@@ -422,6 +422,10 @@
      À simplifier une fois la migration en place. */
   var metiersEnBase = true;
 
+  /* Idem pour les jours travaillés de chacun (30.09.2026) : migration-jours-travailles.sql.
+     À simplifier une fois la migration en place. */
+  var joursEnBase = true;
+
   /* L'annuaire est arrivé après coup, et sa migration se lance à la main :
      tant que la table manque, PostgREST répond « table inconnue » (PGRST205,
      ou 42P01 sur les versions plus anciennes). Faire échouer toute la lecture
@@ -470,6 +474,7 @@
                 capacite: m.capacite, actif: m.actif };
       if (metiersEnBase) { o.metier = vide(m.metier); o.statuts = m.statuts || []; }
       else o.role = vide(m.metier);
+      if (joursEnBase) o.jours = m.jours || null;
       return o;
     },
     affaires: function (a) {
@@ -522,6 +527,8 @@
       adresseEnBase = !affaires.length || ("adresse" in affaires[0]);
       // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
       metiersEnBase = !membres.length || ("metier" in membres[0]);
+      // … et la semaine type de chacun ? (colonne jours)
+      joursEnBase = !membres.length || ("jours" in membres[0]);
 
       // Avant la migration, « administrateur » était un rôle, planifié du côté ingénieur
       function metierDe(m) {
@@ -550,7 +557,7 @@
             id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "",
             metier: metierDe(m), statuts: statutsDe(m),
             succursale: m.succursale || "", discipline: m.discipline || "",
-            capacite: parseFloat(m.capacite), actif: m.actif,
+            capacite: parseFloat(m.capacite), jours: m.jours || null, actif: m.actif,
             absences: absences.filter(function (a) { return a.membre_id === m.id; })
               .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })
           };
