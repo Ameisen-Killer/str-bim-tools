@@ -15,7 +15,6 @@
 --    affaires : note commençant par [jeu de charge]
 --  Retrait complet, bureau compris : purge-jeu-charge.sql. Les données réelles
 --  et le jeu d'essai ne sont pas touchés.
---  Nécessite la migration multi-bureaux (migration-multi-bureaux.sql).
 -- ============================================================================
 
 begin;

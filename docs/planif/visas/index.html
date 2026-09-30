@@ -174,7 +174,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     --v-serie:rgba(22,19,15,.5);
     --p-moi:#9A6200; --p1:#1baf7a; --p2:#eb6834; --p3:#4a3aa7; --p4:#e87ba4; --p5:#2a78d6;
   }
-  #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases,.v-outils-liste,#note-traites{display:none!important}
+  #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases,.v-outils-liste{display:none!important}
   td.v-coche label{width:auto;height:auto;margin:0}
   table.liste tr.v-fait td:not(.v-coche){opacity:1}
   .v-intro{font-size:8.5pt;margin:0 0 8px}
@@ -243,10 +243,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     </div>
   </div>
 
-  <div class="wrap" id="migration-visas" hidden>
+  <div class="wrap" id="sans-stockage" hidden>
     <div class="bandeau">
       <span class="losange" aria-hidden="true"></span>
-      <div><strong>Stockage des exports pas encore installé. </strong>La base n'a pas encore le seau ni la table des exports. Exécute <code>migration-visas.sql</code> dans Supabase (SQL Editor), puis recharge cette page. En attendant, l'export glissé ici est analysé sans être gardé.</div>
+      <div><strong>Exports non gardés dans ce navigateur. </strong>Il ne sait pas les stocker : l'export glissé ici est analysé sans être gardé.</div>
     </div>
   </div>
 
@@ -346,10 +346,6 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout de chaque feuille : qui a traité le plan, et quand."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
         </div>
         <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et tout le bureau la voit ; quand un nouvel indice arrive, le plan repasse « à traiter ».</p>
-        <div class="bandeau" id="note-traites" hidden style="margin-bottom:16px">
-          <span class="losange" aria-hidden="true"></span>
-          <div><strong>Coches « Traité » pas encore installées. </strong>Relance <code>migration-visas.sql</code> dans Supabase (SQL Editor), puis recharge cette page : elle ajoute la table des plans traités, sans toucher aux exports déjà déposés.</div>
-        </div>
         <div data-recherche></div>
         <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
@@ -399,10 +395,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=26"></script>
-<script src="/planif/assets/donnees.js?v=35"></script>
+<script src="/planif/assets/supabase.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=36"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=54"></script>
+<script src="/planif/assets/ui.js?v=55"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
 <script src="/planif/assets/visas.js?v=9"></script>
 <script>
@@ -465,9 +461,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   /* ------------------------------------------------------------ exports déposés
      Un export déposé est gardé dans la base de l'équipe (Supabase Storage, par
-     donnees.js ; migration-visas.sql) avec l'heure du dépôt : chacun du bureau
-     le rouvre ensuite, depuis le menu « Export analysé » ou le tableau des
-     exports. Sans la migration, l'export glissé ici est seulement analysé.
+     donnees.js) avec l'heure du dépôt : chacun du bureau le rouvre ensuite,
+     depuis le menu « Export analysé » ou le tableau des exports. En mode local,
+     un navigateur sans IndexedDB se contente de l'analyser.
      Le dernier export ouvert est retenu dans ce navigateur, pour la visite suivante. */
   var exportsListe = [], stockageOk = false, courant = null, jeux = {}, bruts = {};   // bruts : le fichier lu, pour l'Excel annoté
   var CLE_CHOIX = "planif.visas.choix";
@@ -525,9 +521,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
      La coche « Traité » de la liste : le plan a été repris d'après ses visas.
      Elle est rangée par numéro de plan et indice (table visas_traites, par
      donnees.js), partagée par le bureau et gardée d'un export à l'autre : un
-     nouvel indice redevient « à traiter ». Tant que la table manque, la colonne
-     n'apparaît pas et une note dit quoi relancer. */
-  var traites = {}, traitesOk = false, traitesLus = false;
+     nouvel indice redevient « à traiter ». */
+  var traites = {}, traitesOk = false;
   function cleTraite(code, indice) { return code + "|" + (+indice || 0); }
   function traiteDe(p) { return traitesOk ? traites[cleTraite(p.code, p.doc.ind)] || null : null; }
   function jourTraite(t) { var d = new Date(t.traiteLe); return isNaN(d) ? "" : d.toLocaleDateString("fr-CH"); }
@@ -541,10 +536,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     }).then(function (l) {
       traites = {};
       l.forEach(function (t) { traites[cleTraite(t.code, t.indice)] = t; });
-      traitesLus = true;
       if (donnees) { rendTuiles(); rendListe(); }
     }, function (e) {
-      traitesLus = true;
       UI.toast("Coches « Traité » : " + ((e && e.message) || "lecture impossible."));
     });
   }
@@ -571,10 +564,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   function chargeListe() {
     return D.exportsVisas.disponible().then(function (ok) {
       stockageOk = ok;
-      $("migration-visas").hidden = ok;
+      $("sans-stockage").hidden = ok;
       $("depot-note").textContent = ok
         ? "Il est rangé dans la base de l'équipe avec l'heure du dépôt : chacun du bureau peut ensuite le rouvrir et l'analyser."
-        : "Il est analysé dans ce navigateur, sans être gardé, tant que le stockage des exports n'est pas installé.";
+        : "Il est analysé dans ce navigateur, sans être gardé.";
       return ok ? D.exportsVisas.liste() : [];
     }).then(function (l) {
       exportsListe = l;
@@ -653,7 +646,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       }
       if (!stockageOk) {
         affiche({ ligne: null, nom: f.name, jeu: J, octets: brut });
-        UI.toast("Export analysé, sans être gardé : le stockage des exports n'est pas encore installé.");
+        UI.toast("Export analysé, sans être gardé : ce navigateur ne sait pas le stocker.");
         return;
       }
       UI.toast("Dépôt de « " + f.name + " »…");
@@ -1198,7 +1191,6 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     menuVisas(); menuTraite();
     $("outils-liste").hidden = !traitesOk;
     $("intro-traites").hidden = !traitesOk;
-    $("note-traites").hidden = traitesOk || !traitesLus || !stockageOk;     // stockage absent : le bandeau du haut le dit déjà
     $("choix-statuts").innerHTML = V.STATUTS.map(function (s) {
       return '<button type="button" data-s="' + s.id + '" aria-pressed="' + !!etat.statuts[s.id] + '" style="--c:' + couleurStatut(s.id) + '"><i></i>' + esc(s.nom) + " <b>" + n(compte(s.id)) + "</b></button>";
     }).join("");

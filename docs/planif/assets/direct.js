@@ -12,9 +12,8 @@
        RLS laisse lire à la personne connectée ;
      - un battement toutes les 25 s, le jeton renouvelé quand il change ;
      - reconnexion automatique, de plus en plus espacée (2 s → 30 s).
-   Les tables doivent faire partie de la publication « supabase_realtime » :
-   c'est l'objet de migration-temps-reel.sql. Sans elle (ou si le canal
-   refuse), la page se rabat sur une relecture discrète toutes les 60 s,
+   Les tables doivent faire partie de la publication « supabase_realtime »
+   (base-supabase.sql). Si le canal refuse, la page se rabat sur une relecture discrète toutes les 60 s,
    onglet visible.
 
    Jamais sous les doigts : une relecture attend qu'aucune fenêtre ne soit
@@ -111,8 +110,8 @@
     setTimeout(connecte, delai);
   }
 
-  /* Le canal refuse l'abonnement (tables hors publication : migration pas
-     passée, ou réglage du projet) : on n'insiste pas, le repli suffit. */
+  /* Le canal refuse l'abonnement (tables hors publication, ou réglage du
+     projet) : on n'insiste pas, le repli suffit. */
   function echec(message) {
     abandon = true;
     ferme();

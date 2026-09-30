@@ -124,7 +124,7 @@
   /* Les droits accordés aux groupes, cochés bureau par bureau dans la console.
      Qui ne porte aucun statut n'en a aucun : c'est l'utilisateur « lambda ».
      Ajouter un droit se fait ici — la base accepte n'importe quel code, elle ne
-     juge que ce qu'elle sait appliquer (voir migration-droits-groupes.sql). */
+     juge que ce qu'elle sait appliquer (a_droit, base-supabase.sql). */
   var ORDRE_DROITS = ["affaires_creer", "taches_autrui", "absences_autrui"];
   var DROITS = {
     affaires_creer: {
@@ -173,7 +173,7 @@
      lettre, sinon l'ordre des clés d'un objet JavaScript ne serait plus celui de la liste. */
   var SUCCURSALES = {}, DISCIPLINES = {}, DISCIPLINES_PAR_SUCCURSALE = {};
 
-  // Listes d'origine : mode local, et base qui n'est pas encore passée en multi-bureaux
+  // Listes d'origine : mode local
   var LISTES_ORIGINE = {
     disciplines: [
       { code: "administrateurs", nom: "Administrateurs" },
@@ -397,9 +397,8 @@
   var chargement = null;
 
   /* ---------------------------------------------------------------- profil
-     Qui est connecté, dans quel bureau, avec quels droits. Sans base
-     multi-bureaux (mode local, ou migration pas encore exécutée) : un seul
-     bureau, et tous les droits, comme avant. */
+     Qui est connecté, dans quel bureau, avec quels droits. En mode local :
+     un seul bureau, et tous les droits. */
 
   var profil = null, profilEnCours = null;
 
@@ -433,10 +432,8 @@
           return (brut.statuts || []).indexOf(s) >= 0;
         }),
         /* Les droits que ses statuts lui accordent, réunis par la base. Ils
-           servent à ne pas proposer l'impossible ; c'est la base qui tranche.
-           Absents (migration des droits pas encore passée) : tout est permis,
-           comme avant. */
-        droits: brut.droits ? (brut.droits || []).map(texte) : ORDRE_DROITS.slice(),
+           servent à ne pas proposer l'impossible ; c'est la base qui tranche. */
+        droits: (brut.droits || []).map(texte),
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
         bureau: brut.bureau || null, bureaux: brut.bureaux || []
@@ -687,8 +684,6 @@
 
   var RE_MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-  var MSG_ANNUAIRE = "L'annuaire n'est pas encore installé dans la base : migration-annuaire.sql reste à exécuter dans Supabase — relance-la si tu l'as déjà passée, elle ajoute l'adresse postale.";
-
   /* Une absence est une période pleine : pas de demi-journée, et pas deux
      périodes sur le même jour — sinon les jours d'absence seraient comptés
      deux fois dans le calendrier, et la capacité, elle, ne tomberait qu'une. */
@@ -759,8 +754,8 @@
       statut: STATUTS_AFFAIRE[o.statut] ? o.statut : "active",
       echeance: texte(o.echeance) || null,
       // Tant que la base ignore la colonne, la phase n'est pas retenue : elle se perdrait au rechargement
-      phase: D.phaseEnBase() ? (texte(o.phase) || null) : null,
-      adresse: D.adresseEnBase() ? texte(o.adresse).replace(/\s+/g, " ") : "",
+      phase: texte(o.phase) || null,
+      adresse: texte(o.adresse).replace(/\s+/g, " "),
       ingenieurs: (o.ingenieurs || []).filter(Boolean),
       dessinateurs: (o.dessinateurs || []).filter(Boolean)
     };
@@ -790,7 +785,7 @@
       finiDessin: o.finiDessin === true,
       // Le dessin attend le calcul (calculs.js, finPart). Une tâche neuve est enchaînée
       // sauf avis contraire ; tant que la base ignore la colonne, rien n'est enchaîné.
-      enchaine: D.enchainementEnBase() && ("enchaine" in o ? o.enchaine === true : true)
+      enchaine: "enchaine" in o ? o.enchaine === true : true
     };
   }
 
@@ -1142,30 +1137,9 @@
     },
 
     /* -------------------------------------------------------- annuaire */
-    /** La base connaît-elle l'adresse des affaires ? (migration-adresse-affaires.sql) */
-    adresseEnBase: function () {
-      return !ADAPTATEUR.adresseEnBase || ADAPTATEUR.adresseEnBase();
-    },
     /** Lien Google Maps de l'adresse d'une affaire, ou "" sans adresse. */
     lienCarte: function (a) {
       return a && a.adresse ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(a.adresse) : "";
-    },
-
-    /** La base connaît-elle la phase des affaires ? (migration-phase-affaires.sql) */
-    phaseEnBase: function () {
-      return !ADAPTATEUR.phaseEnBase || ADAPTATEUR.phaseEnBase();
-    },
-
-    /** La base connaît-elle l'enchaînement calcul → dessin ? (migration-enchainement.sql) */
-    enchainementEnBase: function () {
-      return !ADAPTATEUR.enchainementEnBase || ADAPTATEUR.enchainementEnBase();
-    },
-
-    /* La table est arrivée après les autres, et sa migration se lance à la
-       main : tant qu'elle n'est pas passée, l'annuaire se lit vide et refuse
-       d'écrire, plutôt que d'envoyer vers une table qui n'existe pas. */
-    annuaireEnBase: function () {
-      return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
     },
 
     urlSite: urlSite,
@@ -1184,7 +1158,6 @@
 
     ajouteContact: function (o) {
       return Promise.resolve().then(function () {
-        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
         var v = valideContact(o);
         v.id = id();
         etat.contacts.push(v);
@@ -1193,7 +1166,6 @@
     },
     majContact: function (i, o) {
       return Promise.resolve().then(function () {
-        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
         var c = D.contact(i); if (!c) throw erreur("Fiche introuvable.");
         var v = valideContact(o);
         Object.keys(v).forEach(function (k) { c[k] = v[k]; });
@@ -1202,7 +1174,6 @@
     },
     suppContact: function (i) {
       return Promise.resolve().then(function () {
-        if (!D.annuaireEnBase()) throw erreur(MSG_ANNUAIRE);
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
         return sauve();
       });
@@ -1221,9 +1192,6 @@
           o.id = id();
           o.bureau = p.bureau ? p.bureau.id : null;
           o.deposeNom = fiche ? (fiche.prenom + " " + fiche.nom).trim() : "";
-          if (ADAPTATEUR.exportsVisas && !o.bureau) {
-            throw erreur("La base n'est pas encore passée en multi-bureaux : les exports ne peuvent pas y être rangés.");
-          }
           return EXPORTS.depose(fichier, o);
         });
       },

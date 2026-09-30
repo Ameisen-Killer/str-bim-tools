@@ -565,11 +565,10 @@
      changeant de page, le « je passe derrière » de l'ancienne peut arriver
      après le « je suis là » de la nouvelle : la base l'ignore, il est plus vieux.
 
-     Rien ne s'affiche en mode local, ni tant que migration-presence.sql n'a pas
-     été exécutée : mieux vaut pas de compteur qu'un compteur faux. */
+     Rien ne s'affiche en mode local. */
 
   var BATTEMENT = 45000;
-  var enLigne = null, battement = null, presenceCoupee = false;
+  var enLigne = null, battement = null;
 
   var ONGLET = (function () {
     var id = null;
@@ -582,7 +581,7 @@
   })();
 
   function suitPresence() {
-    if (!avecBase || !SB.connecte() || presenceCoupee || battement || document.hidden) return;
+    if (!avecBase || !SB.connecte() || battement || document.hidden) return;
     bat({ visible: true });
     battement = setInterval(function () { bat({ visible: true }); }, BATTEMENT);
   }
@@ -597,17 +596,11 @@
   }
 
   function bat(o) {
-    if (!avecBase || !SB.connecte() || presenceCoupee) return Promise.resolve();
+    if (!avecBase || !SB.connecte()) return Promise.resolve();
     return SB.presence({
       onglet: ONGLET, horloge: Date.now(), visible: o.visible, quitter: o.quitter
     }).then(function (liste) {
-      if (liste === null) {                 // migration pas passée : on n'insiste pas
-        presenceCoupee = true;
-        arretePresence();
-        enLigne = null;
-      } else if (o.visible && !o.quitter) {
-        enLigne = liste;
-      }
+      if (o.visible && !o.quitter) enLigne = liste;
       dessineEnLigne();
     }).catch(function () {
       /* Réseau ou session : le dernier compte reste affiché, le prochain
@@ -1792,13 +1785,12 @@
 
     /* Le dessin attend-il le calcul ? Cochée, la part calcul doit être rendue la
        veille du jour où le dessin commence (Calc.finPart). Une tâche neuve l'est
-       d'office. N'a de sens qu'avec les deux charges ; absente tant que la base
-       ne connaît pas la colonne (migration-enchainement.sql). */
+       d'office. N'a de sens qu'avec les deux charges. */
     var entreeEnchaine = el("input", { type: "checkbox", name: "enchaine", value: "1" });
     entreeEnchaine.checked = t ? !!t.enchaine : !("enchaine" in b) || !!b.enchaine;
-    var caseEnchaine = D.enchainementEnBase() ? el("label", {
+    var caseEnchaine = el("label", {
       class: "case", title: "Décoché : calcul et dessin avancent en parallèle jusqu'à l'échéance."
-    }, [entreeEnchaine, "Le dessin commence quand le calcul est rendu"]) : null;
+    }, [entreeEnchaine, "Le dessin commence quand le calcul est rendu"]);
     function partsPortees() { return parts.filter(function (p) { return !p.input.disabled; }); }
     /** Toutes les parts qui existent sont cochées — et il en existe au moins une. */
     function partsFinies() {
@@ -1819,7 +1811,7 @@
         p.etiquette.style.opacity = porte ? "" : ".4";
       });
       var deuxParts = parts.every(function (p) { return !p.input.disabled; });
-      if (caseEnchaine) caseEnchaine.style.opacity = deuxParts ? "" : ".4";
+      caseEnchaine.style.opacity = deuxParts ? "" : ".4";
       entreeEnchaine.disabled = !deuxParts;
       // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir.
       // Sans aucune charge, il n'y a pas encore de part : rien à conclure (une tâche
@@ -1844,7 +1836,7 @@
       // Même règle que le planning : la part calcul d'une tâche enchaînée finit
       // la veille du début du dessin
       var brouillon = {
-        echeance: v.echeance, enchaine: !!caseEnchaine && entreeEnchaine.checked,
+        echeance: v.echeance, enchaine: entreeEnchaine.checked,
         chargeInge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0,
         chargeDessin: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0,
         dessinateurId: v.dessinateurId || null, statut: "a_faire",
@@ -1885,7 +1877,7 @@
             nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
             valeur: t ? t.chargeDessin : (b.chargeDessin || ""), exemple: "0"
           }),
-          caseEnchaine ? el("div", { class: "champ large" }, [caseEnchaine]) : null
+          el("div", { class: "champ large" }, [caseEnchaine])
         ])
       ]),
       el("fieldset", {}, [

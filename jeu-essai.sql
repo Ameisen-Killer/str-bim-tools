@@ -24,7 +24,6 @@
 --  réels ne sont jamais touchés. Pour le voir, le super admin le choisit dans
 --  le menu des bureaux, en haut du planning (ou « Ouvrir » dans la console).
 --  Retrait complet, bureau compris : purge-jeu-essai.sql.
---  Nécessite la migration multi-bureaux (migration-multi-bureaux.sql).
 -- ============================================================================
 
 begin;

@@ -147,9 +147,9 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=26"></script>
-<script src="/planif/assets/donnees.js?v=35"></script>
-<script src="/planif/assets/ui.js?v=54"></script>
+<script src="/planif/assets/supabase.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=36"></script>
+<script src="/planif/assets/ui.js?v=55"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
 <script>
 (function () {
@@ -179,11 +179,6 @@
     UI.chrome("console", admin ? actionsBarre() : []);
     UI.pied();
     document.querySelector(".entete").classList.add("vu");
-    if (!p.multi) {
-      return message("Migration à exécuter",
-        "La base n'est pas encore passée en multi-bureaux. Exécute migration-multi-bureaux.sql dans Supabase " +
-        "(SQL Editor > New query), après y avoir mis ton adresse, puis recharge cette page.");
-    }
     if (!p.superAdmin) return message("Accès réservé", "La console est réservée au super admin de l'outil.");
     construit();
     return Promise.all([
@@ -366,7 +361,7 @@
     if (!etat) return;
     var valeurs = {
       bureaux: etat.bureaux.length,
-      utilisateurs: migrationFaite() ? personnes().length : "!",
+      utilisateurs: personnes().length,
       droits: "",
       "mise-en-route": ""
     };
@@ -662,9 +657,7 @@
                 nb(r.taches, "tâche", "tâches") + ", " + nb(r.membres, "membre", "membres") + ".");
               return apresChangement();
             }).catch(function (e) {
-              UI.toast(e.code === "PGRST202"
-                ? "Exécute d'abord migration-demo-console.sql dans Supabase."
-                : e.message);
+              UI.toast(e.message);
               return false;
             });
           }
@@ -810,57 +803,14 @@
     });
   }
 
-  /* La base d'avant la migration ne renvoie pas les fiches de l'équipe : sans
-     ce garde-fou, la console montrerait une poignée d'accès et laisserait
-     croire que les membres ont disparu. */
-  function migrationFaite() { return !!(etat && etat.membres); }
-
-  /* Idem pour le métier séparé des statuts : tant que la base parle encore de
-     « role », la console montrerait tout le monde « à désigner » et sans aucune
-     casquette. On le dit plutôt que de le laisser croire. */
-  function statutsEnBase() {
-    return !(etat && etat.membres && etat.membres.length) || ("metier" in etat.membres[0]);
-  }
-
-
   function dessineUtilisateurs() {
     if (!etat) return;
-    if (!migrationFaite()) {
-      hotes.titreUtilisateurs.textContent = "Migration à exécuter";
-      UI.vide(hotes.utilisateurs).appendChild(el("div", { class: "al grave" }, [
-        el("span", { class: "q", text: "À faire" }),
-        el("div", {}, [
-          el("b", { text: "Les utilisateurs de l'équipe ne sont pas encore ici." }),
-          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
-            "La base tient encore les membres et les accès dans deux listes séparées. Exécute ",
-            el("code", { text: "migration-console-membres.sql" }),
-            " dans Supabase (SQL Editor > New query), après y avoir remplacé le domaine d'exemple en tête du fichier, puis recharge cette page."
-          ]),
-          el("p", { class: "aide", style: "margin-top:10px;font-size:13.5px;color:var(--texte-faible)", text:
-            "Elle donne à chaque membre actif son adresse et un accès suspendu : aucun courriel ne part, tu ouvres les accès un par un ensuite." })
-        ])
-      ]));
-      return;
-    }
     suivi.debut();
     var liste = selection(), mots = barre ? barre.termes() : [];
     var total = personnes().length;
     hotes.titreUtilisateurs.textContent = nb(total, "utilisateur", "utilisateurs");
     if (barre) barre.compte(liste.length, selection(true).length);
     UI.vide(hotes.utilisateurs);
-    if (!statutsEnBase()) {
-      hotes.utilisateurs.appendChild(el("div", { class: "al grave" }, [
-        el("span", { class: "q", text: "À faire" }),
-        el("div", {}, [
-          el("b", { text: "Le métier et les statuts ne sont pas encore dans la base." }),
-          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
-            "La base tient encore un rôle unique, qui mélange le métier et la place dans la société. Exécute ",
-            el("code", { text: "migration-roles-statuts.sql" }),
-            " dans Supabase (SQL Editor > New query), puis recharge cette page. En attendant, les métiers et les statuts affichés ci-dessous ne veulent rien dire."
-          ])
-        ])
-      ]));
-    }
     if (!liste.length) {
       hotes.utilisateurs.appendChild(el("div", {
         class: "vide", text: filtreBureau || mots.length ? "Aucun utilisateur pour cette recherche" : "Aucun utilisateur"
@@ -917,10 +867,6 @@
      L'interface ne fait que refléter la base : les mêmes règles y sont posées
      en RLS, une requête lancée hors de l'outil se heurte aux mêmes refus. */
 
-  function droitsEnBase() {
-    return !!(etat && etat.bureaux.length && etat.bureaux[0].droits);
-  }
-
   /** Le bureau dont on règle les droits : celui choisi, sinon le sien. */
   function bureauDesDroits() {
     if (!etat || !etat.bureaux.length) return null;
@@ -966,23 +912,9 @@
     UI.vide(hotes.droits);
     hotes.titreDroits.textContent = "Ce que chaque groupe peut faire";
 
-    if (!migrationFaite() || !statutsEnBase() || !droitsEnBase()) {
+    if (!etat.bureaux.length) {
       hotes.filtreDroits.hidden = true;
-      hotes.droits.appendChild(el("div", { class: "al grave" }, [
-        el("span", { class: "q", text: "À faire" }),
-        el("div", {}, [
-          el("b", { text: "Les droits ne sont pas encore dans la base." }),
-          el("p", { style: "margin-top:8px;color:var(--texte-doux);font-size:15px;max-width:52em" }, [
-            "Exécute dans Supabase (SQL Editor > New query), dans cet ordre : ",
-            el("code", { text: "migration-roles-statuts.sql" }),
-            ", puis coche les statuts de chacun dans « Utilisateurs », puis ",
-            el("code", { text: "migration-droits-groupes.sql" }),
-            ". Recharge ensuite cette page."
-          ]),
-          el("p", { class: "aide", style: "margin-top:10px;font-size:13.5px;color:var(--texte-faible)", text:
-            "Tant que la dernière n'est pas passée, chacun peut tout faire dans son bureau, comme aujourd'hui." })
-        ])
-      ]));
+      hotes.droits.appendChild(el("div", { class: "vide", text: "Aucun bureau : crée d'abord un bureau." }));
       return;
     }
 
@@ -1061,13 +993,6 @@
 
   /** Enregistre la personne avec un champ changé. */
   function enregistreVite(p, modif, message, annule) {
-    /* Tant que la base parle de « role », cette console n'a pas de métier à lui
-       donner : l'enregistrer effacerait le rôle de la personne. On refuse. */
-    if (!statutsEnBase()) {
-      UI.toast("Exécute d'abord migration-roles-statuts.sql dans Supabase.");
-      annule();
-      return Promise.resolve();
-    }
     var donnees = {
       id: p.id, bureauId: p.bureauId, prenom: p.prenom, nom: p.nom,
       metier: p.metier, statuts: p.statuts || [],
@@ -1209,8 +1134,6 @@
 
   function formulaireUtilisateur(p) {
     var nouveau = !p;
-    if (!migrationFaite()) return UI.toast("Exécute d'abord migration-console-membres.sql dans Supabase.");
-    if (!statutsEnBase()) return UI.toast("Exécute d'abord migration-roles-statuts.sql dans Supabase.");
     if (!etat || !etat.bureaux.length) return UI.toast("Crée d'abord un bureau.");
     var prof = D.profil();
     var bureauInit = p ? p.bureauId
@@ -1496,47 +1419,10 @@
     var confirmation = auth ? (auth.mailer_autoconfirm ? "manque" : "fait") : "verifier";
 
     UI.vide(hotes.miseEnRoute).appendChild(el("div", { class: "alertes" }, [
-      point("fait", "Base multi-bureaux.", ["migration-multi-bureaux.sql est exécutée : cette page s'affiche."]),
-      point("verifier", "Annuaire des contacts.", [
-        "La page Annuaire tient le carnet d'adresses du bureau : clients, architectes, entreprises. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-annuaire.sql" }),
-        " (dépôt). Sans elle, la page s'affiche mais reste vide et n'enregistre rien."
-      ]),
-      point("verifier", "Passer la main sur une tâche.", [
-        "Sans le droit « créer des tâches pour les autres », chacun peut confier sa part à un collègue du même métier. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-passer-la-main.sql" }),
-        " (dépôt). Sans elle, la base refuse le geste."
-      ]),
-      point("verifier", "Qui est en ligne.", [
-        "La barre du haut annonce le nombre de personnes qui ont l'outil sous les yeux, et leurs noms au survol. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-presence.sql" }),
-        " (dépôt ; à relancer si la première version est passée). Sans elle, le compteur ne s'affiche pas et le reste fonctionne."
-      ]),
-      point("verifier", "Mises à jour en direct.", [
-        "Quand un collègue enregistre, les pages ouvertes se mettent à jour d'elles-mêmes. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-temps-reel.sql" }),
-        " (dépôt). Sans elle, l'outil relit la base toutes les minutes. La bulle du compteur « en ligne » dit si le direct est actif."
-      ]),
-      point("verifier", "Le dessin attend le calcul.", [
-        "Une tâche enchaînée fait rendre le calcul la veille du jour où le dessin commence. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-enchainement.sql" }),
-        " (dépôt). Sans elle, la case n'apparaît pas dans le formulaire et calcul et dessin restent en parallèle."
-      ]),
-      point("verifier", "Phase des affaires.", [
-        "Chaque affaire peut porter sa phase SIA 112 (avant-projet, projet de l'ouvrage, exécution…). ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-phase-affaires.sql" }),
-        " (dépôt). Sans elle, le champ n'apparaît pas dans la fiche affaire."
-      ]),
-      point("verifier", "Adresse des affaires.", [
-        "L'adresse du chantier, avec son bouton Google Maps dans la liste des affaires. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-adresse-affaires.sql" }),
-        " (dépôt). Sans elle, le champ n'apparaît pas dans la fiche affaire."
-      ]),
-      point("verifier", "Exports Kairnial (page Visas).", [
-        "Les exports « Tableau de suivi » déposés dans la page Visas sont gardés avec l'heure du dépôt, et chacun du bureau peut les rouvrir ; ",
-        "les plans cochés « Traité » dans la liste sont partagés par le bureau. ",
-        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "migration-visas.sql" }),
-        " (dépôt), à relancer si les coches « Traité » manquent. Sans elle, la page analyse l'export qu'on y glisse, sans le garder."
+      point("fait", "Base de données.", [
+        "Cette page s'affiche : la base est en place. Pour une base neuve, ",
+        lien("/sql", "SQL Editor"), " : exécuter ", el("code", { text: "base-supabase.sql" }),
+        " (dépôt), qui installe tout d'un coup — tables, règles, fonctions, mises à jour en direct et stockage des exports Visas."
       ]),
       point("verifier", "Serveur d'envoi (SMTP).", [
         "Sans lui, Supabase ne livre ses courriels qu'aux membres de ton équipe Supabase, 2 par heure. ",

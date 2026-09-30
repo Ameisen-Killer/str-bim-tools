@@ -60,12 +60,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=26"></script>
-<script src="/planif/assets/donnees.js?v=35"></script>
+<script src="/planif/assets/supabase.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=36"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=54"></script>
+<script src="/planif/assets/ui.js?v=55"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
-<script src="/planif/assets/direct.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=2"></script>
 <script>
 /* Carte des affaires (28.09.2026)
    ---------------------------------------------------------------------------
@@ -413,9 +413,6 @@
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    if (!D.adresseEnBase()) {
-      etat.textContent = "Exécute migration-adresse-affaires.sql dans Supabase : les affaires n'ont pas encore d'adresse.";
-    }
     document.getElementById("voir-terminees").addEventListener("change", rend);
     D.surRechargement(function () { positions = {}; rend(); });
     rend();

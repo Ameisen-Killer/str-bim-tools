@@ -1,15 +1,14 @@
 # Planification : réglages Supabase à faire une fois
 
-Ces réglages accompagnent `migration-multi-bureaux.sql`, dans l'ordre ci-dessous.
+Ces réglages accompagnent l'installation de la base (`base-supabase.sql`), dans l'ordre ci-dessous.
 Tout se fait dans le tableau de bord Supabase du projet (Authentication).
 Ce fichier est public : il ne contient aucune adresse réelle ni aucun mot de passe.
 
-## 1. Exécuter la migration
+## 1. Installer la base
 
-SQL Editor > New query > coller `migration-multi-bureaux.sql`, remplacer l'adresse d'exemple
+SQL Editor > New query > coller `base-supabase.sql`, remplacer l'adresse d'exemple
 de la ligne `set_config('planif.super_admin', …)` par ton adresse de connexion, Run.
-Le tableau affiché à la fin doit montrer 1 bureau, tes accès, ton adresse en super admin, et 0 ligne sans bureau.
-Le planning continue de fonctionner ; la console apparaît dans le menu (entrée « Console »).
+La console apparaît ensuite dans le menu (entrée « Console »).
 
 ## 2. Activer la garde des comptes
 

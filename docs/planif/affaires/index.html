@@ -52,12 +52,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=26"></script>
-<script src="/planif/assets/donnees.js?v=35"></script>
+<script src="/planif/assets/supabase.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=36"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=54"></script>
+<script src="/planif/assets/ui.js?v=55"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
-<script src="/planif/assets/direct.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -249,16 +249,16 @@
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042" }),
-        // Phase SIA 112 : absente tant que la base ne connaît pas la colonne (migration-phase-affaires.sql)
-        D.phaseEnBase() ? UI.champ({
+        // Phase SIA 112
+        UI.champ({
           nom: "phase", label: "Phase SIA", type: "select", valeur: a && a.phase ? a.phase : "",
           options: [{ valeur: "", label: "— Non renseignée —" }]
             .concat(a && a.phase && !D.PHASES[a.phase] ? [{ valeur: a.phase, label: a.phase }] : [])
             .concat(D.ORDRE_PHASES.map(function (p) { return { valeur: p, label: D.libellePhase(p) }; }))
-        }) : null,
+        }),
         UI.champ({ nom: "nom", label: "Libellé", valeur: a ? a.nom : "", exemple: "Immeuble de logements — gros œuvre", large: true }),
-        // Un seul champ, tel qu'on le taperait dans Google Maps (absent tant que la migration n'est pas passée)
-        D.adresseEnBase() ? UI.champ({ nom: "adresse", label: "Adresse", valeur: a ? a.adresse : "", exemple: "Rue du Lac 12, 1201 Genève", large: true }) : null,
+        // Un seul champ, tel qu'on le taperait dans Google Maps
+        UI.champ({ nom: "adresse", label: "Adresse", valeur: a ? a.adresse : "", exemple: "Rue du Lac 12, 1201 Genève", large: true }),
         UI.champ({
           nom: "statut", label: "Statut", type: "select", valeur: a ? a.statut : "active",
           options: Object.keys(D.STATUTS_AFFAIRE).map(function (k) { return { valeur: k, label: D.STATUTS_AFFAIRE[k] }; })

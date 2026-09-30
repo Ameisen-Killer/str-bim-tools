@@ -3,7 +3,9 @@
 -- ----------------------------------------------------------------------------
 --  Installation neuve, en une fois, dans le projet Supabase :
 --    Dashboard > SQL Editor > New query > coller ce fichier > Run.
---  Une base déjà en service se met à jour par les fichiers migration-*.sql.
+--  Une base déjà en service reçoit les évolutions par un fichier
+--  migration-<sujet>.sql, retiré du dépôt une fois passé (l'historique Git le
+--  garde). Ce fichier-ci reste la référence : tenir les deux alignés.
 --
 --  AVANT D'EXÉCUTER : remplacer l'adresse d'exemple de la ligne « super admin »
 --  par celle du compte qui administrera l'outil. Ne pas l'enregistrer dans le
@@ -378,7 +380,7 @@ comment on column public.contacts.npa is
 -- ------------------------------------------------------- exports Kairnial ---
 -- Page Visas : les exports « Tableau de suivi » de la GED Kairnial déposés par
 -- l'équipe. Le fichier est dans le seau privé « visas » (Storage), rangé sous
--- <bureau>/<export>.xlsx ; cette table le décrit. Voir migration-visas.sql.
+-- <bureau>/<export>.xlsx ; cette table le décrit.
 create table if not exists public.exports_visas (
   id          uuid primary key default gen_random_uuid(),
   bureau_id   uuid not null default public.bureau_par_defaut()
@@ -1440,7 +1442,7 @@ grant usage on schema public to supabase_auth_admin;
 grant execute on function public.garde_creation_compte(jsonb) to supabase_auth_admin;
 
 -- ================================================ démo : réinitialisation ===
--- Bouton « Réinitialiser la démo » de la console (voir migration-demo-console.sql).
+-- Bouton « Réinitialiser la démo » de la console.
 -- ------------------------------------------------ remplissage du jeu de démo --
 -- Interne : appelée par console_reinitialise_demo, jamais par l'API.
 -- bureau_id est donné partout : la valeur par défaut suivrait le bureau

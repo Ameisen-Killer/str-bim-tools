@@ -275,14 +275,9 @@
   }
 
   /* Profil de la personne connectée : bureau, droits, succursales et
-     disciplines du bureau. Tant que la migration multi-bureaux n'a pas été
-     exécutée, la fonction n'existe pas (PGRST202) : null, et l'outil garde
-     son fonctionnement d'avant. */
+     disciplines du bureau. */
   function profil() {
-    return rpc("mon_profil").catch(function (e) {
-      if (e.code === "PGRST202") return null;
-      throw e;
-    });
+    return rpc("mon_profil");
   }
 
   /* Qui a l'outil sous les yeux en ce moment, dans le bureau affiché.
@@ -292,10 +287,7 @@
        o.horloge  heure de l'onglet : la base ignore un message plus ancien que
                   le dernier retenu (messages d'une même fenêtre en désordre)
        o.visible  sous les yeux (battement) ou passé derrière
-       o.quitter  déconnexion : tous les onglets de l'adresse s'effacent
-     Tant que migration-presence.sql (version par onglet) n'a pas été exécutée,
-     la fonction n'existe pas sous cette forme (PGRST202) : null, et la barre du
-     haut se passe du compteur — une migration en retard ne casse rien. */
+       o.quitter  déconnexion : tous les onglets de l'adresse s'effacent */
   function presence(o) {
     var partir = !o.visible || !!o.quitter;
     return rpc("presence", {
@@ -303,9 +295,6 @@
       p_visible: !!o.visible, p_quitter: !!o.quitter
     }, { garde: partir }).then(function (r) {
       return (r && r.enLigne) || [];
-    }).catch(function (e) {
-      if (e.code === "PGRST202" || e.code === "42883") return null;
-      throw e;
     });
   }
 
@@ -391,7 +380,7 @@
       .then(function () { return requete("membres?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" }); })
       .then(function () {
         // L'annuaire ne pend à rien : aucune cascade ne l'emporte
-        if (annuaireEnBase) return requete("contacts?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" });
+        return requete("contacts?id=not.is.null", { methode: "DELETE", prefer: "return=minimal" });
       })
       .then(function () {});
   }
@@ -400,84 +389,20 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* Les colonnes fini_inge / fini_dessin sont arrivées après coup (parts de
-     tâche terminées séparément). Tant que la migration n'a pas été passée dans
-     Supabase, les envoyer ferait refuser toute écriture de tâche : la lecture
-     dit si la base les connaît. À simplifier une fois la migration en place. */
-  var partsEnBase = true;
-
-  /* Idem pour « enchaine » (le dessin attend le calcul), arrivée le 28.09.2026 :
-     migration-enchainement.sql. À simplifier une fois la migration en place. */
-  var enchaineEnBase = true;
-
-  /* Idem pour la phase des affaires (28.09.2026) : migration-phase-affaires.sql.
-     À simplifier une fois la migration en place. */
-  var phaseEnBase = true;
-  /* Idem pour l'adresse des affaires : migration-adresse-affaires.sql. */
-  var adresseEnBase = true;
-
-  /* Idem pour metier / statuts, arrivés quand le rôle unique s'est scindé en
-     métier et statuts cumulables : tant que migration-roles-statuts.sql n'est
-     pas passée, la base ne connaît que « role ». La lecture le dit.
-     À simplifier une fois la migration en place. */
-  var metiersEnBase = true;
-
-  /* L'annuaire est arrivé après coup, et sa migration se lance à la main :
-     tant que la table manque, PostgREST répond « table inconnue » (PGRST205,
-     ou 42P01 sur les versions plus anciennes). Faire échouer toute la lecture
-     pour cela priverait l'équipe de l'outil entier ; l'annuaire se montre donc
-     vide, en annonçant la migration, et le reste fonctionne.
-     À simplifier une fois la migration passée partout. */
-  var annuaireEnBase = true;
-
-  function tableAbsente(e) {
-    return e && (e.code === "PGRST205" || e.code === "PGRST202" || e.code === "42P01");
-  }
-
-  /* L'adresse postale, puis le site web, sont arrivés après l'annuaire : une
-     base où la migration a été passée trop tôt a la table sans ses colonnes.
-     On regarde la dernière venue, « site » : l'avoir, c'est les avoir toutes.
-     Une fiche lue le dit ; sur un annuaire encore vide, personne ne peut le
-     dire, alors on demande la colonne à la base — une requête, et seulement
-     dans ce cas.
-     Tant qu'elle manque, l'annuaire attend la migration comme si la table
-     n'existait pas : mieux vaut un annuaire annoncé indisponible qu'une adresse
-     saisie qui ne s'enregistre pas. */
-  function litAnnuaire() {
-    return litTout("contacts", "id").then(function (lignes) {
-      if (lignes.length) {
-        if (!("site" in lignes[0])) annuaireEnBase = false;
-        return lignes;
-      }
-      return requete("contacts?select=site&limit=1")
-        .then(function () { return lignes; })
-        .catch(function (e) {
-          if (e.code !== "42703") throw e;      // colonne inconnue
-          annuaireEnBase = false;
-          return lignes;
-        });
-    }).catch(function (e) {
-      if (!tableAbsente(e)) throw e;
-      annuaireEnBase = false;
-      return [];
-    });
-  }
-
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
                 succursale: vide(m.succursale), discipline: vide(m.discipline),
                 capacite: m.capacite, actif: m.actif };
-      if (metiersEnBase) { o.metier = vide(m.metier); o.statuts = m.statuts || []; }
-      else o.role = vide(m.metier);
+      o.metier = vide(m.metier); o.statuts = m.statuts || [];
       o.jours = m.jours || null;
       return o;
     },
     affaires: function (a) {
       var o = { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
-      if (phaseEnBase) o.phase = a.phase || null;
-      if (adresseEnBase) o.adresse = a.adresse || "";
+      o.phase = a.phase || null;
+      o.adresse = a.adresse || "";
       return o;
     },
     taches: function (t) {
@@ -486,8 +411,8 @@
                 debut: vide(t.debut), echeance: t.echeance,
                 ingenieur_id: vide(t.ingenieurId), dessinateur_id: vide(t.dessinateurId),
                 statut: t.statut, avancement: t.avancement };
-      if (partsEnBase) { o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true; }
-      if (enchaineEnBase) o.enchaine = t.enchaine === true;
+      o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true;
+      o.enchaine = t.enchaine === true;
       return o;
     },
     contacts: function (c) {
@@ -508,31 +433,14 @@
       litTout("affaire_membres", "affaire_id,membre_id"),
       litTout("taches", "id"),
       litTout("reglages", "id"),
-      litAnnuaire()
+      litTout("contacts", "id")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
           contacts = r[6] || [];
 
-      // La base connaît-elle déjà les parts terminées ? (colonnes fini_inge / fini_dessin)
-      partsEnBase = !taches.length || ("fini_inge" in taches[0]);
-      // … et l'enchaînement calcul → dessin ? (colonne enchaine)
-      enchaineEnBase = !taches.length || ("enchaine" in taches[0]);
-      // … et la phase des affaires ? (colonne phase)
-      phaseEnBase = !affaires.length || ("phase" in affaires[0]);
-      adresseEnBase = !affaires.length || ("adresse" in affaires[0]);
-      // … et le métier séparé des statuts ? (migration-roles-statuts.sql)
-      metiersEnBase = !membres.length || ("metier" in membres[0]);
-
-      // Avant la migration, « administrateur » était un rôle, planifié du côté ingénieur
-      function metierDe(m) {
-        var v = metiersEnBase ? m.metier : m.role;
-        return v === "administrateur" ? "ingenieur" : (v || "");
-      }
-      function statutsDe(m) {
-        if (!metiersEnBase) return m.role === "administrateur" ? ["administrateur"] : [];
-        return Array.isArray(m.statuts) ? m.statuts : [];
-      }
+      function metierDe(m) { return m.metier || ""; }
+      function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
 
       // Côté de chacun dans l'équipe d'une affaire
       var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
@@ -729,16 +637,13 @@
 
     if (dAffaires.retraits.length) suite = suite.then(function () { return effaceLot("affaires", dAffaires.retraits); });
     if (dMembres.retraits.length) suite = suite.then(function () { return effaceLot("membres", dMembres.retraits); });
-    // Tant que la migration de l'annuaire n'est pas passée, rien ne part vers une table qui n'existe pas
-    if (annuaireEnBase && dContacts.retraits.length) {
-      suite = suite.then(function () { return effaceLot("contacts", dContacts.retraits); });
-    }
+    if (dContacts.retraits.length) suite = suite.then(function () { return effaceLot("contacts", dContacts.retraits); });
 
     suite = suite.then(function () { return appliqueTable("membres", dMembres); });
     suite = suite.then(function () { return appliqueTable("affaires", dAffaires); });
     suite = suite.then(function () { return appliqueTable("taches", dTaches); });
     suite = suite.then(function () { return appliqueTable("absences", dAbsences); });
-    if (annuaireEnBase) suite = suite.then(function () { return appliqueTable("contacts", dContacts); });
+    suite = suite.then(function () { return appliqueTable("contacts", dContacts); });
     if (liensNeufs.length) suite = suite.then(function () { return insere("affaire_membres", liensNeufs); });
 
     var rAv = av.reglages || {}, rAp = etat.reglages;
@@ -756,10 +661,8 @@
   /* ---------------------------------------------- exports Kairnial (Visas)
      La page Visas garde les exports « Tableau de suivi » de Kairnial : le fichier
      va dans le seau privé « visas » de Supabase Storage, sous <bureau>/<id>.xlsx,
-     et une ligne de exports_visas le décrit (migration-visas.sql). L'heure du
-     dépôt et l'adresse de la personne sont posées par la base.
-     Tant que la migration n'est pas passée, la table manque : disponible()
-     répond non, et la page se contente d'analyser le fichier glissé. */
+     et une ligne de exports_visas le décrit. L'heure du dépôt et l'adresse de
+     la personne sont posées par la base. */
   var SEAU_VISAS = "visas";
   var TYPE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -775,8 +678,7 @@
         var j = {};
         try { j = txt ? JSON.parse(txt) : {}; } catch (e) { j = {}; }
         var brut = String(j.message || j.error || "");
-        var m = /bucket not found/i.test(brut) ? "Le stockage des exports n'est pas installé : exécute migration-visas.sql dans Supabase."
-          : /not.?found/i.test(brut) || r.status === 404 ? "Fichier introuvable dans le stockage : il a peut-être été retiré par un collègue."
+        var m = /not.?found/i.test(brut) || r.status === 404 ? "Fichier introuvable dans le stockage : il a peut-être été retiré par un collègue."
           : /row-level security|unauthorized|forbidden/i.test(brut) || r.status === 401 || r.status === 403 ? "Stockage refusé : ton accès ne permet pas cette opération sur les exports de ce bureau."
           : /payload too large|maximum allowed size|exceeded/i.test(brut) || r.status === 413 ? "Fichier trop lourd : 25 Mo au plus."
           : /mime/i.test(brut) ? "Seuls les classeurs Excel (.xlsx) peuvent être déposés."
@@ -800,12 +702,7 @@
   }
 
   var EXPORTS_VISAS = {
-    disponible: function () {
-      return requete("exports_visas?select=id&limit=1").then(function () { return true; }, function (e) {
-        if (tableAbsente(e)) return false;
-        throw e;
-      });
-    },
+    disponible: function () { return Promise.resolve(true); },
     liste: function () {
       return requete("exports_visas?select=*&order=depose_le.desc").then(function (l) { return (l || []).map(versExport); });
     },
@@ -836,19 +733,14 @@
     }
   };
 
-  /* Plans cochés « Traité » dans la liste de la page Visas (table visas_traites,
-     migration-visas.sql) : une ligne par numéro de plan et indice. Cocher un plan
+  /* Plans cochés « Traité » dans la liste de la page Visas (table
+     visas_traites) : une ligne par numéro de plan et indice. Cocher un plan
      qu'un collègue vient de cocher ne change rien : la première coche reste. */
   function versTraite(l) {
     return { code: l.code, indice: +l.indice || 0, traiteLe: l.traite_le, traitePar: l.traite_par || "", traiteNom: l.traite_nom || "" };
   }
   var TRAITES = {
-    disponible: function () {
-      return requete("visas_traites?select=code&limit=1").then(function () { return true; }, function (e) {
-        if (tableAbsente(e)) return false;
-        throw e;
-      });
-    },
+    disponible: function () { return Promise.resolve(true); },
     liste: function () {
       return litTout("visas_traites", "traite_le.desc").then(function (l) { return (l || []).map(versTraite); });
     },
@@ -891,10 +783,6 @@
       ecrire: ecrire,
       videTout: videTout,
       profil: profil,
-      annuaireEnBase: function () { return annuaireEnBase; },
-      enchainementEnBase: function () { return enchaineEnBase; },
-      phaseEnBase: function () { return phaseEnBase; },
-      adresseEnBase: function () { return adresseEnBase; },
       regleJours: regleJours,
       exportsVisas: EXPORTS_VISAS,
       visasTraites: TRAITES

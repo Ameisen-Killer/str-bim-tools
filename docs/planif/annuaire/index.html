@@ -27,7 +27,6 @@
   </div>
 
   <div class="wrap" data-bandeau></div>
-  <div class="wrap" data-migration></div>
 
   <div class="wrap">
     <section class="section">
@@ -44,12 +43,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=26"></script>
-<script src="/planif/assets/donnees.js?v=35"></script>
+<script src="/planif/assets/supabase.js?v=27"></script>
+<script src="/planif/assets/donnees.js?v=36"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=54"></script>
+<script src="/planif/assets/ui.js?v=55"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
-<script src="/planif/assets/direct.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -61,10 +60,7 @@
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    var pret = D.annuaireEnBase();
-    UI.chrome("annuaire", pret
-      ? [{ label: "Nouvelle fiche", or: true, icone: "ico-ajout-contact", action: function () { formulaire(null); } }]
-      : []);
+    UI.chrome("annuaire", [{ label: "Nouvelle fiche", or: true, icone: "ico-ajout-contact", action: function () { formulaire(null); } }]);
     UI.pied();
     // Collé sous la barre, le bloc de recherche se resserre (planif.css)
     UI.colleSousBarre(document.querySelector(".tete-collante"));
@@ -74,20 +70,6 @@
     /* « Nouvelle fiche » ne paraît qu'une fois, dans la barre du haut (et en
        bouton flottant au téléphone) : le doublon en tête de section faisait
        deux boutons identiques à un écran d'intervalle. */
-
-    /* La table de l'annuaire s'installe par une migration lancée à la main :
-       tant qu'elle manque, mieux vaut le dire que d'afficher un carnet vide. */
-    if (!pret) {
-      document.querySelector("[data-migration]").appendChild(el("div", { class: "bandeau" }, [
-        el("span", { class: "losange", "aria-hidden": "true" }),
-        el("div", {}, [
-          el("strong", { text: "Annuaire pas encore installé. " }),
-          "La base n'a pas encore la table des fiches, ou pas ses colonnes d'adresse. Exécute ",
-          el("code", { text: "migration-annuaire.sql" }),
-          " dans Supabase (SQL Editor) — relance-la si elle est déjà passée, elle ajoute l'adresse postale —, puis recharge cette page."
-        ])
-      ]));
-    }
 
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -177,7 +159,7 @@
     if (!contacts.length) {
       var q = barre ? barre.valeur().trim() : "";
       if (!q) {
-        hote.appendChild(el("div", { class: "vide", text: D.annuaireEnBase() ? "Aucune fiche — commence par en créer une" : "Annuaire indisponible" }));
+        hote.appendChild(el("div", { class: "vide", text: "Aucune fiche — commence par en créer une" }));
         return;
       }
       hote.appendChild(el("div", { class: "sans-resultat" }, [
