@@ -414,6 +414,10 @@
         el("td", { class: "num", text: String(b.taches) }),
         el("td", { class: "num", text: b.activite ? quand(b.activite) : "—" }),
         el("td", { class: "actions" }, [
+          b.nom === BUREAU_DEMO ? el("button", {
+            class: "btn", type: "button", title: "Remettre le jeu de démonstration après le passage des testeurs",
+            onclick: function () { reinitialiseDemo(b); }
+          }, ["Réinitialiser la démo"]) : null,
           el("button", { class: "btn", type: "button", title: "Afficher ce bureau dans le planning", onclick: function () { ouvreBureau(b); } }, ["Ouvrir"]),
           UI.boutonIcone("modifier", "Modifier", b.nom, function () { formulaireBureau(b); }),
           UI.boutonIcone("supprimer", "Supprimer", b.nom, function () { supprimeBureau(b); })
@@ -626,6 +630,42 @@
               UI.toast(nouveau ? "Bureau « " + donnees.nom + " » créé." : "Bureau enregistré.");
               return apresChangement();
             }).catch(function (e) { UI.toast(e.message); return false; });
+          }
+        }
+      ]
+    });
+  }
+
+  /* Démonstration : le compte « demo » entre dans ce bureau (compte-demo.sql).
+     Les testeurs y font ce qu'ils veulent ; un clic remet le jeu de départ. */
+  var BUREAU_DEMO = "Bureau de test";
+
+  function reinitialiseDemo(b) {
+    UI.ouvre({
+      surtitre: "Réinitialiser la démo",
+      titre: b.nom,
+      corps: el("p", {
+        style: "color:var(--texte-doux);font-size:15px;max-width:46em",
+        text: "Toutes les affaires, tâches, absences et fiches d'annuaire du bureau sont effacées, " +
+          "puis le jeu de démonstration est rechargé, dates recalées sur la semaine en cours. " +
+          "Les fiches ajoutées à la main, les accès et les réglages du bureau restent. " +
+          "Les testeurs connectés voient leur page se mettre à jour."
+      }),
+      compacte: true,
+      boutons: [
+        { label: "Annuler" },
+        {
+          label: "Réinitialiser", rouge: true, action: function () {
+            return SB.rpc("console_reinitialise_demo").then(function (r) {
+              UI.toast("Démo réinitialisée : " + nb(r.affaires, "affaire", "affaires") + ", " +
+                nb(r.taches, "tâche", "tâches") + ", " + nb(r.membres, "membre", "membres") + ".");
+              return apresChangement();
+            }).catch(function (e) {
+              UI.toast(e.code === "PGRST202"
+                ? "Exécute d'abord migration-demo-console.sql dans Supabase."
+                : e.message);
+              return false;
+            });
           }
         }
       ]

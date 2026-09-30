@@ -31,6 +31,11 @@
 --  [démo]. Retrait : purge-jeu-demo.sql (le bureau et ses réglages restent).
 --  Nécessite les migrations des adresses et des phases d'affaire, et celle de
 --  l'enchaînement des tâches.
+--
+--  Plus simple : la console (Bureaux, ligne « Bureau de test », « Réinitialiser
+--  la démo ») fait purge et rechargement d'un clic, après
+--  migration-demo-console.sql. Elle porte une copie de ces données (fonction
+--  remplit_demo) : retoucher l'un, c'est retoucher l'autre.
 -- ============================================================================
 
 begin;
