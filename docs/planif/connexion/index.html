@@ -76,6 +76,7 @@
 
     <div class="cx-bas">
       <button type="button" id="oubli">Mot de passe oublié ou première connexion</button>
+      <button type="button" id="demo">Essayer la démo</button>
       <a href="/">str-bim-tools.com</a>
     </div>
   </div>
@@ -106,6 +107,7 @@
   var mdp = document.getElementById("mdp");
   var valider = document.getElementById("valider");
   var oubli = document.getElementById("oubli");
+  var demo = document.getElementById("demo");
   var boiteMsg = document.getElementById("message");
   var titre = document.getElementById("titre");
   var labelMdp = document.getElementById("label-mdp");
@@ -150,6 +152,7 @@
     email.readOnly = nouveau;
     email.parentNode.hidden = nouveau && !email.value;
     oubli.hidden = nouveau;
+    demo.hidden = nouveau;
     mdp.value = "";
   }
 
@@ -158,6 +161,7 @@
     dis("Aucune base n'est configurée : l'outil fonctionne en mode local, sans connexion.");
     valider.disabled = true;
     oubli.disabled = true;
+    demo.disabled = true;
   }
 
   /* --- retour d'un lien reçu par courriel ---
@@ -205,6 +209,15 @@
         : err.reseau || /patiente|limite|trop de tentatives/i.test(m) ? m
         : "Envoi impossible pour l'instant : réessaie dans quelques minutes.");
     }).then(function () { oubli.disabled = false; });
+  });
+
+  /* --- démonstration : entre d'un clic dans le Bureau de test (compte-demo.sql) --- */
+  demo.addEventListener("click", function () {
+    dis("");
+    demo.disabled = true;
+    window.Sb.connexion(adresseDe("demo"), "demo")
+      .then(function () { location.replace("/planif/"); })
+      .catch(function (err) { demo.disabled = false; dis(err.message); });
   });
 
   form.addEventListener("submit", function (e) {
