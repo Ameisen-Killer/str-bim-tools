@@ -2097,12 +2097,6 @@
     });
   }
 
-  /** Rendu animé : photo, rendu, puis l'écart. */
-  function animeRendu(hote, rendu, o) {
-    var avant = photo(hote);
-    rendu();
-    joue(hote, avant, o);
-  }
 
   /* Pendant la frappe d'une recherche, rien ne glisse : la liste change à
      chaque lettre, et des lignes en mouvement se lisent mal. */
@@ -2236,6 +2230,6 @@
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions,
-    photo: photo, joue: joue, animeRendu: animeRendu, enFrappe: enFrappe, defileTexte: defileTexte
+    photo: photo, joue: joue, enFrappe: enFrappe, defileTexte: defileTexte
   };
 })(window);

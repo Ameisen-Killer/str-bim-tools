@@ -140,7 +140,6 @@
       aide: "Et régler leurs jours travaillés. Sans ce droit, chacun ne gère que ses propres absences et ses propres jours."
     }
   };
-  function libelleDroit(d) { return (DROITS[d] || {}).titre || d; }
 
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
   function statutsDe(m) {
@@ -690,37 +689,6 @@
 
   var MSG_ANNUAIRE = "L'annuaire n'est pas encore installé dans la base : migration-annuaire.sql reste à exécuter dans Supabase — relance-la si tu l'as déjà passée, elle ajoute l'adresse postale.";
 
-  function valideMembre(o, idExistant) {
-    if (!texte(o.nom)) throw erreur("Le nom est obligatoire.");
-    if (!texte(o.prenom)) throw erreur("Le prénom est obligatoire.");
-    var mail = texte(o.email).toLowerCase();              // facultative
-    if (mail && !RE_MAIL.test(mail)) throw erreur("Cette adresse e-mail n'est pas valide.");
-    var metier = texte(o.metier);
-    if (metier && !METIERS[metier]) throw erreur("Métier inconnu.");
-    var statuts = ORDRE_STATUTS.filter(function (s) {
-      return (Array.isArray(o.statuts) ? o.statuts : []).indexOf(s) >= 0;
-    });
-    var succ = texte(o.succursale), disc = texte(o.discipline);
-    if (succ && !SUCCURSALES[succ]) throw erreur("Succursale inconnue.");
-    if (disc && !DISCIPLINES[disc]) throw erreur("Discipline inconnue.");
-    if (succ && disc && disciplinesDe(succ).indexOf(disc) < 0) {
-      throw erreur("La discipline « " + DISCIPLINES[disc] + " » n'existe pas à " + SUCCURSALES[succ] + ".");
-    }
-    var double = mail && etat.membres.some(function (m) { return m.id !== idExistant && m.email.toLowerCase() === mail; });
-    if (double) throw erreur("Un membre utilise déjà cette adresse e-mail.");
-    var cap = dixieme(nombre(o.capacite, etat.reglages.capaciteDefaut));
-    if (!(cap >= 0.5 && cap <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
-    var jours = reprisJours(o.jours);
-    if (jours && cap > sommeJours(jours) + 1e-9) {
-      throw erreur("La capacité dépasse les jours travaillés (" + global.Cal.fmtJours(sommeJours(jours)) + " j par semaine).");
-    }
-    return {
-      nom: texte(o.nom), prenom: texte(o.prenom), email: mail,
-      metier: metier, statuts: statuts,
-      succursale: succ, discipline: disc, capacite: cap, jours: jours, actif: o.actif !== false
-    };
-  }
-
   /* Une absence est une période pleine : pas de demi-journée, et pas deux
      périodes sur le même jour — sinon les jours d'absence seraient comptés
      deux fois dans le calendrier, et la capacité, elle, ne tomberait qu'une. */
@@ -772,13 +740,6 @@
       canton: texte(o.canton).toUpperCase(),
       pays: texte(o.pays), observations: texte(o.observations)
     };
-  }
-
-  /** « Rue de la Gare 12, 1003 Lausanne (VD) » — ce qui est rempli, dans l'ordre. */
-  function adressePostale(c) {
-    var ville = [texte(c.npa), texte(c.localite)].filter(Boolean).join(" ");
-    var lieu = ville + (texte(c.canton) ? (ville ? " " : "") + "(" + c.canton + ")" : "");
-    return [texte(c.adresse), lieu, texte(c.pays)].filter(Boolean).join(", ");
   }
 
   /** Une fiche se range sous son nom, ou sous sa société quand elle n'en a pas. */
@@ -857,7 +818,6 @@
     aStatut: aStatut,
     DROITS: DROITS,
     ORDRE_DROITS: ORDRE_DROITS,
-    libelleDroit: libelleDroit,
     compareMembres: compareMembres,
     parMetier: parMetier,
     SUCCURSALES: SUCCURSALES,
@@ -1038,36 +998,7 @@
       });
     },
 
-    ajouteMembre: function (o) {
-      return Promise.resolve().then(function () {
-        var v = valideMembre(o, null);
-        v.id = id(); v.absences = [];
-        etat.membres.push(v);
-        return sauve().then(function () { return v; });
-      });
-    },
-    majMembre: function (i, o) {
-      return Promise.resolve().then(function () {
-        var m = D.membre(i); if (!m) throw erreur("Membre introuvable.");
-        var v = valideMembre(o, i);
-        Object.keys(v).forEach(function (k) { m[k] = v[k]; });
-        return sauve().then(function () { return m; });
-      });
-    },
-    suppMembre: function (i) {
-      return Promise.resolve().then(function () {
-        etat.membres = etat.membres.filter(function (m) { return m.id !== i; });
-        etat.affaires.forEach(function (a) {
-          a.ingenieurs = a.ingenieurs.filter(function (x) { return x !== i; });
-          a.dessinateurs = a.dessinateurs.filter(function (x) { return x !== i; });
-        });
-        etat.taches.forEach(function (t) {
-          if (t.ingenieurId === i) t.ingenieurId = null;
-          if (t.dessinateurId === i) t.dessinateurId = null;
-        });
-        return sauve();
-      });
-    },
+
 
     /**
      * Les absences croisant une fenêtre, la plus proche d'abord :
@@ -1237,7 +1168,6 @@
       return !ADAPTATEUR.annuaireEnBase || ADAPTATEUR.annuaireEnBase();
     },
 
-    adressePostale: adressePostale,
     urlSite: urlSite,
 
     /** Fiches rangées par nom, société à défaut. Liste neuve : l'appelant peut la trier autrement. */
@@ -1346,9 +1276,7 @@
         return enFile(function () { return ADAPTATEUR.videTout(); }, instantane);
       });
     },
-    chargeDemo: function () {
-      return Promise.resolve().then(function () { etat = demo(); return sauve(); });
-    },
+
     estDemo: function () { return !!(etat && etat.reglages.demo); }
   };
 

@@ -96,12 +96,6 @@
     return iso(d);
   }
 
-  /** Nombre de jours du mois contenant la date. */
-  function nbJoursMois(s) {
-    var d = dt(s); if (!d) return 0;
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0, 12).getDate();
-  }
-
   /** Décale une date de n mois. Le quantième est ramené au dernier jour si le mois est plus court. */
   function ajouteMois(s, n) {
     var d = dt(s); if (!d) return null;
@@ -298,39 +292,16 @@
 
   function estOuvre(s, canton) { return !chome(s, canton); }
 
-  /** Nombre de jours ouvrés entre deux dates ISO incluses. */
-  function nbOuvres(a, b, canton) {
-    if (!a || !b || diff(a, b) < 0) return 0;
-    var n = 0, cur = a;
-    for (var garde = 0; garde < 4000; garde++) {
-      if (estOuvre(cur, canton)) n++;
-      if (cur === b) break;
-      cur = ajoute(cur, 1);
-    }
-    return n;
-  }
-
-  /** Recule de n jours ouvrés depuis une date (incluse si ouvrée). */
-  function reculeOuvres(fin, n, canton) {
-    var cur = fin, restant = Math.max(1, Math.ceil(n));
-    for (var garde = 0; garde < 4000; garde++) {
-      if (estOuvre(cur, canton)) restant--;
-      if (restant <= 0) return cur;
-      cur = ajoute(cur, -1);
-    }
-    return cur;
-  }
-
   global.Cal = {
     iso: iso, dt: dt, ajoute: ajoute, diff: diff, lundi: lundi,
     aujourdhui: aujourdhui, isoAuj: isoAuj, serie: serie,
     semaineISO: semaineISO, estWeekend: estWeekend, rangJour: rangJour,
-    premierMois: premierMois, nbJoursMois: nbJoursMois, ajouteMois: ajouteMois, mois: mois,
+    premierMois: premierMois, ajouteMois: ajouteMois, mois: mois,
     jourCourt: jourCourt, quantieme: quantieme,
     fmtCourt: fmtCourt, fmtLong: fmtLong, fmtCH: fmtCH, fmtJours: fmtJours,
     fmtMois: fmtMois, fmtMoisCourt: fmtMoisCourt,
     paques: paques, feries: feries, ferie: ferie, chome: chome,
-    estOuvre: estOuvre, nbOuvres: nbOuvres, reculeOuvres: reculeOuvres,
+    estOuvre: estOuvre,
     CANTONS: CANTONS, MOIS: MOIS
   };
 })(window);

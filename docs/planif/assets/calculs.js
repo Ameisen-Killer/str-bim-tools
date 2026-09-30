@@ -40,12 +40,6 @@
     return r >= 1 && r <= 5 ? joursDe(membre)[r - 1] : 0;
   }
 
-  /** Vrai si la personne ne travaille jamais ce jour de la semaine. */
-  function jourOff(membre, jour) {
-    var r = C.rangJour(jour);
-    return r >= 1 && r <= 5 && joursDe(membre)[r - 1] <= 0;
-  }
-
   /**
    * Jours que la personne aurait travaillés entre deux dates incluses : les
    * jours ouvrés du canton, au poids de sa semaine type (un mercredi off ne
@@ -450,7 +444,6 @@
     avance: avance,
     capaciteJour: capaciteJour,
     joursDe: joursDe,
-    jourOff: jourOff,
     poidsJour: poidsJour,
     joursTravaillesEntre: joursTravaillesEntre,
     absenceLe: absenceLe,
