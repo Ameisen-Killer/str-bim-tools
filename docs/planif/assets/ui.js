@@ -1261,13 +1261,13 @@
       }
       var corps = el("tbody");
       m.absences.forEach(function (a) {
-        var n = C.nbOuvres(a.debut, a.fin, D.canton());
+        var n = Calc.joursTravaillesEntre(m, a.debut, a.fin, D.canton());
         corps.appendChild(el("tr", { class: enCours && enCours.id === a.id ? "en-edition" : "" }, [
           el("td", {}, [
             el("div", { class: "principal", text: a.motif }),
             el("div", { class: "secondaire", text: C.fmtCH(a.debut) + " → " + C.fmtCH(a.fin) })
           ]),
-          el("td", { class: "num", text: n + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
+          el("td", { class: "num", text: C.fmtJours(n) + (n > 1 ? " jours ouvrés" : " jour ouvré") }),
           el("td", { class: "actions" }, [
             peutEcrire ? boutonIcone("modifier", "Modifier", a.motif, function () { edite(a); }) : null,
             peutEcrire ? boutonIcone("supprimer", "Retirer", a.motif, function () {
@@ -1856,11 +1856,11 @@
         var m = x.id ? D.membre(x.id) : null;
         var fin = Calc.finPart(brouillon, x.role === "Ingénieur" ? "ingenieur" : "dessinateur", D.canton());
         var debut = Calc.debutPour(x.charge, fin, m, D.canton());
-        var ouvres = C.nbOuvres(debut, fin, D.canton());
+        var ouvres = Calc.joursTravaillesEntre(m, debut, fin, D.canton());
         apercu.appendChild(el("div", {}, [
           el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
           el("span", { class: "or", text: C.fmtLong(debut) }),
-          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + ouvres + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") +
+          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + C.fmtJours(ouvres) + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") +
             (fin !== v.echeance ? " · rendu le " + C.fmtCourt(fin) : "") + (m ? "" : " · à affecter") })
         ]));
       });

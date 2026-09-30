@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=74">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=75">
 </head>
 <body class="large">
 
@@ -83,6 +83,8 @@
         <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
         <span id="leg-lis" hidden><i class="lis" aria-hidden="true"></i> Commence plus tôt (lissage)</span>
         <span>Fond hachuré : absence</span>
+        <span><i class="off" aria-hidden="true"></i> Jour non travaillé</span>
+        <span><i class="demi" aria-hidden="true"></i> Demi-journée</span>
       </div>
     </section>
 
@@ -101,8 +103,8 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=25"></script>
 <script src="/planif/assets/donnees.js?v=33"></script>
-<script src="/planif/assets/calculs.js?v=9"></script>
-<script src="/planif/assets/ui.js?v=51"></script>
+<script src="/planif/assets/calculs.js?v=10"></script>
+<script src="/planif/assets/ui.js?v=52"></script>
 <script src="/planif/assets/palette.js?v=5"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script src="/planif/assets/spectre.js?v=5"></script>
@@ -472,7 +474,8 @@
         var classes = [];
         if (C.chome(j, canton)) classes.push("chome");
         else if (m && Calc.absenceLe(m, j)) classes.push("abs");
-        else if (m && Calc.jourOff(m, j)) classes.push("off");     // jour où la personne ne travaille pas
+        else if (m && !Calc.poidsJour(m, j)) classes.push("off");  // jour où la personne ne travaille pas
+        else if (m && Calc.poidsJour(m, j) < 1) classes.push("demi");
         if (j === auj) classes.push("auj");
         fond.appendChild(el("i", { class: classes.join(" ") }));
       });

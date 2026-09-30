@@ -34,10 +34,33 @@
     return v;
   }
 
+  /** Poids du jour dans la semaine type : 1 plein, 0,5 demi-journée, 0 non travaillé (week-end : 0). */
+  function poidsJour(membre, jour) {
+    var r = C.rangJour(jour);
+    return r >= 1 && r <= 5 ? joursDe(membre)[r - 1] : 0;
+  }
+
   /** Vrai si la personne ne travaille jamais ce jour de la semaine. */
   function jourOff(membre, jour) {
     var r = C.rangJour(jour);
     return r >= 1 && r <= 5 && joursDe(membre)[r - 1] <= 0;
+  }
+
+  /**
+   * Jours que la personne aurait travaillés entre deux dates incluses : les
+   * jours ouvrés du canton, au poids de sa semaine type (un mercredi off ne
+   * compte pas, une demi-journée compte 0,5). Sans personne : jours ouvrés.
+   * C'est ce que coûte une absence, ce qu'offre une fenêtre de travail.
+   */
+  function joursTravaillesEntre(membre, a, b, canton) {
+    if (!a || !b || C.diff(a, b) < 0) return 0;
+    var n = 0, cur = a;
+    for (var garde = 0; garde < 4000; garde++) {
+      if (C.estOuvre(cur, canton)) n += membre ? poidsJour(membre, cur) : 1;
+      if (cur === b) break;
+      cur = C.ajoute(cur, 1);
+    }
+    return n;
   }
 
   /** Capacité d'un membre, en jours, pour une date donnée. 0 si chômé, absent ou jour non travaillé. */
@@ -428,6 +451,8 @@
     capaciteJour: capaciteJour,
     joursDe: joursDe,
     jourOff: jourOff,
+    poidsJour: poidsJour,
+    joursTravaillesEntre: joursTravaillesEntre,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
     chargeOuverte: chargeOuverte,
