@@ -125,6 +125,12 @@
 
   var OUBLI = "« Mot de passe oublié ou première connexion »";
 
+  /* Identifiant sans @ (le compte de démonstration « demo ») : c'est une
+     adresse du domaine du site, que la personne n'a pas à connaître. */
+  function adresseDe(saisie) {
+    return saisie && saisie.indexOf("@") < 0 ? saisie.toLowerCase() + "@str-bim-tools.com" : saisie;
+  }
+
   function messageLien(code, texte) {
     if (code === "otp_expired" || /expired|invalid/i.test(texte || "")) {
       return "Ce lien a expiré ou a déjà servi. Saisis ton adresse, puis " + OUBLI + " pour en recevoir un nouveau.";
@@ -223,7 +229,7 @@
     }
 
     if (mode === "connexion") {
-      window.Sb.connexion(adresse, secret)
+      window.Sb.connexion(adresseDe(adresse), secret)
         .then(function () { location.replace(retour); })
         .catch(function (err) { fini(err.message); });
       return;
