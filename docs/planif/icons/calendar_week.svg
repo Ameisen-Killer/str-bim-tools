@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- feuillet de calendrier -->
+  <rect x="5" y="9" width="38" height="33" rx="3"/>
+  <path d="M5 18h38"/>
+  <path d="M15 5v8M33 5v8"/>
+  <!-- les cinq jours de la semaine, le mercredi non travaillé -->
+  <path d="M11.5 25v10M17.75 25v10M30.25 25v10M36.5 25v10"/>
+  <path d="M22.5 30h3"/>
+</svg>

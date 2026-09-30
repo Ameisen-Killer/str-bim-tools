@@ -13,7 +13,12 @@
 --  sur ces jours, au poids de chacun, et les tâches se calent dessus.
 --
 --  Les fiches existantes gardent une semaine pleine (colonne nulle) : rien ne
---  bouge à l'écran tant qu'on ne règle pas les jours dans la console.
+--  bouge à l'écran tant qu'on ne règle pas les jours.
+--
+--  Chacun règle ses propres jours depuis l'outil (page Équipe, palette) grâce
+--  à regle_jours() ; ceux d'un collègue demandent le droit « Poser les absences
+--  des autres ». Le super admin les règle aussi depuis la console.
+--  Déjà exécutée avant l'arrivée de regle_jours() (30.09.2026) ? La relancer.
 -- ============================================================================
 
 alter table public.membres add column if not exists jours numeric(2,1)[];
@@ -283,10 +288,74 @@ begin
   return v_id;
 end $$;
 
+-- ========================================================= jours travaillés ==
+-- Chacun règle sa semaine type depuis l'outil ; celle d'un collègue demande le
+-- droit « Poser les absences des autres » (la même question : quand est-il là ?).
+-- Les membres ne s'écrivent pas depuis l'outil (règles plus haut) : cette
+-- fonction ne touche que les jours, et la capacité qui en découle.
+--   p_jours : cinq poids du lundi au vendredi (1, 0.5 ou 0), ou nul pour une
+--   semaine pleine.
+-- La capacité suit les jours quand elle les suivait déjà (4 j sur 4 jours
+-- restent 4 j sur 4 jours, 5 j passent à 4 j si l'on retire le mercredi) ;
+-- un temps partiel sans jour fixe (4 j sur 5 jours) ne monte jamais seul :
+-- elle ne fait que redescendre sous les jours travaillés. Changer de taux
+-- d'activité reste l'affaire de la console.
+-- Renvoie { jours, capacite }.
+create or replace function public.regle_jours(p_membre uuid, p_jours jsonb)
+returns jsonb
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_m      public.membres%rowtype;
+  v_jours  numeric[];
+  v_avant  numeric;
+  v_apres  numeric;
+  v_cap    numeric;
+begin
+  if not public.est_autorise() then
+    raise exception 'Accès refusé. Ton adresse est-elle bien dans la liste des accès ?';
+  end if;
+  select * into v_m from public.membres m
+   where m.id = p_membre and m.bureau_id = public.bureau_courant();
+  if not found then
+    raise exception 'Cette personne n''existe plus dans ce bureau.';
+  end if;
+  if p_membre is distinct from public.mon_membre() and not public.a_droit('absences_autrui') then
+    raise exception 'Tu ne règles que tes propres jours : ceux d''un collègue demandent le droit « Poser les absences des autres ».';
+  end if;
+
+  if jsonb_typeof(p_jours) = 'array' then
+    select array_agg(case when x.v::numeric >= 0.75 then 1 when x.v::numeric >= 0.25 then 0.5 else 0 end
+                     order by x.n)
+      into v_jours
+      from jsonb_array_elements_text(p_jours) with ordinality as x(v, n);
+    if cardinality(v_jours) <> 5 then
+      raise exception 'La semaine type compte cinq jours, du lundi au vendredi.';
+    end if;
+    if v_jours <@ array[1]::numeric[] then
+      v_jours := null;
+    elsif not v_jours && array[0.5, 1]::numeric[] then
+      raise exception 'Garde au moins un jour travaillé.';
+    end if;
+  end if;
+
+  v_avant := coalesce((select sum(x) from unnest(v_m.jours) as x), 5);
+  v_apres := coalesce((select sum(x) from unnest(v_jours) as x), 5);
+  v_cap := case when abs(v_m.capacite - v_avant) < 0.05 then v_apres
+                else least(v_m.capacite, v_apres) end;
+
+  update public.membres m
+     set jours = v_jours, capacite = round(v_cap, 1)
+   where m.id = p_membre;
+
+  return jsonb_build_object('jours', to_jsonb(v_jours), 'capacite', round(v_cap, 1));
+end $$;
+
 revoke all on function public.console_etat() from public, anon;
 grant execute on function public.console_etat() to authenticated;
 revoke all on function public.console_enregistre_personne(jsonb) from public, anon;
 grant execute on function public.console_enregistre_personne(jsonb) to authenticated;
+revoke all on function public.regle_jours(uuid, jsonb) from public, anon;
+grant execute on function public.regle_jours(uuid, jsonb) to authenticated;
 
 -- Vérification : la colonne existe (toutes les fiches en semaine pleine au premier passage)
 select count(*) as membres, count(jours) as avec_semaine_type

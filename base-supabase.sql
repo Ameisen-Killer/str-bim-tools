@@ -847,6 +847,68 @@ begin
    where x.email = lower(coalesce(auth.jwt() ->> 'email', ''));
 end $$;
 
+-- ========================================================= jours travaillés ==
+-- Chacun règle sa semaine type depuis l'outil ; celle d'un collègue demande le
+-- droit « Poser les absences des autres » (la même question : quand est-il là ?).
+-- Les membres ne s'écrivent pas depuis l'outil (règles plus haut) : cette
+-- fonction ne touche que les jours, et la capacité qui en découle.
+--   p_jours : cinq poids du lundi au vendredi (1, 0.5 ou 0), ou nul pour une
+--   semaine pleine.
+-- La capacité suit les jours quand elle les suivait déjà (4 j sur 4 jours
+-- restent 4 j sur 4 jours, 5 j passent à 4 j si l'on retire le mercredi) ;
+-- un temps partiel sans jour fixe (4 j sur 5 jours) ne monte jamais seul :
+-- elle ne fait que redescendre sous les jours travaillés. Changer de taux
+-- d'activité reste l'affaire de la console.
+-- Renvoie { jours, capacite }.
+create or replace function public.regle_jours(p_membre uuid, p_jours jsonb)
+returns jsonb
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_m      public.membres%rowtype;
+  v_jours  numeric[];
+  v_avant  numeric;
+  v_apres  numeric;
+  v_cap    numeric;
+begin
+  if not public.est_autorise() then
+    raise exception 'Accès refusé. Ton adresse est-elle bien dans la liste des accès ?';
+  end if;
+  select * into v_m from public.membres m
+   where m.id = p_membre and m.bureau_id = public.bureau_courant();
+  if not found then
+    raise exception 'Cette personne n''existe plus dans ce bureau.';
+  end if;
+  if p_membre is distinct from public.mon_membre() and not public.a_droit('absences_autrui') then
+    raise exception 'Tu ne règles que tes propres jours : ceux d''un collègue demandent le droit « Poser les absences des autres ».';
+  end if;
+
+  if jsonb_typeof(p_jours) = 'array' then
+    select array_agg(case when x.v::numeric >= 0.75 then 1 when x.v::numeric >= 0.25 then 0.5 else 0 end
+                     order by x.n)
+      into v_jours
+      from jsonb_array_elements_text(p_jours) with ordinality as x(v, n);
+    if cardinality(v_jours) <> 5 then
+      raise exception 'La semaine type compte cinq jours, du lundi au vendredi.';
+    end if;
+    if v_jours <@ array[1]::numeric[] then
+      v_jours := null;
+    elsif not v_jours && array[0.5, 1]::numeric[] then
+      raise exception 'Garde au moins un jour travaillé.';
+    end if;
+  end if;
+
+  v_avant := coalesce((select sum(x) from unnest(v_m.jours) as x), 5);
+  v_apres := coalesce((select sum(x) from unnest(v_jours) as x), 5);
+  v_cap := case when abs(v_m.capacite - v_avant) < 0.05 then v_apres
+                else least(v_m.capacite, v_apres) end;
+
+  update public.membres m
+     set jours = v_jours, capacite = round(v_cap, 1)
+   where m.id = p_membre;
+
+  return jsonb_build_object('jours', to_jsonb(v_jours), 'capacite', round(v_cap, 1));
+end $$;
+
 -- ================================================================ console ==
 -- Toutes réservées au super admin : la page de la console est publique comme
 -- le reste du site, c'est ici que se trouve la serrure.
@@ -1359,6 +1421,7 @@ begin
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
     'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
+    'public.regle_jours(uuid, jsonb)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'

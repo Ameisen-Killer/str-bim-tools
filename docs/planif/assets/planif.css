@@ -367,6 +367,10 @@ select option:checked{background:var(--option-choisie);color:var(--or)}
 .semaine button.off{background:repeating-linear-gradient(135deg,rgba(var(--encre),.06) 0 3px,transparent 3px 7px);border-color:var(--ligne);color:var(--texte-faible)}
 .semaine button.off small{color:var(--texte-faible)}
 .semaine button:hover,.semaine button:focus-visible{border-color:var(--or);outline:none}
+.semaine button[disabled]{cursor:default}
+.semaine button[disabled]:hover{border-color:rgba(var(--or-rvb),.55)}
+.semaine button.off[disabled]:hover{border-color:var(--ligne)}
+.semaine button.demi[disabled]:hover{border-color:rgba(var(--or-rvb),.4)}
 fieldset{border:0;margin:0;padding:0;min-width:0}
 .cases{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
 .case{
@@ -482,6 +486,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-ajout-bureau{--ico:url(/planif/icons/building_add.svg?v=1)}
 .ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
 .ico-carte{--ico:url(/planif/icons/map_marker.svg?v=1)}
+.ico-jours{--ico:url(/planif/icons/calendar_week.svg?v=1)}
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}

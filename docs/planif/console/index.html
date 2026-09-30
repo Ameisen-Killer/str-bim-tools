@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=73">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=74">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -147,10 +147,10 @@
 
 <script src="/planif/assets/calendrier.js?v=5"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=24"></script>
-<script src="/planif/assets/donnees.js?v=32"></script>
-<script src="/planif/assets/ui.js?v=50"></script>
-<script src="/planif/assets/palette.js?v=4"></script>
+<script src="/planif/assets/supabase.js?v=25"></script>
+<script src="/planif/assets/donnees.js?v=33"></script>
+<script src="/planif/assets/ui.js?v=51"></script>
+<script src="/planif/assets/palette.js?v=5"></script>
 <script>
 (function () {
   "use strict";
@@ -1253,32 +1253,13 @@
        puis à non travaillé. Les tâches se calent sur ces jours-là. */
     var jours = (p && D.reprisJours(p.jours)) || [1, 1, 1, 1, 1];
     var inCap = chCap.querySelector("input");
-    var boutonsJours = [];
-    var ETATS_JOUR = { 1: ["", "plein"], 0.5: ["demi", "½ j"], 0: ["off", "—"] };
-    function peintJour(b, i) {
-      var e = ETATS_JOUR[jours[i]];
-      b.className = e[0];
-      b.lastChild.textContent = e[1];
-      b.setAttribute("aria-label", D.JOURS_SEMAINE[i] + " : " +
-        (jours[i] === 1 ? "jour plein" : jours[i] > 0 ? "demi-journée" : "non travaillé"));
-    }
     var chJours = el("div", { class: "champ large" }, [el("label", { text: "Jours travaillés" })]);
     if (joursEnBase()) {
-      var rangee = el("div", { class: "semaine" });
-      D.JOURS_COURTS.forEach(function (court, i) {
-        var b = el("button", { type: "button", title: "Cliquer : plein → demi-journée → non travaillé" }, [court, el("small")]);
-        peintJour(b, i);
-        b.addEventListener("click", function () {
-          jours[i] = jours[i] === 1 ? 0.5 : jours[i] > 0 ? 0 : 1;
-          if (!jours.some(function (x) { return x > 0; })) jours[i] = 1;   // au moins un jour
-          peintJour(b, i);
-          inCap.value = String(D.sommeJours(jours));
-        });
-        boutonsJours.push(b);
-        rangee.appendChild(b);
-      });
-      chJours.appendChild(rangee);
-      chJours.appendChild(el("div", { class: "aide", text: "Un clic par jour : plein, demi-journée, puis non travaillé. La capacité se répartit sur les jours travaillés : aucune tâche ne se pose un jour off." }));
+      chJours.appendChild(UI.choixJours(jours, function (j) {
+        jours = j;
+        inCap.value = String(D.sommeJours(jours));
+      }).noeud);
+      chJours.appendChild(el("div", { class: "aide", text: "Un clic par jour : plein, demi-journée, puis non travaillé. La capacité se répartit sur les jours travaillés : aucune tâche ne se pose un jour off. Chacun peut aussi régler les siens depuis la page Équipe." }));
     } else {
       chJours.appendChild(el("div", { class: "aide", text: "Exécute migration-jours-travailles.sql dans Supabase pour régler les jours de chacun." }));
     }

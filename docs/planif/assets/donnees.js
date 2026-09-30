@@ -57,6 +57,16 @@
     return j.map(function (p, i) { return p >= 1 ? JOURS_COURTS[i] : p > 0 ? JOURS_COURTS[i] + "½" : ""; })
       .filter(Boolean).join(" ");
   }
+  /* Capacité après un changement de jours (la base fait le même calcul, dans
+     regle_jours) : elle suit les jours quand elle les suivait déjà — retirer
+     le mercredi d'un plein temps donne 4 j —, mais un temps partiel sans jour
+     fixe ne monte jamais seul, il ne fait que redescendre sous les jours
+     travaillés. Changer de taux d'activité reste l'affaire de la console. */
+  function capaciteApres(m, jours) {
+    var cap = (m && m.capacite) || 5;
+    var avant = sommeJours(reprisJours(m && m.jours)), apres = sommeJours(reprisJours(jours));
+    return dixieme(Math.abs(cap - avant) < 0.05 ? apres : Math.min(cap, apres));
+  }
   /** « Ne travaille pas le mercredi. Demi-journée le vendredi. » */
   function detailJours(m) {
     var j = reprisJours(m && m.jours);
@@ -127,7 +137,7 @@
     },
     absences_autrui: {
       titre: "Poser les absences des autres",
-      aide: "Sans ce droit, chacun ne gère que ses propres absences."
+      aide: "Et régler leurs jours travaillés. Sans ce droit, chacun ne gère que ses propres absences et ses propres jours."
     }
   };
   function libelleDroit(d) { return (DROITS[d] || {}).titre || d; }
@@ -997,6 +1007,37 @@
       if (D.aDroit("absences_autrui")) return true;
       var moi = D.monMembre();
       return !!(moi && moi.id === idMembre);
+    },
+
+    /** Puis-je régler les jours travaillés de ce membre ? Les siens, toujours ;
+     *  ceux d'un collègue avec le même droit que ses absences. */
+    peutJours: function (idMembre) { return D.peutAbsences(idMembre); },
+    /** La base connaît-elle la semaine type ? (migration-jours-travailles.sql) */
+    joursEnBase: function () { return !ADAPTATEUR.joursEnBase || ADAPTATEUR.joursEnBase(); },
+    capaciteApres: capaciteApres,
+
+    /**
+     * Règle la semaine type d'un membre (cinq poids, ou null pour une semaine
+     * pleine) ; la capacité suit (capaciteApres). L'outil n'écrit pas les
+     * fiches de membres : la base passe par sa fonction regle_jours, qui
+     * vérifie le droit. Promesse du membre à jour.
+     */
+    regleJours: function (idMembre, jours) {
+      return Promise.resolve().then(function () {
+        var m = D.membre(idMembre); if (!m) throw erreur("Membre introuvable.");
+        if (!D.peutJours(idMembre)) throw erreur("Tu ne règles que tes propres jours.");
+        var j = reprisJours(jours);
+        if (Array.isArray(jours) && !j && !jours.some(function (x) { return nombre(x, 0) > 0; })) {
+          throw erreur("Garde au moins un jour travaillé.");
+        }
+        m.capacite = capaciteApres(m, j);
+        m.jours = j;
+        if (!ADAPTATEUR.regleJours) return sauve().then(function () { return m; });
+        version++;
+        var instantane = copie(etat);
+        return enFile(function () { return ADAPTATEUR.regleJours(idMembre, j); }, instantane)
+          .then(function () { return D.membre(idMembre) || m; });
+      });
     },
 
     ajouteMembre: function (o) {

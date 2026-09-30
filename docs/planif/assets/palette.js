@@ -238,6 +238,9 @@
     var liste = [];
     if (donnees()) {
       liste.push({ nom: "Nouvelle tâche", mots: "creer ajouter tache", glyphe: "+", action: function () { ferme(); UI.formulaireTache(null, { surEnregistrement: D.redessine }); } });
+      if (D.monMembre && D.monMembre()) {
+        liste.push({ nom: "Mes jours travaillés", mots: "semaine jours off temps partiel mercredi capacite horaire", glyphe: "▦", action: function () { ferme(); UI.joursTravailles(null, D.redessine); } });
+      }
       liste.push({ nom: "Poser une absence", mots: "vacances conge maladie formation absence", glyphe: "◐", action: function () { ferme(); UI.nouvelleAbsence({ surChangement: D.redessine }); } });
       liste.push({ nom: "Rafraîchir les données", mots: "recharger actualiser mise a jour", glyphe: "↻", action: function () { ferme(); UI.rafraichit(false); } });
     }

@@ -598,6 +598,18 @@
     });
   }
 
+  /* Semaine type d'un membre. L'outil n'écrit pas les fiches de membres (la
+     RLS les laisse en lecture) : la fonction regle_jours ne touche que les
+     jours et la capacité, et vérifie que ce sont les siens ou qu'on a le
+     droit. Absente (PGRST202) : migration pas encore relancée. */
+  function regleJours(idMembre, jours) {
+    if (!joursEnBase) return Promise.reject(erreur("Les jours travaillés ne sont pas encore installés dans la base : migration-jours-travailles.sql reste à exécuter dans Supabase."));
+    return rpc("regle_jours", { p_membre: idMembre, p_jours: jours || null }).catch(function (e) {
+      if (e.code === "PGRST202") throw erreur("Régler ses jours depuis l'outil demande de relancer migration-jours-travailles.sql dans Supabase.", e.code);
+      throw e;
+    });
+  }
+
   /* ------------------------------------------------------------ écriture
      donnees.js modifie l'état en mémoire puis demande l'enregistrement en
      fournissant l'état précédent. On en déduit les seules lignes à toucher :
@@ -893,6 +905,8 @@
       enchainementEnBase: function () { return enchaineEnBase; },
       phaseEnBase: function () { return phaseEnBase; },
       adresseEnBase: function () { return adresseEnBase; },
+      joursEnBase: function () { return joursEnBase; },
+      regleJours: regleJours,
       exportsVisas: EXPORTS_VISAS,
       visasTraites: TRAITES
     }

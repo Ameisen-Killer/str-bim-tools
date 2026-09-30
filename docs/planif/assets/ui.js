@@ -1317,6 +1317,98 @@
   }
 
   /** Nouvelle absence sans passer par la fiche d'un membre : le membre se choisit dans la fenêtre. */
+  /**
+   * Sélecteur de la semaine type : un bouton par jour, du lundi au vendredi,
+   * qui passe de plein à demi-journée, puis à non travaillé. Au moins un jour
+   * reste travaillé. Commun à la fenêtre « Jours travaillés » et à la console.
+   * { noeud, valeur() } ; valeur() : cinq poids.
+   */
+  function choixJours(jours, surChange, lectureSeule) {
+    var j = (D.reprisJours(jours) || [1, 1, 1, 1, 1]).slice();
+    var ETATS = { 1: ["", "plein", "jour plein"], 0.5: ["demi", "½ j", "demi-journée"], 0: ["off", "—", "non travaillé"] };
+    var rangee = el("div", { class: "semaine", role: "group", "aria-label": "Jours travaillés" });
+    D.JOURS_COURTS.forEach(function (court, i) {
+      var etiquette = el("small");
+      var b = el("button", { type: "button", disabled: !!lectureSeule,
+        title: lectureSeule ? null : "Cliquer : plein → demi-journée → non travaillé" }, [court, etiquette]);
+      function peint() {
+        var e = ETATS[j[i]];
+        b.className = e[0];
+        etiquette.textContent = e[1];
+        b.setAttribute("aria-label", D.JOURS_SEMAINE[i] + " : " + e[2]);
+      }
+      peint();
+      b.addEventListener("click", function () {
+        j[i] = j[i] === 1 ? 0.5 : j[i] > 0 ? 0 : 1;
+        if (!j.some(function (x) { return x > 0; })) j[i] = 1;          // au moins un jour
+        peint();
+        if (surChange) surChange(j.slice());
+      });
+      rangee.appendChild(b);
+    });
+    return { noeud: rangee, valeur: function () { return j.slice(); } };
+  }
+
+  /**
+   * Fenêtre « Jours travaillés » d'un membre : sa semaine type, et la capacité
+   * qui en découle. Chacun règle les siens ; ceux d'un collègue demandent le
+   * droit de poser ses absences. Sinon, lecture seule.
+   */
+  function joursTravailles(idMembre, surChangement) {
+    var m = idMembre ? D.membre(idMembre) : D.monMembre();
+    if (!m) {
+      return toast(idMembre ? "Membre introuvable."
+        : "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+    }
+    var previent = surChangement || function () {};
+    var moi = D.monMembre();
+    var soi = !!(moi && moi.id === m.id);
+    var peut = D.peutJours(m.id) && D.joursEnBase();
+
+    var capacite = el("b", { class: "num" });
+    var detail = el("span", {});
+    function montre(jours) {
+      var cap = D.capaciteApres(m, jours);
+      capacite.textContent = C.fmtJours(cap) + " j par semaine";
+      detail.textContent = " — " + D.detailJours({ jours: jours }).replace(/^./, function (c) { return c.toLowerCase(); });
+    }
+    var choix = choixJours(m.jours, montre, !peut);
+    montre(choix.valeur());
+
+    var corps = el("div", {}, [
+      el("div", { class: "champ" }, [el("label", { text: "Semaine type" }), choix.noeud]),
+      el("p", { class: "aide", style: "margin:14px 0 0;font-size:13px;color:var(--texte-doux);line-height:1.5" }, [
+        "Capacité : ", capacite, detail
+      ]),
+      el("p", { class: "aide", style: "margin:8px 0 0;font-size:12.5px;color:var(--texte-faible);line-height:1.5",
+        text: !D.joursEnBase()
+          ? "Les jours travaillés ne sont pas encore installés dans la base : migration-jours-travailles.sql reste à exécuter dans Supabase."
+          : !peut
+            ? "Seuls " + m.prenom + " et les personnes qui posent les absences des autres règlent ces jours."
+            : "Un clic par jour : plein, demi-journée, puis non travaillé. Aucune tâche ne se pose un jour non travaillé. Un changement de taux d'activité passe par l'administrateur de l'outil."
+      })
+    ]);
+
+    ouvre({
+      surtitre: "Jours travaillés",
+      titre: soi ? "Tes jours" : m.prenom + " " + m.nom,
+      corps: corps,
+      compacte: true,
+      boutons: peut ? [
+        { label: "Annuler" },
+        {
+          label: "Enregistrer", or: true, entree: true, action: function () {
+            return D.regleJours(m.id, choix.valeur()).then(function (apres) {
+              toast((soi ? "Tes jours sont enregistrés" : "Jours de " + m.prenom + " enregistrés") +
+                " : " + C.fmtJours(apres.capacite) + " j par semaine.");
+              previent();
+            }).catch(function (e) { toast(e.message); return false; });
+          }
+        }
+      ] : [{ label: "Fermer", or: true }]
+    });
+  }
+
   function nouvelleAbsence(o) {
     o = o || {};
     var previent = o.surChangement || function () {};
@@ -2140,6 +2232,7 @@
     choisitTheme: choisitTheme, deconnecte: deconnecte,
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
+    choixJours: choixJours, joursTravailles: joursTravailles,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, caseLissage: caseLissage, annule: annule,
     session: session, echec: echec, avecBase: avecBase,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,

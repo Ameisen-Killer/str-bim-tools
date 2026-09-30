@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=73">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=74">
 </head>
 <body class="large">
 
@@ -52,11 +52,11 @@
 
 <script src="/planif/assets/calendrier.js?v=5"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=24"></script>
-<script src="/planif/assets/donnees.js?v=32"></script>
+<script src="/planif/assets/supabase.js?v=25"></script>
+<script src="/planif/assets/donnees.js?v=33"></script>
 <script src="/planif/assets/calculs.js?v=9"></script>
-<script src="/planif/assets/ui.js?v=50"></script>
-<script src="/planif/assets/palette.js?v=4"></script>
+<script src="/planif/assets/ui.js?v=51"></script>
+<script src="/planif/assets/palette.js?v=5"></script>
 <script src="/planif/assets/direct.js?v=1"></script>
 <script>
 (function () {
@@ -82,11 +82,13 @@
   if (!UI.session()) return;
 
   D.pret().then(function () {
-    // Les fiches se tiennent dans la console : d'ici, on consulte et on pose les absences.
+    // Les fiches se tiennent dans la console : d'ici, on consulte, on pose les
+    // absences et chacun règle ses jours travaillés.
     var p = D.profil();
-    UI.chrome("equipe", p && p.superAdmin
-      ? [{ label: "Console", or: true, icone: "ico-ajout-membre", action: function () { location.href = "/planif/console/#utilisateurs"; } }]
-      : []);
+    var actions = [];
+    if (p && p.superAdmin) actions.push({ label: "Console", or: true, icone: "ico-ajout-membre", action: function () { location.href = "/planif/console/#utilisateurs"; } });
+    if (D.monMembre()) actions.push({ label: "Mes jours", or: !actions.length, icone: "ico-jours", action: function () { UI.joursTravailles(null, dessine); } });
+    UI.chrome("equipe", actions);
     UI.pied();
     // Collé sous la barre, le bloc de recherche se resserre (planif.css)
     UI.colleSousBarre(document.querySelector(".tete-collante"));
@@ -295,6 +297,7 @@
             : el("span", { class: "secondaire", text: "—" })
         ]),
         el("td", { class: "actions" }, [
+          UI.boutonIcone("jours", D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", m.prenom + " " + m.nom, function () { UI.joursTravailles(m.id, dessine); }),
           UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); })
         ])
       ]), m.id));
