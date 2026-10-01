@@ -229,7 +229,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <main>
   <div class="wrap entete">
     <h1>Visas <span id="titre-compte" class="compte-titre"></span></h1>
-    <p class="chapeau">Où en sont les plans, qui tarde à viser, et pourquoi des plans reviennent. Analyse de l'export « Tableau de suivi » de la GED Kairnial, faite dans ton navigateur : le fichier n'est envoyé nulle part.</p>
+    <p class="chapeau">Où en sont les plans, qui tarde à viser, et pourquoi des plans reviennent. Analyse de l'export « Tableau de suivi » de la GED Kairnial, faite dans ton navigateur. Les exports déposés ici sont partagés : toute personne qui a l'adresse de cette page les retrouve.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -245,7 +245,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   <div class="wrap" id="sans-stockage" hidden>
     <div class="bandeau">
       <span class="losange" aria-hidden="true"></span>
-      <div><strong>Exports non gardés dans ce navigateur. </strong>Il ne sait pas les stocker : l'export glissé ici est analysé sans être gardé.</div>
+      <div><strong>Exports non partagés. </strong>Ce navigateur ne sait pas joindre la base : l'export glissé ici est analysé sans être gardé.</div>
     </div>
   </div>
 
@@ -256,7 +256,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       <label class="v-depot" for="fichier" tabindex="0" id="depot">
         <span class="mono">Export Kairnial · .xlsx</span>
         <strong>Glisse l'export « Tableau de suivi » ici, ou clique pour le choisir.</strong>
-        <span id="depot-note">Il est gardé dans ce navigateur avec l'heure du dépôt : tu le retrouves à ta prochaine visite. Rien n'est envoyé.</span>
+        <span id="depot-note">Il est gardé en ligne avec l'heure du dépôt : toute personne qui a l'adresse de cette page peut ensuite le rouvrir et l'analyser.</span>
       </label>
       <ul class="v-liste-points">
         <li>État de chaque plan, avec son indice le plus élevé tous circuits confondus.</li>
@@ -344,7 +344,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         <div class="tete-section"><h2>Liste des plans</h2>
           <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout de chaque feuille : qui a traité le plan, et quand."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
         </div>
-        <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et reste dans ce navigateur ; quand un nouvel indice arrive, le plan repasse « à traiter ».</p>
+        <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et tout le monde la voit ; quand un nouvel indice arrive, le plan repasse « à traiter ».</p>
         <div data-recherche></div>
         <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
@@ -383,7 +383,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
     <section class="section sans-impression" id="exports-deposes" hidden>
       <div class="tete-section"><h2>Exports déposés</h2></div>
-      <p class="v-intro">Les exports gardés dans ce navigateur, du plus récent au plus ancien. Analyse-en un autre, ou retire ceux qui ne servent plus.</p>
+      <p class="v-intro">Les exports gardés en ligne, du plus récent au plus ancien, communs à toute personne qui a l'adresse de cette page. Analyse-en un autre, ou retire ceux qui ne servent plus.</p>
       <div class="defile"><table class="liste" id="table-exports"></table></div>
     </section>
   </div>
@@ -392,7 +392,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/visas/outil.js?v=1"></script>
+<script src="/visas/outil.js?v=2"></script>
 <script src="/visas/visas.js?v=1"></script>
 <script>
 (function () {
@@ -453,10 +453,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   addEventListener("scroll", function () { bulle.hidden = true; }, { passive: true });
 
   /* ------------------------------------------------------------ exports déposés
-     Un export déposé est gardé dans ce navigateur (IndexedDB, par outil.js)
-     avec l'heure du dépôt : il se rouvre ensuite depuis le menu « Export
-     analysé » ou le tableau des exports. Un navigateur sans IndexedDB (certaines
-     navigations privées) se contente de l'analyser.
+     Un export déposé est gardé en ligne (Supabase, par outil.js) avec l'heure
+     du dépôt : toute personne qui a l'adresse de l'outil le rouvre ensuite,
+     depuis le menu « Export analysé » ou le tableau des exports, sans connexion.
      Le dernier export ouvert est retenu, pour la visite suivante. */
   var exportsListe = [], stockageOk = false, courant = null, jeux = {}, bruts = {};   // bruts : le fichier lu, pour l'Excel annoté
   var CLE_CHOIX = "visas.choix";
@@ -510,8 +509,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   /* ------------------------------------------------------------ plans traités
      La coche « Traité » de la liste : le plan a été repris d'après ses visas.
-     Elle est rangée par numéro de plan et indice (localStorage, par outil.js)
-     et gardée d'un export à l'autre : un nouvel indice redevient « à traiter ». */
+     Elle est rangée par numéro de plan et indice (en ligne, par outil.js),
+     commune à tous et gardée d'un export à l'autre : un nouvel indice redevient « à traiter ». */
   var traites = {}, traitesOk = false;
   function cleTraite(code, indice) { return code + "|" + (+indice || 0); }
   function traiteDe(p) { return traitesOk ? traites[cleTraite(p.code, p.doc.ind)] || null : null; }
@@ -538,7 +537,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     else delete traites[k];
     rendTuiles(); rendListe();
     (oui ? S.traites.marque({ code: code, indice: indice }) : S.traites.demarque({ code: code, indice: indice })).then(function (t) {
-      if (oui && t) { traites[k] = t; rendListe(); }   // la coche gardée : son heure
+      if (oui && t) { traites[k] = t; rendListe(); }   // la ligne de la base : son heure
+      else if (oui) chargeTraites();                   // quelqu'un l'avait cochée juste avant : sa coche reste
       UI.toast(court(code) + " (indice " + ind(indice) + ") " + (oui ? "marqué traité." : "remis à traiter."), {
         label: "Annuler", action: function () { coche(code, indice, !oui); }
       });
@@ -554,8 +554,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       stockageOk = ok;
       $("sans-stockage").hidden = ok;
       $("depot-note").textContent = ok
-        ? "Il est gardé dans ce navigateur avec l'heure du dépôt : tu le retrouves à ta prochaine visite. Rien n'est envoyé."
-        : "Il est analysé dans ce navigateur, sans être gardé. Rien n'est envoyé.";
+        ? "Il est gardé en ligne avec l'heure du dépôt : toute personne qui a l'adresse de cette page peut ensuite le rouvrir et l'analyser."
+        : "Il est analysé dans ce navigateur, sans être gardé.";
       return ok ? S.exports.liste() : [];
     }).then(function (l) {
       exportsListe = l;
@@ -633,7 +633,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       }
       if (!stockageOk) {
         affiche({ ligne: null, nom: f.name, jeu: J, octets: brut });
-        UI.toast("Export analysé, sans être gardé : ce navigateur ne sait pas le stocker.");
+        UI.toast("Export analysé, sans être gardé : ce navigateur ne sait pas joindre la base.");
         return;
       }
       return S.exports.depose(f, m).then(function (x) {
@@ -641,7 +641,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         trieExports();
         jeux[x.id] = J; bruts[x.id] = brut;
         affiche({ ligne: x, nom: x.nom, jeu: J, octets: brut });
-        UI.toast("Export du " + (editionTxt(x) || dateHeure(J.edition)) + " analysé et gardé dans ce navigateur.");
+        UI.toast("Export du " + (editionTxt(x) || dateHeure(J.edition)) + " déposé et analysé : il est partagé.");
       }, function (e) {
         affiche({ ligne: null, nom: f.name, jeu: J, octets: brut });
         UI.toast("Analyse affichée, mais l'export n'a pas pu être gardé : " + ((e && e.message) || "erreur inconnue."));
@@ -652,7 +652,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   function retire(x) {
     UI.confirme("Retirer cet export ?", (editionTxt(x) ? "Export Kairnial du " + editionTxt(x) + " (« " + x.nom + " »)" : "« " + x.nom + " »") +
       ", déposé le " + heureDepot(x) +
-      ". Il disparaît de ce navigateur ; le fichier sur ton disque ne change pas.", "Retirer", true).then(function (ok) {
+      ". Il disparaît pour toutes les personnes qui utilisent Visas ; le fichier sur ton disque ne change pas.", "Retirer", true).then(function (ok) {
       if (!ok) return;
       S.exports.supprime(x).then(function () {
         exportsListe = exportsListe.filter(function (e) { return e.id !== x.id; });
@@ -689,7 +689,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   function barreOutil() {
     var actions = donnees ? [{ label: "Exporter en PDF", icone: "ico-export", action: exportePdf }] : [];
-    actions.push({ label: "Analyser un export", or: true, action: choisir });
+    actions.push({ label: stockageOk ? "Déposer un export" : "Analyser un export", or: true, action: choisir });
     UI.barre(actions);
   }
 
@@ -1404,6 +1404,15 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     exemple: "Rechercher un numéro, un libellé ou une personne…",
     surSaisie: function () { etat.limite = 60; if (donnees) rendListe(); },
     surEntree: function () { var t = document.querySelector("tr.v-plan"); if (t && document.querySelectorAll("tr.v-plan").length === 1) bascule(t); }
+  });
+  /* Retour sur l'onglet : relire la liste des exports et les coches, pour voir
+     ce que les autres ont déposé ou coché entre-temps. */
+  var relu = Date.now();
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || Date.now() - relu < 20000) return;
+    relu = Date.now();
+    chargeListe().catch(function () {});
+    chargeTraites();
   });
   chargeTraites();
   chargeListe().then(function (l) {

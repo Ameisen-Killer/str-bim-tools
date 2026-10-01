@@ -22,7 +22,8 @@
 --  réservées. L'outil lui-même ne crée ni ne modifie de membre : la table
 --  membres y est en lecture seule.
 --  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
---  qui permet de publier cette clé dans un dépôt public.
+--  qui permet de publier cette clé dans un dépôt public. Seule exception, voulue :
+--  l'outil Visas (/visas/), ouvert sans connexion — voir la section « Visas ».
 --
 --  Après exécution, dans le tableau de bord Supabase (voir reglages-supabase.md) :
 --    - Authentication > Auth Hooks : « Before User Created », fonction
@@ -1645,6 +1646,77 @@ revoke execute on function public.console_reinitialise_demo() from public, anon;
 grant execute on function public.console_reinitialise_demo() to authenticated;
 
 
+-- ===================================================================== Visas ==
+-- L'outil /visas/, à part de la planification : les exports « Tableau de suivi »
+-- de la GED Kairnial et les plans cochés « Traité ». Il est ouvert à toute
+-- personne qui a l'adresse de l'outil, SANS CONNEXION : le rôle anon (la clé
+-- publiable seule) lit, dépose, coche et retire. C'est la seule exception à
+-- « la clé publiable n'ouvre rien » : ces deux tables et le seau « visas ».
+-- Rien ne se modifie (pas d'update) : un export se dépose ou se retire, une
+-- coche se pose ou s'enlève. Les bornes des colonnes limitent ce qu'un inconnu
+-- peut y glisser ; le seau n'accepte que des classeurs .xlsx de 25 Mo au plus.
+create table if not exists public.visas_exports (
+  id          uuid primary key default gen_random_uuid(),
+  chemin      text not null unique
+              check (char_length(chemin) <= 200 and chemin ~ '^[A-Za-z0-9/_-]+\.xlsx$'),
+  nom         text not null default '' check (char_length(nom) <= 255),
+  taille      bigint not null default 0 check (taille between 0 and 26214400),
+  depose_le   timestamptz not null default now(),
+  edition     timestamp,
+  projet      text not null default '' check (char_length(projet) <= 100),
+  nb_plans    integer not null default 0 check (nb_plans >= 0),
+  nb_indices  integer not null default 0 check (nb_indices >= 0),
+  nb_visas    integer not null default 0 check (nb_visas >= 0)
+);
+create index if not exists visas_exports_depose on public.visas_exports (depose_le desc);
+comment on column public.visas_exports.edition is
+  '« Date édition » écrite par Kairnial dans le fichier : l''heure à laquelle l''export a été tiré, heure locale.';
+
+-- Plans cochés « Traité », par numéro et indice : un nouvel indice redevient
+-- « à traiter ». Décocher efface la ligne.
+create table if not exists public.visas_coches (
+  code        text not null check (char_length(code) between 1 and 200),
+  indice      integer not null default 0 check (indice between 0 and 9999),
+  traite_le   timestamptz not null default now(),
+  primary key (code, indice)
+);
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('visas', 'visas', false, 26214400,
+        array['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+on conflict (id) do update
+  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+alter table public.visas_exports enable row level security;
+alter table public.visas_coches  enable row level security;
+revoke all on public.visas_exports, public.visas_coches from anon, authenticated;
+grant select, insert, delete on public.visas_exports, public.visas_coches to anon, authenticated;
+
+drop policy if exists "visas : lecture" on public.visas_exports;
+drop policy if exists "visas : dépôt"   on public.visas_exports;
+drop policy if exists "visas : retrait" on public.visas_exports;
+create policy "visas : lecture" on public.visas_exports for select to anon, authenticated using (true);
+create policy "visas : dépôt"   on public.visas_exports for insert to anon, authenticated
+  with check (depose_le between now() - interval '5 minutes' and now() + interval '5 minutes');
+create policy "visas : retrait" on public.visas_exports for delete to anon, authenticated using (true);
+
+drop policy if exists "visas : lecture" on public.visas_coches;
+drop policy if exists "visas : coche"   on public.visas_coches;
+drop policy if exists "visas : retrait" on public.visas_coches;
+create policy "visas : lecture" on public.visas_coches for select to anon, authenticated using (true);
+create policy "visas : coche"   on public.visas_coches for insert to anon, authenticated
+  with check (traite_le between now() - interval '5 minutes' and now() + interval '5 minutes');
+create policy "visas : retrait" on public.visas_coches for delete to anon, authenticated using (true);
+
+-- Les fichiers du seau : mêmes droits, sans connexion
+drop policy if exists "visas : lecture" on storage.objects;
+drop policy if exists "visas : dépôt"   on storage.objects;
+drop policy if exists "visas : retrait" on storage.objects;
+create policy "visas : lecture" on storage.objects for select to anon, authenticated using (bucket_id = 'visas');
+create policy "visas : dépôt"   on storage.objects for insert to anon, authenticated with check (bucket_id = 'visas');
+create policy "visas : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'visas');
+
+
 -- ==================================================== mises à jour en direct ==
 -- Les pages ouvertes se mettent à jour quand un collègue enregistre
 -- (docs/planif/assets/direct.js) : le service Realtime ne diffuse que les
@@ -1672,5 +1744,5 @@ commit;
 notify pgrst, 'reload schema';
 
 -- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite)
+--   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports et visas_coches, ouvertes)
 --   écriture -> 401 « new row violates row-level security policy »

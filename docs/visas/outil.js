@@ -2,8 +2,8 @@
    Reprises de la planification au moment où Visas en est sorti (01.10.2026),
    réduites à ce que la page utilise : barre, thème, messages, fenêtre,
    recherche, impression, tableaux lisibles sur téléphone.
-   Aucune connexion, aucun serveur : les exports Kairnial sont gardés dans
-   IndexedDB et les coches « Traité » dans localStorage, sur ce navigateur.
+   Aucune connexion : les exports Kairnial et les coches « Traité » sont
+   gardés en ligne, communs à toute personne qui a l'adresse de l'outil.
    Outil  : l'interface ;  Stock : exports et coches. */
 (function (global) {
   "use strict";
@@ -314,7 +314,7 @@
     hote.appendChild(el("footer", { class: "pied-outil" }, [
       el("a", { href: "/", text: "← str-bim-tools.com" }),
       el("div", { class: "droite" }, [
-        el("span", { text: "Analyse et données dans ce navigateur" }),
+        el("span", { text: "Exports partagés · base hébergée en Europe (Francfort)" }),
         el("a", { href: "/mentions-legales/", text: "Mentions légales" })
       ])
     ]));
@@ -453,104 +453,134 @@
     }, 60);
   }
 
-  /* ================================================================ stockage */
+  /* ================================================================ stockage
+     Exports et coches sont communs à toute personne qui a l'adresse de l'outil,
+     sans connexion : ils vivent dans le projet Supabase du site (tables
+     visas_exports et visas_coches, seau « visas », ouverts au rôle anon —
+     voir base-supabase.sql, section « Visas »). La clé est la clé PUBLIABLE,
+     faite pour être publiée ; la clé secrète ne doit jamais apparaître ici. */
+  var BASE = {
+    url: "https://hxhjkdfnoygrlbdhjkwc.supabase.co",
+    cle: "sb_publishable_33G_BjGlKGUBhSVIc_QUmQ_QDKC64vA"
+  };
+  var SEAU = "visas";
+  var TYPE_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
   function nouvelId() {
-    return (global.crypto && global.crypto.randomUUID) ? global.crypto.randomUUID()
-      : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 3 | 8)).toString(16);
+    });
   }
 
-  /* Exports Kairnial gardés dans IndexedDB : un classeur de quelques Mo n'a pas
-     sa place dans localStorage. Description : id, nom, taille, deposeLe,
-     edition, projet, nbPlans, nbIndices, nbVisas ; le fichier à part. */
-  var exportsKairnial = (function () {
-    var BASE = "visas.exports", MAGASIN = "exports";
-    function ouvreBase() {
-      return new Promise(function (ok, ko) {
-        if (!global.indexedDB) { ko(erreur("Ce navigateur ne sait pas garder de fichier.")); return; }
-        var r = global.indexedDB.open(BASE, 1);
-        r.onupgradeneeded = function () { r.result.createObjectStore(MAGASIN, { keyPath: "id" }); };
-        r.onsuccess = function () { ok(r.result); };
-        r.onerror = function () { ko(r.error); };
-      });
-    }
-    function magasin(mode, fn) {
-      return ouvreBase().then(function (db) {
-        return new Promise(function (ok, ko) {
-          var tx = db.transaction(MAGASIN, mode), req = fn(tx.objectStore(MAGASIN));
-          tx.oncomplete = function () { ok(req && req.result); };
-          tx.onerror = function () { ko(tx.error); };
+  /* Un appel au projet. Les messages de Supabase sont en anglais : on les
+     retraduit pour l'écran. */
+  function appel(chemin, o) {
+    o = o || {};
+    var entetes = { apikey: BASE.cle };
+    if (o.type) entetes["Content-Type"] = o.type;
+    if (o.prefer) entetes.Prefer = o.prefer;
+    if (o.plage) entetes.Range = o.plage;
+    return fetch(BASE.url + chemin, { method: o.methode || "GET", headers: entetes, body: o.corps })
+      .catch(function () { throw erreur("Serveur injoignable : vérifie ta connexion, puis réessaie."); })
+      .then(function (r) {
+        if (r.ok) return r;
+        return r.text().then(function (txt) {
+          var j = {};
+          try { j = txt ? JSON.parse(txt) : {}; } catch (e) { j = {}; }
+          var brut = String(j.message || j.error || j.msg || "");
+          var e = erreur(
+            /could not find the table|relation .* does not exist|PGRST205|42P01/i.test(brut + " " + (j.code || ""))
+              ? "La base n'est pas encore prête pour Visas : il faut exécuter migration-visas-partage.sql dans Supabase."
+            : r.status === 404 || /not.?found/i.test(brut) ? "Fichier introuvable : il a peut-être été retiré entre-temps."
+            : r.status === 413 || /payload too large|maximum allowed size|exceeded/i.test(brut) ? "Fichier trop lourd : 25 Mo au plus."
+            : /mime/i.test(brut) ? "Seuls les classeurs Excel (.xlsx) peuvent être gardés."
+            : /row-level security|unauthorized|forbidden|permission/i.test(brut) || r.status === 401 || r.status === 403
+              ? "Opération refusée par la base."
+            : "Base : " + (brut || "erreur " + r.status) + ".");
+          e.statut = r.status;
+          throw e;
         });
       });
-    }
-    function sansFichier(x) {
-      var o = {};
-      Object.keys(x).forEach(function (k) { if (k !== "fichier") o[k] = x[k]; });
-      return o;
-    }
-    // Navigation privée de certains navigateurs : IndexedDB existe mais refuse de s'ouvrir
-    var dispo = null;
-    return {
-      disponible: function () {
-        if (!dispo) dispo = ouvreBase().then(function () { return true; }, function () { return false; });
-        return dispo;
-      },
-      liste: function () {
-        return magasin("readonly", function (s) { return s.getAll(); }).then(function (l) {
-          return (l || []).map(sansFichier).sort(function (a, b) { return a.deposeLe < b.deposeLe ? 1 : -1; });
-        });
-      },
-      depose: function (fichier, m) {
-        return fichier.arrayBuffer().then(function (octets) {
-          var x = { id: nouvelId(), nom: m.nom, taille: m.taille, deposeLe: new Date().toISOString(),
-            edition: m.edition, projet: m.projet, nbPlans: m.nbPlans, nbIndices: m.nbIndices, nbVisas: m.nbVisas,
-            fichier: octets };
-          return magasin("readwrite", function (s) { return s.put(x); }).then(function () { return sansFichier(x); });
-        });
-      },
-      lit: function (x) {
-        return magasin("readonly", function (s) { return s.get(x.id); }).then(function (r) {
-          if (!r) throw erreur("Fichier introuvable dans ce navigateur.");
-          return r.fichier;
-        });
-      },
-      supprime: function (x) {
-        return magasin("readwrite", function (s) { return s.delete(x.id); }).then(function () {});
-      }
-    };
-  })();
+  }
+  function json(r) { return r.status === 204 ? null : r.json(); }
+  function encodeChemin(c) { return c.split("/").map(encodeURIComponent).join("/"); }
 
-  /* Plans cochés « Traité » : { code, indice, traiteLe }, une liste dans localStorage. */
-  var traites = (function () {
-    var CLE = "visas.traites";
-    function lit() {
-      try { var l = JSON.parse(global.localStorage.getItem(CLE) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+  /** Toutes les lignes d'une table, par pages de 1000 (plafond de l'API). */
+  function litTout(table, ordre) {
+    var tout = [];
+    function page(debut) {
+      return appel("/rest/v1/" + table + "?select=*&order=" + ordre, { plage: debut + "-" + (debut + 999) }).then(json).then(function (l) {
+        tout = tout.concat(l || []);
+        return l && l.length === 1000 ? page(debut + 1000) : tout;
+      });
     }
-    function ecrit(l) {
-      try { global.localStorage.setItem(CLE, JSON.stringify(l)); } catch (e) { throw erreur("Ce navigateur ne peut pas garder les coches."); }
-    }
-    function autre(t) { return function (x) { return x.code !== t.code || x.indice !== t.indice; }; }
+    return page(0);
+  }
+
+  /* Exports Kairnial : le fichier dans le seau « visas », sous exports/<id>.xlsx,
+     décrit par une ligne de visas_exports (l'heure du dépôt est posée par la
+     base). Description : id, chemin, nom, taille, deposeLe, edition, projet,
+     nbPlans, nbIndices, nbVisas. */
+  function versExport(l) {
     return {
-      disponible: function () {
-        try { global.localStorage.setItem(CLE + ".essai", "1"); global.localStorage.removeItem(CLE + ".essai"); return Promise.resolve(true); }
-        catch (e) { return Promise.resolve(false); }
-      },
-      liste: function () { return Promise.resolve(lit()); },
-      marque: function (t) {
-        return Promise.resolve().then(function () {
-          var l = lit(), deja = l.filter(function (x) { return !autre(t)(x); })[0];
-          if (deja) return deja;
-          var x = { code: t.code, indice: +t.indice || 0, traiteLe: new Date().toISOString() };
-          l.unshift(x);
-          ecrit(l);
-          return x;
-        });
-      },
-      demarque: function (t) {
-        return Promise.resolve().then(function () { ecrit(lit().filter(autre({ code: t.code, indice: +t.indice || 0 }))); });
-      }
+      id: l.id, chemin: l.chemin, nom: l.nom, taille: +l.taille || 0, deposeLe: l.depose_le,
+      edition: l.edition || null, projet: l.projet || "",
+      nbPlans: l.nb_plans || 0, nbIndices: l.nb_indices || 0, nbVisas: l.nb_visas || 0
     };
-  })();
+  }
+  var exportsKairnial = {
+    disponible: function () { return Promise.resolve(!!global.fetch); },
+    liste: function () {
+      return litTout("visas_exports", "depose_le.desc").then(function (l) { return l.map(versExport); });
+    },
+    depose: function (fichier, m) {
+      var id = nouvelId(), chemin = "exports/" + id + ".xlsx";
+      return appel("/storage/v1/object/" + SEAU + "/" + encodeChemin(chemin), { methode: "POST", corps: fichier, type: TYPE_XLSX }).then(function () {
+        return appel("/rest/v1/visas_exports", {
+          methode: "POST", type: "application/json", prefer: "return=representation",
+          corps: JSON.stringify({ id: id, chemin: chemin, nom: String(m.nom || "").slice(0, 255), taille: m.taille || 0,
+            edition: m.edition, projet: String(m.projet || "").slice(0, 100), nb_plans: m.nbPlans, nb_indices: m.nbIndices, nb_visas: m.nbVisas })
+        }).then(json).then(function (l) { return versExport(l[0]); }, function (e) {
+          // La ligne refusée : le fichier ne reste pas orphelin dans le seau
+          return appel("/storage/v1/object/" + SEAU + "/" + encodeChemin(chemin), { methode: "DELETE" })
+            .catch(function () {}).then(function () { throw e; });
+        });
+      });
+    },
+    lit: function (x) {
+      return appel("/storage/v1/object/authenticated/" + SEAU + "/" + encodeChemin(x.chemin)).then(function (r) { return r.arrayBuffer(); });
+    },
+    supprime: function (x) {
+      return appel("/storage/v1/object/" + SEAU + "/" + encodeChemin(x.chemin), { methode: "DELETE" }).catch(function (e) {
+        if (e.statut !== 404 && e.statut !== 400) throw e;      // déjà parti : on retire quand même la ligne
+      }).then(function () {
+        return appel("/rest/v1/visas_exports?id=eq." + encodeURIComponent(x.id), { methode: "DELETE", prefer: "return=minimal" });
+      });
+    }
+  };
+
+  /* Plans cochés « Traité » : { code, indice, traiteLe }, une ligne de
+     visas_coches par numéro et indice. Cocher un plan que quelqu'un vient de
+     cocher ne change rien : la première coche reste (marque rend alors null). */
+  function versCoche(l) { return { code: l.code, indice: +l.indice || 0, traiteLe: l.traite_le }; }
+  var traites = {
+    disponible: function () { return Promise.resolve(!!global.fetch); },
+    liste: function () {
+      return litTout("visas_coches", "traite_le.desc").then(function (l) { return l.map(versCoche); });
+    },
+    marque: function (t) {
+      return appel("/rest/v1/visas_coches", {
+        methode: "POST", type: "application/json", prefer: "resolution=ignore-duplicates,return=representation",
+        corps: JSON.stringify({ code: t.code, indice: +t.indice || 0 })
+      }).then(json).then(function (l) { return l && l[0] ? versCoche(l[0]) : null; });
+    },
+    demarque: function (t) {
+      return appel("/rest/v1/visas_coches?code=eq." + encodeURIComponent(t.code) + "&indice=eq." + (+t.indice || 0),
+        { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
 
   global.Outil = {
     el: el, toast: toast, ouvre: ouvre, ferme: ferme, confirme: confirme,
