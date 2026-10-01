@@ -144,6 +144,16 @@ td.v-coche input{width:17px;height:17px;margin:0;accent-color:var(--v-bon);curso
 table.liste tr.v-fait td:not(.v-coche){opacity:.55}
 table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded="true"] td:not(.v-coche){opacity:.85}
 .v-traite-txt{color:var(--v-bon)}
+/* annotation d'un plan : la zone dans la fiche ouverte, un aperçu de deux lignes dans la liste */
+.v-annot-zone{display:flex;flex-direction:column;gap:6px;margin:2px 0 18px;max-width:62em}
+.v-annot-zone label{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--or)}
+.v-annot-zone textarea{font:inherit;font-size:14.5px;line-height:1.5;color:var(--texte);background:rgba(var(--encre),.03);border:1px solid var(--ligne);border-radius:0;padding:9px 11px;min-height:80px;resize:vertical;transition:border-color .25s,background .25s}
+.v-annot-zone textarea:focus{outline:none;border-color:var(--or-doux);background:rgba(var(--encre),.05)}
+.v-annot-zone textarea::placeholder{color:var(--texte-faible)}
+.v-note-etat{font-size:12px;color:var(--texte-faible);min-height:1.5em}
+.v-note-etat.erreur{color:var(--alerte)}
+.v-annot{margin-top:6px;padding-left:8px;border-left:2px solid var(--or);font-size:13px;color:var(--texte-doux);white-space:pre-line;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .v-outils-liste{display:flex;flex-wrap:wrap;gap:8px}
 .v-histo{display:flex;flex-direction:column;gap:16px;padding:4px 0 8px}
 .v-indice{display:flex;flex-direction:column;gap:6px;border-left:1px solid var(--ligne);padding-left:14px}
@@ -175,6 +185,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   }
   #v-bulle,#accueil,#plus,details.v-chiffres,#liste-plans .grille-champs,#analyse .cases,.v-outils-liste{display:none!important}
   td.v-coche label{width:auto;height:auto;margin:0}
+  .v-annot-zone{display:none}
+  .v-annot{display:block;-webkit-line-clamp:none;font-size:7.5pt}
   table.liste tr.v-fait td:not(.v-coche){opacity:1}
   .v-intro{font-size:8.5pt;margin:0 0 8px}
   .v-note{font-size:7.5pt;margin-top:4px}
@@ -212,6 +224,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   .v-attente{grid-template-columns:minmax(0,1fr) 48px}
   .v-attente .v-p{grid-column:1/-1;order:3;margin-bottom:6px}
   .v-indice li{grid-template-columns:1fr}
+  .v-annot-zone textarea{font-size:16px}           /* 16 px : pas de zoom automatique du téléphone */
   .v-barres{grid-template-columns:minmax(0,1fr) auto}
   .v-barres .v-p{grid-column:1/-1;order:3;margin-bottom:4px}
   /* fiche d'un plan : la coche dans le coin, à portée du pouce */
@@ -342,9 +355,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
       <section class="section" id="liste-plans">
         <div class="tete-section"><h2>Liste des plans</h2>
-          <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec une colonne « Traité » au bout de chaque feuille : qui a traité le plan, et quand."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
+          <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec les colonnes « Traité » et « Annotation » au bout de chaque feuille."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
         </div>
-        <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et tout le monde la voit ; quand un nouvel indice arrive, le plan repasse « à traiter ».</p>
+        <p class="v-intro" id="intro-traites" hidden>Coche un plan quand tu l'as repris d'après ses visas. La coche vaut pour cet indice et tout le monde la voit ; quand un nouvel indice arrive, le plan repasse « à traiter ». Ouvre un plan pour l'annoter : l'annotation est partagée elle aussi, et suit le plan d'un indice à l'autre.</p>
         <div data-recherche></div>
         <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
@@ -392,8 +405,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/visas/outil.js?v=2"></script>
-<script src="/visas/visas.js?v=1"></script>
+<script src="/visas/outil.js?v=3"></script>
+<script src="/visas/visas.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -548,6 +561,87 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       UI.toast("La coche n'est pas enregistrée : " + ((e && e.message) || "erreur inconnue."));
     });
   }
+
+  /* ------------------------------------------------------------ annotations
+     Une zone de texte par plan (numéro), dans la fiche ouverte de la liste.
+     Partagée (visas_notes, par outil.js) et gardée d'un indice à l'autre.
+     Enregistrée seule : une seconde après la dernière frappe, et en quittant
+     la zone. Ce qui est en cours de frappe (brouillons) passe avant ce que la
+     base renvoie : une relecture ne l'écrase pas. */
+  var notes = {}, notesOk = false, brouillons = {}, minuteurs = {}, notesSignalees = false;
+  function noteDe(code) { var x = notes[code]; return x ? x.texte : ""; }
+  function heureNote(x) {
+    var d = new Date(x.modifieLe);
+    return isNaN(d) ? "" : d.toLocaleDateString("fr-CH") + " à " + d.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" });
+  }
+  function etatNote(code) {
+    var x = notes[code];
+    return x ? "Partagée · modifiée le " + heureNote(x) : "Partagée avec toutes les personnes qui utilisent Visas. Enregistrée automatiquement.";
+  }
+
+  function chargeNotes() {
+    return S.notes.liste().then(function (l) {
+      notes = {}; notesOk = true;
+      l.forEach(function (x) { notes[x.code] = x; });
+      if (donnees) { menuTraite(); rendListe(); }
+    }, function (e) {
+      if (!notesOk && !notesSignalees) { notesSignalees = true; UI.toast("Annotations : " + ((e && e.message) || "lecture impossible.")); }
+    });
+  }
+
+  function zoneNote(code) {
+    var id = "note-" + code.replace(/[^A-Za-z0-9_-]/g, "_");
+    var texte = code in brouillons ? brouillons[code] : noteDe(code);
+    return '<div class="v-annot-zone"><label for="' + esc(id) + '">Annotation</label>' +
+      '<textarea id="' + esc(id) + '" data-note="' + esc(code) + '" rows="3" maxlength="4000" placeholder="Ta remarque sur ce plan : ce qu\'il reste à reprendre, une question au MO, une réponse attendue…">' + esc(texte) + "</textarea>" +
+      '<span class="v-note-etat" data-etat-note="' + esc(code) + '" aria-live="polite">' + esc(etatNote(code)) + "</span></div>";
+  }
+  function apercuNote(code) {
+    var t = noteDe(code);
+    return t ? '<div class="v-annot" data-apercu-note="' + esc(code) + '" title="' + esc(t) + '">' + esc(t) + "</div>" : "";
+  }
+  // Met à jour l'aperçu de la ligne et l'état sous la zone, sans redessiner la liste (la zone garde le curseur)
+  function montreNote(code, message, erreur) {
+    var tr = document.querySelector('tr.v-plan[data-code="' + CSS.escape(code) + '"]');
+    var cel = tr && tr.querySelector("td.v-lib");
+    if (cel) {
+      var a = cel.querySelector("[data-apercu-note]");
+      if (a) a.remove();
+      if (noteDe(code)) cel.insertAdjacentHTML("beforeend", apercuNote(code));
+    }
+    var e = document.querySelector('[data-etat-note="' + CSS.escape(code) + '"]');
+    if (e) { e.textContent = message || etatNote(code); e.classList.toggle("erreur", !!erreur); }
+  }
+
+  function enregistreNote(code) {
+    clearTimeout(minuteurs[code]); delete minuteurs[code];
+    if (!(code in brouillons)) return Promise.resolve();
+    var texte = brouillons[code], vide = !texte.trim();
+    if (texte === noteDe(code) || (vide && !notes[code])) { delete brouillons[code]; montreNote(code); return Promise.resolve(); }
+    montreNote(code, "Enregistrement…");
+    return (vide ? S.notes.efface(code).then(function () { return null; }) : S.notes.ecrit(code, texte)).then(function (x) {
+      if (x) notes[code] = x; else delete notes[code];
+      if (brouillons[code] === texte) delete brouillons[code];   // rien tapé entre-temps
+      montreNote(code, x ? "Enregistrée · " + heureNote(x) : "Annotation effacée.");
+      menuTraite();
+    }, function (e) {
+      montreNote(code, "Pas enregistrée : " + ((e && e.message) || "erreur inconnue.") + " Elle sera retentée à la prochaine frappe.", true);
+    });
+  }
+  $("table-plans").addEventListener("input", function (e) {
+    var z = e.target.closest("textarea[data-note]"); if (!z) return;
+    var code = z.getAttribute("data-note");
+    brouillons[code] = z.value;
+    clearTimeout(minuteurs[code]);
+    minuteurs[code] = setTimeout(function () { enregistreNote(code); }, 1000);
+    montreNote(code, "Modifiée…");
+  });
+  $("table-plans").addEventListener("focusout", function (e) {
+    var z = e.target.closest && e.target.closest("textarea[data-note]");
+    if (z) enregistreNote(z.getAttribute("data-note"));
+  });
+  // Quitter la page avec une frappe pas encore partie : on l'envoie (au mieux)
+  addEventListener("pagehide", function () { Object.keys(minuteurs).forEach(enregistreNote); });
 
   function chargeListe() {
     return S.exports.disponible().then(function (ok) {
@@ -1095,12 +1189,15 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* Traitement : tous les plans, ceux qui restent à reprendre, ceux déjà repris.
      Le choix est retenu dans ce navigateur : on revient d'ordinaire à sa pile. */
   var CLE_TRAITE = "visas.traitement";
-  try { var t0 = localStorage.getItem(CLE_TRAITE); if (t0 === "a-traiter" || t0 === "traites") etat.traite = t0; } catch (e) {}
+  try { var t0 = localStorage.getItem(CLE_TRAITE); if (t0 === "a-traiter" || t0 === "traites" || t0 === "annotes") etat.traite = t0; } catch (e) {}
   function menuTraite() {
     $("champ-traite").hidden = !traitesOk;
     if (!traitesOk) return;
-    var fait = R.plans.filter(traiteDe).length;
-    $("f-traite").innerHTML = [["tous", "Tous les plans · " + n(R.plans.length)], ["a-traiter", "À traiter · " + n(R.plans.length - fait)], ["traites", "Traités · " + n(fait)]].map(function (o) {
+    if (!R) return;
+    var fait = R.plans.filter(traiteDe).length, annotes = R.plans.filter(function (p) { return !!noteDe(p.code); }).length;
+    if (etat.traite === "annotes" && !notesOk) etat.traite = "tous";
+    $("f-traite").innerHTML = [["tous", "Tous les plans · " + n(R.plans.length)], ["a-traiter", "À traiter · " + n(R.plans.length - fait)], ["traites", "Traités · " + n(fait)]]
+      .concat(notesOk ? [["annotes", "Annotés · " + n(annotes)]] : []).map(function (o) {
       return '<option value="' + o[0] + '"' + (o[0] === etat.traite ? " selected" : "") + ">" + esc(o[1]) + "</option>";
     }).join("");
   }
@@ -1151,8 +1248,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
-      if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
-      return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur], mots);
+      if (etat.traite === "annotes") { if (!noteDe(p.code)) return false; }
+      else if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
+      return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur, noteDe(p.code)], mots);
     });
     l.sort({
       statut: function (a, b) { return ORDRE[a.statut] - ORDRE[b.statut] || (a.doc.dep || 0) - (b.doc.dep || 0); },
@@ -1164,6 +1262,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   }
 
   function rendListe() {
+    // La zone d'annotation en cours de frappe est redessinée : on lui rend le curseur
+    var actif = document.activeElement, enCours = actif && actif.matches && actif.matches("textarea[data-note]")
+      ? { code: actif.getAttribute("data-note"), debut: actif.selectionStart, fin: actif.selectionEnd, haut: actif.scrollTop } : null;
     menuVisas(); menuTraite();
     $("outils-liste").hidden = !traitesOk;
     $("intro-traites").hidden = !traitesOk;
@@ -1179,11 +1280,15 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         var caseT = traitesOk ? '<td class="v-coche"><label title="' + esc(t ? texteTraite(t) + " (décocher pour le remettre à traiter)" : "Marquer ce plan comme traité") + '"><input type="checkbox" data-traite="' + esc(p.code) + '" data-indice="' + d.ind + '"' + (t ? " checked" : "") +
           ' aria-label="' + esc(court(p.code)) + " traité" + '"></label></td>' : "";
         return '<tr class="v-plan' + (t ? " v-fait" : "") + '" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '">' + caseT + '<td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
-          '</td><td class="n">' + ind(d.ind) + '</td><td><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
-          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + "</div></td><td>" + pastille(p.statut) +
+          '</td><td class="n">' + ind(d.ind) + '</td><td class="v-lib"><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
+          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + '</td><td class="n">' + (d.dep ? n(Math.floor(ed - d.dep)) + " j" : "—") + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
+    if (enCours) {
+      var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
+      if (z) { z.focus({ preventScroll: true }); z.setSelectionRange(enCours.debut, enCours.fin); z.scrollTop = enCours.haut; }
+    }
     var reste = l.length - vis.length;
     $("plus").hidden = reste <= 0;
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
@@ -1350,7 +1455,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
      l'indice coché : « Traité le … » sur cet indice, « Traité à l'indice
      05 le … » sur les précédents (un plan passe d'un circuit à l'autre, son
      dernier indice n'est souvent que dans l'une des feuilles). Un indice plus
-     récent que la coche reste vide : il est à traiter. Fait dans le navigateur
+     récent que la coche reste vide : il est à traiter. Une seconde colonne,
+     « Annotation », porte l'annotation du plan sur toutes ses lignes. Fait dans le navigateur
      par visas.js ; le fichier déposé ne change pas. */
   function marqueExcel() {
     var dernier = {};                               // par plan, la coche de l'indice le plus élevé
@@ -1376,7 +1482,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     b.disabled = true;
     UI.toast("Préparation de l'Excel annoté…");
     octetsSource().then(function (octets) {
-      return V.annote(octets, marqueExcel(), "Traité");
+      return V.annote(octets, [{ titre: "Traité", marque: marqueExcel() }, { titre: "Annotation", marque: function (code) { return noteDe(code); } }]);
     }).then(function (r) {
       var url = URL.createObjectURL(new Blob([r.octets], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       var e = donnees.edition ? isoEdition(donnees.edition).slice(0, 16).replace("T", "-").replace(":", "") : "";
@@ -1385,9 +1491,11 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
       // Où chercher : les feuilles qui ont des lignes marquées (onglets « Nomenclatur - MO-AMO »…)
-      var ou = r.feuilles.filter(function (f) { return f.marques; }).map(function (f) { return f.nom.replace(/^.*? - /, "") + " : " + n(f.marques); });
-      UI.toast(r.marques ? "Excel annoté : " + n(r.marques) + " ligne" + (r.marques > 1 ? "s" : "") + " « Traité » (" + ou.join(", ") + "). Dernière colonne de chaque feuille, dans le filtre."
-        : "Excel annoté téléchargé : aucun plan de cet export n'est encore coché, la colonne « Traité » est vide.", { label: "OK", action: function () {} });
+      var ou = r.feuilles.filter(function (f) { return f.marques[0]; }).map(function (f) { return f.nom.replace(/^.*? - /, "") + " : " + n(f.marques[0]); });
+      var tr = r.marques[0], an = r.marques[1];
+      UI.toast((tr ? "Excel annoté : " + n(tr) + " ligne" + (tr > 1 ? "s" : "") + " « Traité » (" + ou.join(", ") + ")" : "Excel annoté : aucun plan coché « Traité »") +
+        (an ? ", " + n(an) + " ligne" + (an > 1 ? "s" : "") + " annotée" + (an > 1 ? "s" : "") : ", aucune annotation") +
+        ". Deux dernières colonnes de chaque feuille, dans le filtre.", { label: "OK", action: function () {} });
     }).catch(function (e) {
       UI.toast(e && e.metier ? e.message : "L'Excel annoté n'a pas pu être fait. " + messageLecture(e));
     }).then(function () { b.disabled = false; });
@@ -1413,8 +1521,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     relu = Date.now();
     chargeListe().catch(function () {});
     chargeTraites();
+    chargeNotes();
   });
   chargeTraites();
+  chargeNotes();
   chargeListe().then(function (l) {
     var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];
     if (x) return ouvre(x);

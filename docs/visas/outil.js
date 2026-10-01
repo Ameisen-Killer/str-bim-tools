@@ -2,7 +2,7 @@
    Reprises de la planification au moment où Visas en est sorti (01.10.2026),
    réduites à ce que la page utilise : barre, thème, messages, fenêtre,
    recherche, impression, tableaux lisibles sur téléphone.
-   Aucune connexion : les exports Kairnial et les coches « Traité » sont
+   Aucune connexion : les exports Kairnial, les coches « Traité » et les annotations sont
    gardés en ligne, communs à toute personne qui a l'adresse de l'outil.
    Outil  : l'interface ;  Stock : exports et coches. */
 (function (global) {
@@ -454,9 +454,9 @@
   }
 
   /* ================================================================ stockage
-     Exports et coches sont communs à toute personne qui a l'adresse de l'outil,
+     Exports, coches et annotations sont communs à toute personne qui a l'adresse de l'outil,
      sans connexion : ils vivent dans le projet Supabase du site (tables
-     visas_exports et visas_coches, seau « visas », ouverts au rôle anon —
+     visas_exports, visas_coches et visas_notes, seau « visas », ouverts au rôle anon —
      voir base-supabase.sql, section « Visas »). La clé est la clé PUBLIABLE,
      faite pour être publiée ; la clé secrète ne doit jamais apparaître ici. */
   var BASE = {
@@ -492,7 +492,7 @@
           var brut = String(j.message || j.error || j.msg || "");
           var e = erreur(
             /could not find the table|relation .* does not exist|PGRST205|42P01/i.test(brut + " " + (j.code || ""))
-              ? "La base n'est pas encore prête pour Visas : il faut exécuter migration-visas-partage.sql dans Supabase."
+              ? "La base n'est pas encore prête pour Visas : exécute dans Supabase les fichiers migration-visas-….sql du dépôt."
             : r.status === 404 || /not.?found/i.test(brut) ? "Fichier introuvable : il a peut-être été retiré entre-temps."
             : r.status === 413 || /payload too large|maximum allowed size|exceeded/i.test(brut) ? "Fichier trop lourd : 25 Mo au plus."
             : /mime/i.test(brut) ? "Seuls les classeurs Excel (.xlsx) peuvent être gardés."
@@ -582,10 +582,29 @@
     }
   };
 
+  /* Annotations : { code, texte, modifieLe }, une ligne de visas_notes par plan
+     (numéro), gardée d'un indice à l'autre. Écrire remplace le texte (la base
+     pose l'heure) ; un texte vide efface la ligne. */
+  function versNote(l) { return { code: l.code, texte: l.texte, modifieLe: l.modifie_le }; }
+  var notes = {
+    liste: function () {
+      return litTout("visas_notes", "code").then(function (l) { return l.map(versNote); });
+    },
+    ecrit: function (code, texte) {
+      return appel("/rest/v1/visas_notes?on_conflict=code", {
+        methode: "POST", type: "application/json", prefer: "resolution=merge-duplicates,return=representation",
+        corps: JSON.stringify({ code: code, texte: String(texte).slice(0, 4000) })
+      }).then(json).then(function (l) { return versNote(l[0]); });
+    },
+    efface: function (code) {
+      return appel("/rest/v1/visas_notes?code=eq." + encodeURIComponent(code), { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
+
   global.Outil = {
     el: el, toast: toast, ouvre: ouvre, ferme: ferme, confirme: confirme,
     barre: barre, colleSousBarre: colleSousBarre, pied: pied,
     recherche: recherche, correspond: correspond, imprime: imprime
   };
-  global.Stock = { exports: exportsKairnial, traites: traites };
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes };
 })(window);

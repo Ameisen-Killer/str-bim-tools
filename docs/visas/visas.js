@@ -150,39 +150,43 @@
   }
 
   /* ============================================================ écriture .xlsx
-     annote(octets, marque, titre) : le même classeur, avec une colonne de plus
-     (« Traité ») au bout de chaque feuille de nomenclature. marque(code, indice)
-     donne le texte de la cellule, ou rien. Tout le reste est recopié octet pour
+     annote(octets, colonnes) : le même classeur, avec des colonnes de plus
+     (« Traité », « Annotation ») au bout de chaque feuille de nomenclature.
+     colonnes : [{ titre, marque(code, indice) }], marque donnant le texte de
+     la cellule, ou rien. Tout le reste est recopié octet pour
      octet ; seules les feuilles touchées sont réécrites, puis recompressées
      (CompressionStream), et le classeur, dont les noms de plage suivent le
      filtre automatique. Les lignes sont reconnues comme à la lecture : même
      en-tête (« Libellé du document »), même numéro de plan, même indice.
-     Rend { octets, marques, feuilles: [{ nom, marques }] }. */
+     Rend { octets, marques: [n par colonne], feuilles: [{ nom, marques: [n par colonne] }] }. */
   function lettres(i) { var s = ""; i++; while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
   function echappe(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-  function ecritFeuille(xml, h, marques, col, titre) {
-    var L = lettres(col), suite = 0;
+  function ecritFeuille(xml, h, marques, col, titres) {
+    var k = titres.length, L = lettres(col + k - 1), suite = 0;
     var out = xml.replace(/(<(\w+:)?row\b)([^>]*?)(\/>|>([\s\S]*?)(<\/(?:\w+:)?row>))/g, function (tout, debut, p, attrs, fin, corps, ferme) {
       var n = attr(attrs, "r"), li = n ? parseInt(n, 10) - 1 : suite, num = li + 1;
       suite = li + 1;
-      var txt = li === h ? titre : marques[li];
-      if (!txt || fin === "/>") return tout;
+      var txts = li === h ? titres : marques[li];
+      if (!txts || fin === "/>") return tout;
       p = p || "";
-      var a2 = attrs.replace(/spans="(\d+):(\d+)"/, function (m, x, y) { return 'spans="' + x + ":" + Math.max(+y, col + 1) + '"'; });
+      var a2 = attrs.replace(/spans="(\d+):(\d+)"/, function (m, x, y) { return 'spans="' + x + ":" + Math.max(+y, col + k) + '"'; });
       // la cellule prend le style de sa voisine : l'en-tête reste un en-tête
       var cs = corps.match(/<(?:\w+:)?c\b[^>]*>/g), s = cs ? attr(cs[cs.length - 1], "s") : null;
-      return debut + a2 + ">" + corps + "<" + p + 'c r="' + L + num + '"' + (s ? ' s="' + s + '"' : "") + ' t="inlineStr"><' + p + "is><" + p + 't xml:space="preserve">' +
-        echappe(txt) + "</" + p + "t></" + p + "is></" + p + "c>" + ferme;
+      return debut + a2 + ">" + corps + txts.map(function (txt, j) {
+        return txt ? "<" + p + 'c r="' + lettres(col + j) + num + '"' + (s ? ' s="' + s + '"' : "") + ' t="inlineStr"><' + p + "is><" + p + 't xml:space="preserve">' +
+          echappe(txt) + "</" + p + "t></" + p + "is></" + p + "c>" : "";
+      }).join("") + ferme;
     });
-    // Étendue de la feuille et filtre automatique : jusqu'à la nouvelle colonne, pour pouvoir filtrer « Traité » dans Excel
-    out = out.replace(/(<(?:\w+:)?(?:dimension|autoFilter)\s+ref="\$?[A-Z]+\$?\d+:\$?)([A-Z]+)(\$?\d+")/g, function (m, a, c, d) { return colonne(c) < col ? a + L + d : m; });
-    // Largeur de la nouvelle colonne, si le classeur déclare les siennes et qu'aucune ne la couvre déjà
+    // Étendue de la feuille et filtre automatique : jusqu'à la dernière colonne ajoutée, pour pouvoir filtrer « Traité » dans Excel
+    out = out.replace(/(<(?:\w+:)?(?:dimension|autoFilter)\s+ref="\$?[A-Z]+\$?\d+:\$?)([A-Z]+)(\$?\d+")/g, function (m, a, c, d) { return colonne(c) < col + k - 1 ? a + L + d : m; });
+    // Largeur des nouvelles colonnes, si le classeur déclare les siennes et qu'aucune ne les couvre déjà
     var cols = /<((?:\w+:)?)cols>([\s\S]*?)<\/(?:\w+:)?cols>/.exec(out);
     if (cols) {
-      var maxi = 0, rM = /\bmax="(\d+)"/g, mm;
+      var maxi = 0, rM = /\bmax="(\d+)"/g, mm, ajout = "";
       while ((mm = rM.exec(cols[2]))) maxi = Math.max(maxi, +mm[1]);
-      if (maxi < col + 1) out = out.replace(/<\/((?:\w+:)?)cols>/, '<$1col min="' + (col + 1) + '" max="' + (col + 1) + '" width="38" customWidth="1"/></$1cols>');
+      for (var j = 0; j < k; j++) if (maxi < col + 1 + j) ajout += '<' + cols[1] + 'col min="' + (col + 1 + j) + '" max="' + (col + 1 + j) + '" width="' + (j ? 60 : 38) + '" customWidth="1"/>';
+      if (ajout) out = out.replace(/<\/((?:\w+:)?)cols>/, ajout + "</$1cols>");
     }
     return out;
   }
@@ -243,12 +247,14 @@
     return out;
   }
 
-  function annote(octets, marque, titre) {
+  function annote(octets, colonnes) {
+    var k = colonnes.length, titres = colonnes.map(function (c) { return c.titre; });
+    function zeros() { return colonnes.map(function () { return 0; }); }
     var u8 = octets instanceof Uint8Array ? octets : new Uint8Array(octets);
     var liste;
     try { liste = repertoire(u8); } catch (e) { return Promise.reject(e); }
     return classeurBrut(u8).then(function (cb) {
-      var modifs = {}, nbMarques = 0, parFeuille = [], etendues = {};
+      var modifs = {}, nbMarques = zeros(), parFeuille = [], etendues = {};
       cb.feuilles.forEach(function (s, iF) {
         if (!s.xml || !s.chemin) return;
         var rows = feuille(s.xml, cb.partages), h = -1, r, j;
@@ -262,20 +268,20 @@
           else if (c.trim() === "Libellé du document") iLib = j;
         });
         if (iInd < 0 || !visas) return;                         // feuille hors circuit : ses plans ne sont pas dans la liste
-        var nomenc = [], col = 0, marques = {}, n = 0;
+        var nomenc = [], col = 0, marques = {}, n = zeros();
         for (j = 0; j < iInd; j++) if (entete[j]) nomenc.push(j);
         rows.forEach(function (a) { if (a && a.length > col) col = a.length; });
         for (r = h + 1; r < rows.length; r++) {
           var a = rows[r];
           if (!a || vide(a[iLib])) continue;
           var code = nomenc.map(function (j) { return a[j] === null || a[j] === undefined ? "" : String(a[j]); }).join("-");
-          var t = marque(code, parseInt(a[iInd], 10) || 0);
-          if (t) { marques[r] = t; n++; }
+          var indice = parseInt(a[iInd], 10) || 0, ts = colonnes.map(function (c) { return c.marque(code, indice) || ""; });
+          ts.forEach(function (t, j) { if (t) { n[j]++; nbMarques[j]++; } });
+          if (ts.some(Boolean)) marques[r] = ts;
         }
-        nbMarques += n;
         parFeuille.push({ nom: s.nom, marques: n });
-        etendues[iF] = col;
-        modifs[s.chemin.toLowerCase()] = ecritFeuille(s.xml, h, marques, col, titre || "Traité");
+        etendues[iF] = col + k - 1;
+        modifs[s.chemin.toLowerCase()] = ecritFeuille(s.xml, h, marques, col, titres);
       });
       if (Object.keys(etendues).length) modifs["xl/workbook.xml"] = ecritClasseur(cb.classeur, etendues);
       var te = new TextEncoder();

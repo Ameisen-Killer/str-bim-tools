@@ -1651,9 +1651,9 @@ grant execute on function public.console_reinitialise_demo() to authenticated;
 -- de la GED Kairnial et les plans cochés « Traité ». Il est ouvert à toute
 -- personne qui a l'adresse de l'outil, SANS CONNEXION : le rôle anon (la clé
 -- publiable seule) lit, dépose, coche et retire. C'est la seule exception à
--- « la clé publiable n'ouvre rien » : ces deux tables et le seau « visas ».
--- Rien ne se modifie (pas d'update) : un export se dépose ou se retire, une
--- coche se pose ou s'enlève. Les bornes des colonnes limitent ce qu'un inconnu
+-- « la clé publiable n'ouvre rien » : ces trois tables et le seau « visas ».
+-- Exports et coches ne se modifient pas (pas d'update) : un export se dépose
+-- ou se retire, une coche se pose ou s'enlève. Les bornes des colonnes limitent ce qu'un inconnu
 -- peut y glisser ; le seau n'accepte que des classeurs .xlsx de 25 Mo au plus.
 create table if not exists public.visas_exports (
   id          uuid primary key default gen_random_uuid(),
@@ -1716,6 +1716,40 @@ create policy "visas : lecture" on storage.objects for select to anon, authentic
 create policy "visas : dépôt"   on storage.objects for insert to anon, authenticated with check (bucket_id = 'visas');
 create policy "visas : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'visas');
 
+-- Annotations : une zone de texte libre par plan (numéro), commune à tous et
+-- gardée d'un indice et d'un export à l'autre. Vider la zone efface la ligne.
+-- Ici, une annotation se modifie : la dernière écriture l'emporte, et la base
+-- pose elle-même l'heure de la modification.
+create table if not exists public.visas_notes (
+  code        text primary key check (char_length(code) between 1 and 200),
+  texte       text not null check (char_length(texte) between 1 and 4000),
+  modifie_le  timestamptz not null default now()
+);
+
+create or replace function public.visas_note_horodate()
+returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.modifie_le := now();
+  return new;
+end $$;
+revoke all on function public.visas_note_horodate() from public, anon, authenticated;
+drop trigger if exists visas_note_horodate on public.visas_notes;
+create trigger visas_note_horodate before insert or update on public.visas_notes
+  for each row execute function public.visas_note_horodate();
+
+alter table public.visas_notes enable row level security;
+revoke all on public.visas_notes from anon, authenticated;
+grant select, insert, update, delete on public.visas_notes to anon, authenticated;
+drop policy if exists "visas : lecture"      on public.visas_notes;
+drop policy if exists "visas : écriture"     on public.visas_notes;
+drop policy if exists "visas : modification" on public.visas_notes;
+drop policy if exists "visas : retrait"      on public.visas_notes;
+create policy "visas : lecture"      on public.visas_notes for select to anon, authenticated using (true);
+create policy "visas : écriture"     on public.visas_notes for insert to anon, authenticated with check (true);
+create policy "visas : modification" on public.visas_notes for update to anon, authenticated using (true) with check (true);
+create policy "visas : retrait"      on public.visas_notes for delete to anon, authenticated using (true);
+
 
 -- ==================================================== mises à jour en direct ==
 -- Les pages ouvertes se mettent à jour quand un collègue enregistre
@@ -1744,5 +1778,5 @@ commit;
 notify pgrst, 'reload schema';
 
 -- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports et visas_coches, ouvertes)
+--   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports, visas_coches et visas_notes, ouvertes)
 --   écriture -> 401 « new row violates row-level security policy »
