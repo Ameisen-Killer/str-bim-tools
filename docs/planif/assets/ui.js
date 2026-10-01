@@ -650,8 +650,7 @@
     { cle: "affaires", href: "/planif/affaires/", nom: "Affaires", court: "Affaires" },
     { cle: "equipe", href: "/planif/equipe/", nom: "Équipe", court: "Équipe" },
     { cle: "absences", href: "/planif/absences/", nom: "Absences", court: "Absences" },
-    { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" },
-    { cle: "visas", href: "/planif/visas/", nom: "Visas", court: "Visas" }
+    { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
   /**

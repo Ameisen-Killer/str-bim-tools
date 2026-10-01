@@ -1,0 +1,482 @@
+/* Visas — feuille de style de l'outil (/visas/).
+   Reprise des briques de la planification au moment où Visas en est sorti
+   (01.10.2026) : thèmes, barre, boutons, champs, tableaux, fenêtre, messages,
+   recherche, téléphone et papier. Indépendante de /planif/ : la planification
+   peut changer sa feuille sans rien casser ici. Le propre de la page (familles
+   de visa, graphiques) reste dans la page. */
+
+/* ---------------------------------------------------------------- thèmes
+   Toutes les couleurs passent par ces variables. Les composantes « -rvb »
+   servent aux transparences : rgba(var(--encre),.12) donne un filet
+   parchemin sur fond noir, un filet d'encre sur fond clair.
+   Le thème est posé sur <html data-theme="sombre|clair|ab"> avant le premier
+   rendu (script en tête de page) : aucun éclair de la mauvaise couleur. */
+:root{
+  color-scheme:dark;
+  --encre:236,232,224;          /* couleur du trait et du texte */
+  --fond-rvb:5,5,5;
+  --or-rvb:214,168,92;
+  --alerte-rvb:201,112,90;
+
+  --noir:#050505;               /* fond de page */
+  --noir-2:#0A0A0A;             /* fond des fenêtres, un cran au-dessus */
+  --texte:#ECE8E0;
+  --or:#D6A85C;
+  --alerte:#C9705A;
+  --voile:rgba(3,3,3,.78);      /* derrière les fenêtres */
+  --option-choisie:#2A2418;
+
+  /* Transparences calées pour un contraste d'au moins 4,5:1 (WCAG AA) sur le fond,
+     y compris pour le texte « faible » : discret, mais toujours lisible. */
+  --ligne:rgba(var(--encre),.17);
+  --ligne-faible:rgba(var(--encre),.09);
+  --or-doux:rgba(var(--or-rvb),.6);
+  --texte-doux:rgba(var(--encre),.74);
+  --texte-faible:rgba(var(--encre),.54);
+
+  --g:clamp(16px,3.2vw,48px);
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+
+/* Thème clair : « dessin sur calque ». Papier chaud, trait d'encre, or bruni. */
+:root[data-theme="clair"]{
+  color-scheme:light;
+  --encre:22,19,15;
+  --fond-rvb:243,240,232;
+  --or-rvb:122,83,18;
+  --alerte-rvb:152,54,30;
+
+  --noir:#F3F0E8;
+  --noir-2:#FBFAF6;
+  --texte:#16130F;
+  --or:#7A5312;
+  --alerte:#98361E;
+  --voile:rgba(22,19,15,.38);
+  --option-choisie:#EADBBE;
+
+  --ligne:rgba(var(--encre),.22);
+  --ligne-faible:rgba(var(--encre),.12);
+  --or-doux:rgba(var(--or-rvb),.7);
+  --texte-doux:rgba(var(--encre),.82);
+  --texte-faible:rgba(var(--encre),.66);
+}
+
+/* Thème « AB ingénieurs » : vert du logo assombri (#5C7722) pour porter un
+   texte, gris neutres, sur blanc. Le même que dans la planification. */
+:root[data-theme="ab"]{
+  color-scheme:light;
+  --encre:46,47,49;
+  --fond-rvb:245,245,244;
+  --or-rvb:92,119,34;
+  --alerte-rvb:152,54,30;
+
+  --noir:#F5F5F4;
+  --noir-2:#FFFFFF;
+  --texte:#2E2F31;
+  --or:#5C7722;
+  --alerte:#98361E;
+  --voile:rgba(46,47,49,.38);
+  --option-choisie:#E6F1D0;
+
+  --ligne:rgba(var(--encre),.22);
+  --ligne-faible:rgba(var(--encre),.12);
+  --or-doux:rgba(var(--or-rvb),.7);
+  --texte-doux:rgba(var(--encre),.86);
+  --texte-faible:rgba(var(--encre),.72);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--noir);color:var(--texte);
+  font-family:var(--sans);font-weight:300;line-height:1.55;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+a{color:inherit}
+h1,h2,h3{font-weight:200;margin:0}
+p{margin:0}
+[hidden]{display:none!important}
+.wrap{max-width:1360px;margin-inline:auto;padding-inline:var(--g)}
+/* Toute la largeur de la fenêtre : les tableaux et les graphiques en ont besoin */
+.large .wrap{max-width:none}
+.mono{font-family:var(--mono)}
+
+/* ---------------------------------------------------------------- barre
+   Le collage se fait sur le conteneur [data-chrome], enfant direct de body. */
+[data-chrome]{position:sticky;top:0;z-index:30}
+.barre{
+  position:relative;
+  background:rgba(var(--fond-rvb),.9);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--ligne-faible);
+}
+.barre-h{
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
+  padding:max(12px,env(safe-area-inset-top)) var(--g) 12px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
+}
+.barre-h a{text-decoration:none;transition:color .3s}
+.barre-h a:hover{color:var(--or)}
+.barre-h .sep{color:var(--texte-faible);margin-inline:6px}
+.barre-h .ici{color:var(--or)}
+.fil{display:flex;align-items:baseline;flex-wrap:nowrap;min-width:0}
+
+/* À droite : les actions de la page, puis le thème */
+.barre-outils{display:flex;align-items:center;gap:18px;white-space:nowrap}
+.barre-outils .actions-page{display:flex;gap:8px}
+.theme-btn{background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;transition:color .3s}
+.theme-btn:hover{color:var(--or)}
+
+/* Menu de thème */
+.theme{position:relative}
+.theme-btn{display:inline-flex;align-items:baseline;gap:7px}
+.theme-ico{font-size:13px;letter-spacing:0;line-height:1}
+.menu-theme{
+  position:absolute;right:-12px;top:calc(100% + 14px);z-index:50;min-width:176px;
+  display:flex;flex-direction:column;padding:6px;
+  background:var(--noir-2);border:1px solid var(--ligne);
+  animation:monte .25s cubic-bezier(.2,.7,.2,1);
+}
+.menu-theme[hidden]{display:none}
+.menu-theme button{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 12px;margin:0;background:none;border:0;cursor:pointer;
+  font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--texte-doux);
+}
+.menu-theme button:hover,.menu-theme button:focus-visible{color:var(--texte);background:rgba(var(--encre),.05);outline:none}
+.menu-theme button[aria-checked="true"]{color:var(--or)}
+.menu-theme .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
+.menu-theme [aria-checked="true"] .coche{background:currentColor}
+
+/* Action principale en bouton flottant : téléphone uniquement */
+.fab{display:none}
+.seul-mobile{display:none!important}           /* !important : .btn, plus bas, imposerait inline-flex */
+
+/* ------------------------------------------------------------- en-tete */
+.entete{position:relative;padding-top:clamp(20px,3vh,32px);padding-bottom:clamp(18px,3vh,30px)}
+.entete h1{margin-top:0;font-size:clamp(34px,5.4vw,62px);line-height:1;letter-spacing:.01em}
+.entete .chapeau{margin-top:12px;color:var(--texte-doux);font-size:15px;max-width:52em}
+/* Le projet et l'heure de l'export au bout du titre, sur la même ligne */
+.entete h1 .compte-titre{
+  margin-left:.5em;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:clamp(12px,1.25vw,16px);letter-spacing:.1em;color:var(--texte-faible);white-space:nowrap;
+}
+.filet-or{height:1px;margin-top:clamp(20px,3vh,32px);background:rgba(var(--or-rvb),.55);transform:scaleX(0);transform-origin:left;transition:transform 1.6s cubic-bezier(.55,.05,.25,1) .2s}
+.vu .filet-or,.filet-or.vu{transform:scaleX(1)}
+
+/* ------------------------------------------------------------- boutons */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--texte-doux);background:transparent;border:1px solid var(--ligne);
+  padding:9px 14px;cursor:pointer;text-decoration:none;
+  transition:color .25s,border-color .25s,background .25s;
+}
+.btn:hover{color:var(--texte);border-color:rgba(var(--encre),.3)}
+.btn:focus-visible{outline:1px solid var(--or);outline-offset:2px}
+.btn-or{color:var(--or);border-color:rgba(var(--or-rvb),.45)}
+.btn-or:hover{color:var(--noir);background:var(--or);border-color:var(--or)}
+.btn-nu{border-color:transparent;padding-inline:8px}
+.btn-nu:hover{border-color:var(--ligne)}
+.btn-rouge:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.5);background:transparent}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.btn-ico{min-width:34px;justify-content:center;padding:8px}
+
+/* Liste déroulante native : sans couleurs explicites, les options héritent du
+   texte translucide du bouton et deviennent illisibles sur le fond clair de Windows. */
+select option,select optgroup{background:var(--noir-2);color:var(--texte)}
+select option:checked{background:var(--option-choisie);color:var(--or)}
+
+/* icône devant le libellé d'un bouton : couleur du bouton */
+.ico-txt{
+  flex:0 0 auto;display:inline-block;width:18px;height:18px;background-color:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
+}
+.ico-export{--ico:url(/visas/icons/file_export.svg?v=1)}
+
+/* --------------------------------------------------------- formulaires */
+.grille-champs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:18px 20px}
+.champ{display:flex;flex-direction:column;gap:7px;min-width:0}
+.champ > label{
+  font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--texte-faible);
+}
+.champ input,.champ select{
+  font-family:var(--sans);font-weight:300;font-size:15px;color:var(--texte);
+  background:rgba(var(--encre),.03);border:1px solid var(--ligne);border-radius:0;
+  padding:9px 11px;width:100%;transition:border-color .25s,background .25s;
+}
+.champ input:focus,.champ select:focus{outline:none;border-color:var(--or-doux);background:rgba(var(--encre),.05)}
+.cases{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.case{
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  border:1px solid var(--ligne);padding:7px 11px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--texte-doux);
+  transition:border-color .25s,color .25s;
+}
+.case:hover{color:var(--texte);border-color:rgba(var(--encre),.3)}
+.case input{accent-color:var(--or);margin:0}
+.case:has(input:checked){color:var(--or);border-color:rgba(var(--or-rvb),.45)}
+
+/* ------------------------------------------------------------ sections */
+.section{padding-block:clamp(26px,4vh,42px);border-top:1px solid var(--ligne)}
+/* Première section : pas de filet au-dessus, et rien qui la repousse */
+.section:first-of-type{border-top:0;padding-top:clamp(12px,1.6vh,20px)}
+.tete-section{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:22px}
+.tete-section h2{font-size:clamp(21px,2.4vw,28px);font-weight:200}
+
+/* ------------------------------------------------------------ tableaux
+   Le tableau défile de côté quand il ne tient pas ; les quatre pixels de marge
+   intérieure, repris en marge négative, laissent respirer les liserés de focus. */
+.defile{overflow-x:auto;scrollbar-width:thin;padding:4px;margin:-4px}
+table.liste{width:100%;border-collapse:collapse;min-width:640px}
+table.liste th{
+  font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--texte-faible);
+  text-align:left;font-weight:400;padding:0 14px 10px 0;border-bottom:1px solid var(--ligne);white-space:nowrap;
+}
+table.liste td{padding:13px 14px 13px 0;border-bottom:1px solid var(--ligne-faible);vertical-align:top;font-size:14.5px}
+table.liste tr:hover td{background:rgba(var(--encre),.02)}
+table.liste td.actions{text-align:right;white-space:nowrap;padding-right:0}
+table.liste td.actions > *{vertical-align:middle}
+table.liste .principal{font-size:16px;font-weight:300}
+table.liste .secondaire{color:var(--texte-faible);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;margin-top:3px}
+.losange{width:6px;height:6px;border:1px solid var(--or);transform:rotate(45deg);flex:0 0 auto;margin-top:7px}
+.vide{padding:44px 0;text-align:center;color:var(--texte-faible);font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+
+/* ------------------------------------------------------------- modale */
+.modale{position:fixed;inset:0;z-index:60;display:none}
+.modale.ouverte{display:block}
+.modale-fond{position:absolute;inset:0;background:var(--voile);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.modale-boite{
+  position:relative;margin:0 auto;max-width:760px;width:calc(100% - 2*var(--g));
+  margin-top:clamp(20px,6vh,78px);margin-bottom:40px;max-height:calc(100dvh - 80px);
+  overflow-y:auto;background:var(--noir-2);border:1px solid var(--ligne);
+  padding:clamp(22px,3.4vw,34px);
+  animation:monte .42s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes monte{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.modale-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
+.modale-tete h2{font-size:clamp(22px,2.6vw,30px)}
+.surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.modale-tete .surtitre{margin-bottom:8px}
+.modale-pied{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne)}
+.modale-boite.compacte{padding:clamp(18px,2.4vw,26px)}
+.compacte .modale-tete{margin-bottom:14px}
+.compacte .modale-tete .surtitre{margin-bottom:5px}
+.compacte .modale-tete h2{line-height:1.2}
+.compacte .modale-pied{margin-top:18px;padding-top:14px}
+
+/* -------------------------------------------------------------- alerte */
+.bandeau{display:flex;gap:12px;align-items:flex-start;border:1px solid rgba(var(--or-rvb),.3);padding:14px 16px;margin-bottom:22px;font-size:14px;color:var(--texte-doux)}
+.bandeau strong{color:var(--texte);font-weight:400}
+
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:80;
+  background:var(--noir-2);border:1px solid rgba(var(--or-rvb),.45);color:var(--texte);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
+  padding:11px 18px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;
+  max-width:calc(100% - 32px);text-align:center;
+}
+.toast.vu{opacity:1;transform:translate(-50%,0)}
+.toast.vu.actif{pointer-events:auto}
+.toast-action{
+  margin-left:16px;padding:0;border:0;background:none;cursor:pointer;
+  font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--or);
+  text-decoration:underline;text-underline-offset:3px;
+}
+
+/* en-tête réservé au papier : le titre, les filtres, la date du tirage */
+.entete-impression{display:none}
+
+/* --------------------------------------------------------------- pied */
+footer.pied-outil{
+  display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 20px;margin-top:40px;
+  padding:20px var(--g) max(22px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);
+}
+footer.pied-outil a{text-decoration:none;transition:color .3s}
+footer.pied-outil a:hover{color:var(--or)}
+footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
+
+/* ------------------------------------------------------------ recherche
+   Recherche et filtres collés sous la barre du haut : --h-chrome est la
+   hauteur mesurée de la barre (outil.js). Une fois collé (classe « collee »),
+   le bloc se resserre et les libellés des filtres s'effacent. */
+.tete-collante{
+  position:sticky;top:var(--h-chrome,0px);z-index:12;
+  background:var(--noir);
+  padding-bottom:16px;margin-bottom:10px;
+  border-bottom:1px solid var(--ligne);
+  transition:padding-bottom .18s;
+}
+.tete-collante > :last-child{margin-bottom:0}
+.tete-collante .champ select{transition:padding .18s,font-size .18s,border-color .25s,background .25s}
+.tete-collante.collee{padding-bottom:10px}
+.tete-collante.collee .grille-champs{gap:10px 14px}
+.tete-collante.collee .champ{gap:0}
+.tete-collante.collee .champ > label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tete-collante.collee .champ select{padding:6px 10px;font-size:14px}
+.tete-collante.collee .case{padding:5px 10px}
+
+/* Un seul trait : le champ n'a pas de cadre, seulement un filet qui passe à
+   l'or quand on y entre, et au rouge quand plus rien ne correspond. */
+.recherche{
+  position:relative;display:flex;align-items:center;gap:16px;
+  margin:0 0 14px;padding:6px 0 12px;border-bottom:1px solid var(--ligne);
+}
+.recherche::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--or);
+  transform:scaleX(0);transform-origin:left;transition:transform .8s cubic-bezier(.55,.05,.25,1),background .3s;
+}
+.recherche:focus-within::after,.recherche.remplie::after{transform:scaleX(1)}
+.recherche.aucun::after{background:var(--alerte)}
+
+.recherche-loupe{position:relative;flex:0 0 auto;width:22px;height:22px;color:var(--texte-faible);transition:color .3s}
+.recherche-loupe::before{content:"";position:absolute;left:1px;top:1px;width:14px;height:14px;border:1.5px solid currentColor;border-radius:50%}
+.recherche-loupe::after{content:"";position:absolute;left:13.5px;top:14px;width:8px;height:1.5px;background:currentColor;transform:rotate(45deg);transform-origin:left center}
+.recherche:focus-within .recherche-loupe,.recherche.remplie .recherche-loupe{color:var(--or)}
+
+.recherche-champ{
+  flex:1 1 auto;min-width:0;padding:0;border:0;outline:none;background:none;
+  -webkit-appearance:none;appearance:none;
+  font-family:var(--sans);font-weight:200;font-size:clamp(22px,2.6vw,32px);line-height:1.25;
+  letter-spacing:.005em;color:var(--texte);caret-color:var(--or);
+}
+.recherche-champ::placeholder{color:var(--texte-faible)}
+.recherche-champ::-webkit-search-cancel-button,.recherche-champ::-webkit-search-decoration{-webkit-appearance:none;display:none}
+
+.recherche-compte{flex:0 0 auto;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--texte-faible);white-space:nowrap;font-variant-numeric:tabular-nums}
+.recherche-compte b{font-weight:400;color:var(--texte);transition:color .3s}
+.recherche.remplie .recherche-compte b{color:var(--or)}
+.recherche.aucun .recherche-compte b{color:var(--alerte)}
+
+.recherche-touche kbd{font-family:var(--mono);font-size:11px;color:var(--texte-faible);border:1px solid var(--ligne);padding:1px 7px}
+.recherche:focus-within .recherche-touche,.recherche.remplie .recherche-touche{display:none}
+
+.recherche-effacer{
+  display:none;flex:0 0 auto;background:none;border:0;padding:8px 0;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);transition:color .25s;
+}
+.recherche-effacer:hover,.recherche-effacer:focus-visible{color:var(--or);outline:none}
+.recherche.remplie .recherche-effacer{display:inline-block}
+
+/* =====================================================================
+   Tablette : fenêtre en plein écran. `max-height` doit rester : sans elle la
+   boîte grandit avec son contenu et ses boutons tombent hors de l'écran.
+   ===================================================================== */
+@media (max-width:860px){
+  .modale-boite{margin-top:0;margin-bottom:0;min-height:100dvh;max-height:100dvh;width:100%;
+    overscroll-behavior:contain}
+}
+
+/* =====================================================================
+   Téléphone (≤ 640 px) — l'outil doit s'y utiliser, pas seulement s'y afficher.
+   Cibles tactiles d'au moins 40 px, rien qui oblige à défiler de côté,
+   action principale à portée de pouce.
+   ===================================================================== */
+@media (max-width:640px){
+  .entete{padding-top:14px;padding-bottom:14px}
+  .entete h1{font-size:34px}
+  .entete .chapeau{display:none}                     /* au téléphone, on vient pour agir : droit au contenu */
+  .modale-pied{flex-direction:column-reverse;align-items:stretch}
+  .modale-pied .btn{justify-content:center}
+
+  /* barre : le nom de l'outil et le thème ; les actions passent au bouton flottant */
+  .barre-h .marque{display:none}
+  .barre-outils .actions-page{display:none}
+  .theme-btn{display:inline-flex;align-items:center;min-height:40px;padding:10px 0;margin:-10px 0}
+  .theme-lib{display:none}
+  .theme-ico{font-size:16px}
+  .menu-theme{right:-8px}
+
+  .fab{
+    display:flex;position:fixed;z-index:40;right:16px;bottom:max(18px,env(safe-area-inset-bottom));
+    align-items:center;gap:10px;height:52px;padding:0 22px;
+    background:var(--or);color:var(--noir);border:0;cursor:pointer;
+    font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  }
+  .fab .ico-txt{width:22px;height:22px}
+  body.avec-fab main{padding-bottom:84px}
+  .seul-mobile{display:inline-flex!important}
+
+  /* boutons et champs au doigt ; 16 px évite le zoom automatique des navigateurs mobiles */
+  .btn{min-height:40px}
+  .btn-nu{padding-inline:10px}
+  .champ input,.champ select{font-size:16px;min-height:44px}
+  .case{min-height:40px}
+  .tete-section{margin-bottom:16px}
+  .section{padding-block:22px}
+  .tete-collante{padding-bottom:12px}
+
+  /* tableaux -> fiches empilées ; les libellés viennent de l'en-tête (outil.js) */
+  table.liste{min-width:0!important}
+  table.liste thead{display:none}
+  table.liste,table.liste tbody,table.liste tr,table.liste td{display:block}
+  table.liste tr{padding:14px 0;border-bottom:1px solid var(--ligne)}
+  table.liste tr:hover td{background:none}
+  table.liste td{border:0;padding:3px 0}
+  table.liste td[data-l]{position:relative;padding-left:104px;min-height:24px}
+  table.liste td[data-l]::before{
+    content:attr(data-l);position:absolute;left:0;top:6px;width:96px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);
+  }
+  table.liste td.actions{display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 0;text-align:left}
+  table.liste td.actions .btn{flex:1 1 auto;justify-content:center;border-color:var(--ligne)}
+  .defile{overflow-x:visible}
+
+  .recherche{gap:12px;margin-bottom:12px}
+  .recherche-touche{display:none}                   /* pas de clavier physique */
+  .recherche-champ{font-size:22px;min-height:40px}
+  .recherche-compte{font-size:11px}
+}
+
+/* =====================================================================
+   Impression et export PDF
+   Aucune bibliothèque : le PDF sort de l'impression du navigateur, et
+   c'est cette feuille qui en fait la mise en page. A4 paysage, palette
+   claire forcée (on n'imprime pas une page noire), fonds conservés.
+   ===================================================================== */
+@page{size:A4 landscape;margin:9mm 8mm}
+
+@media print{
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"],:root[data-theme="ab"]{
+    --encre:22,19,15;
+    --fond-rvb:255,255,255;
+    --or-rvb:122,83,18;
+    --alerte-rvb:152,54,30;
+    --noir:#fff;--noir-2:#fff;--texte:#16130F;--or:#7A5312;--alerte:#98361E;
+    --ligne:rgba(var(--encre),.4);--ligne-faible:rgba(var(--encre),.22);
+    --or-doux:rgba(var(--or-rvb),.8);
+    --texte-doux:rgba(var(--encre),.88);--texte-faible:rgba(var(--encre),.7);
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;color:#16130F;font-size:9pt;overflow-x:visible}
+
+  [data-chrome],.fab,.toast,.modale,.bandeau,.recherche,.seul-mobile,footer.pied-outil,.sans-impression{display:none!important}
+  /* Le bloc collant ne porte que de quoi restreindre la liste : hors papier.
+     Ce qu'il retient se lit dans l'en-tête imprimé. */
+  .tete-collante{display:none!important}
+  body.avec-fab main{padding-bottom:0}
+  .wrap{max-width:none;padding-inline:0}
+  a{text-decoration:none;color:inherit}
+
+  /* l'en-tête d'écran laisse la place à celui du papier */
+  .entete{display:none}
+  .entete-impression{display:block;margin-bottom:10px;border-bottom:1px solid var(--ligne);padding-bottom:6px}
+  .entete-impression h1{font-size:15pt;font-weight:200;line-height:1.1}
+  .entete-impression .ligne{
+    display:flex;justify-content:space-between;gap:16px;margin-top:5px;
+    font-family:var(--mono);font-size:7.5pt;letter-spacing:.06em;color:var(--texte-doux);
+  }
+
+  .section{padding-block:8px;border-top:1px solid var(--ligne-faible)}
+  .tete-section{margin-bottom:10px;break-after:avoid}
+  .tete-section h2{font-size:12pt}
+
+  .defile{overflow:visible!important}
+  table.liste{min-width:0!important;font-size:8pt}
+  table.liste thead{display:table-header-group}
+  table.liste th{font-size:6.5pt}
+  table.liste td,table.liste th{padding:4px 10px 4px 0}
+  table.liste tr{break-inside:avoid}
+  table.liste td.actions{display:none}
+}

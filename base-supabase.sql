@@ -377,49 +377,6 @@ comment on column public.contacts.natel is
 comment on column public.contacts.npa is
   'Code postal. Texte et non nombre : les NPA étrangers ont des lettres et des zéros en tête.';
 
--- ------------------------------------------------------- exports Kairnial ---
--- Page Visas : les exports « Tableau de suivi » de la GED Kairnial déposés par
--- l'équipe. Le fichier est dans le seau privé « visas » (Storage), rangé sous
--- <bureau>/<export>.xlsx ; cette table le décrit.
-create table if not exists public.exports_visas (
-  id          uuid primary key default gen_random_uuid(),
-  bureau_id   uuid not null default public.bureau_par_defaut()
-              constraint exports_visas_bureau_fk references public.bureaux (id) on delete cascade,
-  chemin      text not null unique,
-  nom         text not null default '',
-  taille      bigint not null default 0,
-  depose_le   timestamptz not null default now(),
-  depose_par  text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
-  depose_nom  text not null default '',
-  edition     timestamp,
-  projet      text not null default '',
-  nb_plans    integer not null default 0,
-  nb_indices  integer not null default 0,
-  nb_visas    integer not null default 0
-);
-create index if not exists exports_visas_bureau on public.exports_visas (bureau_id, depose_le desc);
-comment on column public.exports_visas.edition is
-  '« Date édition » écrite par Kairnial dans le fichier : l''heure à laquelle l''export a été tiré, heure locale.';
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('visas', 'visas', false, 26214400,
-        array['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'])
-on conflict (id) do update
-  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
-
--- Plans cochés « Traité » dans la liste de la page Visas, par numéro et indice :
--- un nouvel indice redevient « à traiter ». Décocher efface la ligne.
-create table if not exists public.visas_traites (
-  bureau_id   uuid not null default public.bureau_par_defaut()
-              constraint visas_traites_bureau_fk references public.bureaux (id) on delete cascade,
-  code        text not null,
-  indice      integer not null default 0,
-  traite_le   timestamptz not null default now(),
-  traite_par  text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
-  traite_nom  text not null default '',
-  primary key (bureau_id, code, indice)
-);
-
 -- -------------------------------------------------------------- présences ---
 -- Qui a l'outil sous les yeux : la barre du haut en annonce le nombre, et les
 -- noms au survol. Une ligne par onglet ouvert ; un onglet visible bat toutes
@@ -617,7 +574,7 @@ declare
 begin
   foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                           'succursale_disciplines', 'presences', 'exports_visas', 'visas_traites'] loop
+                           'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -626,7 +583,7 @@ begin
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                        'succursale_disciplines', 'presences', 'exports_visas', 'visas_traites')
+                        'succursale_disciplines', 'presences')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -717,38 +674,6 @@ create policy "bureau courant (modification)" on public.contacts for update to a
   with check (bureau_id = (select public.bureau_courant()));
 create policy "bureau courant (suppression)" on public.contacts for delete to authenticated
   using (bureau_id = (select public.bureau_courant()));
-
--- Exports Kairnial (page Visas) : tout le bureau dépose, rouvre et retire ;
--- un export ne se modifie pas. L'adresse de dépôt est celle de la session, et
--- le fichier doit être rangé dans le dossier du bureau.
-create policy "bureau courant (lecture)" on public.exports_visas for select to authenticated
-  using (bureau_id = (select public.bureau_courant()));
-create policy "bureau courant (dépôt)" on public.exports_visas for insert to authenticated
-  with check (bureau_id = (select public.bureau_courant())
-              and depose_par = lower(coalesce(auth.jwt() ->> 'email', ''))
-              and split_part(chemin, '/', 1) = (select public.bureau_courant())::text);
-create policy "bureau courant (suppression)" on public.exports_visas for delete to authenticated
-  using (bureau_id = (select public.bureau_courant()));
-
--- Plans traités : tout le bureau coche et décoche ; l'adresse est celle de la session.
-create policy "bureau courant (lecture)" on public.visas_traites for select to authenticated
-  using (bureau_id = (select public.bureau_courant()));
-create policy "bureau courant (coche)" on public.visas_traites for insert to authenticated
-  with check (bureau_id = (select public.bureau_courant())
-              and traite_par = lower(coalesce(auth.jwt() ->> 'email', '')));
-create policy "bureau courant (suppression)" on public.visas_traites for delete to authenticated
-  using (bureau_id = (select public.bureau_courant()));
-
--- Leurs fichiers : le premier dossier du chemin est le bureau.
-drop policy if exists "visas : lecture du bureau"      on storage.objects;
-drop policy if exists "visas : dépôt dans le bureau"   on storage.objects;
-drop policy if exists "visas : retrait dans le bureau" on storage.objects;
-create policy "visas : lecture du bureau" on storage.objects for select to authenticated
-  using (bucket_id = 'visas' and (storage.foldername(name))[1] = (select public.bureau_courant())::text);
-create policy "visas : dépôt dans le bureau" on storage.objects for insert to authenticated
-  with check (bucket_id = 'visas' and (storage.foldername(name))[1] = (select public.bureau_courant())::text);
-create policy "visas : retrait dans le bureau" on storage.objects for delete to authenticated
-  using (bucket_id = 'visas' and (storage.foldername(name))[1] = (select public.bureau_courant())::text);
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -1697,11 +1622,10 @@ begin
   end if;
 
   -- Tout ce qu'un testeur a pu toucher
-  delete from public.affaires      where bureau_id = v_bureau;   -- tâches et équipes suivent
-  delete from public.absences      where bureau_id = v_bureau;
-  delete from public.contacts      where bureau_id = v_bureau;
-  delete from public.visas_traites where bureau_id = v_bureau;
-  delete from public.membres       where bureau_id = v_bureau and email like '%@demo.exemple.ch';
+  delete from public.affaires where bureau_id = v_bureau;   -- tâches et équipes suivent
+  delete from public.absences where bureau_id = v_bureau;
+  delete from public.contacts where bureau_id = v_bureau;
+  delete from public.membres  where bureau_id = v_bureau and email like '%@demo.exemple.ch';
 
   perform public.remplit_demo(v_bureau);
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- feuille au coin plié, ouverte en bas à droite pour la flèche -->
+  <path d="M25 43H12a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h16l9 9v12"/>
+  <path d="M28 5v9h9"/>
+  <!-- lignes de texte -->
+  <path d="M15 21h12M15 27h9"/>
+  <!-- flèche d'export -->
+  <path d="M35 30v13M29.5 37.5L35 43l5.5-5.5"/>
+</svg>
