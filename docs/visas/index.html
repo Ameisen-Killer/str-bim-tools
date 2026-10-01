@@ -371,6 +371,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
             </select>
           </div>
         </div>
+        <div class="cases" id="cases-annotes" hidden style="margin:14px 0 0"><label class="case" title="Ne montrer que les plans qui portent une annotation. Se combine avec les autres filtres."><input type="checkbox" id="f-annotes"> <span id="lib-annotes">Plans annotés seulement</span></label></div>
         <div class="v-choix" id="choix-statuts"></div>
         <div class="defile" style="margin-top:18px"><table class="liste" id="table-plans"></table></div>
         <button class="btn v-plus" type="button" id="plus" hidden></button>
@@ -413,7 +414,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   var UI = window.Outil, S = window.Stock, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", traite: "tous", statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", traite: "tous", annotes: false, statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -1189,21 +1190,35 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* Traitement : tous les plans, ceux qui restent à reprendre, ceux déjà repris.
      Le choix est retenu dans ce navigateur : on revient d'ordinaire à sa pile. */
   var CLE_TRAITE = "visas.traitement";
-  try { var t0 = localStorage.getItem(CLE_TRAITE); if (t0 === "a-traiter" || t0 === "traites" || t0 === "annotes") etat.traite = t0; } catch (e) {}
+  /* Plans annotés seulement : une case à part, qui se combine avec le
+     traitement (« à traiter » et annotés, par exemple). Retenue aussi. */
+  var CLE_ANNOTES = "visas.annotes";
+  try {
+    var t0 = localStorage.getItem(CLE_TRAITE);
+    if (t0 === "a-traiter" || t0 === "traites") etat.traite = t0;
+    etat.annotes = localStorage.getItem(CLE_ANNOTES) === "1" || t0 === "annotes";   // « annotes » : l'ancienne entrée du menu
+  } catch (e) {}
   function menuTraite() {
     $("champ-traite").hidden = !traitesOk;
-    if (!traitesOk) return;
+    $("cases-annotes").hidden = !notesOk;
     if (!R) return;
-    var fait = R.plans.filter(traiteDe).length, annotes = R.plans.filter(function (p) { return !!noteDe(p.code); }).length;
-    if (etat.traite === "annotes" && !notesOk) etat.traite = "tous";
-    $("f-traite").innerHTML = [["tous", "Tous les plans · " + n(R.plans.length)], ["a-traiter", "À traiter · " + n(R.plans.length - fait)], ["traites", "Traités · " + n(fait)]]
-      .concat(notesOk ? [["annotes", "Annotés · " + n(annotes)]] : []).map(function (o) {
+    var annotes = R.plans.filter(function (p) { return !!noteDe(p.code); }).length;
+    $("f-annotes").checked = !!etat.annotes;
+    $("lib-annotes").textContent = "Plans annotés seulement · " + n(annotes);
+    if (!traitesOk) return;
+    var fait = R.plans.filter(traiteDe).length;
+    $("f-traite").innerHTML = [["tous", "Tous les plans · " + n(R.plans.length)], ["a-traiter", "À traiter · " + n(R.plans.length - fait)], ["traites", "Traités · " + n(fait)]].map(function (o) {
       return '<option value="' + o[0] + '"' + (o[0] === etat.traite ? " selected" : "") + ">" + esc(o[1]) + "</option>";
     }).join("");
   }
   $("f-traite").addEventListener("change", function () {
     etat.traite = this.value; etat.limite = 60; etat.ouvert = null;
     try { localStorage.setItem(CLE_TRAITE, etat.traite); } catch (e) {}
+    rendListe();
+  });
+  $("f-annotes").addEventListener("change", function () {
+    etat.annotes = this.checked; etat.limite = 60; etat.ouvert = null;
+    try { localStorage.setItem(CLE_ANNOTES, etat.annotes ? "1" : "0"); } catch (e) {}
     rendListe();
   });
 
@@ -1248,8 +1263,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
-      if (etat.traite === "annotes") { if (!noteDe(p.code)) return false; }
-      else if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
+      if (notesOk && etat.annotes && !noteDe(p.code)) return false;
+      if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
       return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur, noteDe(p.code)], mots);
     });
     l.sort({
@@ -1402,6 +1417,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
     if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
+    if (notesOk && etat.annotes) f.push("Plans annotés");
     if (st.length) f.push("Liste : " + st.join(", "));
     var q = barre && barre.valeur().trim();
     if (q) f.push("« " + q + " »");
