@@ -415,6 +415,11 @@
       o.enchaine = t.enchaine === true;
       return o;
     },
+    /* Un avis porte une heure : l'écran la garde en heure locale
+       (« 2026-10-02T14:00 »), la base en timestamptz. */
+    avis: function (a) {
+      return { id: a.id, membre_id: a.membreId, debut: versInstant(a.debut), fin: versInstant(a.fin), motif: a.motif };
+    },
     contacts: function (c) {
       return { id: c.id, nom: c.nom, prenom: c.prenom, societe: c.societe,
                telephone: c.telephone, natel: c.natel, email: c.email, site: c.site, role: c.role,
@@ -422,6 +427,35 @@
                canton: c.canton, pays: c.pays, observations: c.observations };
     }
   };
+
+  /* Heure locale « AAAA-MM-JJTHH:MM » ↔ instant de la base. */
+  function versInstant(local) {
+    var d = new Date(local);
+    return isNaN(d) ? local : d.toISOString();
+  }
+  function versLocal(instant) {
+    var d = new Date(instant);
+    if (isNaN(d)) return "";
+    function deux(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + deux(d.getMonth() + 1) + "-" + deux(d.getDate()) +
+      "T" + deux(d.getHours()) + ":" + deux(d.getMinutes());
+  }
+
+  /* Avis d'absence (table avis, migration-avis.sql) : seuls ceux qui ne sont
+     pas encore passés depuis une semaine sont lus — un avis échu ne sert plus.
+     Garde-fou PROVISOIRE : tant que Tony n'a pas lancé la migration, la table
+     manque ; l'outil marche sans, et l'accueil le signale. À retirer (avec
+     avisEnBase) dès la migration passée. */
+  var avisEnBase = true;
+  function litAvis() {
+    var depuis = new Date(Date.now() - 7 * 864e5).toISOString();
+    return requete("avis?select=*&fin=gte." + encodeURIComponent(depuis) + "&order=debut")
+      .then(function (l) { avisEnBase = true; return l || []; })
+      .catch(function (e) {
+        if (e && (e.code === "PGRST205" || e.code === "42P01")) { avisEnBase = false; return []; }
+        throw e;
+      });
+  }
 
   /* ------------------------------------------------------------ lecture */
 
@@ -433,11 +467,12 @@
       litTout("affaire_membres", "affaire_id,membre_id"),
       litTout("taches", "id"),
       litTout("reglages", "id"),
-      litTout("contacts", "id")
+      litTout("contacts", "id"),
+      litAvis()
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [];
+          contacts = r[6] || [], avis = r[7] || [];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -495,6 +530,10 @@
             localite: c.localite || "", canton: c.canton || "", pays: c.pays || "",
             observations: c.observations || ""
           };
+        }),
+        avis: avis.map(function (a) {
+          return { id: a.id, membreId: a.membre_id, debut: versLocal(a.debut), fin: versLocal(a.fin),
+                   motif: a.motif || "", cree: a.cree_le };
         })
       };
     });
@@ -604,6 +643,8 @@
     var dTaches   = compare(av.taches || [], etat.taches, VERS_BASE.taches);
     var dAbsences = compare(toutesAbsences(av), toutesAbsences(etat), function (a) { return a; });
     var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
+    var dAvis = avisEnBase ? compare(av.avis || [], etat.avis || [], VERS_BASE.avis)
+      : { ajouts: [], modifs: [], retraits: [] };
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -638,12 +679,14 @@
     if (dAffaires.retraits.length) suite = suite.then(function () { return effaceLot("affaires", dAffaires.retraits); });
     if (dMembres.retraits.length) suite = suite.then(function () { return effaceLot("membres", dMembres.retraits); });
     if (dContacts.retraits.length) suite = suite.then(function () { return effaceLot("contacts", dContacts.retraits); });
+    if (dAvis.retraits.length) suite = suite.then(function () { return effaceLot("avis", dAvis.retraits); });
 
     suite = suite.then(function () { return appliqueTable("membres", dMembres); });
     suite = suite.then(function () { return appliqueTable("affaires", dAffaires); });
     suite = suite.then(function () { return appliqueTable("taches", dTaches); });
     suite = suite.then(function () { return appliqueTable("absences", dAbsences); });
     suite = suite.then(function () { return appliqueTable("contacts", dContacts); });
+    suite = suite.then(function () { return appliqueTable("avis", dAvis); });
     if (liensNeufs.length) suite = suite.then(function () { return insere("affaire_membres", liensNeufs); });
 
     var rAv = av.reglages || {}, rAp = etat.reglages;
@@ -678,6 +721,8 @@
     projet: function () { return { url: URL_BASE, cle: CLE }; },
     presence: presence,
     reglagesAuth: reglagesAuth,
+    /** La table des avis d'absence existe-t-elle ? (garde-fou provisoire, voir litAvis) */
+    avisEnBase: function () { return avisEnBase; },
     ADAPT: {
       nom: "supabase",
       semeSiVide: false,

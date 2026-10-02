@@ -14,7 +14,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=75">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=76">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -147,10 +147,10 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=28"></script>
-<script src="/planif/assets/donnees.js?v=37"></script>
-<script src="/planif/assets/ui.js?v=56"></script>
-<script src="/planif/assets/palette.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=29"></script>
+<script src="/planif/assets/donnees.js?v=38"></script>
+<script src="/planif/assets/ui.js?v=57"></script>
+<script src="/planif/assets/palette.js?v=7"></script>
 <script>
 (function () {
   "use strict";
@@ -199,7 +199,7 @@
       el("div", { class: "carte" }, [
         el("div", { class: "num-section", text: titre }),
         el("p", { style: "margin-top:12px;color:var(--texte-doux);font-size:15px;max-width:52em", text: texte }),
-        el("a", { class: "btn", href: "/planif/", style: "margin-top:20px" }, ["Retour au planning"])
+        el("a", { class: "btn", href: "/planif/planning/", style: "margin-top:20px" }, ["Retour au planning"])
       ])
     ]));
   }

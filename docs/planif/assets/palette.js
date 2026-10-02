@@ -224,7 +224,8 @@
   /* ===================================================== les résultats ===== */
 
   var PAGES = [
-    { nom: "Tableau de bord", href: "/planif/", mots: "planning accueil" },
+    { nom: "Accueil", href: "/planif/", mots: "bienvenue salut aujourd'hui mes taches avis" },
+    { nom: "Tableau de bord", href: "/planif/planning/", mots: "planning barres semaines" },
     { nom: "Carte de charge", href: "/planif/charge/", mots: "charge occupation disponibilite qui est libre surcharge semaines" },
     { nom: "Tâches", href: "/planif/taches/", mots: "liste" },
     { nom: "Affaires", href: "/planif/affaires/", mots: "projets" },
@@ -240,6 +241,7 @@
       if (D.monMembre && D.monMembre()) {
         liste.push({ nom: "Mes jours travaillés", mots: "semaine jours off temps partiel mercredi capacite horaire", glyphe: "▦", action: function () { ferme(); UI.joursTravailles(null, D.redessine); } });
       }
+      liste.push({ nom: "Prévenir le bureau d'une absence", mots: "avis absent rendez-vous medecin retard heure prevenir bureau", glyphe: "!", action: function () { ferme(); va("/planif/#prevenir"); } });
       liste.push({ nom: "Poser une absence", mots: "vacances conge maladie formation absence", glyphe: "◐", action: function () { ferme(); UI.nouvelleAbsence({ surChangement: D.redessine }); } });
       liste.push({ nom: "Rafraîchir les données", mots: "recharger actualiser mise a jour", glyphe: "↻", action: function () { ferme(); UI.rafraichit(false); } });
     }

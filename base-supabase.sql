@@ -262,6 +262,28 @@ create table if not exists public.absences (
 create index if not exists absences_membre on public.absences (membre_id, debut);
 create index if not exists absences_bureau on public.absences (bureau_id);
 
+-- ------------------------------------------------------------------- avis ---
+-- Avis d'absence à l'heure près, affichés sur l'accueil de la planification :
+-- un rendez-vous, un après-midi sur un chantier, une arrivée tardive. Ils
+-- informent l'équipe et ne comptent pas dans le planning (les absences, en
+-- jours entiers, s'en chargent).
+create table if not exists public.avis (
+  id         uuid primary key default gen_random_uuid(),
+  bureau_id  uuid not null default public.bureau_par_defaut()
+             constraint avis_bureau_fk references public.bureaux (id) on delete cascade,
+  membre_id  uuid not null,
+  debut      timestamptz not null,
+  fin        timestamptz not null,
+  motif      text not null default 'Absence' check (char_length(motif) <= 200),
+  cree_le    timestamptz not null default now(),
+  constraint avis_ordonne check (fin > debut),
+  constraint avis_membre_bureau_fk foreign key (membre_id, bureau_id)
+    references public.membres (id, bureau_id) on delete cascade
+);
+create index if not exists avis_bureau on public.avis (bureau_id, fin);
+comment on table public.avis is
+  'Avis d''absence à l''heure près, affichés sur l''accueil de la planification. Ne comptent pas dans le planning (les absences, en jours, s''en chargent).';
+
 -- --------------------------------------------------------------- affaires ---
 create table if not exists public.affaires (
   id         uuid primary key default gen_random_uuid(),
@@ -573,7 +595,7 @@ declare
   t text;
   p record;
 begin
-  foreach t in array array['membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts',
+  foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
@@ -582,7 +604,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -659,6 +681,25 @@ create policy "droit ou mes absences (modification)" on public.absences for upda
               and (membre_id = (select public.mon_membre())
                    or (select public.a_droit('absences_autrui'))));
 create policy "droit ou mes absences (suppression)" on public.absences for delete to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (membre_id = (select public.mon_membre())
+              or (select public.a_droit('absences_autrui'))));
+
+-- Avis d'absence : la même règle que les absences.
+create policy "bureau courant (lecture)" on public.avis for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "droit ou mes avis (création)" on public.avis for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and (membre_id = (select public.mon_membre())
+                   or (select public.a_droit('absences_autrui'))));
+create policy "droit ou mes avis (modification)" on public.avis for update to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (membre_id = (select public.mon_membre())
+              or (select public.a_droit('absences_autrui'))))
+  with check (bureau_id = (select public.bureau_courant())
+              and (membre_id = (select public.mon_membre())
+                   or (select public.a_droit('absences_autrui'))));
+create policy "droit ou mes avis (suppression)" on public.avis for delete to authenticated
   using (bureau_id = (select public.bureau_courant())
          and (membre_id = (select public.mon_membre())
               or (select public.a_droit('absences_autrui'))));
@@ -1625,6 +1666,7 @@ begin
   -- Tout ce qu'un testeur a pu toucher
   delete from public.affaires where bureau_id = v_bureau;   -- tâches et équipes suivent
   delete from public.absences where bureau_id = v_bureau;
+  delete from public.avis     where bureau_id = v_bureau;
   delete from public.contacts where bureau_id = v_bureau;
   delete from public.membres  where bureau_id = v_bureau and email like '%@demo.exemple.ch';
 
@@ -1762,7 +1804,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'contacts', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

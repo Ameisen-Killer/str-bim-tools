@@ -349,7 +349,7 @@ select option:checked{background:var(--option-choisie);color:var(--or)}
 .champ textarea{resize:vertical;min-height:76px;line-height:1.5}
 .champ input:focus,.champ select:focus,.champ textarea:focus{outline:none;border-color:var(--or-doux);background:rgba(var(--encre),.05)}
 .champ input::placeholder,.champ textarea::placeholder{color:rgba(var(--encre),.45)}
-.champ input[type=date],.champ input[type=number]{font-family:var(--mono);font-size:13px;letter-spacing:.04em}
+.champ input[type=date],.champ input[type=time],.champ input[type=number]{font-family:var(--mono);font-size:13px;letter-spacing:.04em}
 .champ .aide{font-size:12px;color:var(--texte-faible);line-height:1.4}
 .champ.erreur input,.champ.erreur select{border-color:rgba(var(--alerte-rvb),.7)}
 .champ .msg{font-family:var(--mono);font-size:11px;color:var(--alerte)}
@@ -1170,7 +1170,7 @@ html.palette-ouverte{overflow:hidden}
   /* boutons et champs au doigt ; 16 px évite le zoom automatique des navigateurs mobiles */
   .btn{min-height:40px}
   .btn-nu{padding-inline:10px}
-  .champ input,.champ select,.champ textarea,.champ input[type=date],.champ input[type=number]{font-size:16px;min-height:44px}
+  .champ input,.champ select,.champ textarea,.champ input[type=date],.champ input[type=time],.champ input[type=number]{font-size:16px;min-height:44px}
   .case{min-height:40px}
   button.etiq{min-height:36px;padding-inline:11px}   /* bascule de part : cible atteignable au doigt */
   .tete-section{margin-bottom:16px}
@@ -1446,4 +1446,111 @@ html.palette-ouverte{overflow:hidden}
   table.liste td.actions{display:none}
   .alertes{break-inside:auto}
   .al{break-inside:avoid}
+}
+
+/* ================================================================ accueil
+   /planif/ (02.10.2026) : la date en grand, « Salut <prénom> », puis mes
+   tâches à venir, qui est au bureau, prévenir d'une absence, mes absences. */
+.ac-entete .decor-place{width:min(40vw,640px)}
+.ac-entete .chapeau{max-width:min(46em,calc(100% - min(40vw,640px) - 30px))}
+.ac-date-haut{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or);
+  display:flex;flex-wrap:wrap;gap:.2em .8em;position:relative;z-index:1}
+.ac-sep{color:var(--texte-faible)}
+.ac-heure{font-variant-numeric:tabular-nums;color:var(--texte-doux)}
+.ac-date-grand{position:relative;z-index:1;margin-top:10px;font-weight:100;line-height:.95;
+  font-size:clamp(46px,6.4vw,104px);letter-spacing:-.01em;font-variant-numeric:lining-nums}
+.ac-date-grand .ac-num{color:var(--or);font-weight:200}
+.ac-date-grand .ac-mois{color:var(--texte)}
+.entete h1.ac-salut{margin-top:clamp(14px,2.2vh,24px);font-size:clamp(30px,3.8vw,52px);font-weight:200;letter-spacing:.005em}
+.ac-salut .l{display:inline-block;opacity:0;transform:translateY(.35em);animation:ac-lettre .7s cubic-bezier(.2,.7,.2,1) forwards;
+  animation-delay:calc(var(--i) * 45ms + 120ms)}
+.ac-nom{position:relative;display:inline-block;color:var(--or)}
+.ac-trait{position:absolute;left:-2%;right:-2%;bottom:-.24em;width:104%;height:.3em;overflow:visible}
+.ac-trait path{fill:none;stroke:var(--or);stroke-width:1.6;stroke-linecap:round;vector-effect:non-scaling-stroke;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:ac-trait 1.1s cubic-bezier(.55,.05,.25,1) forwards}
+@keyframes ac-lettre{to{opacity:1;transform:none}}
+@keyframes ac-trait{to{stroke-dashoffset:0}}
+.ac-phrase{position:relative;z-index:1}
+/* La semaine de travail qui avance, lundi 8 h → vendredi 17 h 30 : un fil sous la phrase */
+.ac-semaine-fil{position:relative;z-index:1;margin-top:14px;width:min(320px,60%);height:2px;background:var(--ligne-faible)}
+.ac-semaine-fil i{display:block;height:100%;width:0;background:rgba(var(--or-rvb),.7);transition:width 1.4s cubic-bezier(.55,.05,.25,1) .5s}
+
+.ac-cles-section{padding-bottom:0}
+.ac-cles-section .cles{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+.ac-cles-section .cle .v{font-size:clamp(24px,3vw,36px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-grille{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:0 clamp(28px,4vw,64px);align-items:start}
+.ac-col > .section:first-child{border-top:1px solid var(--ligne)}
+.ac-bloc .tete-section{margin-bottom:14px}
+
+.ac-liste{list-style:none;margin:0;padding:0;border-top:1px solid var(--ligne-faible)}
+.ac-liste > li{border-bottom:1px solid var(--ligne-faible)}
+.ac-ligne,.ac-personne{display:flex;align-items:center;gap:14px;width:100%;padding:12px 4px;text-align:left;
+  background:transparent;border:0;color:inherit;font:inherit}
+.ac-ligne{cursor:pointer;transition:background .2s}
+.ac-ligne:hover,.ac-ligne:focus-visible{background:rgba(var(--encre),.04);outline:none}
+.ac-ligne:hover .ac-titre,.ac-ligne:focus-visible .ac-titre{color:var(--or)}
+.ac-lib{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 auto}
+.ac-titre{font-size:15px;line-height:1.3;transition:color .2s;overflow:hidden;text-overflow:ellipsis}
+.ac-sous{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--texte-faible);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-quand{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:0 0 auto;text-align:right}
+.ac-rel{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--texte-doux);white-space:nowrap}
+.ac-jourc{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--texte-faible);white-space:nowrap}
+.ac-quand.retard .ac-rel{color:var(--alerte)}
+.ac-quand.or .ac-rel{color:var(--or)}
+.ac-groupe{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--texte-faible);margin:18px 0 6px}
+.ac-groupe:first-child{margin-top:0}
+.ac-groupe.retard{color:var(--alerte)}
+.ac-plus{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-doux);text-decoration:none}
+.ac-plus:hover{color:var(--or)}
+.ac-vide{padding:26px 0}
+
+.ac-init{flex:0 0 auto;width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--ligne);
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--texte-doux)}
+.ac-personne.en-cours .ac-init{border-color:var(--or-doux);color:var(--or)}
+.ac-personne.eteinte{opacity:.62}
+.ac-personne .etiq{flex:0 0 auto}
+.ac-etiq-or{border-color:rgba(var(--or-rvb),.5);color:var(--or)}
+.ac-tous-la{display:flex;align-items:center;gap:10px;color:var(--texte-doux);margin:6px 0 0}
+.ac-tous-la .puce{width:7px;height:7px;background:var(--or);transform:rotate(45deg)}
+
+/* Petite feuille de calendrier devant chaque absence */
+.ac-cal{flex:0 0 auto;width:44px;display:flex;flex-direction:column;align-items:center;border:1px solid var(--ligne);padding:4px 0 3px}
+.ac-cal b{font-weight:200;font-size:19px;line-height:1.05;color:var(--or)}
+.ac-cal span{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible)}
+.ac-cal-h b{font-size:13px;font-family:var(--mono);letter-spacing:.02em;padding-top:3px}
+
+/* Prévenir le bureau */
+.ac-prevenir{scroll-margin-top:calc(var(--h-chrome, 90px) + 12px)}
+.ac-prevenir.eclaire .ac-form{animation:ac-eclat 1.6s ease-out}
+@keyframes ac-eclat{25%{box-shadow:0 0 0 1px rgba(var(--or-rvb),.7),0 0 26px rgba(var(--or-rvb),.25)}}
+.ac-form{border:1px solid var(--ligne);padding:clamp(14px,2vw,22px)}
+.ac-raccourcis{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.ac-puce{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-doux);
+  background:transparent;border:1px dashed var(--ligne);padding:7px 10px;cursor:pointer;transition:color .2s,border-color .2s}
+.ac-puce:hover,.ac-puce:focus-visible{color:var(--or);border-color:var(--or-doux);border-style:solid;outline:none}
+.ac-champs{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ac-case{margin-top:16px;text-transform:none;letter-spacing:.02em}
+.ac-envoi{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 18px;margin-top:18px}
+.ac-resume{margin:0;font-size:13.5px;color:var(--texte-doux);flex:1 1 220px}
+.ac-resume.faible{color:var(--texte-faible)}
+
+@media (max-width:1100px){
+  .ac-entete .chapeau{max-width:46em}
+}
+@media (max-width:900px){
+  .ac-grille{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .ac-entete .chapeau{display:block;font-size:14px}
+  .ac-date-haut{letter-spacing:.2em}
+  .entete h1.ac-salut{font-size:32px}
+  .ac-ligne,.ac-personne{padding:12px 0;gap:12px}
+  .ac-ligne{min-height:52px}
+  .ac-puce{padding:10px 12px}
+  .ac-envoi .btn{width:100%;justify-content:center}
+  .ac-personne .etiq{display:none}
+}
+@media print{
+  .ac-prevenir,.ac-semaine-fil,#ac-poser{display:none}
+  .ac-salut .l{opacity:1;transform:none;animation:none}
 }

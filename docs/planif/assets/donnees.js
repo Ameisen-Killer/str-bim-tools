@@ -31,6 +31,12 @@
   function nombre(v, defaut) { var n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : defaut; }
   function erreur(m) { var e = new Error(m); e.metier = true; return e; }
   function dixieme(n) { return Math.round(n * 10) / 10; }
+  /** « 2026-10-02T14:05 », en heure locale : la forme des avis d'absence. */
+  function instantLocal(d) {
+    function deux(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + deux(d.getMonth() + 1) + "-" + deux(d.getDate()) +
+      "T" + deux(d.getHours()) + ":" + deux(d.getMinutes());
+  }
   var CHARGE_MAX = 999.9;                          // plafond de numeric(4,1) en base
 
   /* Semaine type d'un membre : un poids par jour, du lundi au vendredi —
@@ -272,7 +278,7 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: [], contacts: []
+      membres: [], affaires: [], taches: [], contacts: [], avis: []
     };
   }
 
@@ -537,6 +543,12 @@
         observations: texte(c.observations)
       });
     });
+    (brut.avis || []).forEach(function (a) {
+      var debut = texte(a.debut).slice(0, 16), fin = texte(a.fin).slice(0, 16);
+      if (!RE_INSTANT.test(debut) || !RE_INSTANT.test(fin)) return;
+      e.avis.push({ id: texte(a.id) || id(), membreId: texte(a.membreId), debut: debut, fin: fin,
+                    motif: texte(a.motif) || "Absence", cree: texte(a.cree) || new Date().toISOString() });
+    });
     return e;
   }
 
@@ -574,6 +586,7 @@
     });
     // Les fiches de l'annuaire ne pendent à rien : seul leur identifiant change
     (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
+    (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
     var vraisM = {}, vraisA = {};
@@ -584,6 +597,7 @@
       a.dessinateurs = a.dessinateurs.filter(function (x) { return vraisM[x]; });
     });
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
+    e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
     e.taches.forEach(function (t) {
       if (!vraisM[t.ingenieurId]) t.ingenieurId = null;
       if (!vraisM[t.dessinateurId]) t.dessinateurId = null;
@@ -610,6 +624,20 @@
         global.Cal.fmtCH(chevauche.debut) + " au " + global.Cal.fmtCH(chevauche.fin) + ".");
     }
     return { debut: debut, fin: fin, motif: texte(o.motif) || "Absence" };
+  }
+
+  /* Un avis d'absence prévient le bureau à l'heure près (un rendez-vous, un
+     après-midi sur un chantier). Il ne touche pas au planning : les absences,
+     en jours entiers, s'en chargent. Heures locales « AAAA-MM-JJTHH:MM ». */
+  var RE_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+  function valideAvis(o) {
+    var debut = texte(o.debut), fin = texte(o.fin);
+    if (!RE_INSTANT.test(debut)) throw erreur("Indique le jour et l'heure du début.");
+    if (!RE_INSTANT.test(fin)) throw erreur("Indique le jour et l'heure de la fin.");
+    if (fin <= debut) throw erreur("La fin doit venir après le début.");
+    var motif = texte(o.motif) || "Absence";
+    if (motif.length > 200) throw erreur("Motif trop long : 200 caractères au plus.");
+    return { membreId: texte(o.membreId), debut: debut, fin: fin, motif: motif };
   }
 
   /* Une fiche d'annuaire n'a presque rien d'obligatoire : on note ce qu'on a,
@@ -958,6 +986,43 @@
       });
     },
 
+    /* ---------------------------------------------- avis d'absence
+       Prévenir le bureau à l'heure près (accueil). Mode Supabase : tant que
+       la table manque (migration-avis.sql pas encore lancée), rien ne s'écrit. */
+    avisDisponible: function () {
+      return !(global.Sb && global.Sb.configure && global.Sb.avisEnBase && !global.Sb.avisEnBase());
+    },
+    /** Avis pas encore échus, le plus proche d'abord. opts.membreId : ceux d'une personne ;
+     *  opts.jusqu : qui commencent au plus tard ce jour-là (AAAA-MM-JJ). */
+    avis: function (opts) {
+      opts = opts || {};
+      var maintenant = instantLocal(new Date());
+      return (etat.avis || []).filter(function (a) {
+        if (a.fin <= maintenant) return false;
+        if (opts.membreId && a.membreId !== opts.membreId) return false;
+        if (opts.jusqu && a.debut.slice(0, 10) > opts.jusqu) return false;
+        var m = D.membre(a.membreId);
+        return !!m && (opts.tous || m.actif);
+      }).sort(function (x, y) { return x.debut < y.debut ? -1 : x.debut > y.debut ? 1 : 0; });
+    },
+    ajouteAvis: function (o) {
+      return Promise.resolve().then(function () {
+        if (!D.avisDisponible()) throw erreur("Les avis d'absence attendent une mise à jour de la base (migration-avis.sql).");
+        var v = valideAvis(o);
+        if (!D.membre(v.membreId)) throw erreur("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+        if (!D.peutAbsences(v.membreId)) throw erreur("Tu ne préviens que pour toi-même.");
+        v.id = id(); v.cree = new Date().toISOString();
+        (etat.avis || (etat.avis = [])).push(v);
+        return sauve().then(function () { return v; });
+      });
+    },
+    suppAvis: function (i) {
+      return Promise.resolve().then(function () {
+        etat.avis = (etat.avis || []).filter(function (a) { return a.id !== i; });
+        return sauve();
+      });
+    },
+
     /* -------------------------------------------------------- affaires */
     affaires: function (opts) {
       opts = opts || {};
@@ -1210,6 +1275,12 @@
   annulable("suppAbsence", function (i) { return [photoAbsences(i)]; },
     function (i) { return "suppression de " + nomAbsence(i); });
 
+  annulable("ajouteAvis", null,
+    function () { return "avis d'absence"; },
+    function (a) { return [{ coll: "avis", id: a.id, avant: null }]; });
+  annulable("suppAvis", function (i) { return [photo("avis", i)]; },
+    function () { return "retrait de l'avis d'absence"; });
+
   annulable("ajouteContact", null,
     function (o) { return "création de la fiche " + (texte(o.nom) || texte(o.societe)); },
     function (c) { return [{ coll: "contacts", id: c.id, avant: null }]; });
@@ -1302,6 +1373,10 @@
 
     var sophie = e.membres.find(function (x) { return x.id === d3; });
     sophie.absences.push({ id: id(), debut: C.ajoute(l, 8), fin: C.ajoute(l, 12), motif: "Vacances" });
+    // Un avis d'absence à l'heure près, pour que l'accueil en montre un
+    var demain = C.ajoute(C.isoAuj(), 1);
+    e.avis.push({ id: id(), membreId: i2, debut: demain + "T14:00", fin: demain + "T16:30",
+                  motif: "Rendez-vous médical", cree: new Date().toISOString() });
 
     // Annuaire : de quoi montrer les trois cas — une personne dans une société,
     // une société seule, un indépendant sans société.

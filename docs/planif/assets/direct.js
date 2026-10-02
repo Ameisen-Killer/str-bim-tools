@@ -66,7 +66,8 @@
           payload: {
             config: {
               broadcast: { ack: false, self: false }, presence: { key: "" }, private: false,
-              postgres_changes: TABLES.map(function (t) {
+              // Les avis d'absence, une fois leur table créée (migration-avis.sql)
+              postgres_changes: TABLES.concat(D.avisDisponible && D.avisDisponible() ? ["avis"] : []).map(function (t) {
                 var c = { event: "*", schema: "public", table: t };
                 if (bureau) c.filter = "bureau_id=eq." + bureau;
                 return c;
@@ -149,6 +150,10 @@
         touches.noms.push(ligne.titre || (t && t.titre) || "une tâche");
         if (d.type === "DELETE" || d.eventType === "DELETE") touches.retrait = true;
       }
+    } else if (!mienne && d.table === "avis" && (d.type || d.eventType) === "INSERT") {
+      touches.n++;
+      var m = D.membre(ligne.membre_id);
+      touches.noms.push("avis d'absence de " + (m ? m.prenom + " " + m.nom : "un collègue"));
     } else if (!mienne) {
       touches.n++;
     }
