@@ -326,9 +326,13 @@
             b.charge > b.capacite + 0.05 ? "alerte" : "", "Jours de travail planifiés cette semaine, sur ta capacité");
       }
     }
-    var absents = absentsDuJour().length;
-    if (absents) cle(String(absents), absents > 1 ? "Absents aujourd'hui" : "Absent aujourd'hui");
-    else cle("Au complet", "L'équipe aujourd'hui");
+    var manque = quiManque(), entiers = manque.filter(function (x) { return x.genre !== "demi" && x.genre !== "avis"; }).length;
+    if (!manque.length) cle("Au complet", "L'équipe aujourd'hui");
+    else cle(String(manque.length), entiers === manque.length
+      ? (manque.length > 1 ? "Absents aujourd'hui" : "Absent aujourd'hui")
+      : "Absents ou en partie", "", manque.map(function (x) {
+        return x.membre.prenom + " " + x.membre.nom + " : " + GENRES[x.genre].toLowerCase();
+      }).join("\n"));
     var f = prochainFerie();
     if (f) cle(relatif(f.iso), f.nom, "", "Prochain jour férié : " + jourCourt(f.iso));
   }
@@ -406,52 +410,56 @@
   }
 
   /* --------------------------------------------------------------- bureau */
-  function absentsDuJour() {
-    var a = auj(), qui = {};
-    D.absences({ depuis: a, jusqu: a }).forEach(function (x) { qui[x.membre.id] = { membre: x.membre, motif: x.absence.motif, fin: x.absence.fin }; });
-    return Object.keys(qui).map(function (k) { return qui[k]; });
+  /* Qui n'est pas au bureau aujourd'hui, ou pas toute la journée : un avis à
+     l'heure près, une absence du calendrier, un jour non travaillé ou une
+     demi-journée (semaine type des temps partiels). Une personne une fois,
+     par ordre de précision : l'avis l'emporte sur l'absence, l'absence sur la
+     semaine type. [{ membre, genre, detail, avis? }] */
+  var GENRES = { avis: "Avis", absence: "Absence", off: "Jour off", demi: "½ journée" };
+  function quiManque() {
+    var a = auj(), vus = {}, out = [];
+    function ajoute(m, genre, detail, avis) {
+      if (!m || vus[m.id]) return;
+      vus[m.id] = true;
+      out.push({ membre: m, genre: genre, detail: detail, avis: avis || null });
+    }
+    D.avis({ jusqu: a }).forEach(function (x) { ajoute(D.membre(x.membreId), "avis", periodeAvis(x), x); });
+    D.absences({ depuis: a, jusqu: a }).forEach(function (x) {
+      ajoute(x.membre, "absence", (x.absence.motif || "Absence") +
+        (x.absence.fin > a ? " · jusqu'au " + jourCourt(x.absence.fin) : " · toute la journée"));
+    });
+    if (C.estOuvre(a, D.canton())) {
+      var jour = JOURS_LONGS[C.dt(a).getDay()];
+      D.membres({}).forEach(function (m) {
+        var p = Calc.poidsJour(m, a);
+        if (p === 0) ajoute(m, "off", "Ne travaille pas le " + jour);
+        else if (p > 0 && p < 1) ajoute(m, "demi", "Demi-journée le " + jour);
+      });
+    }
+    return out;
   }
 
   function bureau(moi) {
     var hote = UI.vide(document.getElementById("ac-bureau"));
     var a = auj(), dansSemaine = C.ajoute(a, 7);
-    var absents = absentsDuJour();
-    var avis = D.avis({ jusqu: dansSemaine });
-    var avisAuj = avis.filter(function (x) { return x.debut.slice(0, 10) <= a; });
-    var avisApres = avis.filter(function (x) { return x.debut.slice(0, 10) > a; });
-    // Qui a laissé un avis pour aujourd'hui n'apparaît qu'une fois : l'avis, plus précis, suffit
-    absents = absents.filter(function (x) { return !avisAuj.some(function (v) { return v.membreId === x.membre.id; }); });
+    var manque = quiManque();
+    var avisApres = D.avis({ jusqu: dansSemaine }).filter(function (x) { return x.debut.slice(0, 10) > a; });
 
-    // Qui ne travaille jamais ce jour-là (semaine type) : utile à savoir avant d'appeler
-    var off = C.estOuvre(a, D.canton()) ? D.membres({}).filter(function (m) {
-      return Calc.poidsJour(m, a) === 0 && !absents.some(function (x) { return x.membre.id === m.id; });
-    }) : [];
-
-    if (!absents.length && !avisAuj.length && !off.length) {
+    if (!manque.length) {
       hote.appendChild(el("p", { class: "ac-tous-la" }, [
         el("span", { class: "puce", "aria-hidden": "true" }), "Toute l'équipe est là aujourd'hui."
       ]));
     } else {
       var l = el("ul", { class: "ac-liste ac-gens" });
-      avisAuj.forEach(function (x) { l.appendChild(ligneAvis(x, true)); });
-      absents.forEach(function (x) {
-        l.appendChild(el("li", { class: "ac-personne" }, [
+      manque.forEach(function (x) {
+        if (x.avis) { l.appendChild(ligneAvis(x.avis, true)); return; }
+        l.appendChild(el("li", { class: "ac-personne" + (x.genre === "absence" ? "" : " eteinte") }, [
           initiales(x.membre),
           el("span", { class: "ac-lib" }, [
             el("span", { class: "ac-titre", text: x.membre.prenom + " " + x.membre.nom }),
-            el("span", { class: "ac-sous", text: x.motif + (x.fin > a ? " · jusqu'au " + jourCourt(x.fin) : " · toute la journée") })
+            el("span", { class: "ac-sous", text: x.detail })
           ]),
-          el("span", { class: "etiq", text: "Absence" })
-        ]));
-      });
-      off.forEach(function (m) {
-        l.appendChild(el("li", { class: "ac-personne eteinte" }, [
-          initiales(m),
-          el("span", { class: "ac-lib" }, [
-            el("span", { class: "ac-titre", text: m.prenom + " " + m.nom }),
-            el("span", { class: "ac-sous", text: "Ne travaille pas le " + JOURS_LONGS[C.dt(a).getDay()] })
-          ]),
-          el("span", { class: "etiq", text: "Jour off" })
+          el("span", { class: "etiq", text: GENRES[x.genre] })
         ]));
       });
       hote.appendChild(l);
