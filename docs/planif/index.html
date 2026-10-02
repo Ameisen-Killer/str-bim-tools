@@ -22,7 +22,7 @@
 
 <main>
   <!-- La date en grand, puis le salut : l'accueil dit d'abord quel jour on est,
-       et à qui il parle. Le ruban spectral ondule à droite (masqué sous 1100 px). -->
+       et à qui il parle. À droite, le logo du bureau qui tourne (AB) ou un globe filaire (masqués sous 1100 px). -->
   <div class="wrap entete avec-decor ac-entete">
     <div class="ac-date" id="ac-date">
       <div class="ac-date-haut"><span id="ac-jour"></span><span class="ac-sep" aria-hidden="true">·</span><span id="ac-semaine"></span><span class="ac-sep" aria-hidden="true">·</span><span id="ac-heure" class="ac-heure"></span></div>
@@ -31,7 +31,7 @@
     <h1 class="ac-salut" id="ac-salut" aria-live="polite"></h1>
     <p class="chapeau ac-phrase" id="ac-phrase"></p>
     <div class="ac-semaine-fil" id="ac-fil" aria-hidden="true"><i></i></div>
-    <div class="decor-place" aria-hidden="true"><canvas id="spectre" data-palette="theme" data-calme></canvas></div>
+    <div class="decor-place" aria-hidden="true"><canvas id="decor"></canvas></div>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -102,7 +102,8 @@
 <script src="/planif/assets/ui.js?v=58"></script>
 <script src="/planif/assets/palette.js?v=8"></script>
 <script src="/planif/assets/direct.js?v=4"></script>
-<script src="/planif/assets/spectre.js?v=6"></script>
+<script src="/planif/assets/globe.js?v=1"></script>
+<script src="/planif/assets/logo-ab.js?v=1"></script>
 <script>
 (function () {
   "use strict";
@@ -135,6 +136,7 @@
     document.querySelector(".entete").classList.add("vu");
 
     salut();
+    decorDuBureau();
     construitFormulaire();
     document.getElementById("ac-poser").addEventListener("click", function () {
       var moi = D.monMembre();
@@ -153,6 +155,17 @@
   }).catch(UI.echec);
 
   /* ================================================================ en-tête */
+
+  /* Le décor de l'en-tête : le logo du bureau en volume pour AB Ingénieurs —
+     seulement connecté à ce bureau, jamais en démonstration —, le globe
+     filaire pour tous les autres. */
+  function decorDuBureau() {
+    var cv = document.getElementById("decor");
+    var p = D.profil(), nom = p && p.bureau ? UI.foin([p.bureau.nom]) : "";
+    var demo = D.estDemo() || /^demo@/i.test((p && p.email) || "");
+    if (UI.avecBase && p && p.multi && !demo && /\bab\b.*ingenieur/.test(nom)) window.Decor.logoAB(cv);
+    else window.Decor.globe(cv);
+  }
 
   function poseDate() {
     var d = new Date(), iso = auj();
