@@ -96,12 +96,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=29"></script>
-<script src="/planif/assets/donnees.js?v=38"></script>
+<script src="/planif/assets/supabase.js?v=30"></script>
+<script src="/planif/assets/donnees.js?v=39"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/ui.js?v=58"></script>
 <script src="/planif/assets/palette.js?v=8"></script>
-<script src="/planif/assets/direct.js?v=3"></script>
+<script src="/planif/assets/direct.js?v=4"></script>
 <script src="/planif/assets/spectre.js?v=6"></script>
 <script>
 (function () {
@@ -471,9 +471,6 @@
       avisApres.forEach(function (x) { l2.appendChild(ligneAvis(x, false)); });
       hote.appendChild(l2);
     }
-    if (!D.avisDisponible()) {
-      hote.appendChild(el("p", { class: "aide", style: "margin-top:14px", text: "Les avis d'absence s'afficheront ici une fois la base mise à jour." }));
-    }
   }
 
   function initiales(m) {
@@ -564,13 +561,6 @@
     var moi = D.monMembre();
     var droitAutres = D.aDroit("absences_autrui");
 
-    if (!D.avisDisponible()) {
-      hote.appendChild(el("div", { class: "bandeau" }, [
-        el("span", { class: "losange", "aria-hidden": "true" }),
-        el("div", {}, [el("strong", { text: "Bientôt disponible. " }),
-          "Les avis d'absence attendent une mise à jour de la base (migration-avis.sql, à lancer dans Supabase)."])
-      ]));
-    }
     if (!moi && !droitAutres) {
       hote.appendChild(el("p", { class: "aide", text: "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil." }));
       return;
@@ -625,7 +615,7 @@
 
     form.appendChild(el("div", { class: "ac-envoi" }, [
       el("p", { class: "ac-resume", id: "ac-resume", "aria-live": "polite" }),
-      el("button", { type: "submit", class: "btn btn-or", disabled: !D.avisDisponible() }, [
+      el("button", { type: "submit", class: "btn btn-or" }, [
         el("span", { class: "ico-txt ico-lien", "aria-hidden": "true" }), "Prévenir le bureau"
       ])
     ]));
@@ -702,7 +692,7 @@
       dessine();
     }).catch(function (e) {
       UI.toast(e.message);
-    }).then(function () { bouton.disabled = !D.avisDisponible(); });
+    }).then(function () { bouton.disabled = false; });
   }
 
   function versFormulaire(focus) {

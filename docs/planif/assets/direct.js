@@ -28,7 +28,7 @@
   if (!D || !UI || !SB || !UI.avecBase || !SB.connecte()) return;
   if (/^\/planif\/(console|connexion)\//.test(location.pathname)) return;
 
-  var TABLES = ["taches", "affaires", "affaire_membres", "membres", "absences", "contacts", "reglages"];
+  var TABLES = ["taches", "affaires", "affaire_membres", "membres", "absences", "avis", "contacts", "reglages"];
   var BATTEMENT = 25000, REPLI = 60000;
 
   var ws = null, ref = 0, joinRef = null, sujet = "", battement = null, jetonEnvoye = "";
@@ -66,8 +66,7 @@
           payload: {
             config: {
               broadcast: { ack: false, self: false }, presence: { key: "" }, private: false,
-              // Les avis d'absence, une fois leur table créée (migration-avis.sql)
-              postgres_changes: TABLES.concat(D.avisDisponible && D.avisDisponible() ? ["avis"] : []).map(function (t) {
+              postgres_changes: TABLES.map(function (t) {
                 var c = { event: "*", schema: "public", table: t };
                 if (bureau) c.filter = "bureau_id=eq." + bureau;
                 return c;

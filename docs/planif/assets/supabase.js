@@ -441,20 +441,12 @@
       "T" + deux(d.getHours()) + ":" + deux(d.getMinutes());
   }
 
-  /* Avis d'absence (table avis, migration-avis.sql) : seuls ceux qui ne sont
-     pas encore passés depuis une semaine sont lus — un avis échu ne sert plus.
-     Garde-fou PROVISOIRE : tant que Tony n'a pas lancé la migration, la table
-     manque ; l'outil marche sans, et l'accueil le signale. À retirer (avec
-     avisEnBase) dès la migration passée. */
-  var avisEnBase = true;
+  /* Avis d'absence (table avis) : seuls ceux qui ne sont pas passés depuis
+     plus d'une semaine sont lus — un avis échu ne sert plus. */
   function litAvis() {
     var depuis = new Date(Date.now() - 7 * 864e5).toISOString();
     return requete("avis?select=*&fin=gte." + encodeURIComponent(depuis) + "&order=debut")
-      .then(function (l) { avisEnBase = true; return l || []; })
-      .catch(function (e) {
-        if (e && (e.code === "PGRST205" || e.code === "42P01")) { avisEnBase = false; return []; }
-        throw e;
-      });
+      .then(function (l) { return l || []; });
   }
 
   /* ------------------------------------------------------------ lecture */
@@ -643,8 +635,7 @@
     var dTaches   = compare(av.taches || [], etat.taches, VERS_BASE.taches);
     var dAbsences = compare(toutesAbsences(av), toutesAbsences(etat), function (a) { return a; });
     var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
-    var dAvis = avisEnBase ? compare(av.avis || [], etat.avis || [], VERS_BASE.avis)
-      : { ajouts: [], modifs: [], retraits: [] };
+    var dAvis = compare(av.avis || [], etat.avis || [], VERS_BASE.avis);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -721,8 +712,6 @@
     projet: function () { return { url: URL_BASE, cle: CLE }; },
     presence: presence,
     reglagesAuth: reglagesAuth,
-    /** La table des avis d'absence existe-t-elle ? (garde-fou provisoire, voir litAvis) */
-    avisEnBase: function () { return avisEnBase; },
     ADAPT: {
       nom: "supabase",
       semeSiVide: false,

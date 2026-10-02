@@ -987,11 +987,7 @@
     },
 
     /* ---------------------------------------------- avis d'absence
-       Prévenir le bureau à l'heure près (accueil). Mode Supabase : tant que
-       la table manque (migration-avis.sql pas encore lancée), rien ne s'écrit. */
-    avisDisponible: function () {
-      return !(global.Sb && global.Sb.configure && global.Sb.avisEnBase && !global.Sb.avisEnBase());
-    },
+       Prévenir le bureau à l'heure près (accueil). */
     /** Avis pas encore échus, le plus proche d'abord. opts.membreId : ceux d'une personne ;
      *  opts.jusqu : qui commencent au plus tard ce jour-là (AAAA-MM-JJ). */
     avis: function (opts) {
@@ -1007,7 +1003,6 @@
     },
     ajouteAvis: function (o) {
       return Promise.resolve().then(function () {
-        if (!D.avisDisponible()) throw erreur("Les avis d'absence attendent une mise à jour de la base (migration-avis.sql).");
         var v = valideAvis(o);
         if (!D.membre(v.membreId)) throw erreur("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
         if (!D.peutAbsences(v.membreId)) throw erreur("Tu ne préviens que pour toi-même.");
