@@ -9,7 +9,7 @@
    Toutes les couleurs passent par ces variables. Les composantes « -rvb »
    servent aux transparences : rgba(var(--encre),.12) donne un filet
    parchemin sur fond noir, un filet d'encre sur fond clair.
-   Le thème est posé sur <html data-theme="sombre|clair|ab"> avant le premier
+   Le thème est posé sur <html data-theme="sombre|clair"> avant le premier
    rendu (script en tête de page) : aucun éclair de la mauvaise couleur. */
 :root{
   color-scheme:dark;
@@ -60,30 +60,6 @@
   --or-doux:rgba(var(--or-rvb),.7);
   --texte-doux:rgba(var(--encre),.82);
   --texte-faible:rgba(var(--encre),.66);
-}
-
-/* Thème « AB ingénieurs » : vert du logo assombri (#5C7722) pour porter un
-   texte, gris neutres, sur blanc. Le même que dans la planification. */
-:root[data-theme="ab"]{
-  color-scheme:light;
-  --encre:46,47,49;
-  --fond-rvb:245,245,244;
-  --or-rvb:92,119,34;
-  --alerte-rvb:152,54,30;
-
-  --noir:#F5F5F4;
-  --noir-2:#FFFFFF;
-  --texte:#2E2F31;
-  --or:#5C7722;
-  --alerte:#98361E;
-  --voile:rgba(46,47,49,.38);
-  --option-choisie:#E6F1D0;
-
-  --ligne:rgba(var(--encre),.22);
-  --ligne-faible:rgba(var(--encre),.12);
-  --or-doux:rgba(var(--or-rvb),.7);
-  --texte-doux:rgba(var(--encre),.86);
-  --texte-faible:rgba(var(--encre),.72);
 }
 
 *{box-sizing:border-box}
@@ -438,7 +414,7 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
 @page{size:A4 landscape;margin:9mm 8mm}
 
 @media print{
-  :root,:root[data-theme="sombre"],:root[data-theme="clair"],:root[data-theme="ab"]{
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"]{
     --encre:22,19,15;
     --fond-rvb:255,255,255;
     --or-rvb:122,83,18;

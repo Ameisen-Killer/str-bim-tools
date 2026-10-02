@@ -9,13 +9,13 @@
 <meta name="theme-color" content="#050505">
 <script>
 /* Thème posé avant le premier rendu : celui choisi ici, sinon celui de la planification */
-(function(){var r=document.documentElement;try{var c=localStorage.getItem("visas.theme")||localStorage.getItem("planif.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8",ab:"#F5F5F4"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
+(function(){var r=document.documentElement;try{var c=localStorage.getItem("visas.theme")||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/visas/outil.css?v=1">
+<link rel="stylesheet" href="/visas/outil.css?v=2">
 <style>
 /* Visas : propre à cette page. Les familles de visa ont leurs couleurs à elles,
    validées pour le daltonisme et le contraste sur chaque fond (les teintes sourdes
@@ -28,7 +28,7 @@
   /* dépôts par personne : cinq couleurs, sans reprendre celles des statuts de la page */
   --p1:#199e70; --p2:#d95926; --p3:#9085e9; --p4:#d55181; --p5:#3987e5;
 }
-:root[data-theme="clair"],:root[data-theme="ab"]{
+:root[data-theme="clair"]{
   --v-obs:#eda100; --v-cours:#2a78d6; --v-mauvais:#e34948; --v-neutre:#a8a49b;
   --v-r1:#e59a85; --v-r2:#cc6a50; --v-r3:#a8432d; --v-r4:#742414;
   --v-serie:rgba(var(--encre),.5);
@@ -177,7 +177,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
    Ici : les couleurs des familles en version claire, des tailles de papier, et les
    blocs de graphique qui ne se coupent pas entre deux pages. */
 @media print{
-  :root,:root[data-theme="sombre"],:root[data-theme="clair"],:root[data-theme="ab"]{
+  :root,:root[data-theme="sombre"],:root[data-theme="clair"]{
     --v-obs:#eda100; --v-cours:#2a78d6; --v-mauvais:#e34948; --v-neutre:#a8a49b;
     --v-r1:#e59a85; --v-r2:#cc6a50; --v-r3:#a8432d; --v-r4:#742414;
     --v-serie:rgba(22,19,15,.5);
@@ -406,7 +406,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/visas/outil.js?v=3"></script>
+<script src="/visas/outil.js?v=4"></script>
 <script src="/visas/visas.js?v=2"></script>
 <script>
 (function () {

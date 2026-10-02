@@ -26,7 +26,7 @@
 
    Deux réglages, portés par le canvas :
      data-palette="theme"  le ruban prend l'accent du thème (or sur le sombre,
-                           bronze sur le clair, vert sur AB) au lieu du spectre ;
+                           bronze sur le clair) au lieu du spectre ;
      data-calme            le ruban ondule à l'ouverture, puis ralentit jusqu'à
                            presque s'arrêter.
    Le tableau de bord porte les deux (27.09.2026) : un arc-en-ciel animé en

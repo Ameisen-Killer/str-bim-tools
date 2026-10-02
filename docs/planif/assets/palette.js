@@ -246,7 +246,7 @@
       liste.push({ nom: "Rafraîchir les données", mots: "recharger actualiser mise a jour", glyphe: "↻", action: function () { ferme(); UI.rafraichit(false); } });
     }
     if (UI.choisitTheme) {
-      [["sombre", "Thème sombre"], ["clair", "Thème clair"], ["ab", "Thème AB ingénieurs"], ["systeme", "Thème du système"]].forEach(function (t) {
+      [["sombre", "Thème sombre"], ["clair", "Thème clair"], ["systeme", "Thème du système"]].forEach(function (t) {
         liste.push({ nom: t[1], mots: "theme couleur apparence mode", glyphe: "◑", action: function () { UI.choisitTheme(t[0]); ferme(); UI.toast(t[1] + "."); } });
       });
     }

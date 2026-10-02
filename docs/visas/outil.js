@@ -154,22 +154,24 @@
   }
 
   /* ------------------------------------------------------------------ thème
-     Sombre, clair, AB ingénieurs ou celui de l'appareil. Retenu dans ce
+     Sombre, clair ou celui de l'appareil. Retenu dans ce
      navigateur ; à la première visite, celui de la planification s'il y en a un.
      Le même tableau est repris par le script en tête de page, qui pose le
      thème avant le premier rendu. */
   var THEMES = [
     { v: "sombre", l: "Sombre" },
     { v: "clair", l: "Clair" },
-    { v: "ab", l: "AB ingénieurs" },
     { v: "systeme", l: "Système" }
   ];
-  var FOND_THEME = { clair: "#F3F0E8", ab: "#F5F5F4", sombre: "#050505" };
+  var FOND_THEME = { clair: "#F3F0E8", sombre: "#050505" };
   var CLE_THEME = "visas.theme";
   var mediaClair = global.matchMedia ? global.matchMedia("(prefers-color-scheme: light)") : null;
 
   function themeChoisi() {
-    try { return global.localStorage.getItem(CLE_THEME) || global.localStorage.getItem("planif.theme") || "sombre"; }
+    try {
+      var t = global.localStorage.getItem(CLE_THEME) || global.localStorage.getItem("planif.theme") || "sombre";
+      return t === "ab" ? "clair" : t;                       // thème AB retiré le 02.10.2026
+    }
     catch (e) { return "sombre"; }
   }
 

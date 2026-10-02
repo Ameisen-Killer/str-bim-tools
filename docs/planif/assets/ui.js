@@ -357,20 +357,22 @@
   var THEMES = [
     { v: "sombre", l: "Sombre" },
     { v: "clair", l: "Clair" },
-    { v: "ab", l: "AB ingénieurs" },
     { v: "systeme", l: "Système" }
   ];
 
   /* Couleur de la barre du navigateur, sur téléphone : celle du fond de page
      de chaque thème. Le même tableau est repris par le script en tête de
      page, qui pose le thème avant le premier rendu. */
-  var FOND_THEME = { clair: "#F3F0E8", ab: "#F5F5F4", sombre: "#050505" };
+  var FOND_THEME = { clair: "#F3F0E8", sombre: "#050505" };
   var mediaClair = global.matchMedia ? global.matchMedia("(prefers-color-scheme: light)") : null;
 
   function cleTheme() { return "planif.theme:" + (avecBase && SB.connecte() ? SB.email() : ""); }
 
+  /* Le thème « AB ingénieurs » a été retiré (02.10.2026) : qui l'avait choisi passe au clair. */
+  function propre(t) { return t === "ab" ? "clair" : t; }
+
   function themeChoisi() {
-    try { return global.localStorage.getItem(cleTheme()) || global.localStorage.getItem("planif.theme") || "sombre"; }
+    try { return propre(global.localStorage.getItem(cleTheme()) || global.localStorage.getItem("planif.theme") || "sombre"); }
     catch (e) { return "sombre"; }
   }
 
@@ -406,6 +408,7 @@
     if (!avecBase || !SB.connecte()) return;
     SB.utilisateur().then(function (u) {
       var t = u && u.user_metadata && u.user_metadata.theme;
+      if (t === "ab") { choisitTheme("clair"); return; }        // thème retiré : le compte est remis au clair
       if (t && t !== themeChoisi()) { memoriseTheme(t); appliqueTheme(t); }
     }).catch(function () {});
   }
