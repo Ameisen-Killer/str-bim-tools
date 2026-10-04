@@ -439,19 +439,34 @@ footer a:hover{color:var(--or)}
     if (m) $("#date-base").textContent = m[3] + "." + m[2] + "." + m[1];
   })();
 
+  // Tous les mots tapés doivent figurer dans le nom. Sinon (nom copié d'un configurateur :
+  // « Processeur Intel® Core™ Ultra 7 356H vPro® »), on garde les modèles qui en contiennent
+  // le plus, les numéros de modèle pesant trois fois plus que les mots.
   function chercher(liste, q){
     var toks = q.split(/\s+/).map(norm).filter(Boolean);
     if (!toks.length) return [];
-    function filtre(t){ return liste.filter(function(o){ return t.every(function(x){ return o.cle.indexOf(x) >= 0 }) }) }
-    var r = filtre(toks);
+    var r = liste.filter(function(o){ return toks.every(function(x){ return o.cle.indexOf(x) >= 0 }) });
+    var der = toks[toks.length - 1], score = null;
     if (!r.length){
-      var t2 = toks.filter(function(t){ return ["pro","intel","amd","nvidia","laptop","portable","mobile"].indexOf(t) < 0 });
-      if (t2.length && t2.length < toks.length) r = filtre(t2);
+      var chiffres = toks.filter(function(t){ return /\d/.test(t) });
+      score = new Map();
+      liste.forEach(function(o){
+        var s = 0, chiffre = false;
+        toks.forEach(function(t){
+          if (o.cle.indexOf(t) < 0) return;
+          var c = /\d/.test(t);
+          s += t.length*(c ? 3 : 1); if (c) chiffre = true;
+        });
+        if (s && (chiffre || !chiffres.length)) score.set(o, s);
+      });
+      var max = 0;
+      score.forEach(function(s){ if (s > max) max = s });
+      r = liste.filter(function(o){ return score.get(o) >= .75*max });
+      der = chiffres.length ? chiffres[chiffres.length - 1] : der;
     }
-    var der = toks[toks.length - 1];
     r.sort(function(a, b){
       var fa = a.cle.slice(-der.length) === der ? 0 : 1, fb = b.cle.slice(-der.length) === der ? 0 : 1;
-      return fa - fb || a.cle.length - b.cle.length || b.annee - a.annee;
+      return (score ? score.get(b) - score.get(a) : 0) || fa - fb || a.cle.length - b.cle.length || b.annee - a.annee;
     });
     return r.slice(0, 40);
   }
