@@ -334,7 +334,7 @@ footer a:hover{color:var(--or)}
           <div class="poids"><div><span>Multi-cœur</span><span>40 %</span></div><div><span>Mémoire</span><span>30 %</span></div><div><span>Mono-cœur</span><span>15 %</span></div><div><span>Stockage</span><span>10 %</span></div><div><span>Graphique</span><span>5 %</span></div></div>
         </div>
       </div>
-      <p class="source rv" style="--d:.4s">Note globale sur 100&nbsp;: mono-cœur 30&nbsp;%, multi-cœur 25&nbsp;%, graphique 20&nbsp;%, mémoire 15&nbsp;%, stockage 10&nbsp;%, sur une échelle où 100 correspond au meilleur matériel actuel. Repères&nbsp;: 60 et plus, la machine convient&nbsp;; 80 et plus, elle est à l'aise. Scores de référence&nbsp;: ordres de grandeur des moyennes <a href="https://www.cpubenchmark.net/" rel="noopener">PassMark</a> (CPU Mark, Single Thread, G3D Mark), base du <span id="date-base">03.10.2026</span>&nbsp;; les modèles sortis en 2026 sont estimés. Un portable mince bridé par sa ventilation peut rester en dessous de ces moyennes.</p>
+      <p class="source rv" style="--d:.4s">Note globale sur 100&nbsp;: mono-cœur 30&nbsp;%, multi-cœur 25&nbsp;%, graphique 20&nbsp;%, mémoire 15&nbsp;%, stockage 10&nbsp;%, sur une échelle où 100 correspond au meilleur matériel actuel. Repères&nbsp;: 60 et plus, la machine convient&nbsp;; 80 et plus, elle est à l'aise. Sources&nbsp;: scores <a href="https://www.cpubenchmark.net/" rel="noopener">PassMark</a> (CPU Mark, Single Thread, G3D Mark) et caractéristiques TechPowerUp relevés le <span id="date-base">28.09.2026</span> par le projet <a href="https://github.com/lijieyu233/cpu-gpu-data-crawler" rel="noopener">cpu-gpu-data-crawler</a>, complétés à la main. PassMark ne publie le mono-cœur que pour un tiers des processeurs&nbsp;: les autres sont estimés à partir de la fréquence et des puces de la même famille (écart médian de 3&nbsp;%), et marqués «&nbsp;≈&nbsp;». Les puces absentes de ces relevés, surtout les cartes graphiques de portable récentes, sont estimées elles aussi. Un portable mince bridé par sa ventilation peut rester en dessous de ces moyennes.</p>
     </div>
   </section>
 </main>
@@ -344,7 +344,7 @@ footer a:hover{color:var(--or)}
   <span>Bench · valeurs indicatives</span>
 </footer>
 
-<script src="/bench/donnees.js?v=1"></script>
+<script src="/bench/donnees.js?v=2"></script>
 <script>
 (function(){
   "use strict";
@@ -356,26 +356,26 @@ footer a:hover{color:var(--or)}
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
   var fmt = new Intl.NumberFormat("fr-CH");
   function nb(x){ return fmt.format(Math.round(x)) }
+  function go(x){ return String(x).replace(".", ",") + " Go" }
   function norm(s){ return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9+]/g, "") }
 
   // ================= Données =================
+  // Formats : voir l'en-tête de donnees.js (généré par bench/generer-donnees.py)
   var CPUS = D.cpu.trim().split("\n").map(function(l){
-    var p = l.split("|"), c = p[1], hyb = c.indexOf("+") > 0;
-    var marque = /^(Ryzen|Athlon|Threadripper)/.test(p[0]) ? "AMD" : "Intel";
+    var p = l.split("|"), c = p[2], hyb = c.indexOf("+") > 0;
     return {
-      id: norm(p[0]).replace(/\+/g, "plus"), nom: p[0], marque: marque, complet: marque + " " + p[0],
+      id: norm(p[1]).replace(/\+/g, "plus"), nom: p[1], marque: p[0], complet: p[0] + " " + p[1],
       coeurs: hyb ? c.split("+").reduce(function(a, b){ return a + +b }, 0) : +c, hybride: hyb ? c : "",
-      threads: +p[2], base: +p[3], turbo: +p[4], tdp: +p[5], annee: +p[6], type: p[7],
-      mark: +p[8], st: +p[9], igpu: p[10] || "", cle: norm(marque + p[0])
+      threads: +p[3], base: +p[4], turbo: +p[5], tdp: +p[6], annee: +p[7], type: p[8],
+      mark: +p[9], st: +p[10], igpu: p[11] || "", stEstime: p[12] === "e", estime: p[12] === "s", cle: norm(p[0] + p[1])
     };
   });
   var GPUS = D.gpu.trim().split("\n").map(function(l){
-    var p = l.split("|"), nom = p[0];
-    var marque = /^(GeForce|Quadro|NVIDIA)/.test(nom) ? "NVIDIA" : /^(Radeon|AMD)/.test(nom) ? "AMD" : "Intel";
-    var complet = /^(NVIDIA|AMD|Intel)/.test(nom) ? nom : marque + " " + nom;
+    var p = l.split("|"), nom = p[1];
+    var complet = /^(NVIDIA|AMD|Intel|ATI) /.test(nom) ? nom : p[0] + " " + nom;
     return {
-      id: p[6] || norm(nom), nom: nom, marque: marque, complet: complet, vram: +p[1], type: p[2],
-      pro: p[3] === "1", annee: +p[4], g3d: +p[5], cle: norm(complet)
+      id: p[7] || norm(nom), nom: nom, marque: p[0], complet: complet, vram: +p[2], type: p[3],
+      pro: p[4] === "1", annee: +p[5], g3d: +p[6], estime: p[8] === "s", cle: norm(complet)
     };
   });
   var CPU_ID = {}, GPU_ID = {};
@@ -414,7 +414,7 @@ footer a:hover{color:var(--or)}
 
   function graphiqueDe(m){
     if (m.gpu) return m.gpu;
-    if (m.cpu && m.cpu.igpu && GPU_ID[m.cpu.igpu]) return GPU_ID[m.cpu.igpu];
+    if (m.cpu && m.cpu.igpu && GPU_ID[m.cpu.igpu]) return GPU_ID[m.cpu.igpu];   // "?" : inconnue
     return null;
   }
 
@@ -428,12 +428,14 @@ footer a:hover{color:var(--or)}
   function niveau(s){ return s >= 80 ? 4 : s >= 60 ? 3 : s >= 40 ? 2 : 1 }
   var NIVEAUX = ["", "Insuffisant", "Juste", "Adapté", "À l'aise"];
 
+  // Windows 11 : Intel 8e génération et plus, AMD Ryzen 2000 et plus (liste Microsoft, à quelques exceptions près)
   function win11(c){
-    if (!c || c.perso) return null;
+    if (!c || c.perso || !c.annee) return null;
     var n = c.nom, m = /^Core i\d-(\d{4})(?!\d)/.exec(n);
+    if (c.annee < 2017) return false;
     if (m && +m[1].charAt(0) >= 2 && +m[1].charAt(0) <= 7) return false;
-    if (/^Xeon E[35]-|^Pentium G4560|^Athlon 200GE|^Threadripper 1950X|^Ryzen \d 1\d{3}/.test(n)) return false;
-    if (/^Xeon W-21\d\d$/.test(n)) return null;
+    if (/^Xeon E[35]-|^Pentium G4\d{3}|^Athlon (200GE|X4|Pro 200)|Threadripper (PRO )?19\d0X|^Ryzen \d (PRO )?1\d{3}|^A\d+(-| PRO)|^FX-|^E2-/.test(n)) return false;
+    if (/^Xeon W-21\d\d$|^Xeon (Silver|Gold|Platinum|Bronze) \d1\d\d/.test(n)) return null;
     return true;
   }
 
@@ -486,10 +488,10 @@ footer a:hover{color:var(--or)}
     else if (m.ram < 16) moins("<b>8 Go de mémoire</b> : juste pour la bureautique, insuffisant pour Revit. Viser 16 Go, 32 Go pour modéliser.");
     else if (m.ram < 32 && r.u.revit >= 50) moins("<b>" + m.ram + " Go de mémoire</b> : suffisant pour de petits modèles Revit. 32 Go pour des maquettes liées ou du calcul.");
     else if (m.ram < 64 && r.u.calcul >= 60) moins("<b>" + m.ram + " Go de mémoire</b> : 64 Go pour les gros modèles SCIA (maillage fin, calcul non linéaire).");
-    if (!g) moins("<b>Aucune partie graphique</b> : ce processeur n'en a pas, indique la carte graphique de la machine.");
+    if (!g) moins(c.igpu === "?" ? "<b>Graphique à indiquer</b> : la base ne connaît pas la graphique intégrée de ce processeur." : "<b>Aucune partie graphique</b> : ce processeur n'en a pas, indique la carte graphique de la machine.");
     else if (g.type === "I" && g.g3d < 2500) moins("<b>Graphique intégrée modeste</b> : suffisante en bureautique, pénible en 3D dans Revit. Une carte dédiée de 4 Go ou plus change tout.");
     else if (g.type === "I" && g.g3d < 9000) moins("<b>Graphique intégrée récente</b> : correcte pour Revit sur des modèles moyens ; une carte dédiée reste préférable pour les vues 3D lourdes.");
-    else if (g.type !== "I" && g.vram < 4) moins("<b>" + g.vram + " Go de mémoire vidéo</b> : sous les 4 Go recommandés par Autodesk pour Revit.");
+    else if (g.type !== "I" && g.vram < 4) moins("<b>" + go(g.vram) + " de mémoire vidéo</b> : sous les 4 Go recommandés par Autodesk pour Revit.");
     if (c.st < 2500) moins("<b>Processeur lent en mono-cœur</b> : c'est ce qui limite Revit, et ça ne se rattrape pas sans changer de machine.");
     if (c.mark < 15000 && r.u.revit >= 50) moins("<b>Peu de puissance multi-cœur</b> : le solveur SCIA répartit le calcul sur tous les cœurs, il sera lent.");
     if (c.type === "P" && /U$/.test(c.nom) && c.st >= 2500) moins("<b>Processeur basse consommation</b> (série U) : performances bridées en charge longue, typique d'un portable fin.");
@@ -652,10 +654,10 @@ footer a:hover{color:var(--or)}
 
     var icpu = $("#cpu" + i, p), igpu = $("#gpu" + i, p);
     var vCpu = recherche(icpu, $("#lcpu" + i, p), CPUS, function(c){
-      return '<span class="n"><small>' + c.marque + '</small>' + esc(c.nom) + '</span><span class="m">' + TYPES[c.type] + ' · ' + c.annee + '</span>';
+      return '<span class="n"><small>' + c.marque + '</small>' + esc(c.nom) + '</span><span class="m">' + TYPES[c.type] + (c.annee ? ' · ' + c.annee : "") + '</span>';
     }, function(c){ m().cpu = c; changer() });
     var vGpu = recherche(igpu, $("#lgpu" + i, p), GPUS, function(g){
-      return '<span class="n"><small>' + g.marque + '</small>' + esc(g.complet.replace(/^(NVIDIA|AMD|Intel) /, "")) + '</span><span class="m">' + (g.type === "I" ? "Intégrée" : g.vram + " Go") + ' · ' + g.annee + '</span>';
+      return '<span class="n"><small>' + g.marque + '</small>' + esc(g.complet.replace(/^(NVIDIA|AMD|Intel) /, "")) + '</span><span class="m">' + (g.type === "I" ? "Intégrée" : go(g.vram)) + (g.annee ? ' · ' + g.annee : "") + '</span>';
     }, function(g){ m().gpu = g; changer() });
     vCpu.addEventListener("click", function(){ m().cpu = null; changer(); icpu.focus() });
     vGpu.addEventListener("click", function(){ m().gpu = null; changer() });
@@ -695,23 +697,26 @@ footer a:hover{color:var(--or)}
       if (document.activeElement !== icpu){ icpu.value = c ? c.complet : ""; if (c) icpu.dataset.choisi = "1"; else delete icpu.dataset.choisi }
       if (document.activeElement !== igpu){ igpu.value = g ? g.complet : ""; if (g) igpu.dataset.choisi = "1"; else delete igpu.dataset.choisi }
       vCpu.hidden = !c; vGpu.hidden = !g;
-      igpu.placeholder = ig ? "Intégrée : " + ig.complet : c ? "Aucune graphique intégrée : à indiquer" : "Graphique intégrée";
+      igpu.placeholder = ig ? "Intégrée : " + ig.complet : c ? (c.igpu === "?" ? "Graphique inconnue : à indiquer" : "Aucune graphique intégrée : à indiquer") : "Graphique intégrée";
       $("[data-badge]", p).textContent = c ? TYPES[c.type] : "";
       var dc = $("[data-dcpu]", p);
       if (!c) dc.innerHTML = "";
       else if (c.perso) dc.innerHTML = "Saisi à la main<span class=sep>·</span>CPU Mark " + nb(c.mark) + "<span class=sep>·</span>Mono-cœur " + nb(c.st);
       else {
         var w = win11(c);
-        dc.innerHTML = (c.hybride ? c.hybride.replace("+", " P + ") + " E" : c.coeurs + " cœurs") + " / " + c.threads + " threads" +
-          "<span class=sep>·</span>" + String(c.base).replace(".", ",") + "–" + String(c.turbo).replace(".", ",") + " GHz" +
-          "<span class=sep>·</span>" + c.tdp + " W<span class=sep>·</span>" + c.annee +
-          (w === false ? '<span class=sep>·</span><span class="alerte">Hors Windows 11</span>' : "");
+        var ghz = c.base && c.turbo && c.turbo !== c.base ? c.base + "–" + c.turbo : c.turbo || c.base;
+        dc.innerHTML = [
+          (c.hybride ? c.hybride.replace("+", " P + ") + " E" : c.coeurs + " cœur" + (c.coeurs > 1 ? "s" : "")) + " / " + c.threads + " threads",
+          ghz ? String(ghz).replace(/\./g, ",") + " GHz" : "", c.tdp ? c.tdp + " W" : "", c.annee || "",
+          c.estime ? "Valeurs estimées" : c.stEstime ? "Mono-cœur estimé" : "",
+          w === false ? '<span class="alerte">Hors Windows 11</span>' : ""
+        ].filter(Boolean).join("<span class=sep>·</span>");
       }
       var dg = $("[data-dgpu]", p), gg = g || ig;
-      if (!gg) dg.innerHTML = c ? '<span class="alerte">Ce processeur n\'a pas de graphique intégrée</span>' : "";
+      if (!gg) dg.innerHTML = c ? '<span class="alerte">' + (c.igpu === "?" ? "Graphique intégrée inconnue pour ce processeur : indique-la" : "Ce processeur n'a pas de graphique intégrée") + '</span>' : "";
       else dg.innerHTML = (g ? "" : "Graphique intégrée du processeur<span class=sep>·</span>") +
-        (gg.type === "I" ? "Mémoire partagée" : gg.vram + " Go de mémoire vidéo") +
-        (gg.pro ? "<span class=sep>·</span>Gamme pro" : "") + "<span class=sep>·</span>G3D " + nb(gg.g3d);
+        (gg.type === "I" ? "Mémoire partagée" : go(gg.vram) + " de mémoire vidéo") +
+        (gg.pro ? "<span class=sep>·</span>Gamme pro" : "") + "<span class=sep>·</span>G3D " + (gg.estime ? "≈ " : "") + nb(gg.g3d);
       $("[data-integree]", p).hidden = !g || !ig;
       [].forEach.call(p.querySelectorAll(".ram button"), function(b){ b.setAttribute("aria-pressed", +b.getAttribute("data-v") === x.ram ? "true" : "false") });
       $("[data-ram-txt]", p).textContent = x.ram + " Go";
@@ -788,7 +793,8 @@ footer a:hover{color:var(--or)}
         $(".niv", j).textContent = NIVEAUX[n];
       });
       var txt = {
-        st: nb(m.cpu.st) + " pts", mt: nb(m.cpu.mark) + " pts", gpu: g ? "G3D " + nb(g.g3d) : "—",
+        st: (m.cpu.stEstime || m.cpu.estime ? "≈ " : "") + nb(m.cpu.st) + " pts", mt: (m.cpu.estime ? "≈ " : "") + nb(m.cpu.mark) + " pts",
+        gpu: g ? "G3D " + (g.estime ? "≈ " : "") + nb(g.g3d) : "—",
         ram: m.ram + " Go", disque: DISQUES[m.disque]
       };
       COMPOSANTS.forEach(function(c){
@@ -1008,7 +1014,7 @@ footer a:hover{color:var(--or)}
       (function pas(now){
         if (t0 === null) t0 = now;
         var p = Math.min(1, (now - t0)/1700);
-        b.textContent = Math.round(n*(1 - Math.pow(1 - p, 3)));
+        b.textContent = nb(n*(1 - Math.pow(1 - p, 3)));
         if (p < 1) requestAnimationFrame(pas);
       })(performance.now());
     });
