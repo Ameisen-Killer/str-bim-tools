@@ -204,27 +204,76 @@ def igpu(nom, code, typ):
 
 
 # ---------------------------------------------------------------- processeurs
-def processeurs(dossier):
+CPU_EXCLUS = re.compile(r"\(|Steam|^Arc G|^\d{4}S$|Xbox|Playstation|^Processor U?\d+$")
+
+
+def puissance(x):
+    """Cœurs × fréquence, l'hyper-threading comptant pour un tiers de cœur."""
+    f = x["turbo"] or x["base"]
+    try:
+        c, t = int(x["coeurs"]), int(x["threads"] or x["coeurs"])
+    except (TypeError, ValueError):
+        return None
+    return (c + (t - c) / 3) * f if f and c else None
+
+
+def processeurs(dossier, date):
     comp = {cle_cpu(p[0]): p for p in lire_complements("complements-cpu.txt")}
-    rangs = []
+    rangs, sans_mark = [], []
     vus = set()
+    limite = (date or "9999")[:7]
     with open(os.path.join(dossier, "cpu.csv"), encoding="utf-8-sig") as f:
         for r in csv.DictReader(f):
-            if r["brand"] not in ("Intel", "AMD") or not r["passmark_cpu_mark"]:
+            if r["brand"] not in ("Intel", "AMD"):
                 continue
             nom = r["model"].strip()
             k = cle_cpu(nom)
             if k in vus:
                 continue
-            vus.add(k)
-            rangs.append(dict(
+            x = dict(
                 marque=r["brand"], nom=nom, cle=k, coeurs=r["cores"], threads=r["threads"],
                 base=nombre(r["base_clock_ghz"]), turbo=nombre(r["boost_clock_ghz"]), tdp=nombre(r["tdp_w"]),
                 annee=(r["released_date"] or "")[:4], code=r["codename"], socket=r["socket"],
-                mark=int(float(r["passmark_cpu_mark"])),
+                mark=int(float(r["passmark_cpu_mark"])) if r["passmark_cpu_mark"] else None,
                 st=int(float(r["passmark_single_thread"])) if r["passmark_single_thread"] else None,
-            ))
+                estime=False,
+            )
+            if x["mark"]:
+                vus.add(k)
+                rangs.append(x)
+            else:
+                sortie = (r["released_date"] or "")[:7]
+                if sortie and "2010" <= sortie <= limite and k not in comp and not CPU_EXCLUS.search(nom):
+                    sans_mark.append(x)
+
+    # CPU Mark des processeurs sans mesure : log(mark) = a + b·log(cœurs × fréquence), famille par famille,
+    # sinon par marque et par année (± 1 an)
+    par_famille, par_periode = defaultdict(list), defaultdict(list)
+    for x in rangs:
+        w = puissance(x)
+        if w and x["annee"]:
+            par_famille[x["code"]].append((math.log(w), math.log(x["mark"])))
+            for a in (int(x["annee"]) - 1, int(x["annee"]), int(x["annee"]) + 1):
+                par_periode[(x["marque"], str(a), x["socket"].startswith(("BGA", "Socket FP")))].append(
+                    (math.log(w), math.log(x["mark"])))
+    ajoutes = 0
+    for x in sans_mark:
+        if x["cle"] in vus:
+            continue
+        w = puissance(x)
+        p = par_famille.get(x["code"]) or []
+        if len(p) < 4:
+            p = par_periode.get((x["marque"], x["annee"], x["socket"].startswith(("BGA", "Socket FP")))) or []
+        if not w or len(p) < 4:
+            continue
+        a, b = droite(p, .6)
+        x["mark"] = int(round(math.exp(a + b * math.log(w)) / 10) * 10)
+        x["estime"] = True
+        vus.add(x["cle"])
+        rangs.append(x)
+        ajoutes += 1
     st_mesure = {x["cle"]: x["st"] for x in rangs if x["st"]}
+    print("processeurs sans CPU Mark estimés : %d" % ajoutes)
     # Rapport mono-cœur / fréquence par famille, pour estimer les manquants
     par_code, par_annee = defaultdict(list), defaultdict(list)
     for x in rangs:
@@ -237,7 +286,7 @@ def processeurs(dossier):
     for x in rangs:
         c = comp.get(x["cle"])
         typ = c[7] if c else type_cpu(x["nom"], x["socket"])
-        drap = ""
+        drap = "s" if x["estime"] else ""
         st = x["st"]
         if not st:
             # même puce sans graphique (F, KF) ou en version PRO : même mono-cœur
@@ -245,10 +294,10 @@ def processeurs(dossier):
                       x["nom"].replace(" PRO ", " ")):
                 kv = cle_cpu(v)
                 if kv != x["cle"] and (st_mesure.get(kv) or kv in comp):
-                    st, drap = st_mesure.get(kv) or int(comp[kv][9]), "e"
+                    st, drap = st_mesure.get(kv) or int(comp[kv][9]), drap or "e"
                     break
         if not st and c:
-            st, drap = int(c[9]), "e"
+            st, drap = int(c[9]), drap or "e"
         if not st:
             f = x["turbo"] or x["base"]
             ech = par_code.get(x["code"]) or []
@@ -259,7 +308,7 @@ def processeurs(dossier):
             if f and ech:
                 st = int(round(statistics.median(ech) * f / 10) * 10)
                 st = min(st, x["mark"])
-                drap = "e"
+                drap = drap or "e"
         if not st:
             continue
         if drap:
@@ -321,14 +370,14 @@ def debit(r):
         return None
 
 
-def droite(points):
-    """log(G3D) = a + b·log(débit), pente bornée pour rester raisonnable hors de l'échantillon."""
+def droite(points, pente_min=.5):
+    """log(score) = a + b·log(débit), pente bornée pour rester raisonnable hors de l'échantillon."""
     xs = [x for x, _ in points]
     ys = [y for _, y in points]
     mx, my = statistics.mean(xs), statistics.mean(ys)
     sxx = sum((x - mx) ** 2 for x in xs) or 1
     b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
-    b = min(max(b, .5), 1.0)
+    b = min(max(b, pente_min), 1.0)
     return my - b * mx, b
 
 
@@ -445,7 +494,7 @@ def main():
         sys.exit(__doc__)
     dossier = sys.argv[1]
     date = sys.argv[2] if len(sys.argv) > 2 else None
-    cpu = processeurs(dossier)
+    cpu = processeurs(dossier, date)
     gpu = graphiques(dossier, date)
     for l in cpu + gpu:
         for v in l:
