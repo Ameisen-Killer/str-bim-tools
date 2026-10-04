@@ -13,6 +13,7 @@ Sources :
 Usage : python3 bench/generer-donnees.py <dossier out/ du jeu de données> [date AAAA-MM-JJ]
 """
 import csv
+import math
 import os
 import re
 import statistics
@@ -34,10 +35,14 @@ def cle_cpu(nom):
     return norm(nom.replace("Ryzen Threadripper", "Threadripper"))
 
 
-def cle_gpu(nom):
+def cle_gpu(nom, suffixe=""):
+    """Clé de rapprochement : sans marque ; « Laptop », « Mobile » et « Max-Q » désignent la même puce de portable,
+    quelle que soit leur place dans le nom (« RTX 500 Mobile Ada Generation » = « RTX 500 Ada Laptop »)."""
     k = re.sub(r"^(nvidia|amd|intel)", "", norm(nom))
-    k = re.sub(r"(\d)go$", r"\1gb", k.replace("adageneration", "ada"))
-    return k.replace("laptop", "mobile")
+    portable = bool(re.search(r"laptop|mobile|maxq", k))
+    k = re.sub(r"laptop|mobile|maxq|workstation", "", k.replace("adageneration", "ada"))
+    k = re.sub(r"(\d)go$", r"\1gb", k) + suffixe
+    return k + ("@portable" if portable else "")
 
 
 def nombre(x):
@@ -285,36 +290,109 @@ def processeurs(dossier):
 
 # ---------------------------------------------------------------- graphiques
 EXCLUS = re.compile(r"^(Tesla|GRID|Instinct|Radeon Instinct|CMP|A100|H100|H200|B200|L4\b|L40|A10\b|A16\b|A2\b|A30\b|A40\b|"
-                    r"Data Center|Jetson|Xavier|Orin|Playstation|Xbox|Steam Deck)", re.I)
+                    r"Data Center|Jetson|Xavier|Orin|Playstation|Xbox|Steam|Switch|Rubin|B[123]00|GB10|H20|MI\d|RTX Spark|.*Server|"
+                    r"A800|A30X|A10M|Arctic Sound|N1 |Ryzen .*GPU|RTX 6000D|.*PRO V\d|.*Embedded|"
+                    r".* (GA|AD|GB|TU)\d{3}$|.*GDDR6X$|.*TiM$|.* x2$|.*\d+SP\b|P10\dM|.*6000D)", re.I)
 INTEGREES = re.compile(r"(IGP|nForce|^ION|Graphics|^Radeon (RX )?Vega (3|6|7|8|10|11)( Mobile)?$|"
                        r"^Radeon (\d{3}M|80\d0S|8065S|R\d M\d+DX|HD 8\d{3}[EG])$)")
 PORTABLES = re.compile(r"(\d{2,4}MX?\b|\bM\d{3,4}\b|Mobile|Mobility|Max-Q|Laptop|\bM\d+X?\b|\d{3,4}S$)")
 PRO = re.compile(r"^(Quadro|RTX A\d|RTX \d{4} Ada|RTX PRO|T\d{3,4}\b|NVS|Radeon Pro|Radeon PRO|FirePro|FireGL|Arc Pro|Radeon AI PRO)")
 
 
-def graphiques(dossier):
+def famille(r):
+    """Famille d'architecture, pour estimer le G3D Mark à partir des caractéristiques."""
+    c = r["chip"] or ""
+    m = re.match(r"(GB|AD|GA|TU|GP|GM|GK)\d", c)
+    if m:
+        return m.group(1)
+    m = re.match(r"Navi (\d)", c)
+    if m:
+        return "Navi" + m.group(1)
+    if r["brand"] == "Intel":
+        return "Intel"
+    return r["brand"] + "-autre"
+
+
+def debit(r):
+    """Cœurs × fréquence : la puissance de calcul théorique (fréquence de base pour les puces de portable)."""
+    try:
+        return int(r["shaders"]) * float(r["core_clock_ghz"])
+    except (TypeError, ValueError):
+        return None
+
+
+def droite(points):
+    """log(G3D) = a + b·log(débit), pente bornée pour rester raisonnable hors de l'échantillon."""
+    xs = [x for x, _ in points]
+    ys = [y for _, y in points]
+    mx, my = statistics.mean(xs), statistics.mean(ys)
+    sxx = sum((x - mx) ** 2 for x in xs) or 1
+    b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+    b = min(max(b, .5), 1.0)
+    return my - b * mx, b
+
+
+def graphiques(dossier, date):
     comp = lire_complements("complements-gpu.txt")
-    mesures = {}
+    mesures, sans_score = {}, {}
     with open(os.path.join(dossier, "gpu.csv"), encoding="utf-8-sig") as f:
         for r in csv.DictReader(f):
-            if r["brand"] not in ("NVIDIA", "AMD", "ATI", "Intel") or not r["passmark_g3d_mark"]:
+            if r["brand"] not in ("NVIDIA", "AMD", "ATI", "Intel"):
                 continue
             nom = r["model"].strip()
             if EXCLUS.search(nom):
                 continue
             k = cle_gpu(nom)
-            if k in mesures:
-                continue
-            mesures[k] = r
+            if r["passmark_g3d_mark"]:
+                mesures.setdefault(k, r)
+            else:
+                sans_score.setdefault(k, r)
+
+    def integree(r):
+        nom, bus = r["model"], r["bus_interface"] or ""
+        return (bus in ("IGP", "Ring Bus") or not r["memory_gb"] or bool(INTEGREES.search(nom))
+                or bool(re.search(r"\d+EU\b|^Arc \d{3}[VT]\b|^Arc Graphics|^Radeon Graphics", nom))) \
+            and not re.search(r"Vega M|Pro Vega", nom)
+
+    def portable(r):
+        if "Workstation" in r["model"]:
+            return False   # « Max-Q Workstation » : carte de PC fixe
+        return bool(PORTABLES.search(r["model"]) or (r["bus_interface"] or "").startswith("MXM"))
+
+    # Estimation par les caractéristiques, calée sur les cartes mesurées depuis 2016
+    pts = defaultdict(list)
+    for r in mesures.values():
+        t = debit(r)
+        if t and (r["released_date"] or "") >= "2016" and not integree(r):
+            pts[famille(r)].append((math.log(t), math.log(float(r["passmark_g3d_mark"]))))
+    droites = {f: droite(p) for f, p in pts.items() if len(p) >= 4}
+    plafonds = {f: math.exp(max(y for _, y in p)) for f, p in pts.items()}
+
+    def estimer(r):
+        t, d = debit(r), droites.get(famille(r))
+        if not (t and d):
+            return None
+        # jamais au-dessus de la meilleure carte mesurée de la même famille
+        return min(math.exp(d[0] + d[1] * math.log(t)), .98 * plafonds[famille(r)])
+
+    # Les puces de portable sont données à leur fréquence de base : facteur calé sur la base saisie
+    rapports = {"0": [], "1": []}
+    for p in comp:
+        if p[2] == "L":
+            r = sans_score.get(cle_gpu(p[0]))
+            e = estimer(r) if r is not None else None
+            if e:
+                rapports[p[3]].append(float(p[5]) / e)
+    facteur = {k: statistics.median(v) if v else 1.2 for k, v in rapports.items()}
+    print("facteur portable : grand public %.2f, pro %.2f" % (facteur["0"], facteur["1"]))
+
     lignes, pris, maj = [], set(), 0
     # Base saisie d'abord : elle porte les codes des graphiques intégrées et les noms lisibles
     for p in comp:
         k = cle_gpu(p[0])
         r = mesures.get(k)
         if r is None and p[2] != "I":
-            r = mesures.get(k + p[1] + "gb")   # le jeu de données précise la mémoire : « RTX 3060 12 GB »
-        if r is None and p[2] == "I":
-            r = mesures.get(cle_gpu(re.sub(r"^(Intel|AMD) ", "", p[0])))
+            r = mesures.get(cle_gpu(p[0], p[1] + "gb"))   # le jeu de données précise la mémoire : « RTX 3060 12 GB »
         drap = "s"
         g3d = p[5]
         if r is not None:
@@ -322,25 +400,43 @@ def graphiques(dossier):
             pris.add(cle_gpu(r["model"]))
             maj += 1
         pris.add(k)
+        pris.add(cle_gpu(p[0], p[1] + "gb"))
         lignes.append([marque_gpu(p[0]), p[0], p[1], p[2], p[3], p[4], g3d, p[6] if len(p) > 6 else "", drap])
     ajout = 0
     for k, r in mesures.items():
         if k in pris:
             continue
         nom = r["model"].strip()
-        bus = r["bus_interface"] or ""
-        integ = (bus in ("IGP", "Ring Bus") or not r["memory_gb"] or bool(INTEGREES.search(nom))) \
-            and not re.search(r"Vega M|Pro Vega", nom)
-        typ = "I" if integ else ("L" if PORTABLES.search(nom) or bus.startswith("MXM") else "D")
-        vram = nombre(r["memory_gb"]) or 0
-        if integ:
-            vram = 0
+        integ = integree(r)
+        typ = "I" if integ else ("L" if portable(r) else "D")
+        vram = 0 if integ else (nombre(r["memory_gb"]) or 0)
         lignes.append(["ATI" if r["brand"] == "ATI" else r["brand"], nom, txt(vram), typ, "1" if PRO.match(nom) else "0",
                        (r["released_date"] or "")[:4], str(int(float(r["passmark_g3d_mark"]))), "", ""])
+        pris.add(k)
         ajout += 1
+    # Puces sans score PassMark (portables récents, nouvelles cartes pro) : estimées par leurs caractéristiques
+    estimees = 0
+    limite = (date or "9999")[:7]
+    for k, r in sans_score.items():
+        if k in pris or integree(r) or r["brand"] == "ATI":
+            continue
+        sortie = (r["released_date"] or "")[:7]
+        port = portable(r)
+        if sortie > limite or (not sortie and not port) or (sortie and sortie < "2016"):
+            continue   # annonces futures, puces anciennes
+        e = estimer(r)
+        if not e:
+            continue
+        pro = "1" if PRO.match(r["model"]) else "0"
+        if port:
+            e *= facteur[pro]
+        lignes.append([r["brand"], r["model"].strip(), txt(nombre(r["memory_gb"]) or 0), "L" if port else "D", pro,
+                       sortie[:4], str(int(round(e / 100) * 100)), "", "s"])
+        pris.add(k)
+        estimees += 1
     lignes.sort(key=lambda l: (l[3] != "I", l[0], l[1]))
-    print("graphiques : %d (base saisie recalée sur PassMark %d, ajoutées depuis le jeu de données %d)"
-          % (len(lignes), maj, ajout))
+    print("graphiques : %d (base saisie recalée sur PassMark %d, mesurées ajoutées %d, estimées par les caractéristiques %d)"
+          % (len(lignes), maj, ajout, estimees))
     return lignes
 
 
@@ -350,7 +446,7 @@ def main():
     dossier = sys.argv[1]
     date = sys.argv[2] if len(sys.argv) > 2 else None
     cpu = processeurs(dossier)
-    gpu = graphiques(dossier)
+    gpu = graphiques(dossier, date)
     for l in cpu + gpu:
         for v in l:
             assert "|" not in str(v) and "`" not in str(v) and "\n" not in str(v), l

@@ -383,7 +383,7 @@ footer a:hover{color:var(--or)}
           <div class="poids"><div><span>Multi-cœur</span><span>40 %</span></div><div><span>Mémoire</span><span>30 %</span></div><div><span>Mono-cœur</span><span>15 %</span></div><div><span>Stockage</span><span>10 %</span></div><div><span>Graphique</span><span>5 %</span></div></div>
         </div>
       </div>
-      <p class="source rv" style="--d:.4s">Note globale sur 100&nbsp;: mono-cœur 30&nbsp;%, multi-cœur 25&nbsp;%, graphique 20&nbsp;%, mémoire 15&nbsp;%, stockage 10&nbsp;%, sur une échelle où 100 correspond au meilleur matériel actuel. Repères&nbsp;: 60 et plus, la machine convient&nbsp;; 80 et plus, elle est à l'aise. Sources&nbsp;: scores <a href="https://www.cpubenchmark.net/" rel="noopener">PassMark</a> (CPU Mark, Single Thread, G3D Mark) et caractéristiques TechPowerUp relevés le <span id="date-base">28.09.2026</span> par le projet <a href="https://github.com/lijieyu233/cpu-gpu-data-crawler" rel="noopener">cpu-gpu-data-crawler</a>, complétés à la main. PassMark ne publie le mono-cœur que pour un tiers des processeurs&nbsp;: les autres sont estimés à partir de la fréquence et des puces de la même famille (écart médian de 3&nbsp;%), et marqués «&nbsp;≈&nbsp;». Les puces absentes de ces relevés, surtout les cartes graphiques de portable récentes, sont estimées elles aussi. Un portable mince bridé par sa ventilation peut rester en dessous de ces moyennes.</p>
+      <p class="source rv" style="--d:.4s">Note globale sur 100&nbsp;: mono-cœur 30&nbsp;%, multi-cœur 25&nbsp;%, graphique 20&nbsp;%, mémoire 15&nbsp;%, stockage 10&nbsp;%, sur une échelle où 100 correspond au meilleur matériel actuel. Repères&nbsp;: 60 et plus, la machine convient&nbsp;; 80 et plus, elle est à l'aise. Sources&nbsp;: scores <a href="https://www.cpubenchmark.net/" rel="noopener">PassMark</a> (CPU Mark, Single Thread, G3D Mark) et caractéristiques TechPowerUp relevés le <span id="date-base">28.09.2026</span> par le projet <a href="https://github.com/lijieyu233/cpu-gpu-data-crawler" rel="noopener">cpu-gpu-data-crawler</a>, complétés à la main. PassMark ne publie le mono-cœur que pour un tiers des processeurs&nbsp;: les autres sont estimés à partir de la fréquence et des puces de la même famille (écart médian de 3&nbsp;%), et marqués «&nbsp;≈&nbsp;». Les cartes graphiques sans score PassMark, surtout les puces de portable récentes et les nouvelles gammes pro, sont estimées à partir de leurs caractéristiques (cœurs et fréquence), calées sur les cartes mesurées de la même famille. Un portable mince bridé par sa ventilation peut rester en dessous de ces moyennes.</p>
     </div>
   </section>
 </main>
@@ -393,7 +393,7 @@ footer a:hover{color:var(--or)}
   <span>Bench · valeurs indicatives</span>
 </footer>
 
-<script src="/bench/donnees.js?v=2"></script>
+<script src="/bench/donnees.js?v=3"></script>
 <script>
 (function(){
   "use strict";
@@ -416,7 +416,8 @@ footer a:hover{color:var(--or)}
       id: norm(p[1]).replace(/\+/g, "plus"), nom: p[1], marque: p[0], complet: p[0] + " " + p[1],
       coeurs: hyb ? c.split("+").reduce(function(a, b){ return a + +b }, 0) : +c, hybride: hyb ? c : "",
       threads: +p[3], base: +p[4], turbo: +p[5], tdp: +p[6], annee: +p[7], type: p[8],
-      mark: +p[9], st: +p[10], igpu: p[11] || "", stEstime: p[12] === "e", estime: p[12] === "s", cle: norm(p[0] + p[1])
+      mark: +p[9], st: +p[10], igpu: p[11] || "", stEstime: p[12] === "e", estime: p[12] === "s", cle: norm(p[0] + p[1]),
+      sep: " " + (p[0] + " " + p[1]).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ")
     };
   });
   var GPUS = D.gpu.trim().split("\n").map(function(l){
@@ -424,7 +425,8 @@ footer a:hover{color:var(--or)}
     var complet = /^(NVIDIA|AMD|Intel|ATI) /.test(nom) ? nom : p[0] + " " + nom;
     return {
       id: p[7] || norm(nom), nom: nom, marque: p[0], complet: complet, vram: +p[2], type: p[3],
-      pro: p[4] === "1", annee: +p[5], g3d: +p[6], estime: p[8] === "s", cle: norm(complet)
+      pro: p[4] === "1", annee: +p[5], g3d: +p[6], estime: p[8] === "s", cle: norm(complet + (p[3] === "L" ? " portable" : "")),
+      sep: " " + (complet).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ")
     };
   });
   var CPU_ID = {}, GPU_ID = {};
@@ -441,21 +443,27 @@ footer a:hover{color:var(--or)}
 
   // Tous les mots tapés doivent figurer dans le nom. Sinon (nom copié d'un configurateur :
   // « Processeur Intel® Core™ Ultra 7 356H vPro® »), on garde les modèles qui en contiennent
-  // le plus, les numéros de modèle pesant trois fois plus que les mots.
+  // le plus, les numéros de modèle pesant trois fois plus que les mots. Dans les deux cas, un
+  // numéro trouvé entier passe devant (« 500 » : la RTX PRO 500 avant la 4500).
+  var BRUIT = /^(g?ddr\d+x?|hbm\d*|\d+(go|gb|mo|mb))$/;   // type et taille de mémoire d'une fiche commerciale
+  function entier(t, o){ return /\d/.test(t) && new RegExp("(^|[^0-9])" + t + "(?![0-9])").test(o.sep) }
   function chercher(liste, q){
     var toks = q.split(/\s+/).map(norm).filter(Boolean);
     if (!toks.length) return [];
     var r = liste.filter(function(o){ return toks.every(function(x){ return o.cle.indexOf(x) >= 0 }) });
-    var der = toks[toks.length - 1], score = null;
-    if (!r.length){
-      var chiffres = toks.filter(function(t){ return /\d/.test(t) });
-      score = new Map();
+    var der = toks[toks.length - 1], score = new Map();
+    if (r.length){
+      r.forEach(function(o){ score.set(o, toks.filter(function(t){ return entier(t, o) }).length) });
+    } else {
+      var utiles = toks.filter(function(t){ return !BRUIT.test(t) });
+      var chiffres = utiles.filter(function(t){ return /\d/.test(t) });
       liste.forEach(function(o){
         var s = 0, chiffre = false;
-        toks.forEach(function(t){
+        utiles.forEach(function(t){
           if (o.cle.indexOf(t) < 0) return;
           var c = /\d/.test(t);
-          s += t.length*(c ? 3 : 1); if (c) chiffre = true;
+          s += t.length*(c ? 3 : 1) + (entier(t, o) ? 4 : 0);
+          if (c) chiffre = true;
         });
         if (s && (chiffre || !chiffres.length)) score.set(o, s);
       });
@@ -466,7 +474,7 @@ footer a:hover{color:var(--or)}
     }
     r.sort(function(a, b){
       var fa = a.cle.slice(-der.length) === der ? 0 : 1, fb = b.cle.slice(-der.length) === der ? 0 : 1;
-      return (score ? score.get(b) - score.get(a) : 0) || fa - fb || a.cle.length - b.cle.length || b.annee - a.annee;
+      return score.get(b) - score.get(a) || fa - fb || a.cle.length - b.cle.length || b.annee - a.annee;
     });
     return r.slice(0, 40);
   }
