@@ -106,14 +106,14 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 .action[hidden]{display:none}
 
 /* ---------- Postes ---------- */
-.postes{display:grid;gap:56px;margin-top:40px}
+.postes{display:grid;grid-template-columns:minmax(0,1fr);gap:56px;margin-top:40px}
 .postes[data-mode="2"]{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
 .poste{position:relative;border-top:1px solid var(--ligne);padding-top:26px}
 .poste::before{content:"";position:absolute;top:-1px;left:0;height:1px;width:64px;background:var(--or)}
 .poste[hidden]{display:none}
 .poste-tete{display:flex;align-items:baseline;gap:16px}
 .lettre{font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--or)}
-.poste-nom{flex:1;min-width:0;background:none;border:0;border-bottom:1px solid transparent;padding:2px 0 6px;font-weight:200;font-size:clamp(26px,3vw,34px);letter-spacing:.01em;transition:border-color .3s}
+.poste-nom{flex:1;min-width:0;width:0;background:none;border:0;border-bottom:1px solid transparent;padding:2px 0 6px;font-weight:200;font-size:clamp(26px,3vw,34px);letter-spacing:.01em;transition:border-color .3s}
 .poste-nom::placeholder{color:var(--texte-faible)}
 .poste-nom:hover{border-bottom-color:var(--ligne)}
 .poste-nom:focus{outline:none;border-bottom-color:var(--or)}
@@ -122,7 +122,7 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 .champ{margin-top:30px}
 .champ>label,.champ>.etiquette{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
 .saisie{position:relative;margin-top:6px}
-.saisie input{width:100%;background:none;border:0;border-bottom:1px solid rgba(236,232,224,.22);padding:10px 34px 10px 0;font-size:19px;font-weight:300;border-radius:0;transition:border-color .3s}
+.saisie input{width:100%;min-width:0;background:none;border:0;border-bottom:1px solid rgba(236,232,224,.22);padding:10px 34px 10px 0;font-size:19px;font-weight:300;border-radius:0;transition:border-color .3s}
 .saisie input{text-overflow:ellipsis}
 .saisie input::placeholder{color:var(--texte-faible);font-weight:200}
 .saisie input:focus{outline:none;border-bottom-color:var(--or)}
@@ -161,7 +161,7 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 .puces button[aria-pressed="true"]{border-color:rgba(214,168,92,.7);color:var(--or);background:rgba(214,168,92,.06)}
 
 /* ---------- Résultats ---------- */
-.fiches{display:grid;gap:64px;margin-top:40px}
+.fiches{display:grid;grid-template-columns:minmax(0,1fr);gap:64px;margin-top:40px}
 .fiches[data-mode="2"]{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
 .fiche[hidden]{display:none}
 .fiche-tete{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--ligne);padding-bottom:14px}
