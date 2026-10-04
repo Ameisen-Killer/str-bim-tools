@@ -202,10 +202,17 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 .conseils li.plus::before{background:var(--or)}
 .conseils b{font-weight:400;color:var(--texte)}
 .attente{padding:30px 0 0;color:var(--texte-faible);font-size:15.5px}
-@media (max-width:560px){
-  .jauge{grid-template-columns:minmax(0,1fr) 2.4em 6.2em;gap:8px 12px}
-  .jauge .trait{grid-column:1 / -1;grid-row:2}
-  .composants .jauge{grid-template-columns:minmax(0,1fr) auto}
+@media (max-width:640px){
+  /* Jauges aérées : nom à gauche, valeur et niveau à droite, barre pleine largeur dessous */
+  .jauge{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nom val" "nom niv" "trait trait";gap:0 16px;align-items:end;padding:18px 0 22px}
+  .jauge .nom{grid-area:nom;align-self:center;font-size:16px}
+  .jauge .nom small{margin-top:3px}
+  .jauge .val{grid-area:val;font-weight:200;font-size:26px;line-height:1}
+  .jauge .niv{grid-area:niv;text-align:right;margin-top:5px;font-size:10px}
+  .jauge .trait{grid-area:trait;margin-top:16px}
+  .composants .jauge{grid-template-areas:"nom val" "trait trait";padding:16px 0 20px}
+  .composants .jauge .val{font-family:var(--mono);font-weight:400;font-size:12px;line-height:1.4;align-self:center;text-align:right}
+  .composants .jauge .trait{margin-top:14px}
 }
 
 /* ---------- Duel ---------- */
