@@ -24,8 +24,8 @@
        rapetisse), sans 3D ni bibliothèque ;
      - la tranche visible (le chant) suit le même partage vert / gris, un
        ton plus sombre ;
-     - la lumière : une face vue de biais s'assombrit un peu, une ombre douce
-       au sol s'élargit et se resserre avec la rotation.
+     - la lumière : une face vue de biais s'assombrit un peu. Plus d'ombre au
+       sol (retirée à la demande de Tony, 05.10.2026).
    Le dos montre aussi le logo, à l'endroit : on le lit toujours.
 
    S'arrête hors écran et onglet caché ; tourne même quand le système demande
@@ -46,7 +46,9 @@
   var LIMITE = (706.47 - Y0) / HAUT;   // part du vert, en hauteur
   var EPAISSEUR = .10;                 // de la largeur
   var TOUR = 26;                       // secondes par tour : lentement
-  var TRANCHES = 90;
+  var TRANCHES = 60, TRANCHES_MIN = 6; // tranches de la face, selon sa largeur à l'écran
+  var IMAGES = 30;                     // images par seconde au plus : il tourne lentement,
+                                       // 60 ou 144 (écran rapide) ne se voient pas et coûtent
 
   /* Le logo, peint une fois. Largeur S en pixels, hauteur S × RAPPORT. */
   function peint(S) {
@@ -141,16 +143,6 @@
       var demi = L / 2, hd = L * RAPPORT / 2, ep = L * EPAISSEUR / 2;
       var yc = cy;
 
-      // L'ombre au sol, qui suit l'emprise de la plaque
-      var emprise = Math.abs(demi * cos) + Math.abs(ep * sin);
-      var gr = ctx.createRadialGradient(cx, cy + hd * 1.08, 1, cx, cy + hd * 1.08, Math.max(4, emprise * 1.1));
-      gr.addColorStop(0, "rgba(0,0,0,.22)"); gr.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.save();
-      ctx.translate(cx, cy + hd * 1.08); ctx.scale(1, .16); ctx.translate(-cx, -(cy + hd * 1.08));
-      ctx.fillStyle = gr;
-      ctx.beginPath(); ctx.arc(cx, cy + hd * 1.08, Math.max(4, emprise * 1.1), 0, TAU); ctx.fill();
-      ctx.restore();
-
       // Le chant visible : à droite si la plaque tourne sa droite vers nous
       var cote = sin < 0 ? 1 : -1;                  // x du chant visible : +demi ou -demi
       var a = projette(cote * demi, ep, cos, sin), b = projette(cote * demi, -ep, cos, sin);
@@ -172,16 +164,21 @@
       // La face visible, en tranches : l'avant si elle nous regarde, sinon le dos
       var face = cos >= 0 ? ep : -ep;
       var S = logo.width, prec = projette(-demi, face, cos, sin);
+      // Autant de tranches que la face en demande : une tous les 3 px de largeur
+      // vue à l'écran. De face, la perspective ne joue pas ; de profil, la face
+      // est étroite. 90 tranches à chaque image coûtaient pour rien.
+      var large = Math.abs(projette(demi, face, cos, sin).X - prec.X);
+      var n = Math.max(TRANCHES_MIN, Math.min(TRANCHES, Math.round(large / 3)));
       ctx.imageSmoothingEnabled = true;
-      for (var i = 1; i <= TRANCHES; i++) {
-        var u0 = (i - 1) / TRANCHES, u1 = i / TRANCHES;
+      for (var i = 1; i <= n; i++) {
+        var u0 = (i - 1) / n, u1 = i / n;
         var p = projette(-demi + u1 * L, face, cos, sin);
         var x0 = Math.min(prec.X, p.X), w = Math.abs(p.X - prec.X);
         if (w > .01) {
           var k = (prec.k + p.k) / 2, hT = L * RAPPORT * k;
           // de dos, la colonne de gauche de l'écran est la droite du logo : on la retourne pour le lire
           var su = cos >= 0 ? u0 : 1 - u1;
-          ctx.drawImage(logo, su * S, 0, Math.max(1, S / TRANCHES), logo.height,
+          ctx.drawImage(logo, su * S, 0, Math.max(1, S / n), logo.height,
                         x0 - .25, yc - hT / 2, w + .5, hT);    // +0,5 px : pas de jour entre deux tranches
         }
         prec = p;
@@ -212,7 +209,9 @@
 
     function frame(now) {
       anim = null;
-      var dt = dernier ? Math.min(.05, (now - dernier) / 1000) : 0;
+      // Trop tôt pour l'image suivante : on attend la prochaine occasion sans rien dessiner
+      if (dernier && now - dernier < 1000 / IMAGES - 4) { relance(); return; }
+      var dt = dernier ? Math.min(.1, (now - dernier) / 1000) : 0;
       dernier = now;
       excite += (cible - excite) * (1 - Math.exp(-dt / (cible > excite ? .6 : 1.8)));
       T += dt * (1 + 1.5 * excite);
