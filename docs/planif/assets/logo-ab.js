@@ -1,13 +1,23 @@
-/* Logo du bureau en volume — décor de l'accueil (02.10.2026).
+/* Logo du bureau en volume — décor de l'accueil (02.10.2026, redessiné le 05.10.2026).
    ---------------------------------------------------------------------------
    Demande de Tony : sur l'accueil, à la place du globe, le logo du bureau qui
    tourne lentement sur lui-même, avec une épaisseur de 10 % de sa largeur.
    Il ne paraît que pour le bureau qui en est le propriétaire (voir l'accueil,
    decorDuBureau) : jamais en démonstration.
 
-   Le logo est dessiné ici, sans fichier image : un carré vert (haut) et gris
-   (bas), « AB » en blanc à cheval sur la limite. On le peint une fois dans un
-   canvas hors écran, puis, à chaque image :
+   Le logo est dessiné ici, sans fichier image, mais **à l'identique** du
+   fichier fourni par Tony (05.10.2026, 1063 × 1358 px) : chaque bord a été
+   relevé sur l'image, au dixième de pixel (moindres carrés sur 240 lignes
+   pour les jambes du A, cercles ajustés pour les panses du B). Les cotes
+   ci-dessous sont celles de ce fichier, en pixels ; le dessin les met à
+   l'échelle. Ne pas les « arrondir » : Tony veut le logo parfaitement exact.
+     - le pavé n'est pas carré : 921,74 × 876,52 (la hauteur fait 95 % de la
+       largeur) ; vert en haut sur 73 % de la hauteur, gris dessous ;
+     - le A a un sommet plat, des jambes d'épaisseur légèrement variable et
+       pas de barre ; le B, un fût droit et deux panses dont les évidements
+       se terminent en demi-cercle — le bas de la panse haute tombe sur la
+       limite vert / gris.
+   On le peint une fois dans un canvas hors écran, puis, à chaque image :
      - la plaque (largeur L, épaisseur 0,1 L) tourne autour de l'axe vertical ;
      - la face visible est recopiée en fines tranches verticales, chacune à
        sa propre hauteur : c'est la perspective (le bord qui s'éloigne
@@ -26,42 +36,68 @@
   "use strict";
 
   var TAU = Math.PI * 2;
-  var VERT = "#C8DE9A", GRIS = "#8B8B8D", BLANC = "#FFFFFF";
-  var VERT_CHANT = "#9FB676", GRIS_CHANT = "#6C6C6E";
-  var LIMITE = .585;                   // part du vert, en hauteur
+  // Couleurs relevées sur le fichier ; le chant, un ton plus sombre (80 %)
+  var VERT = "#BDE292", GRIS = "#818286", BLANC = "#FFFFFF";
+  var VERT_CHANT = "#97B575", GRIS_CHANT = "#67686B";
+
+  // Cotes du fichier, en pixels de l'image (origine : coin haut gauche du pavé)
+  var X0 = 74.26, Y0 = 64.48, LARG = 921.74, HAUT = 876.52;
+  var RAPPORT = HAUT / LARG;           // hauteur / largeur du pavé
+  var LIMITE = (706.47 - Y0) / HAUT;   // part du vert, en hauteur
   var EPAISSEUR = .10;                 // de la largeur
   var TOUR = 26;                       // secondes par tour : lentement
   var TRANCHES = 90;
 
-  /* Le logo, peint une fois. Côté S en pixels. */
+  /* Le logo, peint une fois. Largeur S en pixels, hauteur S × RAPPORT. */
   function peint(S) {
     var c = document.createElement("canvas");
-    c.width = c.height = S;
+    c.width = S; c.height = Math.round(S * RAPPORT);
     var g = c.getContext("2d");
-    g.fillStyle = VERT; g.fillRect(0, 0, S, S);
-    g.fillStyle = GRIS; g.fillRect(0, Math.round(S * LIMITE), S, S - Math.round(S * LIMITE));
+    g.scale(c.width / LARG, c.height / HAUT);
+    g.translate(-X0, -Y0);
 
-    // « AB » : le A sans barre, comme un lambda ; trait fin et égal
-    var e = S * .062, haut = S * .405, bas = S * .735, h = bas - haut;
-    g.strokeStyle = BLANC; g.lineWidth = e; g.lineJoin = "miter"; g.lineCap = "butt";
-    g.beginPath();
-    var ax = S * .255, aw = S * .235;
-    g.moveTo(ax, bas); g.lineTo(ax + aw / 2, haut + e * .45); g.lineTo(ax + aw, bas);
-    g.stroke();
+    g.fillStyle = VERT; g.fillRect(X0, Y0, LARG, 706.47 - Y0);
+    g.fillStyle = GRIS; g.fillRect(X0, 706.47, LARG, Y0 + HAUT - 706.47);
 
-    // B : un fût et deux panses, la seconde un peu plus large
-    var bx = S * .56 + e / 2, r1 = h * .25, r2 = h * .27, ext1 = S * .115, ext2 = S * .13;
-    var y0 = haut + e / 2, ym = haut + h * .47, y1 = bas - e / 2;
+    var haut = 515.8, bas = 848.1;     // haut et pied des deux lettres
+    g.fillStyle = BLANC;
+
+    // A : quatre bords droits, x = a·y + b (jambe gauche dehors et dedans, jambe droite dedans et dehors)
+    function x(a, b, y) { return a * y + b; }
+    var OG = [-0.40219, 511.413], IG = [-0.41253, 579.490], ID = [0.40595, 100.987], OD = [0.44536, 143.467];
+    var yPointe = (IG[1] - ID[1]) / (ID[0] - IG[0]);       // les deux bords intérieurs se rejoignent
     g.beginPath();
-    g.moveTo(bx, bas); g.lineTo(bx, y0);
-    g.lineTo(bx + ext1 - r1 / 2, y0);
-    g.arc(bx + ext1 - r1 / 2, (y0 + ym) / 2, (ym - y0) / 2, -Math.PI / 2, Math.PI / 2);
-    g.lineTo(bx, ym);
-    g.moveTo(bx, ym);
-    g.lineTo(bx + ext2 - r2 / 2, ym);
-    g.arc(bx + ext2 - r2 / 2, (ym + y1) / 2, (y1 - ym) / 2, -Math.PI / 2, Math.PI / 2);
-    g.lineTo(bx, y1);
-    g.stroke();
+    g.moveTo(x(OG[0], OG[1], haut), haut);
+    g.lineTo(x(OD[0], OD[1], haut), haut);
+    g.lineTo(x(OD[0], OD[1], bas), bas);
+    g.lineTo(x(ID[0], ID[1], bas), bas);
+    g.lineTo(x(ID[0], ID[1], yPointe), yPointe);
+    g.lineTo(x(IG[0], IG[1], bas), bas);
+    g.lineTo(x(OG[0], OG[1], bas), bas);
+    g.closePath();
+    g.fill();
+
+    // B : le contour (deux panses en arcs de cercle), puis les deux évidements retirés (pair-impair)
+    var fut = 563.5;
+    var h1 = { x: 784.9, y: 612.2, r: 96.4 }, h2 = { x: 785.1, y: 751.95, r: 96.15 };
+    var taille = 682;                                       // la taille, entre les deux panses
+    var a1 = Math.asin((taille - h1.y) / h1.r), a2 = Math.asin((taille - h2.y) / h2.r);
+    g.beginPath();
+    g.moveTo(fut, haut);
+    g.lineTo(h1.x, haut);
+    g.arc(h1.x, h1.y, h1.r, -Math.PI / 2, a1);
+    g.arc(h2.x, h2.y, h2.r, a2, Math.PI / 2);
+    g.lineTo(fut, bas);
+    g.closePath();
+    // évidement du haut
+    g.moveTo(630.7, 566.3); g.lineTo(764.8, 566.3);
+    g.arc(764.8, 612.3, 46, -Math.PI / 2, Math.PI / 2);
+    g.lineTo(630.7, 658.3); g.closePath();
+    // évidement du bas
+    g.moveTo(631.1, 706.2); g.lineTo(765.1, 706.2);
+    g.arc(765.1, 751.95, 45.75, -Math.PI / 2, Math.PI / 2);
+    g.lineTo(631.1, 797.7); g.closePath();
+    g.fill("evenodd");
     return c;
   }
 
@@ -98,37 +134,38 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (!L) return;
-      var th = TAU * T / TOUR + .5 * Math.sin(T * .21) * .25;  // pas tout à fait régulier : il flotte
+      // Rotation régulière, sans flottement ni à-coups : un logo qui monte et
+      // descend donnait le mal de mer à Tony (05.10.2026)
+      var th = TAU * T / TOUR;
       var cos = Math.cos(th), sin = Math.sin(th);
-      var demi = L / 2, ep = L * EPAISSEUR / 2;
-      var flotte = Math.sin(T * .9) * L * .015;
-      var yc = cy + flotte;
+      var demi = L / 2, hd = L * RAPPORT / 2, ep = L * EPAISSEUR / 2;
+      var yc = cy;
 
       // L'ombre au sol, qui suit l'emprise de la plaque
       var emprise = Math.abs(demi * cos) + Math.abs(ep * sin);
-      var gr = ctx.createRadialGradient(cx, cy + demi * 1.08, 1, cx, cy + demi * 1.08, Math.max(4, emprise * 1.1));
+      var gr = ctx.createRadialGradient(cx, cy + hd * 1.08, 1, cx, cy + hd * 1.08, Math.max(4, emprise * 1.1));
       gr.addColorStop(0, "rgba(0,0,0,.22)"); gr.addColorStop(1, "rgba(0,0,0,0)");
       ctx.save();
-      ctx.translate(cx, cy + demi * 1.08); ctx.scale(1, .16); ctx.translate(-cx, -(cy + demi * 1.08));
+      ctx.translate(cx, cy + hd * 1.08); ctx.scale(1, .16); ctx.translate(-cx, -(cy + hd * 1.08));
       ctx.fillStyle = gr;
-      ctx.beginPath(); ctx.arc(cx, cy + demi * 1.08, Math.max(4, emprise * 1.1), 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy + hd * 1.08, Math.max(4, emprise * 1.1), 0, TAU); ctx.fill();
       ctx.restore();
 
       // Le chant visible : à droite si la plaque tourne sa droite vers nous
       var cote = sin < 0 ? 1 : -1;                  // x du chant visible : +demi ou -demi
       var a = projette(cote * demi, ep, cos, sin), b = projette(cote * demi, -ep, cos, sin);
       if (Math.abs(a.X - b.X) > .3) {
-        var lim = -demi + L * LIMITE;
+        var lim = -hd + 2 * hd * LIMITE;
         ctx.beginPath();
-        ctx.moveTo(a.X, yc - demi * a.k); ctx.lineTo(b.X, yc - demi * b.k);
+        ctx.moveTo(a.X, yc - hd * a.k); ctx.lineTo(b.X, yc - hd * b.k);
         ctx.lineTo(b.X, yc + lim * b.k); ctx.lineTo(a.X, yc + lim * a.k); ctx.closePath();
         ctx.fillStyle = VERT_CHANT; ctx.fill();
         ctx.beginPath();
         ctx.moveTo(a.X, yc + lim * a.k); ctx.lineTo(b.X, yc + lim * b.k);
-        ctx.lineTo(b.X, yc + demi * b.k); ctx.lineTo(a.X, yc + demi * a.k); ctx.closePath();
+        ctx.lineTo(b.X, yc + hd * b.k); ctx.lineTo(a.X, yc + hd * a.k); ctx.closePath();
         ctx.fillStyle = GRIS_CHANT; ctx.fill();
         // un filet de lumière sur l'arête avant
-        ctx.beginPath(); ctx.moveTo(a.X, yc - demi * a.k); ctx.lineTo(a.X, yc + demi * a.k);
+        ctx.beginPath(); ctx.moveTo(a.X, yc - hd * a.k); ctx.lineTo(a.X, yc + hd * a.k);
         ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.stroke();
       }
 
@@ -141,10 +178,10 @@
         var p = projette(-demi + u1 * L, face, cos, sin);
         var x0 = Math.min(prec.X, p.X), w = Math.abs(p.X - prec.X);
         if (w > .01) {
-          var k = (prec.k + p.k) / 2, hT = L * k;
+          var k = (prec.k + p.k) / 2, hT = L * RAPPORT * k;
           // de dos, la colonne de gauche de l'écran est la droite du logo : on la retourne pour le lire
           var su = cos >= 0 ? u0 : 1 - u1;
-          ctx.drawImage(logo, su * S, 0, Math.max(1, S / TRANCHES), S,
+          ctx.drawImage(logo, su * S, 0, Math.max(1, S / TRANCHES), logo.height,
                         x0 - .25, yc - hT / 2, w + .5, hT);    // +0,5 px : pas de jour entre deux tranches
         }
         prec = p;
@@ -154,8 +191,8 @@
       if (biais > .02) {
         var g0 = projette(-demi, face, cos, sin), g1 = projette(demi, face, cos, sin);
         ctx.beginPath();
-        ctx.moveTo(g0.X, yc - demi * g0.k); ctx.lineTo(g1.X, yc - demi * g1.k);
-        ctx.lineTo(g1.X, yc + demi * g1.k); ctx.lineTo(g0.X, yc + demi * g0.k); ctx.closePath();
+        ctx.moveTo(g0.X, yc - hd * g0.k); ctx.lineTo(g1.X, yc - hd * g1.k);
+        ctx.lineTo(g1.X, yc + hd * g1.k); ctx.lineTo(g0.X, yc + hd * g0.k); ctx.closePath();
         ctx.fillStyle = "rgba(0,0,0," + (.28 * biais).toFixed(3) + ")";
         ctx.fill();
       }
