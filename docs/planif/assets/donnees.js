@@ -446,8 +446,11 @@
       taches[t.id] = t;
       (parAffaire[t.affaireId] || (parAffaire[t.affaireId] = [])).push(t);
     });
+    // Par échéance ; à échéance égale, la priorité départage (1 devant 5)
     var triees = etat.taches.slice().sort(function (a, b) {
-      return (a.echeance || "9999") < (b.echeance || "9999") ? -1 : 1;
+      var ea = a.echeance || "9999", eb = b.echeance || "9999";
+      if (ea !== eb) return ea < eb ? -1 : 1;
+      return (a.priorite || 5) - (b.priorite || 5);
     });
     index = {
       v: version, m: etat.membres, nm: etat.membres.length, a: etat.affaires, na: etat.affaires.length,
@@ -527,8 +530,8 @@
         finiInge: t.finiInge === true,
         finiDessin: t.finiDessin === true,
         enchaine: t.enchaine === true,
-        // 1 la plus importante, 5 par défaut. Lue seulement : la base ne la
-        // reçoit pas encore (pas dans Sb.ADAPT), le curseur viendra avec la saisie.
+        // 1 la plus importante, 5 par défaut. Réglée par le curseur du formulaire
+        // de tâche (version AB) ; écrite si la base a la colonne (supabase.js).
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
@@ -715,7 +718,7 @@
     if (ci + cd <= 0) throw erreur("Indique au moins une durée estimée, côté ingénieur ou côté dessin (0,1 j au minimum).");
     if (ci > CHARGE_MAX || cd > CHARGE_MAX) throw erreur("Une charge ne peut pas dépasser " + String(CHARGE_MAX).replace(".", ",") + " j.");
     // Une charge sans personne est permise : elle attend son affectation (« À affecter » au tableau de bord)
-    return {
+    var v = {
       affaireId: texte(o.affaireId), titre: texte(o.titre), note: texte(o.note),
       chargeInge: ci, chargeDessin: cd,
       debut: null, echeance: texte(o.echeance),
@@ -729,6 +732,10 @@
       // sauf avis contraire ; tant que la base ignore la colonne, rien n'est enchaîné.
       enchaine: "enchaine" in o ? o.enchaine === true : true
     };
+    // Priorité entre tâches de même échéance (1 la plus importante, 5 par défaut) :
+    // seulement quand le formulaire la porte (version AB), sinon elle reste telle quelle
+    if (o.priorite != null && o.priorite !== "") v.priorite = Math.min(5, Math.max(1, parseInt(o.priorite, 10) || 5));
+    return v;
   }
 
   /* ------------------------------------------------------------ API publique */
@@ -1076,6 +1083,7 @@
     ajouteTache: function (o) {
       return Promise.resolve().then(function () {
         var v = accordeParts(valideTache(o), partsNommees(o), false);
+        if (!v.priorite) v.priorite = 5;
         v.id = id(); v.cree = new Date().toISOString(); v.maj = v.cree;
         etat.taches.push(v);
         return sauve().then(function () { return v; });

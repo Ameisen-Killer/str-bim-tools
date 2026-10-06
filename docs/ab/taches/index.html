@@ -15,7 +15,7 @@
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
-<link rel="stylesheet" href="/ab/assets/habillage.css?v=2">
+<link rel="stylesheet" href="/ab/assets/habillage.css?v=3">
 </head>
 <body class="large">
 
@@ -60,10 +60,10 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=31"></script>
-<script src="/planif/assets/donnees.js?v=40"></script>
+<script src="/planif/assets/supabase.js?v=32"></script>
+<script src="/planif/assets/donnees.js?v=41"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=60"></script>
+<script src="/planif/assets/ui.js?v=61"></script>
 <script src="/planif/assets/palette.js?v=9"></script>
 <script src="/planif/assets/direct.js?v=4"></script>
 <script>
@@ -366,7 +366,11 @@
         el("td", {}, [el("div", { class: "tache-titre" }, [
           bascules(t),
           el("div", {}, [
-            el("div", { class: "principal" }, [UI.surligne(t.titre, mots)]),
+            el("div", { class: "principal" }, [
+              UI.surligne(t.titre, mots),
+              // Priorité réglée (1 à 4) : une pastille après le libellé ; 5, la normale, ne s'affiche pas
+              t.priorite < 5 ? el("span", { class: "prio-etiq p" + t.priorite, title: "Priorité " + t.priorite + " sur 5 (1 la plus importante)", text: "P" + t.priorite }) : null
+            ]),
             // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
             el("div", { class: "affaire-ligne", style: "display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [
               el("span", { class: "pastille", style: "color:" + teinte + ";align-self:center", "aria-hidden": "true" }),

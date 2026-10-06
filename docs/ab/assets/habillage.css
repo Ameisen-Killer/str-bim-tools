@@ -200,6 +200,28 @@
 /* --------------------------------------------------------- pied */
 :root[data-version="ab"] footer.pied-outil{font-size:13px;border-top:0;color:var(--texte-faible)}
 
+/* --------------------------------------------------------- priorité des tâches
+   Curseur du formulaire (ui.js, curseurPriorite) et pastille de la liste. */
+:root[data-version="ab"] .priorite-ligne{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+:root[data-version="ab"] .priorite-ligne input[type=range]{
+  flex:1 1 180px;max-width:320px;accent-color:var(--or);height:28px;margin:0;cursor:pointer;
+  border:0;padding:0;background:none;box-shadow:none;
+}
+:root[data-version="ab"] .priorite-borne{font-size:13px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+:root[data-version="ab"] .priorite-lib{
+  min-width:12em;font-size:14px;font-weight:600;padding:3px 10px;border-radius:20px;
+  background:var(--ab-vert-pale);color:var(--or);
+}
+:root[data-version="ab"] .priorite-lib[data-niveau="1"]{background:#FBE4E2;color:var(--alerte)}
+:root[data-version="ab"] .priorite-lib[data-niveau="2"]{background:#FDF0DC;color:#8A5A00}
+:root[data-version="ab"] .priorite-lib[data-niveau="5"]{background:#F0F1EE;color:var(--texte-faible)}
+:root[data-version="ab"] .prio-etiq{
+  display:inline-block;margin-left:8px;padding:0 7px;border-radius:4px;vertical-align:2px;
+  font-size:12px;font-weight:600;line-height:1.6;background:var(--ab-vert-pale);color:var(--or);
+}
+:root[data-version="ab"] .prio-etiq.p1{background:#FBE4E2;color:var(--alerte)}
+:root[data-version="ab"] .prio-etiq.p2{background:#FDF0DC;color:#8A5A00}
+
 /* --------------------------------------------------------- téléphone */
 @media (max-width:640px){
   :root[data-version="ab"] .ab-compte-nom{display:none}

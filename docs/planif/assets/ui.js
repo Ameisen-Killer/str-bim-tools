@@ -1770,6 +1770,34 @@
    * o.affaireId : affaire proposée pour une nouvelle tâche
    * o.surEnregistrement : appelée après l'enregistrement, pour redessiner la page
    */
+  /* Priorité (version AB, 06.10.2026) : départage les tâches de même
+     échéance. Curseur de 1, la plus importante, à 5, par défaut. */
+  var NIVEAUX_PRIORITE = { 1: "la plus importante", 2: "haute", 3: "moyenne", 4: "basse", 5: "normale, par défaut" };
+  function curseurPriorite(valeur) {
+    var v = Math.min(5, Math.max(1, parseInt(valeur, 10) || 5));
+    var entree = el("input", { type: "range", id: "c-priorite", name: "priorite", min: "1", max: "5", step: "1",
+                               value: String(v), "aria-describedby": "c-priorite-lib" });
+    var lib = el("span", { id: "c-priorite-lib", class: "priorite-lib" });
+    function pose() {
+      var n = parseInt(entree.value, 10);
+      lib.textContent = n + " · " + NIVEAUX_PRIORITE[n];
+      lib.setAttribute("data-niveau", String(n));
+      entree.setAttribute("aria-valuetext", "Priorité " + n + ", " + NIVEAUX_PRIORITE[n]);
+    }
+    entree.addEventListener("input", pose);
+    pose();
+    return el("div", { class: "champ large champ-priorite" }, [
+      el("label", { for: "c-priorite", text: "Priorité" }),
+      el("div", { class: "priorite-ligne" }, [
+        el("span", { class: "priorite-borne", "aria-hidden": "true", text: "1" }),
+        entree,
+        el("span", { class: "priorite-borne", "aria-hidden": "true", text: "5" }),
+        lib
+      ]),
+      el("div", { class: "aide", text: "Entre deux tâches de même échéance, la priorité 1 passe devant." })
+    ]);
+  }
+
   function formulaireTache(idTache, o) {
     o = o || {};
     var Calc = global.Calc;
@@ -1981,6 +2009,7 @@
             options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
           }),
           champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
+          VERSION_AB ? curseurPriorite(t ? t.priorite : (b.priorite || 5)) : null,
           el("div", { class: "champ large" }, [
             el("span", { class: "legende", text: "Parts terminées" }),
             casesParts
