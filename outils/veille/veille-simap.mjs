@@ -114,7 +114,10 @@ function motifsDe(det, resume) {
 async function base(chemin, options = {}) {
   const rep = await fetch(URL_BASE + "/rest/v1/" + chemin, {
     method: options.methode || "GET",
-    headers: { apikey: CLE, Authorization: "Bearer " + CLE, "Content-Type": "application/json", Prefer: options.prefer || "" },
+    // Clé secrète au nouveau format (sb_secret_…) : seulement dans apikey ; l'ancienne
+    // clé service_role (un JWT) va aussi dans Authorization.
+    headers: Object.assign({ apikey: CLE, "Content-Type": "application/json", Prefer: options.prefer || "" },
+      /^sb_/.test(CLE) ? {} : { Authorization: "Bearer " + CLE }),
     body: options.corps ? JSON.stringify(options.corps) : undefined
   });
   if (!rep.ok) throw new Error("base " + rep.status + " : " + (await rep.text()).slice(0, 300));
