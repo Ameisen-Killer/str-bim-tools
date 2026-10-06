@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=1">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=4">
-<link rel="stylesheet" href="/planif/assets/inter.css?v=2">
+<link rel="stylesheet" href="/planif/assets/inter.css?v=3">
 </head>
 <body class="large">
 
@@ -37,10 +37,29 @@
   <div class="wrap" data-bandeau></div>
   <div class="wrap">
     <nav class="is-sommaire" aria-label="Sections de la page">
+      <a href="#veille">Veille simap.ch</a>
       <a href="#ao">Appels d'offres</a>
       <a href="#agenda">Agenda des AO</a>
       <a href="#transversal">Affaires transversales</a>
     </nav>
+
+    <section class="section" id="veille">
+      <div class="tete-section">
+        <div>
+          <h2>Veille simap.ch</h2>
+          <p class="is-chapeau">Les appels d'offres publiés à Genève, Vaud et Valais qui touchent la structure ou le génie civil, relevés chaque matin sur simap.ch.</p>
+        </div>
+        <div class="outils">
+          <select id="f-veille" class="btn" aria-label="Filtrer la veille">
+            <option value="nouvelle">Nouvelles</option>
+            <option value="retenue">Devenues des AO</option>
+            <option value="ecartee">Écartées</option>
+            <option value="">Toutes</option>
+          </select>
+        </div>
+      </div>
+      <div id="liste-veille"></div>
+    </section>
 
     <section class="section" id="ao">
       <div class="tete-section">
@@ -89,8 +108,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=40"></script>
-<script src="/planif/assets/donnees.js?v=50"></script>
+<script src="/planif/assets/supabase.js?v=41"></script>
+<script src="/planif/assets/donnees.js?v=51"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/ui.js?v=68"></script>
@@ -101,7 +120,7 @@
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
   var JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-  var filtres = { resultat: "en_cours", type: "", passes: false };
+  var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle" };
 
   if (!UI.session()) return;
 
@@ -112,6 +131,8 @@
     document.querySelector(".entete").classList.add("vu");
 
     document.getElementById("f-resultat").addEventListener("change", function () { filtres.resultat = this.value; rend(); });
+    document.getElementById("f-veille").addEventListener("change", function () { filtres.veille = this.value; rend(); });
+    if (location.hash === "#veille") setTimeout(function () { document.getElementById("veille").scrollIntoView(); }, 50);
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
     document.getElementById("btn-rdv").addEventListener("click", function () { formEvenement(null, {}); });
@@ -185,9 +206,89 @@
     var nRdv = D.agenda({ depuis: auj() }).length;
     document.getElementById("titre-inter").textContent =
       nEnCours + (nEnCours > 1 ? " AO en cours" : " AO en cours") + " · " + nRdv + (nRdv > 1 ? " rendez-vous à venir" : " rendez-vous à venir");
+    listeVeille();
     listeAO(aos);
     listeAgenda();
     listeTransversales();
+  }
+
+  /* ------------------------------------------------------- veille simap.ch */
+  var PROCEDURES = { open: "Procédure ouverte", selective: "Procédure sélective", invitation: "Sur invitation", direct: "Gré à gré" };
+  var TYPES_PUB = { tender: "Appel d'offres", competition: "Concours", study_contract: "Mandat d'étude parallèle", advance_notice: "Avis préalable" };
+
+  function listeVeille() {
+    var hote = UI.vide(document.getElementById("liste-veille"));
+    if (!D.veillePret()) {
+      hote.appendChild(el("p", { class: "vide", text: "La veille attend la mise à jour de la base (migration-veille.sql)." }));
+      return;
+    }
+    var l = D.veille({ etat: filtres.veille });
+    var lien = document.querySelector('.is-sommaire a[href="#veille"]');
+    var n = D.veilleNouvelles().length;
+    lien.textContent = "Veille simap.ch" + (n ? " (" + n + ")" : "");
+    if (!l.length) {
+      hote.appendChild(el("p", { class: "vide", text: filtres.veille === "nouvelle"
+        ? "Aucune nouvelle publication. La veille se met à jour chaque matin de semaine."
+        : "Aucune publication dans cette catégorie." }));
+      return;
+    }
+    var maintenant = new Date();
+    var ul = el("ul", { class: "is-veille" });
+    l.forEach(function (v) {
+      var s = D.suiviVeille(v.id), delai = v.delai ? new Date(v.delai) : null;
+      var jours = delai ? Math.ceil((delai - maintenant) / 864e5) : null;
+      var aff = s && s.affaireId ? D.affaire(s.affaireId) : null;
+      ul.appendChild(el("li", { class: "is-pub" + (s ? " " + s.etat : "") }, [
+        el("div", { class: "is-pub-tete" }, [
+          el("span", { class: "etiq is-canton", text: v.canton || "—" }),
+          el("span", { class: "is-pub-type", text: [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(" · ") }),
+          el("span", { class: "is-pub-date", text: v.publieLe ? "publié le " + C.fmtCourt(v.publieLe) : "" })
+        ]),
+        el("a", { class: "is-pub-titre", href: v.lien, target: "_blank", rel: "noopener noreferrer", text: v.titre }),
+        el("div", { class: "is-pub-adj", text: [v.adjudicateur, v.lieu].filter(Boolean).join(" · ") }),
+        el("div", { class: "is-pub-bas" }, [
+          el("span", { class: "is-remise" + (jours !== null && jours < 0 ? " depassee" : jours !== null && jours <= 7 ? " proche" : "") },
+            [delai ? "Remise : " + jourCourt(v.delai.slice(0, 10)) + " " + String(delai.getHours()).padStart(2, "0") + ":" + String(delai.getMinutes()).padStart(2, "0") +
+              (jours < 0 ? " · passée" : jours === 0 ? " · aujourd'hui" : " · dans " + jours + " j") : "Remise : non indiquée"]),
+          el("span", { class: "is-motifs" }, v.motifs.slice(0, 4).map(function (m) { return el("span", { class: "etiq is-motif", text: m }); })),
+          el("span", { class: "is-pub-actions" }, s ? [
+            s.etat === "retenue" && aff ? el("button", { type: "button", class: "btn btn-nu", text: "Ouvrir " + aff.code, onclick: function () { formAO(aff.id); } }) : null,
+            el("button", { type: "button", class: "btn btn-nu", text: s.etat === "retenue" ? "Remettre en veille" : "Rétablir", onclick: function () { marque(v, null); } })
+          ] : [
+            D.aDroit("affaires_creer") ? el("button", { type: "button", class: "btn btn-or", text: "Créer l'AO", onclick: function () { creeDepuisVeille(v); } }) : null,
+            el("button", { type: "button", class: "btn", text: "Écarter", onclick: function () { marque(v, "ecartee"); } })
+          ])
+        ])
+      ]));
+    });
+    hote.appendChild(ul);
+  }
+
+  function marque(v, etatVeille) {
+    D.marqueVeille(v.id, etatVeille).then(function () {
+      UI.toast(etatVeille === "ecartee" ? "Publication écartée." : "Publication remise en veille.");
+      rend();
+    }).catch(function (e) { UI.toast(e.message); });
+  }
+
+  /* L'adjudicateur retrouvé dans l'annuaire, s'il y est (société contenue dans son nom, ou l'inverse). */
+  function plie(s) { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
+  function demandeurPour(v) {
+    var adj = plie(v.adjudicateur.split("(")[0]);
+    if (!adj) return "";
+    var c = D.contacts().filter(function (c) {
+      var soc = plie(c.societe);
+      return soc.length > 3 && (adj.indexOf(soc) >= 0 || soc.indexOf(adj) >= 0);
+    })[0];
+    return c ? c.id : "";
+  }
+
+  function creeDepuisVeille(v) {
+    var note = [v.adjudicateur && "Adjudicateur : " + v.adjudicateur, v.lieu && "Lieu : " + v.lieu,
+      [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(", "),
+      "simap.ch : " + v.lien, v.description && v.description.slice(0, 1200)].filter(Boolean).join("\n");
+    formAO(null, { nom: v.titre.slice(0, 200), echeance: v.delai ? v.delai.slice(0, 10) : "", aoType: "public",
+                   demandeurId: demandeurPour(v), note: note, veilleId: v.id });
   }
 
   /* ------------------------------------------------------- appels d'offres */
@@ -338,20 +439,22 @@
     return "AO-" + an;
   }
 
-  function formAO(id) {
+  /** pre : valeurs de départ d'un AO neuf (depuis la veille : objet, remise, demandeur, note, veilleId). */
+  function formAO(id, pre) {
+    pre = pre || {};
     var a = id ? D.affaire(id) : null;
     if (!a && !D.aDroit("affaires_creer")) return UI.toast("Ouvrir un appel d'offres demande le droit d'ouvrir une affaire.");
     var contacts = D.contacts();
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         UI.champ({ nom: "code", label: "Numéro", valeur: a ? a.code : codeSuivant() }),
-        UI.champ({ nom: "aoType", label: "Type", type: "select", valeur: a ? (a.aoType || "") : "public",
+        UI.champ({ nom: "aoType", label: "Type", type: "select", valeur: a ? (a.aoType || "") : (pre.aoType || "public"),
           options: [{ valeur: "", label: "—" }, { valeur: "public", label: "Public" }, { valeur: "prive", label: "Privé" }] }),
-        UI.champ({ nom: "nom", label: "Objet de l'appel d'offres", valeur: a ? a.nom : "", exemple: "Halle des Sablières — ingénieur civil", large: true }),
-        UI.champ({ nom: "demandeurId", label: "Demandeur (annuaire)", type: "select", large: true, valeur: a ? (a.demandeurId || "") : "",
+        UI.champ({ nom: "nom", label: "Objet de l'appel d'offres", valeur: a ? a.nom : (pre.nom || ""), exemple: "Halle des Sablières — ingénieur civil", large: true }),
+        UI.champ({ nom: "demandeurId", label: "Demandeur (annuaire)", type: "select", large: true, valeur: a ? (a.demandeurId || "") : (pre.demandeurId || ""),
           options: [{ valeur: "", label: contacts.length ? "— Choisir une fiche de l'annuaire —" : "— L'annuaire est vide —" }]
             .concat(contacts.map(function (c) { return { valeur: c.id, label: nomContact(c) }; })) }),
-        UI.champ({ nom: "echeance", label: "Remise de l'offre", type: "date", valeur: a ? (a.echeance || "") : "" }),
+        UI.champ({ nom: "echeance", label: "Remise de l'offre", type: "date", valeur: a ? (a.echeance || "") : (pre.echeance || "") }),
         UI.champ({ nom: "aoMontant", label: "Honoraires offerts (CHF)", inputmode: "numeric", valeur: a && a.aoMontant != null ? a.aoMontant : "", exemple: "45000" }),
         UI.champ({ nom: "aoResultat", label: "Résultat", type: "select", valeur: a ? (a.aoResultat || "en_cours") : "en_cours",
           options: Object.keys(D.RESULTATS_AO).map(function (k) { return { valeur: k, label: D.RESULTATS_AO[k] }; }) })
@@ -361,7 +464,7 @@
         casesSecteurs(a ? a.secteurs : [])
       ]),
       el("div", { class: "grille-champs", style: "margin-top:14px" }, [
-        UI.champ({ nom: "note", label: "Note", type: "textarea", rows: 2, large: true, valeur: a ? a.note : "", exemple: "Critères d'adjudication, documents à fournir, partenaires…" })
+        UI.champ({ nom: "note", label: "Note", type: "textarea", rows: pre.note ? 5 : 2, large: true, valeur: a ? a.note : (pre.note || ""), exemple: "Critères d'adjudication, documents à fournir, partenaires…" })
       ])
     ]);
     if (a) {
@@ -395,6 +498,7 @@
       if (v.aoResultat === "perdu" || v.aoResultat === "abandonne") o.statut = "terminee";
       else if (o.statut === "terminee") o.statut = "active";
       var p = a ? D.majAffaire(a.id, o) : D.ajouteAffaire(o);
+      if (!a && pre.veilleId) p = p.then(function (cree) { return D.marqueVeille(pre.veilleId, "retenue", cree && cree.id); });
       return p.then(function () {
         UI.toast(a ? "Appel d'offres modifié." : "Appel d'offres ouvert." + (v.aoResultat === "gagne" ? "" : ""));
         rend();

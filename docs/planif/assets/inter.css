@@ -63,3 +63,26 @@
   .is-rdv{grid-template-columns:50px minmax(0,1fr);gap:10px}
   .is-rdv .is-genre{grid-column:2;justify-self:start}
 }
+
+/* Veille simap.ch : une fiche par publication */
+.is-veille{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.is-pub{background:#fff;border:1px solid rgba(var(--encre),.10);border-left:3px solid var(--m-vif);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:5px}
+.is-pub.ecartee{opacity:.6;border-left-color:rgba(var(--encre),.2)}
+.is-pub.retenue{border-left-color:var(--m-fort)}
+.is-pub-tete{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:13px;color:var(--texte-faible)}
+.is-canton{border-color:transparent;background:var(--m-pale);color:var(--m-fort);font-weight:600}
+.is-pub-date{margin-left:auto}
+.is-pub-titre{font-weight:600;font-size:15.5px;line-height:1.35;color:var(--texte);text-decoration:none}
+.is-pub-titre:hover{color:var(--m-fort);text-decoration:underline;text-underline-offset:3px}
+.is-pub-titre::after{content:" ↗";font-weight:400;color:var(--texte-faible)}
+.is-pub-adj{font-size:14px;color:var(--texte-doux)}
+.is-pub-bas{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:4px}
+.is-pub-bas .is-remise{font-size:14px}
+.is-motifs{display:flex;flex-wrap:wrap;gap:4px}
+.is-motif{font-size:11.5px;border-color:transparent;background:#F0F1EE;color:var(--texte-faible)}
+.is-pub-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:640px){
+  .is-pub-date{margin-left:0}
+  .is-pub-actions{margin-left:0;width:100%}
+  .is-pub-actions .btn{flex:1 1 auto;justify-content:center}
+}

@@ -67,8 +67,8 @@ async function simap(chemin, params = {}) {
   throw new Error("simap injoignable : " + chemin);
 }
 
-const texte = v => v == null ? "" : typeof v === "string" ? v
-  : typeof v === "object" ? (v.fr || v.de || v.it || v.en || Object.values(v).find(Boolean) || "") : String(v);
+const texte = v => (v == null ? "" : typeof v === "string" ? v
+  : typeof v === "object" ? (v.fr || v.de || v.it || v.en || Object.values(v).find(Boolean) || "") : String(v)).replace(/\s+/g, " ").trim();
 const code = v => v == null ? "" : typeof v === "object" ? String(v.code || v.id || "") : String(v);
 const codes = l => (Array.isArray(l) ? l : []).map(code).filter(Boolean);
 

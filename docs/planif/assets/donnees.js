@@ -294,7 +294,8 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: [], conges: []
+      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: [], conges: [],
+      veille: [], veilleSuivi: []
     };
   }
 
@@ -577,6 +578,20 @@
       e.avis.push({ id: texte(a.id) || id(), membreId: texte(a.membreId), debut: debut, fin: fin,
                     motif: texte(a.motif) || "Absence", cree: texte(a.cree) || new Date().toISOString() });
     });
+    // Veille simap.ch : publications en lecture seule (la tâche planifiée les écrit), suivi du bureau
+    (brut.veille || []).forEach(function (v) {
+      if (!texte(v.id)) return;
+      e.veille.push({ id: texte(v.id), publicationId: texte(v.publicationId), titre: texte(v.titre),
+        description: texte(v.description), adjudicateur: texte(v.adjudicateur), canton: texte(v.canton), lieu: texte(v.lieu),
+        procedure: texte(v.procedure), typePublication: texte(v.typePublication), sousType: texte(v.sousType),
+        cpv: (v.cpv || []).map(texte), bkp: (v.bkp || []).map(texte), publieLe: texte(v.publieLe).slice(0, 10) || null,
+        delai: texte(v.delai) || null, lien: texte(v.lien), motifs: (v.motifs || []).map(texte) });
+    });
+    (brut.veilleSuivi || []).forEach(function (x) {
+      if (!texte(x.aoId) || (x.etat !== "ecartee" && x.etat !== "retenue")) return;
+      e.veilleSuivi.push({ id: texte(x.id) || id(), aoId: texte(x.aoId), etat: x.etat,
+        affaireId: texte(x.affaireId) || null, par: texte(x.par) || null, le: texte(x.le) || new Date().toISOString() });
+    });
     (brut.conges || []).forEach(function (c) {
       if (!texte(c.membreId) || !texte(c.debut)) return;
       e.conges.push({ id: texte(c.id) || id(), membreId: texte(c.membreId), debut: texte(c.debut).slice(0, 10),
@@ -643,6 +658,7 @@
     (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
     (e.agenda || []).forEach(function (r) { r.id = neuf(r.id); r.affaireId = neuf(r.affaireId); });
     (e.rdv || []).forEach(function (r) { r.id = neuf(r.id); r.participants = r.participants.map(neuf); r.creePar = neuf(r.creePar); });
+    (e.veilleSuivi || []).forEach(function (x) { x.id = neuf(x.id); x.affaireId = neuf(x.affaireId); x.par = neuf(x.par); });
     (e.conges || []).forEach(function (c) { c.id = neuf(c.id); c.membreId = neuf(c.membreId); c.validePar = neuf(c.validePar); c.absenceId = neuf(c.absenceId); });
     e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); });
 
@@ -1253,6 +1269,49 @@
     suppContact: function (i) {
       return Promise.resolve().then(function () {
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
+        return sauve();
+      });
+    },
+
+    /* ------------------------------------------------ veille simap.ch
+       Publications d'appels d'offres retenues chaque matin par la tâche
+       planifiée du dépôt (structure, génie civil ; GE, VD, VS). Le bureau les
+       écarte ou en fait un appel d'offres (affaire en phase AO). */
+    /** La base a-t-elle les tables de la veille (migration-veille.sql) ? Toujours en mode local. */
+    veillePret: function () { return ADAPTATEUR.veilleEnBase ? ADAPTATEUR.veilleEnBase() : true; },
+    suiviVeille: function (idAo) {
+      var l = etat.veilleSuivi || [];
+      for (var k = 0; k < l.length; k++) if (l[k].aoId === idAo) return l[k];
+      return null;
+    },
+    /** Publications, la plus récente d'abord. opts.etat : « nouvelle » (ni écartée ni retenue), « ecartee », « retenue ». */
+    veille: function (opts) {
+      opts = opts || {};
+      return (etat.veille || []).filter(function (v) {
+        var s = D.suiviVeille(v.id);
+        if (opts.etat === "nouvelle") return !s;
+        if (opts.etat) return !!s && s.etat === opts.etat;
+        return true;
+      }).sort(function (a, b) { return (b.publieLe || "") < (a.publieLe || "") ? -1 : (b.publieLe || "") > (a.publieLe || "") ? 1 : 0; });
+    },
+    /** Nouvelles publications dont la remise n'est pas passée : le badge de l'accueil. */
+    veilleNouvelles: function () {
+      var maintenant = new Date().toISOString();
+      return D.veille({ etat: "nouvelle" }).filter(function (v) { return !v.delai || v.delai >= maintenant; });
+    },
+    marqueVeille: function (idAo, etatVeille, idAffaire) {
+      return Promise.resolve().then(function () {
+        if (!D.veillePret()) throw erreur("La veille attend la mise à jour de la base (migration-veille.sql).");
+        var moi = D.monMembre(), s = D.suiviVeille(idAo);
+        etat.veilleSuivi = etat.veilleSuivi || [];
+        if (!etatVeille) {
+          etat.veilleSuivi = etat.veilleSuivi.filter(function (x) { return x.aoId !== idAo; });
+        } else if (s) {
+          s.etat = etatVeille; s.affaireId = idAffaire || s.affaireId || null;
+        } else {
+          etat.veilleSuivi.push({ id: id(), aoId: idAo, etat: etatVeille, affaireId: idAffaire || null,
+                                  par: moi ? moi.id : null, le: new Date().toISOString() });
+        }
         return sauve();
       });
     },
