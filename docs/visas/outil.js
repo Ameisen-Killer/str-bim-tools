@@ -494,7 +494,7 @@
           var brut = String(j.message || j.error || j.msg || "");
           var e = erreur(
             /could not find the table|relation .* does not exist|PGRST205|42P01/i.test(brut + " " + (j.code || ""))
-              ? "La base n'est pas encore prête pour Visas : exécute dans Supabase les fichiers migration-visas-….sql du dépôt."
+              ? "La base n'est pas encore prête pour Visas : exécute dans Supabase le fichier base-supabase.sql du dépôt (section Visas)."
             : r.status === 404 || /not.?found/i.test(brut) ? "Fichier introuvable : il a peut-être été retiré entre-temps."
             : r.status === 413 || /payload too large|maximum allowed size|exceeded/i.test(brut) ? "Fichier trop lourd : 25 Mo au plus."
             : /mime/i.test(brut) ? "Seuls les classeurs Excel (.xlsx) peuvent être gardés."
