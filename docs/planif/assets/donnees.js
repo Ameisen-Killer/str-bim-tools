@@ -223,6 +223,8 @@
   /* Phases SIA 112 (modèle de prestations), par leur numéro : celles où un bureau
      d'ingénieurs structure intervient. Rangées par numéro dans la base. */
   var PHASES = {
+    // Avant toute phase SIA : l'offre du bureau (espace AB, module Inter-secteurs)
+    "AO": "Appel d'offres (offre du bureau)",
     "21": "Étude de faisabilité",
     "31": "Avant-projet",
     "32": "Projet de l'ouvrage",
@@ -232,7 +234,17 @@
     "52": "Exécution de l'ouvrage",
     "53": "Mise en service, achèvement"
   };
-  var ORDRE_PHASES = Object.keys(PHASES).sort();
+  // « AO » vient avant les phases SIA, rangées par numéro
+  var ORDRE_PHASES = ["AO"].concat(Object.keys(PHASES).filter(function (k) { return k !== "AO"; }).sort());
+
+  /* Appels d'offres et leur agenda (espace AB, module Inter-secteurs, 06.10.2026) */
+  var TYPES_AO = { public: "Public", prive: "Privé" };
+  var RESULTATS_AO = { en_cours: "En cours", gagne: "Gagné", perdu: "Perdu", abandonne: "Abandonné" };
+  var GENRES_AGENDA = {
+    visite: "Visite des lieux", questions: "Questions", remise: "Remise de l'offre",
+    ouverture: "Ouverture des offres", presentation: "Présentation", seance: "Séance", autre: "Autre"
+  };
+  var RE_HEURE = /^\d\d:\d\d$/;
   /** « 32 · Projet de l'ouvrage », ou "" sans phase. Un numéro inconnu reste lisible tel quel. */
   function libellePhase(p) { return p ? p + (PHASES[p] ? " · " + PHASES[p] : "") : ""; }
 
@@ -278,7 +290,7 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: [], contacts: [], avis: []
+      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: []
     };
   }
 
@@ -509,6 +521,11 @@
         echeance: texte(a.echeance) || null,
         phase: texte(a.phase) || null,
         adresse: texte(a.adresse),
+        aoType: TYPES_AO[a.aoType] ? a.aoType : null,
+        demandeurId: texte(a.demandeurId) || null,
+        aoResultat: RESULTATS_AO[a.aoResultat] ? a.aoResultat : null,
+        aoMontant: a.aoMontant == null || a.aoMontant === "" ? null : Math.max(0, nombre(a.aoMontant, 0)),
+        secteurs: (a.secteurs || []).map(texte).filter(Boolean),
         ingenieurs: (a.ingenieurs || []).map(texte),
         dessinateurs: (a.dessinateurs || []).map(texte)
       });
@@ -555,6 +572,13 @@
       e.avis.push({ id: texte(a.id) || id(), membreId: texte(a.membreId), debut: debut, fin: fin,
                     motif: texte(a.motif) || "Absence", cree: texte(a.cree) || new Date().toISOString() });
     });
+    (brut.agenda || []).forEach(function (r) {
+      if (!texte(r.jour) || !texte(r.affaireId)) return;
+      var h = texte(r.heure).slice(0, 5);
+      e.agenda.push({ id: texte(r.id) || id(), affaireId: texte(r.affaireId), jour: texte(r.jour).slice(0, 10),
+                      heure: RE_HEURE.test(h) ? h : "", genre: GENRES_AGENDA[r.genre] ? r.genre : "autre",
+                      titre: texte(r.titre), lieu: texte(r.lieu), note: texte(r.note) });
+    });
     return e;
   }
 
@@ -593,6 +617,8 @@
     // Les fiches de l'annuaire ne pendent à rien : seul leur identifiant change
     (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
     (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
+    (e.agenda || []).forEach(function (r) { r.id = neuf(r.id); r.affaireId = neuf(r.affaireId); });
+    e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
     var vraisM = {}, vraisA = {};
@@ -604,6 +630,10 @@
     });
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
     e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
+    e.agenda = (e.agenda || []).filter(function (r) { return vraisA[r.affaireId]; });
+    var vraisC = {};
+    (e.contacts || []).forEach(function (c) { vraisC[c.id] = true; });
+    e.affaires.forEach(function (a) { if (!vraisC[a.demandeurId]) a.demandeurId = null; });
     e.taches.forEach(function (t) {
       if (!vraisM[t.ingenieurId]) t.ingenieurId = null;
       if (!vraisM[t.dessinateurId]) t.dessinateurId = null;
@@ -693,7 +723,7 @@
       return a.id !== idExistant && a.code.toLowerCase() === code.toLowerCase();
     });
     if (double) throw erreur("Une affaire porte déjà le numéro « " + code + " ».");
-    return {
+    var v = {
       code: code, nom: texte(o.nom), note: texte(o.note),
       teinte: Math.min(8, Math.max(1, parseInt(o.teinte, 10) || 1)),
       statut: STATUTS_AFFAIRE[o.statut] ? o.statut : "active",
@@ -704,6 +734,29 @@
       ingenieurs: (o.ingenieurs || []).filter(Boolean),
       dessinateurs: (o.dessinateurs || []).filter(Boolean)
     };
+    // Appel d'offres et secteurs : seulement quand le formulaire les porte (module
+    // Inter-secteurs) ; le formulaire des affaires ne les connaît pas et les laisse en l'état.
+    if ("aoType" in o) v.aoType = TYPES_AO[o.aoType] ? o.aoType : null;
+    if ("demandeurId" in o) v.demandeurId = texte(o.demandeurId) || null;
+    if ("aoResultat" in o) v.aoResultat = RESULTATS_AO[o.aoResultat] ? o.aoResultat : null;
+    if ("aoMontant" in o) {
+      var mt = texte(o.aoMontant).replace(/['’\s]/g, "");
+      if (mt && !(parseFloat(mt.replace(",", ".")) >= 0)) throw erreur("Le montant de l'offre doit être un nombre (CHF).");
+      v.aoMontant = mt ? Math.round(parseFloat(mt.replace(",", "."))) : null;
+    }
+    if ("secteurs" in o) v.secteurs = (o.secteurs || []).map(texte).filter(Boolean);
+    return v;
+  }
+
+  function valideEvenement(o) {
+    if (!texte(o.affaireId) || !etat.affaires.some(function (a) { return a.id === o.affaireId; })) throw erreur("Choisis l'appel d'offres concerné.");
+    if (!texte(o.jour)) throw erreur("La date est obligatoire.");
+    if (!texte(o.titre)) throw erreur("Donne un intitulé au rendez-vous.");
+    var h = texte(o.heure);
+    if (h && !RE_HEURE.test(h)) throw erreur("Heure à saisir sous la forme 14:30.");
+    return { affaireId: texte(o.affaireId), jour: texte(o.jour), heure: h,
+             genre: GENRES_AGENDA[o.genre] ? o.genre : "autre",
+             titre: texte(o.titre).slice(0, 200), lieu: texte(o.lieu).slice(0, 200), note: texte(o.note) };
   }
 
   function valideTache(o) {
@@ -1056,6 +1109,7 @@
       return Promise.resolve().then(function () {
         etat.affaires = etat.affaires.filter(function (a) { return a.id !== i; });
         etat.taches = etat.taches.filter(function (t) { return t.affaireId !== i; });
+        etat.agenda = (etat.agenda || []).filter(function (r) { return r.affaireId !== i; });
         return sauve();
       });
     },
@@ -1157,6 +1211,54 @@
     suppContact: function (i) {
       return Promise.resolve().then(function () {
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
+        return sauve();
+      });
+    },
+
+    /* ------------------------------------------------ appels d'offres et agenda
+       Un appel d'offres est une affaire en phase « AO » (espace AB, module
+       Inter-secteurs). Son agenda est attaché à l'affaire, pas à une personne. */
+    TYPES_AO: TYPES_AO,
+    RESULTATS_AO: RESULTATS_AO,
+    GENRES_AGENDA: GENRES_AGENDA,
+    /** La base connaît-elle les appels d'offres (migration-inter-secteurs.sql) ? Toujours en mode local. */
+    interSecteursPret: function () { return ADAPTATEUR.interSecteurs ? ADAPTATEUR.interSecteurs() : true; },
+    /** Rendez-vous par date puis heure. opts.affaireId : ceux d'un AO ; opts.depuis : à partir de ce jour. */
+    agenda: function (opts) {
+      opts = opts || {};
+      return (etat.agenda || []).filter(function (r) {
+        if (opts.affaireId && r.affaireId !== opts.affaireId) return false;
+        if (opts.depuis && r.jour < opts.depuis) return false;
+        return !!D.affaire(r.affaireId);
+      }).sort(function (a, b) {
+        return a.jour < b.jour ? -1 : a.jour > b.jour ? 1 : (a.heure || "99") < (b.heure || "99") ? -1 : (a.heure || "99") > (b.heure || "99") ? 1 : 0;
+      });
+    },
+    evenement: function (i) {
+      var l = etat.agenda || [];
+      for (var k = 0; k < l.length; k++) if (l[k].id === i) return l[k];
+      return null;
+    },
+    ajouteEvenement: function (o) {
+      return Promise.resolve().then(function () {
+        if (!D.interSecteursPret()) throw erreur("L'agenda des appels d'offres attend la mise à jour de la base (migration-inter-secteurs.sql).");
+        var v = valideEvenement(o);
+        v.id = id();
+        (etat.agenda || (etat.agenda = [])).push(v);
+        return sauve().then(function () { return v; });
+      });
+    },
+    majEvenement: function (i, o) {
+      return Promise.resolve().then(function () {
+        var r = D.evenement(i); if (!r) throw erreur("Rendez-vous introuvable.");
+        var v = valideEvenement(o);
+        Object.keys(v).forEach(function (k) { r[k] = v[k]; });
+        return sauve().then(function () { return r; });
+      });
+    },
+    suppEvenement: function (i) {
+      return Promise.resolve().then(function () {
+        etat.agenda = (etat.agenda || []).filter(function (r) { return r.id !== i; });
         return sauve();
       });
     },

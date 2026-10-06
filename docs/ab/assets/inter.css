@@ -1,0 +1,65 @@
+/* Module Inter-secteurs (version AB, 06.10.2026) — page /ab/inter-secteurs/.
+   Chargée après planif.css et habillage.css. */
+
+.is-sommaire{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.is-sommaire a{
+  text-decoration:none;font-size:14px;font-weight:500;color:var(--texte-doux);
+  background:#fff;border-radius:20px;padding:6px 14px;box-shadow:0 1px 2px rgba(30,34,38,.06);
+}
+.is-sommaire a:hover{background:#EEF5DE;color:var(--texte)}
+.is-chapeau{margin-top:4px;font-size:14px;color:var(--texte-faible);max-width:60em}
+.is-faible{color:var(--texte-faible)}
+
+.is-table{min-width:900px}
+.is-table td{vertical-align:middle}
+.is-affaire{display:inline-flex;align-items:baseline;gap:8px;min-width:0}
+.is-affaire .pastille{align-self:center}
+.is-code{font-size:12.5px;font-weight:600;white-space:nowrap}
+.is-nom{font-weight:500}
+.is-lien-affaire{text-decoration:none;color:var(--texte)}
+.is-lien-affaire:hover .is-nom{color:var(--or);text-decoration:underline;text-underline-offset:3px}
+.is-secteur{margin:0 4px 4px 0;background:#F0F1EE;border-color:transparent}
+.is-secteur.declare{background:#EEF5DE;color:var(--or);font-weight:600}
+.is-remise{white-space:nowrap}
+.is-remise.proche{color:#8A5A00;font-weight:600}
+.is-remise.depassee{color:var(--alerte);font-weight:600}
+.is-resultat{border-color:transparent}
+.is-resultat.en_cours{background:#EAF1F8;color:#2B5A8A}
+.is-resultat.gagne{background:#EEF5DE;color:var(--or)}
+.is-resultat.perdu{background:#FBE4E2;color:var(--alerte)}
+.is-resultat.abandonne{background:#F0F1EE;color:var(--texte-faible)}
+
+/* Agenda : semaine après semaine */
+.is-semaine{margin:18px 0 8px;font-size:14px;font-weight:600;color:var(--texte-faible)}
+.is-semaine:first-child{margin-top:0}
+.is-semaine.actuelle{color:var(--or)}
+.is-agenda{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.is-rdv{
+  display:grid;grid-template-columns:58px minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;
+  text-align:left;font:inherit;color:var(--texte);cursor:pointer;
+  background:#fff;border:1px solid rgba(var(--encre),.10);border-radius:8px;padding:10px 14px 10px 10px;
+  transition:border-color .2s,box-shadow .2s;
+}
+.is-rdv:hover{border-color:var(--or-doux);box-shadow:0 4px 14px rgba(30,34,38,.07)}
+.is-rdv:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+.is-rdv.passe{opacity:.6}
+.is-rdv.remise{border-left:3px solid var(--alerte)}
+.is-cal{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#F6F7F4;border-radius:6px;padding:6px 0;line-height:1.1}
+.is-cal b{font-size:20px;font-weight:650}
+.is-cal span{font-size:11.5px;color:var(--texte-faible)}
+.is-rdv-lib{display:flex;flex-direction:column;gap:3px;min-width:0}
+.is-rdv-titre{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-heure{display:inline-block;margin-right:8px;font-variant-numeric:tabular-nums;color:var(--or)}
+.is-rdv-sous{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-genre{border-color:transparent;background:#F0F1EE}
+.is-genre.remise{background:#FBE4E2;color:var(--alerte)}
+.is-genre.visite,.is-genre.seance,.is-genre.presentation{background:#EEF5DE;color:var(--or)}
+.is-genre.questions,.is-genre.ouverture{background:#EAF1F8;color:#2B5A8A}
+
+.is-mini-agenda{list-style:none;margin:8px 0 0;padding:0;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.is-mini-agenda li.passe{opacity:.6}
+
+@media (max-width:640px){
+  .is-rdv{grid-template-columns:50px minmax(0,1fr);gap:10px}
+  .is-rdv .is-genre{grid-column:2;justify-self:start}
+}

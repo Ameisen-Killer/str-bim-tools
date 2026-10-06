@@ -389,6 +389,14 @@
 
   function vide(v) { return v === "" ? null : v; }
 
+  /* GARDE-FOU PROVISOIRE (06.10.2026) — module Inter-secteurs de l'espace AB.
+     Tant que migration-inter-secteurs.sql n'est pas passée, la table ao_agenda
+     manque et la base refuse toute écriture qui nomme les colonnes d'appel
+     d'offres des affaires. La lecture de ao_agenda le dit : sans elle, on
+     n'écrit ni ces colonnes ni l'agenda. À RETIRER dès que Tony confirme la
+     migration passée. */
+  var interEnBase = false;
+
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -403,6 +411,11 @@
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
       o.phase = a.phase || null;
       o.adresse = a.adresse || "";
+      if (interEnBase) {
+        o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
+        o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
+        o.secteurs = a.secteurs || [];
+      }
       return o;
     },
     taches: function (t) {
@@ -420,6 +433,10 @@
        (« 2026-10-02T14:00 »), la base en timestamptz. */
     avis: function (a) {
       return { id: a.id, membre_id: a.membreId, debut: versInstant(a.debut), fin: versInstant(a.fin), motif: a.motif };
+    },
+    agenda: function (r) {
+      return { id: r.id, affaire_id: r.affaireId, jour: r.jour, heure: r.heure || null, genre: r.genre,
+               titre: r.titre, lieu: r.lieu || "", note: r.note || "" };
     },
     contacts: function (c) {
       return { id: c.id, nom: c.nom, prenom: c.prenom, societe: c.societe,
@@ -461,11 +478,14 @@
       litTout("taches", "id"),
       litTout("reglages", "id"),
       litTout("contacts", "id"),
-      litAvis()
+      litAvis(),
+      // Table du module Inter-secteurs : absente tant que la migration n'est pas passée
+      litTout("ao_agenda", "jour").catch(function () { return null; })
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [];
+          contacts = r[6] || [], avis = r[7] || [], agenda = r[8];
+      interEnBase = agenda !== null;
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -497,6 +517,8 @@
           return {
             id: a.id, code: a.code, nom: a.nom, note: a.note || "",
             teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
+            aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
+            aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
             ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
               .map(function (l) { return l.membre_id; }),
             dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
@@ -524,6 +546,10 @@
             localite: c.localite || "", canton: c.canton || "", pays: c.pays || "",
             observations: c.observations || ""
           };
+        }),
+        agenda: (agenda || []).map(function (x) {
+          return { id: x.id, affaireId: x.affaire_id, jour: x.jour, heure: (x.heure || "").slice(0, 5),
+                   genre: x.genre, titre: x.titre, lieu: x.lieu || "", note: x.note || "" };
         }),
         avis: avis.map(function (a) {
           return { id: a.id, membreId: a.membre_id, debut: versLocal(a.debut), fin: versLocal(a.fin),
@@ -638,6 +664,7 @@
     var dAbsences = compare(toutesAbsences(av), toutesAbsences(etat), function (a) { return a; });
     var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
     var dAvis = compare(av.avis || [], etat.avis || [], VERS_BASE.avis);
+    var dAgenda = interEnBase ? compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda) : { ajouts: [], modifs: [], retraits: [] };
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -648,6 +675,7 @@
     var suite = Promise.resolve();
 
     if (dTaches.retraits.length) suite = suite.then(function () { return effaceLot("taches", dTaches.retraits); });
+    if (dAgenda.retraits.length) suite = suite.then(function () { return effaceLot("ao_agenda", dAgenda.retraits); });
     if (dAbsences.retraits.length) suite = suite.then(function () { return effaceLot("absences", dAbsences.retraits); });
 
     /* Les liens d'équipe n'ont pas d'identifiant propre : ils se suppriment par
@@ -680,6 +708,7 @@
     suite = suite.then(function () { return appliqueTable("absences", dAbsences); });
     suite = suite.then(function () { return appliqueTable("contacts", dContacts); });
     suite = suite.then(function () { return appliqueTable("avis", dAvis); });
+    suite = suite.then(function () { return appliqueTable("ao_agenda", dAgenda); });
     if (liensNeufs.length) suite = suite.then(function () { return insere("affaire_membres", liensNeufs); });
 
     var rAv = av.reglages || {}, rAp = etat.reglages;
@@ -721,7 +750,8 @@
       ecrire: ecrire,
       videTout: videTout,
       profil: profil,
-      regleJours: regleJours
+      regleJours: regleJours,
+      interSecteurs: function () { return interEnBase; }
     }
   };
 })(window);

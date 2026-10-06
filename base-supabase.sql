@@ -295,8 +295,15 @@ create table if not exists public.affaires (
   teinte     smallint not null default 1 check (teinte between 1 and 8),
   statut     text not null default 'active' check (statut in ('active', 'suspendue', 'terminee')),
   echeance   date,
-  phase      text,          -- phase SIA 112 par son numéro (31, 32…), vide : non renseignée
+  phase      text,          -- phase SIA 112 par son numéro (31, 32…), « AO » : appel d'offres ; vide : non renseignée
   adresse    text not null default '',   -- adresse du chantier, en un seul champ
+  -- Appel d'offres (espace AB, module Inter-secteurs) : la date de remise est l'échéance
+  ao_type      text check (ao_type is null or ao_type in ('public', 'prive')),
+  demandeur_id uuid,       -- fiche de l'annuaire (contrainte posée après la table contacts)
+  ao_resultat  text check (ao_resultat is null or ao_resultat in ('en_cours', 'gagne', 'perdu', 'abandonne')),
+  ao_montant   numeric(12,0) check (ao_montant is null or ao_montant >= 0),
+  -- Secteurs (disciplines) qui interviennent : affaires et AO transversaux
+  secteurs     text[] not null default '{}',
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
   constraint affaires_id_bureau_key   unique (id, bureau_id),
@@ -395,6 +402,35 @@ create table if not exists public.contacts (
     check (char_length(trim(nom)) > 0 or char_length(trim(societe)) > 0)
 );
 create index if not exists contacts_bureau on public.contacts (bureau_id);
+
+-- Le demandeur d'un appel d'offres est une fiche de l'annuaire
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'affaires_demandeur_fk') then
+    alter table public.affaires add constraint affaires_demandeur_fk
+      foreign key (demandeur_id) references public.contacts (id) on delete set null;
+  end if;
+end $$;
+
+-- Agenda d'un appel d'offres : attaché à l'affaire, non à une personne
+create table if not exists public.ao_agenda (
+  id         uuid primary key default gen_random_uuid(),
+  bureau_id  uuid not null default public.bureau_par_defaut()
+             constraint ao_agenda_bureau_fk references public.bureaux (id) on delete cascade,
+  affaire_id uuid not null,
+  jour       date not null,
+  heure      time,
+  genre      text not null default 'autre'
+             check (genre in ('visite', 'questions', 'remise', 'ouverture', 'presentation', 'seance', 'autre')),
+  titre      text not null check (char_length(titre) between 1 and 200),
+  lieu       text not null default '' check (char_length(lieu) <= 200),
+  note       text not null default '',
+  cree_le    timestamptz not null default now(),
+  maj_le     timestamptz not null default now(),
+  constraint ao_agenda_affaire_fk foreign key (affaire_id, bureau_id)
+    references public.affaires (id, bureau_id) on delete cascade
+);
+create index if not exists ao_agenda_bureau on public.ao_agenda (bureau_id, jour);
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
@@ -535,7 +571,7 @@ $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages'] loop
+  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages', 'ao_agenda'] loop
     execute format('drop trigger if exists maj_le on public.%I', t);
     execute format(
       'create trigger maj_le before update on public.%I
@@ -598,7 +634,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -606,7 +642,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -717,6 +753,17 @@ create policy "bureau courant (modification)" on public.contacts for update to a
   using (bureau_id = (select public.bureau_courant()))
   with check (bureau_id = (select public.bureau_courant()));
 create policy "bureau courant (suppression)" on public.contacts for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+
+-- Agenda des appels d'offres : comme l'annuaire, tout le bureau le lit et le tient.
+create policy "bureau courant (lecture)" on public.ao_agenda for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (création)" on public.ao_agenda for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (modification)" on public.ao_agenda for update to authenticated
+  using (bureau_id = (select public.bureau_courant()))
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (suppression)" on public.ao_agenda for delete to authenticated
   using (bureau_id = (select public.bureau_courant()));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
@@ -1806,7 +1853,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

@@ -743,7 +743,8 @@
       // Version AB : pas de console ; le module Secteurs, propre à AB, suit la carte de charge
       pages = pages.filter(function (p) { return p.cle !== "console"; });
       var iCharge = pages.map(function (p) { return p.cle; }).indexOf("charge");
-      pages.splice(iCharge + 1, 0, { cle: "secteurs", href: "/ab/secteurs/", nom: "Secteurs", court: "Secteurs" });
+      pages.splice(iCharge + 1, 0, { cle: "secteurs", href: "/ab/secteurs/", nom: "Secteurs", court: "Secteurs" },
+                                   { cle: "inter", href: "/ab/inter-secteurs/", nom: "Inter-secteurs", court: "AO" });
     }
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
