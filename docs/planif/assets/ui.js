@@ -325,7 +325,7 @@
      « ab » ou « str » (Donnees.marque) : posée sur <html data-marque>, retenue
      pour ce compte (le script en tête de page la reprend avant le premier
      rendu), et l'icône de l'onglet suit. */
-  var ICONE_STR = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="16" fill="#1F4E85"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#A9CCF2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>');
+  var ICONE_STR = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="16" fill="#6B5233"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#E9D6B0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>');
   function appliqueMarque() {
     if (!VERSION_AB || !D.marque) return;
     var m = D.marque(), r = document.documentElement;
@@ -691,7 +691,7 @@
      déconnexion. */
   /* Le pavé du logo « ab », relevé sur le fichier du bureau (assets/logo-ab-marque.svg) ;
      celui de STR Bim Tools, le bâtiment au trait. */
-  var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#1F4E85"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#A9CCF2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
+  var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#6B5233"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#E9D6B0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
   var LOGO_AB = '<rect x="6.62" y="1.97" width="1491.7" height="1038.93" fill="#CAE09B"/><rect x="6.62" y="1040.9" width="1491.7" height="379.3" fill="#87868B"/><path fill="#fff" fill-rule="evenodd" d="M379.04 733.3H491.52L730.2 1269.8H607.91L434.68 844.11L258.75 1269.8H163.42ZM800.1 733.3H1159.76A154.36 154.36 0 0 1 1263.61 1001.86A154.33 154.33 0 0 1 1159.16 1269.8H800.1ZM908 814.34H1125.27A74.64 74.64 0 0 1 1125.27 963.62H908ZM908 1040.45H1123.81A74.52 74.52 0 0 1 1123.81 1189.49H908Z"/>';
   var VUE_AB = "6.62 1.97 1491.7 1418.23";
 

@@ -114,7 +114,7 @@
   }
 
   /* Marque de l'espace : posée sur <html>, retenue pour ce compte, icône de l'onglet. */
-  var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#1F4E85"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#A9CCF2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
+  var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#6B5233"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#E9D6B0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
   function appliqueMarque() {
     var m = D.marque(), r = document.documentElement;
     r.setAttribute("data-marque", m);

@@ -1531,7 +1531,7 @@
     estDemo: function () { return !!(etat && etat.reglages.demo); },
 
     /* Marque de l'espace (06.10.2026) : « ab » pour le bureau qui a la sienne
-       (logo et couleurs), « str » (STR Bim Tools, bleuté) pour tous les autres
+       (logo et couleurs), « str » (STR Bim Tools, sable) pour tous les autres
        — et toujours pour la démonstration : rien n'y rappelle un bureau réel. */
     enDemo: function () {
       var p = profil;
