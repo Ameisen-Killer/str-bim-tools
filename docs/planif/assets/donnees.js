@@ -245,6 +245,10 @@
     ouverture: "Ouverture des offres", presentation: "Présentation", seance: "Séance", autre: "Autre"
   };
   var RE_HEURE = /^\d\d:\d\d$/;
+
+  /* Demandes de congé (espace AB, module Communication) */
+  var STATUTS_CONGE = { en_attente: "En attente", acceptee: "Acceptée", refusee: "Refusée", annulee: "Annulée" };
+  var MOTIFS_CONGE = ["Vacances", "Récupération", "Congé sans solde", "Congé spécial", "Formation"];
   /** « 32 · Projet de l'ouvrage », ou "" sans phase. Un numéro inconnu reste lisible tel quel. */
   function libellePhase(p) { return p ? p + (PHASES[p] ? " · " + PHASES[p] : "") : ""; }
 
@@ -290,7 +294,7 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: []
+      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: [], conges: []
     };
   }
 
@@ -572,6 +576,15 @@
       e.avis.push({ id: texte(a.id) || id(), membreId: texte(a.membreId), debut: debut, fin: fin,
                     motif: texte(a.motif) || "Absence", cree: texte(a.cree) || new Date().toISOString() });
     });
+    (brut.conges || []).forEach(function (c) {
+      if (!texte(c.membreId) || !texte(c.debut)) return;
+      e.conges.push({ id: texte(c.id) || id(), membreId: texte(c.membreId), debut: texte(c.debut).slice(0, 10),
+                      fin: texte(c.fin || c.debut).slice(0, 10), motif: texte(c.motif) || "Vacances",
+                      commentaire: texte(c.commentaire), statut: STATUTS_CONGE[c.statut] ? c.statut : "en_attente",
+                      validePar: texte(c.validePar) || null, valideLe: texte(c.valideLe) || null,
+                      reponse: texte(c.reponse), absenceId: texte(c.absenceId) || null,
+                      cree: texte(c.cree) || new Date().toISOString() });
+    });
     (brut.rdv || []).forEach(function (r) {
       if (!texte(r.jour) || !texte(r.titre)) return;
       var de = texte(r.debut).slice(0, 5), a = texte(r.fin).slice(0, 5);
@@ -629,6 +642,7 @@
     (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
     (e.agenda || []).forEach(function (r) { r.id = neuf(r.id); r.affaireId = neuf(r.affaireId); });
     (e.rdv || []).forEach(function (r) { r.id = neuf(r.id); r.participants = r.participants.map(neuf); r.creePar = neuf(r.creePar); });
+    (e.conges || []).forEach(function (c) { c.id = neuf(c.id); c.membreId = neuf(c.membreId); c.validePar = neuf(c.validePar); c.absenceId = neuf(c.absenceId); });
     e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
@@ -642,6 +656,7 @@
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
     e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
     e.agenda = (e.agenda || []).filter(function (r) { return vraisA[r.affaireId]; });
+    e.conges = (e.conges || []).filter(function (c) { return vraisM[c.membreId]; });
     (e.rdv || []).forEach(function (r) {
       r.participants = r.participants.filter(function (x) { return vraisM[x]; });
       if (!vraisM[r.creePar]) r.creePar = null;
@@ -1238,6 +1253,95 @@
       return Promise.resolve().then(function () {
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
         return sauve();
+      });
+    },
+
+    /* ------------------------------------------------ demandes de congé
+       On demande pour soi ; un chef de secteur de la même discipline ou un
+       administrateur décide (jamais pour soi-même) ; acceptée, la demande
+       devient une absence du planning. La base fait la même vérification
+       (peut_valider_conge, decide_conge). */
+    STATUTS_CONGE: STATUTS_CONGE,
+    MOTIFS_CONGE: MOTIFS_CONGE,
+    /** La base a-t-elle la table conges (migration-conges.sql) ? Toujours en mode local. */
+    congesPret: function () { return ADAPTATEUR.congesEnBase ? ADAPTATEUR.congesEnBase() : true; },
+    /** Demandes, la plus proche d'abord. opts.membreId, opts.statut, opts.depuis (fin ≥ ce jour). */
+    conges: function (opts) {
+      opts = opts || {};
+      return (etat.conges || []).filter(function (c) {
+        if (opts.membreId && c.membreId !== opts.membreId) return false;
+        if (opts.statut && c.statut !== opts.statut) return false;
+        if (opts.depuis && c.fin < opts.depuis) return false;
+        return !!D.membre(c.membreId);
+      }).sort(function (a, b) { return a.debut < b.debut ? -1 : a.debut > b.debut ? 1 : 0; });
+    },
+    conge: function (i) {
+      var l = etat.conges || [];
+      for (var k = 0; k < l.length; k++) if (l[k].id === i) return l[k];
+      return null;
+    },
+    /** Puis-je décider des congés de ce membre ? */
+    peutValiderConge: function (idMembre) {
+      if (!profil) return true;                          // mode local
+      if (profil.superAdmin) return true;
+      var moi = D.monMembre(), lui = D.membre(idMembre);
+      if (!moi || !lui || moi.id === lui.id) return false;
+      return aStatut(moi, "administrateur") ||
+        (aStatut(moi, "chef_secteur") && !!moi.discipline && moi.discipline === lui.discipline);
+    },
+    /** Les demandes qui attendent ma décision. */
+    congesAValider: function () {
+      return D.conges({ statut: "en_attente" }).filter(function (c) { return D.peutValiderConge(c.membreId); });
+    },
+    demandeConge: function (o) {
+      return Promise.resolve().then(function () {
+        if (!D.congesPret()) throw erreur("Les demandes de congé attendent la mise à jour de la base (migration-conges.sql).");
+        var moi = D.monMembre(), qui = texte(o.membreId) || (moi && moi.id);
+        var m = D.membre(qui);
+        if (!m) throw erreur("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+        if (!D.peutAbsences(m.id)) throw erreur("Tu ne demandes un congé que pour toi-même.");
+        var debut = texte(o.debut), fin = texte(o.fin) || debut;
+        if (!debut) throw erreur("Choisis le premier jour du congé.");
+        if (fin < debut) throw erreur("Le dernier jour vient avant le premier.");
+        var v = { id: id(), membreId: m.id, debut: debut, fin: fin, motif: texte(o.motif) || "Vacances",
+                  commentaire: texte(o.commentaire), statut: "en_attente", validePar: null, valideLe: null,
+                  reponse: "", absenceId: null, cree: new Date().toISOString() };
+        (etat.conges || (etat.conges = [])).push(v);
+        return sauve().then(function () { return v; });
+      });
+    },
+    annuleConge: function (i) {
+      return Promise.resolve().then(function () {
+        var c = D.conge(i); if (!c) throw erreur("Demande introuvable.");
+        if (c.statut !== "en_attente") throw erreur("Cette demande a déjà été traitée.");
+        c.statut = "annulee";
+        return sauve().then(function () { return c; });
+      });
+    },
+    /** Accepter (l'absence est inscrite au planning) ou refuser, avec un mot de réponse. */
+    decideConge: function (i, accepte, reponse) {
+      return Promise.resolve().then(function () {
+        var c = D.conge(i); if (!c) throw erreur("Demande introuvable.");
+        if (c.statut !== "en_attente") throw erreur("Cette demande a déjà été traitée.");
+        if (!D.peutValiderConge(c.membreId)) throw erreur("Tu ne décides que des congés de ton secteur.");
+        var moi = D.monMembre();
+        c.statut = accepte ? "acceptee" : "refusee";
+        c.validePar = moi ? moi.id : null; c.valideLe = new Date().toISOString(); c.reponse = texte(reponse);
+        if (!ADAPTATEUR.decideConge) {
+          if (accepte) {
+            var m = D.membre(c.membreId), a = { id: id(), debut: c.debut, fin: c.fin, motif: c.motif };
+            m.absences.push(a);
+            m.absences.sort(function (x, y) { return x.debut < y.debut ? -1 : 1; });
+            c.absenceId = a.id;
+          }
+          return sauve().then(function () { return c; });
+        }
+        // La base décide et inscrit l'absence : on relit ensuite pour la voir
+        version++;
+        var instantane = copie(etat);
+        return enFile(function () { return ADAPTATEUR.decideConge(i, !!accepte, texte(reponse)); }, instantane)
+          .then(function () { return D.recharge(); })
+          .then(function () { return D.conge(i) || c; });
       });
     },
 

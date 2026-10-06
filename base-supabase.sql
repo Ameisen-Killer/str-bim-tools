@@ -454,6 +454,32 @@ create table if not exists public.rendez_vous (
   constraint rendez_vous_heures check (debut is null or fin is null or fin > debut)
 );
 create index if not exists rendez_vous_bureau on public.rendez_vous (bureau_id, jour);
+
+-- Demandes de congé (espace AB, module Communication) : la personne demande,
+-- un chef de son secteur (même discipline) ou un administrateur décide. Une
+-- demande acceptée devient une absence du planning (decide_conge).
+create table if not exists public.conges (
+  id          uuid primary key default gen_random_uuid(),
+  bureau_id   uuid not null default public.bureau_par_defaut()
+              constraint conges_bureau_fk references public.bureaux (id) on delete cascade,
+  membre_id   uuid not null,
+  debut       date not null,
+  fin         date not null,
+  motif       text not null default 'Vacances' check (char_length(motif) between 1 and 100),
+  commentaire text not null default '',
+  statut      text not null default 'en_attente'
+              check (statut in ('en_attente', 'acceptee', 'refusee', 'annulee')),
+  valide_par  uuid,                       -- fiche de la personne qui a décidé
+  valide_le   timestamptz,
+  reponse     text not null default '',
+  absence_id  uuid references public.absences (id) on delete set null,
+  cree_le     timestamptz not null default now(),
+  maj_le      timestamptz not null default now(),
+  constraint conges_ordonne check (fin >= debut),
+  constraint conges_membre_bureau_fk foreign key (membre_id, bureau_id)
+    references public.membres (id, bureau_id) on delete cascade
+);
+create index if not exists conges_bureau on public.conges (bureau_id, statut, debut);
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
@@ -594,7 +620,7 @@ $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages', 'ao_agenda', 'rendez_vous'] loop
+  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages', 'ao_agenda', 'rendez_vous', 'conges'] loop
     execute format('drop trigger if exists maj_le on public.%I', t);
     execute format(
       'create trigger maj_le before update on public.%I
@@ -657,7 +683,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'ao_agenda', 'rendez_vous', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'rendez_vous', 'conges', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -665,7 +691,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -807,6 +833,21 @@ create policy "les siens ou le droit (suppression)" on public.rendez_vous for de
     cree_par = (select public.mon_membre())
     or (select public.mon_membre()) = any (participants)
     or (select public.a_droit('absences_autrui'))));
+
+-- Demandes de congé : tout le bureau les voit (qui part quand) ; on demande
+-- pour soi (ou pour un autre avec le droit sur ses absences), on annule sa
+-- demande tant qu'elle attend. La décision passe par decide_conge.
+create policy "bureau courant (lecture)" on public.conges for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "ma demande ou le droit (création)" on public.conges for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant()) and statut = 'en_attente'
+              and valide_par is null and absence_id is null
+              and (membre_id = (select public.mon_membre()) or (select public.a_droit('absences_autrui'))));
+create policy "ma demande en attente (annulation)" on public.conges for update to authenticated
+  using (bureau_id = (select public.bureau_courant()) and statut = 'en_attente'
+         and (membre_id = (select public.mon_membre()) or (select public.a_droit('absences_autrui'))))
+  with check (bureau_id = (select public.bureau_courant()) and statut in ('en_attente', 'annulee')
+              and valide_par is null and absence_id is null);
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -967,6 +1008,59 @@ begin
    where m.id = p_membre;
 
   return jsonb_build_object('jours', to_jsonb(v_jours), 'capacite', round(v_cap, 1));
+end $$;
+
+-- Qui décide d'un congé : un administrateur du bureau, ou un chef de secteur
+-- de la même discipline — jamais pour soi-même ; le super admin, toujours.
+create or replace function public.peut_valider_conge(p_membre uuid)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.est_super_admin() or exists (
+    select 1
+      from public.membres moi
+      join public.membres lui on lui.id = p_membre and lui.bureau_id = moi.bureau_id
+     where moi.id = public.mon_membre()
+       and moi.id <> lui.id
+       and ('administrateur' = any (moi.statuts)
+            or ('chef_secteur' = any (moi.statuts) and moi.discipline is not null
+                and moi.discipline = lui.discipline)));
+$$;
+
+-- Accepter ou refuser une demande. Acceptée, elle devient une absence du
+-- planning : la personne qui décide n'a pas forcément le droit d'écrire les
+-- absences des autres, d'où cette fonction plutôt qu'une écriture directe.
+create or replace function public.decide_conge(p_demande uuid, p_accepte boolean, p_reponse text default '')
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_d   public.conges%rowtype;
+  v_abs uuid;
+begin
+  if not public.est_autorise() then
+    raise exception 'Accès refusé. Ton adresse est-elle bien dans la liste des accès ?';
+  end if;
+  select * into v_d from public.conges c
+   where c.id = p_demande and c.bureau_id = public.bureau_courant()
+   for update;
+  if not found then
+    raise exception 'Cette demande de congé n''existe plus.';
+  end if;
+  if v_d.statut <> 'en_attente' then
+    raise exception 'Cette demande a déjà été traitée.';
+  end if;
+  if not public.peut_valider_conge(v_d.membre_id) then
+    raise exception 'Tu ne décides que des congés de ton secteur (chef de secteur de la même discipline, ou administrateur).';
+  end if;
+  if p_accepte then
+    insert into public.absences (bureau_id, membre_id, debut, fin, motif)
+    values (v_d.bureau_id, v_d.membre_id, v_d.debut, v_d.fin, v_d.motif)
+    returning id into v_abs;
+  end if;
+  update public.conges c
+     set statut = case when p_accepte then 'acceptee' else 'refusee' end,
+         valide_par = public.mon_membre(), valide_le = now(),
+         reponse = coalesce(p_reponse, ''), absence_id = v_abs
+   where c.id = v_d.id;
 end $$;
 
 -- ================================================================ console ==
@@ -1481,7 +1575,7 @@ begin
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
     'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
-    'public.regle_jours(uuid, jsonb)',
+    'public.regle_jours(uuid, jsonb)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'
@@ -1895,7 +1989,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
 <link rel="stylesheet" href="/ab/assets/habillage.css?v=3">
-<link rel="stylesheet" href="/ab/assets/communication.css?v=1">
+<link rel="stylesheet" href="/ab/assets/communication.css?v=2">
 </head>
 <body class="large">
 
@@ -73,9 +73,11 @@
       <div class="tete-section">
         <h2>Absences et congés</h2>
         <div class="outils">
-          <button class="btn" type="button" id="btn-absence"><span class="ico-txt ico-absence" aria-hidden="true"></span>Poser une absence</button>
+          <button class="btn btn-or" type="button" id="btn-conge"><span class="ico-txt ico-absence" aria-hidden="true"></span>Demander un congé</button>
+          <button class="btn" type="button" id="btn-absence">Poser une absence</button>
         </div>
       </div>
+      <div id="conges"></div>
       <div id="liste-absences"></div>
     </section>
   </div>
@@ -85,8 +87,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=37"></script>
-<script src="/planif/assets/donnees.js?v=46"></script>
+<script src="/planif/assets/supabase.js?v=38"></script>
+<script src="/planif/assets/donnees.js?v=47"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/ab/assets/version.js?v=1"></script>
 <script src="/planif/assets/ui.js?v=67"></script>
@@ -116,6 +118,7 @@
     document.getElementById("suiv").addEventListener("click", function () { vue.lundi = C.ajoute(vue.lundi, 7); agenda(); });
     document.getElementById("auj").addEventListener("click", function () { vue.lundi = C.lundi(auj()); agenda(); });
     document.getElementById("f-miens").addEventListener("change", function () { vue.miens = this.checked; agenda(); });
+    document.getElementById("btn-conge").addEventListener("click", function () { formConge(); });
     document.getElementById("btn-absence").addEventListener("click", function () {
       var moi = D.monMembre();
       UI.nouvelleAbsence({ membreId: moi && moi.id, surChangement: rend });
@@ -140,6 +143,7 @@
     var actions = [];
     actions.push({ label: "Nouveau rendez-vous", or: true, icone: "ico-ajout-tache", action: function () { formRdv(null, {}); } });
     actions.push({ label: "Prévenir le bureau", icone: "ico-lien", action: formAvis });
+    if (D.congesPret()) actions.push({ label: "Demander un congé", icone: "ico-absence", action: function () { formConge(); } });
     UI.chrome("communication", actions);
   }
 
@@ -185,6 +189,7 @@
   function rend() {
     bureau();
     agenda();
+    conges();
     absences();
   }
 
@@ -293,6 +298,142 @@
         onclick: function () { formRdv(null, { jour: j }); } }, ["+"]));
       hote.appendChild(col);
     });
+  }
+
+  /* ------------------------------------------------------- demandes de congé
+     À valider (pour qui décide), puis mes demandes, puis celles de l'équipe
+     qui attendent encore. */
+  function conges() {
+    var hote = UI.vide(document.getElementById("conges"));
+    document.getElementById("btn-conge").hidden = !D.congesPret();
+    if (!D.congesPret()) return;
+    var a = auj(), moi = D.monMembre(), canton = D.canton();
+    var aValider = D.congesAValider();
+    var miennes = moi ? D.conges({ membreId: moi.id, depuis: C.ajoute(a, -30) }).filter(function (c) { return c.statut !== "annulee"; }) : [];
+    var attente = D.conges({ statut: "en_attente", depuis: a }).filter(function (c) {
+      return (!moi || c.membreId !== moi.id) && aValider.indexOf(c) < 0;
+    });
+
+    function periode(c) { return c.debut === c.fin ? jourCourt(c.debut) : jourCourt(c.debut) + " → " + jourCourt(c.fin); }
+    function jours(c) {
+      var n = Calc.joursTravaillesEntre(D.membre(c.membreId), c.debut, c.fin, canton);
+      return C.fmtJours(n) + (n > 1 ? " jours" : " jour");
+    }
+    function etiquette(c) { return el("span", { class: "etiq cm-conge " + c.statut, text: D.STATUTS_CONGE[c.statut] }); }
+    function bloc(titre, lignes, classe) {
+      if (!lignes.length) return;
+      hote.appendChild(el("h3", { class: "cm-sous" + (classe ? " " + classe : ""), text: titre }));
+      var ul = el("ul", { class: "cm-liste" });
+      lignes.forEach(function (li) { ul.appendChild(li); });
+      hote.appendChild(ul);
+    }
+
+    bloc("À valider" + " (" + aValider.length + ")", aValider.map(function (c) {
+      var m = D.membre(c.membreId);
+      return el("li", { class: "cm-demande" }, [
+        el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
+        el("span", { class: "cm-lib" }, [
+          el("span", { class: "cm-titre", text: nom(m) + " — " + c.motif }),
+          el("span", { class: "cm-detail", text: periode(c) + " · " + jours(c) + (c.commentaire ? " · « " + c.commentaire + " »" : "") })
+        ]),
+        el("span", { class: "cm-boutons" }, [
+          el("button", { type: "button", class: "btn btn-or", text: "Accepter", onclick: function () { decide(c, true); } }),
+          el("button", { type: "button", class: "btn btn-rouge", text: "Refuser", onclick: function () { decide(c, false); } })
+        ])
+      ]);
+    }), "a-valider");
+
+    bloc("Mes demandes", miennes.map(function (c) {
+      var juge = c.validePar ? D.membre(c.validePar) : null;
+      return el("li", { class: "cm-demande" }, [
+        el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(moi) }),
+        el("span", { class: "cm-lib" }, [
+          el("span", { class: "cm-titre", text: c.motif + " · " + periode(c) }),
+          el("span", { class: "cm-detail", text: jours(c) +
+            (c.statut !== "en_attente" && juge ? " · " + (c.statut === "acceptee" ? "acceptée" : "refusée") + " par " + nom(juge) : "") +
+            (c.reponse ? " · « " + c.reponse + " »" : "") })
+        ]),
+        el("span", { class: "cm-boutons" }, [
+          etiquette(c),
+          c.statut === "en_attente" ? el("button", { type: "button", class: "btn btn-nu", text: "Annuler", onclick: function () {
+            UI.confirme("Annuler cette demande ?", c.motif + ", " + periode(c) + ".", "Annuler la demande", true).then(function (ok) {
+              if (ok) D.annuleConge(c.id).then(function () { UI.toast("Demande annulée."); rend(); }).catch(function (e) { UI.toast(e.message); });
+            });
+          } }) : null
+        ])
+      ]);
+    }));
+
+    bloc("Demandes de l'équipe en attente", attente.map(function (c) {
+      var m = D.membre(c.membreId);
+      return el("li", { class: "cm-demande" }, [
+        el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
+        el("span", { class: "cm-lib" }, [
+          el("span", { class: "cm-titre", text: nom(m) + " — " + c.motif }),
+          el("span", { class: "cm-detail", text: periode(c) + " · " + jours(c) })
+        ]),
+        etiquette(c)
+      ]);
+    }));
+  }
+
+  function decide(c, accepte) {
+    var m = D.membre(c.membreId);
+    var corps = el("div", {}, [
+      el("p", { style: "margin-bottom:12px", text: nom(m) + " · " + c.motif + " · " + (c.debut === c.fin ? jourCourt(c.debut) : jourCourt(c.debut) + " → " + jourCourt(c.fin)) +
+        (accepte ? ". L'absence sera inscrite au planning." : ".") }),
+      el("div", { class: "grille-champs" }, [
+        UI.champ({ nom: "reponse", label: accepte ? "Un mot (facultatif)" : "Motif du refus", type: "textarea", rows: 2, large: true,
+                   exemple: accepte ? "Bonnes vacances !" : "Remise du dossier X cette semaine-là…" })
+      ])
+    ]);
+    UI.ouvre({ surtitre: "Demande de congé", titre: accepte ? "Accepter" : "Refuser", corps: corps, compacte: true, boutons: [
+      { label: "Annuler" },
+      { label: accepte ? "Accepter" : "Refuser", or: accepte, rouge: !accepte, entree: true, action: function () {
+        var rep = UI.lit(corps).reponse || "";
+        return D.decideConge(c.id, accepte, rep).then(function () {
+          UI.toast(accepte ? "Congé accepté, inscrit au planning." : "Congé refusé.");
+          rend();
+        }).catch(function (e) { UI.toast(e.message); return false; });
+      } }
+    ] });
+  }
+
+  function formConge() {
+    var moi = D.monMembre(), droit = D.aDroit("absences_autrui");
+    if (!moi && !droit) return UI.toast("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
+    var champs = [];
+    if (droit && D.membres({}).length > 1) {
+      champs.push(UI.champ({ nom: "membreId", label: "Pour", type: "select", large: true, valeur: moi ? moi.id : "", options: UI.optionsParMetier(D.membres({})) }));
+    }
+    var lundi = C.ajoute(C.lundi(auj()), 7);
+    champs.push(UI.champ({ nom: "debut", label: "Premier jour", type: "date", valeur: lundi }));
+    champs.push(UI.champ({ nom: "fin", label: "Dernier jour", type: "date", valeur: C.ajoute(lundi, 4) }));
+    champs.push(UI.champ({ nom: "motif", label: "Type de congé", type: "select", valeur: "Vacances",
+      options: D.MOTIFS_CONGE.map(function (x) { return { valeur: x, label: x }; }) }));
+    champs.push(UI.champ({ nom: "commentaire", label: "Commentaire (facultatif)", type: "textarea", rows: 2, large: true, exemple: "Remplacement prévu, urgences…" }));
+    var resume = el("p", { class: "cm-resume", "aria-live": "polite" });
+    var corps = el("div", {}, [el("div", { class: "grille-champs" }, champs), resume]);
+    function calcule() {
+      var v = UI.lit(corps), m = D.membre(v.membreId || (moi && moi.id));
+      if (!v.debut || !v.fin || v.fin < v.debut || !m) { resume.textContent = "Choisis le premier et le dernier jour."; return; }
+      var n = Calc.joursTravaillesEntre(m, v.debut, v.fin, D.canton());
+      resume.textContent = C.fmtJours(n) + (n > 1 ? " jours travaillés" : " jour travaillé") + " (fériés et jours non travaillés exclus). La demande part en validation chez le chef de secteur.";
+    }
+    corps.addEventListener("input", calcule);
+    corps.addEventListener("change", function (e) {
+      var d = corps.querySelector("input[name=debut]"), f = corps.querySelector("input[name=fin]");
+      if (e.target === d && f.value < d.value) f.value = d.value;
+      calcule();
+    });
+    calcule();
+    UI.ouvre({ surtitre: "Congés", titre: "Demander un congé", corps: corps, compacte: true, boutons: [
+      { label: "Annuler" },
+      { label: "Envoyer la demande", or: true, entree: true, action: function () {
+        return D.demandeConge(UI.lit(corps)).then(function () { UI.toast("Demande envoyée : elle attend la validation."); rend(); })
+          .catch(function (e) { UI.toast(e.message); return false; });
+      } }
+    ] });
   }
 
   /* ------------------------------------------------------- absences et congés */

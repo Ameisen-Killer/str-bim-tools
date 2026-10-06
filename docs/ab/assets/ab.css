@@ -110,6 +110,11 @@ button { font: inherit; color: inherit; }
 }
 .ab-module:hover, .ab-module:focus-visible { transform: translateY(-3px); box-shadow: var(--ombre-haute); outline: none; }
 .ab-module svg { width: 112px; height: 112px; flex: none; }
+.ab-module { position: relative; }
+.ab-badge {
+  position: absolute; top: 12px; right: 12px; padding: 3px 10px; border-radius: 20px;
+  background: #FDF0DC; color: #8A5A00; font-size: 13px; font-weight: 600;
+}
 .ab-module h2 { margin: 14px 0 6px; font-size: clamp(19px, 1.65vw, 25px); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
 .ab-module p { margin: 0 12px; color: var(--faible); font-size: clamp(15px, 1.25vw, 19px); line-height: 1.38; flex: 1; }
 .ab-acceder {
@@ -197,6 +202,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 
 /* ------------------------------------------------------------ téléphone */
 @media (max-width: 640px) {
+  .ab-badge { position: static; grid-column: 2; justify-self: start; margin-top: 4px; font-size: 12px; }
   .ab-page { padding-top: 14px; }
   .ab-barre { margin-bottom: 14px; }
   .ab-entete { padding-left: 0; align-items: center; }

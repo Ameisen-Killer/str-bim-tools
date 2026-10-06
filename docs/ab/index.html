@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%226.62 1.97 1491.7 1418.23%22%3E%3Crect x=%226.62%22 y=%221.97%22 width=%221491.7%22 height=%221038.93%22 fill=%22%23CAE09B%22/%3E%3Crect x=%226.62%22 y=%221040.9%22 width=%221491.7%22 height=%22379.3%22 fill=%22%2387868B%22/%3E%3Cpath fill=%22%23fff%22 fill-rule=%22evenodd%22 d=%22M379.04 733.3H491.52L730.2 1269.8H607.91L434.68 844.11L258.75 1269.8H163.42ZM800.1 733.3H1159.76A154.36 154.36 0 0 1 1263.61 1001.86A154.33 154.33 0 0 1 1159.16 1269.8H800.1ZM908 814.34H1125.27A74.64 74.64 0 0 1 1125.27 963.62H908ZM908 1040.45H1123.81A74.52 74.52 0 0 1 1123.81 1189.49H908Z%22/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/ab/assets/ab.css?v=2">
+<link rel="stylesheet" href="/ab/assets/ab.css?v=3">
 </head>
 <body>
 
@@ -22,7 +22,7 @@
   <!-- Les quatre entrées, vers les pages de la version AB (/ab/…), qui
        lisent la même base que la planification. -->
   <nav class="ab-modules" aria-label="Modules">
-    <a class="ab-module ab-monte" style="--r:0" href="/ab/communication/">
+    <a class="ab-module ab-monte" style="--r:0" href="/ab/communication/" id="module-comm">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <path class="ic-v" d="M12 9h27a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H21l-7 7v-7h-2a5 5 0 0 1-5-5V14a5 5 0 0 1 5-5z"/>
         <path class="ic-f ic-blanc" d="M28 23h24a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5h-2v7.5L42.5 46H28a5 5 0 0 1-5-5V28a5 5 0 0 1 5-5z"/>
@@ -98,8 +98,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=37"></script>
-<script src="/planif/assets/donnees.js?v=46"></script>
+<script src="/planif/assets/supabase.js?v=38"></script>
+<script src="/planif/assets/donnees.js?v=47"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/ab/assets/version.js?v=1"></script>
 <script src="/ab/assets/ab.js?v=5"></script>
@@ -135,9 +135,19 @@
 
   function dessine() {
     var moi = D.monMembre();
+    badgeConges();
     prioritaires(moi);
     absences(moi);
     aAffecter();
+  }
+
+  /* Sur la carte Communication : les demandes de congé qui attendent ma décision */
+  function badgeConges() {
+    var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge");
+    if (ancien) ancien.remove();
+    var n = D.congesPret ? D.congesAValider().length : 0;
+    if (!n) return;
+    carte.appendChild(el("span", { class: "ab-badge", text: n + (n > 1 ? " congés à valider" : " congé à valider") }));
   }
 
   /** Plus importante d'abord : échéance, puis priorité (1 avant 5), puis libellé. */

@@ -97,3 +97,18 @@
 .cm-groupe{font-size:12.5px;font-weight:600;color:var(--texte-faible);margin:8px 0 2px}
 .cm-groupe:first-child{margin-top:0}
 .cm-participants .cases{margin-top:4px}
+
+/* Demandes de congé */
+.cm-demande{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 2px}
+.cm-boutons{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:flex-end}
+.cm-sous.a-valider{color:#8A5A00}
+.cm-conge{border-color:transparent}
+.cm-conge.en_attente{background:#FDF0DC;color:#8A5A00}
+.cm-conge.acceptee{background:#EEF5DE;color:var(--or)}
+.cm-conge.refusee{background:#FBE4E2;color:var(--alerte)}
+.cm-conge.annulee{background:#F0F1EE;color:var(--texte-faible)}
+.cm-resume{margin-top:12px;font-size:14px;color:var(--texte-doux)}
+@media (max-width:640px){
+  .cm-demande{grid-template-columns:36px minmax(0,1fr)}
+  .cm-demande .cm-boutons{grid-column:2;justify-content:flex-start}
+}
