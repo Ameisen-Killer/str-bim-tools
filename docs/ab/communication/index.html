@@ -85,13 +85,13 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=36"></script>
-<script src="/planif/assets/donnees.js?v=45"></script>
+<script src="/planif/assets/supabase.js?v=37"></script>
+<script src="/planif/assets/donnees.js?v=46"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/ab/assets/version.js?v=1"></script>
 <script src="/planif/assets/ui.js?v=66"></script>
 <script src="/planif/assets/palette.js?v=12"></script>
-<script src="/planif/assets/direct.js?v=5"></script>
+<script src="/planif/assets/direct.js?v=6"></script>
 <script>
 (function () {
   "use strict";
@@ -110,7 +110,6 @@
     chrome();
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
-    bandeauBase();
     document.querySelector(".entete").classList.add("vu");
 
     document.getElementById("prec").addEventListener("click", function () { vue.lundi = C.ajoute(vue.lundi, -7); agenda(); });
@@ -139,20 +138,9 @@
 
   function chrome() {
     var actions = [];
-    if (D.rdvPret()) actions.push({ label: "Nouveau rendez-vous", or: true, icone: "ico-ajout-tache", action: function () { formRdv(null, {}); } });
+    actions.push({ label: "Nouveau rendez-vous", or: true, icone: "ico-ajout-tache", action: function () { formRdv(null, {}); } });
     actions.push({ label: "Prévenir le bureau", icone: "ico-lien", action: formAvis });
     UI.chrome("communication", actions);
-  }
-
-  function bandeauBase() {
-    if (D.rdvPret()) return;
-    document.querySelector("[data-bandeau]").appendChild(el("div", { class: "bandeau rouge" }, [
-      el("div", {}, [
-        el("strong", { text: "Base à mettre à jour. " }),
-        "L'agenda des rendez-vous demande le script migration-communication.sql (Supabase › SQL Editor › Run). " +
-        "En attendant, la page montre le bureau, les absences et les avis, sans agenda."
-      ])
-    ]));
   }
 
   /* ================================================================ calculs */
@@ -240,8 +228,7 @@
 
     // Rendez-vous du jour
     var hr = UI.vide(document.getElementById("rdv-jour"));
-    if (!D.rdvPret()) hr.appendChild(el("p", { class: "vide", text: "L'agenda attend la mise à jour de la base." }));
-    else if (!rdvJour.length) hr.appendChild(el("p", { class: "vide", text: "Aucun rendez-vous noté pour aujourd'hui." }));
+    if (!rdvJour.length) hr.appendChild(el("p", { class: "vide", text: "Aucun rendez-vous noté pour aujourd'hui." }));
     else {
       var ul2 = el("ul", { class: "cm-liste" });
       rdvJour.forEach(function (r) { ul2.appendChild(el("li", {}, [carteRdv(r, true)])); });
@@ -287,7 +274,6 @@
     var hote = UI.vide(document.getElementById("grille-agenda"));
     var lundi = vue.lundi, dimanche = C.ajoute(lundi, 6), s = C.semaineISO(lundi);
     document.getElementById("periode-agenda").textContent = "Semaine " + s.num + " · du " + C.fmtLong(lundi) + " au " + C.fmtLong(C.ajoute(lundi, 4));
-    if (!D.rdvPret()) { hote.appendChild(el("p", { class: "vide", text: "L'agenda attend la mise à jour de la base." })); return; }
     var moi = D.monMembre();
     var l = D.rendezVous({ depuis: lundi, jusqu: dimanche, membreId: vue.miens && moi ? moi.id : null });
     var jours = C.serie(lundi, 5);
@@ -374,7 +360,6 @@
   }
 
   function formRdv(id, o) {
-    if (!D.rdvPret()) return UI.toast("L'agenda attend la mise à jour de la base.");
     var r = id ? D.rdvParId(id) : null, moi = D.monMembre();
     var lecture = r && !D.peutRdv(r);
     var corps = el("div", {}, [

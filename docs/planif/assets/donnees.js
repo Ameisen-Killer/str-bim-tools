@@ -1244,8 +1244,6 @@
     /* ------------------------------------------------ rendez-vous du bureau
        L'agenda interne (espace AB, module Communication) : un rendez-vous, ses
        participants. La réplication avec Outlook viendra (source, externeId). */
-    /** La base a-t-elle la table rendez_vous (migration-communication.sql) ? Toujours en mode local. */
-    rdvPret: function () { return ADAPTATEUR.rdvEnBase ? ADAPTATEUR.rdvEnBase() : true; },
     /** Rendez-vous par date puis heure. opts.depuis / opts.jusqu (AAAA-MM-JJ), opts.membreId : ceux d'une personne. */
     rendezVous: function (opts) {
       opts = opts || {};
@@ -1271,7 +1269,6 @@
     },
     ajouteRdv: function (o) {
       return Promise.resolve().then(function () {
-        if (!D.rdvPret()) throw erreur("L'agenda attend la mise à jour de la base (migration-communication.sql).");
         var v = valideRdv(o), moi = D.monMembre();
         v.id = id(); v.creePar = moi ? moi.id : null; v.source = "planif"; v.externeId = null;
         (etat.rdv || (etat.rdv = [])).push(v);

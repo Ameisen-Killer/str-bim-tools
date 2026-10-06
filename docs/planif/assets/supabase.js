@@ -389,12 +389,6 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — module Communication de l'espace AB.
-     Tant que migration-communication.sql n'est pas passée, la table
-     rendez_vous manque : sa lecture échoue sans bloquer le reste, et on n'y
-     écrit rien. À RETIRER dès que Tony confirme la migration passée. */
-  var rdvEnBase = false;
-
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -482,13 +476,11 @@
       litTout("contacts", "id"),
       litAvis(),
       litTout("ao_agenda", "jour"),
-      // Table du module Communication : absente tant que la migration n'est pas passée
-      litTout("rendez_vous", "jour").catch(function () { return null; })
+      litTout("rendez_vous", "jour")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9];
-      rdvEnBase = rdv !== null;
+          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -550,7 +542,7 @@
             observations: c.observations || ""
           };
         }),
-        rdv: (rdv || []).map(function (x) {
+        rdv: rdv.map(function (x) {
           return { id: x.id, titre: x.titre, jour: x.jour, debut: (x.debut || "").slice(0, 5), fin: (x.fin || "").slice(0, 5),
                    lieu: x.lieu || "", note: x.note || "", participants: x.participants || [],
                    creePar: x.cree_par || null, source: x.source, externeId: x.externe_id || null };
@@ -673,7 +665,7 @@
     var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
     var dAvis = compare(av.avis || [], etat.avis || [], VERS_BASE.avis);
     var dAgenda = compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda);
-    var dRdv = rdvEnBase ? compare(av.rdv || [], etat.rdv || [], VERS_BASE.rdv) : { ajouts: [], modifs: [], retraits: [] };
+    var dRdv = compare(av.rdv || [], etat.rdv || [], VERS_BASE.rdv);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -761,8 +753,7 @@
       ecrire: ecrire,
       videTout: videTout,
       profil: profil,
-      regleJours: regleJours,
-      rdvEnBase: function () { return rdvEnBase; }
+      regleJours: regleJours
     }
   };
 })(window);
