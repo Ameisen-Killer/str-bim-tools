@@ -178,6 +178,15 @@ for (const p of candidats) {
 console.log(`${lignes.length} publication(s) retenue(s) (structure, génie civil).`);
 for (const l of lignes) console.log(`  · [${l.canton}] ${l.publie_le} — ${l.titre} — ${l.adjudicateur} — remise ${l.delai_remise || "?"} — ${l.motifs.join(", ")}`);
 
+// Contrôle du lien vers la fiche simap.ch (la première publication retenue)
+if (lignes.length) {
+  try {
+    const r = await fetch(lignes[0].lien, { headers: { "User-Agent": AGENT, Cookie: enteteCookies() }, redirect: "follow" });
+    const corps = await r.text();
+    console.log(`Lien de contrôle : ${lignes[0].lien} → HTTP ${r.status}, ${r.url !== lignes[0].lien ? "redirigé vers " + r.url : "même adresse"}, ${corps.length} caractères.`);
+  } catch (e) { console.warn("⚠ lien de contrôle : " + e.message); }
+}
+
 if (ESSAI) { console.log("Essai : rien n'est écrit dans la base."); process.exit(0); }
 if (!URL_BASE) throw new Error("Adresse de la base introuvable.");
 for (let i = 0; i < lignes.length; i += 50) {
