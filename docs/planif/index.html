@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=2">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=5">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=6">
 </head>
 <body>
 
@@ -109,6 +109,7 @@
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/portail.js?v=7"></script>
+<script src="/planif/assets/tchat.js?v=1"></script>
 <script>
 (function () {
   "use strict";
@@ -149,10 +150,17 @@
 
   /* Sur la carte Communication : les demandes de congé qui attendent ma décision */
   function badgeConges() {
-    var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge");
+    var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge:not(.tchat)");
     if (ancien) ancien.remove();
     var n = D.congesAValider().length;
     if (n) carte.appendChild(el("span", { class: "ab-badge", text: n + (n > 1 ? " congés à valider" : " congé à valider") }));
+    // Et les messages du tchat arrivés depuis ma dernière visite
+    if (window.Tchat) Tchat.nonLus().then(function (nm) {
+      var b = carte.querySelector(".ab-badge.tchat");
+      if (b) b.remove();
+      carte.href = nm ? "/planif/communication/#tchat" : "/planif/communication/";
+      if (nm) carte.appendChild(el("span", { class: "ab-badge tchat", text: nm + (nm > 1 ? " nouveaux messages" : " nouveau message") }));
+    });
     // Sur la carte Inter-secteurs : les nouvelles publications de la veille simap.ch
     var inter = document.getElementById("module-inter"), vieux = inter.querySelector(".ab-badge");
     if (vieux) vieux.remove();

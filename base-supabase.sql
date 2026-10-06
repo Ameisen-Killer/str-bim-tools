@@ -521,6 +521,19 @@ create table if not exists public.veille_suivi (
   constraint veille_suivi_unique unique (bureau_id, ao_id)
 );
 create index if not exists veille_suivi_bureau on public.veille_suivi (bureau_id);
+
+-- Tchat du bureau (module Communication, 06.10.2026) : les messages, lus par
+-- tout le bureau, écrits par chacun en son nom.
+create table if not exists public.messages (
+  id         uuid primary key default gen_random_uuid(),
+  bureau_id  uuid not null default public.bureau_par_defaut()
+             constraint messages_bureau_fk references public.bureaux (id) on delete cascade,
+  auteur_id  uuid default public.mon_membre()
+             constraint messages_auteur_fk references public.membres (id) on delete set null,
+  texte      text not null check (char_length(btrim(texte)) between 1 and 2000),
+  cree_le    timestamptz not null default now()
+);
+create index if not exists messages_bureau on public.messages (bureau_id, cree_le desc);
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
@@ -724,7 +737,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -732,7 +745,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -903,6 +916,18 @@ create policy "bureau courant (modification)" on public.veille_suivi for update 
   with check (bureau_id = (select public.bureau_courant()));
 create policy "bureau courant (suppression)" on public.veille_suivi for delete to authenticated
   using (bureau_id = (select public.bureau_courant()));
+-- Tchat : tout le bureau lit ; chacun écrit en son nom (jamais le compte de
+-- démonstration, partagé et public : ses messages restent sur son écran) ;
+-- on retire les siens, le super admin tous. Pas de modification.
+create policy "bureau courant (lecture)" on public.messages for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "en son nom (création)" on public.messages for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and auteur_id is not null and auteur_id = (select public.mon_membre())
+              and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
+create policy "les siens (suppression)" on public.messages for delete to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (auteur_id = (select public.mon_membre()) or (select public.est_super_admin())));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -2044,7 +2069,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_suivi', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_suivi', 'messages', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

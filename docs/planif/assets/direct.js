@@ -138,6 +138,7 @@
   /* ------------------------------------------------- une modification arrive */
 
   function change(d) {
+    if (d.table === "messages") return message(d);
     // Un enregistrement de cette page qui revient : on relit, sans rien annoncer
     var mienne = D.ecritureRecente && D.ecritureRecente(2500);
     if (!mienne) echo = false;
@@ -158,6 +159,25 @@
     }
     clearTimeout(enAttente);
     enAttente = setTimeout(relis, 500);           // une rafale de changements = une seule relecture
+  }
+
+  /* Tchat : un message ne relit pas la base. Il est relayé tel quel à la page
+     (tchat.js l'affiche) ; ailleurs, un message bref l'annonce. */
+  function message(d) {
+    var type = d.type || d.eventType, ligne = d.record || d["new"] || {}, vieux = d.old_record || d.old || {};
+    var T = global.Tchat;
+    if (type === "DELETE") {
+      global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "DELETE", id: String(vieux.id || "") } }));
+      return;
+    }
+    if (type !== "INSERT" || !ligne.id) return;
+    var m = T ? T.depuisBase(ligne) : { id: String(ligne.id), auteurId: String(ligne.auteur_id || ""), texte: String(ligne.texte || ""), creeLe: String(ligne.cree_le || "") };
+    global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "INSERT", message: m } }));
+    var moi = D.monMembre ? D.monMembre() : null;
+    if ((moi && m.auteurId === moi.id) || /^\/planif\/communication\//.test(location.pathname)) return;
+    var auteur = D.membre(m.auteurId), extrait = m.texte.replace(/\s+/g, " ");
+    UI.toast("Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait),
+      { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
   }
 
   function occupe() {
@@ -223,6 +243,9 @@
     }, REPLI);
   }
   function arreteRepli() { clearInterval(repli); repli = null; }
+
+  /** Les tables suivies en direct (tchat.js : relire lui-même sinon). */
+  global.PlanifDirect = { suit: function (t) { return TABLES.indexOf(t) >= 0; } };
 
   etat("non");
   D.pret().then(function () { connecte(); }).catch(function () {});

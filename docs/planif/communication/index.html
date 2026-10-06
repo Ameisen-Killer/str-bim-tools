@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=4">
-<link rel="stylesheet" href="/planif/assets/communication.css?v=3">
+<link rel="stylesheet" href="/planif/assets/communication.css?v=4">
 </head>
 <body class="large">
 
@@ -26,7 +26,7 @@
 
 <!-- Module Communication (06.10.2026) : le bureau aujourd'hui
      (qui est là, qui manque, les rendez-vous du jour, la semaine d'un coup
-     d'œil), l'agenda interne des rendez-vous (participants, lieu ; la
+     d'œil) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
      réplication avec Outlook viendra) et les absences et congés à venir. -->
 <main>
   <div class="wrap entete">
@@ -37,26 +37,29 @@
   <div class="wrap">
     <nav class="cm-sommaire" aria-label="Sections de la page">
       <a href="#bureau">Le bureau aujourd'hui</a>
+      <a href="#tchat">Tchat</a>
       <a href="#agenda">Agenda</a>
       <a href="#absences">Absences et congés</a>
     </nav>
 
-    <section class="section" id="bureau">
-      <div class="tete-section"><h2 id="titre-jour">Aujourd'hui</h2></div>
-      <div class="cles cm-cles" id="cles"></div>
-      <div class="cm-deux">
-        <div>
-          <h3 class="cm-sous">Qui manque</h3>
-          <div id="manque"></div>
-        </div>
-        <div>
-          <h3 class="cm-sous">Rendez-vous du jour</h3>
-          <div id="rdv-jour"></div>
-        </div>
-      </div>
-      <h3 class="cm-sous">La semaine</h3>
-      <div class="cm-semaine" id="semaine"></div>
-    </section>
+    <!-- En haut : le bureau aujourd'hui, compacté à gauche ; le tchat à droite -->
+    <div class="cm-haut">
+      <section class="section cm-bureau" id="bureau">
+        <div class="tete-section"><h2 id="titre-jour">Aujourd'hui</h2></div>
+        <div class="cles cm-cles" id="cles"></div>
+        <h3 class="cm-sous">Qui manque</h3>
+        <div id="manque" class="cm-defile"></div>
+        <h3 class="cm-sous">Rendez-vous du jour</h3>
+        <div id="rdv-jour"></div>
+        <h3 class="cm-sous">La semaine</h3>
+        <div class="cm-semaine" id="semaine"></div>
+      </section>
+
+      <section class="section cm-tchat" id="tchat">
+        <div class="tete-section"><h2>Tchat du bureau</h2></div>
+        <div class="tc" id="tchat-hote"></div>
+      </section>
+    </div>
 
     <section class="section" id="agenda">
       <div class="tete-section">
@@ -96,7 +99,8 @@
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/ui.js?v=69"></script>
 <script src="/planif/assets/palette.js?v=13"></script>
-<script src="/planif/assets/direct.js?v=8"></script>
+<script src="/planif/assets/tchat.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=9"></script>
 <script>
 (function () {
   "use strict";
@@ -129,6 +133,7 @@
 
     D.surRechargement(rend);
     rend();
+    Tchat.monte(document.getElementById("tchat-hote"));
     // Un avis qui se termine quitte la liste sans attendre une modification
     setInterval(function () { if (!document.hidden && !document.querySelector(".modale.ouverte")) rend(); }, 5 * 60000);
   }).catch(UI.echec);

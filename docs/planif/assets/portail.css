@@ -113,6 +113,7 @@ button { font: inherit; color: inherit; }
   background: #FDF0DC; color: #8A5A00; font-size: 13px; font-weight: 600;
 }
 .ab-badge.veille { background: var(--m-pale); color: var(--m-fort); }
+.ab-badge.tchat { right: auto; left: 12px; background: var(--m-pale); color: var(--m-fort); }
 .ab-module h2 { margin: 14px 0 6px; font-size: clamp(19px, 1.65vw, 25px); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
 .ab-module p { margin: 0 12px; color: var(--faible); font-size: clamp(15px, 1.25vw, 19px); line-height: 1.38; flex: 1; }
 .ab-acceder {
