@@ -70,7 +70,12 @@
                 var c = { event: "*", schema: "public", table: t };
                 if (bureau) c.filter = "bureau_id=eq." + bureau;
                 return c;
-              })
+              }).concat(bureau ? [
+                /* Une suppression n'arrive qu'avec l'identifiant de la ligne (RLS) :
+                   le filtre sur bureau_id ne la laisse jamais passer. Pour le tchat,
+                   on les reçoit donc sans filtre — un identifiant inconnu ne fait rien. */
+                { event: "DELETE", schema: "public", table: "messages" }
+              ] : [])
             },
             access_token: jeton
           }

@@ -230,8 +230,10 @@
           joinRef = String(++ref); jetonEnvoye = jeton;
           var c = { event: "*", schema: "public", table: "messages" };
           if (bureau) c.filter = "bureau_id=eq." + bureau;
+          // Les suppressions arrivent sans bureau_id (identifiant seul) : sans filtre
+          var liste = bureau ? [c, { event: "DELETE", schema: "public", table: "messages" }] : [c];
           ws.send(JSON.stringify({ topic: sujet, event: "phx_join", ref: joinRef, join_ref: joinRef, payload: {
-            config: { broadcast: { ack: false, self: false }, presence: { key: "" }, private: false, postgres_changes: [c] },
+            config: { broadcast: { ack: false, self: false }, presence: { key: "" }, private: false, postgres_changes: liste },
             access_token: jeton } }));
           clearInterval(battement);
           battement = setInterval(function () {
@@ -428,13 +430,16 @@
       }
     });
 
-    // Sans direct sur la table : relecture discrète
+    // Relecture discrète : toutes les 15 s sans direct, toutes les minutes avec
     function suiviEnDirect() {
       return global.PlanifDirect && global.PlanifDirect.suit("messages") &&
         document.documentElement.getAttribute("data-direct") === "oui";
     }
+    // Avec le direct, une relecture par minute suffit (filet pour les retraits)
+    var tours = 0;
     setInterval(function () {
-      if (document.hidden || !enBase() || suiviEnDirect()) return;
+      tours++;
+      if (document.hidden || !enBase() || (suiviEnDirect() && tours % 4)) return;
       var avant = liste.length ? liste[liste.length - 1].id : "", n = liste.length;
       charge().then(function () {
         var apres = liste.length ? liste[liste.length - 1].id : "";
