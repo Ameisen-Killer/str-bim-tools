@@ -750,6 +750,27 @@
    * Ligne du bas : les quatre sections, puis les actions de la page. Sur
    * téléphone, l'action principale (or) devient un bouton flottant à portée de pouce.
    */
+  /* Badge du tchat dans la barre : relu à l'ouverture, à chaque message reçu
+     en direct, quand le tchat est lu, et au retour sur l'onglet. */
+  var badgeEnCours = null;
+  function badgeTchat() {
+    if (!global.Tchat) return;
+    clearTimeout(badgeEnCours);
+    badgeEnCours = setTimeout(function () {
+      global.Tchat.nonLus().then(function (n) {
+        [].forEach.call(document.querySelectorAll("[data-tchat]"), function (b) {
+          b.hidden = !n;
+          b.textContent = n > 99 ? "99+" : String(n);
+          b.title = n + (n > 1 ? " messages non lus" : " message non lu");
+          b.setAttribute("aria-label", b.title);
+        });
+      }).catch(function () {});
+    }, 300);
+  }
+  global.addEventListener("planif:message", badgeTchat);
+  global.addEventListener("planif:tchat-lu", badgeTchat);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) badgeTchat(); });
+
   function chrome(actif, actions) {
     var hote = document.querySelector("[data-chrome]");
     if (!hote) return;
@@ -773,9 +794,12 @@
     pages.forEach(function (p) {
       nav.appendChild(el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null }, [
         el("span", { class: "long", text: p.nom }),
-        el("span", { class: "court", text: p.court })
+        el("span", { class: "court", text: p.court }),
+        // Communication : les messages du tchat pas encore lus (tchat.js)
+        p.cle === "communication" ? el("span", { class: "nav-badge", dataset: { tchat: "" }, hidden: true }) : null
       ]));
     });
+    badgeTchat();
     var pousse = el("div", { class: "pousse outils" });
     // a.icone : classe d'une icône (planif.css) posée devant le libellé
     (actions || []).forEach(function (a) {

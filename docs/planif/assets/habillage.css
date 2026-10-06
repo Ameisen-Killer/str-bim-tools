@@ -109,6 +109,12 @@
 }
 :root[data-version="v2"] .nav-outil a:hover{background:var(--ab-vert-pale);color:var(--texte)}
 :root[data-version="v2"] .nav-outil a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
+/* Messages du tchat non lus, sur « Communication » */
+:root[data-version="v2"] .nav-badge{
+  display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-left:6px;border-radius:10px;
+  background:var(--alerte);color:#fff;font-size:11.5px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;vertical-align:1px;
+}
+:root[data-version="v2"] .nav-badge[hidden]{display:none}
 
 /* --------------------------------------------------------- en-tête de page */
 :root[data-version="v2"] .entete{padding-top:clamp(22px,3.4vh,36px);padding-bottom:clamp(14px,2.4vh,22px)}

@@ -15,7 +15,8 @@
 
    Non lus : la date du dernier message vu est retenue par compte
    (localStorage « planif.tchat.lu:<email> ») ; Tchat.nonLus() compte les
-   messages plus récents des autres, pour le badge de l'accueil.
+   messages plus récents des autres, pour le badge de l'accueil et celui de
+   « Communication » dans la barre du haut (ui.js).
    --------------------------------------------------------------------------- */
 (function (global) {
   "use strict";
@@ -154,7 +155,10 @@
 
   function dernierLu() { return lit(CLE_LU + (email() || "local")) || ""; }
   function marqueLu(quand) {
-    if (quand && quand > dernierLu()) ecrit(CLE_LU + (email() || "local"), quand);
+    if (!quand || quand <= dernierLu()) return;
+    ecrit(CLE_LU + (email() || "local"), quand);
+    // La barre du haut (ui.js) remet son compteur à jour
+    global.dispatchEvent(new CustomEvent("planif:tchat-lu"));
   }
   /** Messages des autres arrivés depuis la dernière visite du tchat (promesse d'un nombre). */
   function nonLus() {
