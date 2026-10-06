@@ -527,6 +527,9 @@
         finiInge: t.finiInge === true,
         finiDessin: t.finiDessin === true,
         enchaine: t.enchaine === true,
+        // 1 la plus importante, 5 par défaut. Lue seulement : la base ne la
+        // reçoit pas encore (pas dans Sb.ADAPT), le curseur viendra avec la saisie.
+        priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
         // À la lecture, « Terminé » prime : une tâche d'avant les parts, ou

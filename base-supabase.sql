@@ -342,6 +342,8 @@ create table if not exists public.taches (
   fini_dessin    boolean not null default false,
   -- Le dessin attend le calcul : la part calcul finit la veille du début du dessin.
   enchaine       boolean not null default false,
+  -- Priorité entre tâches de même échéance : 1 la plus importante, 5 par défaut.
+  priorite       smallint not null default 5 check (priorite between 1 and 5),
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),

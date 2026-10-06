@@ -511,6 +511,7 @@
             statut: t.statut, avancement: t.avancement,
             finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
             enchaine: t.enchaine === true,
+            priorite: t.priorite,
             cree: t.cree_le, maj: t.maj_le
           };
         }),
