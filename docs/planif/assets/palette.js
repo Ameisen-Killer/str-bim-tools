@@ -258,6 +258,7 @@
 
   function pages() {
     var p = D.profil ? D.profil() : null;
+    if (UI.versionAB) return PAGES.concat([{ nom: "Secteurs", href: "/ab/secteurs/", mots: "disciplines secteur ressources projets charge equipe" }]);
     return PAGES.concat(p && p.multi && p.superAdmin ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : []);
   }
 

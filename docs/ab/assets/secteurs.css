@@ -1,0 +1,67 @@
+/* Module Secteurs (version AB, 06.10.2026) — page /ab/secteurs/.
+   Chargée après planif.css et habillage.css. */
+
+/* ------------------------------------------------------------ cartes */
+.sc-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;margin-top:6px}
+.sc-carte{
+  display:flex;flex-direction:column;gap:14px;text-align:left;cursor:pointer;
+  font:inherit;color:var(--texte);background:#fff;
+  border:1px solid rgba(var(--encre),.10);border-radius:8px;padding:16px 18px 12px;
+  transition:border-color .2s,box-shadow .2s,transform .2s;
+}
+.sc-carte:hover{border-color:var(--or-doux);box-shadow:0 6px 18px rgba(30,34,38,.08);transform:translateY(-2px)}
+.sc-carte:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+.sc-carte.choisie{border-color:var(--or);box-shadow:inset 0 0 0 1px var(--or)}
+.sc-tete{display:flex;flex-direction:column;gap:2px}
+.sc-nom{font-size:17px;font-weight:650;line-height:1.25}
+.sc-gens{font-size:13px;color:var(--texte-faible)}
+
+.sc-cles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sc-cle{display:flex;flex-direction:column;background:#F6F7F4;border-radius:6px;padding:8px 10px}
+.sc-cle b{font-size:20px;font-weight:650;line-height:1.1;font-variant-numeric:tabular-nums}
+.sc-cle span{font-size:12.5px;color:var(--texte-faible);line-height:1.3}
+.sc-cle.trop b{color:var(--alerte)}
+
+/* Barres de charge : une par semaine, ancrées au bas, trait à 100 % */
+.sc-graphe{display:flex;flex-direction:column;gap:4px}
+.sc-barres{position:relative;display:flex;align-items:flex-end;gap:2px;height:54px;border-bottom:1px solid rgba(var(--encre),.18)}
+.sc-cent{position:absolute;left:0;right:0;height:0;border-top:1px dashed rgba(var(--encre),.35);pointer-events:none}
+.sc-col{position:relative;flex:1 1 0;height:100%;display:flex;align-items:flex-end}
+.sc-col:hover{background:rgba(var(--or-rvb),.07)}
+.sc-barre{display:block;width:100%;background:var(--or);border-radius:3px 3px 0 0;min-height:0}
+.sc-barre.trop{background:var(--alerte)}
+.sc-axe{display:flex;justify-content:space-between;font-size:11.5px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.sc-legende{margin-top:14px;font-size:13px;color:var(--texte-faible)}
+.sc-rouge{color:var(--alerte);font-weight:600}
+
+/* ------------------------------------------------------------ détail */
+.sc-sous{font-size:17px;font-weight:650;margin:22px 0 10px}
+.tete-section + .sc-sous{margin-top:0}
+.sc-table{min-width:760px}
+.sc-table th.sc-th-sem,.sc-table td.sc-case{text-align:center;padding-left:4px;padding-right:4px;width:62px}
+.sc-table th.actuelle{color:var(--or)}
+.sc-table td{vertical-align:middle}
+.sc-case{font-size:13px;font-variant-numeric:tabular-nums;border-radius:4px;border:2px solid #fff}
+.sc-case.p0{background:#fff;color:var(--texte-faible)}
+.sc-case.p1{background:rgba(var(--or-rvb),.08)}
+.sc-case.p2{background:rgba(var(--or-rvb),.16)}
+.sc-case.p3{background:rgba(var(--or-rvb),.26)}
+.sc-case.p4{background:rgba(var(--or-rvb),.38)}
+.sc-case.p5{background:rgba(var(--or-rvb),.50)}
+.sc-case.trop{background:#FBE4E2;color:var(--alerte);font-weight:600}
+.sc-case.ferme{background:repeating-linear-gradient(135deg,rgba(var(--encre),.06) 0 3px,transparent 3px 7px);color:var(--texte-faible)}
+.sc-faible{color:var(--texte-faible);font-size:14px}
+.sc-absent{color:var(--alerte);font-size:14px}
+.sc-total td{font-weight:600;border-top:1px solid var(--ligne)}
+table.liste tr.sc-total:hover td{background:none}
+.sc-affaire{display:inline-flex;align-items:baseline;gap:8px;text-decoration:none;color:var(--texte)}
+.sc-affaire:hover span:last-child{color:var(--or);text-decoration:underline;text-underline-offset:3px}
+.sc-affaire .pastille{align-self:center}
+.sc-code{font-size:12.5px;font-weight:600;white-space:nowrap}
+.sc-alerte{color:var(--alerte);font-weight:600}
+.sc-etiq{margin:0 4px 4px 0}
+
+@media (max-width:640px){
+  .sc-grille{grid-template-columns:minmax(0,1fr);gap:12px}
+  .sc-cle b{font-size:18px}
+}

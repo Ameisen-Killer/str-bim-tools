@@ -739,7 +739,12 @@
     var profil = D.profil ? D.profil() : null;
     var superAdmin = !!(profil && profil.multi && profil.superAdmin);
     var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
-    if (VERSION_AB) pages = pages.filter(function (p) { return p.cle !== "console"; });
+    if (VERSION_AB) {
+      // Version AB : pas de console ; le module Secteurs, propre à AB, suit la carte de charge
+      pages = pages.filter(function (p) { return p.cle !== "console"; });
+      var iCharge = pages.map(function (p) { return p.cle; }).indexOf("charge");
+      pages.splice(iCharge + 1, 0, { cle: "secteurs", href: "/ab/secteurs/", nom: "Secteurs", court: "Secteurs" });
+    }
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
     pages.forEach(function (p) {
