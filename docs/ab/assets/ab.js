@@ -103,6 +103,16 @@
   }
 
   /** Barre (accueil, retour), logo et mots du bureau, date, menu du compte. */
+  /** « Version du 6 octobre 2026 », d'après ab/assets/version.js. */
+  function versionPubliee() {
+    var d = global.AB_VERSION && C.dt(global.AB_VERSION);
+    return d ? "Version du " + d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear() : "";
+  }
+  function pied() {
+    var p = document.getElementById("pied"), v = versionPubliee();
+    if (p && v) p.textContent = "Espace AB Ingénieurs · " + v;
+  }
+
   function entete(hote) {
     var accueil = location.pathname.replace(/\/+$/, "/") === "/ab/";
     var barre = el("nav", { class: "ab-barre", "aria-label": "Navigation" }, [
@@ -149,6 +159,7 @@
     var date = el("div", { class: "ab-date", text: dateDuJour() });
     setInterval(function () { date.textContent = dateDuJour(); }, 60000);
 
+    pied();
     vide(hote);
     hote.appendChild(barre);
     hote.appendChild(el("header", { class: "ab-entete" }, [
@@ -175,6 +186,6 @@
   global.AB = {
     el: el, vide: vide, svg: svg, majuscule: majuscule,
     avecBase: avecBase, session: session, echec: echec, deconnecte: deconnecte,
-    identite: identite, entete: entete, surRetour: surRetour, JOURS: JOURS
+    identite: identite, entete: entete, versionPubliee: versionPubliee, surRetour: surRetour, JOURS: JOURS
   };
 })(window);

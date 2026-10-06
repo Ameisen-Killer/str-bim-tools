@@ -1143,6 +1143,12 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  /** Pages AB : « Version du 6 octobre 2026 », d'après ab/assets/version.js. */
+  function versionAB() {
+    var d = global.AB_VERSION && C.dt(global.AB_VERSION);
+    return d ? "Version du " + d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear() : "";
+  }
+
   function pied() {
     var hote = document.querySelector("[data-pied]");
     if (!hote) return;
@@ -1150,7 +1156,7 @@
     hote.appendChild(el("footer", { class: "pied-outil" }, [
       VERSION_AB ? el("a", { href: "/ab/", text: "← Espace AB Ingénieurs" }) : el("a", { href: "/", text: "← str-bim-tools.com" }),
       el("div", { class: "droite" }, [
-        VERSION_AB ? el("a", { href: "/planif/", text: "Version classique" }) : null,
+        VERSION_AB && versionAB() ? el("span", { text: versionAB() }) : null,
         el("span", { class: "maj", text: avecBase ? "Base hébergée en Europe (Francfort)" : "Données enregistrées dans ce navigateur" }),
         el("a", { href: "/mentions-legales/", text: "Mentions légales" })
       ])
