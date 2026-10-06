@@ -21,7 +21,7 @@
   --vert-vif: #7DB843;        /* traits des icônes, décor */
   --vert-titre: #5F9126;      /* grand texte (≥ 24 px gras) : 3,5:1 */
   --vert-texte: #4D7A1C;      /* texte courant vert : 5,1:1 */
-  --gris-logo: #8B8B8D;
+  --gris-logo: #87868B;
   --rouge: #E0352B;
   --rouge-texte: #C62B22;     /* 5,6:1 sur blanc */
   --orange: #F2A51F;
@@ -62,11 +62,9 @@ button { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------ en-tête */
 .ab-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
-.ab-marque { display: flex; align-items: center; gap: 22px; text-decoration: none; }
-.ab-logo { width: clamp(70px, 6.6vw, 100px); height: auto; display: block; flex: none; }
-.ab-mots { color: var(--gris-logo); text-transform: uppercase; }
-.ab-mots b { display: block; font-weight: 600; font-size: clamp(15px, 1.35vw, 20px); letter-spacing: .26em; margin-bottom: 8px; }
-.ab-mots span { display: block; font-size: clamp(10px, .82vw, 12px); letter-spacing: .14em; line-height: 1.5; }
+.ab-marque { display: block; text-decoration: none; flex: 0 1 auto; min-width: 0; }
+/* Logo du bureau (pavé + texte), proportions du fichier : 2,95 × 1 */
+.ab-logo { display: block; height: clamp(76px, 7.2vw, 108px); width: auto; max-width: 100%; }
 
 .ab-qui { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; padding-top: 4px; }
 .ab-date { color: var(--faible); font-size: 17px; }
@@ -202,10 +200,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-page { padding-top: 14px; }
   .ab-barre { margin-bottom: 14px; }
   .ab-entete { padding-left: 0; align-items: center; }
-  .ab-marque { gap: 12px; }
-  .ab-logo { width: 58px; }
-  .ab-mots b { font-size: 13px; letter-spacing: .2em; margin-bottom: 4px; }
-  .ab-mots span { font-size: 8.5px; letter-spacing: .1em; }
+  .ab-logo { height: 58px; }
   .ab-date { display: none; }
   .ab-moi-nom, .ab-chevron { display: none; }
   .ab-avatar { width: 44px; height: 44px; font-size: 15px; }

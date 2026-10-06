@@ -79,16 +79,6 @@
     SB.deconnexion().then(function () { location.replace("/planif/connexion/?retour=" + encodeURIComponent("/ab/")); });
   }
 
-  /* ------------------------------------------------------------ logo
-     Le logo du bureau, dessiné (même tracé que planif/assets/logo-ab.js) :
-     carré vert en haut, gris en bas, « AB » blanc à cheval sur la limite. */
-  var LOGO =
-    '<rect width="100" height="100" fill="#C8DE9A"/>' +
-    '<rect y="58.5" width="100" height="41.5" fill="#8B8B8D"/>' +
-    '<g fill="none" stroke="#fff" stroke-width="6.2" stroke-linejoin="miter">' +
-    '<path d="M25.5 73.5 37.25 43.3 49 73.5"/>' +
-    '<path d="M59.1 73.5V43.6h7.4a6.2 6.2 0 0 1 0 12.4h-7.4M59.1 56h8.5a7.2 7.2 0 0 1 0 14.4h-8.5"/>' +
-    '</g>';
 
   /* ------------------------------------------------------------ en-tête */
 
@@ -126,13 +116,11 @@
       ])
     ]);
 
-    var marque = el("a", { class: "ab-marque", href: "/ab/", "aria-label": "AB Ingénieurs — accueil" }, [
-      svg("0 0 100 100", LOGO, "ab-logo"),
-      el("span", { class: "ab-mots", "aria-hidden": "true" }, [
-        el("b", { text: "Ingénieurs" }),
-        el("span", { text: "Bâtir aujourd'hui" }),
-        el("span", { text: "les espaces de demain" })
-      ])
+    /* Le logo du bureau, tel quel : pavé et texte officiel à sa droite
+       (ab/assets/logo-ab-horizontal.svg, relevé sur le fichier du bureau). */
+    var marque = el("a", { class: "ab-marque", href: "/ab/" }, [
+      el("img", { class: "ab-logo", src: "/ab/assets/logo-ab-horizontal.svg?v=1",
+                  alt: "AB Ingénieurs civils, géotechnique, environnement — accueil", width: "443", height: "150" })
     ]);
 
     var id = identite();

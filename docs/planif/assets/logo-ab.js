@@ -6,11 +6,13 @@
    decorDuBureau) : jamais en démonstration.
 
    Le logo est dessiné ici, sans fichier image, mais **à l'identique** du
-   fichier fourni par Tony (05.10.2026, 1063 × 1358 px) : chaque bord a été
-   relevé sur l'image, au dixième de pixel (moindres carrés sur 240 lignes
-   pour les jambes du A, cercles ajustés pour les panses du B). Les cotes
-   ci-dessous sont celles de ce fichier, en pixels ; le dessin les met à
-   l'échelle. Ne pas les « arrondir » : Tony veut le logo parfaitement exact.
+   fichier du bureau fourni par Tony (06.10.2026, 1502 × 2000 px, après un
+   premier de 1063 × 1358 le 05.10) : chaque bord a été relevé sur l'image au
+   dixième de pixel (moindres carrés pour les jambes du A, cercles ajustés
+   pour les panses du B), puis le rendu comparé au fichier : écart moyen
+   0,4 / 255. Les cotes ci-dessous sont celles de ce fichier, en pixels ; le
+   dessin les met à l'échelle. Ne pas les « arrondir » : Tony veut le logo
+   parfaitement exact. Le même tracé sert à /ab/ (ab/assets/logo-ab*.svg).
      - le pavé n'est pas carré : 921,74 × 876,52 (la hauteur fait 95 % de la
        largeur) ; vert en haut sur 73 % de la hauteur, gris dessous ;
      - le A a un sommet plat, des jambes d'épaisseur légèrement variable et
@@ -36,14 +38,16 @@
   "use strict";
 
   var TAU = Math.PI * 2;
-  // Couleurs relevées sur le fichier ; le chant, un ton plus sombre (80 %)
-  var VERT = "#BDE292", GRIS = "#818286", BLANC = "#FFFFFF";
-  var VERT_CHANT = "#97B575", GRIS_CHANT = "#67686B";
+  // Couleurs du fichier du bureau (06.10.2026) ; le chant, un ton plus sombre (80 %)
+  var VERT = "#CAE09B", GRIS = "#87868B", BLANC = "#FFFFFF";
+  var VERT_CHANT = "#A2B37C", GRIS_CHANT = "#6C6B6F";
 
-  // Cotes du fichier, en pixels de l'image (origine : coin haut gauche du pavé)
-  var X0 = 74.26, Y0 = 64.48, LARG = 921.74, HAUT = 876.52;
+  // Cotes du fichier, en pixels de l'image (1502 × 2000) : le pavé
+  var X0 = 6.62, Y0 = 1.97, LARG = 1491.7, HAUT = 1418.23, Y_LIMITE = 1040.9;
   var RAPPORT = HAUT / LARG;           // hauteur / largeur du pavé
-  var LIMITE = (706.47 - Y0) / HAUT;   // part du vert, en hauteur
+  var LIMITE = (Y_LIMITE - Y0) / HAUT; // part du vert, en hauteur
+  // « AB » en blanc, même tracé que ab/assets/logo-ab-marque.svg (pair-impair : les évidements du B)
+  var LETTRES = "M379.04 733.3H491.52L730.2 1269.8H607.91L434.68 844.11L258.75 1269.8H163.42ZM800.1 733.3H1159.76A154.36 154.36 0 0 1 1263.61 1001.86A154.33 154.33 0 0 1 1159.16 1269.8H800.1ZM908 814.34H1125.27A74.64 74.64 0 0 1 1125.27 963.62H908ZM908 1040.45H1123.81A74.52 74.52 0 0 1 1123.81 1189.49H908Z";
   var EPAISSEUR = .10;                 // de la largeur
   var TOUR = 26;                       // secondes par tour : lentement
   var TRANCHES = 60, TRANCHES_MIN = 6; // tranches de la face, selon sa largeur à l'écran
@@ -57,49 +61,10 @@
     var g = c.getContext("2d");
     g.scale(c.width / LARG, c.height / HAUT);
     g.translate(-X0, -Y0);
-
-    g.fillStyle = VERT; g.fillRect(X0, Y0, LARG, 706.47 - Y0);
-    g.fillStyle = GRIS; g.fillRect(X0, 706.47, LARG, Y0 + HAUT - 706.47);
-
-    var haut = 515.8, bas = 848.1;     // haut et pied des deux lettres
+    g.fillStyle = VERT; g.fillRect(X0, Y0, LARG, Y_LIMITE - Y0);
+    g.fillStyle = GRIS; g.fillRect(X0, Y_LIMITE, LARG, Y0 + HAUT - Y_LIMITE);
     g.fillStyle = BLANC;
-
-    // A : quatre bords droits, x = a·y + b (jambe gauche dehors et dedans, jambe droite dedans et dehors)
-    function x(a, b, y) { return a * y + b; }
-    var OG = [-0.40219, 511.413], IG = [-0.41253, 579.490], ID = [0.40595, 100.987], OD = [0.44536, 143.467];
-    var yPointe = (IG[1] - ID[1]) / (ID[0] - IG[0]);       // les deux bords intérieurs se rejoignent
-    g.beginPath();
-    g.moveTo(x(OG[0], OG[1], haut), haut);
-    g.lineTo(x(OD[0], OD[1], haut), haut);
-    g.lineTo(x(OD[0], OD[1], bas), bas);
-    g.lineTo(x(ID[0], ID[1], bas), bas);
-    g.lineTo(x(ID[0], ID[1], yPointe), yPointe);
-    g.lineTo(x(IG[0], IG[1], bas), bas);
-    g.lineTo(x(OG[0], OG[1], bas), bas);
-    g.closePath();
-    g.fill();
-
-    // B : le contour (deux panses en arcs de cercle), puis les deux évidements retirés (pair-impair)
-    var fut = 563.5;
-    var h1 = { x: 784.9, y: 612.2, r: 96.4 }, h2 = { x: 785.1, y: 751.95, r: 96.15 };
-    var taille = 682;                                       // la taille, entre les deux panses
-    var a1 = Math.asin((taille - h1.y) / h1.r), a2 = Math.asin((taille - h2.y) / h2.r);
-    g.beginPath();
-    g.moveTo(fut, haut);
-    g.lineTo(h1.x, haut);
-    g.arc(h1.x, h1.y, h1.r, -Math.PI / 2, a1);
-    g.arc(h2.x, h2.y, h2.r, a2, Math.PI / 2);
-    g.lineTo(fut, bas);
-    g.closePath();
-    // évidement du haut
-    g.moveTo(630.7, 566.3); g.lineTo(764.8, 566.3);
-    g.arc(764.8, 612.3, 46, -Math.PI / 2, Math.PI / 2);
-    g.lineTo(630.7, 658.3); g.closePath();
-    // évidement du bas
-    g.moveTo(631.1, 706.2); g.lineTo(765.1, 706.2);
-    g.arc(765.1, 751.95, 45.75, -Math.PI / 2, Math.PI / 2);
-    g.lineTo(631.1, 797.7); g.closePath();
-    g.fill("evenodd");
+    g.fill(new Path2D(LETTRES), "evenodd");
     return c;
   }
 

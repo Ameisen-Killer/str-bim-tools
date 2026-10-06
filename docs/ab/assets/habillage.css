@@ -75,10 +75,7 @@
 :root[data-version="ab"] .ab-maison{fill:#5BA33B}
 :root[data-version="ab"] .ab-fleche{fill:none;stroke:var(--texte);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 :root[data-version="ab"] .ab-marque-barre{display:flex;align-items:center;gap:12px;margin-left:10px;text-decoration:none;min-width:0}
-:root[data-version="ab"] .ab-logo-barre{width:40px;height:40px;flex:0 0 auto;display:block}
-:root[data-version="ab"] .barre-h .ab-mot{
-  color:#8B8B8D;font-weight:600;font-size:14px;letter-spacing:.26em;text-transform:uppercase;white-space:nowrap;
-}
+:root[data-version="ab"] .ab-logo-barre{width:44px;height:auto;flex:0 0 auto;display:block}
 :root[data-version="ab"] .barre-outils{align-items:center;gap:14px}
 :root[data-version="ab"] .barre-outils .btn-palette{border-radius:6px;padding:7px 9px 7px 11px;margin:0;font-size:14px;background:#F4F5F2;border-color:transparent}
 :root[data-version="ab"] .barre-outils .btn-palette:hover{border-color:var(--or-doux);background:#fff}
@@ -205,9 +202,9 @@
 
 /* --------------------------------------------------------- téléphone */
 @media (max-width:640px){
-  :root[data-version="ab"] .barre-h .ab-mot,:root[data-version="ab"] .ab-compte-nom{display:none}
+  :root[data-version="ab"] .ab-compte-nom{display:none}
   :root[data-version="ab"] .ab-marque-barre{margin-left:4px}
-  :root[data-version="ab"] .ab-logo-barre{width:36px;height:36px}
+  :root[data-version="ab"] .ab-logo-barre{width:40px}
   :root[data-version="ab"] .ab-carre{width:38px;height:38px}
   :root[data-version="ab"] .barre-outils{gap:10px}
   :root[data-version="ab"] .nav-outil a{font-size:14px;padding:9px 11px}
