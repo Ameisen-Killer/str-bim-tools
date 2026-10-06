@@ -2,7 +2,7 @@
    ---------------------------------------------------------------------------
    Une conversation par bureau : tout le bureau lit, chacun écrit en son nom,
    on retire ses propres messages (le super admin, tous). Table « messages »
-   de la base (migration-tchat.sql), lue et écrite directement, hors de la
+   de la base (base-supabase.sql), lue et écrite directement, hors de la
    file d'écritures de donnees.js : un message part tout de suite.
 
    En direct : direct.js relaie chaque message reçu par l'événement
@@ -74,7 +74,7 @@
 
   /* --------------------------------------------------------------- données */
 
-  var liste = [], plusAnciens = false, manqueBase = false;
+  var liste = [], plusAnciens = false;
 
   /** Les derniers messages. Résout la liste, du plus ancien au plus récent. */
   function charge() {
@@ -84,7 +84,6 @@
       return Promise.resolve(liste);
     }
     return SB.requete("messages?select=id,auteur_id,texte,cree_le&order=cree_le.desc&limit=" + LIMITE).then(function (r) {
-      manqueBase = false;
       var recents = (r || []).map(depuisBase).sort(parDate);
       // Les plus anciens déjà chargés restent ; la page récente remplace le reste
       var debut = recents.length ? recents[0].creeLe : "";
@@ -92,10 +91,6 @@
       liste = anciens.concat(recents);
       if (!anciens.length) plusAnciens = recents.length >= LIMITE;
       return liste;
-    }, function (e) {
-      // Table absente : migration-tchat.sql pas encore passée
-      if (e && /^(PGRST205|42P01)$/.test(e.code || "")) { manqueBase = true; liste = []; return liste; }
-      throw e;
     });
   }
 
@@ -216,9 +211,7 @@
     var zone = el("textarea", { class: "tc-saisie", rows: "1", maxlength: String(MAX), placeholder: "Écris au bureau…", "aria-label": "Message" });
     var bouton = el("button", { type: "button", class: "btn btn-or tc-envoyer", text: "Envoyer" });
     var aide = el("p", { class: "tc-aide" });
-    var alerte = el("div", { class: "tc-alerte", hidden: true });
     UI.vide(hote);
-    hote.appendChild(alerte);
     hote.appendChild(el("div", { class: "tc-cadre" }, [fil, nouveaux]));
     hote.appendChild(el("div", { class: "tc-pied" }, [zone, bouton]));
     hote.appendChild(aide);
@@ -245,7 +238,7 @@
         } }));
       }
       if (!liste.length) {
-        fil.appendChild(el("p", { class: "tc-vide", text: manqueBase ? "" : "Aucun message pour l'instant. Lance la conversation !" }));
+        fil.appendChild(el("p", { class: "tc-vide", text: "Aucun message pour l'instant. Lance la conversation !" }));
       }
       var moi = monId(), jour = "", prec = null;
       liste.forEach(function (m) {
@@ -284,14 +277,6 @@
     }
 
     function etatSaisie() {
-      var bloque = manqueBase;
-      zone.disabled = bouton.disabled = bloque;
-      alerte.hidden = !manqueBase;
-      if (manqueBase) {
-        UI.vide(alerte);
-        alerte.appendChild(el("b", { text: "Base à mettre à jour. " }));
-        alerte.appendChild(document.createTextNode("Le tchat attend la migration migration-tchat.sql (Supabase › SQL Editor)."));
-      }
       aide.textContent = !enBase()
         ? (compteDemo() || (D.enDemo && D.enDemo()) ? "Démo : tes messages restent dans ce navigateur, personne d'autre ne les voit." : "Mode local : les messages restent dans ce navigateur.")
         : "Entrée pour envoyer · Maj+Entrée pour aller à la ligne";
@@ -307,7 +292,7 @@
         zone.value = ""; ajuste();
         dessine(false);
       }).catch(function (e) { UI.toast(e.message); }).then(function () {
-        envoiEnCours = false; bouton.disabled = manqueBase; zone.focus();
+        envoiEnCours = false; bouton.disabled = false; zone.focus();
       });
     }
     bouton.addEventListener("click", part);

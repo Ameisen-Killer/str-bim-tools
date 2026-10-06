@@ -184,11 +184,8 @@
   border:1px solid rgba(var(--encre),.18);border-radius:10px;background:#fff;color:var(--texte);
 }
 .tc-saisie:focus{outline:2px solid var(--or);outline-offset:-1px}
-.tc-saisie:disabled{background:#F6F7F4}
 .tc-envoyer{flex:none;min-height:42px}
 .tc-aide{font-size:12.5px;color:var(--texte-faible);margin:6px 2px 0}
-.tc-alerte{background:#FBE4E2;color:var(--alerte);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:14px}
-.tc-alerte[hidden]{display:none}
 
 @media (max-width:900px){
   .cm-haut{grid-template-columns:minmax(0,1fr)}

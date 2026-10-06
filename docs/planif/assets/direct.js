@@ -28,7 +28,7 @@
   if (!D || !UI || !SB || !UI.avecBase || !SB.connecte()) return;
   if (/^\/planif\/(console|connexion)\//.test(location.pathname)) return;
 
-  var TABLES = ["taches", "affaires", "affaire_membres", "membres", "absences", "avis", "contacts", "ao_agenda", "rendez_vous", "conges", "veille_suivi", "reglages"];
+  var TABLES = ["taches", "affaires", "affaire_membres", "membres", "absences", "avis", "contacts", "ao_agenda", "rendez_vous", "conges", "veille_suivi", "messages", "reglages"];
   var BATTEMENT = 25000, REPLI = 60000;
 
   var ws = null, ref = 0, joinRef = null, sujet = "", battement = null, jetonEnvoye = "";
