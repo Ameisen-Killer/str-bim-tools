@@ -6,7 +6,7 @@
      Portail.el, .vide         construction du DOM
      Portail.session()         renvoie à la connexion si personne n'est connecté
      Portail.echec(e)          erreur de chargement
-     Portail.entete(hote)      barre (accueil), logo de la marque, date, compte
+     Portail.entete(hote)      logo de la marque, date, compte
      Portail.surRetour(f)      relit la base au retour sur l'onglet après une minute
    La marque (Donnees.marque : « ab » ou « str ») décide du logo et des couleurs.
    --------------------------------------------------------------------------- */
@@ -102,7 +102,7 @@
     return majuscule(JOURS[d.getDay()]) + " " + d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear();
   }
 
-  /** Barre (accueil), logo et mots du bureau, date, menu du compte. */
+  /** Logo et mots du bureau, date, menu du compte. */
   /** « Version du 6 octobre 2026 », d'après assets/version.js. */
   function versionPubliee() {
     var d = global.PLANIF_VERSION && C.dt(global.PLANIF_VERSION);
@@ -131,13 +131,7 @@
 
   function entete(hote) {
     var m = appliqueMarque();
-    var accueil = location.pathname.replace(/\/+$/, "/") === "/planif/";
-    var barre = el("nav", { class: "ab-barre", "aria-label": "Navigation" }, [
-      el("a", { class: "ab-bouton-carre", href: "/planif/", title: "Accueil", "aria-label": "Accueil",
-                "aria-current": accueil ? "page" : null }, [
-        svg("0 0 24 24", '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>')
-      ])
-    ]);
+    // Plus de bouton « Accueil » ici (06.10.2026) : on y est déjà
 
     /* Le logo de la marque : celui du bureau tel quel (assets/logo-ab-horizontal.svg,
        relevé sur son fichier), ou STR Bim Tools (pavé et texte). */
@@ -177,7 +171,6 @@
 
     pied();
     vide(hote);
-    hote.appendChild(barre);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
       el("div", { class: "ab-qui" }, [date, el("div", { class: "ab-moi" }, [bouton, menu])])

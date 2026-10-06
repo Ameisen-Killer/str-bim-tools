@@ -43,16 +43,6 @@ button { font: inherit; color: inherit; }
 
 .ab-page { max-width: 1520px; margin: 0 auto; padding: 22px var(--marge) 40px; }
 
-/* ------------------------------------------------------------ barre */
-.ab-barre { display: flex; gap: 12px; margin-bottom: 18px; }
-.ab-bouton-carre {
-  display: inline-grid; place-items: center; width: 46px; height: 46px;
-  border: 0; border-radius: 6px; background: var(--carte); box-shadow: var(--ombre);
-  cursor: pointer; text-decoration: none; transition: transform .15s, box-shadow .15s;
-}
-.ab-bouton-carre:hover { transform: translateY(-1px); box-shadow: var(--ombre-haute); }
-.ab-bouton-carre svg { width: 26px; height: 26px; }
-.ab-maison { fill: var(--m-maison); }
 
 /* ------------------------------------------------------------ en-tête */
 .ab-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
@@ -201,7 +191,6 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 @media (max-width: 640px) {
   .ab-badge { position: static; grid-column: 2; justify-self: start; margin-top: 4px; font-size: 12px; }
   .ab-page { padding-top: 14px; }
-  .ab-barre { margin-bottom: 14px; }
   .ab-entete { padding-left: 0; align-items: center; }
   .ab-logo { height: 58px; }
   .ab-logo-str { font-size: 13px; }
