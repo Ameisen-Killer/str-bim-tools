@@ -67,12 +67,10 @@
   border:0;border-radius:6px;background:#fff;box-shadow:var(--ab-ombre);cursor:pointer;
   transition:transform .15s,box-shadow .15s;
 }
-:root[data-version="v2"] .ab-carre.gris{background:#E9EBE6;box-shadow:none}
 :root[data-version="v2"] .ab-carre:hover{transform:translateY(-1px);box-shadow:var(--ab-ombre-haute)}
 :root[data-version="v2"] .ab-carre:focus-visible{outline:2px solid var(--or);outline-offset:2px}
 :root[data-version="v2"] .ab-carre svg{width:22px;height:22px}
 :root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
-:root[data-version="v2"] .ab-fleche{fill:none;stroke:var(--texte);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 :root[data-version="v2"] .ab-marque-barre{display:flex;align-items:center;gap:12px;margin-left:10px;text-decoration:none;min-width:0}
 :root[data-version="v2"] .ab-logo-barre{width:44px;height:auto;flex:0 0 auto;display:block}
 :root[data-version="v2"] .ab-logo-str{font-size:14px}

@@ -440,7 +440,13 @@ table.liste tr.groupe-vide td{padding:14px 0}
   -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
 }
 .ico-ajout-tache{--ico:url(/planif/icons/clipboard_add.svg?v=1)}
-.ico-absence{--ico:url(/planif/icons/beach.svg?v=3)}
+.ico-absence{--ico:url(/planif/icons/valise.svg?v=1)}
+/* Au survol du bouton, la valise se balance au bout de sa poignée : on part ! */
+.btn:hover > .ico-absence,.btn:focus-visible > .ico-absence{animation:valise .9s ease-in-out;transform-origin:46% 22%}
+@keyframes valise{
+  0%{transform:rotate(0)} 22%{transform:rotate(-14deg)} 46%{transform:rotate(10deg)}
+  68%{transform:rotate(-5deg)} 86%{transform:rotate(2deg)} 100%{transform:rotate(0)}
+}
 .ico-taches{--ico:url(/planif/icons/task_list.svg?v=1)}
 .ico-ajout-affaire{--ico:url(/planif/icons/folder_add.svg?v=1)}
 .ico-ajout-membre{--ico:url(/planif/icons/user_add.svg?v=1)}

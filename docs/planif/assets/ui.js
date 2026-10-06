@@ -686,7 +686,7 @@
   ];
 
   /* ------------------------------------------------- barre de la version 2
-     Accueil et retour, logo de la marque ; à droite la recherche, qui est en
+     Accueil et logo de la marque (plus de bouton retour depuis le 06.10.2026) ; à droite la recherche, qui est en
      ligne, le bureau (super admin) et le compte : nom, rafraîchir, données,
      déconnexion. */
   /* Le pavé du logo « ab », relevé sur le fichier du bureau (assets/logo-ab-marque.svg) ;
@@ -707,10 +707,6 @@
     return el("div", { class: "ab-fil" }, [
       el("a", { class: "ab-carre", href: "/planif/", title: "Accueil", "aria-label": "Accueil" }, [
         dessinAB("0 0 24 24", '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>')
-      ]),
-      el("button", { type: "button", class: "ab-carre gris", title: "Retour", "aria-label": "Retour",
-        onclick: function () { if (history.length > 1) history.back(); else location.href = "/planif/"; } }, [
-        dessinAB("0 0 24 24", '<path class="ab-fleche" d="M19.5 12h-15M10.5 6l-6 6 6 6"/>')
       ]),
       el("a", { class: "ab-marque-barre", href: "/planif/", "aria-label": D.nomEspace() + " — accueil", title: D.nomEspace() + " — accueil" }, [
         D.marque() === "ab" ? dessinAB(VUE_AB, LOGO_AB, "ab-logo-barre")

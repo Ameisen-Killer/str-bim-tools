@@ -50,11 +50,9 @@ button { font: inherit; color: inherit; }
   border: 0; border-radius: 6px; background: var(--carte); box-shadow: var(--ombre);
   cursor: pointer; text-decoration: none; transition: transform .15s, box-shadow .15s;
 }
-.ab-bouton-carre.gris { background: #E9EBE6; box-shadow: none; }
 .ab-bouton-carre:hover { transform: translateY(-1px); box-shadow: var(--ombre-haute); }
 .ab-bouton-carre svg { width: 26px; height: 26px; }
 .ab-maison { fill: var(--m-maison); }
-.ab-fleche { fill: none; stroke: var(--texte); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ------------------------------------------------------------ en-tête */
 .ab-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
