@@ -389,11 +389,6 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — demandes de congé (module Communication).
-     Tant que migration-conges.sql n'est pas passée, la table conges manque :
-     sa lecture échoue sans bloquer le reste, et on n'y écrit rien. À RETIRER
-     dès que Tony confirme la migration passée. */
-  var congesEnBase = false;
 
   var VERS_BASE = {
     membres: function (m) {
@@ -487,13 +482,11 @@
       litAvis(),
       litTout("ao_agenda", "jour"),
       litTout("rendez_vous", "jour"),
-      // Table des demandes de congé : absente tant que la migration n'est pas passée
-      litTout("conges", "id").catch(function () { return null; })
+      litTout("conges", "id")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10];
-      congesEnBase = conges !== null;
+          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10] || [];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -555,7 +548,7 @@
             observations: c.observations || ""
           };
         }),
-        conges: (conges || []).map(function (x) {
+        conges: conges.map(function (x) {
           return { id: x.id, membreId: x.membre_id, debut: x.debut, fin: x.fin, motif: x.motif,
                    commentaire: x.commentaire || "", statut: x.statut, validePar: x.valide_par || null,
                    valideLe: x.valide_le || null, reponse: x.reponse || "", absenceId: x.absence_id || null, cree: x.cree_le };
@@ -684,7 +677,7 @@
     var dAvis = compare(av.avis || [], etat.avis || [], VERS_BASE.avis);
     var dAgenda = compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda);
     var dRdv = compare(av.rdv || [], etat.rdv || [], VERS_BASE.rdv);
-    var dConges = congesEnBase ? compare(av.conges || [], etat.conges || [], VERS_BASE.conges) : { ajouts: [], modifs: [], retraits: [] };
+    var dConges = compare(av.conges || [], etat.conges || [], VERS_BASE.conges);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -776,8 +769,7 @@
       regleJours: regleJours,
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
-      },
-      congesEnBase: function () { return congesEnBase; }
+      }
     }
   };
 })(window);

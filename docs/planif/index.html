@@ -104,8 +104,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=39"></script>
-<script src="/planif/assets/donnees.js?v=49"></script>
+<script src="/planif/assets/supabase.js?v=40"></script>
+<script src="/planif/assets/donnees.js?v=50"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/portail.js?v=6"></script>
@@ -151,7 +151,7 @@
   function badgeConges() {
     var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge");
     if (ancien) ancien.remove();
-    var n = D.congesPret ? D.congesAValider().length : 0;
+    var n = D.congesAValider().length;
     if (!n) return;
     carte.appendChild(el("span", { class: "ab-badge", text: n + (n > 1 ? " congés à valider" : " congé à valider") }));
   }

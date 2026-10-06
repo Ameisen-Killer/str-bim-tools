@@ -90,13 +90,13 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=39"></script>
-<script src="/planif/assets/donnees.js?v=49"></script>
+<script src="/planif/assets/supabase.js?v=40"></script>
+<script src="/planif/assets/donnees.js?v=50"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/ui.js?v=68"></script>
 <script src="/planif/assets/palette.js?v=13"></script>
-<script src="/planif/assets/direct.js?v=6"></script>
+<script src="/planif/assets/direct.js?v=7"></script>
 <script>
 (function () {
   "use strict";
@@ -146,7 +146,7 @@
     var actions = [];
     actions.push({ label: "Nouveau rendez-vous", or: true, icone: "ico-ajout-tache", action: function () { formRdv(null, {}); } });
     actions.push({ label: "Prévenir le bureau", icone: "ico-lien", action: formAvis });
-    if (D.congesPret()) actions.push({ label: "Demander un congé", icone: "ico-absence", action: function () { formConge(); } });
+    actions.push({ label: "Demander un congé", icone: "ico-absence", action: function () { formConge(); } });
     UI.chrome("communication", actions);
   }
 
@@ -308,8 +308,6 @@
      qui attendent encore. */
   function conges() {
     var hote = UI.vide(document.getElementById("conges"));
-    document.getElementById("btn-conge").hidden = !D.congesPret();
-    if (!D.congesPret()) return;
     var a = auj(), moi = D.monMembre(), canton = D.canton();
     var aValider = D.congesAValider();
     var miennes = moi ? D.conges({ membreId: moi.id, depuis: C.ajoute(a, -30) }).filter(function (c) { return c.statut !== "annulee"; }) : [];

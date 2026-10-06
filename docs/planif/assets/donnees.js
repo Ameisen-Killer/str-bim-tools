@@ -1264,8 +1264,6 @@
        (peut_valider_conge, decide_conge). */
     STATUTS_CONGE: STATUTS_CONGE,
     MOTIFS_CONGE: MOTIFS_CONGE,
-    /** La base a-t-elle la table conges (migration-conges.sql) ? Toujours en mode local. */
-    congesPret: function () { return ADAPTATEUR.congesEnBase ? ADAPTATEUR.congesEnBase() : true; },
     /** Demandes, la plus proche d'abord. opts.membreId, opts.statut, opts.depuis (fin ≥ ce jour). */
     conges: function (opts) {
       opts = opts || {};
@@ -1296,7 +1294,6 @@
     },
     demandeConge: function (o) {
       return Promise.resolve().then(function () {
-        if (!D.congesPret()) throw erreur("Les demandes de congé attendent la mise à jour de la base (migration-conges.sql).");
         var moi = D.monMembre(), qui = texte(o.membreId) || (moi && moi.id);
         var m = D.membre(qui);
         if (!m) throw erreur("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
