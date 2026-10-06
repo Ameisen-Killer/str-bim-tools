@@ -144,7 +144,6 @@
     bouton.setAttribute("aria-label", "Compte : " + nom);
     var menu = el("ul", { class: "ab-menu", role: "menu", hidden: true }, [
       mail ? el("li", { class: "ab-menu-mail", role: "presentation", text: mail }) : null,
-      el("li", { role: "none" }, [el("a", { role: "menuitem", href: "/planif/", text: "Version classique de la planification" })]),
       el("li", { role: "none" }, [el("button", { type: "button", role: "menuitem", text: "Se déconnecter", onclick: deconnecte })])
     ]);
     function ouvre(oui) {

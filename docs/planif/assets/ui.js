@@ -718,7 +718,6 @@
       D.etat() ? el("button", { type: "button", role: "menuitem", dataset: { rafraichir: "" },
         onclick: function () { ouvre(false); rafraichit(false); } }, ["Rafraîchir les données"]) : null,
       D.etat() ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); ouvreDonnees(); } }, ["Données (export, import)"]) : null,
-      el("a", { role: "menuitem", href: "/planif/" }, ["Version classique de la planification"]),
       avecBase ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); deconnecte(); } }, ["Se déconnecter"]) : null
     ]);
     var ouvre = deroulant(bouton, menu);
