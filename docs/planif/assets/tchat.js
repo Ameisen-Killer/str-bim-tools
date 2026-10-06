@@ -189,10 +189,81 @@
     if (!dernierConnu || m.creeLe > dernierConnu) dernierConnu = m.creeLe;
     global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "INSERT", message: m } }));
     var UI = global.UI;
-    if (!UI || m.auteurId === monId() || /^\/planif\/communication\//.test(location.pathname)) return;
+    if (m.auteurId === monId() || /^\/planif\/communication\//.test(location.pathname)) return;
     var auteur = D.membre(m.auteurId), extrait = m.texte.replace(/\s+/g, " ");
-    UI.toast("Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait),
-      { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
+    var texte = "Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait);
+    if (UI) UI.toast(texte, { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
+    else annonce(texte);
+  }
+
+  /* Accueil (sans ui.js) : l'annonce est un lien vers le tchat, en bas de l'écran
+     (style dans portail.css). */
+  var boite = null, minuterie = null;
+  function annonce(texte) {
+    if (!boite) {
+      boite = document.createElement("a");
+      boite.className = "tc-annonce";
+      boite.href = "/planif/communication/#tchat";
+      boite.setAttribute("role", "status");
+      document.body.appendChild(boite);
+    }
+    boite.textContent = texte;
+    boite.classList.add("vu");
+    clearTimeout(minuterie);
+    minuterie = setTimeout(function () { boite.classList.remove("vu"); }, 8000);
+  }
+
+  /* Pages sans direct.js (l'accueil) : un canal Realtime pour le seul tchat,
+     écrit comme celui de direct.js (protocole Phoenix, vsn 1.0.0). */
+  function directTchat() {
+    if (global.PlanifDirect || !SB.projet || typeof global.WebSocket === "undefined") return;
+    var ws = null, ref = 0, joinRef = null, sujet = "", battement = null, essais = 0, jetonEnvoye = "", abandon = false;
+    function envoie(m) { if (ws && ws.readyState === 1) { m.ref = String(++ref); ws.send(JSON.stringify(m)); } }
+    function connecte() {
+      if (abandon || ws) return;
+      SB.jeton().then(function (jeton) {
+        var p = D.profil ? D.profil() : null, bureau = p && p.bureau ? p.bureau.id : "", pr = SB.projet();
+        sujet = "realtime:tchat-" + (bureau || "commun");
+        try { ws = new global.WebSocket(pr.url.replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + encodeURIComponent(pr.cle) + "&vsn=1.0.0"); }
+        catch (e) { ws = null; return planifie(); }
+        ws.onopen = function () {
+          joinRef = String(++ref); jetonEnvoye = jeton;
+          var c = { event: "*", schema: "public", table: "messages" };
+          if (bureau) c.filter = "bureau_id=eq." + bureau;
+          ws.send(JSON.stringify({ topic: sujet, event: "phx_join", ref: joinRef, join_ref: joinRef, payload: {
+            config: { broadcast: { ack: false, self: false }, presence: { key: "" }, private: false, postgres_changes: [c] },
+            access_token: jeton } }));
+          clearInterval(battement);
+          battement = setInterval(function () {
+            envoie({ topic: "phoenix", event: "heartbeat", payload: {} });
+            SB.jeton().then(function (j) {
+              if (j && j !== jetonEnvoye) { jetonEnvoye = j; envoie({ topic: sujet, event: "access_token", payload: { access_token: j }, join_ref: joinRef }); }
+            }).catch(function () {});
+          }, 25000);
+        };
+        ws.onmessage = function (e) {
+          var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+          if (m.topic !== sujet) return;
+          if (m.event === "phx_reply" && m.ref === joinRef) { if (m.payload && m.payload.status === "ok") essais = 0; return; }
+          if (m.event !== "postgres_changes" || !m.payload || !m.payload.data) return;
+          var d = m.payload.data, type = d.type || d.eventType;
+          if (type === "INSERT" && d.record && d.record.id) recu(depuisBase(d.record));
+          else if (type === "DELETE") global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "DELETE", id: String((d.old_record || {}).id || "") } }));
+        };
+        ws.onclose = function () { clearInterval(battement); ws = null; planifie(); };
+        ws.onerror = function () { /* onclose suit */ };
+      }).catch(function () { planifie(); });
+    }
+    function planifie() {
+      if (abandon) return;
+      setTimeout(connecte, Math.min(30000, 2000 * Math.pow(2, essais++)));
+    }
+    global.addEventListener("pagehide", function () {
+      abandon = true; clearInterval(battement);
+      if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} ws = null; }
+    });
+    global.addEventListener("pageshow", function (e) { if (e.persisted) { abandon = false; essais = 0; connecte(); } });
+    connecte();
   }
 
   function veille() {
@@ -214,6 +285,7 @@
     if (!enBase()) return;
     veille();
     setInterval(veille, VEILLE);
+    directTchat();
     document.addEventListener("visibilitychange", function () { if (!document.hidden) veille(); });
   }).catch(function () {});
 
