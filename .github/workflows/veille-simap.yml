@@ -1,0 +1,41 @@
+# Veille des appels d'offres simap.ch (06.10.2026) : chaque matin de semaine,
+# outils/veille/veille-simap.mjs range dans la base les publications de
+# Genève, Vaud et Valais qui concernent la structure et le génie civil
+# (critères : outils/veille/criteres.json). Secret requis :
+# SUPABASE_SERVICE_ROLE_KEY (Supabase › Project Settings › API › service_role).
+name: Veille simap.ch
+
+on:
+  schedule:
+    - cron: "17 4 * * 1-5"      # 06:17 en été, 05:17 en hiver (heure suisse)
+  workflow_dispatch:
+    inputs:
+      jours:
+        description: "Publications des N derniers jours"
+        default: "3"
+      essai:
+        description: "Essai (1 : rien n'est écrit)"
+        default: "0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veille-simap
+  cancel-in-progress: false
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Veille
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JOURS: ${{ github.event.inputs.jours || '3' }}
+          ESSAI: ${{ github.event.inputs.essai || '0' }}
+        run: node outils/veille/veille-simap.mjs
