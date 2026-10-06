@@ -531,7 +531,7 @@
         finiDessin: t.finiDessin === true,
         enchaine: t.enchaine === true,
         // 1 la plus importante, 5 par défaut. Réglée par le curseur du formulaire
-        // de tâche (version AB) ; écrite si la base a la colonne (supabase.js).
+        // de tâche (version AB) ; colonne taches.priorite en base.
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()

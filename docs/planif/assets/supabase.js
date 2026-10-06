@@ -389,12 +389,6 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — priorité des tâches.
-     Tant que migration-priorite.sql n'est pas passée, la base refuse toute
-     écriture qui nomme la colonne priorite (42703). On ne l'envoie donc que si
-     la lecture l'a vue. À RETIRER dès que Tony confirme la migration passée. */
-  var prioriteEnBase = false;
-
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -419,7 +413,7 @@
                 statut: t.statut, avancement: t.avancement };
       o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true;
       o.enchaine = t.enchaine === true;
-      if (prioriteEnBase) o.priorite = Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5));
+      o.priorite = Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5));
       return o;
     },
     /* Un avis porte une heure : l'écran la garde en heure locale
@@ -458,12 +452,6 @@
 
   /* ------------------------------------------------------------ lecture */
 
-  /** La colonne priorite existe-t-elle ? Une ligne lue le dit ; table vide : une requête qui la nomme. */
-  function sondePriorite() {
-    return requete("taches?select=priorite&limit=1")
-      .then(function () { return true; }, function () { return false; });
-  }
-
   function charge() {
     return Promise.all([
       litTout("membres", "id"),
@@ -473,13 +461,11 @@
       litTout("taches", "id"),
       litTout("reglages", "id"),
       litTout("contacts", "id"),
-      litAvis(),
-      sondePriorite()
+      litAvis()
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
           contacts = r[6] || [], avis = r[7] || [];
-      prioriteEnBase = r[8] === true || (taches.length > 0 && "priorite" in taches[0]);
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
