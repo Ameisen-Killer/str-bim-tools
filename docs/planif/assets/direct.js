@@ -161,8 +161,8 @@
     enAttente = setTimeout(relis, 500);           // une rafale de changements = une seule relecture
   }
 
-  /* Tchat : un message ne relit pas la base. Il est relayé tel quel à la page
-     (tchat.js l'affiche) ; ailleurs, un message bref l'annonce. */
+  /* Tchat : un message ne relit pas la base. Il passe à tchat.js, qui le
+     relaie à la page et, ailleurs que dans Communication, l'annonce. */
   function message(d) {
     var type = d.type || d.eventType, ligne = d.record || d["new"] || {}, vieux = d.old_record || d.old || {};
     var T = global.Tchat;
@@ -171,13 +171,8 @@
       return;
     }
     if (type !== "INSERT" || !ligne.id) return;
-    var m = T ? T.depuisBase(ligne) : { id: String(ligne.id), auteurId: String(ligne.auteur_id || ""), texte: String(ligne.texte || ""), creeLe: String(ligne.cree_le || "") };
-    global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "INSERT", message: m } }));
-    var moi = D.monMembre ? D.monMembre() : null;
-    if ((moi && m.auteurId === moi.id) || /^\/planif\/communication\//.test(location.pathname)) return;
-    var auteur = D.membre(m.auteurId), extrait = m.texte.replace(/\s+/g, " ");
-    UI.toast("Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait),
-      { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
+    // tchat.js annonce et relaie (une seule fois, qu'il arrive par ici ou par sa relecture)
+    if (T) T.recu(T.depuisBase(ligne));
   }
 
   function occupe() {

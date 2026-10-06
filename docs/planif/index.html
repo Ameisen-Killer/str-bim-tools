@@ -109,7 +109,7 @@
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/portail.js?v=7"></script>
-<script src="/planif/assets/tchat.js?v=3"></script>
+<script src="/planif/assets/tchat.js?v=4"></script>
 <script>
 (function () {
   "use strict";
@@ -124,6 +124,8 @@
     var id = Portail.entete(document.getElementById("entete"));
     salut(id);
     Portail.surRetour(dessine);
+    // Un message du tchat arrive (tchat.js) : le badge de la carte Communication suit
+    window.addEventListener("planif:message", badgeConges);
     dessine();
   }).catch(Portail.echec);
 

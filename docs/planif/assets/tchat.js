@@ -175,6 +175,48 @@
     }, function () { return 0; });
   }
 
+  /* --------------------------------------------------------------- arrivées
+     Un message neuf arrive par le direct (direct.js) ou, en filet, par la
+     relecture de toutes les pages : les nouveaux messages depuis le dernier
+     connu, toutes les 20 s, onglet visible (06.10.2026 : sans elle, le badge
+     et l'annonce attendaient un rafraîchissement quand le direct ne livrait
+     pas). Chaque message n'est relayé qu'une fois. */
+  var VEILLE = 20000, vus = {}, dernierConnu = null, veilleEnCours = false;
+
+  function recu(m) {
+    if (!m || !m.id || vus[m.id]) return;
+    vus[m.id] = true;
+    if (!dernierConnu || m.creeLe > dernierConnu) dernierConnu = m.creeLe;
+    global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "INSERT", message: m } }));
+    var UI = global.UI;
+    if (!UI || m.auteurId === monId() || /^\/planif\/communication\//.test(location.pathname)) return;
+    var auteur = D.membre(m.auteurId), extrait = m.texte.replace(/\s+/g, " ");
+    UI.toast("Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait),
+      { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
+  }
+
+  function veille() {
+    if (veilleEnCours || document.hidden || !enBase()) return;
+    veilleEnCours = true;
+    var chemin = dernierConnu === null
+      ? "messages?select=cree_le&order=cree_le.desc&limit=1"
+      : "messages?select=id,auteur_id,texte,cree_le&order=cree_le.asc&limit=50" + (dernierConnu ? "&cree_le=gt." + encodeURIComponent(dernierConnu) : "");
+    var premier = dernierConnu === null;
+    SB.requete(chemin).then(function (r) {
+      r = r || [];
+      // Premier passage : on retient seulement où en est le fil
+      if (premier) { dernierConnu = r.length ? String(r[0].cree_le) : ""; return; }
+      r.map(depuisBase).forEach(recu);
+    }).catch(function () {}).then(function () { veilleEnCours = false; });
+  }
+
+  if (D && D.pret) D.pret().then(function () {
+    if (!enBase()) return;
+    veille();
+    setInterval(veille, VEILLE);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) veille(); });
+  }).catch(function () {});
+
   /* --------------------------------------------------------------- affichage */
 
   var JOURS_ABR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
@@ -338,6 +380,7 @@
 
   global.Tchat = {
     monte: monte,
+    recu: recu,
     nonLus: nonLus,
     depuisBase: depuisBase,
     /** Le message vient-il de la personne connectée ? (direct.js, pour ne pas s'annoncer à soi-même) */
