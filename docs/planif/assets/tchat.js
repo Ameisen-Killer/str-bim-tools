@@ -24,6 +24,12 @@
   var D = global.Donnees, SB = global.Sb;
   var LIMITE = 150, MAX = 2000, RELECTURE = 15000;
   var CLE_LU = "planif.tchat.lu:", CLE_LOCAL = "planif.tchat.local:";
+  /* Émojis au-dessus de la saisie (06.10.2026) : une rangée des plus courants,
+     « + » ouvre les autres. Un clic insère l'émoji à l'endroit du curseur. */
+  var EMOJIS = ["👍", "🙏", "😀", "😂", "😉", "🙂", "😅", "🤔", "👏", "🎉", "✅", "❌", "⚠️", "☕", "🔥", "❤️"];
+  var EMOJIS_PLUS = ["😊", "😁", "🤣", "😍", "😎", "🤩", "😇", "🙃", "😬", "😮", "😢", "😭", "😡", "🤯", "🥳", "😴",
+    "🤝", "👌", "✌️", "💪", "👋", "🙌", "👀", "🤞", "💡", "📌", "📎", "📅", "⏰", "📞", "✉️", "📄",
+    "📐", "📏", "🏗️", "🚧", "🏠", "🏢", "🚗", "🍕", "🍰", "🍻", "🎂", "🌞", "🌧️", "❄️", "⭐", "💯"];
 
   function email() { return SB && SB.connecte && SB.connecte() ? SB.email() : ""; }
   function compteDemo() { return /^demo@/i.test(email()); }
@@ -403,6 +409,35 @@
     }
 
     function ajuste() { zone.style.height = "auto"; zone.style.height = Math.min(zone.scrollHeight, 132) + "px"; }
+    // Émojis : rangée rapide + grille complète repliée
+    function insere(e) {
+      if (zone.value.length + e.length > MAX) return;
+      var d = zone.selectionStart, f = zone.selectionEnd;
+      if (typeof d === "number" && zone.setRangeText) zone.setRangeText(e, d, f, "end");
+      else zone.value += e;
+      ajuste();
+      // Sur téléphone, ne pas faire surgir le clavier à chaque émoji
+      if (!global.matchMedia || global.matchMedia("(hover: hover)").matches) zone.focus();
+    }
+    function boutonEmoji(e) {
+      return el("button", { type: "button", class: "tc-emoji", text: e, title: e, "aria-label": "Insérer " + e,
+        onmousedown: function (ev) { ev.preventDefault(); },          // garde le curseur dans la saisie
+        onclick: function () { insere(e); } });
+    }
+    var grille = el("div", { class: "tc-emojis-plus", id: "tc-emojis-plus", hidden: true, role: "group", "aria-label": "Tous les émojis" },
+      EMOJIS_PLUS.map(boutonEmoji));
+    var tous = el("button", { type: "button", class: "tc-emoji tc-emojis-tous", text: "+", title: "Plus d'émojis",
+      "aria-label": "Plus d'émojis", "aria-expanded": "false", "aria-controls": "tc-emojis-plus",
+      onclick: function () {
+        grille.hidden = !grille.hidden;
+        tous.textContent = grille.hidden ? "+" : "−";
+        tous.setAttribute("aria-expanded", grille.hidden ? "false" : "true");
+        tous.title = grille.hidden ? "Plus d'émojis" : "Moins d'émojis";
+      } });
+    var rangee = el("div", { class: "tc-emojis", role: "group", "aria-label": "Émojis" }, EMOJIS.map(boutonEmoji).concat([tous]));
+    var pied = hote.querySelector(".tc-pied");
+    hote.insertBefore(grille, pied);
+    hote.insertBefore(rangee, pied);
     zone.addEventListener("input", ajuste);
     var envoiEnCours = false;
     function part() {

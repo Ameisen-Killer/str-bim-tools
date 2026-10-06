@@ -186,6 +186,23 @@
 .tc-saisie:focus{outline:2px solid var(--or);outline-offset:-1px}
 .tc-envoyer{flex:none;min-height:42px}
 .tc-aide{font-size:12.5px;color:var(--texte-faible);margin:6px 2px 0}
+/* Émojis au-dessus de la saisie : rangée qui défile sur téléphone, grille repliée */
+.tc-emojis{display:flex;gap:2px;align-items:center;margin-top:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tc-emojis::-webkit-scrollbar{display:none}
+.tc-emoji{
+  flex:none;width:34px;height:34px;display:inline-grid;place-items:center;padding:0;border:0;border-radius:8px;background:none;cursor:pointer;
+  font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;font-size:19px;line-height:1;
+  transition:background .15s,transform .15s;
+}
+.tc-emoji:hover{background:var(--m-voile);transform:scale(1.12)}
+.tc-emoji:focus-visible{outline:2px solid var(--or);outline-offset:-2px}
+.tc-emojis-tous{font-family:inherit;font-size:20px;font-weight:500;color:var(--texte-faible)}
+.tc-emojis-tous:hover{color:var(--texte);transform:none}
+.tc-emojis-plus{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:2px;margin-top:8px;padding:6px;
+  max-height:168px;overflow-y:auto;background:#FAFAF8;border:1px solid var(--ligne-faible);border-radius:10px;
+}
+.tc-emojis-plus[hidden]{display:none}
 
 @media (max-width:900px){
   .cm-haut{grid-template-columns:minmax(0,1fr)}
@@ -194,6 +211,8 @@
 @media (max-width:640px){
   .tc-msg{max-width:92%}
   .tc-saisie{font-size:16px}
+  .tc-emoji{width:40px;height:40px;font-size:21px}
+  .tc-emojis-plus{grid-template-columns:repeat(auto-fill,minmax(40px,1fr))}
   .tc-fil{padding:4px 8px 10px}
 }
 @media print{
