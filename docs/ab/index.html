@@ -217,8 +217,9 @@
   /* ----------------------------------------------- absences de l'équipe
      La semaine prochaine, du lundi au vendredi. L'équipe, c'est le secteur
      (discipline) de la personne connectée quand elle en a un, sinon tout le
-     bureau. Rouge : absent toute la semaine ; orange : une partie ; vert :
-     présent. Seuls comptent les jours que la personne aurait travaillés. */
+     bureau. Seuls les absents y figurent (demande de Tony, 06.10.2026) :
+     rouge, absent toute la semaine ; orange, une partie. Seuls comptent les
+     jours que la personne aurait travaillés. */
   function absences(moi) {
     var hote = AB.vide(document.getElementById("abs"));
     var lundi = C.ajoute(C.lundi(auj()), 7), vendredi = C.ajoute(lundi, 4), canton = D.canton();
@@ -228,7 +229,6 @@
       (secteur && D.DISCIPLINES[secteur] ? " · " + D.DISCIPLINES[secteur] : "") + ")";
     document.getElementById("abs-quand").title = "Semaine " + C.semaineISO(lundi).num + ", du " + C.fmtLong(lundi) + " au " + C.fmtLong(vendredi);
 
-    var semaineOuvree = Calc.joursTravaillesEntre(null, lundi, vendredi, canton);
     var lignes = gens.map(function (m) {
       var dus = Calc.joursTravaillesEntre(m, lundi, vendredi, canton);
       var periodes = (m.absences || []).filter(function (a) { return a.debut <= vendredi && (a.fin || a.debut) >= lundi; });
@@ -236,28 +236,28 @@
         var de = a.debut < lundi ? lundi : a.debut, a2 = (a.fin || a.debut) > vendredi ? vendredi : (a.fin || a.debut);
         return s + Calc.joursTravaillesEntre(m, de, a2, canton);
       }, 0);
-      var etat = dus <= 0 ? "off" : manque >= dus - 0.01 ? "rouge" : manque > 0 ? "orange" : "vert";
-      return { m: m, etat: etat, periodes: periodes, dus: dus, manque: manque };
+      // Rouge : absent tous les jours qu'il aurait travaillés ; orange : une partie
+      return { m: m, etat: manque >= dus - 0.01 ? "rouge" : "orange", periodes: periodes, dus: dus, manque: manque };
+    }).filter(function (x) {
+      // Seuls les absents : une absence qui ne tombe que sur des jours non travaillés ne compte pas
+      return x.periodes.length && x.manque > 0;
     });
-    var rang = { rouge: 0, orange: 1, off: 2, vert: 3 };
-    lignes.sort(function (a, b) { return rang[a.etat] - rang[b.etat] || D.compareMembres(a.m, b.m); });
+    // Le premier parti d'abord, puis par nom
+    lignes.sort(function (a, b) {
+      var da = a.periodes[0].debut, db = b.periodes[0].debut;
+      return da < db ? -1 : da > db ? 1 : D.compareMembres(a.m, b.m);
+    });
 
-    if (!lignes.length) { videMessage(hote, "Aucun membre dans l'équipe."); return; }
+    if (!lignes.length) { videMessage(hote, "Personne n'est absent la semaine prochaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
-      var p = x.periodes[0], periode = "—", motif = "Présent", titre = x.m.prenom + " " + x.m.nom;
-      if (p) {
-        periode = p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin);
-        motif = p.motif || "Absence";
-        titre += "\n" + x.periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
-          "\n" + C.fmtJours(x.manque) + " j d'absence sur " + C.fmtJours(x.dus) + " j travaillés";
-      } else if (x.etat === "off") {
-        motif = "Ne travaille pas";
-      } else if (x.dus < semaineOuvree - 0.01) {
-        motif = "Présent · " + C.fmtJours(x.dus) + " j";
-        titre += "\n" + D.detailJours(x.m);
-      }
+      var p = x.periodes[0];
+      var periode = p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin);
+      var motif = p.motif || "Absence";
+      var titre = x.m.prenom + " " + x.m.nom + "\n" +
+        x.periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
+        "\n" + C.fmtJours(x.manque) + " j d'absence sur " + C.fmtJours(x.dus) + " j travaillés";
       return el("a", { class: "ab-ligne trois", href: "/ab/absences/", title: titre }, [
-        el("span", { class: "ab-point " + (x.etat === "off" ? "" : x.etat), "aria-hidden": "true" }),
+        el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
         el("span", { class: "ab-periode", text: periode }),
         el("span", { class: "ab-quand", text: motif })
