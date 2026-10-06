@@ -70,12 +70,13 @@
                 var c = { event: "*", schema: "public", table: t };
                 if (bureau) c.filter = "bureau_id=eq." + bureau;
                 return c;
-              }).concat(bureau ? [
-                /* Une suppression n'arrive qu'avec l'identifiant de la ligne (RLS) :
-                   le filtre sur bureau_id ne la laisse jamais passer. Pour le tchat,
-                   on les reçoit donc sans filtre — un identifiant inconnu ne fait rien. */
-                { event: "DELETE", schema: "public", table: "messages" }
-              ] : [])
+              }).concat(bureau ? TABLES.filter(function (t) { return t !== "reglages"; }).map(function (t) {
+                /* Une suppression n'arrive qu'avec la clé de la ligne (RLS) : le
+                   filtre sur bureau_id ne la laisse jamais passer. On reçoit donc
+                   les suppressions sans filtre, et concerne() écarte celles d'un
+                   autre bureau (clé inconnue ici). */
+                return { event: "DELETE", schema: "public", table: t };
+              }) : [])
             },
             access_token: jeton
           }
@@ -142,8 +143,21 @@
 
   /* ------------------------------------------------- une modification arrive */
 
+  /* Une suppression nous concerne-t-elle ? Sa clé (id, ou affaire_id pour
+     l'équipe d'une affaire) doit figurer dans ce que la page a chargé. Nos
+     propres suppressions, déjà retirées ici, sont écartées du même coup. */
+  function concerne(d) {
+    var v = d.old_record || d.old || {};
+    var cles = [v.id, v.affaire_id].filter(Boolean).map(String);
+    if (!cles.length) return true;
+    var tout = "";
+    try { tout = JSON.stringify(D.etat() || {}); } catch (e) { return true; }
+    return cles.some(function (c) { return tout.indexOf('"' + c + '"') >= 0; });
+  }
+
   function change(d) {
     if (d.table === "messages") return message(d);
+    if ((d.type || d.eventType) === "DELETE" && !concerne(d)) return;
     // Un enregistrement de cette page qui revient : on relit, sans rien annoncer
     var mienne = D.ecritureRecente && D.ecritureRecente(2500);
     if (!mienne) echo = false;
