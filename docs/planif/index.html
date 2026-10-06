@@ -104,8 +104,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=41"></script>
-<script src="/planif/assets/donnees.js?v=51"></script>
+<script src="/planif/assets/supabase.js?v=42"></script>
+<script src="/planif/assets/donnees.js?v=52"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/portail.js?v=6"></script>
@@ -156,7 +156,7 @@
     // Sur la carte Inter-secteurs : les nouvelles publications de la veille simap.ch
     var inter = document.getElementById("module-inter"), vieux = inter.querySelector(".ab-badge");
     if (vieux) vieux.remove();
-    var nv = D.veillePret() ? D.veilleNouvelles().length : 0;
+    var nv = D.veilleNouvelles().length;
     if (nv) {
       inter.href = "/planif/inter-secteurs/#veille";
       inter.appendChild(el("span", { class: "ab-badge veille", text: nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication") }));

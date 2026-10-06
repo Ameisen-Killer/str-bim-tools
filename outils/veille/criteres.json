@@ -1,20 +1,62 @@
 {
   "_lisezmoi": "Critères de la veille simap.ch (06.10.2026, demande de Tony) : Genève, Vaud, Valais ; structure et génie civil. Modifier ici, pousser : la prochaine exécution en tient compte.",
-  "cantons": ["GE", "VD", "VS"],
+  "cantons": [
+    "GE",
+    "VD",
+    "VS"
+  ],
   "institutions": {
     "GE": "d03fdaa0-62a2-4338-894e-8ff20828b067",
     "VD": "f595059a-68c3-4143-812f-82bc1f44f889",
     "VS": "f8e02dc2-fd1f-4d80-85ab-21878cb328c8"
   },
-  "typesPublication": ["tender", "competition", "study_contract", "advance_notice"],
-  "sousTypesRetenus": ["service", "project_competition", "overall_performance_competition", "project_study", "overall_performance_study", "idea_competition", "idea_study"],
-  "cpvPrefixes": ["7130", "7131", "7132", "7134"],
-  "bkp": ["292"],
-  "motsCles": [
-    "ingénieur civil", "ingenieur civil", "ingénieurs civils", "génie civil", "genie civil",
-    "ingénierie civile", "ingénieur structure", "ingénieur en structure", "structure porteuse",
-    "ouvrage d'art", "ouvrages d'art", "pont", "passerelle", "mandataire ingénieur",
-    "Bauingenieur", "Tragwerk", "Kunstbaute"
+  "typesPublication": [
+    "tender",
+    "competition",
+    "study_contract",
+    "advance_notice"
   ],
-  "joursParDefaut": 3
+  "sousTypesRetenus": [
+    "service",
+    "project_competition",
+    "overall_performance_competition",
+    "project_study",
+    "overall_performance_study",
+    "idea_competition",
+    "idea_study"
+  ],
+  "cpvPrefixes": [
+    "7130",
+    "7131",
+    "7132",
+    "7134"
+  ],
+  "bkp": [
+    "292"
+  ],
+  "motsCles": [
+    "ingénieur civil",
+    "ingenieur civil",
+    "ingénieurs civils",
+    "génie civil",
+    "genie civil",
+    "ingénierie civile",
+    "ingénieur structure",
+    "ingénieur en structure",
+    "structure porteuse",
+    "ouvrage d'art",
+    "ouvrages d'art",
+    "pont",
+    "passerelle",
+    "mandataire ingénieur",
+    "Bauingenieur",
+    "Tragwerk",
+    "Kunstbaute"
+  ],
+  "joursParDefaut": 3,
+  "cpvFaibles": [
+    "71300000",
+    "71340000"
+  ],
+  "_cpvFaibles": "Codes trop généraux (ingénierie en tout genre) : ils ne suffisent pas seuls, il faut aussi un mot-clé ou un autre code."
 }

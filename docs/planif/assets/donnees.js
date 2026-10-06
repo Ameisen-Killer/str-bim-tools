@@ -1277,8 +1277,6 @@
        Publications d'appels d'offres retenues chaque matin par la tâche
        planifiée du dépôt (structure, génie civil ; GE, VD, VS). Le bureau les
        écarte ou en fait un appel d'offres (affaire en phase AO). */
-    /** La base a-t-elle les tables de la veille (migration-veille.sql) ? Toujours en mode local. */
-    veillePret: function () { return ADAPTATEUR.veilleEnBase ? ADAPTATEUR.veilleEnBase() : true; },
     suiviVeille: function (idAo) {
       var l = etat.veilleSuivi || [];
       for (var k = 0; k < l.length; k++) if (l[k].aoId === idAo) return l[k];
@@ -1301,7 +1299,6 @@
     },
     marqueVeille: function (idAo, etatVeille, idAffaire) {
       return Promise.resolve().then(function () {
-        if (!D.veillePret()) throw erreur("La veille attend la mise à jour de la base (migration-veille.sql).");
         var moi = D.monMembre(), s = D.suiviVeille(idAo);
         etat.veilleSuivi = etat.veilleSuivi || [];
         if (!etatVeille) {

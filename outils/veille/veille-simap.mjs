@@ -103,11 +103,15 @@ function motifsDe(det, resume) {
   const motifs = [];
   const cpv = [code(det.base && det.base.cpvCode), ...codes(det.procurement && det.procurement.additionalCpvCodes)].filter(Boolean);
   const bkp = codes(det.procurement && det.procurement.bkpCodes);
-  for (const c of cpv) if (C.cpvPrefixes.some(p => c.startsWith(p))) motifs.push("CPV " + c);
+  const faibles = C.cpvFaibles || [];
+  let fort = false;
+  for (const c of cpv) if (C.cpvPrefixes.some(p => c.startsWith(p))) { motifs.push("CPV " + c); if (!faibles.includes(c)) fort = true; }
   for (const b of bkp) if (C.bkp.some(p => b.startsWith(p))) motifs.push("CFC " + b);
   const corps = texte(resume.title) + " " + texte(det.procurement && det.procurement.orderDescription);
-  for (const m of C.motsCles) if (motEntier(m).test(corps)) motifs.push("« " + m + " »");
-  return { motifs: [...new Set(motifs)], cpv, bkp };
+  for (const m of C.motsCles) if (motEntier(m).test(corps)) { motifs.push("« " + m + " »"); fort = true; }
+  if (motifs.some(m => m.startsWith("CFC "))) fort = true;
+  // Un code CPV trop général (ingénierie en tout genre) ne suffit pas seul
+  return { motifs: fort ? [...new Set(motifs)] : [], cpv, bkp };
 }
 
 /* ------------------------------------------------------------ base */

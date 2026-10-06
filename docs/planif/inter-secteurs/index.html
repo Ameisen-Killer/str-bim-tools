@@ -108,13 +108,13 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=41"></script>
-<script src="/planif/assets/donnees.js?v=51"></script>
+<script src="/planif/assets/supabase.js?v=42"></script>
+<script src="/planif/assets/donnees.js?v=52"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=2"></script>
 <script src="/planif/assets/ui.js?v=68"></script>
 <script src="/planif/assets/palette.js?v=13"></script>
-<script src="/planif/assets/direct.js?v=7"></script>
+<script src="/planif/assets/direct.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -218,11 +218,8 @@
 
   function listeVeille() {
     var hote = UI.vide(document.getElementById("liste-veille"));
-    if (!D.veillePret()) {
-      hote.appendChild(el("p", { class: "vide", text: "La veille attend la mise à jour de la base (migration-veille.sql)." }));
-      return;
-    }
-    var l = D.veille({ etat: filtres.veille });
+    // « Nouvelles » : ni écartées ni retenues, et dont la remise n'est pas passée
+    var l = filtres.veille === "nouvelle" ? D.veilleNouvelles() : D.veille({ etat: filtres.veille });
     var lien = document.querySelector('.is-sommaire a[href="#veille"]');
     var n = D.veilleNouvelles().length;
     lien.textContent = "Veille simap.ch" + (n ? " (" + n + ")" : "");

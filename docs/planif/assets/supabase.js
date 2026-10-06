@@ -389,11 +389,6 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — veille simap.ch.
-     Tant que migration-veille.sql n'est pas passée, les tables veille_ao et
-     veille_suivi manquent : leur lecture échoue sans bloquer le reste, et on
-     n'y écrit rien. À RETIRER dès que Tony confirme la migration passée. */
-  var veilleEnBase = false;
 
   /** Publications de la veille des 90 derniers jours (la tâche planifiée les écrit). */
   function litVeille() {
@@ -498,14 +493,12 @@
       litTout("ao_agenda", "jour"),
       litTout("rendez_vous", "jour"),
       litTout("conges", "id"),
-      // Veille simap.ch : absente tant que la migration n'est pas passée
-      litVeille().catch(function () { return null; }),
-      litTout("veille_suivi", "id").catch(function () { return null; })
+      litVeille(),
+      litTout("veille_suivi", "id")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10] || [], veille = r[11], veilleSuivi = r[12];
-      veilleEnBase = veille !== null && veilleSuivi !== null;
+          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10] || [], veille = r[11] || [], veilleSuivi = r[12] || [];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -567,14 +560,14 @@
             observations: c.observations || ""
           };
         }),
-        veille: (veille || []).map(function (x) {
+        veille: veille.map(function (x) {
           return { id: x.id, publicationId: x.publication_id, titre: x.titre, description: x.description || "",
                    adjudicateur: x.adjudicateur || "", canton: x.canton || "", lieu: x.lieu || "",
                    procedure: x.procedure || "", typePublication: x.type_publication || "", sousType: x.sous_type || "",
                    cpv: x.cpv || [], bkp: x.bkp || [], publieLe: x.publie_le, delai: x.delai_remise,
                    lien: x.lien || "", motifs: x.motifs || [] };
         }),
-        veilleSuivi: (veilleSuivi || []).map(function (x) {
+        veilleSuivi: veilleSuivi.map(function (x) {
           return { id: x.id, aoId: x.ao_id, etat: x.etat, affaireId: x.affaire_id || null, par: x.par || null, le: x.le };
         }),
         conges: conges.map(function (x) {
@@ -707,7 +700,7 @@
     var dAgenda = compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda);
     var dRdv = compare(av.rdv || [], etat.rdv || [], VERS_BASE.rdv);
     var dConges = compare(av.conges || [], etat.conges || [], VERS_BASE.conges);
-    var dSuivi = veilleEnBase ? compare(av.veilleSuivi || [], etat.veilleSuivi || [], VERS_BASE.veilleSuivi) : { ajouts: [], modifs: [], retraits: [] };
+    var dSuivi = compare(av.veilleSuivi || [], etat.veilleSuivi || [], VERS_BASE.veilleSuivi);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -799,7 +792,6 @@
       videTout: videTout,
       profil: profil,
       regleJours: regleJours,
-      veilleEnBase: function () { return veilleEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }
