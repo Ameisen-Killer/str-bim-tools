@@ -1,4 +1,4 @@
-/* Module Inter-secteurs (version AB, 06.10.2026) — page /ab/inter-secteurs/.
+/* Module Inter-secteurs (06.10.2026) — page /planif/inter-secteurs/.
    Chargée après planif.css et habillage.css. */
 
 .is-sommaire{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
@@ -6,7 +6,7 @@
   text-decoration:none;font-size:14px;font-weight:500;color:var(--texte-doux);
   background:#fff;border-radius:20px;padding:6px 14px;box-shadow:0 1px 2px rgba(30,34,38,.06);
 }
-.is-sommaire a:hover{background:#EEF5DE;color:var(--texte)}
+.is-sommaire a:hover{background:var(--m-pale);color:var(--texte)}
 .is-chapeau{margin-top:4px;font-size:14px;color:var(--texte-faible);max-width:60em}
 .is-faible{color:var(--texte-faible)}
 
@@ -19,13 +19,13 @@
 .is-lien-affaire{text-decoration:none;color:var(--texte)}
 .is-lien-affaire:hover .is-nom{color:var(--or);text-decoration:underline;text-underline-offset:3px}
 .is-secteur{margin:0 4px 4px 0;background:#F0F1EE;border-color:transparent}
-.is-secteur.declare{background:#EEF5DE;color:var(--or);font-weight:600}
+.is-secteur.declare{background:var(--m-pale);color:var(--or);font-weight:600}
 .is-remise{white-space:nowrap}
 .is-remise.proche{color:#8A5A00;font-weight:600}
 .is-remise.depassee{color:var(--alerte);font-weight:600}
 .is-resultat{border-color:transparent}
 .is-resultat.en_cours{background:#EAF1F8;color:#2B5A8A}
-.is-resultat.gagne{background:#EEF5DE;color:var(--or)}
+.is-resultat.gagne{background:var(--m-pale);color:var(--or)}
 .is-resultat.perdu{background:#FBE4E2;color:var(--alerte)}
 .is-resultat.abandonne{background:#F0F1EE;color:var(--texte-faible)}
 
@@ -53,7 +53,7 @@
 .is-rdv-sous{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .is-genre{border-color:transparent;background:#F0F1EE}
 .is-genre.remise{background:#FBE4E2;color:var(--alerte)}
-.is-genre.visite,.is-genre.seance,.is-genre.presentation{background:#EEF5DE;color:var(--or)}
+.is-genre.visite,.is-genre.seance,.is-genre.presentation{background:var(--m-pale);color:var(--or)}
 .is-genre.questions,.is-genre.ouverture{background:#EAF1F8;color:#2B5A8A}
 
 .is-mini-agenda{list-style:none;margin:8px 0 0;padding:0;font-size:14px;display:flex;flex-direction:column;gap:4px}

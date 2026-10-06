@@ -259,9 +259,9 @@
   function pages() {
     var p = D.profil ? D.profil() : null;
     if (UI.versionAB) return PAGES.concat([
-      { nom: "Communication", href: "/ab/communication/", mots: "rendez-vous agenda absences conges vacances bureau aujourd'hui qui est la" },
-      { nom: "Secteurs", href: "/ab/secteurs/", mots: "disciplines secteur ressources projets charge equipe" },
-      { nom: "Inter-secteurs", href: "/ab/inter-secteurs/", mots: "appels d'offres ao offre soumission agenda transversal secteurs" }
+      { nom: "Communication", href: "/planif/communication/", mots: "rendez-vous agenda absences conges vacances bureau aujourd'hui qui est la" },
+      { nom: "Secteurs", href: "/planif/secteurs/", mots: "disciplines secteur ressources projets charge equipe" },
+      { nom: "Inter-secteurs", href: "/planif/inter-secteurs/", mots: "appels d'offres ao offre soumission agenda transversal secteurs" }
     ]);
     return PAGES.concat(p && p.multi && p.superAdmin ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : []);
   }

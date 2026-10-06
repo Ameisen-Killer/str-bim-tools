@@ -3,717 +3,312 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Accueil · Planification · STR Bim Tools</title>
+<title>Accueil · Planification</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%231F4E85'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23A9CCF2' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
-/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
-(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
+/* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
+   reprise du dernier passage de ce compte, avant le premier rendu ;
+   ui.js / portail.js la confirment ensuite. */
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
 </script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=77">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=1">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=4">
 </head>
-<body class="large">
+<body>
 
-<div data-chrome></div>
+<main class="ab-page">
+  <div id="entete"></div>
 
-<main>
-  <!-- La date en grand, puis le salut : l'accueil dit d'abord quel jour on est,
-       et à qui il parle. À droite, le logo du bureau qui tourne (AB) ou un globe filaire (masqués sous 1100 px). -->
-  <div class="wrap entete avec-decor ac-entete">
-    <div class="ac-date" id="ac-date">
-      <div class="ac-date-haut"><span id="ac-jour"></span><span class="ac-sep" aria-hidden="true">·</span><span id="ac-semaine"></span><span class="ac-sep" aria-hidden="true">·</span><span id="ac-heure" class="ac-heure"></span></div>
-      <div class="ac-date-grand" id="ac-grand"></div>
-    </div>
-    <h1 class="ac-salut" id="ac-salut" aria-live="polite"></h1>
-    <p class="chapeau ac-phrase" id="ac-phrase"></p>
-    <div class="ac-semaine-fil" id="ac-fil" aria-hidden="true"><i></i></div>
-    <div class="decor-place" aria-hidden="true"><canvas id="decor"></canvas></div>
-    <div class="filet-or" aria-hidden="true"></div>
-  </div>
+  <h1 class="ab-salut" id="salut">Bonjour</h1>
+  <p class="ab-sous-titre">Bienvenue sur votre espace de travail</p>
 
-  <div class="wrap" data-bandeau></div>
+  <!-- Les quatre entrées vers les modules. -->
+  <nav class="ab-modules" aria-label="Modules">
+    <a class="ab-module ab-monte" style="--r:0" href="/planif/communication/" id="module-comm">
+      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <path class="ic-v" d="M12 9h27a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H21l-7 7v-7h-2a5 5 0 0 1-5-5V14a5 5 0 0 1 5-5z"/>
+        <path class="ic-f ic-blanc" d="M28 23h24a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5h-2v7.5L42.5 46H28a5 5 0 0 1-5-5V28a5 5 0 0 1 5-5z"/>
+      </svg>
+      <h2>Communication</h2>
+      <p>Rendez-vous, absences, congés et vision d'ensemble du bureau</p>
+      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
+    </a>
+    <a class="ab-module ab-monte" style="--r:1" href="/planif/taches/">
+      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect class="ic-v" x="8" y="8" width="48" height="48" rx="4"/>
+        <rect class="ic-f" x="15" y="16" width="11" height="11" rx="1.5"/>
+        <rect class="ic-f" x="15" y="36" width="11" height="11" rx="1.5"/>
+        <path class="ic-v" d="m17.5 21.5 3 3 5-6M17.5 41.5l3 3 5-6"/>
+        <path class="ic-f" d="M32 19h17M32 39h17"/>
+        <path class="ic-v" d="M32 25h11M32 45h11"/>
+      </svg>
+      <h2>Saisie des tâches</h2>
+      <p>Vos tâches, échéances et avancement</p>
+      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
+    </a>
+    <a class="ab-module ab-monte" style="--r:2" href="/planif/secteurs/">
+      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <path class="ic-f" d="M13 52V38a3 3 0 0 1 6 0v14M26 52V28a3 3 0 0 1 6 0v24"/>
+        <rect class="ic-plein" x="39" y="8" width="9" height="44"/>
+        <path class="ic-sol" d="M9 57.5h46"/>
+      </svg>
+      <h2>Secteurs</h2>
+      <p>Vision globale par secteur (projets et ressources)</p>
+      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
+    </a>
+    <a class="ab-module ab-monte" style="--r:3" href="/planif/inter-secteurs/">
+      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <path class="ic-f" d="M17 6h21l12 12v37a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z"/>
+        <path class="ic-f" d="M38 6v12h12"/>
+        <rect class="ic-v" x="21" y="18" width="9" height="7" rx="1"/>
+        <path class="ic-f" d="M21 33h22M21 40h22M21 47h22"/>
+      </svg>
+      <h2>Inter-secteurs</h2>
+      <p>Appels d'offres, agenda et informations transversales</p>
+      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
+    </a>
+  </nav>
 
-  <div class="wrap">
-    <section class="section ac-cles-section">
-      <div class="cles" id="ac-cles"></div>
+  <div class="ab-encadres">
+    <section class="ab-encadre ab-monte" style="--r:4" aria-labelledby="t-prio">
+      <div class="ab-encadre-tete">
+        <h3 id="t-prio">Mes tâches prioritaires</h3>
+        <a class="ab-voir" id="voir-prio" href="/planif/taches/">Voir tout</a>
+      </div>
+      <div id="prio"></div>
     </section>
 
-    <div class="ac-grille">
-      <div class="ac-col">
-        <section class="section ac-bloc">
-          <div class="tete-section">
-            <div>
-              <div class="num-section">01 — Mes tâches</div>
-              <h2>À venir</h2>
-            </div>
-            <a class="btn" id="ac-toutes" href="/planif/taches/">Toutes mes tâches</a>
-          </div>
-          <div id="ac-taches"></div>
-        </section>
-
-        <section class="section ac-bloc">
-          <div class="tete-section">
-            <div>
-              <div class="num-section">02 — Au bureau</div>
-              <h2 id="ac-titre-bureau">Aujourd'hui</h2>
-            </div>
-          </div>
-          <div id="ac-bureau"></div>
-        </section>
+    <section class="ab-encadre ab-monte" style="--r:5" aria-labelledby="t-abs">
+      <div class="ab-encadre-tete">
+        <h3 id="t-abs">Absences de l'équipe <small id="abs-quand">(semaine prochaine)</small></h3>
+        <a class="ab-voir" href="/planif/absences/">Voir tout</a>
       </div>
+      <div id="abs"></div>
+    </section>
 
-      <div class="ac-col">
-        <section class="section ac-bloc ac-prevenir" id="prevenir">
-          <div class="tete-section">
-            <div>
-              <div class="num-section">03 — Prévenir le bureau</div>
-              <h2>Je m'absente</h2>
-            </div>
-          </div>
-          <div id="ac-form"></div>
-        </section>
-
-        <section class="section ac-bloc">
-          <div class="tete-section">
-            <div>
-              <div class="num-section">04 — Mes absences</div>
-              <h2>À venir</h2>
-            </div>
-            <button class="btn" type="button" id="ac-poser"><span class="ico-txt ico-absence" aria-hidden="true"></span>Poser une absence</button>
-          </div>
-          <div id="ac-absences"></div>
-        </section>
+    <section class="ab-encadre ab-monte" style="--r:6" aria-labelledby="t-aff">
+      <div class="ab-encadre-tete">
+        <h3 id="t-aff">Tâches à affecter</h3>
+        <a class="ab-voir" href="/planif/taches/?membre=a-affecter">Voir tout</a>
       </div>
-    </div>
+      <div id="aff"></div>
+    </section>
   </div>
-</main>
 
-<div data-pied></div>
+  <p class="ab-pied" id="pied"></p>
+</main>
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=38"></script>
-<script src="/planif/assets/donnees.js?v=47"></script>
+<script src="/planif/assets/supabase.js?v=39"></script>
+<script src="/planif/assets/donnees.js?v=49"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=67"></script>
-<script src="/planif/assets/palette.js?v=12"></script>
-<script src="/planif/assets/direct.js?v=6"></script>
-<script src="/planif/assets/globe.js?v=1"></script>
-<script src="/planif/assets/logo-ab.js?v=4"></script>
+<script src="/planif/assets/version.js?v=2"></script>
+<script src="/planif/assets/portail.js?v=6"></script>
 <script>
 (function () {
   "use strict";
-  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = Portail.el;
 
-  var JOURS_LONGS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-  var JOURS_ABR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-  var MAX_TACHES = 8;
-  var MOTIFS = ["Rendez-vous médical", "Chantier", "Séance à l'extérieur", "Formation",
-                "Rendez-vous personnel", "Arrivée plus tard", "Départ plus tôt", "Télétravail"];
+  var LIGNES = 6;                                 // lignes par encadré, avant « Et N de plus »
+  var JOURS_ABR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
 
-  function deux(n) { return (n < 10 ? "0" : "") + n; }
-  function majuscule(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
-  function auj() { return C.isoAuj(); }
-  function maintenant() { var d = new Date(); return C.iso(d) + "T" + deux(d.getHours()) + ":" + deux(d.getMinutes()); }
-
-  if (!UI.session()) return;
-
-  // La date se pose avant même les données : c'est la première chose qu'on voit
-  poseDate();
-  setInterval(poseDate, 15000);
+  if (!Portail.session()) return;
 
   D.pret().then(function () {
-    UI.chrome("accueil", [{
-      label: "Prévenir le bureau", or: true, icone: "ico-absence",
-      action: function () { versFormulaire(true); }
-    }]);
-    UI.pied();
-    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
-    document.querySelector(".entete").classList.add("vu");
-
-    salut();
-    decorDuBureau();
-    construitFormulaire();
-    document.getElementById("ac-poser").addEventListener("click", function () {
-      var moi = D.monMembre();
-      UI.nouvelleAbsence({ membreId: moi && moi.id, surChangement: dessine });
-    });
-
-    D.surRechargement(dessine);
+    var id = Portail.entete(document.getElementById("entete"));
+    salut(id);
+    Portail.surRetour(dessine);
     dessine();
-    // Un avis qui se termine quitte la liste sans attendre une modification
-    setInterval(function () {
-      if (!document.hidden && !document.querySelector(".modale.ouverte")) dessine();
-    }, 5 * 60000);
+  }).catch(Portail.echec);
 
-    if (location.hash === "#prevenir") versFormulaire(true);
-    window.addEventListener("hashchange", function () { if (location.hash === "#prevenir") versFormulaire(true); });
-  }).catch(UI.echec);
+  function auj() { return C.isoAuj(); }
+  function deux(n) { return (n < 10 ? "0" : "") + n; }
+  /** « 06.10 » */
+  function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + "." + deux(d.getMonth() + 1) : "—"; }
 
-  /* ================================================================ en-tête */
-
-  /* Le décor de l'en-tête : le logo du bureau en volume pour AB Ingénieurs —
-     seulement connecté à ce bureau, jamais en démonstration —, le globe
-     filaire pour tous les autres. */
-  function decorDuBureau() {
-    var cv = document.getElementById("decor");
-    var p = D.profil(), nom = p && p.bureau ? UI.foin([p.bureau.nom]) : "";
-    var demo = D.estDemo() || /^demo@/i.test((p && p.email) || "");
-    if (UI.avecBase && p && p.multi && !demo && /\bab\b.*ingenieur/.test(nom)) window.Decor.logoAB(cv);
-    else window.Decor.globe(cv);
+  /* « Bonjour » puis prénom et nom, en vert. */
+  function salut(id) {
+    var h = Portail.vide(document.getElementById("salut"));
+    var nom = [id.prenom, id.nom].filter(Boolean).join(" ");
+    h.appendChild(document.createTextNode("Bonjour" + (nom ? " " : "")));
+    if (nom) h.appendChild(el("span", { class: "ab-nom", text: nom }));
   }
 
-  function poseDate() {
-    var d = new Date(), iso = auj();
-    var sem = C.semaineISO(iso).num;
-    document.getElementById("ac-jour").textContent = majuscule(JOURS_LONGS[d.getDay()]);
-    document.getElementById("ac-semaine").textContent = "Semaine " + sem;
-    document.getElementById("ac-heure").textContent = deux(d.getHours()) + ":" + deux(d.getMinutes());
-    var grand = document.getElementById("ac-grand");
-    var texte = d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear();
-    if (grand.getAttribute("data-texte") !== texte) {
-      grand.setAttribute("data-texte", texte);
-      UI.vide(grand);
-      grand.appendChild(el("span", { class: "ac-num", text: String(d.getDate()) }));
-      grand.appendChild(el("span", { class: "ac-mois", text: " " + C.MOIS[d.getMonth()] + " " + d.getFullYear() }));
-    }
-    // Avancement de la semaine de travail : lundi 8 h → vendredi 17 h 30
-    var lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay() + 6) % 7)); lundi.setHours(8, 0, 0, 0);
-    var fin = new Date(lundi); fin.setDate(lundi.getDate() + 4); fin.setHours(17, 30, 0, 0);
-    var part = Math.max(0, Math.min(1, (d - lundi) / (fin - lundi)));
-    var fil = document.getElementById("ac-fil");
-    fil.firstChild.style.width = (part * 100).toFixed(1) + "%";
-    fil.title = "Semaine de travail faite à " + Math.round(part * 100) + " %";
-    if (D.etat()) phrase();
-  }
-
-  /** Le prénom de la personne connectée : sa fiche, sinon son adresse. */
-  function prenom() {
+  function dessine() {
     var moi = D.monMembre();
-    if (moi && moi.prenom) return moi.prenom;
-    var p = D.profil(), mail = (p && p.email) || (UI.avecBase && window.Sb ? window.Sb.email() : "");
-    var local = (mail || "").split("@")[0].split(/[._-]/)[0];
-    return local && local !== "demo" ? majuscule(local.toLowerCase()) : "";
+    badgeConges();
+    prioritaires(moi);
+    absences(moi);
+    aAffecter();
   }
 
-  /* « Salut Tony » : les lettres montent une à une, le prénom en or, souligné
-     d'un trait qui se dessine. */
-  function salut() {
-    var h = UI.vide(document.getElementById("ac-salut"));
-    var nom = prenom(), rang = 0;
-    function lettres(texte, classe) {
-      var s = el("span", { class: classe || null });
-      texte.split("").forEach(function (c) {
-        s.appendChild(el("span", { class: "l", style: "--i:" + (rang++), text: c === " " ? "\u00a0" : c }));
-      });
-      return s;
-    }
-    h.setAttribute("aria-label", "Salut" + (nom ? " " + nom : ""));
-    h.appendChild(lettres("Salut" + (nom ? " " : "")));
-    if (nom) {
-      var n = lettres(nom, "ac-nom");
-      n.setAttribute("aria-hidden", "true");
-      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("viewBox", "0 0 200 14");
-      svg.setAttribute("preserveAspectRatio", "none");
-      svg.setAttribute("class", "ac-trait");
-      svg.setAttribute("aria-hidden", "true");
-      var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      p.setAttribute("d", "M2 9 C 40 3, 80 12, 120 7 S 180 4, 198 8");
-      p.setAttribute("pathLength", "1");
-      p.style.animationDelay = (rang * 45 + 150) + "ms";
-      svg.appendChild(p);
-      n.appendChild(svg);
-      h.appendChild(n);
-    }
-    [].forEach.call(h.querySelectorAll(".l"), function (l) { l.setAttribute("aria-hidden", "true"); });
+  /* Sur la carte Communication : les demandes de congé qui attendent ma décision */
+  function badgeConges() {
+    var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge");
+    if (ancien) ancien.remove();
+    var n = D.congesPret ? D.congesAValider().length : 0;
+    if (!n) return;
+    carte.appendChild(el("span", { class: "ab-badge", text: n + (n > 1 ? " congés à valider" : " congé à valider") }));
   }
 
-  /* La phrase d'accueil : le moment de la journée, puis ce qui attend. */
-  function phrase() {
-    var d = new Date(), h = d.getHours() + d.getMinutes() / 60, j = d.getDay();
-    var ferie = C.ferie(auj(), D.canton());
-    var debut;
-    if (ferie) debut = "C'est férié aujourd'hui (" + ferie + ")";
-    else if (j === 0 || j === 6) debut = "Bon week-end — tu passes quand même faire un tour";
-    else if (h < 6) debut = "Tu commences tôt";
-    else if (h < 11.5) debut = j === 1 ? "Bonne semaine, et bonne matinée" : "Bonne matinée";
-    else if (h < 13.75) debut = "Bon appétit";
-    else if (h < 18.5) debut = j === 5 ? "Bon après-midi — le week-end approche" : "Bon après-midi";
-    else debut = "Bonne soirée — pense à souffler";
-
-    var moi = D.monMembre(), suite = "";
-    if (moi) {
-      var l = mesTaches(moi), retard = l.filter(function (x) { return x.t.echeance < auj(); }).length;
-      if (!l.length) suite = "Aucune tâche ouverte à ton nom.";
-      else {
-        var p = l.filter(function (x) { return x.t.echeance >= auj(); })[0];
-        suite = l.length + (l.length > 1 ? " tâches t'attendent" : " tâche t'attend") +
-          (retard ? ", dont " + retard + " en retard." : p ? ", la prochaine " + relatif(p.t.echeance, true) + "." : ".");
-      }
-    }
-    var n = document.getElementById("ac-phrase");
-    var txt = debut + ". " + suite;
-    if (n.textContent !== txt) n.textContent = txt;
+  /** Plus importante d'abord : échéance, puis priorité (1 avant 5), puis libellé. */
+  function parUrgence(a, b) {
+    var ea = a.echeance || "9999", eb = b.echeance || "9999";
+    if (ea !== eb) return ea < eb ? -1 : 1;
+    if ((a.priorite || 5) !== (b.priorite || 5)) return (a.priorite || 5) - (b.priorite || 5);
+    return a.titre.localeCompare(b.titre, "fr");
   }
 
-  /* ================================================================ calculs */
+  /** « Fairmont – Validation plans noyau D » */
+  function libelle(t) {
+    var af = D.affaire(t.affaireId);
+    return (af ? (af.nom || af.code) + " – " : "") + t.titre;
+  }
 
-  /** Mes parts ouvertes : [{ t, roles:[…], charge }], par échéance. */
-  function mesTaches(moi) {
-    if (!moi) return [];
-    return D.taches({ membreId: moi.id, sansTerminees: true }).map(function (t) {
-      var roles = ["ingenieur", "dessinateur"].filter(function (r) {
+  /** Point de couleur : rouge à échéance (ou passée), orange dans la semaine, gris au-delà. */
+  function urgence(iso) {
+    var n = C.diff(auj(), iso);
+    return n <= 0 ? "rouge" : n < 7 ? "orange" : "";
+  }
+
+  /** « Aujourd'hui », « Demain », « Ven. 09.10 » dans la semaine, « 12.10 » au-delà, « Retard · 30.09 ». */
+  function quand(iso) {
+    var n = C.diff(auj(), iso);
+    if (n < 0) return "Retard · " + jj(iso);
+    if (n === 0) return "Aujourd'hui";
+    if (n === 1) return "Demain";
+    if (n < 7) return JOURS_ABR[C.dt(iso).getDay()] + " " + jj(iso);
+    return jj(iso);
+  }
+
+  function liste(hote, lignes, total, plus) {
+    var ul = el("ul", { class: "ab-liste" });
+    lignes.forEach(function (li) { ul.appendChild(el("li", {}, [li])); });
+    hote.appendChild(ul);
+    if (total > lignes.length) {
+      hote.appendChild(el("a", { class: "ab-plus", href: plus, text: "Et " + (total - lignes.length) + " de plus →" }));
+    }
+  }
+
+  function videMessage(hote, texte) { hote.appendChild(el("p", { class: "ab-vide", text: texte })); }
+
+  /* ----------------------------------------------- mes tâches prioritaires
+     Mes parts encore ouvertes (calcul si j'en suis l'ingénieur, dessin si
+     j'en suis le dessinateur), la plus urgente d'abord. */
+  function prioritaires(moi) {
+    var hote = Portail.vide(document.getElementById("prio"));
+    if (!moi) { videMessage(hote, "Aucune fiche d'équipe n'est rattachée à votre adresse."); return; }
+    document.getElementById("voir-prio").href = "/planif/taches/?membre=" + encodeURIComponent(moi.id);
+    var miennes = D.taches({ membreId: moi.id, sansTerminees: true }).filter(function (t) {
+      return t.echeance && ["ingenieur", "dessinateur"].some(function (r) {
         var P = D.PARTS[r];
         return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
       });
-      var charge = roles.reduce(function (s, r) { return s + t[D.PARTS[r].charge]; }, 0);
-      return { t: t, roles: roles, charge: charge };
-    }).filter(function (x) { return x.roles.length && x.t.echeance; });
-  }
-
-  /** « aujourd'hui », « demain », « mardi », « dans 12 j », « il y a 3 j ». */
-  function relatif(iso, pour) {
-    var n = C.diff(auj(), iso);
-    if (n === 0) return pour ? "pour aujourd'hui" : "aujourd'hui";
-    if (n === 1) return pour ? "pour demain" : "demain";
-    if (n === -1) return "hier";
-    if (n < 0) return "il y a " + (-n) + " j";
-    if (n < 7) return (pour ? "pour " : "") + JOURS_LONGS[C.dt(iso).getDay()];
-    return "dans " + n + " j";
-  }
-
-  function jourCourt(iso) {
-    var d = C.dt(iso);
-    return d ? JOURS_ABR[d.getDay()] + " " + C.fmtCourt(iso) : "—";
-  }
-
-  /** Période d'un avis : « ven. 2 oct. · 14:00 – 16:30 », ou sur plusieurs jours. */
-  function periodeAvis(a) {
-    var j1 = a.debut.slice(0, 10), j2 = a.fin.slice(0, 10), h1 = a.debut.slice(11), h2 = a.fin.slice(11);
-    if (j1 === j2) return jourAvis(j1) + " · " + h1 + " – " + h2;
-    return jourAvis(j1) + " " + h1 + " → " + jourAvis(j2) + " " + h2;
-  }
-  function jourAvis(iso) {
-    var n = C.diff(auj(), iso);
-    return n === 0 ? "aujourd'hui" : n === 1 ? "demain" : jourCourt(iso);
-  }
-  function enCours(a) { var t = maintenant(); return a.debut <= t && t < a.fin; }
-
-  /* ================================================================ rendu */
-
-  function dessine() {
-    phrase();
-    var moi = D.monMembre();
-    cles(moi);
-    taches(moi);
-    bureau(moi);
-    absences(moi);
-  }
-
-  function cles(moi) {
-    var hote = UI.vide(document.getElementById("ac-cles"));
-    var l = mesTaches(moi), a = auj();
-    function cle(v, lib, classe, titre) {
-      hote.appendChild(el("div", { class: "cle" + (classe ? " " + classe : ""), title: titre || null }, [
-        el("div", { class: "v", text: v }), el("div", { class: "l", text: lib })
-      ]));
-    }
-    if (moi) {
-      cle(String(l.length), l.length > 1 ? "Tâches ouvertes" : "Tâche ouverte");
-      var retard = l.filter(function (x) { return x.t.echeance < a; }).length;
-      if (retard) cle(String(retard), "En retard", "alerte");
-      else {
-        var p = l[0];
-        cle(p ? relatif(p.t.echeance) : "—", "Prochaine échéance", p && C.diff(a, p.t.echeance) <= 1 ? "or" : "");
-      }
-      if (D.PLANIFIES[moi.metier]) {
-        var jours = C.serie(C.lundi(a), 7);
-        var rep = Calc.repartition(D.taches({ sansTerminees: true }), D.membres({ tous: true }), D.canton());
-        var b = Calc.bilan(moi, jours, rep[moi.id], D.canton());
-        cle(C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j", "Ma charge cette semaine",
-            b.charge > b.capacite + 0.05 ? "alerte" : "", "Jours de travail planifiés cette semaine, sur ta capacité");
-      }
-    }
-    var manque = quiManque(), entiers = manque.filter(function (x) { return x.genre !== "demi" && x.genre !== "avis"; }).length;
-    if (!manque.length) cle("Au complet", "L'équipe aujourd'hui");
-    else cle(String(manque.length), entiers === manque.length
-      ? (manque.length > 1 ? "Absents aujourd'hui" : "Absent aujourd'hui")
-      : "Absents ou en partie", "", manque.map(function (x) {
-        return x.membre.prenom + " " + x.membre.nom + " : " + GENRES[x.genre].toLowerCase();
-      }).join("\n"));
-    var f = prochainFerie();
-    if (f) cle(relatif(f.iso), f.nom, "", "Prochain jour férié : " + jourCourt(f.iso));
-  }
-
-  function prochainFerie() {
-    var a = auj(), an = C.dt(a).getFullYear(), out = null;
-    [an, an + 1].some(function (y) {
-      var f = C.feries(y, D.canton());
-      Object.keys(f).sort().some(function (iso) {
-        if (iso > a && !C.estWeekend(iso)) { out = { iso: iso, nom: f[iso] }; return true; }
-        return false;
-      });
-      return !!out;
-    });
-    return out;
-  }
-
-  /* --------------------------------------------------------------- tâches */
-  function taches(moi) {
-    var hote = UI.vide(document.getElementById("ac-taches"));
-    var toutes = document.getElementById("ac-toutes");
-    if (!moi) {
-      toutes.hidden = true;
-      hote.appendChild(el("div", { class: "vide ac-vide", text: "Aucune fiche d'équipe n'est rattachée à ton adresse" }));
-      return;
-    }
-    toutes.hidden = false;
-    toutes.href = "/planif/taches/?membre=" + encodeURIComponent(moi.id);
-    var l = mesTaches(moi);
-    if (!l.length) {
-      hote.appendChild(el("div", { class: "vide ac-vide", text: "Rien sur ta pile — profites-en" }));
-      return;
-    }
-    var a = auj(), lundiProchain = C.ajoute(C.lundi(a), 7), lundiApres = C.ajoute(C.lundi(a), 14);
-    var groupes = [
-      { titre: "En retard", classe: "retard", test: function (e) { return e < a; } },
-      { titre: "Cette semaine", test: function (e) { return e >= a && e < lundiProchain; } },
-      { titre: "La semaine prochaine", test: function (e) { return e >= lundiProchain && e < lundiApres; } },
-      { titre: "Plus tard", test: function (e) { return e >= lundiApres; } }
-    ];
-    var montrees = 0;
-    groupes.forEach(function (g) {
-      var dans = l.filter(function (x) { return g.test(x.t.echeance); });
-      if (!dans.length || montrees >= MAX_TACHES) return;
-      dans = dans.slice(0, MAX_TACHES - montrees);
-      montrees += dans.length;
-      hote.appendChild(el("div", { class: "ac-groupe" + (g.classe ? " " + g.classe : "") }, [g.titre]));
-      var liste = el("ul", { class: "ac-liste" });
-      dans.forEach(function (x) { liste.appendChild(ligneTache(x)); });
-      hote.appendChild(liste);
-    });
-    if (l.length > montrees) {
-      hote.appendChild(el("a", { class: "ac-plus", href: toutes.href, text: "Et " + (l.length - montrees) + " de plus →" }));
-    }
-  }
-
-  function ligneTache(x) {
-    var t = x.t, af = D.affaire(t.affaireId), retard = t.echeance < auj();
-    var parts = x.roles.map(function (r) { return D.PARTS[r].label + " " + C.fmtJours(t[D.PARTS[r].charge]) + " j"; }).join(" · ");
-    return el("li", {}, [el("button", {
-      type: "button", class: "ac-ligne", dataset: { anim: "t|" + t.id },
-      onclick: function () { UI.ficheTache(t.id, { surEnregistrement: dessine }); },
-      "aria-label": t.titre + ", échéance " + C.fmtLong(t.echeance)
-    }, [
-      el("span", { class: "pastille", style: "color:" + UI.teinte(af ? af.teinte : 1), "aria-hidden": "true" }),
-      el("span", { class: "ac-lib" }, [
-        el("span", { class: "ac-titre", text: t.titre }),
-        el("span", { class: "ac-sous", text: (af ? af.code + " · " : "") + parts })
-      ]),
-      el("span", { class: "ac-quand" + (retard ? " retard" : "") }, [
-        el("span", { class: "ac-rel", text: relatif(t.echeance) }),
-        el("span", { class: "ac-jourc", text: jourCourt(t.echeance) })
-      ])
-    ])]);
-  }
-
-  /* --------------------------------------------------------------- bureau */
-  /* Qui n'est pas au bureau aujourd'hui, ou pas toute la journée : un avis à
-     l'heure près, une absence du calendrier, un jour non travaillé ou une
-     demi-journée (semaine type des temps partiels). Une personne une fois,
-     par ordre de précision : l'avis l'emporte sur l'absence, l'absence sur la
-     semaine type. [{ membre, genre, detail, avis? }] */
-  var GENRES = { avis: "Avis", absence: "Absence", off: "Jour off", demi: "½ journée" };
-  function quiManque() {
-    var a = auj(), vus = {}, out = [];
-    function ajoute(m, genre, detail, avis) {
-      if (!m || vus[m.id]) return;
-      vus[m.id] = true;
-      out.push({ membre: m, genre: genre, detail: detail, avis: avis || null });
-    }
-    D.avis({ jusqu: a }).forEach(function (x) { ajoute(D.membre(x.membreId), "avis", periodeAvis(x), x); });
-    D.absences({ depuis: a, jusqu: a }).forEach(function (x) {
-      ajoute(x.membre, "absence", (x.absence.motif || "Absence") +
-        (x.absence.fin > a ? " · jusqu'au " + jourCourt(x.absence.fin) : " · toute la journée"));
-    });
-    if (C.estOuvre(a, D.canton())) {
-      var jour = JOURS_LONGS[C.dt(a).getDay()];
-      D.membres({}).forEach(function (m) {
-        var p = Calc.poidsJour(m, a);
-        if (p === 0) ajoute(m, "off", "Ne travaille pas le " + jour);
-        else if (p > 0 && p < 1) ajoute(m, "demi", "Demi-journée le " + jour);
-      });
-    }
-    return out;
-  }
-
-  function bureau(moi) {
-    var hote = UI.vide(document.getElementById("ac-bureau"));
-    var a = auj(), dansSemaine = C.ajoute(a, 7);
-    var manque = quiManque();
-    var avisApres = D.avis({ jusqu: dansSemaine }).filter(function (x) { return x.debut.slice(0, 10) > a; });
-
-    if (!manque.length) {
-      hote.appendChild(el("p", { class: "ac-tous-la" }, [
-        el("span", { class: "puce", "aria-hidden": "true" }), "Toute l'équipe est là aujourd'hui."
-      ]));
-    } else {
-      var l = el("ul", { class: "ac-liste ac-gens" });
-      manque.forEach(function (x) {
-        if (x.avis) { l.appendChild(ligneAvis(x.avis, true)); return; }
-        l.appendChild(el("li", { class: "ac-personne" + (x.genre === "absence" ? "" : " eteinte") }, [
-          initiales(x.membre),
-          el("span", { class: "ac-lib" }, [
-            el("span", { class: "ac-titre", text: x.membre.prenom + " " + x.membre.nom }),
-            el("span", { class: "ac-sous", text: x.detail })
-          ]),
-          el("span", { class: "etiq", text: GENRES[x.genre] })
-        ]));
-      });
-      hote.appendChild(l);
-    }
-
-    if (avisApres.length) {
-      hote.appendChild(el("div", { class: "ac-groupe" }, ["Avis pour les prochains jours"]));
-      var l2 = el("ul", { class: "ac-liste ac-gens" });
-      avisApres.forEach(function (x) { l2.appendChild(ligneAvis(x, false)); });
-      hote.appendChild(l2);
-    }
-  }
-
-  function initiales(m) {
-    return el("span", { class: "ac-init", "aria-hidden": "true", text: (m.prenom.charAt(0) + m.nom.charAt(0)).toUpperCase() });
-  }
-
-  function ligneAvis(x, aujourdhui) {
-    var m = D.membre(x.membreId), moi = D.monMembre();
-    var soi = moi && moi.id === x.membreId;
-    return el("li", { class: "ac-personne" + (enCours(x) ? " en-cours" : "") }, [
-      initiales(m),
-      el("span", { class: "ac-lib" }, [
-        el("span", { class: "ac-titre", text: (soi ? "Toi" : m.prenom + " " + m.nom) + " — " + x.motif }),
-        el("span", { class: "ac-sous", text: periodeAvis(x) })
-      ]),
-      enCours(x) ? el("span", { class: "etiq ac-etiq-or", text: "En ce moment" })
-        : el("span", { class: "etiq", text: aujourdhui ? "Aujourd'hui" : "Prévu" }),
-      D.peutAbsences(x.membreId) ? UI.boutonIcone("supprimer", "Retirer l'avis", x.motif, function () { retireAvis(x); }) : null
-    ]);
-  }
-
-  function retireAvis(x) {
-    UI.confirme("Retirer cet avis ?", "Le bureau ne le verra plus : " + x.motif + ", " + periodeAvis(x) + ".", "Retirer", true)
-      .then(function (ok) {
-        if (!ok) return;
-        D.suppAvis(x.id).then(function () { UI.toast("Avis retiré."); dessine(); }).catch(function (e) { UI.toast(e.message); });
-      });
-  }
-
-  /* ------------------------------------------------------------ absences */
-  function absences(moi) {
-    var hote = UI.vide(document.getElementById("ac-absences"));
-    document.getElementById("ac-poser").hidden = !moi;
-    if (!moi) {
-      hote.appendChild(el("div", { class: "vide ac-vide", text: "Aucune fiche d'équipe n'est rattachée à ton adresse" }));
-      return;
-    }
-    var a = auj();
-    var periodes = moi.absences.filter(function (x) { return (x.fin || x.debut) >= a; });
-    var mesAvis = D.avis({ membreId: moi.id });
-    if (!periodes.length && !mesAvis.length) {
-      hote.appendChild(el("div", { class: "vide ac-vide", text: "Aucune absence prévue" }));
-      return;
-    }
-    var l = el("ul", { class: "ac-liste" });
-    periodes.forEach(function (x) {
-      var n = Calc.joursTravaillesEntre(moi, x.debut, x.fin, D.canton());
-      var encours = x.debut <= a;
-      var une = x.debut === x.fin;
-      l.appendChild(el("li", {}, [el("button", {
-        type: "button", class: "ac-ligne ac-abs", onclick: function () { UI.absences(moi.id, dessine); }
+    }).sort(parUrgence);
+    if (!miennes.length) { videMessage(hote, "Aucune tâche ouverte à votre nom."); return; }
+    liste(hote, miennes.slice(0, LIGNES).map(function (t) {
+      var u = urgence(t.echeance), q = quand(t.echeance);
+      var parts = ["ingenieur", "dessinateur"].filter(function (r) {
+        var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
+      }).map(function (r) { return D.PARTS[r].label + " " + C.fmtJours(t[D.PARTS[r].charge]) + " j"; }).join(" · ");
+      return el("a", {
+        class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
+        title: libelle(t) + "\n" + parts + " · échéance " + C.fmtLong(t.echeance) +
+               (t.priorite < 5 ? " · priorité " + t.priorite : "")
       }, [
-        el("span", { class: "ac-cal", "aria-hidden": "true" }, [
-          el("b", { text: String(C.dt(x.debut).getDate()) }),
-          el("span", { text: C.fmtCourt(x.debut).split(" ")[1] || "" })
-        ]),
-        el("span", { class: "ac-lib" }, [
-          el("span", { class: "ac-titre", text: x.motif || "Absence" }),
-          el("span", { class: "ac-sous", text: une ? jourCourt(x.debut) : jourCourt(x.debut) + " → " + jourCourt(x.fin) })
-        ]),
-        el("span", { class: "ac-quand" + (encours ? " or" : "") }, [
-          el("span", { class: "ac-rel", text: encours ? "en cours" : relatif(x.debut) }),
-          el("span", { class: "ac-jourc", text: C.fmtJours(n) + (n > 1 ? " jours" : " jour") })
+        el("span", { class: "ab-point " + u, "aria-hidden": "true" }),
+        el("span", { class: "ab-lib", text: libelle(t) }),
+        el("span", { class: "ab-quand" + (u === "rouge" ? " rouge" : "") }, [
+          t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
+          q
         ])
-      ])]));
+      ]);
+    }), miennes.length, document.getElementById("voir-prio").href);
+  }
+
+  /* ----------------------------------------------- absences de l'équipe
+     La semaine prochaine, du lundi au vendredi. L'équipe, c'est le secteur
+     (discipline) de la personne connectée quand elle en a un, sinon tout le
+     bureau. Seuls les absents y figurent (demande de Tony, 06.10.2026) :
+     rouge, absent toute la semaine ; orange, une partie. Seuls comptent les
+     jours que la personne aurait travaillés. */
+  function absences(moi) {
+    var hote = Portail.vide(document.getElementById("abs"));
+    var lundi = C.ajoute(C.lundi(auj()), 7), vendredi = C.ajoute(lundi, 4), canton = D.canton();
+    var secteur = moi && moi.discipline ? moi.discipline : "";
+    var gens = D.membres({}).filter(function (m) { return !secteur || m.discipline === secteur; });
+    document.getElementById("abs-quand").textContent = "(semaine prochaine" +
+      (secteur && D.DISCIPLINES[secteur] ? " · " + D.DISCIPLINES[secteur] : "") + ")";
+    document.getElementById("abs-quand").title = "Semaine " + C.semaineISO(lundi).num + ", du " + C.fmtLong(lundi) + " au " + C.fmtLong(vendredi);
+
+    var lignes = gens.map(function (m) {
+      var dus = Calc.joursTravaillesEntre(m, lundi, vendredi, canton);
+      var periodes = (m.absences || []).filter(function (a) { return a.debut <= vendredi && (a.fin || a.debut) >= lundi; });
+      var manque = periodes.reduce(function (s, a) {
+        var de = a.debut < lundi ? lundi : a.debut, a2 = (a.fin || a.debut) > vendredi ? vendredi : (a.fin || a.debut);
+        return s + Calc.joursTravaillesEntre(m, de, a2, canton);
+      }, 0);
+      // Rouge : absent tous les jours qu'il aurait travaillés ; orange : une partie
+      return { m: m, etat: manque >= dus - 0.01 ? "rouge" : "orange", periodes: periodes, dus: dus, manque: manque };
+    }).filter(function (x) {
+      // Seuls les absents : une absence qui ne tombe que sur des jours non travaillés ne compte pas
+      return x.periodes.length && x.manque > 0;
     });
-    mesAvis.forEach(function (x) {
-      l.appendChild(el("li", { class: "ac-personne ac-avis-moi" }, [
-        el("span", { class: "ac-cal ac-cal-h", "aria-hidden": "true" }, [
-          el("b", { text: x.debut.slice(11) }), el("span", { text: "avis" })
-        ]),
-        el("span", { class: "ac-lib" }, [
-          el("span", { class: "ac-titre", text: x.motif }),
-          el("span", { class: "ac-sous", text: periodeAvis(x) })
-        ]),
-        UI.boutonIcone("supprimer", "Retirer l'avis", x.motif, function () { retireAvis(x); })
-      ]));
+    // Le premier parti d'abord, puis par nom
+    lignes.sort(function (a, b) {
+      var da = a.periodes[0].debut, db = b.periodes[0].debut;
+      return da < db ? -1 : da > db ? 1 : D.compareMembres(a.m, b.m);
     });
-    hote.appendChild(l);
+
+    if (!lignes.length) { videMessage(hote, "Personne n'est absent la semaine prochaine."); return; }
+    liste(hote, lignes.slice(0, LIGNES).map(function (x) {
+      var p = x.periodes[0];
+      var periode = p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin);
+      var motif = p.motif || "Absence";
+      var titre = x.m.prenom + " " + x.m.nom + "\n" +
+        x.periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
+        "\n" + C.fmtJours(x.manque) + " j d'absence sur " + C.fmtJours(x.dus) + " j travaillés";
+      return el("a", { class: "ab-ligne trois", href: "/planif/absences/", title: titre }, [
+        el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
+        el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
+        el("span", { class: "ab-periode", text: periode }),
+        el("span", { class: "ab-quand", text: motif })
+      ]);
+    }), lignes.length, "/planif/absences/");
   }
 
-  /* ========================================================== prévenir */
-
-  var form = null;
-
-  function construitFormulaire() {
-    var hote = UI.vide(document.getElementById("ac-form"));
-    var moi = D.monMembre();
-    var droitAutres = D.aDroit("absences_autrui");
-
-    if (!moi && !droitAutres) {
-      hote.appendChild(el("p", { class: "aide", text: "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil." }));
-      return;
-    }
-
-    form = el("form", { class: "ac-form", novalidate: true });
-    form.addEventListener("submit", function (e) { e.preventDefault(); envoie(); });
-
-    // Raccourcis : un clic remplit les heures
-    var raccourcis = el("div", { class: "ac-raccourcis", role: "group", "aria-label": "Périodes toutes faites" });
-    [
-      { lib: "Ce matin", j: 0, de: "08:00", a: "12:00" },
-      { lib: "Cet après-midi", j: 0, de: "13:30", a: "17:30" },
-      { lib: "Toute la journée", j: 0, de: "08:00", a: "17:30" },
-      { lib: "Demain matin", j: 1, de: "08:00", a: "12:00" },
-      { lib: "Demain après-midi", j: 1, de: "13:30", a: "17:30" },
-      { lib: "Dans 1 h", h: 1 }
-    ].forEach(function (r) {
-      raccourcis.appendChild(el("button", { type: "button", class: "ac-puce", text: r.lib, onclick: function () { remplit(r); } }));
-    });
-    form.appendChild(raccourcis);
-
-    var grille = el("div", { class: "grille-champs ac-champs" });
-    if (droitAutres && D.membres({}).length > 1) {
-      grille.appendChild(UI.champ({ nom: "membreId", label: "Pour", type: "select", large: true,
-        valeur: moi ? moi.id : "", options: UI.optionsParMetier(D.membres({})) }));
-    }
-    var dep = depart();
-    grille.appendChild(UI.champ({ nom: "jourDebut", label: "Du", type: "date", valeur: dep.jour }));
-    grille.appendChild(UI.champ({ nom: "heureDebut", label: "À partir de", type: "time", pas: 300, valeur: dep.de }));
-    grille.appendChild(UI.champ({ nom: "jourFin", label: "Au", type: "date", valeur: dep.jour }));
-    grille.appendChild(UI.champ({ nom: "heureFin", label: "Jusqu'à", type: "time", pas: 300, valeur: dep.a }));
-    var motif = UI.champ({ nom: "motif", label: "Motif", large: true, exemple: "Rendez-vous médical, chantier, formation…" });
-    var liste = el("datalist", { id: "ac-motifs" });
-    MOTIFS.forEach(function (m) { liste.appendChild(el("option", { value: m })); });
-    motif.querySelector("input").setAttribute("list", "ac-motifs");
-    motif.appendChild(liste);
-    grille.appendChild(motif);
-    form.appendChild(grille);
-
-    // Le début qui avance pousse la fin : jamais de période à l'envers
-    form.elements.jourDebut.addEventListener("change", function () {
-      if (form.elements.jourFin.value < form.elements.jourDebut.value) form.elements.jourFin.value = form.elements.jourDebut.value;
-      resume();
-    });
-    ["jourFin", "heureDebut", "heureFin", "motif"].forEach(function (k) { form.elements[k].addEventListener("input", resume); });
-
-    var planning = el("input", { type: "checkbox", name: "planning", value: "1" });
-    form.appendChild(el("label", { class: "case ac-case", title: "Ajoute aussi une absence en jours entiers au planning : tes tâches seront recalées autour." }, [
-      planning, " L'inscrire aussi au planning (jours entiers)"
-    ]));
-
-    form.appendChild(el("div", { class: "ac-envoi" }, [
-      el("p", { class: "ac-resume", id: "ac-resume", "aria-live": "polite" }),
-      el("button", { type: "submit", class: "btn btn-or" }, [
-        el("span", { class: "ico-txt ico-lien", "aria-hidden": "true" }), "Prévenir le bureau"
-      ])
-    ]));
-    hote.appendChild(form);
-    resume();
-  }
-
-  /** Valeurs de départ : de maintenant (au quart d'heure) à 17 h 30, ou demain si la journée est finie. */
-  function depart() {
-    var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
-    if (m >= 17 * 60 || C.estWeekend(auj())) {
-      var j = auj();
-      do { j = C.ajoute(j, 1); } while (!C.estOuvre(j, D.canton()));
-      return { jour: j, de: "08:00", a: "12:00" };
-    }
-    var q = Math.max(8 * 60, Math.ceil(m / 15) * 15);
-    return { jour: auj(), de: hm(q), a: hm(Math.max(q + 60, 17 * 60 + 30)) };
-  }
-  function hm(min) { return deux(Math.floor(min / 60) % 24) + ":" + deux(min % 60); }
-
-  function remplit(r) {
-    var e = form.elements;
-    if (r.h) {
-      var d = new Date(), m = Math.ceil((d.getHours() * 60 + d.getMinutes()) / 5) * 5;
-      e.jourDebut.value = e.jourFin.value = auj();
-      e.heureDebut.value = hm(m);
-      e.heureFin.value = hm(Math.min(23 * 60 + 55, m + r.h * 60));
-    } else {
-      var j = C.ajoute(auj(), r.j);
-      e.jourDebut.value = e.jourFin.value = j;
-      e.heureDebut.value = r.de; e.heureFin.value = r.a;
-    }
-    resume();
-    e.motif.focus();
-  }
-
-  function valeurs() {
-    var e = form.elements, moi = D.monMembre();
-    return {
-      membreId: e.membreId ? e.membreId.value : (moi && moi.id),
-      debut: e.jourDebut.value + "T" + e.heureDebut.value,
-      fin: (e.jourFin.value || e.jourDebut.value) + "T" + e.heureFin.value,
-      motif: e.motif.value.trim(),
-      planning: e.planning.checked
-    };
-  }
-
-  /** Ce que verra le bureau, écrit en clair sous le formulaire. */
-  function resume() {
-    var v = valeurs(), n = document.getElementById("ac-resume");
-    if (!n) return;
-    if (!/T\d\d:\d\d$/.test(v.debut) || !/T\d\d:\d\d$/.test(v.fin) || v.fin <= v.debut) {
-      n.textContent = "Choisis un début et une fin.";
-      n.classList.add("faible");
-      return;
-    }
-    n.classList.remove("faible");
-    n.textContent = "Le bureau verra : " + (v.motif || "Absence") + ", " + periodeAvis(v) + ".";
-  }
-
-  function envoie() {
-    var v = valeurs(), bouton = form.querySelector("button[type=submit]");
-    bouton.disabled = true;
-    D.ajouteAvis(v).then(function () {
-      if (!v.planning) return "Bureau prévenu.";
-      return D.ajouteAbsence(v.membreId, { debut: v.debut.slice(0, 10), fin: v.fin.slice(0, 10), motif: v.motif || "Absence" })
-        .then(function () { return "Bureau prévenu, et absence inscrite au planning."; })
-        .catch(function (e) { return "Bureau prévenu. Planning inchangé : " + e.message; });
-    }).then(function (msg) {
-      UI.toast(msg);
-      form.elements.motif.value = "";
-      form.elements.planning.checked = false;
-      resume();
-      dessine();
-    }).catch(function (e) {
-      UI.toast(e.message);
-    }).then(function () { bouton.disabled = false; });
-  }
-
-  function versFormulaire(focus) {
-    var bloc = document.getElementById("prevenir");
-    if (!bloc) return;
-    bloc.scrollIntoView({ behavior: "smooth", block: "start" });
-    bloc.classList.remove("eclaire"); void bloc.offsetWidth; bloc.classList.add("eclaire");
-    if (focus && form && form.elements.motif) setTimeout(function () { form.elements.motif.focus({ preventScroll: true }); }, 450);
+  /* ----------------------------------------------- tâches à affecter
+     Les tâches dont une part chargée attend encore quelqu'un. */
+  function aAffecter() {
+    var hote = Portail.vide(document.getElementById("aff"));
+    var l = D.taches({ sansTerminees: true }).filter(function (t) { return Calc.nonAffectees(t).length; }).sort(parUrgence);
+    var titre = document.getElementById("t-aff");
+    var compte = titre.querySelector(".ab-compte");
+    if (compte) compte.remove();
+    if (l.length) titre.appendChild(el("span", { class: "ab-compte", text: String(l.length) }));
+    if (!l.length) { videMessage(hote, "Aucune tâche en attente d'affectation."); return; }
+    liste(hote, l.slice(0, LIGNES).map(function (t) {
+      var attend = Calc.nonAffectees(t).map(function (x) {
+        return D.PARTS[x.role].label + " " + C.fmtJours(x.charge) + " j";
+      }).join(" · ");
+      var retard = C.diff(auj(), t.echeance) < 0;
+      return el("a", {
+        class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
+        title: libelle(t) + "\nÀ affecter : " + attend + " · échéance " + C.fmtLong(t.echeance)
+      }, [
+        el("span", { class: "ab-point" + (retard ? " rouge" : ""), "aria-hidden": "true" }),
+        el("span", { class: "ab-lib", text: libelle(t) }),
+        el("span", { class: "ab-quand" + (retard ? " rouge" : "") }, [
+          t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
+          jj(t.echeance)
+        ])
+      ]);
+    }), l.length, "/planif/taches/?membre=a-affecter");
   }
 })();
 </script>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secteurs · Planification</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%231F4E85'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23A9CCF2' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+/* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
+   reprise du dernier passage de ce compte, avant le premier rendu ;
+   ui.js / portail.js la confirment ensuite. */
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
+</script>
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=1">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=77">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=4">
+<link rel="stylesheet" href="/planif/assets/secteurs.css?v=2">
+</head>
+<body class="large">
+
+<div data-chrome></div>
+
+<!-- Module Secteurs (06.10.2026) : la vision globale par secteur.
+     Un secteur, c'est une discipline. Pour chacun : ses ressources (qui, quelle
+     charge semaine après semaine, qui est absent, quand il se libère) et ses
+     projets (les affaires où travaillent ses membres, et les autres secteurs
+     qu'elles font intervenir). Mêmes chiffres que la carte de charge. -->
+<main>
+  <div class="wrap entete">
+    <h1>Secteurs <span id="titre-secteurs" class="compte-titre"></span></h1>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+  <div class="wrap" data-bandeau></div>
+  <div class="wrap">
+    <section class="section">
+      <div class="plan-barre">
+        <span class="plan-periode" id="periode"></span>
+        <span style="flex:1 1 auto"></span>
+        <select id="horizon" class="btn" aria-label="Nombre de semaines regardées">
+          <option value="4">4 semaines</option>
+          <option value="8">8 semaines</option>
+          <option value="12">12 semaines</option>
+        </select>
+        <select id="f-succursale" class="btn" aria-label="Filtrer par succursale"></select>
+      </div>
+      <div class="sc-grille" id="grille"></div>
+      <p class="sc-legende">Barres : charge de chaque semaine sur la capacité du secteur (jours travaillés, absences déduites). Le trait marque 100 % ; <span class="sc-rouge">rouge</span> : surcharge.</p>
+    </section>
+
+    <section class="section" id="detail" aria-live="polite"></section>
+  </div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=6"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=39"></script>
+<script src="/planif/assets/donnees.js?v=49"></script>
+<script src="/planif/assets/calculs.js?v=11"></script>
+<script src="/planif/assets/version.js?v=2"></script>
+<script src="/planif/assets/ui.js?v=68"></script>
+<script src="/planif/assets/palette.js?v=13"></script>
+<script src="/planif/assets/direct.js?v=6"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
+
+  var SEUIL_LIBRE = 0.7;          // « libre » : sous 70 % de charge, comme la carte de charge
+  var SANS = "_sans";             // les membres sans discipline
+  var MEMO = "ab.secteurs";
+
+  var vue = { horizon: 8, succursale: "", secteur: "" };
+  try { var m = JSON.parse(localStorage.getItem(MEMO) || "null"); if (m) { vue.horizon = m.horizon || 8; vue.succursale = m.succursale || ""; } } catch (e) {}
+  var q = new URLSearchParams(location.search);
+  if (q.get("secteur")) vue.secteur = q.get("secteur");
+
+  if (!UI.session()) return;
+
+  D.pret().then(function () {
+    UI.chrome("secteurs", []);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+
+    var h = document.getElementById("horizon");
+    h.value = String(vue.horizon);
+    if (h.value !== String(vue.horizon)) { vue.horizon = 8; h.value = "8"; }
+    h.addEventListener("change", function () { vue.horizon = parseInt(h.value, 10); memorise(); rend(); });
+    var s = document.getElementById("f-succursale");
+    s.addEventListener("change", function () { vue.succursale = s.value; memorise(); rend(); });
+
+    D.surRechargement(rend);
+    rend();
+  }).catch(UI.echec);
+
+  function memorise() {
+    try { localStorage.setItem(MEMO, JSON.stringify({ horizon: vue.horizon, succursale: vue.succursale })); } catch (e) {}
+  }
+
+  function pourcent(x) { return Math.round(x * 100) + " %"; }
+  function nomSecteur(code) { return code === SANS ? "Sans secteur" : (D.DISCIPLINES[code] || code); }
+  function pluriel(n, un, plusieurs) { return n + " " + (n > 1 ? plusieurs : un); }
+
+  /* =============================================================== calculs */
+
+  /** Tout ce que la page montre, calculé une fois par rendu. */
+  function calcule() {
+    var canton = D.canton(), auj = C.isoAuj(), lundi = C.lundi(auj);
+    var sems = [];
+    for (var w = 0; w < vue.horizon; w++) {
+      var l = C.ajoute(lundi, 7 * w);
+      sems.push({ lundi: l, num: C.semaineISO(l).num, jours: C.serie(l, 7) });
+    }
+    var fin = C.ajoute(lundi, 7 * vue.horizon - 1);
+
+    var tous = D.membres({ tous: true });
+    var ouvertes = D.taches({ sansTerminees: true });
+    var rep = Calc.repartition(ouvertes, tous, canton);
+
+    var membres = D.membres({}).filter(function (m) { return !vue.succursale || m.succursale === vue.succursale; });
+    var secteurDe = {};
+    D.membres({ tous: true }).forEach(function (m) { secteurDe[m.id] = m.discipline || SANS; });
+
+    // Secteurs : les disciplines dans l'ordre de la liste, puis « Sans secteur »
+    var codes = Object.keys(D.DISCIPLINES).concat([SANS]);
+    var secteurs = codes.map(function (code) {
+      var gens = membres.filter(function (m) { return (m.discipline || SANS) === code; });
+      return { code: code, nom: nomSecteur(code), gens: gens };
+    }).filter(function (s) { return s.gens.length; });
+
+    secteurs.forEach(function (s) {
+      var planifies = s.gens.filter(function (m) { return D.PLANIFIES[m.metier]; });
+      s.planifies = planifies;
+      s.parMetier = {};
+      s.gens.forEach(function (m) { s.parMetier[m.metier || ""] = (s.parMetier[m.metier || ""] || 0) + 1; });
+
+      // Charge par semaine, personne par personne, puis pour le secteur
+      s.lignes = planifies.map(function (m) {
+        var cases = sems.map(function (sem) { return Calc.bilan(m, sem.jours, rep[m.id], canton); });
+        var libre = null;
+        for (var i = 0; i < cases.length; i++) { if (cases[i].capacite > 0 && cases[i].taux < SEUIL_LIBRE) { libre = i; break; } }
+        return { m: m, cases: cases, libre: libre, absence: absenceSemaine(m, sems[0], canton) };
+      });
+      s.semaines = sems.map(function (sem, i) {
+        var charge = 0, capacite = 0;
+        s.lignes.forEach(function (l) { charge += l.cases[i].charge; capacite += l.cases[i].capacite; });
+        return { num: sem.num, lundi: sem.lundi, charge: charge, capacite: capacite,
+                 taux: capacite > 0 ? charge / capacite : (charge > 0 ? 9 : 0) };
+      });
+      s.libres = s.semaines.reduce(function (t, x) { return t + Math.max(0, x.capacite - x.charge); }, 0);
+      s.absents = s.lignes.filter(function (l) { return l.absence; }).length +
+        s.gens.filter(function (m) { return !D.PLANIFIES[m.metier] && absenceSemaine(m, sems[0], canton); }).length;
+
+      // Projets : charge du secteur sur la période, affaire par affaire
+      var parAffaire = {};
+      function affaire(id) {
+        return parAffaire[id] || (parAffaire[id] = { id: id, charge: 0, ouvertes: 0, aAffecter: 0, echeance: null, secteurs: {} });
+      }
+      planifies.forEach(function (m) {
+        var r = rep[m.id] || {};
+        Object.keys(r).forEach(function (j) {
+          if (j < sems[0].lundi || j > fin) return;
+          r[j].parts.forEach(function (p) {
+            var t = D.tache(p.tacheId);
+            if (t) affaire(t.affaireId).charge += p.jours;
+          });
+        });
+      });
+      var ids = {};
+      s.gens.forEach(function (m) { ids[m.id] = true; });
+      D.affaires().forEach(function (a) {
+        if (a.ingenieurs.concat(a.dessinateurs).some(function (i) { return ids[i]; })) affaire(a.id);
+      });
+      ouvertes.forEach(function (t) {
+        if (ids[t.ingenieurId] || ids[t.dessinateurId]) affaire(t.affaireId);
+      });
+      // Pour chaque affaire du secteur : tâches ouvertes, à affecter, prochaine échéance, autres secteurs
+      s.affaires = Object.keys(parAffaire).map(function (id) {
+        var x = parAffaire[id], a = D.affaire(id);
+        if (!a || a.statut === "terminee") return null;
+        x.a = a;
+        a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { if (secteurDe[i]) x.secteurs[secteurDe[i]] = true; });
+        D.taches({ affaireId: id, sansTerminees: true }).forEach(function (t) {
+          x.ouvertes++;
+          if (Calc.nonAffectees(t).length) x.aAffecter++;
+          if (t.echeance && t.echeance >= auj && (!x.echeance || t.echeance < x.echeance)) x.echeance = t.echeance;
+          [t.ingenieurId, t.dessinateurId].forEach(function (i) { if (i && secteurDe[i]) x.secteurs[secteurDe[i]] = true; });
+        });
+        delete x.secteurs[s.code];
+        return x;
+      }).filter(Boolean).sort(function (p, q) { return q.charge - p.charge || p.a.code.localeCompare(q.a.code, "fr", { numeric: true }); });
+    });
+
+    return { sems: sems, fin: fin, secteurs: secteurs };
+  }
+
+  /** L'absence qui retire au moins un jour travaillé dans la semaine, ou null. */
+  function absenceSemaine(m, sem, canton) {
+    var lundi = sem.lundi, vendredi = C.ajoute(lundi, 4);
+    var p = (m.absences || []).filter(function (a) { return a.debut <= vendredi && (a.fin || a.debut) >= lundi; });
+    for (var i = 0; i < p.length; i++) {
+      var de = p[i].debut < lundi ? lundi : p[i].debut, a = (p[i].fin || p[i].debut) > vendredi ? vendredi : (p[i].fin || p[i].debut);
+      if (Calc.joursTravaillesEntre(m, de, a, canton) > 0) return p[i];
+    }
+    return null;
+  }
+
+  /* =============================================================== rendu */
+
+  function rend() {
+    remplitSuccursales();
+    var r = calcule();
+    var titre = document.getElementById("titre-secteurs");
+    titre.textContent = pluriel(r.secteurs.length, "secteur", "secteurs");
+    document.getElementById("periode").textContent = "Semaines " + r.sems[0].num + " à " + r.sems[r.sems.length - 1].num +
+      " · du " + C.fmtCourt(r.sems[0].lundi) + " au " + C.fmtCourt(r.fin);
+
+    if (!r.secteurs.some(function (s) { return s.code === vue.secteur; })) {
+      var moi = D.monMembre();
+      var mien = moi && r.secteurs.filter(function (s) { return s.code === (moi.discipline || SANS); })[0];
+      vue.secteur = mien ? mien.code : (r.secteurs[0] ? r.secteurs[0].code : "");
+    }
+    grille(r);
+    detail(r);
+  }
+
+  function remplitSuccursales() {
+    var s = document.getElementById("f-succursale");
+    var codes = Object.keys(D.SUCCURSALES);
+    s.hidden = codes.length < 2;
+    if (!D.SUCCURSALES[vue.succursale]) vue.succursale = "";
+    UI.vide(s);
+    s.appendChild(el("option", { value: "", text: "Toutes les succursales" }));
+    codes.forEach(function (c) { s.appendChild(el("option", { value: c, text: D.SUCCURSALES[c] })); });
+    s.value = vue.succursale;
+  }
+
+  /* ------------------------------------------------------- une carte par secteur */
+  function grille(r) {
+    var hote = UI.vide(document.getElementById("grille"));
+    if (!r.secteurs.length) {
+      hote.appendChild(el("p", { class: "vide", text: "Aucun membre actif dans cette succursale." }));
+      return;
+    }
+    r.secteurs.forEach(function (s) {
+      var cette = s.semaines[0];
+      var choisie = s.code === vue.secteur;
+      var carte = el("button", {
+        type: "button", class: "sc-carte" + (choisie ? " choisie" : ""),
+        "aria-pressed": String(choisie), "data-anim": "sc|" + s.code,
+        onclick: function () { choisit(s.code); }
+      }, [
+        el("span", { class: "sc-tete" }, [
+          el("span", { class: "sc-nom", text: s.nom }),
+          el("span", { class: "sc-gens", text: effectifs(s) })
+        ]),
+        el("span", { class: "sc-cles" }, [
+          cle(cette.capacite > 0 ? pourcent(cette.taux) : "—", "charge cette semaine", cette.taux > 1 ? "trop" : ""),
+          cle(C.fmtJours(Math.round(s.libres * 2) / 2) + " j", "libres sur " + vue.horizon + " sem."),
+          cle(String(s.absents), s.absents > 1 ? "absents cette semaine" : "absent cette semaine"),
+          cle(String(s.affaires.length), s.affaires.length > 1 ? "affaires en cours" : "affaire en cours")
+        ]),
+        barres(s)
+      ]);
+      hote.appendChild(carte);
+    });
+  }
+
+  function effectifs(s) {
+    var morceaux = [];
+    D.ORDRE_METIERS.forEach(function (k) {
+      var n = s.parMetier[k]; if (!n) return;
+      morceaux.push(n + " " + (n > 1 ? (D.TITRES_METIERS[k] || "").toLowerCase() : D.libelleMetier(k).toLowerCase()));
+    });
+    return morceaux.join(" · ");
+  }
+
+  function cle(v, l, classe) {
+    return el("span", { class: "sc-cle" + (classe ? " " + classe : "") }, [
+      el("b", { text: v }), el("span", { text: l })
+    ]);
+  }
+
+  /* Une barre par semaine : charge sur capacité. Hauteur plafonnée à 130 %, trait à 100 %. */
+  var PLAFOND = 1.3;
+  function barres(s) {
+    var zone = el("span", { class: "sc-barres", role: "img",
+      "aria-label": "Charge par semaine : " + s.semaines.map(function (x) {
+        return "S" + x.num + " " + (x.capacite > 0 ? pourcent(x.taux) : "aucune capacité");
+      }).join(", ") });
+    zone.appendChild(el("span", { class: "sc-cent", style: "bottom:" + (100 / PLAFOND).toFixed(2) + "%", "aria-hidden": "true" }));
+    s.semaines.forEach(function (x) {
+      var t = x.capacite > 0 ? x.taux : 0;
+      var hauteur = Math.max(t > 0 ? 3 : 0, Math.min(t, PLAFOND) / PLAFOND * 100);
+      zone.appendChild(el("span", {
+        class: "sc-col", title: "Semaine " + x.num + " (" + C.fmtCourt(x.lundi) + ") : " +
+          (x.capacite > 0 ? pourcent(x.taux) + " — " + C.fmtJours(Math.round(x.charge * 10) / 10) + " j sur " + C.fmtJours(Math.round(x.capacite * 10) / 10) + " j" + (x.taux > 1 ? " · surcharge" : "") : "aucune capacité")
+      }, [el("span", { class: "sc-barre" + (t > 1 ? " trop" : ""), style: "height:" + hauteur.toFixed(1) + "%" })]));
+    });
+    var axe = el("span", { class: "sc-axe", "aria-hidden": "true" }, [
+      el("span", { text: "S" + s.semaines[0].num }),
+      el("span", { text: "S" + s.semaines[s.semaines.length - 1].num })
+    ]);
+    return el("span", { class: "sc-graphe" }, [zone, axe]);
+  }
+
+  function choisit(code) {
+    vue.secteur = code;
+    var u = new URL(location.href);
+    u.searchParams.set("secteur", code);
+    history.replaceState(null, "", u.pathname + u.search);
+    rend();
+    var d = document.getElementById("detail");
+    if (d.getBoundingClientRect().top > window.innerHeight * .6) d.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ------------------------------------------------------- le secteur choisi */
+  function detail(r) {
+    var hote = UI.vide(document.getElementById("detail"));
+    var s = r.secteurs.filter(function (x) { return x.code === vue.secteur; })[0];
+    if (!s) { hote.hidden = true; return; }
+    hote.hidden = false;
+    hote.appendChild(el("div", { class: "tete-section" }, [
+      el("div", {}, [
+        el("div", { class: "num-section", text: "Secteur" }),
+        el("h2", { text: s.nom })
+      ])
+    ]));
+
+    /* Ressources */
+    hote.appendChild(el("h3", { class: "sc-sous", text: "Ressources" }));
+    if (!s.lignes.length) {
+      hote.appendChild(el("p", { class: "vide", text: "Aucun ingénieur ni dessinateur dans ce secteur." }));
+    } else {
+      var t = el("table", { class: "liste sc-table" });
+      var tr = el("tr", {}, [el("th", { text: "Personne" }), el("th", { text: "Métier" })]);
+      r.sems.forEach(function (sem, i) {
+        tr.appendChild(el("th", { class: "sc-th-sem" + (i === 0 ? " actuelle" : ""), text: "S" + sem.num, title: "Semaine du " + C.fmtLong(sem.lundi) }));
+      });
+      tr.appendChild(el("th", { text: "Libre dès" }));
+      tr.appendChild(el("th", { text: "Cette semaine" }));
+      t.appendChild(el("thead", {}, [tr]));
+      var corps = el("tbody");
+      s.lignes.slice().sort(function (a, b) { return D.compareMembres(a.m, b.m); }).forEach(function (l) {
+        var ligne = el("tr", {}, [
+          el("td", {}, [el("a", { class: "lien-doux", href: "/planif/taches/?membre=" + encodeURIComponent(l.m.id), text: l.m.prenom + " " + l.m.nom })]),
+          el("td", { class: "sc-faible", text: D.libelleMetier(l.m.metier) })
+        ]);
+        l.cases.forEach(function (c, i) { ligne.appendChild(caseCharge(c, r.sems[i])); });
+        ligne.appendChild(el("td", { class: "sc-faible", text: l.libre === null ? "—" : (l.libre === 0 ? "maintenant" : "S" + r.sems[l.libre].num) }));
+        ligne.appendChild(el("td", { class: l.absence ? "sc-absent" : "sc-faible",
+          text: l.absence ? (l.absence.motif || "Absence") + " · " + C.fmtCourt(l.absence.debut) + (l.absence.fin && l.absence.fin !== l.absence.debut ? " → " + C.fmtCourt(l.absence.fin) : "") : "—" }));
+        corps.appendChild(ligne);
+      });
+      // Total du secteur
+      var total = el("tr", { class: "sc-total" }, [el("td", { text: "Secteur" }), el("td", { class: "sc-faible", text: pluriel(s.lignes.length, "personne", "personnes") })]);
+      s.semaines.forEach(function (x, i) { total.appendChild(caseCharge(x, r.sems[i])); });
+      total.appendChild(el("td", { class: "sc-faible", text: C.fmtJours(Math.round(s.libres * 2) / 2) + " j libres" }));
+      total.appendChild(el("td", { class: "sc-faible", text: pluriel(s.absents, "absent", "absents") }));
+      corps.appendChild(total);
+      t.appendChild(corps);
+      hote.appendChild(el("div", { class: "defile" }, [t]));
+    }
+
+    /* Projets */
+    hote.appendChild(el("h3", { class: "sc-sous", text: "Projets" }));
+    if (!s.affaires.length) {
+      hote.appendChild(el("p", { class: "vide", text: "Aucune affaire en cours pour ce secteur." }));
+      return;
+    }
+    var tp = el("table", { class: "liste sc-table" });
+    tp.appendChild(el("thead", {}, [el("tr", {}, [
+      el("th", { text: "Affaire" }),
+      el("th", { class: "num", text: "Charge du secteur", title: "Jours de travail du secteur sur l'affaire, sur les " + vue.horizon + " semaines regardées" }),
+      el("th", { class: "num", text: "Tâches ouvertes" }),
+      el("th", { class: "num", text: "À affecter" }),
+      el("th", { text: "Prochaine échéance" }),
+      el("th", { text: "Autres secteurs" })
+    ])]));
+    var cp = el("tbody");
+    s.affaires.forEach(function (x) {
+      var a = x.a, autres = Object.keys(x.secteurs);
+      cp.appendChild(el("tr", {}, [
+        el("td", {}, [el("a", { class: "sc-affaire", href: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" }, [
+          el("span", { class: "pastille", style: "color:" + UI.teinte(a.teinte), "aria-hidden": "true" }),
+          el("span", { class: "num sc-code", style: "color:" + UI.teinte(a.teinte), text: a.code }),
+          el("span", { text: a.nom })
+        ])]),
+        el("td", { class: "num", text: x.charge > 0.05 ? C.fmtJours(Math.round(x.charge * 2) / 2) + " j" : "—" }),
+        el("td", { class: "num", text: String(x.ouvertes) }),
+        el("td", { class: "num" + (x.aAffecter ? " sc-alerte" : ""), text: x.aAffecter ? String(x.aAffecter) : "—" }),
+        el("td", { text: x.echeance ? C.fmtCourt(x.echeance) : "—" }),
+        el("td", {}, autres.length ? autres.map(function (c) { return el("span", { class: "etiq sc-etiq", text: nomSecteur(c) }); }) : [el("span", { class: "sc-faible", text: "—" })])
+      ]));
+    });
+    tp.appendChild(cp);
+    hote.appendChild(el("div", { class: "defile" }, [tp]));
+  }
+
+  /** Case de charge : pourcentage teinté par paliers, rouge au-delà de 100 %. */
+  function caseCharge(c, sem) {
+    if (!(c.capacite > 0)) return el("td", { class: "sc-case ferme", title: "Semaine " + sem.num + " : aucune capacité", text: "—" });
+    var t = c.taux, palier = t > 1 ? "trop" : "p" + Math.max(0, Math.min(5, Math.ceil(t * 5)));
+    return el("td", {
+      class: "sc-case " + palier,
+      title: "Semaine " + sem.num + " : " + C.fmtJours(Math.round(c.charge * 10) / 10) + " j sur " + C.fmtJours(Math.round(c.capacite * 10) / 10) + " j" + (t > 1 ? " · surcharge" : "")
+    }, [(t > 1 ? "! " : "") + pourcent(t)]);
+  }
+})();
+</script>
+</body>
+</html>

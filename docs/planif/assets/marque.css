@@ -1,0 +1,49 @@
+/* Planification — couleurs de la marque (06.10.2026).
+   ---------------------------------------------------------------------------
+   Deux marques, posées sur <html data-marque="…"> :
+     - « str » : STR Bim Tools, bleuté. C'est la marque par défaut : la
+       démonstration et tout bureau autre que celui qui a la sienne ;
+     - « ab » : le bureau qui a fait faire la version 2, avec ses couleurs.
+   Les feuilles de la version 2 (portail.css, habillage.css, les modules) ne
+   nomment aucune couleur de marque : elles lisent ces variables. Chargée
+   avant elles, sur toutes les pages.
+   Contrastes vérifiés (WCAG AA) : --m-fort 6,8:1 sur blanc, 5,9:1 sur --m-pale ;
+   --m-titre réservé au grand texte (≥ 3:1) ; texte foncé sur --m-clair 12:1.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --m-fond: #F2F5F9;          /* fond de page */
+  --m-fort: #2A5D96;          /* accent : texte, liens, traits */
+  --m-fort-rvb: 42, 93, 150;
+  --m-titre: #3A72B0;         /* grand texte seulement */
+  --m-vif: #4C8BD1;           /* traits des icônes, barres */
+  --m-logo: #A9C9EC;          /* remplissage fort (survol des boutons) */
+  --m-clair: #D3E3F6;         /* fond des boutons principaux */
+  --m-pale: #E8F0FA;          /* fond des étiquettes, survols de menu */
+  --m-voile: #F3F7FC;         /* survol léger d'une ligne */
+  --m-voile-fort: #E9F1FA;    /* jour ou ligne mis en avant */
+  --m-maison: #3A7BC8;        /* icône « accueil » */
+  --m-encre: #1F4E85;         /* pavé du logo */
+}
+
+:root[data-marque="ab"] {
+  --m-fond: #F4F5F2;
+  --m-fort: #4D7A1C;
+  --m-fort-rvb: 77, 122, 28;
+  --m-titre: #5F9126;
+  --m-vif: #7DB843;
+  --m-logo: #CAE09B;
+  --m-clair: #D5E8AC;
+  --m-pale: #EEF5DE;
+  --m-voile: #F6FAEE;
+  --m-voile-fort: #F2F8E6;
+  --m-maison: #5BA33B;
+  --m-encre: #87868B;
+}
+
+/* Logo STR Bim Tools : le pavé et deux lignes de texte (HTML, police du site) */
+.marque-str { display: inline-flex; align-items: center; gap: .55em; text-decoration: none; color: var(--m-encre); }
+.marque-str svg { flex: none; width: 2.6em; height: 2.6em; display: block; }
+.marque-str .marque-mots { display: flex; flex-direction: column; line-height: 1.05; }
+.marque-str b { font-weight: 700; font-size: 1em; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
+.marque-str span span { font-size: .62em; letter-spacing: .24em; text-transform: uppercase; color: #6B7684; margin-top: .3em; white-space: nowrap; }

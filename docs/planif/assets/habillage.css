@@ -1,0 +1,245 @@
+/* Version 2 — habillage des pages de la planification (06.10.2026)
+   ---------------------------------------------------------------------------
+   Les pages chargent planif.css (composants communs), marque.css puis cette
+   feuille, et portent <html data-version="v2" data-theme="clair">. Tout est
+   rangé sous :root[data-version="v2"] : posée après planif.css, à spécificité
+   égale, elle l'emporte sur le thème clair d'origine.
+   La charte est celle de l'accueil (portail.css) : fond gris très clair,
+   cartes blanches arrondies, couleurs de la marque (marque.css).
+   --------------------------------------------------------------------------- */
+
+:root[data-version="v2"]{
+  color-scheme:light;
+  --encre:30,34,38;
+  --fond-rvb:255,255,255;
+  --or-rvb:var(--m-fort-rvb);           /* l'accent : vert assombri, 5,1:1 sur blanc */
+  --alerte-rvb:198,43,34;
+  --verre-rvb:43,90,138;
+
+  --noir:#FFFFFF;               /* surfaces : cartes, bandeaux collants */
+  --noir-2:#FFFFFF;             /* fenêtres, menus */
+  --texte:#1E2226;
+  --or:var(--m-fort);
+  --alerte:#C62B22;
+  --bleu:#2B5A8A;
+  --voile:rgba(30,34,38,.34);
+  --option-choisie:var(--m-pale);
+
+  --ligne:rgba(var(--encre),.15);
+  --ligne-faible:rgba(var(--encre),.08);
+  --or-doux:rgba(var(--or-rvb),.6);
+  --texte-doux:rgba(var(--encre),.82);
+  --texte-faible:rgba(var(--encre),.66);
+
+  --mono:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  /* Teintes d'affaire, lisibles sur blanc */
+  --t1:var(--m-fort); --t2:#2B5A8A; --t3:#1F7A70; --t4:#B0561A;
+  --t5:#5E4FA0; --t6:#475B66; --t7:#7A6A12; --t8:#9C3F55;
+
+  --ab-fond:var(--m-fond);
+  --ab-vert-logo:var(--m-logo);
+  --ab-vert-clair:var(--m-clair);
+  --ab-vert-pale:var(--m-pale);
+  --ab-ombre:0 1px 2px rgba(30,34,38,.05),0 4px 14px rgba(30,34,38,.05);
+  --ab-ombre-haute:0 2px 4px rgba(30,34,38,.06),0 14px 34px rgba(30,34,38,.12);
+}
+
+/* --------------------------------------------------------- typographie
+   Pas de capitales espacées ni de chasse fixe : une seule police, en casse
+   normale. Le corps passe en graisse normale, les titres en gras. */
+:root[data-version="v2"] body{background:var(--ab-fond);font-weight:400}
+:root[data-version="v2"] body *{letter-spacing:normal;text-transform:none}
+:root[data-version="v2"] h1,:root[data-version="v2"] h2,:root[data-version="v2"] h3{font-weight:650}
+:root[data-version="v2"] .num,:root[data-version="v2"] .mono{font-variant-numeric:tabular-nums}
+
+/* --------------------------------------------------------- barre du haut */
+:root[data-version="v2"] .barre{
+  background:rgba(255,255,255,.94);border-bottom:0;box-shadow:0 1px 0 rgba(30,34,38,.06),0 6px 18px rgba(30,34,38,.05);
+}
+:root[data-version="v2"] .barre-h{
+  align-items:center;padding:max(12px,env(safe-area-inset-top)) var(--g) 10px;
+  font-size:14px;color:var(--texte);
+}
+:root[data-version="v2"] .ab-fil{display:flex;align-items:center;gap:10px;min-width:0}
+:root[data-version="v2"] .ab-carre{
+  flex:0 0 auto;display:inline-grid;place-items:center;width:40px;height:40px;padding:0;
+  border:0;border-radius:6px;background:#fff;box-shadow:var(--ab-ombre);cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+}
+:root[data-version="v2"] .ab-carre.gris{background:#E9EBE6;box-shadow:none}
+:root[data-version="v2"] .ab-carre:hover{transform:translateY(-1px);box-shadow:var(--ab-ombre-haute)}
+:root[data-version="v2"] .ab-carre:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="v2"] .ab-carre svg{width:22px;height:22px}
+:root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
+:root[data-version="v2"] .ab-fleche{fill:none;stroke:var(--texte);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:root[data-version="v2"] .ab-marque-barre{display:flex;align-items:center;gap:12px;margin-left:10px;text-decoration:none;min-width:0}
+:root[data-version="v2"] .ab-logo-barre{width:44px;height:auto;flex:0 0 auto;display:block}
+:root[data-version="v2"] .ab-logo-str{font-size:14px}
+:root[data-version="v2"] .ab-logo-str svg{width:40px;height:40px}
+:root[data-version="v2"] .barre-outils{align-items:center;gap:14px}
+:root[data-version="v2"] .barre-outils .btn-palette{border-radius:6px;padding:7px 9px 7px 11px;margin:0;font-size:14px;background:#F4F5F2;border-color:transparent}
+:root[data-version="v2"] .barre-outils .btn-palette:hover{border-color:var(--or-doux);background:#fff}
+:root[data-version="v2"] .btn-palette kbd{border-radius:4px;font-size:11px}
+:root[data-version="v2"] .ab-compte{position:relative}
+:root[data-version="v2"] .barre-outils .ab-compte-btn{
+  display:inline-flex;align-items:center;gap:10px;font-size:15px;color:var(--texte);
+  border-radius:30px;padding:2px 6px 2px 2px;
+}
+:root[data-version="v2"] .barre-outils .ab-compte-btn:hover{color:var(--or)}
+:root[data-version="v2"] .ab-compte-btn:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="v2"] .ab-avatar{
+  display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;
+  background:#8E9295;color:#fff;font-size:13px;font-weight:500;flex:0 0 auto;
+}
+:root[data-version="v2"] .ab-compte-btn .fleche{font-size:10px;color:var(--texte-faible)}
+:root[data-version="v2"] .ab-menu-compte{left:auto;right:0;min-width:270px}
+:root[data-version="v2"] .ab-menu-mail{padding:8px 12px 10px;margin-bottom:4px;border-bottom:1px solid var(--ligne-faible);font-size:13px;color:var(--texte-faible);word-break:break-all}
+:root[data-version="v2"] .menu-bureau{border:0;border-radius:8px;box-shadow:var(--ab-ombre-haute);font-size:14px}
+:root[data-version="v2"] .menu-bureau button,:root[data-version="v2"] .menu-bureau a{border-radius:6px;color:var(--texte)}
+:root[data-version="v2"] .menu-bureau button:hover,:root[data-version="v2"] .menu-bureau a:hover,
+:root[data-version="v2"] .menu-bureau button:focus-visible,:root[data-version="v2"] .menu-bureau a:focus-visible{background:var(--ab-vert-pale)}
+:root[data-version="v2"] .bureau-btn{color:var(--or);font-size:14px}
+
+/* Les sections : onglets arrondis, la page ouverte en vert du logo */
+:root[data-version="v2"] .nav-outil{gap:6px;padding:2px var(--g) 12px}
+:root[data-version="v2"] .nav-outil a{
+  font-size:15px;font-weight:500;color:var(--texte-doux);padding:8px 15px;border:0;border-radius:6px;
+  transition:background .2s,color .2s;
+}
+:root[data-version="v2"] .nav-outil a:hover{background:var(--ab-vert-pale);color:var(--texte)}
+:root[data-version="v2"] .nav-outil a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
+
+/* --------------------------------------------------------- en-tête de page */
+:root[data-version="v2"] .entete{padding-top:clamp(22px,3.4vh,36px);padding-bottom:clamp(14px,2.4vh,22px)}
+:root[data-version="v2"] .entete h1{font-size:clamp(30px,3.6vw,50px);font-weight:700;letter-spacing:-.02em;line-height:1.08}
+:root[data-version="v2"] .entete h1 .compte-titre{font-size:clamp(14px,1.3vw,18px);font-weight:500;color:var(--texte-faible);letter-spacing:0}
+:root[data-version="v2"] .entete .chapeau{font-size:17px;color:var(--texte-faible)}
+:root[data-version="v2"] .filet-or{display:none}
+:root[data-version="v2"] .decor-place{display:none}
+:root[data-version="v2"] .entete.avec-decor{display:block;min-height:0}
+:root[data-version="v2"] .surtitre,:root[data-version="v2"] .num-section{font-size:13px;font-weight:600;color:var(--or)}
+
+/* --------------------------------------------------------- cartes */
+:root[data-version="v2"] .section{
+  background:#fff;border-top:0;border-radius:8px;box-shadow:var(--ab-ombre);
+  padding:clamp(16px,2vw,24px) clamp(14px,2vw,26px);margin-bottom:20px;
+}
+:root[data-version="v2"] .section:first-of-type{padding-top:clamp(16px,2vw,24px)}
+:root[data-version="v2"] .tete-section h2{font-size:clamp(19px,1.8vw,24px);font-weight:600}
+:root[data-version="v2"] .carte{border:1px solid var(--ligne-faible);border-radius:8px;background:#fff}
+:root[data-version="v2"] .tete-collante{background:#fff}
+/* Équipe : le bloc de recherche est hors de toute section, il devient lui-même une carte */
+:root[data-version="v2"] .wrap > .tete-collante{border-radius:8px;box-shadow:var(--ab-ombre);padding:14px clamp(14px,2vw,26px);border-bottom:0;margin-bottom:20px}
+
+/* Chiffres clés : tuiles claires dans la carte */
+:root[data-version="v2"] .cles{gap:12px;background:none;border:0}
+:root[data-version="v2"] .cle{background:#F6F7F4;border-radius:8px;padding:16px 18px}
+:root[data-version="v2"] .cle .v{font-weight:650;font-size:clamp(26px,3vw,38px)}
+:root[data-version="v2"] .cle .l{font-size:13.5px;margin-top:6px}
+
+/* --------------------------------------------------------- boutons */
+:root[data-version="v2"] .btn{
+  font-size:14px;font-weight:500;color:var(--texte);background:#fff;
+  border:1px solid rgba(var(--encre),.16);border-radius:6px;padding:8px 14px;
+}
+:root[data-version="v2"] .btn:hover{color:var(--texte);border-color:var(--or-doux);background:var(--m-voile)}
+:root[data-version="v2"] .btn:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="v2"] .btn-or{background:var(--ab-vert-clair);border-color:transparent;color:var(--texte);font-weight:600}
+:root[data-version="v2"] .btn-or:hover{background:var(--ab-vert-logo);border-color:transparent;color:var(--texte)}
+:root[data-version="v2"] .btn-nu{border-color:transparent;background:none}
+:root[data-version="v2"] .btn-rouge:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.5);background:#FDF3F2}
+:root[data-version="v2"] select.btn{padding-right:30px}
+:root[data-version="v2"] .ico{border-radius:6px}
+:root[data-version="v2"] .case{border-radius:6px;font-size:14px}
+:root[data-version="v2"] .case:has(input:checked){background:var(--ab-vert-pale);border-color:transparent;color:var(--texte)}
+:root[data-version="v2"] .semaine button{border-radius:6px;font-size:13px}
+
+/* --------------------------------------------------------- formulaires */
+:root[data-version="v2"] .champ > label,:root[data-version="v2"] .legende{font-size:13px;font-weight:500;color:var(--texte-faible)}
+:root[data-version="v2"] .champ input,:root[data-version="v2"] .champ select,:root[data-version="v2"] .champ textarea{
+  font-weight:400;background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;
+}
+:root[data-version="v2"] .champ input:focus,:root[data-version="v2"] .champ select:focus,:root[data-version="v2"] .champ textarea:focus{
+  border-color:var(--or);background:#fff;box-shadow:0 0 0 3px rgba(var(--or-rvb),.14);
+}
+:root[data-version="v2"] .champ input[type=date],:root[data-version="v2"] .champ input[type=time],:root[data-version="v2"] .champ input[type=number]{font-size:15px}
+:root[data-version="v2"] .champ .msg{font-size:13px}
+
+/* --------------------------------------------------------- listes */
+:root[data-version="v2"] table.liste th{font-size:13px;font-weight:600;color:var(--texte-faible)}
+:root[data-version="v2"] table.liste td{font-size:15px}
+:root[data-version="v2"] table.liste .principal{font-size:16px;font-weight:500}
+:root[data-version="v2"] table.liste .secondaire{font-size:13px}
+:root[data-version="v2"] table.liste tr:hover td{background:var(--m-voile)}
+:root[data-version="v2"] table.liste tr.cliquable:hover td{background:var(--m-voile-fort)}
+:root[data-version="v2"] .groupe-taches h3{font-weight:650}
+:root[data-version="v2"] .groupe-taches .compte{font-size:13px}
+:root[data-version="v2"] .etiq{font-size:12px;font-weight:500;border-radius:20px;padding:3px 10px}
+:root[data-version="v2"] .etiq.ing{background:var(--ab-vert-pale);border-color:transparent}
+:root[data-version="v2"] .etiq.des{background:#EAF1F8;border-color:transparent}
+:root[data-version="v2"] .plan-periode{font-size:14px;font-weight:500}
+:root[data-version="v2"] .plan-periode b{font-weight:650}
+:root[data-version="v2"] .pl-vide{font-size:13px}
+
+/* Planning : barres arrondies, teinte un peu plus présente sur blanc */
+:root[data-version="v2"] .bt{border-radius:4px;font-size:13px;background:color-mix(in srgb,var(--tt) 13%,#fff)}
+:root[data-version="v2"] .bt:hover{background:color-mix(in srgb,var(--tt) 22%,#fff)}
+:root[data-version="v2"] .bt .code,:root[data-version="v2"] .bt .jr{font-size:12px;font-weight:600}
+
+/* --------------------------------------------------------- fenêtres et messages */
+:root[data-version="v2"] .modale-boite{border:0;border-radius:10px;box-shadow:var(--ab-ombre-haute)}
+:root[data-version="v2"] .modale-tete h2{font-weight:650}
+:root[data-version="v2"] .pal-boite{border:0;border-radius:10px;box-shadow:0 30px 80px rgba(30,34,38,.22)}
+:root[data-version="v2"] .bandeau{border-radius:8px;background:var(--m-voile);border-color:transparent;font-size:15px}
+:root[data-version="v2"] .bandeau.rouge{background:#FDF3F2}
+:root[data-version="v2"] .toast{
+  font-size:14px;border-radius:8px;border:0;background:#1E2226;color:#fff;box-shadow:var(--ab-ombre-haute);
+}
+:root[data-version="v2"] .toast-action{color:var(--ab-vert-logo)}
+
+/* --------------------------------------------------------- pied */
+:root[data-version="v2"] footer.pied-outil{font-size:13px;border-top:0;color:var(--texte-faible)}
+
+/* --------------------------------------------------------- priorité des tâches
+   Curseur du formulaire (ui.js, curseurPriorite) et pastille de la liste. */
+:root[data-version="v2"] .priorite-ligne{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+:root[data-version="v2"] .priorite-ligne input[type=range]{
+  flex:1 1 180px;max-width:320px;accent-color:var(--or);height:28px;margin:0;cursor:pointer;
+  border:0;padding:0;background:none;box-shadow:none;
+}
+:root[data-version="v2"] .priorite-borne{font-size:13px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+:root[data-version="v2"] .priorite-lib{
+  min-width:12em;font-size:14px;font-weight:600;padding:3px 10px;border-radius:20px;
+  background:var(--ab-vert-pale);color:var(--or);
+}
+:root[data-version="v2"] .priorite-lib[data-niveau="1"]{background:#FBE4E2;color:var(--alerte)}
+:root[data-version="v2"] .priorite-lib[data-niveau="2"]{background:#FDF0DC;color:#8A5A00}
+:root[data-version="v2"] .priorite-lib[data-niveau="5"]{background:#F0F1EE;color:var(--texte-faible)}
+:root[data-version="v2"] .prio-etiq{
+  display:inline-block;margin-left:8px;padding:0 7px;border-radius:4px;vertical-align:2px;
+  font-size:12px;font-weight:600;line-height:1.6;background:var(--ab-vert-pale);color:var(--or);
+}
+:root[data-version="v2"] .prio-etiq.p1{background:#FBE4E2;color:var(--alerte)}
+:root[data-version="v2"] .prio-etiq.p2{background:#FDF0DC;color:#8A5A00}
+
+/* --------------------------------------------------------- téléphone */
+@media (max-width:640px){
+  :root[data-version="v2"] .ab-compte-nom,:root[data-version="v2"] .ab-logo-str .marque-mots{display:none}
+  :root[data-version="v2"] .ab-marque-barre{margin-left:4px}
+  :root[data-version="v2"] .ab-logo-barre{width:40px}
+  :root[data-version="v2"] .ab-carre{width:38px;height:38px}
+  :root[data-version="v2"] .barre-outils{gap:10px}
+  :root[data-version="v2"] .nav-outil a{font-size:14px;padding:9px 11px}
+  :root[data-version="v2"] .section{padding:14px 12px;border-radius:8px}
+  :root[data-version="v2"] .fab{
+    background:var(--ab-vert-clair);color:var(--texte);border-radius:28px;font-size:15px;font-weight:600;
+    box-shadow:var(--ab-ombre-haute);
+  }
+}
+
+/* --------------------------------------------------------- impression */
+@media print{
+  :root[data-version="v2"] body{background:#fff}
+  :root[data-version="v2"] .section{box-shadow:none;padding:0;border-radius:0}
+}

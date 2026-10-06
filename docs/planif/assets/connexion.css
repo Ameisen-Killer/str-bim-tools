@@ -1,6 +1,6 @@
-/* Connexion de l'espace AB (06.10.2026) — page /ab/connexion/.
-   Chargée après ab.css (couleurs, police). Une carte blanche au centre : le
-   logo officiel à gauche, le formulaire à droite ; empilés sur téléphone. */
+/* Connexion de la planification, version 2 (06.10.2026) — page /planif/connexion/.
+   Chargée après marque.css et portail.css. Une carte blanche au centre : le
+   logo de la marque à gauche, le formulaire à droite ; empilés sur téléphone. */
 
 body { min-height: 100vh; min-height: 100dvh; }
 .cx {
@@ -15,10 +15,12 @@ body { min-height: 100vh; min-height: 100dvh; }
   overflow: hidden;
   animation: ab-monte .5s cubic-bezier(.2, .7, .3, 1) both;
 }
-.cx-logo {
-  display: block; width: 100%; height: auto; max-width: 200px; margin: 0 auto;
-  padding: 44px 0;
-}
+.cx-logo { display: block; width: 100%; max-width: 200px; margin: 0 auto; padding: 44px 0; }
+.cx-logo img { display: block; width: 100%; height: auto; }
+/* STR Bim Tools : le pavé au-dessus de son nom */
+.cx-logo.cx-logo-str { display: flex; flex-direction: column; align-items: center; gap: 14px; font-size: 18px; text-align: center; }
+.cx-logo-str svg { width: 96px; height: 96px; }
+.cx-logo-str .marque-mots { align-items: center; }
 .cx-carte > .cx-logo { justify-self: center; }
 .cx-boite { padding: 44px 44px 34px; border-left: 1px solid var(--filet); }
 
@@ -34,12 +36,12 @@ body { min-height: 100vh; min-height: 100dvh; }
   border: 1px solid #D5D8D2; border-radius: 6px; padding: 11px 12px; width: 100%;
   transition: border-color .2s, box-shadow .2s;
 }
-.cx-champ input:focus { outline: none; border-color: var(--vert-texte); box-shadow: 0 0 0 3px rgba(77, 122, 28, .15); }
+.cx-champ input:focus { outline: none; border-color: var(--vert-texte); box-shadow: 0 0 0 3px rgba(var(--m-fort-rvb), .15); }
 .cx-champ input[readonly] { background: #F6F7F4; color: var(--faible); }
 .cx-aide { font-size: 13px; color: var(--faible); }
 
 .cx-msg { margin-top: 16px; padding: 10px 12px; border-radius: 6px; font-size: 14.5px; background: #FBE4E2; color: var(--rouge-texte); }
-.cx-msg.ok { background: #EEF5DE; color: var(--vert-texte); }
+.cx-msg.ok { background: var(--m-pale); color: var(--vert-texte); }
 
 .cx-valider {
   display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 22px;
@@ -65,6 +67,8 @@ body { min-height: 100vh; min-height: 100dvh; }
   .cx { justify-content: flex-start; }
   .cx-carte { grid-template-columns: minmax(0, 1fr); }
   .cx-logo { max-width: 120px; padding: 28px 0 8px; }
+  .cx-logo.cx-logo-str { max-width: none; font-size: 15px; }
+  .cx-logo-str svg { width: 64px; height: 64px; }
   .cx-boite { border-left: 0; padding: 18px 20px 24px; }
   .cx-boite h1 { font-size: 26px; text-align: center; }
   .cx-sous { text-align: center; margin-bottom: 20px; }

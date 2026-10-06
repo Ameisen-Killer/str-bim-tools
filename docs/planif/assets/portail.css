@@ -1,27 +1,23 @@
-/* Espace AB Ingénieurs — /ab/ (06.10.2026)
+/* Portail — l'accueil de la planification, version 2 (06.10.2026)
    ---------------------------------------------------------------------------
-   La version du bureau AB, d'après la maquette d'Enrico : fond clair, cartes
-   blanches, vert du logo. Elle a sa propre feuille et ne charge pas
-   planif.css : la planification garde sa charte noir et or.
-   Couleurs du bureau (relevées pour l'ancien thème AB) : vert du logo
-   #CAE09B, gris #7B7B7B. Le vert du logo ne porte aucun texte (1,4:1 sur
-   blanc) : il reste aux remplissages ; le texte vert prend sa version
-   assombrie à teinte égale.
+   Fond clair, cartes blanches, couleurs de la marque (marque.css, chargée
+   avant). L'accueil a sa propre feuille et ne charge pas planif.css.
+   La couleur claire de la marque ne porte aucun texte : elle reste aux
+   remplissages ; le texte coloré prend sa version assombrie (--m-fort).
    --------------------------------------------------------------------------- */
 
 :root {
   color-scheme: light;
-  --fond: #F4F5F2;
+  --fond: var(--m-fond);
   --carte: #FFFFFF;
   --texte: #1E2226;
   --faible: #62676B;          /* 5,2:1 sur le fond */
   --filet: #E6E8E3;
-  --vert-logo: #CAE09B;       /* remplissages seulement */
-  --vert-clair: #D5E8AC;      /* fond des boutons « Accéder » : texte foncé 12:1 */
-  --vert-vif: #7DB843;        /* traits des icônes, décor */
-  --vert-titre: #5F9126;      /* grand texte (≥ 24 px gras) : 3,5:1 */
-  --vert-texte: #4D7A1C;      /* texte courant vert : 5,1:1 */
-  --gris-logo: #87868B;
+  --vert-logo: var(--m-logo);       /* remplissages seulement */
+  --vert-clair: var(--m-clair);      /* fond des boutons « Accéder » : texte foncé 12:1 */
+  --vert-vif: var(--m-vif);        /* traits des icônes, décor */
+  --vert-titre: var(--m-titre);      /* grand texte (≥ 24 px gras) : 3,5:1 */
+  --vert-texte: var(--m-fort);      /* texte courant vert : 5,1:1 */
   --rouge: #E0352B;
   --rouge-texte: #C62B22;     /* 5,6:1 sur blanc */
   --orange: #F2A51F;
@@ -57,13 +53,14 @@ button { font: inherit; color: inherit; }
 .ab-bouton-carre.gris { background: #E9EBE6; box-shadow: none; }
 .ab-bouton-carre:hover { transform: translateY(-1px); box-shadow: var(--ombre-haute); }
 .ab-bouton-carre svg { width: 26px; height: 26px; }
-.ab-maison { fill: var(--vert-ok); }
+.ab-maison { fill: var(--m-maison); }
 .ab-fleche { fill: none; stroke: var(--texte); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ------------------------------------------------------------ en-tête */
 .ab-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
 .ab-marque { display: block; text-decoration: none; flex: 0 1 auto; min-width: 0; }
-/* Logo du bureau (pavé + texte), proportions du fichier : 2,95 × 1 */
+/* Logo de la marque : celui du bureau (pavé + texte, proportions 2,95 × 1) ou STR Bim Tools */
+.ab-logo-str { font-size: clamp(16px, 1.55vw, 22px); }
 .ab-logo { display: block; height: clamp(76px, 7.2vw, 108px); width: auto; max-width: 100%; }
 
 .ab-qui { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; padding-top: 4px; }
@@ -89,7 +86,7 @@ button { font: inherit; color: inherit; }
   display: block; width: 100%; text-align: left; padding: 11px 14px; border: 0; border-radius: 6px;
   background: none; text-decoration: none; cursor: pointer; font-size: 15px;
 }
-.ab-menu a:hover, .ab-menu button:hover, .ab-menu a:focus-visible, .ab-menu button:focus-visible { background: #EEF5DE; outline: none; }
+.ab-menu a:hover, .ab-menu button:hover, .ab-menu a:focus-visible, .ab-menu button:focus-visible { background: var(--m-pale); outline: none; }
 .ab-menu .ab-menu-mail { padding: 8px 14px 10px; color: var(--faible); font-size: 13px; border-bottom: 1px solid var(--filet); margin-bottom: 4px; word-break: break-all; }
 
 /* ------------------------------------------------------------ salut */
@@ -171,7 +168,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-periode { color: var(--faible); white-space: nowrap; }
 .ab-prio {
   display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 12px; font-weight: 600;
-  background: #EEF5DE; color: var(--vert-texte);
+  background: var(--m-pale); color: var(--vert-texte);
 }
 .ab-prio.p1 { background: #FBE4E2; color: var(--rouge-texte); }
 .ab-vide { padding: 22px 2px 8px; color: var(--faible); }
@@ -207,6 +204,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-barre { margin-bottom: 14px; }
   .ab-entete { padding-left: 0; align-items: center; }
   .ab-logo { height: 58px; }
+  .ab-logo-str { font-size: 13px; }
   .ab-date { display: none; }
   .ab-moi-nom, .ab-chevron { display: none; }
   .ab-avatar { width: 44px; height: 44px; font-size: 15px; }

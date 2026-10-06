@@ -93,7 +93,7 @@
        planning (un ingénieur porte les charges de calcul, un dessinateur celles
        de dessin, un administratif n'est pas planifié) ;
      · les STATUTS qu'on porte dans la société — autant qu'il en faut, ou aucun.
-     Enrico est ingénieur, administrateur et chef de projet ; Christophe est
+     On peut être ingénieur, administrateur et chef de projet à la fois, ou
      « juste » dessinateur. */
   var METIERS = {
     ingenieur: "Ingénieur", dessinateur: "Dessinateur", administratif: "Administratif"
@@ -223,7 +223,7 @@
   /* Phases SIA 112 (modèle de prestations), par leur numéro : celles où un bureau
      d'ingénieurs structure intervient. Rangées par numéro dans la base. */
   var PHASES = {
-    // Avant toute phase SIA : l'offre du bureau (espace AB, module Inter-secteurs)
+    // Avant toute phase SIA : l'offre du bureau (module Inter-secteurs)
     "AO": "Appel d'offres (offre du bureau)",
     "21": "Étude de faisabilité",
     "31": "Avant-projet",
@@ -237,7 +237,7 @@
   // « AO » vient avant les phases SIA, rangées par numéro
   var ORDRE_PHASES = ["AO"].concat(Object.keys(PHASES).filter(function (k) { return k !== "AO"; }).sort());
 
-  /* Appels d'offres et leur agenda (espace AB, module Inter-secteurs, 06.10.2026) */
+  /* Appels d'offres et leur agenda (module Inter-secteurs, 06.10.2026) */
   var TYPES_AO = { public: "Public", prive: "Privé" };
   var RESULTATS_AO = { en_cours: "En cours", gagne: "Gagné", perdu: "Perdu", abandonne: "Abandonné" };
   var GENRES_AGENDA = {
@@ -246,7 +246,7 @@
   };
   var RE_HEURE = /^\d\d:\d\d$/;
 
-  /* Demandes de congé (espace AB, module Communication) */
+  /* Demandes de congé (module Communication) */
   var STATUTS_CONGE = { en_attente: "En attente", acceptee: "Acceptée", refusee: "Refusée", annulee: "Annulée" };
   var MOTIFS_CONGE = ["Vacances", "Récupération", "Congé sans solde", "Congé spécial", "Formation"];
   /** « 32 · Projet de l'ouvrage », ou "" sans phase. Un numéro inconnu reste lisible tel quel. */
@@ -334,6 +334,7 @@
      un seul bureau, et tous les droits. */
 
   var profil = null, profilEnCours = null;
+  function avecBaseConnectee() { return !!(global.Sb && global.Sb.configure && global.Sb.connecte()); }
 
   // Les messages commencent par « Accès refusé » : UI.echec déconnecte et renvoie à la connexion
   var REFUS = {
@@ -552,7 +553,7 @@
         finiDessin: t.finiDessin === true,
         enchaine: t.enchaine === true,
         // 1 la plus importante, 5 par défaut. Réglée par le curseur du formulaire
-        // de tâche (version AB) ; colonne taches.priorite en base.
+        // de tâche ; colonne taches.priorite en base.
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
@@ -827,7 +828,7 @@
       enchaine: "enchaine" in o ? o.enchaine === true : true
     };
     // Priorité entre tâches de même échéance (1 la plus importante, 5 par défaut) :
-    // seulement quand le formulaire la porte (version AB), sinon elle reste telle quelle
+    // seulement quand le formulaire la porte (module Inter-secteurs), sinon elle reste telle quelle
     if (o.priorite != null && o.priorite !== "") v.priorite = Math.min(5, Math.max(1, parseInt(o.priorite, 10) || 5));
     return v;
   }
@@ -1346,7 +1347,7 @@
     },
 
     /* ------------------------------------------------ rendez-vous du bureau
-       L'agenda interne (espace AB, module Communication) : un rendez-vous, ses
+       L'agenda interne (module Communication) : un rendez-vous, ses
        participants. La réplication avec Outlook viendra (source, externeId). */
     /** Rendez-vous par date puis heure. opts.depuis / opts.jusqu (AAAA-MM-JJ), opts.membreId : ceux d'une personne. */
     rendezVous: function (opts) {
@@ -1398,7 +1399,7 @@
     },
 
     /* ------------------------------------------------ appels d'offres et agenda
-       Un appel d'offres est une affaire en phase « AO » (espace AB, module
+       Un appel d'offres est une affaire en phase « AO » (module
        Inter-secteurs). Son agenda est attaché à l'affaire, pas à une personne. */
     TYPES_AO: TYPES_AO,
     RESULTATS_AO: RESULTATS_AO,
@@ -1474,7 +1475,28 @@
       });
     },
 
-    estDemo: function () { return !!(etat && etat.reglages.demo); }
+    estDemo: function () { return !!(etat && etat.reglages.demo); },
+
+    /* Marque de l'espace (06.10.2026) : « ab » pour le bureau qui a la sienne
+       (logo et couleurs), « str » (STR Bim Tools, bleuté) pour tous les autres
+       — et toujours pour la démonstration : rien n'y rappelle un bureau réel. */
+    enDemo: function () {
+      var p = profil;
+      if (D.estDemo()) return true;                       // jeu de démonstration (mode local)
+      if (!p || !p.multi) return !avecBaseConnectee();    // mode local sans jeu : pas un bureau réel non plus
+      return /^demo@/i.test(p.email || "") || (!!p.bureau && /^bureau de test$/i.test(texte(p.bureau.nom)));
+    },
+    marque: function () {
+      var p = profil;
+      if (D.enDemo() || !p || !p.bureau) return "str";
+      var nom = texte(p.bureau.nom).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return /\bab\b.*ingenieur/.test(nom) ? "ab" : "str";
+    },
+    /** « Espace Démo », ou « Espace » suivi du nom du bureau. */
+    nomEspace: function () {
+      if (D.enDemo()) return "Espace Démo";
+      return "Espace " + texte(profil && profil.bureau && profil.bureau.nom || "de travail");
+    }
   };
 
   /* ---------------------------------------------------------- annuler

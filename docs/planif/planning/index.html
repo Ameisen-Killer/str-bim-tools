@@ -3,27 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tableau de bord · Planification · STR Bim Tools</title>
+<title>Tableau de bord · Planification</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%231F4E85'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23A9CCF2' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
-/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
-(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
+/* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
+   reprise du dernier passage de ce compte, avant le premier rendu ;
+   ui.js / portail.js la confirment ensuite. */
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
 </script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=1">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=4">
 </head>
 <body class="large">
 
 <div data-chrome></div>
 
 <main>
-  <div class="wrap entete avec-decor">
+  <div class="wrap entete">
     <h1>Tableau de bord</h1>
-    <div class="decor-place" aria-hidden="true"><canvas id="spectre" data-palette="theme" data-calme></canvas></div>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -101,13 +104,13 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=38"></script>
-<script src="/planif/assets/donnees.js?v=47"></script>
+<script src="/planif/assets/supabase.js?v=39"></script>
+<script src="/planif/assets/donnees.js?v=49"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=67"></script>
-<script src="/planif/assets/palette.js?v=12"></script>
+<script src="/planif/assets/version.js?v=2"></script>
+<script src="/planif/assets/ui.js?v=68"></script>
+<script src="/planif/assets/palette.js?v=13"></script>
 <script src="/planif/assets/direct.js?v=6"></script>
-<script src="/planif/assets/spectre.js?v=6"></script>
 <script>
 (function () {
   "use strict";

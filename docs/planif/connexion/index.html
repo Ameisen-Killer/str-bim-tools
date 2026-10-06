@@ -3,101 +3,67 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Connexion · Planification · STR Bim Tools</title>
+<title>Connexion · Planification</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%231F4E85'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23A9CCF2' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
-/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
-(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
+/* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
+   reprise du dernier passage de ce compte, avant le premier rendu ;
+   ui.js / portail.js la confirment ensuite. */
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
 </script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=77">
-<style>
-  main.cx{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:clamp(24px,6vh,72px) var(--g)}
-  .cx-boite{width:100%;max-width:430px}
-  .cx-boite h1{font-size:clamp(38px,6vw,58px);line-height:1;margin-top:12px}
-  .cx-filet{height:1px;background:rgba(var(--or-rvb),.55);margin:26px 0 30px;transform:scaleX(0);transform-origin:left;animation:trace 1.6s cubic-bezier(.55,.05,.25,1) .25s forwards}
-  @keyframes trace{to{transform:scaleX(1)}}
-  .cx-champs{display:grid;gap:18px}
-  .cx-champs input[readonly]{color:var(--texte-doux);background:transparent}
-  .cx-msg{margin-top:20px;border-left:2px solid var(--alerte);padding:10px 0 10px 14px;font-size:14px;color:var(--texte-doux)}
-  .cx-msg.ok{border-left-color:var(--or)}
-  .cx-actions{display:flex;flex-direction:column;gap:12px;margin-top:28px}
-  .cx-actions .btn{justify-content:center;padding:13px 16px}
-  .cx-bas{margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne);display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;
-          font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
-  .cx-bas a,.cx-bas button{color:inherit;background:none;border:0;padding:0;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-decoration:none;text-align:left;transition:color .3s}
-  .cx-bas a:hover,.cx-bas button:hover{color:var(--or)}
-  .cx-bas button[disabled]{opacity:.5;cursor:progress}
-  /* Le ruban spectral du tableau de bord (spectre.js), en bas de l'écran et sur
-     toute sa largeur : derrière le formulaire, jamais sous les mains. */
-  /* Le formulaire remonte d'autant : les liens du bas ne se lisent pas à travers les fils. */
-  main.cx{position:relative;z-index:1;padding-bottom:calc(clamp(110px,24vh,240px) * .8)}
-  .cx-ruban{position:fixed;left:0;right:0;bottom:0;height:clamp(110px,24vh,240px);z-index:0;pointer-events:none}
-  .cx-ruban canvas{display:block;width:100%;height:100%}
-  @media (max-width:640px){
-    .cx-ruban{height:clamp(90px,17vh,150px)}
-    main.cx{padding-bottom:calc(clamp(90px,17vh,150px) * .8)}
-  }
-  @media print{ .cx-ruban{display:none} }
-</style>
+<link rel="stylesheet" href="/planif/assets/marque.css?v=1">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=4">
+<link rel="stylesheet" href="/planif/assets/connexion.css?v=2">
 </head>
 <body>
 
-<div class="cx-ruban" aria-hidden="true"><canvas id="spectre" data-fondu=".1,.9"></canvas></div>
-
+<!-- Connexion de la planification, version 2 (06.10.2026). Le logo suit la
+     marque retenue sur ce navigateur (STR Bim Tools par défaut) ; « Essayer la
+     démo » repasse toujours en STR Bim Tools. -->
 <main class="cx">
-  <div class="cx-boite">
-    <h1 id="titre">Connexion</h1>
-    <div class="cx-filet" aria-hidden="true"></div>
+  <div class="cx-carte">
+    <div class="cx-logo" id="logo"></div>
+    <div class="cx-boite">
+      <h1 id="titre">Connexion</h1>
+      <p class="cx-sous">Votre espace de travail</p>
 
-    <form id="formulaire" autocomplete="on" novalidate>
-      <div class="cx-champs">
-        <div class="champ">
-          <label for="email">Adresse e-mail</label>
-          <input type="email" id="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <form id="formulaire" autocomplete="on" novalidate>
+        <div class="cx-champs">
+          <div class="cx-champ">
+            <label for="email">Adresse e-mail</label>
+            <input type="email" id="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <div class="cx-champ">
+            <label for="mdp" id="label-mdp">Mot de passe</label>
+            <input type="password" id="mdp" name="mdp" autocomplete="current-password" required>
+            <div class="cx-aide" id="aide-mdp" hidden>Six caractères au minimum.</div>
+          </div>
         </div>
-        <div class="champ">
-          <label for="mdp" id="label-mdp">Mot de passe</label>
-          <input type="password" id="mdp" name="mdp" autocomplete="current-password" required>
-          <div class="aide" id="aide-mdp" hidden>Six caractères au minimum.</div>
-        </div>
+
+        <div class="cx-msg" id="message" role="alert" hidden></div>
+
+        <button class="cx-valider" type="submit" id="valider">Se connecter</button>
+      </form>
+
+      <div class="cx-bas">
+        <button type="button" id="oubli">Mot de passe oublié ou première connexion</button>
+        <button type="button" id="demo">Essayer la démo</button>
       </div>
-
-      <div class="cx-msg" id="message" hidden></div>
-
-      <div class="cx-actions">
-        <button class="btn btn-or" type="submit" id="valider">Se connecter</button>
-      </div>
-    </form>
-
-    <div class="cx-bas">
-      <button type="button" id="oubli">Mot de passe oublié ou première connexion</button>
-      <button type="button" id="demo">Essayer la démo</button>
-      <a href="/">str-bim-tools.com</a>
     </div>
   </div>
+  <p class="cx-pied"><span id="nom-pied">STR Bim Tools · Planification</span> · <span id="version"></span></p>
 </main>
 
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=38"></script>
-<script src="/planif/assets/spectre.js?v=6"></script>
+<script src="/planif/assets/supabase.js?v=39"></script>
+<script src="/planif/assets/version.js?v=2"></script>
 <script>
 (function () {
   "use strict";
-
-  /* Lien reçu par courriel, demandé depuis la connexion de l'espace AB sur ce
-     navigateur (repère « ab.lien », 7 jours) : on y renvoie, lien compris. */
-  try {
-    var depuisAB = parseInt(localStorage.getItem("ab.lien"), 10);
-    if (depuisAB && Date.now() - depuisAB < 7 * 864e5 && /jeton=|access_token=|error/.test(location.hash + location.search)) {
-      location.replace("/ab/connexion/" + location.search + location.hash);
-      return;
-    }
-  } catch (e) {}
 
   var p = new URLSearchParams(location.search);
   /* Pas de renvoi hors de l'outil. Tester le premier caractère ne suffisait
@@ -106,8 +72,7 @@
   function retourSur(brut) {
     try {
       var u = new URL(brut || "/planif/", location.origin);
-      // L'espace du bureau AB (/ab/) partage la connexion de la planification
-      if (u.origin === location.origin && /^\/(planif|ab)\//.test(u.pathname)) return u.pathname + u.search + u.hash;
+      if (u.origin === location.origin && /^\/planif\//.test(u.pathname) && !/^\/planif\/connexion\//.test(u.pathname)) return u.pathname + u.search + u.hash;
     } catch (e) {}
     return "/planif/";
   }
@@ -227,7 +192,11 @@
     dis("");
     demo.disabled = true;
     window.Sb.connexion(adresseDe("demo"), "demo")
-      .then(function () { location.replace("/planif/"); })
+      .then(function () {
+        // La démonstration est toujours aux couleurs de STR Bim Tools
+        try { localStorage.setItem("planif.marque", "str"); localStorage.setItem("planif.marque:" + adresseDe("demo"), "str"); } catch (e) {}
+        location.replace("/planif/");
+      })
       .catch(function (err) { demo.disabled = false; dis(err.message); });
   });
 
@@ -269,9 +238,29 @@
         });
     jetons
       .then(function (j) { return window.Sb.choisitMotDePasse(j, secret); })
-      .then(function () { location.replace("/planif/"); })
+      .then(function () { location.replace(retour); })
       .catch(function (err) { fini(err.message); });
   });
+
+  // Date de la version publiée, au pied
+  var v = window.PLANIF_VERSION && /^(\d{4})-(\d\d)-(\d\d)$/.exec(window.PLANIF_VERSION);
+  var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  if (v) document.getElementById("version").textContent = "Version du " + parseInt(v[3], 10) + " " + MOIS[parseInt(v[2], 10) - 1] + " " + v[1];
+
+  /* Le logo de la marque retenue (posée sur <html> par le script de tête) */
+  (function logo() {
+    var hote = document.getElementById("logo");
+    if (document.documentElement.getAttribute("data-marque") === "ab") {
+      var img = document.createElement("img");
+      img.src = "/planif/assets/logo-ab.svg?v=1"; img.alt = "Logo du bureau"; img.width = 150; img.height = 200;
+      hote.appendChild(img);
+      document.getElementById("nom-pied").textContent = "Planification";
+    } else {
+      hote.className += " marque-str cx-logo-str";
+      hote.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="16" fill="#1F4E85"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#A9CCF2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>' +
+        '<span class="marque-mots"><b>STR Bim Tools</b><span>Planification</span></span>';
+    }
+  })();
 
   (mode === "nouveau" ? mdp : email).focus();
 })();

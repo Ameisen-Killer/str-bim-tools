@@ -389,7 +389,7 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — demandes de congé de l'espace AB.
+  /* GARDE-FOU PROVISOIRE (06.10.2026) — demandes de congé (module Communication).
      Tant que migration-conges.sql n'est pas passée, la table conges manque :
      sa lecture échoue sans bloquer le reste, et on n'y écrit rien. À RETIRER
      dès que Tony confirme la migration passée. */
@@ -409,7 +409,7 @@
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
       o.phase = a.phase || null;
       o.adresse = a.adresse || "";
-      // Appel d'offres et secteurs (espace AB, module Inter-secteurs)
+      // Appel d'offres et secteurs (module Inter-secteurs)
       o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
       o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
       o.secteurs = a.secteurs || [];

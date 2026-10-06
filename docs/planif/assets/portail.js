@@ -1,14 +1,14 @@
-/* Espace AB Ingénieurs — briques communes aux pages de /ab/ (06.10.2026)
+/* Portail — l'accueil de la planification, version 2 (06.10.2026)
    ---------------------------------------------------------------------------
-   La V2 du bureau AB réutilise le moteur de la planification (calendrier.js,
-   config.js, supabase.js, donnees.js, calculs.js : mêmes comptes, mêmes
-   données) mais pas son interface (ui.js, planif.css) : elle a la sienne.
-   Ce fichier porte ce que chaque page AB partage :
-     AB.el, AB.vide         construction du DOM
-     AB.session()           renvoie à la connexion si personne n'est connecté
-     AB.echec(e)            erreur de chargement
-     AB.entete(hote)        barre (accueil, retour), logo, date, menu du compte
-     AB.surRetour(f)        relit la base au retour sur l'onglet après une minute
+   L'accueil réutilise le moteur (calendrier.js, config.js, supabase.js,
+   donnees.js, calculs.js) mais pas l'interface des autres pages (ui.js,
+   planif.css) : il a la sienne (portail.css). Ce fichier porte :
+     Portail.el, .vide         construction du DOM
+     Portail.session()         renvoie à la connexion si personne n'est connecté
+     Portail.echec(e)          erreur de chargement
+     Portail.entete(hote)      barre (accueil, retour), logo de la marque, date, compte
+     Portail.surRetour(f)      relit la base au retour sur l'onglet après une minute
+   La marque (Donnees.marque : « ab » ou « str ») décide du logo et des couleurs.
    --------------------------------------------------------------------------- */
 (function (global) {
   "use strict";
@@ -38,7 +38,7 @@
   }
   function vide(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
 
-  /** Un dessin SVG écrit en clair : AB.svg("0 0 64 64", "<path …/>"). */
+  /** Un dessin SVG écrit en clair : Portail.svg("0 0 64 64", "<path …/>"). */
   function svg(vue, contenu, classe) {
     var s = document.createElementNS(SVG, "svg");
     s.setAttribute("viewBox", vue);
@@ -54,7 +54,7 @@
   /* ------------------------------------------------------------ session */
 
   function versConnexion(motif) {
-    location.replace("/ab/connexion/?retour=" + encodeURIComponent(location.pathname + location.search) +
+    location.replace("/planif/connexion/?retour=" + encodeURIComponent(location.pathname + location.search) +
       (motif ? "&motif=" + encodeURIComponent(motif) : ""));
   }
 
@@ -76,7 +76,7 @@
 
   function deconnecte() {
     if (!avecBase) { location.href = "/planif/"; return; }
-    SB.deconnexion().then(function () { location.replace("/ab/connexion/"); });
+    SB.deconnexion().then(function () { location.replace("/planif/connexion/"); });
   }
 
 
@@ -103,34 +103,55 @@
   }
 
   /** Barre (accueil, retour), logo et mots du bureau, date, menu du compte. */
-  /** « Version du 6 octobre 2026 », d'après ab/assets/version.js. */
+  /** « Version du 6 octobre 2026 », d'après assets/version.js. */
   function versionPubliee() {
-    var d = global.AB_VERSION && C.dt(global.AB_VERSION);
+    var d = global.PLANIF_VERSION && C.dt(global.PLANIF_VERSION);
     return d ? "Version du " + d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear() : "";
   }
   function pied() {
     var p = document.getElementById("pied"), v = versionPubliee();
-    if (p && v) p.textContent = "Espace AB Ingénieurs · " + v;
+    if (p) p.textContent = D.nomEspace() + (v ? " · " + v : "");
+  }
+
+  /* Marque de l'espace : posée sur <html>, retenue pour ce compte, icône de l'onglet. */
+  var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#1F4E85"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#A9CCF2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
+  function appliqueMarque() {
+    var m = D.marque(), r = document.documentElement;
+    r.setAttribute("data-marque", m);
+    try {
+      var mail = avecBase && SB.connecte() ? SB.email() : "";
+      if (mail) global.localStorage.setItem("planif.marque:" + mail, m);
+      global.localStorage.setItem("planif.marque", m);
+    } catch (e) {}
+    var icone = document.querySelector("link[rel=icon]");
+    if (icone) icone.href = m === "ab" ? "/planif/assets/logo-ab-marque.svg?v=1"
+      : "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' + LOGO_STR + "</svg>");
+    return m;
   }
 
   function entete(hote) {
-    var accueil = location.pathname.replace(/\/+$/, "/") === "/ab/";
+    var m = appliqueMarque();
+    var accueil = location.pathname.replace(/\/+$/, "/") === "/planif/";
     var barre = el("nav", { class: "ab-barre", "aria-label": "Navigation" }, [
-      el("a", { class: "ab-bouton-carre", href: "/ab/", title: "Accueil", "aria-label": "Accueil",
+      el("a", { class: "ab-bouton-carre", href: "/planif/", title: "Accueil", "aria-label": "Accueil",
                 "aria-current": accueil ? "page" : null }, [
         svg("0 0 24 24", '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>')
       ]),
       el("button", { type: "button", class: "ab-bouton-carre gris", title: "Retour", "aria-label": "Retour",
-                     onclick: function () { if (history.length > 1) history.back(); else location.href = "/ab/"; } }, [
+                     onclick: function () { if (history.length > 1) history.back(); else location.href = "/planif/"; } }, [
         svg("0 0 24 24", '<path class="ab-fleche" d="M19.5 12h-15M10.5 6l-6 6 6 6"/>')
       ])
     ]);
 
-    /* Le logo du bureau, tel quel : pavé et texte officiel à sa droite
-       (ab/assets/logo-ab-horizontal.svg, relevé sur le fichier du bureau). */
-    var marque = el("a", { class: "ab-marque", href: "/ab/" }, [
-      el("img", { class: "ab-logo", src: "/ab/assets/logo-ab-horizontal.svg?v=1",
-                  alt: "AB Ingénieurs civils, géotechnique, environnement — accueil", width: "443", height: "150" })
+    /* Le logo de la marque : celui du bureau tel quel (assets/logo-ab-horizontal.svg,
+       relevé sur son fichier), ou STR Bim Tools (pavé et texte). */
+    var marque = el("a", { class: "ab-marque", href: "/planif/", "aria-label": D.nomEspace() + " — accueil" }, [
+      m === "ab"
+        ? el("img", { class: "ab-logo", src: "/planif/assets/logo-ab-horizontal.svg?v=1", alt: "", width: "443", height: "150" })
+        : el("span", { class: "marque-str ab-logo-str" }, [
+            svg("0 0 100 100", LOGO_STR),
+            el("span", { class: "marque-mots" }, [el("b", { text: "STR Bim Tools" }), el("span", { text: D.enDemo() ? "Espace démo" : "Planification" })])
+          ])
     ]);
 
     var id = identite();
@@ -182,7 +203,7 @@
     });
   }
 
-  global.AB = {
+  global.Portail = {
     el: el, vide: vide, svg: svg, majuscule: majuscule,
     avecBase: avecBase, session: session, echec: echec, deconnecte: deconnecte,
     identite: identite, entete: entete, versionPubliee: versionPubliee, surRetour: surRetour, JOURS: JOURS
