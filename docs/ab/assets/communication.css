@@ -1,0 +1,99 @@
+/* Module Communication (version AB, 06.10.2026) — page /ab/communication/.
+   Chargée après planif.css et habillage.css. */
+
+.cm-sommaire{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.cm-sommaire a{
+  text-decoration:none;font-size:14px;font-weight:500;color:var(--texte-doux);
+  background:#fff;border-radius:20px;padding:6px 14px;box-shadow:0 1px 2px rgba(30,34,38,.06);
+}
+.cm-sommaire a:hover{background:#EEF5DE;color:var(--texte)}
+.cm-sous{font-size:16px;font-weight:650;margin:22px 0 10px}
+.cm-cles{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){.cm-cles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cm-deux{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px}
+@media (max-width:900px){.cm-deux{grid-template-columns:minmax(0,1fr)}}
+
+/* Listes de personnes */
+.cm-liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.cm-liste > li + li{border-top:1px solid var(--ligne-faible)}
+.cm-personne,.cm-absence{
+  display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:12px;
+  padding:9px 2px;width:100%;
+}
+.cm-absence{font:inherit;color:var(--texte);text-align:left;background:none;border:0;cursor:pointer;border-radius:6px}
+.cm-absence:hover{background:#F6FAEE}
+.cm-absence:focus-visible{outline:2px solid var(--or);outline-offset:1px}
+.cm-init{
+  display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  background:#E9EBE6;color:var(--texte-doux);font-size:12.5px;font-weight:600;
+}
+.cm-init.petit{width:24px;height:24px;font-size:10px;margin-left:-4px;border:2px solid #fff}
+.cm-init.petit:first-child{margin-left:0}
+.cm-lib{display:flex;flex-direction:column;min-width:0}
+.cm-titre{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-detail{font-size:13.5px;color:var(--texte-faible);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-motif{font-size:14px;color:var(--texte-doux)}
+.cm-jours{font-size:13.5px;color:var(--texte-faible);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cm-genre{border-color:transparent;background:#F0F1EE}
+.cm-genre.absence{background:#FBE4E2;color:var(--alerte)}
+.cm-genre.avis{background:#FDF0DC;color:#8A5A00}
+.cm-genre.encours{background:#8A5A00;color:#fff}
+.cm-ok{display:flex;align-items:center;gap:10px;color:var(--texte-doux)}
+.cm-puce{width:10px;height:10px;border-radius:50%;background:#5BA33B}
+
+/* La semaine d'un coup d'œil */
+.cm-semaine{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.cm-jour{display:flex;flex-direction:column;gap:6px;background:#F6F7F4;border-radius:8px;padding:10px 12px;border:2px solid transparent}
+.cm-jour.aujourdhui{border-color:var(--or);background:#fff}
+.cm-jour.passe{opacity:.55}
+.cm-jour.chome{background:repeating-linear-gradient(135deg,rgba(var(--encre),.05) 0 3px,transparent 3px 7px)}
+.cm-jour-nom{font-weight:650}
+.cm-jour-chiffres{display:flex;flex-direction:column;font-size:13px;color:var(--texte-faible)}
+.cm-jour-chiffres b{color:var(--texte);font-variant-numeric:tabular-nums}
+.cm-jour-ferie{font-size:13px;color:var(--texte-faible)}
+@media (max-width:640px){
+  .cm-semaine{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+  .cm-jour{padding:8px 6px}
+  .cm-jour-chiffres span{font-size:11.5px}
+}
+
+/* Rendez-vous */
+.cm-rdv{
+  display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;font:inherit;color:var(--texte);cursor:pointer;
+  background:#fff;border:1px solid rgba(var(--encre),.10);border-left:3px solid var(--or);border-radius:6px;padding:8px 10px;
+  transition:border-color .2s,box-shadow .2s;
+}
+.cm-rdv:hover{box-shadow:0 4px 12px rgba(30,34,38,.08);border-color:var(--or-doux);border-left-color:var(--or)}
+.cm-rdv:focus-visible{outline:2px solid var(--or);outline-offset:1px}
+.cm-rdv.outlook{border-left-color:#2B5A8A}
+.cm-rdv.compact{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:4px 0}
+.cm-heure{font-size:12.5px;font-weight:600;color:var(--or);font-variant-numeric:tabular-nums}
+.cm-rdv-titre{font-weight:600;font-size:14.5px;line-height:1.3}
+.cm-rdv-lieu{font-size:13px;color:var(--texte-faible)}
+.cm-gens{display:flex;align-items:center;margin-top:2px}
+.cm-rdv.compact .cm-gens{margin-left:auto}
+.cm-plus{font-size:11.5px;color:var(--texte-faible);margin-left:4px}
+
+/* Agenda : une colonne par jour */
+.cm-grille{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:10px;margin-top:10px}
+.cm-col{display:flex;flex-direction:column;gap:8px;background:#F6F7F4;border-radius:8px;padding:10px;min-height:150px}
+.cm-col.aujourdhui{background:#F2F8E6;box-shadow:inset 0 0 0 2px var(--or)}
+.cm-col.passe{opacity:.7}
+.cm-col-tete{display:flex;align-items:baseline;gap:6px}
+.cm-col-jour{font-size:13px;color:var(--texte-faible)}
+.cm-col-num{font-size:20px;font-weight:650}
+.cm-ajout{
+  margin-top:auto;align-self:stretch;height:30px;border:1px dashed rgba(var(--encre),.22);border-radius:6px;
+  background:none;color:var(--texte-faible);font-size:18px;cursor:pointer;
+}
+.cm-ajout:hover{border-color:var(--or);color:var(--or);background:#fff}
+@media (max-width:900px){
+  .cm-grille{grid-template-columns:minmax(0,1fr)}
+  .cm-col{min-height:0}
+}
+
+/* Participants (formulaire) */
+.cm-participants{max-height:260px;overflow-y:auto;padding:4px 2px;margin-top:8px}
+.cm-groupe{font-size:12.5px;font-weight:600;color:var(--texte-faible);margin:8px 0 2px}
+.cm-groupe:first-child{margin-top:0}
+.cm-participants .cases{margin-top:4px}

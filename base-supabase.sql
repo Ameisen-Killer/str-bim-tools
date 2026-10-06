@@ -431,6 +431,29 @@ create table if not exists public.ao_agenda (
     references public.affaires (id, bureau_id) on delete cascade
 );
 create index if not exists ao_agenda_bureau on public.ao_agenda (bureau_id, jour);
+
+-- Agenda interne du bureau (espace AB, module Communication) : rendez-vous
+-- d'une ou plusieurs personnes. externe_id et source préparent la réplication
+-- avec Outlook (identifiant de l'événement de l'autre côté), encore à venir.
+create table if not exists public.rendez_vous (
+  id           uuid primary key default gen_random_uuid(),
+  bureau_id    uuid not null default public.bureau_par_defaut()
+               constraint rendez_vous_bureau_fk references public.bureaux (id) on delete cascade,
+  titre        text not null check (char_length(titre) between 1 and 200),
+  jour         date not null,
+  debut        time,                     -- vide : toute la journée
+  fin          time,
+  lieu         text not null default '' check (char_length(lieu) <= 200),
+  note         text not null default '',
+  participants uuid[] not null default '{}',   -- fiches d'équipe (membres)
+  cree_par     uuid,                     -- fiche de la personne qui l'a noté
+  source       text not null default 'planif' check (source in ('planif', 'outlook')),
+  externe_id   text,
+  cree_le      timestamptz not null default now(),
+  maj_le       timestamptz not null default now(),
+  constraint rendez_vous_heures check (debut is null or fin is null or fin > debut)
+);
+create index if not exists rendez_vous_bureau on public.rendez_vous (bureau_id, jour);
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
@@ -571,7 +594,7 @@ $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages', 'ao_agenda'] loop
+  foreach t in array array['membres', 'affaires', 'taches', 'contacts', 'reglages', 'ao_agenda', 'rendez_vous'] loop
     execute format('drop trigger if exists maj_le on public.%I', t);
     execute format(
       'create trigger maj_le before update on public.%I
@@ -634,7 +657,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'ao_agenda', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'rendez_vous', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -642,7 +665,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -765,6 +788,25 @@ create policy "bureau courant (modification)" on public.ao_agenda for update to 
   with check (bureau_id = (select public.bureau_courant()));
 create policy "bureau courant (suppression)" on public.ao_agenda for delete to authenticated
   using (bureau_id = (select public.bureau_courant()));
+
+-- Rendez-vous : tout le bureau les voit et en note ; seuls celui qui l'a
+-- noté, ses participants et qui a le droit de poser les absences des autres
+-- les modifient ou les retirent.
+create policy "bureau courant (lecture)" on public.rendez_vous for select to authenticated
+  using (bureau_id = (select public.bureau_courant()));
+create policy "bureau courant (création)" on public.rendez_vous for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "les siens ou le droit (modification)" on public.rendez_vous for update to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (
+    cree_par = (select public.mon_membre())
+    or (select public.mon_membre()) = any (participants)
+    or (select public.a_droit('absences_autrui'))))
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "les siens ou le droit (suppression)" on public.rendez_vous for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (
+    cree_par = (select public.mon_membre())
+    or (select public.mon_membre()) = any (participants)
+    or (select public.a_droit('absences_autrui'))));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -1853,7 +1895,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

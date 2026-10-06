@@ -290,7 +290,7 @@
     return {
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
-      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: []
+      membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: []
     };
   }
 
@@ -572,6 +572,16 @@
       e.avis.push({ id: texte(a.id) || id(), membreId: texte(a.membreId), debut: debut, fin: fin,
                     motif: texte(a.motif) || "Absence", cree: texte(a.cree) || new Date().toISOString() });
     });
+    (brut.rdv || []).forEach(function (r) {
+      if (!texte(r.jour) || !texte(r.titre)) return;
+      var de = texte(r.debut).slice(0, 5), a = texte(r.fin).slice(0, 5);
+      e.rdv.push({ id: texte(r.id) || id(), titre: texte(r.titre), jour: texte(r.jour).slice(0, 10),
+                   debut: RE_HEURE.test(de) ? de : "", fin: RE_HEURE.test(a) ? a : "",
+                   lieu: texte(r.lieu), note: texte(r.note),
+                   participants: (r.participants || []).map(texte).filter(Boolean),
+                   creePar: texte(r.creePar) || null, source: r.source === "outlook" ? "outlook" : "planif",
+                   externeId: texte(r.externeId) || null });
+    });
     (brut.agenda || []).forEach(function (r) {
       if (!texte(r.jour) || !texte(r.affaireId)) return;
       var h = texte(r.heure).slice(0, 5);
@@ -618,6 +628,7 @@
     (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
     (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
     (e.agenda || []).forEach(function (r) { r.id = neuf(r.id); r.affaireId = neuf(r.affaireId); });
+    (e.rdv || []).forEach(function (r) { r.id = neuf(r.id); r.participants = r.participants.map(neuf); r.creePar = neuf(r.creePar); });
     e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
@@ -631,6 +642,10 @@
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
     e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
     e.agenda = (e.agenda || []).filter(function (r) { return vraisA[r.affaireId]; });
+    (e.rdv || []).forEach(function (r) {
+      r.participants = r.participants.filter(function (x) { return vraisM[x]; });
+      if (!vraisM[r.creePar]) r.creePar = null;
+    });
     var vraisC = {};
     (e.contacts || []).forEach(function (c) { vraisC[c.id] = true; });
     e.affaires.forEach(function (a) { if (!vraisC[a.demandeurId]) a.demandeurId = null; });
@@ -746,6 +761,17 @@
     }
     if ("secteurs" in o) v.secteurs = (o.secteurs || []).map(texte).filter(Boolean);
     return v;
+  }
+
+  function valideRdv(o) {
+    if (!texte(o.titre)) throw erreur("Donne un intitulé au rendez-vous.");
+    if (!texte(o.jour)) throw erreur("La date est obligatoire.");
+    var de = texte(o.debut), a = texte(o.fin);
+    if ((de && !RE_HEURE.test(de)) || (a && !RE_HEURE.test(a))) throw erreur("Heures à saisir sous la forme 14:30.");
+    if (de && a && a <= de) throw erreur("La fin doit venir après le début.");
+    var gens = (o.participants || []).map(texte).filter(function (x) { return x && idx().membres[x]; });
+    return { titre: texte(o.titre).slice(0, 200), jour: texte(o.jour), debut: de, fin: de ? a : "",
+             lieu: texte(o.lieu).slice(0, 200), note: texte(o.note), participants: gens };
   }
 
   function valideEvenement(o) {
@@ -1211,6 +1237,61 @@
     suppContact: function (i) {
       return Promise.resolve().then(function () {
         etat.contacts = etat.contacts.filter(function (c) { return c.id !== i; });
+        return sauve();
+      });
+    },
+
+    /* ------------------------------------------------ rendez-vous du bureau
+       L'agenda interne (espace AB, module Communication) : un rendez-vous, ses
+       participants. La réplication avec Outlook viendra (source, externeId). */
+    /** La base a-t-elle la table rendez_vous (migration-communication.sql) ? Toujours en mode local. */
+    rdvPret: function () { return ADAPTATEUR.rdvEnBase ? ADAPTATEUR.rdvEnBase() : true; },
+    /** Rendez-vous par date puis heure. opts.depuis / opts.jusqu (AAAA-MM-JJ), opts.membreId : ceux d'une personne. */
+    rendezVous: function (opts) {
+      opts = opts || {};
+      return (etat.rdv || []).filter(function (r) {
+        if (opts.depuis && r.jour < opts.depuis) return false;
+        if (opts.jusqu && r.jour > opts.jusqu) return false;
+        if (opts.membreId && r.participants.indexOf(opts.membreId) < 0 && r.creePar !== opts.membreId) return false;
+        return true;
+      }).sort(function (a, b) {
+        return a.jour < b.jour ? -1 : a.jour > b.jour ? 1 : (a.debut || "") < (b.debut || "") ? -1 : (a.debut || "") > (b.debut || "") ? 1 : 0;
+      });
+    },
+    rdvParId: function (i) {
+      var l = etat.rdv || [];
+      for (var k = 0; k < l.length; k++) if (l[k].id === i) return l[k];
+      return null;
+    },
+    /** Puis-je modifier ce rendez-vous ? Le mien (noté par moi, ou j'y participe), ou le droit sur les absences des autres. */
+    peutRdv: function (r) {
+      if (!r || D.aDroit("absences_autrui")) return true;
+      var moi = D.monMembre();
+      return !!moi && (r.creePar === moi.id || r.participants.indexOf(moi.id) >= 0);
+    },
+    ajouteRdv: function (o) {
+      return Promise.resolve().then(function () {
+        if (!D.rdvPret()) throw erreur("L'agenda attend la mise à jour de la base (migration-communication.sql).");
+        var v = valideRdv(o), moi = D.monMembre();
+        v.id = id(); v.creePar = moi ? moi.id : null; v.source = "planif"; v.externeId = null;
+        (etat.rdv || (etat.rdv = [])).push(v);
+        return sauve().then(function () { return v; });
+      });
+    },
+    majRdv: function (i, o) {
+      return Promise.resolve().then(function () {
+        var r = D.rdvParId(i); if (!r) throw erreur("Rendez-vous introuvable.");
+        if (!D.peutRdv(r)) throw erreur("Seuls ses participants et la personne qui l'a noté modifient ce rendez-vous.");
+        var v = valideRdv(o);
+        Object.keys(v).forEach(function (k) { r[k] = v[k]; });
+        return sauve().then(function () { return r; });
+      });
+    },
+    suppRdv: function (i) {
+      return Promise.resolve().then(function () {
+        var r = D.rdvParId(i); if (!r) return;
+        if (!D.peutRdv(r)) throw erreur("Seuls ses participants et la personne qui l'a noté retirent ce rendez-vous.");
+        etat.rdv = etat.rdv.filter(function (x) { return x.id !== i; });
         return sauve();
       });
     },

@@ -742,6 +742,8 @@
     if (VERSION_AB) {
       // Version AB : pas de console ; le module Secteurs, propre à AB, suit la carte de charge
       pages = pages.filter(function (p) { return p.cle !== "console"; });
+      // Communication (rendez-vous, absences, vision du bureau) juste après l'accueil
+      pages.splice(1, 0, { cle: "communication", href: "/ab/communication/", nom: "Communication", court: "Comm." });
       var iCharge = pages.map(function (p) { return p.cle; }).indexOf("charge");
       pages.splice(iCharge + 1, 0, { cle: "secteurs", href: "/ab/secteurs/", nom: "Secteurs", court: "Secteurs" },
                                    { cle: "inter", href: "/ab/inter-secteurs/", nom: "Inter-secteurs", court: "AO" });
