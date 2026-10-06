@@ -86,13 +86,13 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=34"></script>
-<script src="/planif/assets/donnees.js?v=43"></script>
+<script src="/planif/assets/supabase.js?v=35"></script>
+<script src="/planif/assets/donnees.js?v=44"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/ab/assets/version.js?v=1"></script>
 <script src="/planif/assets/ui.js?v=65"></script>
 <script src="/planif/assets/palette.js?v=11"></script>
-<script src="/planif/assets/direct.js?v=4"></script>
+<script src="/planif/assets/direct.js?v=5"></script>
 <script>
 (function () {
   "use strict";
@@ -106,7 +106,6 @@
     chrome();
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
-    bandeauBase();
     document.querySelector(".entete").classList.add("vu");
 
     document.getElementById("f-resultat").addEventListener("change", function () { filtres.resultat = this.value; rend(); });
@@ -118,28 +117,14 @@
     rend();
   }).catch(UI.echec);
 
-  function pret() { return D.interSecteursPret(); }
   function auj() { return C.isoAuj(); }
 
   function chrome() {
     var actions = [];
-    if (pret() && D.aDroit("affaires_creer")) {
+    if (D.aDroit("affaires_creer")) {
       actions.push({ label: "Nouvel appel d'offres", or: true, icone: "ico-ajout-affaire", action: function () { formAO(null); } });
     }
     UI.chrome("inter", actions);
-  }
-
-  /* La base n'a pas encore les colonnes ni la table : on le dit, on n'écrit rien. */
-  function bandeauBase() {
-    if (pret()) return;
-    document.querySelector("[data-bandeau]").appendChild(el("div", { class: "bandeau rouge" }, [
-      el("div", {}, [
-        el("strong", { text: "Base à mettre à jour. " }),
-        "Les appels d'offres et leur agenda demandent le script migration-inter-secteurs.sql (Supabase › SQL Editor › Run). " +
-        "En attendant, la page montre les affaires transversales, sans rien enregistrer."
-      ])
-    ]));
-    document.getElementById("btn-rdv").hidden = true;
   }
 
   /* ================================================================ outils */
@@ -215,7 +200,7 @@
 
     if (!l.length) {
       hote.appendChild(el("p", { class: "vide", text: aos.length ? "Aucun appel d'offres pour ces filtres." :
-        "Aucun appel d'offres pour l'instant." + (pret() && D.aDroit("affaires_creer") ? " « Nouvel appel d'offres », en haut, en ouvre un." : "") }));
+        "Aucun appel d'offres pour l'instant." + (D.aDroit("affaires_creer") ? " « Nouvel appel d'offres », en haut, en ouvre un." : "") }));
       return;
     }
     var t = el("table", { class: "liste is-table" });
@@ -256,7 +241,7 @@
     var depuis = filtres.passes ? C.ajoute(auj(), -30) : auj();
     var l = D.agenda({ depuis: depuis });
     if (!l.length) {
-      hote.appendChild(el("p", { class: "vide", text: pret() ? "Aucun rendez-vous à venir. Visites, questions, remises et ouvertures des offres se notent ici." : "L'agenda attend la mise à jour de la base." }));
+      hote.appendChild(el("p", { class: "vide", text: "Aucun rendez-vous à venir. Visites, questions, remises et ouvertures des offres se notent ici." }));
       return;
     }
     var semaine = null, ul = null;
@@ -319,7 +304,7 @@
         el("td", { class: "num", text: String(a.ingenieurs.length + a.dessinateurs.length) }),
         el("td", { class: "num", text: String(ouvertes.length) }),
         el("td", { text: proch ? jourCourt(proch.echeance) : "—" }),
-        el("td", { class: "actions" }, pret() ? [el("button", { type: "button", class: "btn btn-nu", text: "Secteurs…", onclick: function () { formSecteurs(a.id); } })] : [])
+        el("td", { class: "actions" }, [el("button", { type: "button", class: "btn btn-nu", text: "Secteurs…", onclick: function () { formSecteurs(a.id); } })])
       ]));
     });
     t.appendChild(corps);
@@ -351,7 +336,6 @@
   }
 
   function formAO(id) {
-    if (!pret()) return UI.toast("Les appels d'offres attendent la mise à jour de la base.");
     var a = id ? D.affaire(id) : null;
     if (!a && !D.aDroit("affaires_creer")) return UI.toast("Ouvrir un appel d'offres demande le droit d'ouvrir une affaire.");
     var contacts = D.contacts();
@@ -417,7 +401,6 @@
   }
 
   function formEvenement(id, o) {
-    if (!pret()) return UI.toast("L'agenda attend la mise à jour de la base.");
     var r = id ? D.evenement(id) : null;
     var aos = appelsDOffres().filter(function (a) { return enCours(a) || (r && a.id === r.affaireId); });
     if (!aos.length) return UI.toast("Ouvre d'abord un appel d'offres : un rendez-vous s'y rattache toujours.");

@@ -1221,8 +1221,6 @@
     TYPES_AO: TYPES_AO,
     RESULTATS_AO: RESULTATS_AO,
     GENRES_AGENDA: GENRES_AGENDA,
-    /** La base connaît-elle les appels d'offres (migration-inter-secteurs.sql) ? Toujours en mode local. */
-    interSecteursPret: function () { return ADAPTATEUR.interSecteurs ? ADAPTATEUR.interSecteurs() : true; },
     /** Rendez-vous par date puis heure. opts.affaireId : ceux d'un AO ; opts.depuis : à partir de ce jour. */
     agenda: function (opts) {
       opts = opts || {};
@@ -1241,7 +1239,6 @@
     },
     ajouteEvenement: function (o) {
       return Promise.resolve().then(function () {
-        if (!D.interSecteursPret()) throw erreur("L'agenda des appels d'offres attend la mise à jour de la base (migration-inter-secteurs.sql).");
         var v = valideEvenement(o);
         v.id = id();
         (etat.agenda || (etat.agenda = [])).push(v);

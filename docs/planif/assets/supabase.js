@@ -389,14 +389,6 @@
 
   function vide(v) { return v === "" ? null : v; }
 
-  /* GARDE-FOU PROVISOIRE (06.10.2026) — module Inter-secteurs de l'espace AB.
-     Tant que migration-inter-secteurs.sql n'est pas passée, la table ao_agenda
-     manque et la base refuse toute écriture qui nomme les colonnes d'appel
-     d'offres des affaires. La lecture de ao_agenda le dit : sans elle, on
-     n'écrit ni ces colonnes ni l'agenda. À RETIRER dès que Tony confirme la
-     migration passée. */
-  var interEnBase = false;
-
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -411,11 +403,10 @@
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
       o.phase = a.phase || null;
       o.adresse = a.adresse || "";
-      if (interEnBase) {
-        o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
-        o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
-        o.secteurs = a.secteurs || [];
-      }
+      // Appel d'offres et secteurs (espace AB, module Inter-secteurs)
+      o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
+      o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
+      o.secteurs = a.secteurs || [];
       return o;
     },
     taches: function (t) {
@@ -479,13 +470,11 @@
       litTout("reglages", "id"),
       litTout("contacts", "id"),
       litAvis(),
-      // Table du module Inter-secteurs : absente tant que la migration n'est pas passée
-      litTout("ao_agenda", "jour").catch(function () { return null; })
+      litTout("ao_agenda", "jour")
     ]).then(function (r) {
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [], agenda = r[8];
-      interEnBase = agenda !== null;
+          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -547,7 +536,7 @@
             observations: c.observations || ""
           };
         }),
-        agenda: (agenda || []).map(function (x) {
+        agenda: agenda.map(function (x) {
           return { id: x.id, affaireId: x.affaire_id, jour: x.jour, heure: (x.heure || "").slice(0, 5),
                    genre: x.genre, titre: x.titre, lieu: x.lieu || "", note: x.note || "" };
         }),
@@ -664,7 +653,7 @@
     var dAbsences = compare(toutesAbsences(av), toutesAbsences(etat), function (a) { return a; });
     var dContacts = compare(av.contacts || [], etat.contacts || [], VERS_BASE.contacts);
     var dAvis = compare(av.avis || [], etat.avis || [], VERS_BASE.avis);
-    var dAgenda = interEnBase ? compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda) : { ajouts: [], modifs: [], retraits: [] };
+    var dAgenda = compare(av.agenda || [], etat.agenda || [], VERS_BASE.agenda);
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -750,8 +739,7 @@
       ecrire: ecrire,
       videTout: videTout,
       profil: profil,
-      regleJours: regleJours,
-      interSecteurs: function () { return interEnBase; }
+      regleJours: regleJours
     }
   };
 })(window);
