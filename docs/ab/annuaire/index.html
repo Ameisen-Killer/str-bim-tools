@@ -3,18 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Annuaire · Planification · STR Bim Tools</title>
+<title>Annuaire · AB Ingénieurs</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#F4F5F2">
 <script>
-/* Thème posé avant le premier rendu : préférence de l'utilisateur connecté, sinon la dernière utilisée */
-(function(){var r=document.documentElement;try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),c=localStorage.getItem("planif.theme:"+(s&&s.email||""))||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);var f={clair:"#F3F0E8"}[c];if(f)document.querySelector("meta[name=theme-color]").setAttribute("content",f);}catch(e){r.setAttribute("data-theme","sombre");}})();
+/* Version AB : charte claire unique, posée avant le premier rendu (ui.js la garde) */
+(function(){var r=document.documentElement;r.setAttribute("data-version","ab");r.setAttribute("data-theme","clair");})();
 </script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23C8DE9A'/%3E%3Crect y='58.5' width='100' height='41.5' fill='%238B8B8D'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='6.2'%3E%3Cpath d='M25.5 73.5 37.25 43.3 49 73.5'/%3E%3Cpath d='M59.1 73.5V43.6h7.4a6.2 6.2 0 0 1 0 12.4h-7.4M59.1 56h8.5a7.2 7.2 0 0 1 0 14.4h-8.5'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=77">
+<link rel="stylesheet" href="/ab/assets/habillage.css?v=1">
 </head>
 <body class="large">
 

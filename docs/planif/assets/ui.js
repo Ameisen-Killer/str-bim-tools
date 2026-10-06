@@ -308,6 +308,19 @@
   var SB = global.Sb;
   var avecBase = !!(SB && SB.configure);
 
+  /* Version AB (/ab/, 06.10.2026) : les pages du bureau AB sont des copies
+     de celles-ci, posées sous /ab/ avec <html data-version="ab">. Elles lisent
+     la même base par le même moteur ; seuls l'habillage (ab/assets/habillage.css),
+     la barre du haut et les adresses changent. chemin() envoie chaque lien de
+     l'outil vers la page de la même version. */
+  var VERSION_AB = document.documentElement.getAttribute("data-version") === "ab";
+  var PAGES_AB = /^\/planif\/(planning|charge|taches|affaires|equipe|absences|annuaire|carte)\//;
+  function chemin(p) {
+    if (!VERSION_AB || typeof p !== "string") return p;
+    if (p === "/planif/" || p.indexOf("/planif/?") === 0 || p.indexOf("/planif/#") === 0) return "/ab/" + p.slice(8);
+    return PAGES_AB.test(p) ? "/ab/" + p.slice(8) : p;
+  }
+
   function pageConnexion(parametres) {
     location.replace("/planif/connexion/?" + parametres);
   }
@@ -342,7 +355,7 @@
         arretePresence();
         bat({ quitter: true })
           .then(function () { return SB.deconnexion(); })
-          .then(function () { pageConnexion(""); });
+          .then(function () { pageConnexion(VERSION_AB ? "retour=" + encodeURIComponent("/ab/") : ""); });
       });
   }
 
@@ -378,9 +391,10 @@
 
   function appliqueTheme(choix) {
     var effectif = choix === "systeme" ? (mediaClair && mediaClair.matches ? "clair" : "sombre") : choix;
+    if (VERSION_AB) effectif = "clair";        // la version AB a une seule charte, claire
     document.documentElement.setAttribute("data-theme", effectif);
     var meta = document.querySelector("meta[name=theme-color]");
-    if (meta) meta.setAttribute("content", FOND_THEME[effectif] || FOND_THEME.sombre);
+    if (meta) meta.setAttribute("content", VERSION_AB ? "#F4F5F2" : FOND_THEME[effectif] || FOND_THEME.sombre);
     [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function (b) {
       b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === choix));
     });
@@ -657,6 +671,62 @@
     { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
+  /* ------------------------------------------------- barre de la version AB
+     Accueil et retour, logo du bureau ; à droite la recherche, qui est en
+     ligne, le bureau (super admin) et le compte : nom, rafraîchir, données,
+     version classique, déconnexion. */
+  var LOGO_AB =
+    '<rect width="100" height="100" fill="#C8DE9A"/><rect y="58.5" width="100" height="41.5" fill="#8B8B8D"/>' +
+    '<g fill="none" stroke="#fff" stroke-width="6.2"><path d="M25.5 73.5 37.25 43.3 49 73.5"/>' +
+    '<path d="M59.1 73.5V43.6h7.4a6.2 6.2 0 0 1 0 12.4h-7.4M59.1 56h8.5a7.2 7.2 0 0 1 0 14.4h-8.5"/></g>';
+
+  function dessinAB(vue, contenu, classe) {
+    var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", vue); s.setAttribute("aria-hidden", "true"); s.setAttribute("focusable", "false");
+    if (classe) s.setAttribute("class", classe);
+    s.innerHTML = contenu;
+    return s;
+  }
+
+  function marqueAB() {
+    return el("div", { class: "ab-fil" }, [
+      el("a", { class: "ab-carre", href: "/ab/", title: "Accueil", "aria-label": "Accueil" }, [
+        dessinAB("0 0 24 24", '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>')
+      ]),
+      el("button", { type: "button", class: "ab-carre gris", title: "Retour", "aria-label": "Retour",
+        onclick: function () { if (history.length > 1) history.back(); else location.href = "/ab/"; } }, [
+        dessinAB("0 0 24 24", '<path class="ab-fleche" d="M19.5 12h-15M10.5 6l-6 6 6 6"/>')
+      ]),
+      el("a", { class: "ab-marque-barre", href: "/ab/", "aria-label": "AB Ingénieurs — accueil" }, [
+        dessinAB("0 0 100 100", LOGO_AB, "ab-logo-barre"),
+        el("span", { class: "ab-mot", text: "Ingénieurs" })
+      ])
+    ]);
+  }
+
+  function compteAB(profil) {
+    var moi = D.etat() ? D.monMembre() : null;
+    var mail = avecBase ? SB.email() : "";
+    var nom = moi ? moi.prenom + " " + moi.nom : (mail || (D.estDemo() ? "Démonstration" : "Données locales"));
+    var init = moi ? (moi.prenom.charAt(0) + moi.nom.charAt(0)).toUpperCase() : (nom.charAt(0) || "?").toUpperCase();
+    var bouton = el("button", { type: "button", class: "ab-compte-btn", "aria-haspopup": "menu", "aria-expanded": "false",
+                                "aria-label": "Compte : " + nom }, [
+      el("span", { class: "ab-avatar", "aria-hidden": "true", text: init }),
+      el("span", { class: "ab-compte-nom", text: nom }),
+      el("span", { class: "fleche", "aria-hidden": "true", text: "▾" })
+    ]);
+    var menu = el("div", { class: "menu-bureau ab-menu-compte", role: "menu", hidden: true }, [
+      mail ? el("p", { class: "ab-menu-mail", text: mail }) : null,
+      D.etat() ? el("button", { type: "button", role: "menuitem", dataset: { rafraichir: "" },
+        onclick: function () { ouvre(false); rafraichit(false); } }, ["Rafraîchir les données"]) : null,
+      D.etat() ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); ouvreDonnees(); } }, ["Données (export, import)"]) : null,
+      el("a", { role: "menuitem", href: "/planif/" }, ["Version classique de la planification"]),
+      avecBase ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); deconnecte(); } }, ["Se déconnecter"]) : null
+    ]);
+    var ouvre = deroulant(bouton, menu);
+    return el("div", { class: "ab-compte" }, [bouton, menu]);
+  }
+
   /**
    * Construit barre + navigation dans l'élément [data-chrome].
    * Ligne du haut : fil d'Ariane à gauche, « Données » et « Quitter » à droite.
@@ -672,10 +742,11 @@
     var profil = D.profil ? D.profil() : null;
     var superAdmin = !!(profil && profil.multi && profil.superAdmin);
     var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
+    if (VERSION_AB) pages = pages.filter(function (p) { return p.cle !== "console"; });
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
     pages.forEach(function (p) {
-      nav.appendChild(el("a", { href: p.href, "aria-current": p.cle === actif ? "page" : null }, [
+      nav.appendChild(el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null }, [
         el("span", { class: "long", text: p.nom }),
         el("span", { class: "court", text: p.court })
       ]));
@@ -719,7 +790,14 @@
       avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
     ]);
 
+    if (VERSION_AB) {
+      outilsHaut = el("div", { class: "barre-outils" }, [
+        palette, placeEnLigne(), bureauCourant(profil), compteAB(profil)
+      ]);
+    }
+
     hote.appendChild(el("div", { class: "barre" }, [
+      VERSION_AB ? el("div", { class: "barre-h" }, [marqueAB(), outilsHaut]) :
       el("div", { class: "barre-h" }, [
         el("div", { class: "fil" + (superAdmin ? " avec-choix" : "") }, [
           el("span", { class: "marque" }, [
@@ -1072,8 +1150,9 @@
     if (!hote) return;
     vide(hote);
     hote.appendChild(el("footer", { class: "pied-outil" }, [
-      el("a", { href: "/", text: "← str-bim-tools.com" }),
+      VERSION_AB ? el("a", { href: "/ab/", text: "← Espace AB Ingénieurs" }) : el("a", { href: "/", text: "← str-bim-tools.com" }),
       el("div", { class: "droite" }, [
+        VERSION_AB ? el("a", { href: "/planif/", text: "Version classique" }) : null,
         el("span", { class: "maj", text: avecBase ? "Base hébergée en Europe (Francfort)" : "Données enregistrées dans ce navigateur" }),
         el("a", { href: "/mentions-legales/", text: "Mentions légales" })
       ])
@@ -1704,7 +1783,7 @@
       return ouvre({
         titre: "Aucune affaire",
         corps: el("p", { style: "color:var(--texte-doux)", text: "Une tâche se rattache toujours à une affaire. Crée d'abord une affaire." }),
-        boutons: [{ label: "Fermer" }, { label: "Aller aux affaires", or: true, action: function () { location.href = "/planif/affaires/"; } }]
+        boutons: [{ label: "Fermer" }, { label: "Aller aux affaires", or: true, action: function () { location.href = chemin("/planif/affaires/"); } }]
       });
     }
 
@@ -2221,7 +2300,7 @@
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
     formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, caseLissage: caseLissage, annule: annule,
-    session: session, echec: echec, avecBase: avecBase,
+    session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions,

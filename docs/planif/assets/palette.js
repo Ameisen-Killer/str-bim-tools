@@ -420,7 +420,7 @@
     };
   }
   function lignePage(p, mots) {
-    return { noeud: [glyphe("→"), lib(p.nom, mots), meta(location.pathname === p.href ? "Ici" : "")],
+    return { noeud: [glyphe("→"), lib(p.nom, mots), meta(location.pathname === (UI.chemin ? UI.chemin(p.href) : p.href) ? "Ici" : "")],
              action: function () { va(p.href); } };
   }
   function ligneCommande(c, mots) {
@@ -469,7 +469,7 @@
     }).catch(function (e) { UI.toast(e.message); });
   }
 
-  function va(href) { ferme(); location.href = href; }
+  function va(href) { ferme(); location.href = UI.chemin ? UI.chemin(href) : href; }
 
   /* ========================================================= la fenêtre ===== */
 

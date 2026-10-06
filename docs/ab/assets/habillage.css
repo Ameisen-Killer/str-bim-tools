@@ -1,0 +1,225 @@
+/* Version AB — habillage des pages de la planification copiées sous /ab/ (06.10.2026)
+   ---------------------------------------------------------------------------
+   Les pages /ab/<page>/ chargent planif.css (composants communs) puis cette
+   feuille, et portent <html data-version="ab" data-theme="clair">. Tout est
+   rangé sous :root[data-version="ab"] : posée après planif.css, à spécificité
+   égale, elle l'emporte sur le thème clair d'origine ; sur une page de
+   /planif/, elle n'a aucun effet.
+   La charte est celle de l'accueil AB (ab.css) : fond gris très clair, cartes
+   blanches arrondies, vert du logo en remplissage, texte vert assombri.
+   --------------------------------------------------------------------------- */
+
+:root[data-version="ab"]{
+  color-scheme:light;
+  --encre:30,34,38;
+  --fond-rvb:255,255,255;
+  --or-rvb:77,122,28;           /* l'accent : vert assombri, 5,1:1 sur blanc */
+  --alerte-rvb:198,43,34;
+  --verre-rvb:43,90,138;
+
+  --noir:#FFFFFF;               /* surfaces : cartes, bandeaux collants */
+  --noir-2:#FFFFFF;             /* fenêtres, menus */
+  --texte:#1E2226;
+  --or:#4D7A1C;
+  --alerte:#C62B22;
+  --bleu:#2B5A8A;
+  --voile:rgba(30,34,38,.34);
+  --option-choisie:#EEF5DE;
+
+  --ligne:rgba(var(--encre),.15);
+  --ligne-faible:rgba(var(--encre),.08);
+  --or-doux:rgba(var(--or-rvb),.6);
+  --texte-doux:rgba(var(--encre),.82);
+  --texte-faible:rgba(var(--encre),.66);
+
+  --mono:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  /* Teintes d'affaire, lisibles sur blanc */
+  --t1:#4D7A1C; --t2:#2B5A8A; --t3:#1F7A70; --t4:#B0561A;
+  --t5:#5E4FA0; --t6:#475B66; --t7:#7A6A12; --t8:#9C3F55;
+
+  --ab-fond:#F4F5F2;
+  --ab-vert-logo:#CAE09B;
+  --ab-vert-clair:#D5E8AC;
+  --ab-vert-pale:#EEF5DE;
+  --ab-ombre:0 1px 2px rgba(30,34,38,.05),0 4px 14px rgba(30,34,38,.05);
+  --ab-ombre-haute:0 2px 4px rgba(30,34,38,.06),0 14px 34px rgba(30,34,38,.12);
+}
+
+/* --------------------------------------------------------- typographie
+   Pas de capitales espacées ni de chasse fixe : une seule police, en casse
+   normale. Le corps passe en graisse normale, les titres en gras. */
+:root[data-version="ab"] body{background:var(--ab-fond);font-weight:400}
+:root[data-version="ab"] body *{letter-spacing:normal;text-transform:none}
+:root[data-version="ab"] h1,:root[data-version="ab"] h2,:root[data-version="ab"] h3{font-weight:650}
+:root[data-version="ab"] .num,:root[data-version="ab"] .mono{font-variant-numeric:tabular-nums}
+
+/* --------------------------------------------------------- barre du haut */
+:root[data-version="ab"] .barre{
+  background:rgba(255,255,255,.94);border-bottom:0;box-shadow:0 1px 0 rgba(30,34,38,.06),0 6px 18px rgba(30,34,38,.05);
+}
+:root[data-version="ab"] .barre-h{
+  align-items:center;padding:max(12px,env(safe-area-inset-top)) var(--g) 10px;
+  font-size:14px;color:var(--texte);
+}
+:root[data-version="ab"] .ab-fil{display:flex;align-items:center;gap:10px;min-width:0}
+:root[data-version="ab"] .ab-carre{
+  flex:0 0 auto;display:inline-grid;place-items:center;width:40px;height:40px;padding:0;
+  border:0;border-radius:6px;background:#fff;box-shadow:var(--ab-ombre);cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+}
+:root[data-version="ab"] .ab-carre.gris{background:#E9EBE6;box-shadow:none}
+:root[data-version="ab"] .ab-carre:hover{transform:translateY(-1px);box-shadow:var(--ab-ombre-haute)}
+:root[data-version="ab"] .ab-carre:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="ab"] .ab-carre svg{width:22px;height:22px}
+:root[data-version="ab"] .ab-maison{fill:#5BA33B}
+:root[data-version="ab"] .ab-fleche{fill:none;stroke:var(--texte);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:root[data-version="ab"] .ab-marque-barre{display:flex;align-items:center;gap:12px;margin-left:10px;text-decoration:none;min-width:0}
+:root[data-version="ab"] .ab-logo-barre{width:40px;height:40px;flex:0 0 auto;display:block}
+:root[data-version="ab"] .barre-h .ab-mot{
+  color:#8B8B8D;font-weight:600;font-size:14px;letter-spacing:.26em;text-transform:uppercase;white-space:nowrap;
+}
+:root[data-version="ab"] .barre-outils{align-items:center;gap:14px}
+:root[data-version="ab"] .barre-outils .btn-palette{border-radius:6px;padding:7px 9px 7px 11px;margin:0;font-size:14px;background:#F4F5F2;border-color:transparent}
+:root[data-version="ab"] .barre-outils .btn-palette:hover{border-color:var(--or-doux);background:#fff}
+:root[data-version="ab"] .btn-palette kbd{border-radius:4px;font-size:11px}
+:root[data-version="ab"] .ab-compte{position:relative}
+:root[data-version="ab"] .barre-outils .ab-compte-btn{
+  display:inline-flex;align-items:center;gap:10px;font-size:15px;color:var(--texte);
+  border-radius:30px;padding:2px 6px 2px 2px;
+}
+:root[data-version="ab"] .barre-outils .ab-compte-btn:hover{color:var(--or)}
+:root[data-version="ab"] .ab-compte-btn:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="ab"] .ab-avatar{
+  display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;
+  background:#8E9295;color:#fff;font-size:13px;font-weight:500;flex:0 0 auto;
+}
+:root[data-version="ab"] .ab-compte-btn .fleche{font-size:10px;color:var(--texte-faible)}
+:root[data-version="ab"] .ab-menu-compte{left:auto;right:0;min-width:270px}
+:root[data-version="ab"] .ab-menu-mail{padding:8px 12px 10px;margin-bottom:4px;border-bottom:1px solid var(--ligne-faible);font-size:13px;color:var(--texte-faible);word-break:break-all}
+:root[data-version="ab"] .menu-bureau{border:0;border-radius:8px;box-shadow:var(--ab-ombre-haute);font-size:14px}
+:root[data-version="ab"] .menu-bureau button,:root[data-version="ab"] .menu-bureau a{border-radius:6px;color:var(--texte)}
+:root[data-version="ab"] .menu-bureau button:hover,:root[data-version="ab"] .menu-bureau a:hover,
+:root[data-version="ab"] .menu-bureau button:focus-visible,:root[data-version="ab"] .menu-bureau a:focus-visible{background:var(--ab-vert-pale)}
+:root[data-version="ab"] .bureau-btn{color:var(--or);font-size:14px}
+
+/* Les sections : onglets arrondis, la page ouverte en vert du logo */
+:root[data-version="ab"] .nav-outil{gap:6px;padding:2px var(--g) 12px}
+:root[data-version="ab"] .nav-outil a{
+  font-size:15px;font-weight:500;color:var(--texte-doux);padding:8px 15px;border:0;border-radius:6px;
+  transition:background .2s,color .2s;
+}
+:root[data-version="ab"] .nav-outil a:hover{background:var(--ab-vert-pale);color:var(--texte)}
+:root[data-version="ab"] .nav-outil a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
+
+/* --------------------------------------------------------- en-tête de page */
+:root[data-version="ab"] .entete{padding-top:clamp(22px,3.4vh,36px);padding-bottom:clamp(14px,2.4vh,22px)}
+:root[data-version="ab"] .entete h1{font-size:clamp(30px,3.6vw,50px);font-weight:700;letter-spacing:-.02em;line-height:1.08}
+:root[data-version="ab"] .entete h1 .compte-titre{font-size:clamp(14px,1.3vw,18px);font-weight:500;color:var(--texte-faible);letter-spacing:0}
+:root[data-version="ab"] .entete .chapeau{font-size:17px;color:var(--texte-faible)}
+:root[data-version="ab"] .filet-or{display:none}
+:root[data-version="ab"] .decor-place{display:none}
+:root[data-version="ab"] .entete.avec-decor{display:block;min-height:0}
+:root[data-version="ab"] .surtitre,:root[data-version="ab"] .num-section{font-size:13px;font-weight:600;color:var(--or)}
+
+/* --------------------------------------------------------- cartes */
+:root[data-version="ab"] .section{
+  background:#fff;border-top:0;border-radius:8px;box-shadow:var(--ab-ombre);
+  padding:clamp(16px,2vw,24px) clamp(14px,2vw,26px);margin-bottom:20px;
+}
+:root[data-version="ab"] .section:first-of-type{padding-top:clamp(16px,2vw,24px)}
+:root[data-version="ab"] .tete-section h2{font-size:clamp(19px,1.8vw,24px);font-weight:600}
+:root[data-version="ab"] .carte{border:1px solid var(--ligne-faible);border-radius:8px;background:#fff}
+:root[data-version="ab"] .tete-collante{background:#fff}
+/* Équipe : le bloc de recherche est hors de toute section, il devient lui-même une carte */
+:root[data-version="ab"] .wrap > .tete-collante{border-radius:8px;box-shadow:var(--ab-ombre);padding:14px clamp(14px,2vw,26px);border-bottom:0;margin-bottom:20px}
+
+/* Chiffres clés : tuiles claires dans la carte */
+:root[data-version="ab"] .cles{gap:12px;background:none;border:0}
+:root[data-version="ab"] .cle{background:#F6F7F4;border-radius:8px;padding:16px 18px}
+:root[data-version="ab"] .cle .v{font-weight:650;font-size:clamp(26px,3vw,38px)}
+:root[data-version="ab"] .cle .l{font-size:13.5px;margin-top:6px}
+
+/* --------------------------------------------------------- boutons */
+:root[data-version="ab"] .btn{
+  font-size:14px;font-weight:500;color:var(--texte);background:#fff;
+  border:1px solid rgba(var(--encre),.16);border-radius:6px;padding:8px 14px;
+}
+:root[data-version="ab"] .btn:hover{color:var(--texte);border-color:var(--or-doux);background:#F7FAF0}
+:root[data-version="ab"] .btn:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+:root[data-version="ab"] .btn-or{background:var(--ab-vert-clair);border-color:transparent;color:var(--texte);font-weight:600}
+:root[data-version="ab"] .btn-or:hover{background:var(--ab-vert-logo);border-color:transparent;color:var(--texte)}
+:root[data-version="ab"] .btn-nu{border-color:transparent;background:none}
+:root[data-version="ab"] .btn-rouge:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.5);background:#FDF3F2}
+:root[data-version="ab"] select.btn{padding-right:30px}
+:root[data-version="ab"] .ico{border-radius:6px}
+:root[data-version="ab"] .case{border-radius:6px;font-size:14px}
+:root[data-version="ab"] .case:has(input:checked){background:var(--ab-vert-pale);border-color:transparent;color:var(--texte)}
+:root[data-version="ab"] .semaine button{border-radius:6px;font-size:13px}
+
+/* --------------------------------------------------------- formulaires */
+:root[data-version="ab"] .champ > label,:root[data-version="ab"] .legende{font-size:13px;font-weight:500;color:var(--texte-faible)}
+:root[data-version="ab"] .champ input,:root[data-version="ab"] .champ select,:root[data-version="ab"] .champ textarea{
+  font-weight:400;background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;
+}
+:root[data-version="ab"] .champ input:focus,:root[data-version="ab"] .champ select:focus,:root[data-version="ab"] .champ textarea:focus{
+  border-color:var(--or);background:#fff;box-shadow:0 0 0 3px rgba(var(--or-rvb),.14);
+}
+:root[data-version="ab"] .champ input[type=date],:root[data-version="ab"] .champ input[type=time],:root[data-version="ab"] .champ input[type=number]{font-size:15px}
+:root[data-version="ab"] .champ .msg{font-size:13px}
+
+/* --------------------------------------------------------- listes */
+:root[data-version="ab"] table.liste th{font-size:13px;font-weight:600;color:var(--texte-faible)}
+:root[data-version="ab"] table.liste td{font-size:15px}
+:root[data-version="ab"] table.liste .principal{font-size:16px;font-weight:500}
+:root[data-version="ab"] table.liste .secondaire{font-size:13px}
+:root[data-version="ab"] table.liste tr:hover td{background:#F8FAF4}
+:root[data-version="ab"] table.liste tr.cliquable:hover td{background:#F2F7E8}
+:root[data-version="ab"] .groupe-taches h3{font-weight:650}
+:root[data-version="ab"] .groupe-taches .compte{font-size:13px}
+:root[data-version="ab"] .etiq{font-size:12px;font-weight:500;border-radius:20px;padding:3px 10px}
+:root[data-version="ab"] .etiq.ing{background:var(--ab-vert-pale);border-color:transparent}
+:root[data-version="ab"] .etiq.des{background:#EAF1F8;border-color:transparent}
+:root[data-version="ab"] .plan-periode{font-size:14px;font-weight:500}
+:root[data-version="ab"] .plan-periode b{font-weight:650}
+:root[data-version="ab"] .pl-vide{font-size:13px}
+
+/* Planning : barres arrondies, teinte un peu plus présente sur blanc */
+:root[data-version="ab"] .bt{border-radius:4px;font-size:13px;background:color-mix(in srgb,var(--tt) 13%,#fff)}
+:root[data-version="ab"] .bt:hover{background:color-mix(in srgb,var(--tt) 22%,#fff)}
+:root[data-version="ab"] .bt .code,:root[data-version="ab"] .bt .jr{font-size:12px;font-weight:600}
+
+/* --------------------------------------------------------- fenêtres et messages */
+:root[data-version="ab"] .modale-boite{border:0;border-radius:10px;box-shadow:var(--ab-ombre-haute)}
+:root[data-version="ab"] .modale-tete h2{font-weight:650}
+:root[data-version="ab"] .pal-boite{border:0;border-radius:10px;box-shadow:0 30px 80px rgba(30,34,38,.22)}
+:root[data-version="ab"] .bandeau{border-radius:8px;background:#F6FAEE;border-color:transparent;font-size:15px}
+:root[data-version="ab"] .bandeau.rouge{background:#FDF3F2}
+:root[data-version="ab"] .toast{
+  font-size:14px;border-radius:8px;border:0;background:#1E2226;color:#fff;box-shadow:var(--ab-ombre-haute);
+}
+:root[data-version="ab"] .toast-action{color:var(--ab-vert-logo)}
+
+/* --------------------------------------------------------- pied */
+:root[data-version="ab"] footer.pied-outil{font-size:13px;border-top:0;color:var(--texte-faible)}
+
+/* --------------------------------------------------------- téléphone */
+@media (max-width:640px){
+  :root[data-version="ab"] .barre-h .ab-mot,:root[data-version="ab"] .ab-compte-nom{display:none}
+  :root[data-version="ab"] .ab-marque-barre{margin-left:4px}
+  :root[data-version="ab"] .ab-logo-barre{width:36px;height:36px}
+  :root[data-version="ab"] .ab-carre{width:38px;height:38px}
+  :root[data-version="ab"] .barre-outils{gap:10px}
+  :root[data-version="ab"] .nav-outil a{font-size:14px;padding:9px 11px}
+  :root[data-version="ab"] .section{padding:14px 12px;border-radius:8px}
+  :root[data-version="ab"] .fab{
+    background:var(--ab-vert-clair);color:var(--texte);border-radius:28px;font-size:15px;font-weight:600;
+    box-shadow:var(--ab-ombre-haute);
+  }
+}
+
+/* --------------------------------------------------------- impression */
+@media print{
+  :root[data-version="ab"] body{background:#fff}
+  :root[data-version="ab"] .section{box-shadow:none;padding:0;border-radius:0}
+}
