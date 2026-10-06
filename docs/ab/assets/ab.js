@@ -54,7 +54,7 @@
   /* ------------------------------------------------------------ session */
 
   function versConnexion(motif) {
-    location.replace("/planif/connexion/?retour=" + encodeURIComponent(location.pathname + location.search) +
+    location.replace("/ab/connexion/?retour=" + encodeURIComponent(location.pathname + location.search) +
       (motif ? "&motif=" + encodeURIComponent(motif) : ""));
   }
 
@@ -76,7 +76,7 @@
 
   function deconnecte() {
     if (!avecBase) { location.href = "/planif/"; return; }
-    SB.deconnexion().then(function () { location.replace("/planif/connexion/?retour=" + encodeURIComponent("/ab/")); });
+    SB.deconnexion().then(function () { location.replace("/ab/connexion/"); });
   }
 
 

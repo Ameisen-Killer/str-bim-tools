@@ -1,0 +1,72 @@
+/* Connexion de l'espace AB (06.10.2026) — page /ab/connexion/.
+   Chargée après ab.css (couleurs, police). Une carte blanche au centre : le
+   logo officiel à gauche, le formulaire à droite ; empilés sur téléphone. */
+
+body { min-height: 100vh; min-height: 100dvh; }
+.cx {
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+}
+.cx-carte {
+  width: min(820px, 100%);
+  display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); align-items: center;
+  background: var(--carte); border-radius: 12px; box-shadow: var(--ombre-haute);
+  overflow: hidden;
+  animation: ab-monte .5s cubic-bezier(.2, .7, .3, 1) both;
+}
+.cx-logo {
+  display: block; width: 100%; height: auto; max-width: 200px; margin: 0 auto;
+  padding: 44px 0;
+}
+.cx-carte > .cx-logo { justify-self: center; }
+.cx-boite { padding: 44px 44px 34px; border-left: 1px solid var(--filet); }
+
+.cx-boite h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.cx-sous { margin: 4px 0 26px; color: var(--faible); font-size: 17px; }
+
+.cx-champs { display: flex; flex-direction: column; gap: 16px; }
+.cx-champ { display: flex; flex-direction: column; gap: 6px; }
+.cx-champ[hidden] { display: none; }
+.cx-champ label { font-size: 14px; font-weight: 500; color: var(--faible); }
+.cx-champ input {
+  font: inherit; font-size: 16px; color: var(--texte); background: #fff;
+  border: 1px solid #D5D8D2; border-radius: 6px; padding: 11px 12px; width: 100%;
+  transition: border-color .2s, box-shadow .2s;
+}
+.cx-champ input:focus { outline: none; border-color: var(--vert-texte); box-shadow: 0 0 0 3px rgba(77, 122, 28, .15); }
+.cx-champ input[readonly] { background: #F6F7F4; color: var(--faible); }
+.cx-aide { font-size: 13px; color: var(--faible); }
+
+.cx-msg { margin-top: 16px; padding: 10px 12px; border-radius: 6px; font-size: 14.5px; background: #FBE4E2; color: var(--rouge-texte); }
+.cx-msg.ok { background: #EEF5DE; color: var(--vert-texte); }
+
+.cx-valider {
+  display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 22px;
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--texte);
+  background: var(--vert-clair); border: 0; border-radius: 6px; padding: 13px 16px; cursor: pointer;
+  transition: background .2s;
+}
+.cx-valider:hover { background: var(--vert-logo); }
+.cx-valider:focus-visible { outline: 2px solid var(--vert-texte); outline-offset: 2px; }
+.cx-valider[disabled] { opacity: .6; cursor: progress; }
+
+.cx-bas { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 18px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--filet); }
+.cx-bas button {
+  font: inherit; font-size: 14px; color: var(--faible); background: none; border: 0; padding: 4px 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: #C9CCC6; text-underline-offset: 3px;
+}
+.cx-bas button:hover { color: var(--vert-texte); text-decoration-color: currentColor; }
+.cx-bas button[disabled] { opacity: .5; cursor: default; }
+
+.cx-pied { margin: 22px 0 0; font-size: 13px; color: var(--faible); text-align: center; }
+
+@media (max-width: 700px) {
+  .cx { justify-content: flex-start; }
+  .cx-carte { grid-template-columns: minmax(0, 1fr); }
+  .cx-logo { max-width: 120px; padding: 28px 0 8px; }
+  .cx-boite { border-left: 0; padding: 18px 20px 24px; }
+  .cx-boite h1 { font-size: 26px; text-align: center; }
+  .cx-sous { text-align: center; margin-bottom: 20px; }
+  .cx-bas { flex-direction: column; align-items: center; }
+}

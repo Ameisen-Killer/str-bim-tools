@@ -322,7 +322,8 @@
   }
 
   function pageConnexion(parametres) {
-    location.replace("/planif/connexion/?" + parametres);
+    // Version AB : sa propre page de connexion, aux couleurs du bureau
+    location.replace((VERSION_AB ? "/ab/connexion/?" : "/planif/connexion/?") + parametres);
   }
 
   /**
