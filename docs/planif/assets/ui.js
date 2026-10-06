@@ -686,9 +686,10 @@
   ];
 
   /* ------------------------------------------------- barre de la version 2
-     À gauche la maison (accueil ; plus de bouton retour depuis le 06.10.2026) ;
-     à droite la recherche, qui est en ligne, le bureau (super admin), le compte
-     (nom, rafraîchir, données, déconnexion), puis le logo de la marque. */
+     En haut, à droite : la recherche, qui est en ligne, le bureau (super admin),
+     le compte (nom, rafraîchir, données, déconnexion), puis le logo de la
+     marque. L'accueil est la maison en tête de la barre des pages (06.10.2026 :
+     plus de bouton retour ni de maison en haut à gauche). */
   /* Le pavé du logo « ab », relevé sur le fichier du bureau (assets/logo-ab-marque.svg) ;
      celui de STR Bim Tools, le bâtiment au trait. */
   var LOGO_STR = '<rect width="100" height="100" rx="16" fill="#6B5233"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#E9D6B0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>';
@@ -703,13 +704,8 @@
     return s;
   }
 
-  function marqueAB() {
-    return el("div", { class: "ab-fil" }, [
-      el("a", { class: "ab-carre", href: "/planif/", title: "Accueil", "aria-label": "Accueil" }, [
-        dessinAB("0 0 24 24", '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>')
-      ])
-    ]);
-  }
+  /* La maison : l'entrée « Accueil » de la barre des pages (06.10.2026). */
+  var MAISON = '<path class="ab-maison" d="M12 3.2 2.6 11.1a.9.9 0 0 0 1.2 1.4l.7-.6V20a1 1 0 0 0 1 1H10v-5.5h4V21h4.5a1 1 0 0 0 1-1v-8.1l.7.6a.9.9 0 0 0 1.2-1.4z"/>';
 
   /* Le logo de la marque, tout à droite de la barre (06.10.2026, à la demande de Tony). */
   function logoMarque() {
@@ -792,6 +788,12 @@
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
     pages.forEach(function (p) {
+      // Version 2 : l'accueil est la maison, en tête de la barre des pages
+      if (VERSION_AB && p.cle === "accueil") {
+        nav.appendChild(el("a", { class: "nav-maison", href: chemin(p.href), title: p.nom, "aria-label": p.nom,
+          "aria-current": p.cle === actif ? "page" : null }, [dessinAB("0 0 24 24", MAISON)]));
+        return;
+      }
       nav.appendChild(el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null }, [
         el("span", { class: "long", text: p.nom }),
         el("span", { class: "court", text: p.court }),
@@ -846,7 +848,7 @@
     }
 
     hote.appendChild(el("div", { class: "barre" }, [
-      VERSION_AB ? el("div", { class: "barre-h" }, [marqueAB(), outilsHaut]) :
+      VERSION_AB ? el("div", { class: "barre-h" }, [outilsHaut]) :
       el("div", { class: "barre-h" }, [
         el("div", { class: "fil" + (superAdmin ? " avec-choix" : "") }, [
           el("span", { class: "marque" }, [

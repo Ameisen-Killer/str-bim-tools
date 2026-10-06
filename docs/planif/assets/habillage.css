@@ -61,16 +61,11 @@
   align-items:center;padding:max(12px,env(safe-area-inset-top)) var(--g) 10px;
   font-size:14px;color:var(--texte);
 }
-:root[data-version="v2"] .ab-fil{display:flex;align-items:center;gap:10px;min-width:0}
-:root[data-version="v2"] .ab-carre{
-  flex:0 0 auto;display:inline-grid;place-items:center;width:40px;height:40px;padding:0;
-  border:0;border-radius:6px;background:#fff;box-shadow:var(--ab-ombre);cursor:pointer;
-  transition:transform .15s,box-shadow .15s;
-}
-:root[data-version="v2"] .ab-carre:hover{transform:translateY(-1px);box-shadow:var(--ab-ombre-haute)}
-:root[data-version="v2"] .ab-carre:focus-visible{outline:2px solid var(--or);outline-offset:2px}
-:root[data-version="v2"] .ab-carre svg{width:22px;height:22px}
+:root[data-version="v2"] .barre-h > .barre-outils{margin-left:auto}
 :root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
+/* La maison, première entrée de la barre des pages */
+:root[data-version="v2"] .nav-outil a.nav-maison{display:inline-flex;align-items:center;padding:6px 12px}
+:root[data-version="v2"] .nav-maison svg{width:22px;height:22px;display:block}
 :root[data-version="v2"] .ab-marque-barre{display:flex;align-items:center;gap:12px;margin-left:6px;text-decoration:none;min-width:0;flex:0 0 auto}
 :root[data-version="v2"] .ab-logo-barre{width:44px;height:auto;flex:0 0 auto;display:block}
 :root[data-version="v2"] .ab-logo-str{font-size:14px}
@@ -232,7 +227,6 @@
   :root[data-version="v2"] .ab-compte-nom,:root[data-version="v2"] .ab-logo-str .marque-mots{display:none}
   :root[data-version="v2"] .ab-marque-barre{margin-left:0}
   :root[data-version="v2"] .ab-logo-barre{width:40px}
-  :root[data-version="v2"] .ab-carre{width:38px;height:38px}
   :root[data-version="v2"] .barre-outils{gap:10px}
   :root[data-version="v2"] .nav-outil a{font-size:14px;padding:9px 11px}
   :root[data-version="v2"] .section{padding:14px 12px;border-radius:8px}
