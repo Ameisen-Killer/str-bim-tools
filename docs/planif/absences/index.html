@@ -74,8 +74,6 @@
            du bouton flottant, l'export garde donc un bouton dans la page. -->
       <button class="btn seul-mobile" type="button" id="pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
-      <div class="cles" id="cles"></div>
-
       <!-- L'en-tête du calendrier vit hors du conteneur qui défile de côté :
            c'est la seule façon qu'il se colle sous la barre du haut quand on
            descend dans la page (dans un conteneur à overflow, « sticky » se
@@ -242,7 +240,7 @@
     var tous = [].concat.apply([], D.parMetier(D.membres({ metier: vue.metier || null })).map(function (g) { return g.membres; }));
 
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
-       du bas, clés, liste des périodes — porte donc sur ce qui reste affiché,
+       du bas, liste des périodes — porte donc sur ce qui reste affiché,
        comme le fait déjà le filtre par métier. */
     var mots = barreRecherche ? barreRecherche.termes() : [];
     var membres = !mots.length ? tous : tous.filter(function (m) {
@@ -278,7 +276,6 @@
     });
 
     rendPeriode(membres.length);
-    rendCles(membres, canton);
     rendPlan(canton);
     rendListe(periodes);
   }
@@ -321,33 +318,6 @@
       (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());
-  }
-
-  function rendCles(membres, canton) {
-    var hote = UI.vide(document.getElementById("cles"));
-    var total = 0, concernes = 0;
-    membres.forEach(function (m) {
-      total += joursDe[m.id];
-      if (joursDe[m.id] > 0) concernes++;
-    });
-
-    var auj = C.isoAuj();
-    var aujourdhui = membres.filter(function (m) { return !!Calc.absenceLe(m, auj); }).length;
-
-    var pic = 0, jourPic = null;
-    jours.forEach(function (j) {
-      if ((jaugeParJour[j] || 0) > pic) { pic = jaugeParJour[j]; jourPic = j; }
-    });
-
-    function cle(v, l, classe) {
-      hote.appendChild(el("div", { class: "cle" + (classe ? " " + classe : "") }, [
-        el("div", { class: "v", text: v }), el("div", { class: "l", text: l })
-      ]));
-    }
-    cle(String(total), "Jours d'absence", total ? "or" : "");
-    cle(concernes + " / " + membres.length, "Membres concernés", "");
-    cle(String(aujourdhui), "Absents aujourd'hui", aujourdhui ? "alerte" : "");
-    cle(String(pic), jourPic ? "Absents le même jour · " + C.fmtCourt(jourPic) : "Absents le même jour", pic > 1 ? "alerte" : "");
   }
 
   /* ---------------------------------------------------------- calendrier */
