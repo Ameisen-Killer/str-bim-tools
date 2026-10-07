@@ -422,6 +422,9 @@
 
   function rendCles(canton) {
     var hote = document.getElementById("cles");
+    // Collaborateur : ces chiffres d'équipe n'ont pas de sens sur ses seules tâches (07.10.2026)
+    hote.hidden = !!mien;
+    if (mien) { UI.vide(hote); return; }
     // Les valeurs d'avant, pour que les chiffres défilent jusqu'aux nouvelles
     var anciens = [].map.call(hote.querySelectorAll(".cle .v"), function (v) { return v._texte != null ? v._texte : v.textContent; });
     UI.vide(hote);
