@@ -53,7 +53,8 @@
         <button class="btn" type="button" id="suiv" aria-label="Mois suivant"><span class="txt">Suivant </span>▶</button>
         <span class="plan-periode" id="periode"></span>
         <span style="flex:1 1 auto"></span>
-        <select id="duree" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Nombre de mois affichés">
+        <select id="duree" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Période affichée">
+          <option value="0">1 semaine</option>
           <option value="1">1 mois</option>
           <option value="2">2 mois</option>
           <option value="3">3 mois</option>
@@ -125,10 +126,13 @@
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.absences";
+  /* mois : 1 à 3 mois affichés, ou 0 pour une semaine (07.10.2026) ; la
+     période part alors du lundi, sinon du premier du mois. */
   var vue = { debut: null, mois: 1, metier: "", masque: false };
   try { Object.assign(vue, JSON.parse(localStorage.getItem(CLE_VUE) || "{}")); } catch (e) {}
-  vue.debut = C.premierMois(vue.debut || C.isoAuj());
-  vue.mois = Math.min(3, Math.max(1, parseInt(vue.mois, 10) || 1));
+  vue.mois = parseInt(vue.mois, 10);
+  vue.mois = isNaN(vue.mois) ? 1 : Math.min(3, Math.max(0, vue.mois));
+  vue.debut = cale(vue.debut || C.isoAuj());
 
   var jours = [], lignes = [], jaugeParJour = {}, nomsParJour = {}, joursDe = {};
   // Nom explicite : « barre » est déjà la fonction qui dessine une barre du planning
@@ -156,12 +160,23 @@
     document.getElementById("prec").addEventListener("click", function () { decale(-1); });
     document.getElementById("suiv").addEventListener("click", function () { decale(1); });
     document.getElementById("auj").addEventListener("click", function () {
-      vue.debut = C.premierMois(C.isoAuj()); memorise(); rend();
+      vue.debut = cale(C.isoAuj()); memorise(); rend();
     });
 
     var duree = document.getElementById("duree");
     duree.value = String(vue.mois);
-    duree.addEventListener("change", function () { vue.mois = parseInt(duree.value, 10); memorise(); rend(); });
+    duree.addEventListener("change", function () {
+      var avant = vue.mois;
+      vue.mois = parseInt(duree.value, 10);
+      // Vers la semaine : celle d'aujourd'hui si elle est affichée, sinon la
+      // première du mois affiché ; vers les mois : le mois de la semaine affichée.
+      if (vue.mois === 0 && avant !== 0) {
+        var auj = C.isoAuj(), d = C.premierMois(vue.debut);
+        var fin = C.ajoute(C.ajouteMois(d, avant), -1);
+        vue.debut = cale(auj >= d && auj <= fin ? auj : C.ajoute(d, 6));
+      } else vue.debut = cale(vue.debut);
+      memorise(); rend();
+    });
 
     var fr = document.getElementById("f-metier");
     fr.value = vue.metier || "";
@@ -184,7 +199,21 @@
     rend();
   }).catch(UI.echec);
 
-  function decale(n) { vue.debut = C.ajouteMois(vue.debut, n); memorise(); rend(); }
+  function decale(n) {
+    vue.debut = vue.mois === 0 ? C.ajoute(vue.debut, 7 * n) : C.ajouteMois(vue.debut, n);
+    memorise(); rend();
+  }
+
+  /** Début de la période qui contient la date : lundi en vue semaine, premier du mois sinon. */
+  function cale(j) { return vue.mois === 0 ? C.lundi(j) : C.premierMois(j); }
+
+  /** Les boutons parlent de semaine ou de mois selon la vue. */
+  function libellesBoutons() {
+    var sem = vue.mois === 0;
+    document.getElementById("auj").textContent = sem ? "Cette semaine" : "Ce mois";
+    document.getElementById("prec").setAttribute("aria-label", sem ? "Semaine précédente" : "Mois précédent");
+    document.getElementById("suiv").setAttribute("aria-label", sem ? "Semaine suivante" : "Mois suivant");
+  }
 
   function nouvelle() { UI.nouvelleAbsence({ surChangement: rend }); }
 
@@ -204,7 +233,8 @@
 
   function rend() {
     var canton = D.canton();
-    var fin = C.ajoute(C.ajouteMois(vue.debut, vue.mois), -1);
+    libellesBoutons();
+    var fin = vue.mois === 0 ? C.ajoute(vue.debut, 6) : C.ajoute(C.ajouteMois(vue.debut, vue.mois), -1);
     jours = C.serie(vue.debut, C.diff(vue.debut, fin) + 1);
     var premier = jours[0], dernier = jours[jours.length - 1];
 
@@ -267,6 +297,12 @@
   }
 
   function libellePeriode() {
+    if (vue.mois === 0) {
+      var a = jours[0], b = jours[jours.length - 1];
+      return "Semaine " + C.semaineISO(a).num + " · " + (a.slice(0, 7) === b.slice(0, 7)
+        ? C.quantieme(a) + " – " + C.quantieme(b) + " " + C.fmtMois(b)
+        : C.fmtCourt(a) + " – " + C.fmtCourt(b) + " " + b.slice(0, 4));
+    }
     var m = C.mois(jours);
     return m.length === 1 ? C.fmtMois(jours[0]) : C.fmtMois(jours[0]) + " → " + C.fmtMois(jours[jours.length - 1]);
   }
@@ -348,7 +384,7 @@
     C.mois(jours).forEach(function (mo) {
       lignesMois.appendChild(el("div", {
         class: "pl-mois", style: "--span:" + mo.jours.length,
-        text: mo.jours.length > 10 ? C.fmtMois(mo.premier) : C.fmtMoisCourt(mo.premier)
+        text: mo.jours.length > 10 || (vue.mois === 0 && mo.jours.length > 3) ? C.fmtMois(mo.premier) : C.fmtMoisCourt(mo.premier)
       }));
     });
 
