@@ -225,20 +225,10 @@
    * Seul ce qui ne rentre vraiment pas dans la capacité libre apparaît en
    * surcharge, réparti au prorata de la capacité de chaque jour.
    *
-   * Lissage (o.lisse, par défaut le choix mémorisé — voir lissage()) : ce qui
-   * ne tient pas dans la fenêtre d'une tâche remonte d'abord dans la capacité
-   * libre des jours qui la précèdent, jamais avant aujourd'hui. Deux tâches
-   * rendues la même semaine ne font plus déborder la personne quand la semaine
-   * d'avant est vide : on commence plus tôt, comme on le ferait vraiment.
-   * Seul ce qui ne trouve aucune place d'ici l'échéance reste en surcharge.
-   *
    * Renvoie { membreId: { "AAAA-MM-JJ": { total, parts:[{tacheId, role, jours}] } } }
-   * et, hors énumération, `avances` : { "membre|tâche|métier": premier jour avancé }.
    */
   function repartition(taches, membres, canton, o) {
     o = o || {};
-    var lisse = "lisse" in o ? !!o.lisse : lissage();
-    var auj = C.isoAuj();
     var index = {}, lots = {};
     membres.forEach(function (m) { index[m.id] = m; });
     function trouve(id) { return index[id] || membreParDefaut(id); }
@@ -271,8 +261,7 @@
     });
 
     // 2. Remplissage, membre par membre
-    var parMembre = {}, avances = {};
-    Object.defineProperty(parMembre, "avances", { value: avances });
+    var parMembre = {};
     Object.keys(lots).forEach(function (mid) {
       var occupe = {};
       var cible = parMembre[mid] = {};
@@ -301,32 +290,7 @@
         lot.jours.forEach(function (j, k) { if (lot.parts[k] > 1e-9) occupe[j] = (occupe[j] || 0) + lot.parts[k]; });
       });
 
-      // b. Lissage : ce qui déborde remonte dans les jours libres d'avant la fenêtre,
-      //    en partant du plus proche. Une fois toutes les fenêtres servies, pour
-      //    qu'aucune tâche ne prenne la place qu'une autre avait chez elle.
-      //    L'échéance la plus proche choisit en premier.
-      if (lisse) {
-        lots[mid].filter(function (lot) { return lot.reste > 1e-9; })
-          .sort(function (a, b) { return a.fin < b.fin ? -1 : a.fin > b.fin ? 1 : a.ouvres - b.ouvres; })
-          .forEach(function (lot) {
-            var cur = C.ajoute(lot.jours[0], -1);
-            for (var garde = 0; garde < 260 && cur >= auj && lot.reste > 1e-9; garde++) {
-              var l = Math.max(0, capaciteJour(membre, cur, canton) - (occupe[cur] || 0));
-              if (l > 1e-9) {
-                var pris = Math.min(l, lot.reste);
-                lot.avant.push({ jour: cur, jours: pris });
-                occupe[cur] = (occupe[cur] || 0) + pris;
-                lot.reste -= pris;
-              }
-              cur = C.ajoute(cur, -1);
-            }
-            if (lot.avant.length) {
-              avances[mid + "|" + lot.tacheId + "|" + lot.role] = lot.avant[lot.avant.length - 1].jour;
-            }
-          });
-      }
-
-      // c. Ce qui ne rentre toujours pas : vraie surcharge, au prorata de la capacité du jour.
+      // b. Ce qui ne rentre toujours pas : vraie surcharge, au prorata de la capacité du jour.
       //    Période entièrement chômée ou en congé : on répartit quand même,
       //    sinon la tâche disparaîtrait du planning sans prévenir.
       lots[mid].forEach(function (lot) {
@@ -422,26 +386,7 @@
     return out.sort(function (a, b) { return a.rang - b.rang; });
   }
 
-  /* Lissage de la charge : un choix de lecture, mémorisé dans le navigateur et
-     suivi par toutes les pages (planning, carte de charge, équipe, alertes).
-     Rien n'est écrit en base : l'échéance fait toujours foi. */
-  var CLE_LISSAGE = "planif.lissage";
-  function lissage() {
-    try { return global.localStorage.getItem(CLE_LISSAGE) === "1"; } catch (e) { return false; }
-  }
-  function poseLissage(actif) {
-    try { global.localStorage.setItem(CLE_LISSAGE, actif ? "1" : "0"); } catch (e) {}
-  }
-
-  /** Premier jour avancé par le lissage pour cette affectation, sinon null. */
-  function avance(rep, membreId, tacheId, role) {
-    return (rep && rep.avances && rep.avances[membreId + "|" + tacheId + "|" + role]) || null;
-  }
-
   global.Calc = {
-    lissage: lissage,
-    poseLissage: poseLissage,
-    avance: avance,
     capaciteJour: capaciteJour,
     joursDe: joursDe,
     poidsJour: poidsJour,

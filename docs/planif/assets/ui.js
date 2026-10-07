@@ -2408,40 +2408,6 @@
     }, 60);
   }
 
-  /* ------------------------------------------------------------ lissage
-     Case « Lisser la charge » du tableau de bord et de la carte de charge.
-     Le choix vaut pour toutes les pages (Calc.lissage) ; le message dit ce
-     qu'il a changé, en surcharges des quatre semaines à venir. */
-  function caseLissage(surChange) {
-    var D = global.Donnees, Calc = global.Calc;
-    function surcharges() {
-      return Calc.alertes(D.etat(), D.canton()).filter(function (a) { return a.membreId; }).length;
-    }
-    var entree = el("input", { type: "checkbox" });
-    entree.checked = Calc.lissage();
-    entree.addEventListener("change", function () {
-      var avant = surcharges();
-      Calc.poseLissage(entree.checked);
-      var apres = surcharges();
-      surChange();
-      if (!entree.checked) {
-        toast("Lissage retiré : chaque tâche repart au plus tard avant son échéance.");
-      } else if (!avant) {
-        toast("Charge lissée : aucune surcharge à résorber.");
-      } else {
-        var resorbees = avant - apres;
-        toast("Charge lissée : " + (resorbees > 0
-          ? resorbees + (resorbees > 1 ? " surcharges résorbées" : " surcharge résorbée")
-          : "aucune surcharge résorbée") +
-          (apres ? ", " + apres + (apres > 1 ? " restent." : " reste.") : "."));
-      }
-    });
-    return el("label", {
-      class: "case", style: "text-transform:none;letter-spacing:.04em",
-      title: "Ce qui ne tient pas avant une échéance commence plus tôt, dans les jours encore libres (jamais avant aujourd'hui). Rien n'est modifié dans les tâches."
-    }, [entree, " Lisser la charge"]);
-  }
-
   /** Bandeau affiché tant que le jeu de démonstration n'a pas été effacé. */
   function bandeauDemo(hote) {
     if (!D.estDemo() || !hote) return;
@@ -2472,7 +2438,7 @@
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
-    formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, caseLissage: caseLissage, annule: annule,
+    formulaireTache: formulaireTache, ficheTache: ficheTache, decaleTache: decaleTache, imprime: imprime, annule: annule,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,

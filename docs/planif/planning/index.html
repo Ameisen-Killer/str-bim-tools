@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=78">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=79">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 </head>
 <body class="large">
@@ -60,7 +60,6 @@
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
         </label>
-        <span id="f-lisse"></span>
       </div>
 
       <div class="cles" id="cles"></div>
@@ -84,7 +83,6 @@
         <span><i class="dash" aria-hidden="true"></i> Charge ingénieur</span>
         <span><i class="coche" aria-hidden="true"></i> Part terminée</span>
         <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
-        <span id="leg-lis" hidden><i class="lis" aria-hidden="true"></i> Commence plus tôt (lissage)</span>
         <span>Fond hachuré : absence</span>
         <span><i class="off" aria-hidden="true"></i> Jour non travaillé</span>
         <span><i class="demi" aria-hidden="true"></i> Demi-journée</span>
@@ -106,9 +104,9 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=42"></script>
 <script src="/planif/assets/donnees.js?v=54"></script>
-<script src="/planif/assets/calculs.js?v=11"></script>
+<script src="/planif/assets/calculs.js?v=12"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=80"></script>
+<script src="/planif/assets/ui.js?v=81"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -216,7 +214,6 @@
     var fo = document.getElementById("f-occupes");
     fo.checked = !!vue.occupes;
     fo.addEventListener("change", function () { vue.occupes = fo.checked; memorise(); rend(); });
-    document.getElementById("f-lisse").replaceWith(UI.caseLissage(rend));
 
     barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -265,17 +262,15 @@
     membres = D.membres({ planifies: true }).slice();   // administrateurs, administratifs et non désignés n'ont pas de planning
     // La répartition ne dépend ni de la semaine affichée ni de la durée : changer
     // de semaine ne la recalcule pas. Seuls les données, le filtre d'affaire ou le canton la périment.
-    var lisse = Calc.lissage();
-    var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton + "|" + lisse + "|" + C.isoAuj();
+    var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton + "|" + C.isoAuj();
     if (cacheRep.cle !== cle) {
       // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
       // comme sur la page Équipe et dans les alertes
       var enCours = taches.filter(function (t) { return t.statut !== "termine"; });
-      var repartie = Calc.repartition(enCours, membres, canton, { lisse: lisse });
+      var repartie = Calc.repartition(enCours, membres, canton);
 
       // Toutes les affectations et leur fenêtre, calculées une fois ; chaque semaine affichée n'en garde que ce qui la touche.
       // Une part ouverte en retard repart d'aujourd'hui (Calc.fenetre) : elle pèse là où le travail se fera.
-      // Lissée, une barre commence au premier jour que la répartition lui a avancé.
       var affectations = [];
       taches.forEach(function (t) {
         var fin = Calc.finEffective(t);
@@ -290,8 +285,6 @@
           if (t.statut !== "termine" && !af.fini) {
             var f = Calc.fenetre(af.charge, finAf, D.membre(af.membreId), canton);
             if (f.reportee) { info.debut = f.debut; info.fin = f.fin; info.reportee = true; }
-            var av = Calc.avance(repartie, af.membreId, t.id, af.role);
-            if (av && av < info.debut) { info.debut = av; info.avancee = true; }
           }
           affectations.push(info);
         });
@@ -312,7 +305,6 @@
       cacheRep = { cle: cle, rep: repartie, affectations: affectations, aAffecter: aAffecter };
     }
     rep = cacheRep.rep;
-    document.getElementById("leg-lis").hidden = !lisse;
 
     // Ingénieurs d'abord, dessinateurs ensuite ; l'ordre alphabétique est gardé dans chaque groupe.
     // Un administratif ne porte pas de tâches : il ne paraît pas ici.
@@ -664,7 +656,6 @@
         if (finOuvre && front > iFin + 0.001) { fin = front; break; }
       }
       var debut = debutPosition(info, iFin, fin - iFin, cap);
-      if (info.avancee) debut = Math.min(debut, C.diff(jours[0], info.debut));
       fronts[l] = debut;
 
       // Découpage aux bords de la fenêtre
@@ -715,7 +706,6 @@
     if (t.statut === "termine") classes.push("termine");
     else if (info.fini) classes.push("part-finie");
     else if ((info.echeancePart || t.echeance) < auj) classes.push("retard");
-    if (info.avancee) classes.push("lissee");
     // Le filet d'or marque l'échéance : une part reportée ne finit pas à la sienne
     if (!info.reportee && C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
     var etirable = !info.fini && t.statut !== "termine" && D.peutEcrireTache(t);
@@ -735,7 +725,6 @@
                : t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "") +
              (info.role === "ingenieur" && !info.fini && Calc.enchainee(t)
                ? "\nCalcul à rendre avant le dessin (échéance de la tâche : " + C.fmtCH(t.echeance) + ")" : "") +
-             (info.avancee ? "\nCommence plus tôt : charge lissée" : "") +
              (etirable ? "\nBord gauche : étirer pour changer la charge (Maj + flèches au clavier)" : "")
     }, [
       etirable ? el("i", { class: "poignee", "aria-hidden": "true" }) : null,
@@ -973,7 +962,7 @@
 
   function rendAlertes(canton) {
     var hote = UI.vide(document.getElementById("alertes"));
-    var cle = D.version() + "|" + canton + "|" + Calc.lissage() + "|" + C.isoAuj();
+    var cle = D.version() + "|" + canton + "|" + C.isoAuj();
     if (cacheAlertes.cle !== cle) cacheAlertes = { cle: cle, liste: Calc.alertes(D.etat(), canton) };
     var liste = cacheAlertes.liste.filter(function (al) {
       // Collaborateur : ses tâches, et sa propre surcharge

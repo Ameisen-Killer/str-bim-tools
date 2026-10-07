@@ -670,7 +670,6 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .bt.glisse{opacity:.55;cursor:grabbing;z-index:5}
 .bt.role-i{border-top-style:dashed}
 /* Lissage : la barre commence plus tôt que son début déduit — bord gauche pointillé */
-.bt.lissee{border-left-style:dotted}
 /* Poignée du bord gauche : étirer change la charge, l'échéance reste */
 .bt > .poignee{position:absolute;left:-2px;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:1}
 .bt > .poignee::before{content:"";position:absolute;left:1px;top:3px;bottom:3px;width:2px;background:var(--or);opacity:0;transition:opacity .15s}
@@ -713,7 +712,6 @@ body.glisse-en-cours{user-select:none;-webkit-user-select:none}
 .legende-plan .ech{width:14px;height:10px;border:1px solid var(--ligne);border-right:2px solid var(--or)}
 .legende-plan .ret{width:14px;height:10px;border:1px solid rgba(var(--alerte-rvb),.75)}
 .legende-plan .dash{width:14px;height:10px;border:1px solid var(--ligne);border-top-style:dashed}
-.legende-plan .lis{width:14px;height:10px;border:1px solid var(--ligne);border-left:2px dotted var(--or)}
 
 /* ------------------------------------------------- calendrier des absences
    Reprend la grille du planning : une ligne par membre, une colonne par jour.

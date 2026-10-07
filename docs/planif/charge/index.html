@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=78">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=79">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 </head>
 <body class="large">
@@ -60,7 +60,6 @@
           <option value="dessinateur">Dessinateurs</option>
         </select>
         <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:260px" aria-label="Ne compter qu'une affaire"></select>
-        <span id="f-lisse"></span>
       </div>
 
       <div class="cles" id="cles"></div>
@@ -80,9 +79,9 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=42"></script>
 <script src="/planif/assets/donnees.js?v=54"></script>
-<script src="/planif/assets/calculs.js?v=11"></script>
+<script src="/planif/assets/calculs.js?v=12"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=80"></script>
+<script src="/planif/assets/ui.js?v=81"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -156,7 +155,6 @@
     var fa = document.getElementById("f-affaire");
     fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
 
-    document.getElementById("f-lisse").replaceWith(UI.caseLissage(rend));
 
     D.surRechargement(function () { remplitAffaires(); rend(); });
     rend();
