@@ -1683,44 +1683,49 @@ create or replace function public.remplit_demo(p_bureau uuid)
 returns void
 language plpgsql volatile security definer set search_path = '' as $$
 declare
-  v_discipline text := (select d.code from public.disciplines d
-                         where d.bureau_id = p_bureau and lower(d.nom) = 'structure'
-                         order by d.ordre limit 1);
+  -- Disciplines du Bureau de test, Structure en tête ; celles de l'administration
+  -- ne portent pas de projets. Le jeu se plie à ce que la console y a déclaré.
+  v_discs text[] := array(select d.code from public.disciplines d
+                           where d.bureau_id = p_bureau and d.nom !~* '^administr'
+                           order by (d.nom ~* '^structure') desc, d.ordre, d.nom);
 begin
   -- ------------------------------------------------------------------ membres
   -- Les administrateurs sont des ingénieurs associés : ils peuvent recevoir des
   -- tâches. Les administratifs ne portent aucune charge.
+  -- s : secteur — 1 la première discipline (Structure), 2 la deuxième, 3 la
+  -- troisième ; s'il en manque, le secteur se replie sur la dernière. Plusieurs
+  -- affaires mêlent ainsi des personnes de deux secteurs (affaires transversales).
   insert into public.membres (bureau_id, prenom, nom, email, metier, statuts, capacite, actif, discipline)
   select p_bureau, v.prenom, v.nom, v.email, v.metier, v.statuts::text[], v.capacite, true,
-         case when v.metier = 'administratif' then null
-              else v_discipline end
+         case when v.metier = 'administratif' or cardinality(v_discs) = 0 then null
+              else v_discs[least(v.s, cardinality(v_discs))] end
   from (values
-    ('Laurent', 'Mercier', 'laurent.mercier@demo.exemple.ch', 'ingenieur', '{administrateur}', 5),
-    ('Claire', 'Dufour', 'claire.dufour@demo.exemple.ch', 'ingenieur', '{administrateur}', 5),
-    ('Sandrine', 'Rey', 'sandrine.rey@demo.exemple.ch', 'administratif', '{}', 5),
-    ('Patrick', 'Gilliéron', 'patrick.gillieron@demo.exemple.ch', 'administratif', '{}', 4),
-    ('Mélanie', 'Constantin', 'melanie.constantin@demo.exemple.ch', 'administratif', '{}', 3),
-    ('Olivier', 'Berthoud', 'olivier.berthoud@demo.exemple.ch', 'ingenieur', '{chef_secteur}', 5),
-    ('Camille', 'Rossier', 'camille.rossier@demo.exemple.ch', 'ingenieur', '{chef_projet}', 5),
-    ('Thomas', 'Jaquet', 'thomas.jaquet@demo.exemple.ch', 'ingenieur', '{chef_projet}', 5),
-    ('Aurélie', 'Fontannaz', 'aurelie.fontannaz@demo.exemple.ch', 'ingenieur', '{chef_projet}', 4),
-    ('Nicolas', 'Perroud', 'nicolas.perroud@demo.exemple.ch', 'ingenieur', '{chef_projet}', 5),
-    ('Jérémie', 'Brodard', 'jeremie.brodard@demo.exemple.ch', 'ingenieur', '{}', 5),
-    ('Léa', 'Cattin', 'lea.cattin@demo.exemple.ch', 'ingenieur', '{}', 5),
-    ('Mathieu', 'Pidoux', 'mathieu.pidoux@demo.exemple.ch', 'ingenieur', '{}', 5),
-    ('Sofia', 'Marques', 'sofia.marques@demo.exemple.ch', 'ingenieur', '{}', 4),
-    ('Adrien', 'Chevalley', 'adrien.chevalley@demo.exemple.ch', 'ingenieur', '{}', 5),
-    ('Yannick', 'Pasquier', 'yannick.pasquier@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Céline', 'Burnier', 'celine.burnier@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Romain', 'Tissot', 'romain.tissot@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Laetitia', 'Mottier', 'laetitia.mottier@demo.exemple.ch', 'dessinateur', '{}', 4),
-    ('Fabio', 'Russo', 'fabio.russo@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Nadia', 'Haddad', 'nadia.haddad@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Steve', 'Monney', 'steve.monney@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Justine', 'Rouiller', 'justine.rouiller@demo.exemple.ch', 'dessinateur', '{}', 3),
-    ('Bruno', 'Teixeira', 'bruno.teixeira@demo.exemple.ch', 'dessinateur', '{}', 5),
-    ('Manon', 'Dériaz', 'manon.deriaz@demo.exemple.ch', 'dessinateur', '{}', 5)
-  ) as v(prenom, nom, email, metier, statuts, capacite);
+    ('Laurent', 'Mercier', 'laurent.mercier@demo.exemple.ch', 'ingenieur', '{administrateur}', 5, 1),
+    ('Claire', 'Dufour', 'claire.dufour@demo.exemple.ch', 'ingenieur', '{administrateur}', 5, 1),
+    ('Sandrine', 'Rey', 'sandrine.rey@demo.exemple.ch', 'administratif', '{}', 5, 1),
+    ('Patrick', 'Gilliéron', 'patrick.gillieron@demo.exemple.ch', 'administratif', '{}', 4, 1),
+    ('Mélanie', 'Constantin', 'melanie.constantin@demo.exemple.ch', 'administratif', '{}', 3, 1),
+    ('Olivier', 'Berthoud', 'olivier.berthoud@demo.exemple.ch', 'ingenieur', '{chef_secteur}', 5, 1),
+    ('Camille', 'Rossier', 'camille.rossier@demo.exemple.ch', 'ingenieur', '{chef_projet}', 5, 1),
+    ('Thomas', 'Jaquet', 'thomas.jaquet@demo.exemple.ch', 'ingenieur', '{chef_projet}', 5, 1),
+    ('Aurélie', 'Fontannaz', 'aurelie.fontannaz@demo.exemple.ch', 'ingenieur', '{chef_secteur,chef_projet}', 4, 3),
+    ('Nicolas', 'Perroud', 'nicolas.perroud@demo.exemple.ch', 'ingenieur', '{chef_secteur,chef_projet}', 5, 2),
+    ('Jérémie', 'Brodard', 'jeremie.brodard@demo.exemple.ch', 'ingenieur', '{}', 5, 2),
+    ('Léa', 'Cattin', 'lea.cattin@demo.exemple.ch', 'ingenieur', '{}', 5, 1),
+    ('Mathieu', 'Pidoux', 'mathieu.pidoux@demo.exemple.ch', 'ingenieur', '{}', 5, 3),
+    ('Sofia', 'Marques', 'sofia.marques@demo.exemple.ch', 'ingenieur', '{}', 4, 1),
+    ('Adrien', 'Chevalley', 'adrien.chevalley@demo.exemple.ch', 'ingenieur', '{}', 5, 2),
+    ('Yannick', 'Pasquier', 'yannick.pasquier@demo.exemple.ch', 'dessinateur', '{}', 5, 1),
+    ('Céline', 'Burnier', 'celine.burnier@demo.exemple.ch', 'dessinateur', '{}', 5, 1),
+    ('Romain', 'Tissot', 'romain.tissot@demo.exemple.ch', 'dessinateur', '{}', 5, 1),
+    ('Laetitia', 'Mottier', 'laetitia.mottier@demo.exemple.ch', 'dessinateur', '{}', 4, 1),
+    ('Fabio', 'Russo', 'fabio.russo@demo.exemple.ch', 'dessinateur', '{}', 5, 3),
+    ('Nadia', 'Haddad', 'nadia.haddad@demo.exemple.ch', 'dessinateur', '{}', 5, 1),
+    ('Steve', 'Monney', 'steve.monney@demo.exemple.ch', 'dessinateur', '{}', 5, 2),
+    ('Justine', 'Rouiller', 'justine.rouiller@demo.exemple.ch', 'dessinateur', '{}', 3, 2),
+    ('Bruno', 'Teixeira', 'bruno.teixeira@demo.exemple.ch', 'dessinateur', '{}', 5, 2),
+    ('Manon', 'Dériaz', 'manon.deriaz@demo.exemple.ch', 'dessinateur', '{}', 5, 3)
+  ) as v(prenom, nom, email, metier, statuts, capacite, s);
 
   -- ----------------------------------------------------------------- affaires
   -- Rues réelles, numéros et projets inventés.
