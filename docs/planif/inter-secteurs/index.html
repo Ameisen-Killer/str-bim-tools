@@ -111,7 +111,7 @@
 <script src="/planif/assets/supabase.js?v=42"></script>
 <script src="/planif/assets/donnees.js?v=52"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
-<script src="/planif/assets/version.js?v=2"></script>
+<script src="/planif/assets/version.js?v=3"></script>
 <script src="/planif/assets/ui.js?v=73"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=13"></script>
@@ -421,12 +421,23 @@
              phase: a.phase, adresse: a.adresse, ingenieurs: a.ingenieurs, dessinateurs: a.dessinateurs };
   }
 
+  /** Une case par discipline du bureau ; s'il n'y en a qu'une, dire où en ajouter. */
   function casesSecteurs(choisis) {
-    return el("div", { class: "cases" }, Object.keys(D.DISCIPLINES).map(function (c) {
+    var codes = Object.keys(D.DISCIPLINES);
+    var cases = el("div", { class: "cases" }, codes.map(function (c) {
       var input = el("input", { type: "checkbox", name: "secteurs", value: c });
       input.checked = (choisis || []).indexOf(c) >= 0;
       return el("label", { class: "case" }, [input, D.DISCIPLINES[c]]);
     }));
+    if (codes.length >= 2) return cases;
+    var p = D.profil(), superAdmin = !!(p && p.multi && p.superAdmin);
+    var aide = el("p", { class: "aide", style: "margin-top:8px" }, superAdmin
+      ? [(codes.length ? "Ce bureau ne compte qu'une discipline" : "Ce bureau ne compte aucune discipline") +
+         " : les secteurs se déclarent dans la ",
+         el("a", { href: "/planif/console/", text: "Console" }), " (fiche du bureau, « + Ajouter une discipline »)."]
+      : [(codes.length ? "Ce bureau ne compte qu'une discipline" : "Ce bureau ne compte aucune discipline") +
+         " : demande à l'administrateur de l'outil d'ajouter les autres secteurs."]);
+    return el("div", {}, [cases, aide]);
   }
 
   /** Prochain numéro libre : AO-2026-01, AO-2026-02… */
