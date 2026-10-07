@@ -689,15 +689,36 @@
     { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
-  /* Pages de la version 2, groupées par niveau d'accès (07.10.2026, Donnees.niveauAcces) :
-     tout le monde, chefs de secteur, administrateurs, super admin. Un trait sépare
-     deux groupes ; chacun ne voit que ceux de son niveau. Même ordre dans la palette. */
+  /* Barre des pages de la version 2 (07.10.2026, demande de Tony) : l'accueil
+     et les quatre modules, chacun selon son niveau d'accès (Donnees.niveauAcces) ;
+     la console du super admin après un trait. Les autres pages se rangent sous
+     un module, qui reste allumé quand on y est (MODULE_DE). */
   var GROUPES_V2 = [
-    ["accueil", "communication", "tableau", "taches", "absences", "annuaire"],
-    ["affaires", "equipe", "charge", "secteurs"],
-    ["inter"],
+    ["accueil", "communication", "taches", "secteurs", "inter"],
     ["console"]
   ];
+  var MODULE_DE = {
+    tableau: "communication", absences: "communication", annuaire: "communication",
+    affaires: "taches", equipe: "taches", charge: "taches"
+  };
+  /* Saisie des tâches : au-dessus de la page, les pages de gestion qui
+     l'accompagnent, pour les chefs de secteur et au-delà. */
+  var SOUS_TACHES = ["taches", "affaires", "equipe", "charge"];
+
+  function sousNavTaches(actif, parCle) {
+    var vieux = document.querySelector(".sous-nav-wrap");
+    if (vieux) vieux.remove();
+    if (SOUS_TACHES.indexOf(actif) < 0) return;
+    var l = SOUS_TACHES.filter(function (c) { return parCle[c] && (!D.pagePermise || D.pagePermise(c)); });
+    if (l.length < 2) return;
+    var entete = document.querySelector("main .entete");
+    if (!entete) return;
+    var nav = el("nav", { class: "sous-nav", "aria-label": "Saisie des tâches" }, l.map(function (c) {
+      return el("a", { href: chemin(parCle[c].href), "aria-current": c === actif ? "page" : null,
+        text: c === "charge" ? "Tableau de charge" : parCle[c].nom });
+    }));
+    entete.parentNode.insertBefore(el("div", { class: "wrap sous-nav-wrap" }, [nav]), entete.nextSibling);
+  }
 
   /* ------------------------------------------------- barre de la version 2
      En haut, à droite : la recherche, qui est en ligne, le bureau (super admin),
@@ -814,6 +835,7 @@
       var parCle = {};
       pages.concat([
         { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
+        { cle: "taches", href: "/planif/taches/", nom: "Saisie des tâches", court: "Tâches" },
         { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
         { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
       ]).forEach(function (p) { parCle[p.cle] = p; });
@@ -824,6 +846,11 @@
         if (pages.length) pages.push(null);
         l.forEach(function (c) { pages.push(parCle[c]); });
       });
+      // Tâches, Affaires… sous la barre ; la Saisie des tâches allumée en haut
+      var sousCles = {};
+      PAGES.forEach(function (p) { sousCles[p.cle] = p; });
+      sousNavTaches(actif, sousCles);
+      if (MODULE_DE[actif]) actif = MODULE_DE[actif];
     }
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });

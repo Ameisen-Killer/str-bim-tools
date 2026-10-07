@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=78">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=12">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=13">
 <link rel="stylesheet" href="/planif/assets/communication.css?v=6">
 </head>
 <body class="large">
@@ -27,7 +27,8 @@
 <!-- Module Communication (06.10.2026) : le bureau aujourd'hui
      (qui est là, qui manque, les rendez-vous du jour, la semaine d'un coup
      d'œil) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
-     réplication avec Outlook viendra) et les absences et congés à venir. -->
+     réplication avec Outlook viendra) et les absences et congés à venir.
+     Sommaire (07.10.2026) : le bureau aujourd'hui, et « Absences et congés » mène à /planif/absences/. -->
 <main>
   <div class="wrap entete">
     <h1>Communication <span id="titre-comm" class="compte-titre"></span></h1>
@@ -37,9 +38,7 @@
   <div class="wrap">
     <nav class="cm-sommaire" aria-label="Sections de la page">
       <a href="#bureau">Le bureau aujourd'hui</a>
-      <a href="#tchat">Tchat</a>
-      <a href="#agenda">Agenda</a>
-      <a href="#absences">Absences et congés</a>
+      <a href="/planif/absences/">Absences et congés</a>
     </nav>
 
     <!-- En haut : le bureau aujourd'hui, compacté à gauche ; le tchat à droite -->
@@ -97,7 +96,7 @@
 <script src="/planif/assets/donnees.js?v=54"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=76"></script>
+<script src="/planif/assets/ui.js?v=77"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
