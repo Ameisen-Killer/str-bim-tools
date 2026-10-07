@@ -18,15 +18,14 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=78">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
-<link rel="stylesheet" href="/planif/assets/communication.css?v=8">
+<link rel="stylesheet" href="/planif/assets/communication.css?v=9">
 </head>
 <body class="large">
 
 <div data-chrome></div>
 
 <!-- Module Communication (06.10.2026) : le bureau aujourd'hui
-     (qui est là, qui manque, les rendez-vous du jour, la semaine d'un coup
-     d'œil) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
+     (qui manque, les rendez-vous du jour) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
      réplication avec Outlook viendra) et les absences et congés à venir.
      Sous le titre (07.10.2026) : la sous-barre « Le bureau aujourd'hui » / « Absences et congés »
      , Annuaire (ui.js, SOUS_NAV) ; la page Absences porte le même titre « Communication ». -->
@@ -45,8 +44,6 @@
         <div id="manque" class="cm-defile"></div>
         <h3 class="cm-sous">Rendez-vous du jour</h3>
         <div id="rdv-jour"></div>
-        <h3 class="cm-sous">La semaine</h3>
-        <div class="cm-semaine" id="semaine"></div>
       </section>
 
       <section class="section cm-tchat" id="tchat">
@@ -201,7 +198,7 @@
     var ferie = C.ferie(a, canton);
     document.getElementById("titre-jour").textContent = majuscule(JOURS[d.getDay()]) + " " + d.getDate() + " " + C.MOIS[d.getMonth()] +
       (ferie ? " · " + ferie : "");
-    // Plus de chiffres clés en tête (07.10.2026) : qui manque, les rendez-vous, la semaine
+    // Plus de chiffres clés ni de semaine (07.10.2026) : qui manque, puis les rendez-vous du jour
     var manque = quiManque(a);
     var rdvJour = D.rendezVous({ depuis: a, jusqu: a });
     document.getElementById("titre-comm").textContent = manque.length ? manque.length + (manque.length > 1 ? " personnes manquent aujourd'hui" : " personne manque aujourd'hui") : "toute l'équipe est là";
@@ -233,23 +230,6 @@
       rdvJour.forEach(function (r) { ul2.appendChild(el("li", {}, [carteRdv(r, true)])); });
       hr.appendChild(ul2);
     }
-
-    // La semaine d'un coup d'œil : absents et rendez-vous, du lundi au vendredi
-    var sem = UI.vide(document.getElementById("semaine"));
-    C.serie(C.lundi(a), 5).forEach(function (j) {
-      var m = quiManque(j), rv = D.rendezVous({ depuis: j, jusqu: j });
-      var dj = C.dt(j), passe = j < a, chome = !C.estOuvre(j, canton);
-      sem.appendChild(el("div", {
-        class: "cm-jour" + (j === a ? " aujourdhui" : "") + (passe ? " passe" : "") + (chome ? " chome" : ""),
-        title: chome ? (C.ferie(j, canton) || "Jour non ouvré") : (m.length ? "Absents ou en partie : " + m.map(function (x) { return nom(x.membre) + " (" + GENRES[x.genre].toLowerCase() + ")"; }).join(", ") : "Toute l'équipe là")
-      }, [
-        el("span", { class: "cm-jour-nom", text: majuscule(JOURS_ABR[dj.getDay()]) + " " + dj.getDate() }),
-        chome ? el("span", { class: "cm-jour-ferie", text: C.ferie(j, canton) || "Chômé" }) : el("span", { class: "cm-jour-chiffres" }, [
-          el("span", {}, [el("b", { text: String(m.length) }), m.length > 1 ? " absents" : " absent"]),
-          el("span", {}, [el("b", { text: String(rv.length) }), " rendez-vous"])
-        ])
-      ]));
-    });
   }
 
   /** Un rendez-vous : heure, intitulé, lieu, participants. Clic : le formulaire. */

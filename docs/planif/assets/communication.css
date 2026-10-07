@@ -31,22 +31,6 @@
 .cm-ok{display:flex;align-items:center;gap:10px;color:var(--texte-doux)}
 .cm-puce{width:10px;height:10px;border-radius:50%;background:#5BA33B}
 
-/* La semaine d'un coup d'œil */
-.cm-semaine{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-.cm-jour{display:flex;flex-direction:column;gap:6px;background:#F6F7F4;border-radius:8px;padding:10px 12px;border:2px solid transparent}
-.cm-jour.aujourdhui{border-color:var(--or);background:#fff}
-.cm-jour.passe{opacity:.55}
-.cm-jour.chome{background:repeating-linear-gradient(135deg,rgba(var(--encre),.05) 0 3px,transparent 3px 7px)}
-.cm-jour-nom{font-weight:650}
-.cm-jour-chiffres{display:flex;flex-direction:column;font-size:13px;color:var(--texte-faible)}
-.cm-jour-chiffres b{color:var(--texte);font-variant-numeric:tabular-nums}
-.cm-jour-ferie{font-size:13px;color:var(--texte-faible)}
-@media (max-width:640px){
-  .cm-semaine{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
-  .cm-jour{padding:8px 6px}
-  .cm-jour-chiffres span{font-size:11.5px}
-}
-
 /* Rendez-vous */
 .cm-rdv{
   display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;font:inherit;color:var(--texte);cursor:pointer;
@@ -119,13 +103,6 @@
 .cm-bureau .cm-detail{font-size:13px}
 .cm-defile{max-height:228px;overflow-y:auto}
 .cm-bureau .cm-ok{font-size:14.5px}
-.cm-bureau .cm-semaine{gap:6px}
-.cm-bureau .cm-jour{padding:7px 9px;gap:3px}
-.cm-bureau .cm-jour-nom{font-size:14px}
-.cm-bureau .cm-jour-chiffres{font-size:12px}
-@media (max-width:1100px){
-  :root[data-version="v2"] .cm-bureau .cm-cles{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
 
 /* Tchat */
 .cm-tchat{display:flex;flex-direction:column;min-height:540px}
