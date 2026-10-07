@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=79">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
-<link rel="stylesheet" href="/planif/assets/inter.css?v=3">
+<link rel="stylesheet" href="/planif/assets/inter.css?v=4">
 </head>
 <body class="large">
 
@@ -28,7 +28,10 @@
      secteurs. Les appels d'offres (une affaire en phase « AO » : public ou
      privé, demandeur pris dans l'annuaire, date de remise = échéance de
      l'affaire, secteurs concernés, résultat), leur agenda (attaché à l'AO, non
-     à une personne) et les affaires qui font intervenir plusieurs secteurs. -->
+     à une personne) et les affaires qui font intervenir plusieurs secteurs.
+     Deux pages sous le même titre (07.10.2026), choisies par la sous-barre
+     (ui.js, SOUS_NAV) : « Appels d'offres » (veille, AO, agenda) et, avec
+     ?vue=transversales, « Affaires transversales ». -->
 <main>
   <div class="wrap entete">
     <h1>Inter-secteurs <span id="titre-inter" class="compte-titre"></span></h1>
@@ -36,17 +39,10 @@
   </div>
   <div class="wrap" data-bandeau></div>
   <div class="wrap">
-    <nav class="is-sommaire" aria-label="Sections de la page">
-      <a href="#veille">Veille simap.ch</a>
-      <a href="#ao">Appels d'offres</a>
-      <a href="#agenda">Agenda des AO</a>
-      <a href="#transversal">Affaires transversales</a>
-    </nav>
-
-    <section class="section" id="veille">
+    <section class="section" id="veille" data-vue="ao">
       <div class="tete-section">
         <div>
-          <h2>Veille simap.ch</h2>
+          <h2>Veille simap.ch <span id="compte-veille" class="compte-titre"></span></h2>
           <p class="is-chapeau">Les appels d'offres publiés à Genève, Vaud et Valais qui touchent la structure ou le génie civil, relevés chaque matin sur simap.ch.</p>
         </div>
         <div class="outils">
@@ -61,7 +57,7 @@
       <div id="liste-veille"></div>
     </section>
 
-    <section class="section" id="ao">
+    <section class="section" id="ao" data-vue="ao">
       <div class="tete-section">
         <h2>Appels d'offres</h2>
         <div class="outils">
@@ -81,7 +77,7 @@
       <div class="defile" id="liste-ao"></div>
     </section>
 
-    <section class="section" id="agenda">
+    <section class="section" id="agenda" data-vue="ao">
       <div class="tete-section">
         <h2>Agenda des appels d'offres</h2>
         <div class="outils">
@@ -92,7 +88,7 @@
       <div id="liste-agenda"></div>
     </section>
 
-    <section class="section" id="transversal">
+    <section class="section" id="transversal" data-vue="trans">
       <div class="tete-section">
         <div>
           <h2>Affaires transversales</h2>
@@ -109,10 +105,10 @@
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=42"></script>
-<script src="/planif/assets/donnees.js?v=54"></script>
+<script src="/planif/assets/donnees.js?v=55"></script>
 <script src="/planif/assets/calculs.js?v=12"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=81"></script>
+<script src="/planif/assets/ui.js?v=82"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -122,6 +118,10 @@
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
   var JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
   var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle" };
+  // La page affichée : les appels d'offres, ou les affaires transversales (?vue=transversales)
+  var VUE = new URLSearchParams(location.search).get("vue") === "transversales" ? "trans" : "ao";
+  [].forEach.call(document.querySelectorAll("[data-vue]"), function (s) { s.hidden = s.getAttribute("data-vue") !== VUE; });
+  if (VUE === "trans") document.title = "Affaires transversales · Planification";
 
   if (!UI.session()) return;
 
@@ -146,10 +146,10 @@
 
   function chrome() {
     var actions = [];
-    if (D.aDroit("affaires_creer")) {
+    if (VUE === "ao" && D.aDroit("affaires_creer")) {
       actions.push({ label: "Nouvel appel d'offres", or: true, icone: "ico-ajout-affaire", action: function () { formAO(null); } });
     }
-    UI.chrome("inter", actions);
+    UI.chrome(VUE === "trans" ? "transversales" : "inter", actions);
   }
 
   /* ================================================================ outils */
@@ -202,6 +202,11 @@
   /* ================================================================ rendu */
 
   function rend() {
+    if (VUE === "trans") {
+      var nt = listeTransversales();
+      document.getElementById("titre-inter").textContent = nt + (nt > 1 ? " affaires transversales" : " affaire transversale");
+      return;
+    }
     var aos = appelsDOffres();
     var nEnCours = aos.filter(enCours).length;
     var nRdv = D.agenda({ depuis: auj() }).length;
@@ -210,7 +215,6 @@
     listeVeille();
     listeAO(aos);
     listeAgenda();
-    listeTransversales();
   }
 
   /* ------------------------------------------------------- veille simap.ch */
@@ -221,9 +225,8 @@
     var hote = UI.vide(document.getElementById("liste-veille"));
     // « Nouvelles » : ni écartées ni retenues, et dont la remise n'est pas passée
     var l = filtres.veille === "nouvelle" ? D.veilleNouvelles() : D.veille({ etat: filtres.veille });
-    var lien = document.querySelector('.is-sommaire a[href="#veille"]');
     var n = D.veilleNouvelles().length;
-    lien.textContent = "Veille simap.ch" + (n ? " (" + n + ")" : "");
+    document.getElementById("compte-veille").textContent = n ? n + (n > 1 ? " nouvelles" : " nouvelle") : "";
     if (!l.length) {
       hote.appendChild(el("p", { class: "vide", text: filtres.veille === "nouvelle"
         ? "Aucune nouvelle publication. La veille se met à jour chaque matin de semaine."
@@ -391,7 +394,7 @@
       .sort(function (x, y) { return y.secteurs.length - x.secteurs.length || x.a.code.localeCompare(y.a.code, "fr", { numeric: true }); });
     if (!l.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire en cours ne fait intervenir plusieurs secteurs." }));
-      return;
+      return 0;
     }
     var t = el("table", { class: "liste is-table" });
     t.appendChild(el("thead", {}, [el("tr", {}, ["Affaire", "Phase", "Secteurs", "Équipe", "Tâches ouvertes", "Prochaine échéance", ""].map(function (h) { return el("th", { text: h }); }))]));
@@ -411,6 +414,7 @@
     });
     t.appendChild(corps);
     hote.appendChild(t);
+    return l.length;
   }
 
   /* ================================================================ formulaires */

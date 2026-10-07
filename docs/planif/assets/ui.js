@@ -699,13 +699,13 @@
   ];
   var MODULE_DE = {
     absences: "communication", annuaire: "communication",
-    tableau: "taches", affaires: "taches", equipe: "taches", charge: "taches"
+    tableau: "taches", affaires: "taches", transversales: "inter", equipe: "taches", charge: "taches"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
      ouverte en vert clair. Communication : le bureau aujourd'hui, les
      absences et l'annuaire, pour tous. Tâches : la liste et le tableau de
      bord pour tous, puis les pages de gestion pour les chefs de secteur et
-     au-delà. Une seule page permise : pas de sous-barre. */
+     au-delà. Inter-secteurs : appels d'offres et affaires transversales. Une seule page permise : pas de sous-barre. */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [
       { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
@@ -718,6 +718,10 @@
       { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
       { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" },
       { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge" }
+    ] },
+    inter: { nom: "Inter-secteurs", pages: [
+      { cle: "inter", href: "/planif/inter-secteurs/", nom: "Appels d'offres" },
+      { cle: "transversales", href: "/planif/inter-secteurs/?vue=transversales", nom: "Affaires transversales" }
     ] }
   };
 

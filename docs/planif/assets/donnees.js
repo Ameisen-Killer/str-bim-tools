@@ -151,7 +151,7 @@
   var NIVEAUX_PAGES = {
     accueil: 0, communication: 0, tableau: 0, taches: 0, absences: 0, annuaire: 0,
     affaires: 1, equipe: 1, charge: 1, secteurs: 1,
-    inter: 2,
+    inter: 2, transversales: 2,
     console: 3
   };
 
