@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=13">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=14">
 </head>
 <body>
 
@@ -90,7 +90,7 @@
       <div id="abs"></div>
     </section>
 
-    <section class="ab-encadre ab-monte" style="--r:6" aria-labelledby="t-aff">
+    <section class="ab-encadre ab-monte" id="encadre-aff" style="--r:6" aria-labelledby="t-aff">
       <div class="ab-encadre-tete">
         <h3 id="t-aff">Tâches à affecter</h3>
         <a class="ab-voir" href="/planif/taches/?membre=a-affecter">Voir tout</a>
@@ -327,8 +327,14 @@
   }
 
   /* ----------------------------------------------- tâches à affecter
-     Les tâches dont une part chargée attend encore quelqu'un. */
+     Les tâches dont une part chargée attend encore quelqu'un. Réservé aux
+     chefs de secteur et au-delà (demande de Tony, 07.10.2026) : en dessous,
+     l'encadré disparaît et les deux autres se partagent la largeur. */
   function aAffecter() {
+    var chef = D.niveauAcces() >= 1;
+    document.getElementById("encadre-aff").style.display = chef ? "" : "none";
+    document.querySelector(".ab-encadres").classList.toggle("deux", !chef);
+    if (!chef) return;
     var hote = Portail.vide(document.getElementById("aff"));
     var l = D.taches({ sansTerminees: true }).filter(function (t) { return Calc.nonAffectees(t).length; }).sort(parUrgence);
     var titre = document.getElementById("t-aff");
