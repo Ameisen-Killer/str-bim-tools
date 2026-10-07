@@ -147,6 +147,14 @@
     }
   };
 
+  /* Niveau demandé par chaque page (voir niveauAcces) */
+  var NIVEAUX_PAGES = {
+    accueil: 0, communication: 0, tableau: 0, taches: 0, absences: 0, annuaire: 0,
+    affaires: 1, equipe: 1, charge: 1, secteurs: 1,
+    inter: 2,
+    console: 3
+  };
+
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
   function statutsDe(m) {
     var l = (m && m.statuts) || [];
@@ -994,6 +1002,24 @@
        Ce que la personne connectée a le droit de faire. Les pages s'en
        servent pour ne pas proposer l'impossible ; c'est la base (RLS) qui
        tranche pour de bon, avec exactement les mêmes règles. */
+
+    /* Accès aux pages selon le statut (demande de Tony, 07.10.2026) :
+       0 tout le monde (chefs de projet compris), 1 chefs de secteur,
+       2 administrateurs du bureau, 3 super admin (la console). Le statut le
+       plus haut l'emporte. Mode local : tout sauf la console. Ce n'est qu'un
+       rangement de l'interface : les données du bureau restent lisibles. */
+    NIVEAUX_PAGES: NIVEAUX_PAGES,
+    niveauAcces: function () {
+      if (!profil || !profil.multi) return 2;
+      if (profil.superAdmin) return 3;
+      var st = profil.statuts || [];
+      return st.indexOf("administrateur") >= 0 ? 2 : st.indexOf("chef_secteur") >= 0 ? 1 : 0;
+    },
+    /** cle : celle de la barre des pages (« tableau », « inter »…) ; inconnue : permise. */
+    pagePermise: function (cle) {
+      var n = NIVEAUX_PAGES[cle];
+      return n == null || n <= D.niveauAcces();
+    },
 
     /** Le super admin a tous les droits : c'est lui qui les distribue. */
     aDroit: function (code) {

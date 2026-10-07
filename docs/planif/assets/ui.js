@@ -685,9 +685,15 @@
     { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
-  /* Ordre des pages de la version 2 (barre et palette Ctrl+K) ; null : un trait. */
-  var ORDRE_V2 = ["accueil", "communication", "taches", null, "tableau", "charge", null, "secteurs", "inter", null,
-                  "affaires", "absences", "equipe", "annuaire", null, "console"];
+  /* Pages de la version 2, groupées par niveau d'accès (07.10.2026, Donnees.niveauAcces) :
+     tout le monde, chefs de secteur, administrateurs, super admin. Un trait sépare
+     deux groupes ; chacun ne voit que ceux de son niveau. Même ordre dans la palette. */
+  var GROUPES_V2 = [
+    ["accueil", "communication", "tableau", "taches", "absences", "annuaire"],
+    ["affaires", "equipe", "charge", "secteurs"],
+    ["inter"],
+    ["console"]
+  ];
 
   /* ------------------------------------------------- barre de la version 2
      En haut, à droite : la recherche, qui est en ligne, le bureau (super admin),
@@ -782,17 +788,26 @@
     var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
     if (VERSION_AB) {
       appliqueMarque();
-      // Ordre de la barre (07.10.2026) : le quotidien, la planification, les modules,
-      // les référentiels, puis la console ; null : un trait entre deux groupes
+      // Page hors de son niveau, ouverte par son adresse : retour à l'accueil, qui le dit
+      if (actif && actif !== "console" && D.pagePermise && !D.pagePermise(actif)) {
+        document.documentElement.style.visibility = "hidden";
+        location.replace("/planif/?refus=" + encodeURIComponent(actif));
+        return;
+      }
+      // Les groupes permis, un trait (null) entre deux
       var parCle = {};
       pages.concat([
         { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
         { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
         { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
       ]).forEach(function (p) { parCle[p.cle] = p; });
-      pages = ORDRE_V2.map(function (c) { return c ? parCle[c] : null; })
-        .filter(function (p) { return p !== undefined; });
-      while (pages.length && pages[pages.length - 1] === null) pages.pop();
+      pages = [];
+      GROUPES_V2.forEach(function (g) {
+        var l = g.filter(function (c) { return parCle[c] && (!D.pagePermise || D.pagePermise(c)); });
+        if (!l.length) return;
+        if (pages.length) pages.push(null);
+        l.forEach(function (c) { pages.push(parCle[c]); });
+      });
     }
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
@@ -1879,7 +1894,8 @@
       return ouvre({
         titre: "Aucune affaire",
         corps: el("p", { style: "color:var(--texte-doux)", text: "Une tâche se rattache toujours à une affaire. Crée d'abord une affaire." }),
-        boutons: [{ label: "Fermer" }, { label: "Aller aux affaires", or: true, action: function () { location.href = chemin("/planif/affaires/"); } }]
+        boutons: [{ label: "Fermer" }].concat(D.pagePermise && !D.pagePermise("affaires") ? []
+          : [{ label: "Aller aux affaires", or: true, action: function () { location.href = chemin("/planif/affaires/"); } }])
       });
     }
 

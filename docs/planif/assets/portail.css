@@ -84,7 +84,7 @@ button { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------ modules */
 .ab-modules {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;
+  display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 16px;
   margin: 18px calc(var(--marge) * -.4) 0;
 }
 .ab-module {
@@ -173,6 +173,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-site a { color: var(--faible); text-decoration: none; opacity: .75; transition: opacity .2s; }
 .ab-site a:hover { opacity: 1; text-decoration: underline; }
 .ab-message { margin: 30px auto; max-width: 620px; padding: 18px 20px; border-radius: var(--rayon); background: var(--carte); box-shadow: var(--ombre); }
+.ab-refus { margin: 18px auto 0; }
 
 /* Apparition douce au premier rendu */
 .ab-monte { animation: ab-monte .5s cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(var(--r, 0) * 60ms); }

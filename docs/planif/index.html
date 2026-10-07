@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=2">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=10">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=11">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
 
   <!-- Les quatre entrées vers les modules. -->
   <nav class="ab-modules" aria-label="Modules">
-    <a class="ab-module ab-monte" style="--r:0" href="/planif/communication/" id="module-comm">
+    <a class="ab-module ab-monte" style="--r:0" data-page="communication" href="/planif/communication/" id="module-comm">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <path class="ic-v" d="M12 9h27a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H21l-7 7v-7h-2a5 5 0 0 1-5-5V14a5 5 0 0 1 5-5z"/>
         <path class="ic-f ic-blanc" d="M28 23h24a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5h-2v7.5L42.5 46H28a5 5 0 0 1-5-5V28a5 5 0 0 1 5-5z"/>
@@ -37,7 +37,7 @@
       <p>Rendez-vous, absences, congés et vision d'ensemble du bureau</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
-    <a class="ab-module ab-monte" style="--r:1" href="/planif/taches/">
+    <a class="ab-module ab-monte" style="--r:1" data-page="taches" href="/planif/taches/">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <rect class="ic-v" x="8" y="8" width="48" height="48" rx="4"/>
         <rect class="ic-f" x="15" y="16" width="11" height="11" rx="1.5"/>
@@ -50,7 +50,7 @@
       <p>Vos tâches, échéances et avancement</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
-    <a class="ab-module ab-monte" style="--r:2" href="/planif/secteurs/">
+    <a class="ab-module ab-monte" style="--r:2" data-page="secteurs" href="/planif/secteurs/">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <path class="ic-f" d="M13 52V38a3 3 0 0 1 6 0v14M26 52V28a3 3 0 0 1 6 0v24"/>
         <rect class="ic-plein" x="39" y="8" width="9" height="44"/>
@@ -60,7 +60,7 @@
       <p>Vision globale par secteur (projets et ressources)</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
-    <a class="ab-module ab-monte" style="--r:3" href="/planif/inter-secteurs/" id="module-inter">
+    <a class="ab-module ab-monte" style="--r:3" data-page="inter" href="/planif/inter-secteurs/" id="module-inter">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <path class="ic-f" d="M17 6h21l12 12v37a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z"/>
         <path class="ic-f" d="M38 6v12h12"/>
@@ -106,7 +106,7 @@
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=42"></script>
-<script src="/planif/assets/donnees.js?v=52"></script>
+<script src="/planif/assets/donnees.js?v=53"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=3"></script>
 <script src="/planif/assets/portail.js?v=9"></script>
@@ -124,6 +124,8 @@
   D.pret().then(function () {
     var id = Portail.entete(document.getElementById("entete"));
     salut(id);
+    cartesPermises();
+    refus();
     Portail.surRetour(dessine);
     // Un message du tchat arrive (tchat.js) : le badge de la carte Communication suit
     window.addEventListener("planif:message", badgeConges);
@@ -141,6 +143,30 @@
     var nom = [id.prenom, id.nom].filter(Boolean).join(" ");
     h.appendChild(document.createTextNode("Bonjour" + (nom ? " " : "")));
     if (nom) h.appendChild(el("span", { class: "ab-nom", text: nom }));
+  }
+
+  /* Les cartes des modules selon le niveau d'accès (Donnees.niveauAcces) ;
+     la grille prend autant de colonnes que de cartes montrées. */
+  function cartesPermises() {
+    var nav = document.querySelector(".ab-modules"), n = 0;
+    [].forEach.call(nav.querySelectorAll(".ab-module"), function (a) {
+      var ok = D.pagePermise(a.getAttribute("data-page"));
+      a.style.display = ok ? "" : "none";
+      if (ok) n++;
+    });
+    nav.style.setProperty("--n", n);
+  }
+
+  /* Arrivée ici depuis une page hors de son niveau (ui.js, chrome) : le dire */
+  var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", secteurs: "Secteurs", inter: "Inter-secteurs" };
+  function refus() {
+    var cle = new URLSearchParams(location.search).get("refus");
+    if (!cle) return;
+    history.replaceState(null, "", location.pathname + location.hash);
+    var qui = D.NIVEAUX_PAGES[cle] >= 2 ? "aux administrateurs du bureau" : "aux chefs de secteur et aux administrateurs du bureau";
+    var nav = document.querySelector(".ab-modules");
+    nav.parentNode.insertBefore(el("p", { class: "ab-message ab-refus",
+      text: "La page « " + (NOMS_PAGES[cle] || cle) + " » est réservée " + qui + "." }), nav);
   }
 
   function dessine() {
