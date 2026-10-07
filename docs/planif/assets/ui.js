@@ -701,21 +701,38 @@
     tableau: "communication", absences: "communication", annuaire: "communication",
     affaires: "taches", equipe: "taches", charge: "taches"
   };
-  /* Saisie des tâches : au-dessus de la page, les pages de gestion qui
-     l'accompagnent, pour les chefs de secteur et au-delà. */
-  var SOUS_TACHES = ["taches", "affaires", "equipe", "charge"];
+  /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
+     ouverte en vert clair. Communication : le bureau aujourd'hui et les
+     absences, pour tous. Saisie des tâches : les pages de gestion qui
+     l'accompagnent, pour les chefs de secteur et au-delà (sinon une seule
+     page permise : pas de sous-barre). */
+  var SOUS_NAV = {
+    communication: { nom: "Communication", pages: [
+      { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
+      { cle: "absences", href: "/planif/absences/", nom: "Absences et congés" }
+    ] },
+    taches: { nom: "Saisie des tâches", pages: [
+      { cle: "taches", href: "/planif/taches/", nom: "Tâches" },
+      { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
+      { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" },
+      { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge" }
+    ] }
+  };
 
-  function sousNavTaches(actif, parCle) {
+  function sousNav(actif) {
     var vieux = document.querySelector(".sous-nav-wrap");
     if (vieux) vieux.remove();
-    if (SOUS_TACHES.indexOf(actif) < 0) return;
-    var l = SOUS_TACHES.filter(function (c) { return parCle[c] && (!D.pagePermise || D.pagePermise(c)); });
+    var module = null;
+    Object.keys(SOUS_NAV).forEach(function (k) {
+      if (SOUS_NAV[k].pages.some(function (p) { return p.cle === actif; })) module = SOUS_NAV[k];
+    });
+    if (!module) return;
+    var l = module.pages.filter(function (p) { return !D.pagePermise || D.pagePermise(p.cle); });
     if (l.length < 2) return;
     var entete = document.querySelector("main .entete");
     if (!entete) return;
-    var nav = el("nav", { class: "sous-nav", "aria-label": "Saisie des tâches" }, l.map(function (c) {
-      return el("a", { href: chemin(parCle[c].href), "aria-current": c === actif ? "page" : null,
-        text: c === "charge" ? "Tableau de charge" : parCle[c].nom });
+    var nav = el("nav", { class: "sous-nav", "aria-label": module.nom }, l.map(function (p) {
+      return el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null, text: p.nom });
     }));
     entete.parentNode.insertBefore(el("div", { class: "wrap sous-nav-wrap" }, [nav]), entete.nextSibling);
   }
@@ -846,10 +863,8 @@
         if (pages.length) pages.push(null);
         l.forEach(function (c) { pages.push(parCle[c]); });
       });
-      // Tâches, Affaires… sous la barre ; la Saisie des tâches allumée en haut
-      var sousCles = {};
-      PAGES.forEach(function (p) { sousCles[p.cle] = p; });
-      sousNavTaches(actif, sousCles);
+      // La sous-barre du module sous le titre ; le module allumé en haut
+      sousNav(actif);
       if (MODULE_DE[actif]) actif = MODULE_DE[actif];
     }
 

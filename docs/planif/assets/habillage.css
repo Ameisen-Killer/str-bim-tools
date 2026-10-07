@@ -116,6 +116,7 @@
 }
 :root[data-version="v2"] .sous-nav a:hover{background:var(--m-pale);color:var(--texte)}
 :root[data-version="v2"] .sous-nav a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
+@media print{.sous-nav-wrap{display:none!important}}
 /* Trait entre deux groupes de pages */
 :root[data-version="v2"] .nav-outil .nav-trait{flex:0 0 1px;height:22px;margin:0 6px;background:var(--ligne)}
 /* Messages du tchat non lus, sur « Communication » */
