@@ -62,6 +62,9 @@ body { min-height: 100vh; min-height: 100dvh; }
 .cx-bas button[disabled] { opacity: .5; cursor: default; }
 
 .cx-pied { margin: 22px 0 0; font-size: 13px; color: var(--faible); text-align: center; }
+.cx-site { margin: 8px 0 0; font-size: 12px; text-align: center; }
+.cx-site a { color: var(--faible); text-decoration: none; opacity: .75; transition: opacity .2s; }
+.cx-site a:hover { opacity: 1; text-decoration: underline; }
 
 @media (max-width: 700px) {
   .cx { justify-content: flex-start; }

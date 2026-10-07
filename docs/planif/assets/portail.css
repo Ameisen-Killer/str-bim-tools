@@ -168,6 +168,10 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 /* ------------------------------------------------------------ pied */
 .ab-pied { margin-top: 26px; text-align: center; color: var(--faible); font-size: 13px; }
 .ab-pied a { color: var(--faible); }
+/* Lien discret vers le site principal, en bas à droite */
+.ab-site { margin: 6px 0 0; text-align: right; font-size: 12px; }
+.ab-site a { color: var(--faible); text-decoration: none; opacity: .75; transition: opacity .2s; }
+.ab-site a:hover { opacity: 1; text-decoration: underline; }
 .ab-message { margin: 30px auto; max-width: 620px; padding: 18px 20px; border-radius: var(--rayon); background: var(--carte); box-shadow: var(--ombre); }
 
 /* Apparition douce au premier rendu */

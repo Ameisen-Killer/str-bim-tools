@@ -199,6 +199,8 @@
 
 /* --------------------------------------------------------- pied */
 :root[data-version="v2"] footer.pied-outil{font-size:13px;border-top:0;color:var(--texte-faible)}
+:root[data-version="v2"] footer.pied-outil .lien-site{font-size:12px;opacity:.75}
+:root[data-version="v2"] footer.pied-outil .lien-site:hover{opacity:1}
 
 /* --------------------------------------------------------- priorité des tâches
    Curseur du formulaire (ui.js, curseurPriorite) et pastille de la liste. */

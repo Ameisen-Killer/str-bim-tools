@@ -1211,7 +1211,8 @@
       el("div", { class: "droite" }, [
         VERSION_AB && versionAB() ? el("span", { text: versionAB() }) : null,
         el("span", { class: "maj", text: avecBase ? "Base hébergée en Europe (Francfort)" : "Données enregistrées dans ce navigateur" }),
-        el("a", { href: "/mentions-legales/", text: "Mentions légales" })
+        el("a", { href: "/mentions-legales/", text: "Mentions légales" }),
+        VERSION_AB ? el("a", { href: "/", class: "lien-site", text: "str-bim-tools.com" }) : null
       ])
     ]));
   }
