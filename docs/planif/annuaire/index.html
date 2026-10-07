@@ -24,8 +24,9 @@
 <div data-chrome></div>
 
 <main>
+  <!-- Page du module Communication (07.10.2026) : même titre, sous-barre en dessous (ui.js) -->
   <div class="wrap entete">
-    <h1>Annuaire <span id="titre-liste" class="compte-titre"></span></h1>
+    <h1>Communication <span id="titre-liste" class="compte-titre"></span></h1>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
 
@@ -50,7 +51,7 @@
 <script src="/planif/assets/donnees.js?v=54"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=78"></script>
+<script src="/planif/assets/ui.js?v=79"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -159,7 +160,7 @@
     suivi.debut();
     if (barre) barre.compte(contacts.length, selection({ sansTexte: true }).length);
     document.getElementById("titre-liste").textContent =
-      contacts.length + (contacts.length > 1 ? " fiches" : " fiche");
+      contacts.length + (contacts.length > 1 ? " fiches" : " fiche") + " dans l'annuaire";
 
     if (!contacts.length) {
       var q = barre ? barre.valeur().trim() : "";

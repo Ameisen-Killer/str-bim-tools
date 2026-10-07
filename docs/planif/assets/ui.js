@@ -702,14 +702,16 @@
     affaires: "taches", equipe: "taches", charge: "taches"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
-     ouverte en vert clair. Communication : le bureau aujourd'hui et les
-     absences, pour tous. Saisie des tâches : les pages de gestion qui
+     ouverte en vert clair. Communication : le bureau aujourd'hui, les
+     absences, le tableau de bord et l'annuaire, pour tous. Saisie des tâches : les pages de gestion qui
      l'accompagnent, pour les chefs de secteur et au-delà (sinon une seule
      page permise : pas de sous-barre). */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [
       { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
-      { cle: "absences", href: "/planif/absences/", nom: "Absences et congés" }
+      { cle: "absences", href: "/planif/absences/", nom: "Absences et congés" },
+      { cle: "tableau", href: "/planif/planning/", nom: "Tableau de bord" },
+      { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire" }
     ] },
     taches: { nom: "Saisie des tâches", pages: [
       { cle: "taches", href: "/planif/taches/", nom: "Tâches" },

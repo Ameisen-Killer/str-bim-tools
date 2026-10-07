@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=78">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=14">
-<link rel="stylesheet" href="/planif/assets/communication.css?v=7">
+<link rel="stylesheet" href="/planif/assets/communication.css?v=8">
 </head>
 <body class="large">
 
@@ -29,7 +29,7 @@
      d'œil) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
      réplication avec Outlook viendra) et les absences et congés à venir.
      Sous le titre (07.10.2026) : la sous-barre « Le bureau aujourd'hui » / « Absences et congés »
-     (ui.js, SOUS_NAV) ; la page Absences porte le même titre « Communication ». -->
+     , Tableau de bord, Annuaire (ui.js, SOUS_NAV) ; la page Absences porte le même titre « Communication ». -->
 <main>
   <div class="wrap entete">
     <h1>Communication <span id="titre-comm" class="compte-titre"></span></h1>
@@ -41,7 +41,6 @@
     <div class="cm-haut">
       <section class="section cm-bureau" id="bureau">
         <div class="tete-section"><h2 id="titre-jour">Aujourd'hui</h2></div>
-        <div class="cles cm-cles" id="cles"></div>
         <h3 class="cm-sous">Qui manque</h3>
         <div id="manque" class="cm-defile"></div>
         <h3 class="cm-sous">Rendez-vous du jour</h3>
@@ -92,7 +91,7 @@
 <script src="/planif/assets/donnees.js?v=54"></script>
 <script src="/planif/assets/calculs.js?v=11"></script>
 <script src="/planif/assets/version.js?v=3"></script>
-<script src="/planif/assets/ui.js?v=78"></script>
+<script src="/planif/assets/ui.js?v=79"></script>
 <script src="/planif/assets/palette.js?v=15"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -202,17 +201,9 @@
     var ferie = C.ferie(a, canton);
     document.getElementById("titre-jour").textContent = majuscule(JOURS[d.getDay()]) + " " + d.getDate() + " " + C.MOIS[d.getMonth()] +
       (ferie ? " · " + ferie : "");
-    var gens = D.membres({}), manque = quiManque(a);
-    var entiers = manque.filter(function (x) { return x.genre === "absence" || x.genre === "off"; }).length;
+    // Plus de chiffres clés en tête (07.10.2026) : qui manque, les rendez-vous, la semaine
+    var manque = quiManque(a);
     var rdvJour = D.rendezVous({ depuis: a, jusqu: a });
-    var ouvre = C.estOuvre(a, canton);
-
-    var cles = UI.vide(document.getElementById("cles"));
-    function cle(v, l, classe) { cles.appendChild(el("div", { class: "cle" + (classe ? " " + classe : "") }, [el("div", { class: "v", text: v }), el("div", { class: "l", text: l })])); }
-    cle(ouvre ? (gens.length - entiers) + " / " + gens.length : "—", ouvre ? "Au bureau aujourd'hui" : "Jour non ouvré");
-    cle(String(entiers), entiers > 1 ? "Absents toute la journée" : "Absent toute la journée", entiers ? "alerte" : "");
-    cle(String(manque.length - entiers), "En partie (avis, ½ journée)");
-    cle(String(rdvJour.length), rdvJour.length > 1 ? "Rendez-vous aujourd'hui" : "Rendez-vous aujourd'hui");
     document.getElementById("titre-comm").textContent = manque.length ? manque.length + (manque.length > 1 ? " personnes manquent aujourd'hui" : " personne manque aujourd'hui") : "toute l'équipe est là";
 
     // Qui manque

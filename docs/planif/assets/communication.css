@@ -2,8 +2,6 @@
    Chargée après planif.css et habillage.css. */
 
 .cm-sous{font-size:16px;font-weight:650;margin:22px 0 10px}
-.cm-cles{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:760px){.cm-cles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* Listes de personnes */
 .cm-liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
