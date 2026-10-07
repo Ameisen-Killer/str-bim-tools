@@ -698,23 +698,23 @@
     ["console"]
   ];
   var MODULE_DE = {
-    tableau: "communication", absences: "communication", annuaire: "communication",
-    affaires: "taches", equipe: "taches", charge: "taches"
+    absences: "communication", annuaire: "communication",
+    tableau: "taches", affaires: "taches", equipe: "taches", charge: "taches"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
      ouverte en vert clair. Communication : le bureau aujourd'hui, les
-     absences, le tableau de bord et l'annuaire, pour tous. Saisie des tâches : les pages de gestion qui
-     l'accompagnent, pour les chefs de secteur et au-delà (sinon une seule
-     page permise : pas de sous-barre). */
+     absences et l'annuaire, pour tous. Tâches : la liste et le tableau de
+     bord pour tous, puis les pages de gestion pour les chefs de secteur et
+     au-delà. Une seule page permise : pas de sous-barre. */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [
       { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
       { cle: "absences", href: "/planif/absences/", nom: "Absences et congés" },
-      { cle: "tableau", href: "/planif/planning/", nom: "Tableau de bord" },
       { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire" }
     ] },
-    taches: { nom: "Saisie des tâches", pages: [
+    taches: { nom: "Tâches", pages: [
       { cle: "taches", href: "/planif/taches/", nom: "Tâches" },
+      { cle: "tableau", href: "/planif/planning/", nom: "Tableau de bord" },
       { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
       { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" },
       { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge" }
@@ -854,7 +854,7 @@
       var parCle = {};
       pages.concat([
         { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
-        { cle: "taches", href: "/planif/taches/", nom: "Saisie des tâches", court: "Tâches" },
+        { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
         { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
         { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
       ]).forEach(function (p) { parCle[p.cle] = p; });

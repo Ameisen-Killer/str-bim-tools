@@ -108,7 +108,7 @@
 }
 :root[data-version="v2"] .nav-outil a:hover{background:var(--ab-vert-pale);color:var(--texte)}
 :root[data-version="v2"] .nav-outil a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
-/* Sous la barre, sur la Saisie des tâches : Tâches, Affaires, Équipe, Tableau de charge (07.10.2026) */
+/* Sous-barre des modules, sous le titre de la page (ui.js, SOUS_NAV ; 07.10.2026) */
 :root[data-version="v2"] .sous-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 :root[data-version="v2"] .sous-nav a{
   text-decoration:none;font-size:14px;font-weight:500;color:var(--texte-doux);
