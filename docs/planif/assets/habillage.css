@@ -31,7 +31,8 @@
   --texte-doux:rgba(var(--encre),.82);
   --texte-faible:rgba(var(--encre),.66);
 
-  --mono:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
 
   /* Teintes d'affaire, lisibles sur blanc */
   --t1:var(--m-fort); --t2:#2B5A8A; --t3:#1F7A70; --t4:#B0561A;
@@ -47,11 +48,14 @@
 
 /* --------------------------------------------------------- typographie
    Pas de capitales espacées ni de chasse fixe : une seule police, en casse
-   normale. Le corps passe en graisse normale, les titres en gras. */
-:root[data-version="v2"] body{background:var(--ab-fond);font-weight:400}
+   normale : Inter (07.10.2026, Inter Tight jugée trop fine). Le corps passe
+   un cran au-dessus de la graisse normale, les titres en gras. */
+:root[data-version="v2"] body{background:var(--ab-fond);font-weight:450}
 :root[data-version="v2"] body *{letter-spacing:normal;text-transform:none}
 :root[data-version="v2"] h1,:root[data-version="v2"] h2,:root[data-version="v2"] h3{font-weight:650}
 :root[data-version="v2"] .num,:root[data-version="v2"] .mono{font-variant-numeric:tabular-nums}
+/* Restes des graisses très fines de la version classique */
+:root[data-version="v2"] .recherche-champ,:root[data-version="v2"] .sans-resultat .q{font-weight:450}
 
 /* --------------------------------------------------------- barre du haut */
 :root[data-version="v2"] .barre{
@@ -161,7 +165,7 @@
 /* --------------------------------------------------------- formulaires */
 :root[data-version="v2"] .champ > label,:root[data-version="v2"] .legende{font-size:13px;font-weight:500;color:var(--texte-faible)}
 :root[data-version="v2"] .champ input,:root[data-version="v2"] .champ select,:root[data-version="v2"] .champ textarea{
-  font-weight:400;background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;
+  font-weight:450;background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;
 }
 :root[data-version="v2"] .champ input:focus,:root[data-version="v2"] .champ select:focus,:root[data-version="v2"] .champ textarea:focus{
   border-color:var(--or);background:#fff;box-shadow:0 0 0 3px rgba(var(--or-rvb),.14);

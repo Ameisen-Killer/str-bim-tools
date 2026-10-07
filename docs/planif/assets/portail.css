@@ -27,14 +27,14 @@
   --ombre-haute: 0 2px 4px rgba(30, 34, 38, .06), 0 12px 28px rgba(30, 34, 38, .10);
   --rayon: 8px;
   --marge: clamp(16px, 3.4vw, 48px);
-  --police: "Inter Tight", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --police: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--fond); color: var(--texte);
-  font-family: var(--police); font-size: 16px; line-height: 1.4;
+  font-family: var(--police); font-size: 16px; font-weight: 450; line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; }
