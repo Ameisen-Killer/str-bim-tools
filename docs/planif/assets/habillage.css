@@ -102,6 +102,8 @@
 }
 :root[data-version="v2"] .nav-outil a:hover{background:var(--ab-vert-pale);color:var(--texte)}
 :root[data-version="v2"] .nav-outil a[aria-current]{background:var(--ab-vert-clair);color:var(--texte);font-weight:600}
+/* Trait entre deux groupes de pages */
+:root[data-version="v2"] .nav-outil .nav-trait{flex:0 0 1px;height:22px;margin:0 6px;background:var(--ligne)}
 /* Messages du tchat non lus, sur « Communication » */
 :root[data-version="v2"] .nav-badge{
   display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-left:6px;border-radius:10px;

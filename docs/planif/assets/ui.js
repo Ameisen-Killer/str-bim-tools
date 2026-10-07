@@ -685,6 +685,10 @@
     { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire", court: "Annuaire" }
   ];
 
+  /* Ordre des pages de la version 2 (barre et palette Ctrl+K) ; null : un trait. */
+  var ORDRE_V2 = ["accueil", "communication", "taches", null, "tableau", "charge", null, "secteurs", "inter", null,
+                  "affaires", "absences", "equipe", "annuaire", null, "console"];
+
   /* ------------------------------------------------- barre de la version 2
      En haut, à droite : la recherche, qui est en ligne, le bureau (super admin),
      le compte (nom, rafraîchir, données, déconnexion), puis le logo de la
@@ -778,16 +782,22 @@
     var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
     if (VERSION_AB) {
       appliqueMarque();
-      // Communication (rendez-vous, absences, vision du bureau) juste après l'accueil ;
-      // Secteurs et Inter-secteurs après la carte de charge
-      pages.splice(1, 0, { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." });
-      var iCharge = pages.map(function (p) { return p.cle; }).indexOf("charge");
-      pages.splice(iCharge + 1, 0, { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
-                                   { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" });
+      // Ordre de la barre (07.10.2026) : le quotidien, la planification, les modules,
+      // les référentiels, puis la console ; null : un trait entre deux groupes
+      var parCle = {};
+      pages.concat([
+        { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
+        { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
+        { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
+      ]).forEach(function (p) { parCle[p.cle] = p; });
+      pages = ORDRE_V2.map(function (c) { return c ? parCle[c] : null; })
+        .filter(function (p) { return p !== undefined; });
+      while (pages.length && pages[pages.length - 1] === null) pages.pop();
     }
 
     var nav = el("nav", { class: "nav-outil", "aria-label": "Sections de l'outil" });
     pages.forEach(function (p) {
+      if (p === null) { nav.appendChild(el("span", { class: "nav-trait", "aria-hidden": "true" })); return; }
       // Version 2 : l'accueil est la maison, en tête de la barre des pages
       if (VERSION_AB && p.cle === "accueil") {
         nav.appendChild(el("a", { class: "nav-maison", href: chemin(p.href), title: p.nom, "aria-label": p.nom,

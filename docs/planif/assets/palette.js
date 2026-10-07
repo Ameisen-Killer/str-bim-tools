@@ -258,12 +258,18 @@
 
   function pages() {
     var p = D.profil ? D.profil() : null;
-    if (UI.versionAB) return PAGES.concat([
+    var console_ = p && p.multi && p.superAdmin ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : [];
+    if (!UI.versionAB) return PAGES.concat(console_);
+    // Même ordre que la barre des pages (ui.js, ORDRE_V2)
+    var parHref = {};
+    PAGES.concat([
       { nom: "Communication", href: "/planif/communication/", mots: "rendez-vous agenda absences conges vacances bureau aujourd'hui qui est la" },
       { nom: "Secteurs", href: "/planif/secteurs/", mots: "disciplines secteur ressources projets charge equipe" },
       { nom: "Inter-secteurs", href: "/planif/inter-secteurs/", mots: "appels d'offres ao offre soumission agenda transversal secteurs" }
-    ]);
-    return PAGES.concat(p && p.multi && p.superAdmin ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : []);
+    ], console_).forEach(function (x) { parHref[x.href.split("/")[2] || "accueil"] = x; });
+    return ["accueil", "communication", "taches", "planning", "charge", "secteurs", "inter-secteurs",
+            "affaires", "absences", "equipe", "annuaire", "console"]
+      .map(function (c) { return parHref[c]; }).filter(Boolean);
   }
 
   /* Le texte de recherche de chaque objet, plié une fois par ouverture */
