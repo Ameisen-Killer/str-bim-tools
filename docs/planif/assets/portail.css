@@ -75,6 +75,12 @@ button { font: inherit; color: inherit; }
   background: none; text-decoration: none; cursor: pointer; font-size: 15px;
 }
 .ab-menu a:hover, .ab-menu button:hover, .ab-menu a:focus-visible, .ab-menu button:focus-visible { background: var(--m-pale); outline: none; }
+.ab-menu .ab-menu-titre { padding: 6px 14px 4px; color: var(--faible); font-size: 12px; }
+.ab-menu .ab-menu-role { display: flex; align-items: center; gap: 12px; }
+.ab-menu .ab-menu-role[aria-checked="true"] { color: var(--vert-texte); font-weight: 600; }
+.ab-coche { width: 7px; height: 7px; border: 1px solid currentColor; transform: rotate(45deg); flex: 0 0 auto; }
+.ab-menu-role[aria-checked="true"] .ab-coche { background: currentColor; }
+.ab-menu .ab-menu-sep { border-top: 1px solid var(--filet); margin: 4px 0; }
 .ab-menu .ab-menu-mail { padding: 8px 14px 10px; color: var(--faible); font-size: 13px; border-bottom: 1px solid var(--filet); margin-bottom: 4px; word-break: break-all; }
 
 /* ------------------------------------------------------------ salut */

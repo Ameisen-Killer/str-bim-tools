@@ -28,7 +28,11 @@
   --m-encre: #6B5233;         /* pavé du logo */
 }
 
-:root[data-marque="ab"] {
+/* Le vert du bureau, et la démonstration en vert (07.10.2026, demande de Tony) :
+   data-teinte="vert" posé par appliqueMarque (ui.js, portail.js) en démo. Le logo
+   STR Bim Tools y garde son pavé et son encre sable (--m-encre plus bas). */
+:root[data-marque="ab"],
+:root[data-marque="str"][data-teinte="vert"] {
   --m-fond: #F4F5F2;
   --m-fort: #4D7A1C;
   --m-fort-rvb: 77, 122, 28;
@@ -40,8 +44,8 @@
   --m-voile: #F6FAEE;
   --m-voile-fort: #F2F8E6;
   --m-maison: #5BA33B;
-  --m-encre: #87868B;
 }
+:root[data-marque="ab"] { --m-encre: #87868B; }
 
 /* Logo STR Bim Tools : le pavé et deux lignes de texte (HTML, police du site) */
 .marque-str { display: inline-flex; align-items: center; gap: .55em; text-decoration: none; color: var(--m-encre); }

@@ -11,12 +11,12 @@
 /* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
    reprise du dernier passage de ce compte, avant le premier rendu ;
    ui.js / portail.js la confirment ensuite. */
-(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
 </script>
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=2">
-<link rel="stylesheet" href="/planif/assets/marque.css?v=2">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=11">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=12">
 <link rel="stylesheet" href="/planif/assets/connexion.css?v=3">
 </head>
 <body>

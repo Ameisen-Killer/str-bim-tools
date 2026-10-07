@@ -330,9 +330,13 @@
     if (!VERSION_AB || !D.marque) return;
     var m = D.marque(), r = document.documentElement;
     r.setAttribute("data-marque", m);
+    // Démonstration en vert, logo STR Bim Tools gardé (demande de Tony, 07.10.2026)
+    var vert = m === "str" && D.enDemo();
+    if (vert) r.setAttribute("data-teinte", "vert"); else r.removeAttribute("data-teinte");
     try {
       var mail = avecBase && SB.connecte() ? SB.email() : "";
       if (mail) global.localStorage.setItem("planif.marque:" + mail, m);
+      if (mail) global.localStorage.setItem("planif.teinte:" + mail, vert ? "vert" : "");
       global.localStorage.setItem("planif.marque", m);
     } catch (e) {}
     var icone = document.querySelector("link[rel=icon]");
@@ -739,8 +743,18 @@
       el("span", { class: "ab-compte-nom", text: nom }),
       el("span", { class: "fleche", "aria-hidden": "true", text: "▾" })
     ]);
+    // Démonstration : voir l'outil avec le rôle choisi (Donnees.roleDemo)
+    var roles = D.rolesDemo ? D.rolesDemo() : null;
+    var choixRole = roles ? el("div", { class: "ab-menu-roles", role: "group", "aria-label": "Voir la démo en tant que" },
+      [el("p", { class: "ab-menu-titre", text: "Voir la démo en tant que" })].concat(roles.map(function (r) {
+        return el("button", { type: "button", role: "menuitemradio", "aria-checked": String(r.actif), onclick: function () {
+          ouvre(false);
+          if (!r.actif) { D.choisitRoleDemo(r.code); location.reload(); }
+        } }, [el("span", { class: "coche", "aria-hidden": "true" }), el("span", { class: "lib", text: r.nom })]);
+      }))) : null;
     var menu = el("div", { class: "menu-bureau ab-menu-compte", role: "menu", hidden: true }, [
       mail ? el("p", { class: "ab-menu-mail", text: mail }) : null,
+      choixRole,
       D.etat() ? el("button", { type: "button", role: "menuitem", dataset: { rafraichir: "" },
         onclick: function () { ouvre(false); rafraichit(false); } }, ["Rafraîchir les données"]) : null,
       D.etat() ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); ouvreDonnees(); } }, ["Données (export, import)"]) : null,
@@ -785,7 +799,9 @@
     // Profil connu une fois les données (ou le seul profil, pour la console) chargées
     var profil = D.profil ? D.profil() : null;
     var superAdmin = !!(profil && profil.multi && profil.superAdmin);
-    var pages = PAGES.concat(superAdmin ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
+    // La console : le super admin, ou le rôle « Admin du site » de la démonstration
+    var avecConsole = superAdmin || !!(D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3);
+    var pages = PAGES.concat(avecConsole ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
     if (VERSION_AB) {
       appliqueMarque();
       // Page hors de son niveau, ouverte par son adresse : retour à l'accueil, qui le dit

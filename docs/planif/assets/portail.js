@@ -118,9 +118,13 @@
   function appliqueMarque() {
     var m = D.marque(), r = document.documentElement;
     r.setAttribute("data-marque", m);
+    // Démonstration en vert, logo STR Bim Tools gardé (demande de Tony, 07.10.2026)
+    var vert = m === "str" && D.enDemo();
+    if (vert) r.setAttribute("data-teinte", "vert"); else r.removeAttribute("data-teinte");
     try {
       var mail = avecBase && SB.connecte() ? SB.email() : "";
       if (mail) global.localStorage.setItem("planif.marque:" + mail, m);
+      if (mail) global.localStorage.setItem("planif.teinte:" + mail, vert ? "vert" : "");
       global.localStorage.setItem("planif.marque", m);
     } catch (e) {}
     var icone = document.querySelector("link[rel=icon]");
@@ -153,10 +157,21 @@
       svg("0 0 14 14", '<path d="M2.5 5 7 9.5 11.5 5"/>', "ab-chevron")
     ]);
     bouton.setAttribute("aria-label", "Compte : " + nom);
+    // Démonstration : voir l'outil avec le rôle choisi (Donnees.roleDemo)
+    var roles = D.rolesDemo ? D.rolesDemo() : null;
+    var choixRole = roles ? [el("li", { class: "ab-menu-titre", role: "presentation", text: "Voir la démo en tant que" })]
+      .concat(roles.map(function (r) {
+        return el("li", { role: "none" }, [el("button", { type: "button", role: "menuitemradio", "aria-checked": String(r.actif),
+          class: "ab-menu-role", onclick: function () {
+            ouvre(false);
+            if (!r.actif) { D.choisitRoleDemo(r.code); location.reload(); }
+          } }, [el("span", { class: "ab-coche", "aria-hidden": "true" }), r.nom])]);
+      })).concat([el("li", { class: "ab-menu-sep", role: "separator" })]) : [];
     var menu = el("ul", { class: "ab-menu", role: "menu", hidden: true }, [
-      mail ? el("li", { class: "ab-menu-mail", role: "presentation", text: mail }) : null,
+      mail ? el("li", { class: "ab-menu-mail", role: "presentation", text: mail }) : null
+    ].concat(choixRole, [
       el("li", { role: "none" }, [el("button", { type: "button", role: "menuitem", text: "Se déconnecter", onclick: deconnecte })])
-    ]);
+    ]));
     function ouvre(oui) {
       menu.hidden = !oui;
       bouton.setAttribute("aria-expanded", String(oui));
