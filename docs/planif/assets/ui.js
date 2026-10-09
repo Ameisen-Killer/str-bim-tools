@@ -789,8 +789,9 @@
     ]);
     // Démonstration : voir l'outil avec le rôle choisi (Donnees.roleDemo)
     var roles = D.rolesDemo ? D.rolesDemo() : null;
-    var choixRole = roles ? el("div", { class: "ab-menu-roles", role: "group", "aria-label": "Voir la démo en tant que" },
-      [el("p", { class: "ab-menu-titre", text: "Voir la démo en tant que" })].concat(roles.map(function (r) {
+    var titreRoles = roles ? D.titreRolesDemo() : "";
+    var choixRole = roles ? el("div", { class: "ab-menu-roles", role: "group", "aria-label": titreRoles },
+      [el("p", { class: "ab-menu-titre", text: titreRoles })].concat(roles.map(function (r) {
         return el("button", { type: "button", role: "menuitemradio", "aria-checked": String(r.actif), onclick: function () {
           ouvre(false);
           if (!r.actif) { D.choisitRoleDemo(r.code); location.reload(); }
@@ -843,8 +844,9 @@
     // Profil connu une fois les données (ou le seul profil, pour la console) chargées
     var profil = D.profil ? D.profil() : null;
     var superAdmin = !!(profil && profil.multi && profil.superAdmin);
-    // La console : le super admin, ou le rôle « Admin du site » de la démonstration
-    var avecConsole = superAdmin || !!(D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3);
+    // La console : le rôle « Admin du site », celui du super admin par défaut
+    // (il peut se voir en collaborateur, chef…) ou celui choisi en démonstration
+    var avecConsole = !!(D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3);
     var pages = PAGES.concat(avecConsole ? [{ cle: "console", href: "/planif/console/", nom: "Console", court: "Console" }] : []);
     if (VERSION_AB) {
       appliqueMarque();

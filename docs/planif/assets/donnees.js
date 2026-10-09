@@ -158,14 +158,16 @@
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
      l'outil comme chacun le verra. Il ne change que le niveau d'accès aux pages
      (barre, palette, cartes de l'accueil), pas les droits en base. Retenu sur
-     ce navigateur ; par défaut « Administrateur », le statut de Laurent Mercier. */
+     ce navigateur ; par défaut « Administrateur », le statut de Laurent Mercier.
+     Le super admin a le même choix partout (09.10.2026), sous sa propre clé,
+     « Admin du site » par défaut : c'est lui. */
   var ROLES_DEMO = [
     { code: "collaborateur", nom: "Collaborateur", niveau: 0 },
     { code: "chef_secteur", nom: "Chef de secteur", niveau: 1 },
     { code: "administrateur", nom: "Administrateur", niveau: 2 },
     { code: "admin_site", nom: "Admin du site", niveau: 3 }
   ];
-  var CLE_ROLE_DEMO = "planif.demo.role";
+  var CLE_ROLE_DEMO = "planif.demo.role", CLE_ROLE_SUPER = "planif.super.role";
 
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
   function statutsDe(m) {
@@ -1029,13 +1031,18 @@
       var st = profil.statuts || [];
       return st.indexOf("administrateur") >= 0 ? 2 : st.indexOf("chef_secteur") >= 0 ? 1 : 0;
     },
-    /** Rôle simulé en démonstration, ou null (hors démo, ou vrai super admin
-     *  sur le Bureau de test : lui voit tout). */
+    /** Rôle simulé : en démonstration, et pour le super admin partout ;
+     *  null sinon. */
     roleDemo: function () {
-      if (!D.enDemo() || (profil && profil.superAdmin)) return null;
-      var code = "administrateur";
-      try { code = global.localStorage.getItem(CLE_ROLE_DEMO) || code; } catch (e) {}
-      return ROLES_DEMO.filter(function (r) { return r.code === code; })[0] || ROLES_DEMO[2];
+      var sa = !!(profil && profil.multi && profil.superAdmin);
+      if (!sa && !D.enDemo()) return null;
+      var code = null;
+      try { code = global.localStorage.getItem(sa ? CLE_ROLE_SUPER : CLE_ROLE_DEMO); } catch (e) {}
+      return ROLES_DEMO.filter(function (r) { return r.code === code; })[0] || ROLES_DEMO[sa ? 3 : 2];
+    },
+    /** Titre du choix de rôle dans le menu du compte. */
+    titreRolesDemo: function () {
+      return D.enDemo() ? "Voir la démo en tant que" : "Voir l'outil en tant que";
     },
     /** Les rôles du menu, avec « actif » ; null hors démonstration. */
     rolesDemo: function () {
@@ -1043,7 +1050,8 @@
       return r ? ROLES_DEMO.map(function (x) { return { code: x.code, nom: x.nom, actif: x.code === r.code }; }) : null;
     },
     choisitRoleDemo: function (code) {
-      try { global.localStorage.setItem(CLE_ROLE_DEMO, code); } catch (e) {}
+      var sa = !!(profil && profil.multi && profil.superAdmin);
+      try { global.localStorage.setItem(sa ? CLE_ROLE_SUPER : CLE_ROLE_DEMO, code); } catch (e) {}
     },
     /** cle : celle de la barre des pages (« tableau », « inter »…) ; inconnue : permise. */
     pagePermise: function (cle) {

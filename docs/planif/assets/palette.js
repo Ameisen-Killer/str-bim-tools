@@ -258,7 +258,7 @@
 
   function pages() {
     var p = D.profil ? D.profil() : null;
-    var console_ = (p && p.multi && p.superAdmin) || (D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3) ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : [];
+    var console_ = D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3 ? [{ nom: "Console", href: "/planif/console/", mots: "administration reglages bureaux utilisateurs droits" }] : [];
     if (!UI.versionAB) return PAGES.concat(console_);
     // Même ordre que la barre des pages (ui.js, GROUPES_V2), selon le niveau d'accès
     var parHref = {}, CLES = { planning: "tableau", "inter-secteurs": "inter" };

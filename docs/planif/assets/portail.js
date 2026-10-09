@@ -159,7 +159,7 @@
     bouton.setAttribute("aria-label", "Compte : " + nom);
     // Démonstration : voir l'outil avec le rôle choisi (Donnees.roleDemo)
     var roles = D.rolesDemo ? D.rolesDemo() : null;
-    var choixRole = roles ? [el("li", { class: "ab-menu-titre", role: "presentation", text: "Voir la démo en tant que" })]
+    var choixRole = roles ? [el("li", { class: "ab-menu-titre", role: "presentation", text: D.titreRolesDemo() })]
       .concat(roles.map(function (r) {
         return el("li", { role: "none" }, [el("button", { type: "button", role: "menuitemradio", "aria-checked": String(r.actif),
           class: "ab-menu-role", onclick: function () {
