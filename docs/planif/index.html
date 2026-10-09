@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=15">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=16">
 </head>
 <body>
 
@@ -138,12 +138,16 @@
   /** « 06.10 » */
   function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + "." + deux(d.getMonth() + 1) : "—"; }
 
-  /* « Bonjour » puis prénom et nom, en vert. */
+  /* « Bonjour » puis prénom et nom, en vert ; le nom un ton plus clair. */
   function salut(id) {
     var h = Portail.vide(document.getElementById("salut"));
     var nom = [id.prenom, id.nom].filter(Boolean).join(" ");
     h.appendChild(document.createTextNode("Bonjour" + (nom ? " " : "")));
-    if (nom) h.appendChild(el("span", { class: "ab-nom", text: nom }));
+    if (nom) h.appendChild(el("span", { class: "ab-nom" }, [
+      id.prenom || "",
+      id.prenom && id.nom ? " " : "",
+      id.nom ? el("span", { class: "ab-nom-famille", text: id.nom }) : null
+    ]));
   }
 
   /* Les cartes des modules selon le niveau d'accès (Donnees.niveauAcces) ;
