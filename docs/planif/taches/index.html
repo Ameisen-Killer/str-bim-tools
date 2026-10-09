@@ -18,6 +18,63 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=79">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
+<style>
+.imp-periode{display:none}
+/* Export PDF de la liste (09.10.2026) : A4 portrait et serré, une ligne par
+   tâche, pour en faire tenir un maximum sur chaque feuille. Les autres pages
+   gardent le paysage de planif.css. */
+@media print{
+  @page{size:A4 portrait;margin:7mm 7mm 8mm}
+  .entete-impression{margin-bottom:4px;padding-bottom:3px}
+  .entete-impression h1{font-size:11pt}
+  .entete-impression .ligne{margin-top:2px;font-size:6.5pt}
+
+  #liste table.liste{table-layout:fixed;width:100%;font-size:7pt;line-height:1.2}
+  #liste table.liste th{font-size:5.5pt;letter-spacing:.1em;padding:0 5px 2px 0}
+  #liste table.liste th:nth-child(1){width:49%}
+  #liste table.liste th:nth-child(2){width:23%}
+  #liste table.liste th:nth-child(3){width:5%}
+  #liste table.liste th:nth-child(4){width:11%}
+  #liste table.liste th:nth-child(5){width:12%}
+  #liste table.liste th:last-child{display:none}
+  #liste table.liste td{padding:1.6pt 5px 1.6pt 0;font-size:7pt;vertical-align:top}
+
+  /* Tâche : libellé, priorité et affaire à la suite ; la note reste à l'écran */
+  #liste .tache-titre{gap:0}
+  #liste .tache-titre > div{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;min-width:0}
+  #liste table.liste .principal{font-size:7.5pt;font-weight:400}
+  #liste .prio-etiq{font-size:5.5pt;padding:0 3px;margin-left:3px}
+  #liste .affaire-ligne{margin-top:0!important;font-size:6.5pt!important;gap:3px!important;line-height:1.2!important;
+    min-width:0;max-width:100%;white-space:nowrap;overflow:hidden}
+  #liste .affaire-ligne > span:last-child{overflow:hidden;text-overflow:ellipsis}
+  #liste .affaire-ligne .num{font-size:6pt!important;letter-spacing:.04em!important}
+  #liste .affaire-ligne .pastille{width:5px;height:5px}
+  #liste .tache-titre .secondaire{display:none}
+
+  /* Affectations : les noms, sans cadre */
+  #liste td:nth-child(2) > div{gap:0 7px!important}
+  #liste table.liste .etiq{font-size:6pt;letter-spacing:.03em;text-transform:none;padding:0;border:0;min-height:0;gap:2px}
+  #liste .etiq:not(.finie) > .coche{display:none}
+  #liste .etiq > .coche{width:6px;height:3px}
+
+  /* Période sur une ligne, avancement à côté du statut */
+  #liste td:nth-child(4) > div{display:none}
+  #liste td:nth-child(4) > .imp-periode{display:block}
+  #liste .statut{font-size:6pt;letter-spacing:.04em;gap:3px}
+  #liste .statut i{width:5px;height:5px}
+  #liste td:nth-child(5) .jauge{display:none}
+  #liste td:nth-child(5) > .secondaire{display:inline;margin:0 0 0 4px;font-size:6pt}
+
+  /* Semaines : un intertitre d'une ligne */
+  #liste table.liste tr.groupe-taches td{padding:6pt 0 1.5pt;border-bottom:1px solid var(--ligne)}
+  #liste table.liste tbody tr.groupe-taches:first-child td{padding-top:0}
+  #liste tr.groupe-taches{break-after:avoid}
+  #liste .groupe-taches .num-section{float:right;font-size:6pt;letter-spacing:.08em;margin:2px 0 0}
+  #liste .groupe-taches h3{display:inline-flex;gap:0 8px;font-size:9pt;font-weight:600;margin:0}
+  #liste .groupe-taches .compte{font-size:6pt;letter-spacing:.06em}
+  #liste table.liste tr.groupe-vide td{padding:2pt 0;font-size:6.5pt}
+}
+</style>
 </head>
 <body class="large">
 
@@ -393,7 +450,12 @@
         el("td", { class: "num", style: "white-space:nowrap" }, [
           el("div", { text: C.fmtCH(debut) + " →" }),
           el("div", { style: retard ? "color:var(--alerte)" : "color:var(--or)", text: C.fmtCH(t.echeance) }),
-          el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : reste === 0 ? "aujourd'hui" : "dans " + reste + " j") })
+          el("div", { class: "secondaire", text: t.statut === "termine" ? "" : (retard ? Math.abs(reste) + " j de retard" : reste === 0 ? "aujourd'hui" : "dans " + reste + " j") }),
+          // Papier seulement : la période sur une ligne, en dates courtes
+          el("div", { class: "imp-periode" }, [
+            dateCourte(debut) + " → ",
+            el("span", { style: retard ? "color:var(--alerte)" : "", text: dateCourte(t.echeance) })
+          ])
         ]),
         el("td", {}, [
           el("span", { class: "statut s-" + t.statut }, [el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_TACHE[t.statut], mots)]),
@@ -427,6 +489,13 @@
       });
       return suivi.marque(rangee, t.id);
     }
+  }
+
+  /** « 06.10 », l'année en plus (« 06.10.27 ») hors de l'année en cours */
+  function dateCourte(iso) {
+    var c = C.fmtCH(iso);
+    if (c.length !== 10) return c;
+    return c.slice(6) === C.isoAuj().slice(0, 4) ? c.slice(0, 5) : c.slice(0, 6) + c.slice(8);
   }
 
   // Début de chaque tâche, calculé une fois par version des données : le
