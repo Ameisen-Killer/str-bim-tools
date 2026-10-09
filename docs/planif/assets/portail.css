@@ -86,7 +86,7 @@ button { font: inherit; color: inherit; }
 /* ------------------------------------------------------------ salut */
 .ab-salut { margin: 26px 0 0; font-size: clamp(34px, 4.4vw, 66px); line-height: 1.08; font-weight: 700; letter-spacing: -.02em; }
 .ab-salut .ab-nom { color: var(--vert-titre); }
-.ab-salut .ab-nom-famille { color: var(--vert-vif); }
+.ab-salut .ab-nom-famille { color: var(--vert-logo); }   /* le vert du logo (demande de Tony) */
 .ab-sous-titre { margin: 4px 0 0; color: var(--faible); font-size: clamp(17px, 1.6vw, 24px); }
 
 /* ------------------------------------------------------------ modules */
