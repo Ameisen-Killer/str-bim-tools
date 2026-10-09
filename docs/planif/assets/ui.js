@@ -803,6 +803,8 @@
       D.etat() ? el("button", { type: "button", role: "menuitem", dataset: { rafraichir: "" },
         onclick: function () { ouvre(false); rafraichit(false); } }, ["Rafraîchir les données"]) : null,
       D.etat() ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); ouvreDonnees(); } }, ["Données (export, import)"]) : null,
+      // Rôle « Admin du site » : la console, juste au-dessus de la déconnexion
+      D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3 ? el("a", { role: "menuitem", href: "/planif/console/" }, ["Console"]) : null,
       avecBase ? el("button", { type: "button", role: "menuitem", onclick: function () { ouvre(false); deconnecte(); } }, ["Se déconnecter"]) : null
     ]);
     var ouvre = deroulant(bouton, menu);
