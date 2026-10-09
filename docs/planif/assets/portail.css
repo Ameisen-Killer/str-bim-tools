@@ -186,6 +186,8 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 /* Apparition douce au premier rendu */
 .ab-monte { animation: ab-monte .5s cubic-bezier(.2, .7, .3, 1) both; animation-delay: calc(var(--r, 0) * 60ms); }
 @keyframes ab-monte { from { opacity: 0; transform: translateY(10px); } }
+/* Accueil : rien ne monte avant de savoir quelles cartes ont droit de cité */
+.ab-attente .ab-monte { visibility: hidden; animation: none; }
 
 /* ------------------------------------------------------------ écrans moyens */
 @media (max-width: 1180px) {

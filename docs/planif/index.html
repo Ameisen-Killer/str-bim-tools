@@ -16,11 +16,11 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=14">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=15">
 </head>
 <body>
 
-<main class="ab-page">
+<main class="ab-page ab-attente">
   <div id="entete"></div>
 
   <h1 class="ab-salut" id="salut">Bonjour</h1>
@@ -108,7 +108,7 @@
 <script src="/planif/assets/supabase.js?v=42"></script>
 <script src="/planif/assets/donnees.js?v=55"></script>
 <script src="/planif/assets/calculs.js?v=12"></script>
-<script src="/planif/assets/version.js?v=3"></script>
+<script src="/planif/assets/version.js?v=4"></script>
 <script src="/planif/assets/portail.js?v=10"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script>
@@ -130,6 +130,7 @@
     // Un message du tchat arrive (tchat.js) : le badge de la carte Communication suit
     window.addEventListener("planif:message", badgeConges);
     dessine();
+    apparition();
   }).catch(Portail.echec);
 
   function auj() { return C.isoAuj(); }
@@ -155,6 +156,17 @@
       if (ok) n++;
     });
     nav.style.setProperty("--n", n);
+  }
+
+  /* Cartes et encadrés restent cachés tant que le niveau d'accès n'est pas
+     connu (classe ab-attente) : on ne fait monter que ceux qui restent,
+     les uns après les autres, sans trou dans la cascade. */
+  function apparition() {
+    var main = document.querySelector("main"), r = 0;
+    [].forEach.call(main.querySelectorAll(".ab-monte"), function (b) {
+      if (b.style.display !== "none") b.style.setProperty("--r", r++);
+    });
+    main.classList.remove("ab-attente");
   }
 
   /* Arrivée ici depuis une page hors de son niveau (ui.js, chrome) : le dire */
