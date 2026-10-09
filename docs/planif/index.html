@@ -24,7 +24,7 @@
   <div id="entete"></div>
 
   <h1 class="ab-salut" id="salut">Bonjour</h1>
-  <p class="ab-sous-titre">Bienvenue sur votre espace de travail</p>
+  <p class="ab-sous-titre">Bienvenue sur ton espace de travail</p>
 
   <!-- Les quatre entrées vers les modules. -->
   <nav class="ab-modules" aria-label="Modules">
@@ -47,7 +47,7 @@
         <path class="ic-v" d="M32 25h11M32 45h11"/>
       </svg>
       <h2>Tâches</h2>
-      <p>Vos tâches, échéances et avancement</p>
+      <p>Tes tâches, échéances et avancement</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
     <a class="ab-module ab-monte" style="--r:2" data-page="secteurs" href="/planif/secteurs/">
@@ -262,7 +262,7 @@
      j'en suis le dessinateur), la plus urgente d'abord. */
   function prioritaires(moi) {
     var hote = Portail.vide(document.getElementById("prio"));
-    if (!moi) { videMessage(hote, "Aucune fiche d'équipe n'est rattachée à votre adresse."); return; }
+    if (!moi) { videMessage(hote, "Aucune fiche d'équipe n'est rattachée à ton adresse."); return; }
     document.getElementById("voir-prio").href = "/planif/taches/?membre=" + encodeURIComponent(moi.id);
     var miennes = D.taches({ membreId: moi.id, sansTerminees: true }).filter(function (t) {
       return t.echeance && ["ingenieur", "dessinateur"].some(function (r) {
@@ -270,7 +270,7 @@
         return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
       });
     }).sort(parUrgence);
-    if (!miennes.length) { videMessage(hote, "Aucune tâche ouverte à votre nom."); return; }
+    if (!miennes.length) { videMessage(hote, "Aucune tâche ouverte à ton nom."); return; }
     liste(hote, miennes.slice(0, LIGNES).map(function (t) {
       var u = urgence(t.echeance), q = quand(t.echeance);
       var parts = ["ingenieur", "dessinateur"].filter(function (r) {

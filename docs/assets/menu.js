@@ -3,7 +3,7 @@
 // - À chaque publication : mettre MISE_A_JOUR à la date du jour (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-10-05";
+  var MISE_A_JOUR = "2026-10-09";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
@@ -55,7 +55,7 @@
     if (ici) a.setAttribute("aria-current", "page");
     var num = document.createElement("span"); num.className = "num"; num.textContent = ("0" + n).slice(-2);
     var nom = document.createElement("span"); nom.className = "nom"; nom.textContent = p.nom;
-    var desc = document.createElement("span"); desc.className = "desc" + (ici ? " ici" : ""); desc.textContent = ici ? "Vous êtes ici" : p.desc;
+    var desc = document.createElement("span"); desc.className = "desc" + (ici ? " ici" : ""); desc.textContent = ici ? "Tu es ici" : p.desc;
     a.appendChild(num); a.appendChild(nom); a.appendChild(desc);
     li.appendChild(a); ol.appendChild(li);
   });
