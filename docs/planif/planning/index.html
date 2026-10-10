@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=83">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=84">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 </head>
 <body class="large">
@@ -781,7 +781,7 @@
   /* Demande de Tony (10.10.2026) : au survol d'une barre, un fil la relie à
      l'autre part de la même tâche (le calcul à son dessin), d'une ligne à
      l'autre, et l'autre barre s'entoure (tracé : UI.fil). L'autre part cachée
-     par un filtre ou hors de la période : une note dit qui la porte. */
+     par un filtre ou hors de la période : rien, la bulle de la barre la nomme. */
   var lien = null;
 
   function cacheLien() {
@@ -809,23 +809,8 @@
     lien = { noeuds: [], barres: [n] };
     n.classList.add("lie");
 
-    if (!jumelle) {
-      var o = plan.getBoundingClientRect(), r = n.getBoundingClientRect();
-      var a = { g: r.left - o.left, d: r.right - o.left, cy: (r.top + r.bottom) / 2 - o.top };
-      var qui = t[P.membre] ? D.membre(t[P.membre]) : null;
-      var note = el("div", { class: "pl-lien-note", style: "--tt:" + teinte }, [
-        el("b", { text: P.label }),
-        " · " + (qui ? qui.prenom + " " + qui.nom : "à affecter") + (t[P.fini] ? " · terminé" : "") + " — hors de la vue"
-      ]);
-      // À droite de la barre, ou à gauche quand la place manque
-      var aDroite = a.d + 260 < o.width;
-      note.style.top = (a.cy - 11) + "px";
-      if (aDroite) note.style.left = (a.d + 8) + "px";
-      else { note.style.right = (o.width - a.g + 8) + "px"; note.classList.add("a-gauche"); }
-      plan.appendChild(note);
-      lien.noeuds.push(note);
-      return;
-    }
+    // L'autre part masquée (filtre, autre période) : pas de fil, la bulle dit qui la porte
+    if (!jumelle) return;
 
     jumelle.classList.add("jumelle");
     lien.barres.push(jumelle);

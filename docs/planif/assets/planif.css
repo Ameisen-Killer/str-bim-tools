@@ -682,13 +682,6 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 @keyframes pl-bout{to{opacity:1}}
 .bt.lie,.bt.jumelle{box-shadow:0 0 0 2px color-mix(in srgb,var(--tt) 60%,transparent);z-index:3}
 .plan .pl-piste .bt.jumelle{opacity:1;background:color-mix(in srgb,var(--tt) 22%,#fff)}
-.pl-lien-note{
-  position:absolute;z-index:4;pointer-events:none;white-space:nowrap;
-  padding:3px 9px;border-radius:4px;font-size:12px;line-height:16px;color:var(--texte);
-  background:#fff;border:1px solid color-mix(in srgb,var(--tt) 55%,transparent);border-left:2px solid var(--tt);
-  box-shadow:0 2px 8px rgba(0,0,0,.08);animation:pl-bout .15s ease-out
-}
-.pl-lien-note b{color:var(--tt);font-weight:600}
 /* Bulle d'une barre du planning : l'affaire, la tâche, ses deux parts et
    qui les porte. Carte blanche, filet de la teinte de l'affaire à gauche. */
 .bt-bulle{
@@ -729,7 +722,7 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .gens-parts{position:relative}
 .gens-parts > .pl-lien{z-index:1}
 .etiq.lie{box-shadow:0 0 0 2px color-mix(in srgb,var(--tt) 60%,transparent)}
-@media print{.pl-lien,.pl-lien-note{display:none!important}}
+@media print{.pl-lien{display:none!important}}
 .legende-plan .fil{width:16px;height:10px;border-bottom:2px solid var(--texte-faible);border-radius:0 0 0 10px}
 @media (hover:none){.legende-plan .seul-souris{display:none}}
 /* Lissage : la barre commence plus tôt que son début déduit — bord gauche pointillé */
