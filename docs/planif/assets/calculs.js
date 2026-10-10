@@ -152,16 +152,30 @@
     return dernier || C.isoAuj();
   }
 
+  /** Premier jour, à partir d'aujourd'hui, où la personne travaille (sans
+   *  personne : le premier jour ouvré du canton). Une charge reprise un samedi
+   *  ne commence que le lundi (demande de Tony, 10.10.2026). */
+  function repriseLe(membre, canton) {
+    if (membre && !membre.actif) membre = null;
+    var cur = C.isoAuj();
+    for (var garde = 0; garde < 1500; garde++) {
+      var cap = membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0);
+      if (cap > 0) return cur;
+      cur = C.ajoute(cur, 1);
+    }
+    return C.isoAuj();
+  }
+
   /**
    * Fenêtre de travail d'une part encore ouverte : de son début déduit à son
    * échéance. Échéance dépassée : le travail reste à faire, il ne peut plus se
-   * faire hier. Sa charge est reprise dès aujourd'hui et pèse sur les semaines
+   * faire hier. Sa charge est reprise dès le premier jour travaillé et pèse sur les semaines
    * qui viennent — sinon une tâche en retard allégeait le planning au lieu de
    * l'alourdir. { debut, fin, reportee }
    */
   function fenetre(charge, fin, membre, canton) {
     if (!fin) return { debut: null, fin: null, reportee: false };
-    if (fin < C.isoAuj()) return { debut: C.isoAuj(), fin: finReportee(charge, membre, canton), reportee: true };
+    if (fin < C.isoAuj()) return { debut: repriseLe(membre, canton), fin: finReportee(charge, membre, canton), reportee: true };
     return { debut: debutPour(charge, fin, membre, canton), fin: fin, reportee: false };
   }
 

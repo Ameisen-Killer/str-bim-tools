@@ -105,7 +105,7 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=42"></script>
 <script src="/planif/assets/donnees.js?v=56"></script>
-<script src="/planif/assets/calculs.js?v=12"></script>
+<script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=5"></script>
 <script src="/planif/assets/ui.js?v=85"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
@@ -722,7 +722,7 @@
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
              (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
-             (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(info.echeancePart || t.echeance) + " dépassée, charge reprise dès aujourd'hui"
+             (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(info.echeancePart || t.echeance) + " dépassée, charge reprise dès le " + C.fmtCH(info.debut)
                : t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "") +
              (info.role === "ingenieur" && !info.fini && Calc.enchainee(t)
                ? "\nCalcul à rendre avant le dessin (échéance de la tâche : " + C.fmtCH(t.echeance) + ")" : "") +
