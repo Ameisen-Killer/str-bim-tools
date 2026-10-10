@@ -682,6 +682,21 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 @keyframes pl-bout{to{opacity:1}}
 .bt.lie,.bt.jumelle{box-shadow:0 0 0 2px color-mix(in srgb,var(--tt) 60%,transparent);z-index:3}
 .plan .pl-piste .bt.jumelle{opacity:1;background:color-mix(in srgb,var(--tt) 22%,#fff)}
+/* Mon profil : cartes sur deux colonnes, l'identité sur toute la largeur */
+.pf-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;align-items:start;padding-bottom:28px}
+.pf-grille > .section{margin:0}
+.pf-grille > .pf-large{grid-column:1/-1}
+.pf-identite{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.ab-avatar.pf-avatar{width:112px;height:112px;font-size:34px;letter-spacing:.02em}
+.pf-qui{flex:1 1 240px;min-width:0}
+.pf-nom{font-size:22px;font-weight:600}
+.pf-detail{margin-top:2px;color:var(--texte-doux);font-size:14px;word-break:break-word}
+.pf-boutons{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.pf-note{margin:14px 0 0;font-size:13px;line-height:1.5;color:var(--texte-faible)}
+.pf-note.rouge{color:var(--alerte)}
+.pf-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.btn.en-cours{opacity:.6;cursor:progress}
+
 /* Bulle d'une barre du planning : l'affaire, la tâche, ses deux parts et
    qui les porte. Carte blanche, filet de la teinte de l'affaire à gauche. */
 .bt-bulle{

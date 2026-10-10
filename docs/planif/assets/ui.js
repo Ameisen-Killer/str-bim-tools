@@ -776,6 +776,13 @@
     ]);
   }
 
+  /** Pastille d'une personne : sa photo (Mon profil), sinon ses initiales. */
+  function avatar(m, init, classe) {
+    var photo = m && m.photo;
+    return el("span", { class: (classe || "ab-avatar") + (photo ? " a-photo" : ""), "aria-hidden": "true" },
+      photo ? [el("img", { src: photo, alt: "" })] : [init || (m ? (m.prenom.charAt(0) + m.nom.charAt(0)).toUpperCase() : "?")]);
+  }
+
   function compteAB(profil) {
     var moi = D.etat() ? D.monMembre() : null;
     var mail = avecBase ? SB.email() : "";
@@ -783,7 +790,7 @@
     var init = moi ? (moi.prenom.charAt(0) + moi.nom.charAt(0)).toUpperCase() : (nom.charAt(0) || "?").toUpperCase();
     var bouton = el("button", { type: "button", class: "ab-compte-btn", "aria-haspopup": "menu", "aria-expanded": "false",
                                 "aria-label": "Compte : " + nom }, [
-      el("span", { class: "ab-avatar", "aria-hidden": "true", text: init }),
+      avatar(moi, init),
       el("span", { class: "ab-compte-nom", text: nom }),
       el("span", { class: "fleche", "aria-hidden": "true", text: "▾" })
     ]);
@@ -799,6 +806,9 @@
       }))) : null;
     var menu = el("div", { class: "menu-bureau ab-menu-compte", role: "menu", hidden: true }, [
       mail ? el("p", { class: "ab-menu-mail", text: mail }) : null,
+      // Mon profil (10.10.2026) : photo, téléphones, jours travaillés, mot de passe
+      D.etat() ? el("a", { role: "menuitem", href: "/planif/profil/", class: "ab-menu-profil" }, ["Mon profil"]) : null,
+      D.etat() ? el("div", { class: "ab-menu-sep", role: "separator" }) : null,
       choixRole,
       D.etat() ? el("button", { type: "button", role: "menuitem", dataset: { rafraichir: "" },
         onclick: function () { ouvre(false); rafraichit(false); } }, ["Rafraîchir les données"]) : null,
@@ -2598,6 +2608,6 @@
     foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions,
     photo: photo, joue: joue, enFrappe: enFrappe, defileTexte: defileTexte,
-    fil: fil, bulleTache: bulleTache, placeBulle: placeBulle, cacheBulle: cacheBulle
+    fil: fil, avatar: avatar, bulleTache: bulleTache, placeBulle: placeBulle, cacheBulle: cacheBulle
   };
 })(window);

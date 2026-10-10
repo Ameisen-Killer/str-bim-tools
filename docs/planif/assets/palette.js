@@ -238,6 +238,7 @@
     var liste = [];
     if (donnees()) {
       liste.push({ nom: "Nouvelle tâche", mots: "creer ajouter tache", glyphe: "+", action: function () { ferme(); UI.formulaireTache(null, { surEnregistrement: D.redessine }); } });
+      liste.push({ nom: "Mon profil", mots: "profil photo telephone numero interne externe mot de passe compte", glyphe: "◉", action: function () { ferme(); va("/planif/profil/"); } });
       if (D.monMembre && D.monMembre()) {
         liste.push({ nom: "Mes jours travaillés", mots: "semaine jours off temps partiel mercredi capacite horaire", glyphe: "▦", action: function () { ferme(); UI.joursTravailles(null, D.redessine); } });
       }

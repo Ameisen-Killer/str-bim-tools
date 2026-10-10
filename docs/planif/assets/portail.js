@@ -85,7 +85,7 @@
   /** Prénom et nom de la personne connectée : sa fiche d'équipe, sinon son adresse. */
   function identite() {
     var moi = D && D.etat() ? D.monMembre() : null;
-    if (moi) return { prenom: moi.prenom, nom: moi.nom };
+    if (moi) return { prenom: moi.prenom, nom: moi.nom, photo: moi.photo || null };
     var p = D && D.profil(), mail = (p && p.email) || (avecBase ? SB.email() : "");
     var morceaux = (mail || "").split("@")[0].split(/[._-]/).filter(Boolean);
     if (!morceaux.length || morceaux[0] === "demo") return { prenom: "", nom: "" };
@@ -152,7 +152,8 @@
     var nom = [id.prenom, id.nom].filter(Boolean).join(" ") || (avecBase ? SB.email() : "Mode local");
     var mail = avecBase ? SB.email() : "";
     var bouton = el("button", { type: "button", class: "ab-moi-bouton", "aria-haspopup": "true", "aria-expanded": "false" }, [
-      el("span", { class: "ab-avatar", "aria-hidden": "true", text: initiales(id) }),
+      id.photo ? el("span", { class: "ab-avatar a-photo", "aria-hidden": "true" }, [el("img", { src: id.photo, alt: "" })])
+        : el("span", { class: "ab-avatar", "aria-hidden": "true", text: initiales(id) }),
       el("span", { class: "ab-moi-nom", text: nom }),
       svg("0 0 14 14", '<path d="M2.5 5 7 9.5 11.5 5"/>', "ab-chevron")
     ]);
@@ -168,7 +169,10 @@
           } }, [el("span", { class: "ab-coche", "aria-hidden": "true" }), r.nom])]);
       })).concat([el("li", { class: "ab-menu-sep", role: "separator" })]) : [];
     var menu = el("ul", { class: "ab-menu", role: "menu", hidden: true }, [
-      mail ? el("li", { class: "ab-menu-mail", role: "presentation", text: mail }) : null
+      mail ? el("li", { class: "ab-menu-mail", role: "presentation", text: mail }) : null,
+      // Mon profil (10.10.2026) : photo, téléphones, jours travaillés, mot de passe
+      el("li", { role: "none" }, [el("a", { role: "menuitem", href: "/planif/profil/", text: "Mon profil" })]),
+      el("li", { class: "ab-menu-sep", role: "separator" })
     ].concat(choixRole, [
       // Rôle « Admin du site » : la console, juste au-dessus de la déconnexion
       D.roleDemo && D.roleDemo() && D.niveauAcces() >= 3

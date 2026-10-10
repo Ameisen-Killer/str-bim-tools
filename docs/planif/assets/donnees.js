@@ -535,6 +535,8 @@
         capacite: nombre(m.capacite, e.reglages.capaciteDefaut),
         jours: reprisJours(m.jours),
         actif: m.actif !== false,
+        telInterne: texte(m.telInterne), telExterne: texte(m.telExterne),
+        photo: /^data:image\//.test(texte(m.photo)) ? texte(m.photo) : null,
         absences: (m.absences || []).map(function (a) {
           return { id: texte(a.id) || id(), debut: texte(a.debut), fin: texte(a.fin) || texte(a.debut), motif: texte(a.motif) };
         })
@@ -1118,6 +1120,38 @@
     },
 
 
+
+    /**
+     * Mon profil (10.10.2026) : téléphones interne et externe, photo (petite
+     * image en data URL, null pour aucune) de sa propre fiche. Comme pour les
+     * jours, la base passe par sa fonction regle_profil. Promesse du membre à jour.
+     */
+    regleProfil: function (idMembre, p) {
+      return Promise.resolve().then(function () {
+        var m = D.membre(idMembre); if (!m) throw erreur("Membre introuvable.");
+        var moi = D.monMembre();
+        if (!moi || moi.id !== idMembre) throw erreur("Tu ne règles que ton propre profil.");
+        if (!D.profilPret()) throw erreur("La base n'est pas encore à jour pour le profil.");
+        var neuf = {
+          telInterne: texte(p.telInterne).trim().slice(0, 40),
+          telExterne: texte(p.telExterne).trim().slice(0, 40),
+          photo: p.photo === undefined ? m.photo : (/^data:image\//.test(texte(p.photo)) ? texte(p.photo) : null)
+        };
+        if (neuf.photo !== m.photo && D.photoBloquee()) throw erreur("La photo ne se change pas dans la démonstration.");
+        m.telInterne = neuf.telInterne; m.telExterne = neuf.telExterne; m.photo = neuf.photo;
+        if (!ADAPTATEUR.regleProfil) return sauve().then(function () { return m; });
+        version++;
+        var instantane = copie(etat);
+        return enFile(function () { return ADAPTATEUR.regleProfil(idMembre, neuf); }, instantane)
+          .then(function () { return D.membre(idMembre) || m; });
+      });
+    },
+    /** Les colonnes du profil existent en base (toujours vrai en mode local). Garde-fou provisoire. */
+    profilPret: function () { return ADAPTATEUR.profilEnBase ? ADAPTATEUR.profilEnBase() : true; },
+    /** Compte de démonstration partagé : la photo, vue de tous les visiteurs, ne s'y change pas. */
+    photoBloquee: function () {
+      return !!ADAPTATEUR.regleProfil && /^demo@/i.test(texte(profil && profil.email) || (global.Sb && global.Sb.email ? global.Sb.email() : ""));
+    },
 
     /**
      * Les absences croisant une fenêtre, la plus proche d'abord :

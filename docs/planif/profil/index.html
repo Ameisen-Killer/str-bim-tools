@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mon profil · Planification</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%236B5233'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23E9D6B0' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+/* Version 2 : charte claire unique. La marque du bureau (logo, couleurs) est
+   reprise du dernier passage de ce compte, avant le premier rendu ;
+   ui.js / portail.js la confirment ensuite. */
+(function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=3">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=85">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=16">
+</head>
+<body class="large">
+
+<div data-chrome></div>
+
+<main>
+  <div class="wrap entete">
+    <h1>Mon profil</h1>
+    <div class="filet-or" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap" data-bandeau></div>
+
+  <div class="wrap pf-grille" id="profil"></div>
+</main>
+
+<div data-pied></div>
+
+<script src="/planif/assets/calendrier.js?v=6"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=43"></script>
+<script src="/planif/assets/donnees.js?v=57"></script>
+<script src="/planif/assets/calculs.js?v=13"></script>
+<script src="/planif/assets/version.js?v=5"></script>
+<script src="/planif/assets/ui.js?v=87"></script>
+<script src="/planif/assets/tchat.js?v=7"></script>
+<script src="/planif/assets/palette.js?v=17"></script>
+<script src="/planif/assets/direct.js?v=13"></script>
+<script>
+(function () {
+  "use strict";
+  /* Mon profil (10.10.2026, demande de Tony) : sa photo, ses téléphones
+     interne et externe, ses jours travaillés et son mot de passe. Chacun ne
+     règle que sa propre fiche (D.regleProfil, D.regleJours) ; le nom, le
+     métier et l'adresse se changent dans la console. */
+  var D = window.Donnees, C = window.Cal, el = UI.el;
+  if (!UI.session()) return;
+
+  D.pret().then(function () {
+    UI.chrome("profil", []);
+    UI.pied();
+    UI.bandeauDemo(document.querySelector("[data-bandeau]"));
+    document.querySelector(".entete").classList.add("vu");
+    D.surRechargement(rend);
+    rend();
+  }).catch(UI.echec);
+
+  function rend() {
+    var hote = UI.vide(document.getElementById("profil"));
+    var moi = D.monMembre();
+    hote.appendChild(identite(moi));
+    if (moi) {
+      hote.appendChild(telephones(moi));
+      hote.appendChild(jours(moi));
+    }
+    hote.appendChild(motDePasse());
+  }
+
+  function section(titre, enfants, classe) {
+    return el("section", { class: "section pf-carte" + (classe ? " " + classe : "") }, [
+      el("div", { class: "tete-section" }, [el("h2", { text: titre })])
+    ].concat(enfants));
+  }
+  function note(texte, rouge) { return el("p", { class: "pf-note" + (rouge ? " rouge" : ""), text: texte }); }
+  function occupe(bouton, oui) { bouton.disabled = oui; bouton.classList.toggle("en-cours", oui); }
+
+  // La barre du haut garde la pastille à jour (photo)
+  function rafraichitBarre() { UI.chrome("profil", []); }
+
+  /* ------------------------------------------------------------ identité */
+
+  function identite(moi) {
+    if (!moi) {
+      return section("Identité", [
+        note("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil. " +
+             "Tu peux tout de même changer ton mot de passe ci-dessous.")
+      ], "pf-large");
+    }
+    var pret = D.profilPret(), bloquee = D.photoBloquee();
+    var entree = el("input", { type: "file", accept: "image/*", hidden: true });
+    var choisir = el("button", { type: "button", class: "btn btn-or", text: moi.photo ? "Changer la photo" : "Ajouter une photo",
+      disabled: !pret || bloquee, onclick: function () { entree.click(); } });
+    var retirer = moi.photo ? el("button", { type: "button", class: "btn", text: "Retirer",
+      disabled: !pret || bloquee, onclick: function () { enregistrePhoto(null, retirer); } }) : null;
+    entree.addEventListener("change", function () {
+      var f = entree.files && entree.files[0];
+      entree.value = "";
+      if (!f) return;
+      if (!/^image\//.test(f.type)) { UI.toast("Choisis une image (JPEG, PNG…)."); return; }
+      occupe(choisir, true);
+      reduit(f).then(function (url) { return enregistrePhoto(url, choisir); })
+        .catch(function (e) { occupe(choisir, false); UI.toast(e.message || "Image illisible."); });
+    });
+
+    function enregistrePhoto(url, bouton) {
+      occupe(bouton, true);
+      return D.regleProfil(moi.id, { telInterne: moi.telInterne, telExterne: moi.telExterne, photo: url })
+        .then(function () { UI.toast(url ? "Photo enregistrée." : "Photo retirée."); rafraichitBarre(); rend(); })
+        .catch(function (e) { occupe(bouton, false); UI.toast(e.message); });
+    }
+
+    var mail = UI.avecBase && window.Sb && window.Sb.email ? window.Sb.email() : moi.email;
+    return section("Identité", [
+      el("div", { class: "pf-identite" }, [
+        UI.avatar(moi, null, "ab-avatar pf-avatar"),
+        el("div", { class: "pf-qui" }, [
+          el("div", { class: "pf-nom", text: moi.prenom + " " + moi.nom }),
+          el("div", { class: "pf-detail", text: D.libelleMetier(moi.metier) + (mail ? " · " + mail : "") }),
+          el("div", { class: "pf-boutons" }, [choisir, retirer, entree])
+        ])
+      ]),
+      !pret ? note("Base à mettre à jour : la photo et les téléphones s'enregistreront dès que la migration « Mon profil » sera passée.", true)
+        : bloquee ? note("La photo ne se change pas dans la démonstration : elle est vue de tous les visiteurs.")
+        : note("Une image carrée de préférence ; elle est recadrée au centre et réduite. Le nom, le métier et l'adresse se changent dans la console.")
+    ], "pf-large");
+  }
+
+  /** Image choisie → carré de 160 px, recadré au centre, en JPEG (data URL). */
+  function reduit(fichier) {
+    return new Promise(function (ok, ko) {
+      var lecteur = new FileReader();
+      lecteur.onerror = function () { ko(new Error("Image illisible.")); };
+      lecteur.onload = function () {
+        var img = new Image();
+        img.onerror = function () { ko(new Error("Image illisible.")); };
+        img.onload = function () {
+          var cote = 160, c = document.createElement("canvas");
+          c.width = c.height = cote;
+          var g = c.getContext("2d");
+          var m = Math.min(img.naturalWidth, img.naturalHeight);
+          g.fillStyle = "#fff"; g.fillRect(0, 0, cote, cote);
+          g.imageSmoothingQuality = "high";
+          g.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, cote, cote);
+          var url = c.toDataURL("image/jpeg", 0.85);
+          if (url.length > 120000) url = c.toDataURL("image/jpeg", 0.6);
+          ok(url);
+        };
+        img.src = lecteur.result;
+      };
+      lecteur.readAsDataURL(fichier);
+    });
+  }
+
+  /* ---------------------------------------------------------- téléphones */
+
+  function telephones(moi) {
+    var pret = D.profilPret();
+    var interne = UI.champ({ nom: "tel-interne", label: "Téléphone interne", valeur: moi.telInterne, exemple: "ex. 214", type: "tel", autocomplete: "off" });
+    var externe = UI.champ({ nom: "tel-externe", label: "Téléphone externe", valeur: moi.telExterne, exemple: "ex. 079 123 45 67", type: "tel", autocomplete: "tel" });
+    var ci = interne.querySelector("input"), ce = externe.querySelector("input");
+    ci.maxLength = ce.maxLength = 40;
+    var bouton = el("button", { type: "submit", class: "btn btn-or", text: "Enregistrer", disabled: !pret });
+    var form = el("form", { class: "pf-form" }, [
+      el("div", { class: "grille-champs" }, [interne, externe]),
+      el("div", { class: "pf-actions" }, [bouton])
+    ]);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      occupe(bouton, true);
+      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value })
+        .then(function () { UI.toast("Téléphones enregistrés."); occupe(bouton, false); })
+        .catch(function (err) { occupe(bouton, false); UI.toast(err.message); });
+    });
+    return section("Téléphones", [form, !pret ? note("Base à mettre à jour : enregistrement possible après la migration « Mon profil ».", true) : null]);
+  }
+
+  /* ---------------------------------------------------- jours travaillés */
+
+  function jours(moi) {
+    var capacite = el("b", { class: "num" }), detail = el("span", {});
+    function montre(j) {
+      capacite.textContent = C.fmtJours(D.capaciteApres(moi, j)) + " j par semaine";
+      detail.textContent = " — " + D.detailJours({ jours: j }).replace(/^./, function (c) { return c.toLowerCase(); });
+    }
+    var choix = UI.choixJours(moi.jours, montre, false);
+    montre(choix.valeur());
+    var bouton = el("button", { type: "button", class: "btn btn-or", text: "Enregistrer", onclick: function () {
+      occupe(bouton, true);
+      D.regleJours(moi.id, choix.valeur()).then(function (apres) {
+        UI.toast("Tes jours sont enregistrés : " + C.fmtJours(apres.capacite) + " j par semaine.");
+        occupe(bouton, false);
+      }).catch(function (e) { occupe(bouton, false); UI.toast(e.message); });
+    } });
+    return section("Jours travaillés", [
+      el("div", { class: "champ" }, [el("label", { text: "Semaine type" }), choix.noeud]),
+      el("p", { class: "pf-note" }, ["Capacité : ", capacite, detail]),
+      note("Un clic par jour : plein, demi-journée, puis non travaillé. Aucune tâche ne se pose un jour non travaillé. Un changement de taux d'activité passe par l'administrateur."),
+      el("div", { class: "pf-actions" }, [bouton])
+    ]);
+  }
+
+  /* -------------------------------------------------------- mot de passe */
+
+  function motDePasse() {
+    if (!UI.avecBase) {
+      return section("Mot de passe", [note("Pas de mot de passe en mode local : les données restent dans ce navigateur.")]);
+    }
+    if (/^demo@/i.test(window.Sb.email() || "")) {
+      return section("Mot de passe", [note("Le mot de passe de la démonstration ne se change pas : il est partagé par tous les visiteurs.")]);
+    }
+    function champ(nom, label, auto) {
+      var c = UI.champ({ nom: nom, label: label, type: "password", autocomplete: auto });
+      c.querySelector("input").required = true;
+      return c;
+    }
+    var actuel = champ("mdp-actuel", "Mot de passe actuel", "current-password");
+    var nouveau = champ("mdp-nouveau", "Nouveau mot de passe", "new-password");
+    var encore = champ("mdp-encore", "Confirme le nouveau", "new-password");
+    var bouton = el("button", { type: "submit", class: "btn btn-or", text: "Changer le mot de passe" });
+    // Un champ d'adresse caché aide le gestionnaire de mots de passe du navigateur
+    var form = el("form", { class: "pf-form", autocomplete: "on" }, [
+      el("input", { type: "email", name: "email", autocomplete: "username", value: window.Sb.email(), hidden: true, readonly: true }),
+      el("div", { class: "grille-champs" }, [actuel, nouveau, encore]),
+      el("div", { class: "pf-actions" }, [bouton])
+    ]);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var a = actuel.querySelector("input").value, n = nouveau.querySelector("input").value, n2 = encore.querySelector("input").value;
+      if (n.length < 6) { UI.toast("Six caractères au minimum pour le nouveau mot de passe."); return; }
+      if (n !== n2) { UI.toast("Les deux saisies du nouveau mot de passe diffèrent."); return; }
+      if (n === a) { UI.toast("Choisis un mot de passe différent de l'actuel."); return; }
+      occupe(bouton, true);
+      window.Sb.changeMotDePasse(a, n).then(function () {
+        form.reset();
+        occupe(bouton, false);
+        UI.toast("Mot de passe changé.");
+      }).catch(function (err) { occupe(bouton, false); UI.toast(err.message); });
+    });
+    return section("Mot de passe", [form, note("Six caractères au minimum. Les autres appareils restent connectés.")]);
+  }
+})();
+</script>
+</body>
+</html>

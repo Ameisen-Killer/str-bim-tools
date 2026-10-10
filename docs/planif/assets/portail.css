@@ -63,6 +63,8 @@ button { font: inherit; color: inherit; }
   display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
   background: #8E9295; color: #fff; font-size: 17px; letter-spacing: .04em;
 }
+.ab-avatar.a-photo { background: none; overflow: hidden; }
+.ab-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .ab-chevron { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .15s; }
 .ab-moi-bouton[aria-expanded="true"] .ab-chevron { transform: rotate(180deg); }
 .ab-menu {

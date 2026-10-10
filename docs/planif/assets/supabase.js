@@ -499,6 +499,9 @@
       var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
           liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
           contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10] || [], veille = r[11] || [], veilleSuivi = r[12] || [];
+      // Garde-fou provisoire (10.10.2026) : colonnes de « Mon profil » pas encore en base
+      // tant que migration-profil.sql n'est pas passée. À retirer ensuite.
+      profilEnBase = !!membres.length && "tel_interne" in membres[0];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -521,6 +524,7 @@
             metier: metierDe(m), statuts: statutsDe(m),
             succursale: m.succursale || "", discipline: m.discipline || "",
             capacite: parseFloat(m.capacite), jours: m.jours || null, actif: m.actif,
+            telInterne: m.tel_interne || "", telExterne: m.tel_externe || "", photo: m.photo || null,
             absences: absences.filter(function (a) { return a.membre_id === m.id; })
               .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })
           };
@@ -598,6 +602,40 @@
      droit. */
   function regleJours(idMembre, jours) {
     return rpc("regle_jours", { p_membre: idMembre, p_jours: jours || null });
+  }
+
+  /* Mon profil : téléphones et photo de sa propre fiche, par la fonction
+     regle_profil (même raison que regle_jours). */
+  var profilEnBase = false;
+  function regleProfil(idMembre, p) {
+    return rpc("regle_profil", {
+      p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || ""
+    });
+  }
+
+  /* Changer son mot de passe : l'ancien est d'abord vérifié par une connexion
+     (qui renouvelle la session), puis le nouveau est posé sur le compte. */
+  function changeMotDePasse(ancien, nouveau) {
+    if (!session || !session.email) return Promise.reject(erreur("Aucune session."));
+    return appelAuth("token?grant_type=password", { email: session.email, password: ancien })
+      .catch(function (e) {
+        if (/incorrect/i.test(e.message)) throw erreur("Mot de passe actuel incorrect.");
+        throw e;
+      })
+      .then(function (j) {
+        poseSession(depuisJeton(j));
+        return fetch(URL_BASE + "/auth/v1/user", {
+          method: "PUT",
+          headers: { apikey: CLE, Authorization: "Bearer " + session.jeton, "Content-Type": "application/json" },
+          body: JSON.stringify({ password: nouveau })
+        }).catch(function () { throw erreurReseau(); });
+      })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (u) {
+          if (!r.ok) throw erreur(messageAuth(u, r.status));
+          return true;
+        });
+      });
   }
 
   /* ------------------------------------------------------------ écriture
@@ -777,6 +815,7 @@
     rafraichis: rafraichis,
     utilisateur: utilisateur,
     enregistrePreferences: enregistrePreferences,
+    changeMotDePasse: changeMotDePasse,
     requete: requete,
     rpc: rpc,
     /** Jeton valide (rafraîchi au besoin), l'adresse du projet et sa clé publiable : le direct (direct.js) s'en sert. */
@@ -792,6 +831,8 @@
       videTout: videTout,
       profil: profil,
       regleJours: regleJours,
+      regleProfil: regleProfil,
+      profilEnBase: function () { return profilEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }
