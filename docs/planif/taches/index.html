@@ -412,7 +412,8 @@
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
           "aria-pressed": p.fini ? "true" : "false",
           "data-anim": "p|" + t.id + "|" + p.role, "data-anim-etat": p.fini ? "fini" : "",
-          title: (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
+          // Pas de bulle du navigateur : celle de la ligne (UI.bulleTache) suffit
+          "aria-label": (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
           onclick: function () { terminePart(t.id, p.role, !p.fini); }
         }, [
           el("i", { class: "coche", "aria-hidden": "true" }),
