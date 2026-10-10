@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=82">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=83">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 <style>
 .imp-periode{display:none}
@@ -123,7 +123,7 @@
 <script src="/planif/assets/donnees.js?v=56"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=85"></script>
+<script src="/planif/assets/ui.js?v=86"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=16"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -490,13 +490,25 @@
       });
       /* Comme au tableau de bord : au survol de la ligne, un fil relie
          l'étiquette du calcul à celle du dessin (UI.fil), qui s'entourent. */
-      if (etiquettes.ingenieur && etiquettes.dessinateur) {
-        var montre = function () { montreLien(gens, etiquettes.ingenieur, etiquettes.dessinateur, teinte); };
-        rangee.addEventListener("pointerenter", function (ev) { if (ev.pointerType !== "touch") montre(); });
-        rangee.addEventListener("pointerleave", cacheLien);
-        rangee.addEventListener("focusin", montre);
-        rangee.addEventListener("focusout", function (ev) { if (!rangee.contains(ev.relatedTarget)) cacheLien(); });
-      }
+      // Et, après un court arrêt, la même bulle qu'au tableau de bord (UI.bulleTache)
+      var relie = etiquettes.ingenieur && etiquettes.dessinateur;
+      var aide = "Clic : fiche de la tâche · étiquette : terminer la part";
+      var fil = function () { if (relie) montreLien(gens, etiquettes.ingenieur, etiquettes.dessinateur, teinte); };
+      rangee.addEventListener("pointerenter", function (ev) {
+        if (ev.pointerType === "touch") return;
+        fil();
+        UI.bulleTache(t, { aide: aide, x: ev.clientX, y: ev.clientY });
+      });
+      rangee.addEventListener("pointermove", function (ev) { if (ev.pointerType !== "touch") UI.placeBulle(ev.clientX, ev.clientY); });
+      rangee.addEventListener("pointerleave", function () { cacheLien(); UI.cacheBulle(); });
+      rangee.addEventListener("pointerdown", function () { UI.cacheBulle(); });
+      rangee.addEventListener("focusin", function (ev) {
+        fil();
+        if (ev.target === rangee) { var r = gens.getBoundingClientRect(); UI.bulleTache(t, { aide: aide, x: r.left, y: r.bottom }); }
+      });
+      rangee.addEventListener("focusout", function (ev) {
+        if (!rangee.contains(ev.relatedTarget)) { cacheLien(); UI.cacheBulle(); }
+      });
       return suivi.marque(rangee, t.id);
     }
   }

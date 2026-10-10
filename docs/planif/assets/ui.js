@@ -2483,6 +2483,105 @@
     return svg;
   }
 
+  /* ------------------------------------------------ bulle d'une tâche
+
+     Demande de Tony (10.10.2026) : une bulle plus lisible que celle du
+     navigateur, qui dit aussi qui porte l'autre part. En tête l'affaire et la
+     tâche ; puis les deux parts, calcul puis dessin, chacune avec sa personne,
+     sa charge et sa période — celle de la barre survolée éclairée (o.role) ;
+     enfin les avertissements et l'aide. Commune au tableau de bord (barres)
+     et à la page Tâches (lignes). Elle paraît après un court arrêt de la
+     souris (DELAI_BULLE), pas au moindre passage. */
+  var DELAI_BULLE = 420;
+  var bulleEl = null, bulleMinuterie = null, bulleXY = [0, 0];
+
+  /** Période d'une part, calculée comme pour sa barre (retard : reprise). */
+  function periodePart(t, role, canton) {
+    var Calc = global.Calc, P = D.PARTS[role], m = t[P.membre] ? D.membre(t[P.membre]) : null;
+    var fin = Calc.finPart(t, role, canton);
+    if (!fin) return null;
+    var p = { debut: Calc.debutPour(t[P.charge], fin, m, canton), fin: fin, reportee: false, echeance: fin };
+    if (t.statut !== "termine" && !t[P.fini]) {
+      var f = Calc.fenetre(t[P.charge], fin, m, canton);
+      if (f.reportee) { p.debut = f.debut; p.fin = f.fin; p.reportee = true; }
+    }
+    return p;
+  }
+
+  /** o : { role (part survolée, facultatif), periode (la sienne, sinon calculée), aide, x, y } */
+  function bulleTache(t, o) {
+    cacheBulle();
+    o = o || {};
+    bulleXY = [o.x || 0, o.y || 0];
+    bulleMinuterie = setTimeout(function () {
+      bulleMinuterie = null;
+      if (document.hidden) return;
+      bulleEl = construitBulle(t, o);
+      document.body.appendChild(bulleEl);
+      placeBulle(bulleXY[0], bulleXY[1]);
+      requestAnimationFrame(function () { if (bulleEl) bulleEl.classList.add("vue"); });
+    }, o.delai != null ? o.delai : DELAI_BULLE);
+  }
+
+  function construitBulle(t, o) {
+    var Calc = global.Calc, a = D.affaire(t.affaireId), auj = C.isoAuj(), canton = D.canton();
+    var parts = [], alertes = [];
+    ["ingenieur", "dessinateur"].forEach(function (role) {
+      var P = D.PARTS[role];
+      if (!(t[P.charge] > 0)) return;
+      var ici = role === o.role;
+      var per = ici && o.periode ? o.periode : periodePart(t, role, canton);
+      var fini = t.statut === "termine" || t[P.fini];
+      var retard = !fini && per && per.echeance < auj;
+      var etat = fini ? el("span", { class: "etat fini", text: "Terminé" })
+        : retard ? el("span", { class: "etat retard", text: "En retard" }) : null;
+      parts.push(el("div", { class: "part" + (ici ? " ici" : "") }, [
+        el("div", { class: "l1" }, [
+          el("span", { class: "metier", text: P.label }),
+          el("span", { class: "qui" + (t[P.membre] ? "" : " vide"), text: t[P.membre] ? D.nomMembre(t[P.membre]) : "À affecter" }),
+          el("span", { class: "j", text: C.fmtJours(t[P.charge]) + " j" })
+        ]),
+        el("div", { class: "l2" }, [
+          per ? C.fmtCH(per.debut) + " → " + C.fmtCH(per.fin) : "Sans échéance",
+          etat
+        ])
+      ]));
+      if (retard && per.reportee)
+        alertes.push(el("div", { class: "rouge", text: P.label + " : échéance du " + C.fmtCH(per.echeance) + " dépassée, reprise dès le " + C.fmtCH(per.debut) }));
+    });
+    if (!t.finiInge && Calc.enchainee(t))
+      alertes.push(el("div", { text: "Calcul à rendre avant le dessin, échéance de la tâche le " + C.fmtCH(t.echeance) }));
+
+    return el("div", { class: "bt-bulle", role: "tooltip", style: "--tt:" + teinte(a ? a.teinte : 1) }, [
+      el("div", { class: "aff" }, [
+        el("span", { class: "code", text: a ? a.code : "—" }),
+        a ? el("span", { class: "nom", text: a.nom }) : null
+      ]),
+      el("div", { class: "titre", text: t.titre }),
+      parts.length ? el("div", { class: "parts" + (parts.length > 1 ? " lies" : "") }, parts) : null,
+      alertes.length ? el("div", { class: "alertes" }, alertes) : null,
+      o.aide ? el("div", { class: "aide", text: o.aide }) : null
+    ]);
+  }
+
+  /** La bulle suit la souris ; avant qu'elle paraisse, on retient la position. */
+  function placeBulle(x, y) {
+    bulleXY = [x, y];
+    if (!bulleEl) return;
+    var r = bulleEl.getBoundingClientRect(), l = innerWidth, h = innerHeight;
+    var px = x + 16, py = y + 20;
+    if (px + r.width > l - 10) px = Math.max(10, x - r.width - 16);
+    if (py + r.height > h - 10) py = Math.max(10, y - r.height - 14);
+    bulleEl.style.transform = "translate(" + Math.round(px) + "px," + Math.round(py) + "px)";
+  }
+
+  function cacheBulle() {
+    if (bulleMinuterie) { clearTimeout(bulleMinuterie); bulleMinuterie = null; }
+    if (bulleEl && bulleEl.parentNode) bulleEl.parentNode.removeChild(bulleEl);
+    bulleEl = null;
+  }
+  global.addEventListener("scroll", cacheBulle, { passive: true });
+
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
@@ -2499,6 +2598,6 @@
     foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions,
     photo: photo, joue: joue, enFrappe: enFrappe, defileTexte: defileTexte,
-    fil: fil
+    fil: fil, bulleTache: bulleTache, placeBulle: placeBulle, cacheBulle: cacheBulle
   };
 })(window);
