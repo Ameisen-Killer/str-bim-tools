@@ -669,6 +669,28 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .bt > .coche{margin-right:1px;color:var(--tt)}
 .bt.glisse{opacity:.55;cursor:grabbing;z-index:5}
 .bt.role-i{border-top-style:dashed}
+/* Fil calcul <-> dessin (survol d'une barre) : tracé au-dessus des barres, sans
+   capter la souris ; l'autre part s'entoure de la teinte de l'affaire. */
+.plan{position:relative}
+.pl-lien{position:absolute;left:0;top:0;z-index:4;pointer-events:none;overflow:visible}
+.pl-lien path{fill:none;stroke-linecap:round}
+.pl-lien .halo{stroke:#fff;stroke-width:5;opacity:.85}
+.pl-lien .fil{stroke:var(--tt);stroke-width:1.8;stroke-dasharray:1;stroke-dashoffset:1;animation:pl-fil .32s ease-out forwards}
+.pl-lien .bout{fill:var(--tt);stroke:#fff;stroke-width:1.5}
+.pl-lien .arrivee{opacity:0;animation:pl-bout .12s .26s ease-out forwards}
+@keyframes pl-fil{to{stroke-dashoffset:0}}
+@keyframes pl-bout{to{opacity:1}}
+.bt.lie,.bt.jumelle{box-shadow:0 0 0 2px color-mix(in srgb,var(--tt) 60%,transparent);z-index:3}
+.plan .pl-piste .bt.jumelle{opacity:1;background:color-mix(in srgb,var(--tt) 22%,#fff)}
+.pl-lien-note{
+  position:absolute;z-index:4;pointer-events:none;white-space:nowrap;
+  padding:3px 9px;border-radius:4px;font-size:12px;line-height:16px;color:var(--texte);
+  background:#fff;border:1px solid color-mix(in srgb,var(--tt) 55%,transparent);border-left:2px solid var(--tt);
+  box-shadow:0 2px 8px rgba(0,0,0,.08);animation:pl-bout .15s ease-out
+}
+.pl-lien-note b{color:var(--tt);font-weight:600}
+.legende-plan .fil{width:16px;height:10px;border-bottom:2px solid var(--texte-faible);border-radius:0 0 0 10px}
+@media (hover:none){.legende-plan .seul-souris{display:none}}
 /* Lissage : la barre commence plus tôt que son début déduit — bord gauche pointillé */
 /* Poignée du bord gauche : étirer change la charge, l'échéance reste */
 .bt > .poignee{position:absolute;left:-2px;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:1}
