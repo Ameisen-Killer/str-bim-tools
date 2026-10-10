@@ -40,7 +40,7 @@ begin
   if not found then
     raise exception 'Cette personne n''existe plus dans ce bureau.';
   end if;
-  if p_membre is distinct from public.mon_membre() and not public.est_super_admin() then
+  if p_membre is distinct from public.mon_membre() and not coalesce(public.est_super_admin(), false) then
     raise exception 'Tu ne règles que ton propre profil.';
   end if;
   if char_length(v_int) > 40 or char_length(v_ext) > 40 then
