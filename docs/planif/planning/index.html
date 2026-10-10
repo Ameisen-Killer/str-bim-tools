@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=81">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=82">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 </head>
 <body class="large">
@@ -718,7 +718,8 @@
       // Une tâche n'a qu'une part par métier : (tâche, métier) suit la barre d'une ligne à l'autre
       "data-anim": "b|" + t.id + "|" + info.role, "data-anim-taille": "",
       "data-anim-etat": t.statut === "termine" || info.fini ? "fini" : "",
-      title: (a ? a.code + " · " : "") + t.titre + "\n" +
+      // Lu par les lecteurs d'écran ; à l'écran, la bulle maison (montreBulle)
+      "aria-label": (a ? a.code + " · " : "") + t.titre + "\n" +
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
              (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
@@ -737,11 +738,21 @@
 
     activeGlissement(n, info, canton);
     // Fil vers l'autre part de la tâche : au survol de la souris ou au clavier
-    n.addEventListener("pointerenter", function (e) { if (e.pointerType !== "touch") montreLien(n, info); });
-    n.addEventListener("pointerleave", cacheLien);
-    n.addEventListener("focus", function () { montreLien(n, info); });
-    n.addEventListener("blur", cacheLien);
-    n.addEventListener("pointerdown", cacheLien);
+    // et la bulle de la tâche, qui nomme aussi la personne de l'autre part
+    n.addEventListener("pointerenter", function (e) {
+      if (e.pointerType === "touch") return;
+      montreLien(n, info);
+      montreBulle(info, canton, etirable, e.clientX, e.clientY);
+    });
+    n.addEventListener("pointermove", function (e) { if (e.pointerType !== "touch") placeBulle(e.clientX, e.clientY); });
+    n.addEventListener("pointerleave", function () { cacheLien(); cacheBulle(); });
+    n.addEventListener("focus", function () {
+      montreLien(n, info);
+      var r = n.getBoundingClientRect();
+      montreBulle(info, canton, etirable, r.left + 12, r.bottom - 8);
+    });
+    n.addEventListener("blur", function () { cacheLien(); cacheBulle(); });
+    n.addEventListener("pointerdown", function () { cacheLien(); cacheBulle(); });
     n.addEventListener("keydown", function (e) {
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && e.shiftKey) {
         // Maj + flèche : la barre s'allonge (←) ou se raccourcit (→) d'une demi-journée
@@ -816,6 +827,91 @@
   }
   // La mise en page change : le fil ne tomberait plus juste
   window.addEventListener("resize", cacheLien);
+
+  /* ------------------------------------------------ bulle d'une barre */
+
+  /* Demande de Tony (10.10.2026) : une bulle plus lisible que celle du
+     navigateur, qui dit aussi qui porte l'autre part. En tête l'affaire et la
+     tâche ; puis les deux parts, calcul puis dessin, chacune avec sa personne,
+     sa charge et sa période — celle de la barre survolée éclairée ; enfin les
+     avertissements (retard, calcul à rendre avant le dessin) et l'aide. */
+  var bulle = null;
+
+  /** Période d'une part, calculée comme pour sa barre (retard : reprise). */
+  function periodePart(t, role, canton) {
+    var P = D.PARTS[role], m = t[P.membre] ? D.membre(t[P.membre]) : null;
+    var fin = Calc.finPart(t, role, canton);
+    if (!fin) return null;
+    var p = { debut: Calc.debutPour(t[P.charge], fin, m, canton), fin: fin, reportee: false, echeance: fin };
+    if (t.statut !== "termine" && !t[P.fini]) {
+      var f = Calc.fenetre(t[P.charge], fin, m, canton);
+      if (f.reportee) { p.debut = f.debut; p.fin = f.fin; p.reportee = true; }
+    }
+    return p;
+  }
+
+  function montreBulle(info, canton, etirable, x, y) {
+    cacheBulle();
+    if (document.body.classList.contains("glisse-en-cours")) return;
+    var t = info.tache, a = D.affaire(t.affaireId), auj = C.isoAuj();
+    var teinte = UI.teinte(a ? a.teinte : 1);
+    var parts = [], alertes = [];
+    ["ingenieur", "dessinateur"].forEach(function (role) {
+      var P = D.PARTS[role];
+      if (!(t[P.charge] > 0)) return;
+      var ici = role === info.role;
+      var per = ici ? { debut: info.debut, fin: info.fin, reportee: info.reportee, echeance: info.echeancePart || t.echeance }
+                    : periodePart(t, role, canton);
+      var fini = t.statut === "termine" || t[P.fini];
+      var retard = !fini && per && per.echeance < auj;
+      var etat = fini ? el("span", { class: "etat fini", text: "Terminé" })
+        : retard ? el("span", { class: "etat retard", text: "En retard" }) : null;
+      parts.push(el("div", { class: "part" + (ici ? " ici" : "") }, [
+        el("div", { class: "l1" }, [
+          el("span", { class: "metier", text: P.label }),
+          el("span", { class: "qui" + (t[P.membre] ? "" : " vide"), text: t[P.membre] ? D.nomMembre(t[P.membre]) : "À affecter" }),
+          el("span", { class: "j", text: C.fmtJours(t[P.charge]) + " j" })
+        ]),
+        el("div", { class: "l2" }, [
+          per ? C.fmtCH(per.debut) + " → " + C.fmtCH(per.fin) : "Sans échéance",
+          etat
+        ])
+      ]));
+      if (retard && per.reportee)
+        alertes.push(el("div", { class: "rouge", text: P.label + " : échéance du " + C.fmtCH(per.echeance) + " dépassée, reprise dès le " + C.fmtCH(per.debut) }));
+    });
+    if (!t.finiInge && Calc.enchainee(t))
+      alertes.push(el("div", { text: "Calcul à rendre avant le dessin, échéance de la tâche le " + C.fmtCH(t.echeance) }));
+
+    bulle = el("div", { class: "bt-bulle", role: "tooltip", style: "--tt:" + teinte }, [
+      el("div", { class: "aff" }, [
+        el("span", { class: "code", text: a ? a.code : "—" }),
+        a ? el("span", { class: "nom", text: a.nom }) : null
+      ]),
+      el("div", { class: "titre", text: t.titre }),
+      el("div", { class: "parts" + (parts.length > 1 ? " lies" : "") }, parts),
+      alertes.length ? el("div", { class: "alertes" }, alertes) : null,
+      el("div", { class: "aide", text: etirable ? "Glisser pour déplacer · bord gauche pour la charge · clic : fiche" : "Clic : fiche de la tâche" })
+    ]);
+    document.body.appendChild(bulle);
+    placeBulle(x, y);
+    requestAnimationFrame(function () { if (bulle) bulle.classList.add("vue"); });
+  }
+
+  function placeBulle(x, y) {
+    if (!bulle) return;
+    var r = bulle.getBoundingClientRect(), l = innerWidth, h = innerHeight;
+    var px = x + 16, py = y + 20;
+    if (px + r.width > l - 10) px = Math.max(10, x - r.width - 16);
+    if (py + r.height > h - 10) py = Math.max(10, y - r.height - 14);
+    bulle.style.transform = "translate(" + Math.round(px) + "px," + Math.round(py) + "px)";
+  }
+
+  function cacheBulle() {
+    if (bulle && bulle.parentNode) bulle.parentNode.removeChild(bulle);
+    bulle = null;
+  }
+  window.addEventListener("scroll", cacheBulle, { passive: true });
 
   /* ------------------------------------------------- glisser-déposer */
 

@@ -689,6 +689,42 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
   box-shadow:0 2px 8px rgba(0,0,0,.08);animation:pl-bout .15s ease-out
 }
 .pl-lien-note b{color:var(--tt);font-weight:600}
+/* Bulle d'une barre du planning : l'affaire, la tâche, ses deux parts et
+   qui les porte. Carte blanche, filet de la teinte de l'affaire à gauche. */
+.bt-bulle{
+  position:fixed;left:0;top:0;z-index:80;width:max-content;min-width:250px;max-width:340px;
+  padding:12px 14px 11px;pointer-events:none;background:#fff;color:var(--texte);
+  border:1px solid var(--ligne);border-left:3px solid var(--tt);border-radius:8px;
+  box-shadow:0 12px 32px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06);
+  font-size:13px;line-height:1.35;opacity:0;transition:opacity .12s
+}
+.bt-bulle.vue{opacity:1}
+.bt-bulle .aff{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--texte-faible)}
+.bt-bulle .aff .code{color:var(--tt);font-weight:650;letter-spacing:.04em;white-space:nowrap}
+.bt-bulle .aff .nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-bulle .titre{margin-top:3px;font-size:14.5px;font-weight:600}
+.bt-bulle .parts{position:relative;margin-top:10px;display:flex;flex-direction:column;gap:4px}
+/* Deux parts : un trait les relie, rappel du fil tracé dans le planning */
+.bt-bulle .parts.lies::before{content:"";position:absolute;left:11px;top:22px;bottom:22px;border-left:2px dotted color-mix(in srgb,var(--tt) 60%,transparent)}
+.bt-bulle .part{position:relative;padding:6px 8px 6px 24px;border-radius:6px}
+.bt-bulle .part::before{content:"";position:absolute;left:7px;top:11px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid var(--tt);box-sizing:border-box}
+.bt-bulle .part.ici{background:color-mix(in srgb,var(--tt) 12%,#fff)}
+.bt-bulle .part.ici::before{background:var(--tt)}
+.bt-bulle .l1{display:flex;align-items:baseline;gap:8px}
+.bt-bulle .metier{flex:0 0 auto;min-width:46px;font-size:11.5px;font-weight:600;color:var(--texte-doux)}
+.bt-bulle .qui{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-bulle .qui.vide{font-weight:400;font-style:italic;color:var(--texte-faible)}
+.bt-bulle .j{flex:0 0 auto;font-weight:600;color:var(--texte-doux)}
+.bt-bulle .l2{display:flex;align-items:center;gap:8px;margin-top:1px;padding-left:54px;font-size:12px;color:var(--texte-faible)}
+.bt-bulle .etat{font-size:11px;font-weight:600;padding:0 7px;border-radius:10px;line-height:17px}
+.bt-bulle .etat.retard{background:#FBE4E2;color:var(--alerte)}
+.bt-bulle .etat.fini{background:color-mix(in srgb,var(--tt) 16%,#fff);color:var(--texte-doux)}
+.bt-bulle .alertes{margin-top:9px;padding-top:8px;border-top:1px solid var(--ligne-faible);display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--texte-doux)}
+.bt-bulle .alertes .rouge{color:var(--alerte)}
+.bt-bulle .aide{margin-top:8px;font-size:11px;color:var(--texte-faible)}
+@media (hover:none){.bt-bulle{display:none}}
+@media print{.bt-bulle{display:none!important}}
+
 /* Page Tâches : le fil relie les deux étiquettes d'une ligne */
 .gens-parts{position:relative}
 .gens-parts > .pl-lien{z-index:1}
