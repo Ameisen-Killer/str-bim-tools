@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=80">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=81">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 <style>
 .imp-periode{display:none}
@@ -123,7 +123,7 @@
 <script src="/planif/assets/donnees.js?v=56"></script>
 <script src="/planif/assets/calculs.js?v=12"></script>
 <script src="/planif/assets/version.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=84"></script>
+<script src="/planif/assets/ui.js?v=85"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=16"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -398,7 +398,8 @@
       // Une étiquette par métier, qui sert aussi de bascule : un clic termine
       // cette part-là sans fermer l'autre (l'ingénieur qui boucle son calcul
       // laisse le dessin au planning).
-      var gens = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
+      var gens = el("div", { class: "gens-parts", style: "display:flex;flex-wrap:wrap;gap:6px;--tt:" + teinte });
+      var etiquettes = {};
       [
         { role: "ingenieur", classe: "ing", charge: t.chargeInge, membre: t.ingenieurId, fini: t.finiInge },
         { role: "dessinateur", classe: "des", charge: t.chargeDessin, membre: t.dessinateurId, fini: t.finiDessin }
@@ -406,7 +407,7 @@
         if (!(p.charge > 0)) return;
         var nom = p.membre ? D.nomMembre(p.membre) : "À affecter";
         var label = D.PARTS[p.role].label;
-        gens.appendChild(el("button", {
+        gens.appendChild(etiquettes[p.role] = el("button", {
           type: "button",
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
           "aria-pressed": p.fini ? "true" : "false",
@@ -487,9 +488,36 @@
         ev.preventDefault();
         fiche(t.id);
       });
+      /* Comme au tableau de bord : au survol de la ligne, un fil relie
+         l'étiquette du calcul à celle du dessin (UI.fil), qui s'entourent. */
+      if (etiquettes.ingenieur && etiquettes.dessinateur) {
+        var montre = function () { montreLien(gens, etiquettes.ingenieur, etiquettes.dessinateur, teinte); };
+        rangee.addEventListener("pointerenter", function (ev) { if (ev.pointerType !== "touch") montre(); });
+        rangee.addEventListener("pointerleave", cacheLien);
+        rangee.addEventListener("focusin", montre);
+        rangee.addEventListener("focusout", function (ev) { if (!rangee.contains(ev.relatedTarget)) cacheLien(); });
+      }
       return suivi.marque(rangee, t.id);
     }
   }
+
+  /* ------------------------------------------- fil calcul <-> dessin */
+  var lien = null;
+  function cacheLien() {
+    if (!lien) return;
+    if (lien.svg.parentNode) lien.svg.parentNode.removeChild(lien.svg);
+    lien.etiq.forEach(function (e) { e.classList.remove("lie"); });
+    lien = null;
+  }
+  function montreLien(hote, calcul, dessin, teinte) {
+    if (lien && lien.hote === hote) return;
+    cacheLien();
+    if (!document.body.contains(hote)) return;
+    calcul.classList.add("lie"); dessin.classList.add("lie");
+    lien = { hote: hote, etiq: [calcul, dessin], svg: UI.fil(hote, calcul, dessin, teinte) };
+  }
+  // La mise en page change : le fil ne tomberait plus juste
+  window.addEventListener("resize", cacheLien);
 
   /** « 06.10 », l'année en plus (« 06.10.27 ») hors de l'année en cours */
   function dateCourte(iso) {

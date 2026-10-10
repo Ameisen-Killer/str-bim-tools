@@ -689,6 +689,11 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
   box-shadow:0 2px 8px rgba(0,0,0,.08);animation:pl-bout .15s ease-out
 }
 .pl-lien-note b{color:var(--tt);font-weight:600}
+/* Page Tâches : le fil relie les deux étiquettes d'une ligne */
+.gens-parts{position:relative}
+.gens-parts > .pl-lien{z-index:1}
+.etiq.lie{box-shadow:0 0 0 2px color-mix(in srgb,var(--tt) 60%,transparent)}
+@media print{.pl-lien,.pl-lien-note{display:none!important}}
 .legende-plan .fil{width:16px;height:10px;border-bottom:2px solid var(--texte-faible);border-radius:0 0 0 10px}
 @media (hover:none){.legende-plan .seul-souris{display:none}}
 /* Lissage : la barre commence plus tôt que son début déduit — bord gauche pointillé */

@@ -2436,6 +2436,53 @@
     ]));
   }
 
+  /* Fil calcul -> dessin (10.10.2026) : une courbe entre deux éléments d'un
+     même hôte (positionné), du premier — le calcul — vers le second — le
+     dessin. Le dessin suit : le fil part du bord droit et arrive au bord
+     gauche ; sur la même ligne il passe en arc par-dessus ; quand les deux se
+     chevauchent dans le temps, il descend tout droit. Rend le <svg> posé dans
+     l'hôte (classe pl-lien, style dans planif.css) ; à retirer par l'appelant. */
+  function fil(hote, de, vers, teinte) {
+    var NS = "http://www.w3.org/2000/svg";
+    function svgEl(nom, attrs) {
+      var e = document.createElementNS(NS, nom);
+      Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+    var o = hote.getBoundingClientRect();
+    function boite(b) {
+      var r = b.getBoundingClientRect();
+      return { g: r.left - o.left, d: r.right - o.left, h: r.top - o.top, b: r.bottom - o.top,
+               cx: (r.left + r.right) / 2 - o.left, cy: (r.top + r.bottom) / 2 - o.top, ht: r.height };
+    }
+    var c = boite(de), d = boite(vers);
+    var x1, y1, x2, y2, chemin, k;
+    function n(v) { return Math.round(v * 10) / 10; }
+    if (Math.abs(c.cy - d.cy) < Math.min(c.ht, d.ht) / 2) {         // même ligne : arc par-dessus
+      x1 = c.cx; x2 = d.cx; y1 = c.h; y2 = d.h;
+      k = Math.min(18, Math.max(10, Math.abs(x2 - x1) / 4));
+      chemin = "M" + n(x1) + " " + n(y1) + " C" + n(x1) + " " + n(y1 - k) + " " + n(x2) + " " + n(y2 - k) + " " + n(x2) + " " + n(y2);
+    } else if (c.d <= d.g + 2 || d.d <= c.g + 2) {                // l'un après l'autre
+      var avant = c.d <= d.g + 2, s = avant ? 1 : -1;
+      x1 = avant ? c.d : c.g; x2 = avant ? d.g : d.d; y1 = c.cy; y2 = d.cy;
+      k = Math.max(28, Math.abs(x2 - x1) / 2);
+      chemin = "M" + n(x1) + " " + n(y1) + " C" + n(x1 + s * k) + " " + n(y1) + " " + n(x2 - s * k) + " " + n(y2) + " " + n(x2) + " " + n(y2);
+    } else {                                                       // chevauchement : tout droit
+      x1 = x2 = (Math.max(c.g, d.g) + Math.min(c.d, d.d)) / 2;
+      if (c.cy <= d.cy) { y1 = c.b; y2 = d.h; } else { y1 = c.h; y2 = d.b; }
+      chemin = "M" + n(x1) + " " + n(y1) + " L" + n(x2) + " " + n(y2);
+    }
+    var l = Math.ceil(o.width), h = Math.ceil(o.height);
+    var svg = svgEl("svg", { class: "pl-lien", width: l, height: h, viewBox: "0 0 " + l + " " + h, "aria-hidden": "true" });
+    if (teinte) svg.style.setProperty("--tt", teinte);
+    svg.appendChild(svgEl("path", { class: "halo", d: chemin }));
+    svg.appendChild(svgEl("path", { class: "fil", d: chemin, pathLength: "1" }));
+    svg.appendChild(svgEl("circle", { class: "bout", cx: n(x1), cy: n(y1), r: 3.5 }));
+    svg.appendChild(svgEl("circle", { class: "bout arrivee", cx: n(x2), cy: n(y2), r: 3.5 }));
+    hote.appendChild(svg);
+    return svg;
+  }
+
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
@@ -2451,6 +2498,7 @@
     recherche: recherche, termes: termes, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,
     suiviApparitions: suiviApparitions,
-    photo: photo, joue: joue, enFrappe: enFrappe, defileTexte: defileTexte
+    photo: photo, joue: joue, enFrappe: enFrappe, defileTexte: defileTexte,
+    fil: fil
   };
 })(window);

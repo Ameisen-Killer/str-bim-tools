@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=3">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=80">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=81">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=15">
 </head>
 <body class="large">
@@ -107,7 +107,7 @@
 <script src="/planif/assets/donnees.js?v=56"></script>
 <script src="/planif/assets/calculs.js?v=12"></script>
 <script src="/planif/assets/version.js?v=5"></script>
-<script src="/planif/assets/ui.js?v=84"></script>
+<script src="/planif/assets/ui.js?v=85"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=16"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -761,18 +761,9 @@
 
   /* Demande de Tony (10.10.2026) : au survol d'une barre, un fil la relie à
      l'autre part de la même tâche (le calcul à son dessin), d'une ligne à
-     l'autre, et l'autre barre s'entoure. Le fil part de la fin du calcul et
-     arrive au début du dessin ; quand les deux se chevauchent dans le temps,
-     il descend tout droit. L'autre part cachée par un filtre ou hors de la
-     période : une note dit qui la porte. */
+     l'autre, et l'autre barre s'entoure (tracé : UI.fil). L'autre part cachée
+     par un filtre ou hors de la période : une note dit qui la porte. */
   var lien = null;
-  var SVG = "http://www.w3.org/2000/svg";
-
-  function svgEl(nom, attrs) {
-    var e = document.createElementNS(SVG, nom);
-    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
-    return e;
-  }
 
   function cacheLien() {
     if (!lien) return;
@@ -795,17 +786,13 @@
       return false;
     });
 
-    var o = plan.getBoundingClientRect();
-    function boite(b) {
-      var r = b.getBoundingClientRect();
-      return { g: r.left - o.left, d: r.right - o.left, h: r.top - o.top, b: r.bottom - o.top, cy: (r.top + r.bottom) / 2 - o.top };
-    }
-    var a = boite(n);
     var teinte = n.style.getPropertyValue("--tt");
     lien = { noeuds: [], barres: [n] };
     n.classList.add("lie");
 
     if (!jumelle) {
+      var o = plan.getBoundingClientRect(), r = n.getBoundingClientRect();
+      var a = { g: r.left - o.left, d: r.right - o.left, cy: (r.top + r.bottom) / 2 - o.top };
       var qui = t[P.membre] ? D.membre(t[P.membre]) : null;
       var note = el("div", { class: "pl-lien-note", style: "--tt:" + teinte }, [
         el("b", { text: P.label }),
@@ -823,33 +810,8 @@
 
     jumelle.classList.add("jumelle");
     lien.barres.push(jumelle);
-    var b = boite(jumelle);
     // Toujours du calcul vers le dessin : le fil se lit dans le sens du travail
-    var c = info.role === "ingenieur" ? a : b, d = info.role === "ingenieur" ? b : a;
-    var x1, y1, x2, y2, chemin, k;
-    if (c.d <= d.g + 2) {                              // le dessin suit le calcul
-      x1 = c.d; y1 = c.cy; x2 = d.g; y2 = d.cy;
-      k = Math.max(28, (x2 - x1) / 2);
-      chemin = "M" + x1 + " " + y1 + " C" + (x1 + k) + " " + y1 + " " + (x2 - k) + " " + y2 + " " + x2 + " " + y2;
-    } else if (d.d <= c.g + 2) {                       // dessin placé avant le calcul
-      x1 = c.g; y1 = c.cy; x2 = d.d; y2 = d.cy;
-      k = Math.max(28, (x1 - x2) / 2);
-      chemin = "M" + x1 + " " + y1 + " C" + (x1 - k) + " " + y1 + " " + (x2 + k) + " " + y2 + " " + x2 + " " + y2;
-    } else {                                           // les deux se chevauchent : fil vertical
-      x1 = x2 = (Math.max(c.g, d.g) + Math.min(c.d, d.d)) / 2;
-      if (c.cy <= d.cy) { y1 = c.b; y2 = d.h; } else { y1 = c.h; y2 = d.b; }
-      chemin = "M" + x1 + " " + y1 + " L" + x2 + " " + y2;
-    }
-    var svg = svgEl("svg", {
-      class: "pl-lien", width: Math.ceil(o.width), height: Math.ceil(o.height),
-      viewBox: "0 0 " + Math.ceil(o.width) + " " + Math.ceil(o.height), "aria-hidden": "true"
-    });
-    svg.style.setProperty("--tt", teinte);
-    svg.appendChild(svgEl("path", { class: "halo", d: chemin }));
-    svg.appendChild(svgEl("path", { class: "fil", d: chemin, pathLength: "1" }));
-    svg.appendChild(svgEl("circle", { class: "bout", cx: x1, cy: y1, r: 3.5 }));
-    svg.appendChild(svgEl("circle", { class: "bout arrivee", cx: x2, cy: y2, r: 3.5 }));
-    plan.appendChild(svg);
+    var svg = info.role === "ingenieur" ? UI.fil(plan, n, jumelle, teinte) : UI.fil(plan, jumelle, n, teinte);
     lien.noeuds.push(svg);
   }
   // La mise en page change : le fil ne tomberait plus juste
