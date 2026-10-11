@@ -327,7 +327,7 @@ h1{
     ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
     maquette(T);
     MIROIR = false;
-    var y0 = ecran(CENTRE)[1], y1 = Math.min(H - 2, ecran([CENTRE[0], -.32*hmax, CENTRE[2]])[1]);
+    var y0 = ecran(CENTRE)[1], y1 = Math.min(H - 2, ecran([CENTRE[0], -.45*hmax, CENTRE[2]])[1]);
     if (y1 > y0 + 4){
       var fondu = ctx.createLinearGradient(0, y0, 0, y1);
       fondu.addColorStop(0, "rgba(0,0,0,1)"); fondu.addColorStop(1, "rgba(0,0,0,0)");
@@ -341,7 +341,7 @@ h1{
     ctx.fillStyle = "#050505"; ctx.fillRect(0,0,W,H);
     ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
     if (y1 > y0 + 4){
-      ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = .2;
+      ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = .32;
       ctx.drawImage(rcv, 0, 0);
       ctx.globalAlpha = 1; ctx.setTransform(dpr,0,0,dpr,0,0);
     }
@@ -573,6 +573,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=18"></script>
+<script src="/assets/menu.js?v=19"></script>
 </body>
 </html>
