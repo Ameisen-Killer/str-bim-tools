@@ -58,7 +58,7 @@
 <script src="/planif/assets/supabase.js?v=43"></script>
 <script src="/planif/assets/donnees.js?v=57"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
-<script src="/planif/assets/version.js?v=5"></script>
+<script src="/planif/assets/version.js?v=6"></script>
 <script src="/planif/assets/ui.js?v=87"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
@@ -105,7 +105,7 @@
     });
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un nom, un métier, un statut, une succursale, une absence…",
+      exemple: "Rechercher un nom, un métier, un statut, un téléphone, une absence…",
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) UI.absences(l[0].id, dessine); }
     });
@@ -179,9 +179,28 @@
   }
 
   function champsCherches(m) {
-    return [m.prenom + " " + m.nom, D.libelleMetier(m.metier), rattachement(m), m.actif ? "" : "inactif"]
+    return [m.prenom + " " + m.nom, D.libelleMetier(m.metier), rattachement(m), m.actif ? "" : "inactif",
+            m.telInterne, m.telExterne]
       .concat(D.statutsDe(m).map(D.libelleStatut))
       .concat(m.absences.map(function (a) { return a.motif; }));
+  }
+
+  /** Numéro cliquable : « 079 123 45 67 » compose tel:0791234567 sans les espaces. */
+  function lienTel(numero, mots) {
+    return el("a", { href: "tel:" + numero.replace(/[^+0-9]/g, ""), class: "lien-doux" }, [UI.surligne(numero, mots)]);
+  }
+
+  /* Téléphones de la fiche, tenus par chacun dans « Mon profil » : l'interne
+     (numéro court du bureau) puis l'externe, chacun avec son libellé. */
+  function telephones(m, mots) {
+    var lignes = [["Int.", m.telInterne], ["Ext.", m.telExterne]].filter(function (l) { return l[1]; });
+    if (!lignes.length) return el("span", { class: "secondaire", text: "—" });
+    return el("div", {}, lignes.map(function (l) {
+      return el("div", { class: "num" }, [
+        el("span", { class: "secondaire", style: "margin-right:6px", text: l[0] }),
+        lienTel(l[1], mots)
+      ]);
+    }));
   }
 
   function selection(metier, sansTexte) {
@@ -285,6 +304,7 @@
             ? el("div", { class: "statuts-ligne", style: "margin-top:5px" }, UI.etiquettesStatuts(m))
             : null
         ]),
+        el("td", {}, [telephones(m, mots)]),
         el("td", { class: "num", title: D.detailJours(m) }, [
           C.fmtJours(m.capacite) + " j/sem.",
           D.libelleJours(m) ? el("div", { class: "secondaire", text: D.libelleJours(m) }) : null
@@ -312,6 +332,7 @@
       el("thead", {}, [el("tr", {}, [
         el("th", { text: "Nom et rattachement" }),
         el("th", { text: "Métier et statuts" }),
+        el("th", { text: "Téléphones" }),
         el("th", { text: "Capacité" }),
         el("th", { text: "Cette semaine" }),
         el("th", { text: "Absences" }),
