@@ -268,10 +268,11 @@ h1{
     cam.fw = norm([CENTRE[0]-cam.eye[0], 0, CENTRE[2]-cam.eye[2]]);
     cam.rt = [cam.fw[2], 0, -cam.fw[0]];
   }
+  var MIROIR = false;   // vrai pendant le dessin du reflet : la maquette est retournée sous le sol
   function proj(p){
     var dx = p[0]-cam.eye[0], dz = p[2]-cam.eye[2];
     var z = dx*cam.fw[0] + dz*cam.fw[2];
-    return [(dx*cam.rt[0] + dz*cam.rt[2])/z, -(p[1]-EH)/z];
+    return [(dx*cam.rt[0] + dz*cam.rt[2])/z, -((MIROIR ? -p[1] : p[1])-EH)/z];
   }
 
   // Cadrage valable pour tous les angles : le bâtiment ne sort jamais du cadre
@@ -286,12 +287,14 @@ h1{
   })();
 
   var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0;
+  var rcv = document.createElement("canvas"), rctx = rcv.getContext("2d"), principal = ctx;   // reflet au sol
   var RECUL = .8;                           // < 1 : caméra plus éloignée, bâtiment plus petit dans le cadre
   function taille(){
     var r = cv.getBoundingClientRect();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = r.width; H = r.height;
     cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    rcv.width = cv.width; rcv.height = cv.height;
     S = RECUL * Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
     CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
   }
@@ -303,9 +306,32 @@ h1{
 
   function dessiner(T, th){
     camera(th);
+
+    // reflet : la maquette retournée, dessinée à part puis fondue vers le bas
+    ctx = rctx; MIROIR = true;
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,rcv.width,rcv.height);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+    maquette(T);
+    MIROIR = false;
+    var y0 = ecran(CENTRE)[1], y1 = Math.min(H - 2, ecran([CENTRE[0], -.32*hmax, CENTRE[2]])[1]);
+    if (y1 > y0 + 4){
+      var fondu = ctx.createLinearGradient(0, y0, 0, y1);
+      fondu.addColorStop(0, "rgba(0,0,0,1)"); fondu.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.fillStyle = fondu; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "source-over";
+    }
+    ctx = principal;
+
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle = "#050505"; ctx.fillRect(0,0,W,H);
     ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+    if (y1 > y0 + 4){
+      ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = .2;
+      ctx.drawImage(rcv, 0, 0);
+      ctx.globalAlpha = 1; ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
 
     // ligne de sol : cercle d'implantation
     var ps = ease(clamp((T-.1)/2.4));
@@ -319,6 +345,10 @@ h1{
       ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
     }
 
+    maquette(T);
+  }
+
+  function maquette(T){
     // ossature en or, dessinée sous les façades qui la recouvrent en montant
     for (var oc in OSS){
       ctx.beginPath(); var no = 0;
@@ -403,6 +433,7 @@ h1{
   var DEBUT_ROT = loggiaFin - 1.5;
   var t0 = null, prec = 0, th = TH0, omega = 0, prochaine = DEBUT_ROT + 1;
   var glisse = false, gx = 0, gt = 0, gv = 0;
+  var incl = 0, inclL = 0;
 
   function frame(now){
     if (t0 === null) t0 = now;
@@ -425,13 +456,27 @@ h1{
       lq.cur = Math.abs(d) <= pas ? lq.o : lq.cur + Math.sign(d)*pas;
     }
 
-    dessiner(T, th);
+    inclL += (incl - inclL) * Math.min(1, dt*4);
+    dessiner(T, th + inclL);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
+  // Sur téléphone, pencher l'appareil à gauche ou à droite fait pivoter un peu la vue
+  window.addEventListener("deviceorientation", function(e){
+    if (e.gamma == null) return;
+    incl = Math.max(-25, Math.min(25, e.gamma)) * Math.PI/180 * 1.2;
+  });
+  var permis = false;   // iPhone : l'accès à l'inclinaison se demande au premier toucher
+  function demanderInclinaison(){
+    if (permis) return; permis = true;
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function")
+      DeviceOrientationEvent.requestPermission().catch(function(){});
+  }
+
   // On peut aussi faire tourner le bâtiment à la main, puis il reprend sa course
   cv.addEventListener("pointerdown", function(e){
+    demanderInclinaison();
     glisse = true; gx = e.clientX; gt = performance.now(); gv = 0;
     cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
   });
@@ -450,6 +495,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=8"></script>
+<script src="/assets/menu.js?v=9"></script>
 </body>
 </html>
