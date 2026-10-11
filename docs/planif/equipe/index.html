@@ -279,15 +279,18 @@
       return;
     }
 
-    // Charge de la semaine en cours, pour situer chacun d'un coup d'œil
+    // Charge de la semaine en cours, pour situer chacun d'un coup d'œil. Pas pour
+    // un collaborateur (11.10.2026, demande de Tony) : la charge des autres ne le
+    // regarde pas, comme au tableau de bord.
+    var voitCharge = D.niveauAcces() >= 1;
     var jours = C.serie(C.lundi(C.isoAuj()), 7);
-    var rep = repartitionCourante();
+    var rep = voitCharge ? repartitionCourante() : {};
     var planifie = !!D.PLANIFIES[s.metier];
 
     var corps = el("tbody");
     membres.forEach(function (m) {
-      var b = Calc.bilan(m, jours, rep[m.id], D.canton());
-      var pourcent = b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
+      var b = voitCharge ? Calc.bilan(m, jours, rep[m.id], D.canton()) : null;
+      var pourcent = b && b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
       var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
       var sousTitre = rattachement(m);
 
@@ -309,7 +312,7 @@
           C.fmtJours(m.capacite) + " j/sem.",
           D.libelleJours(m) ? el("div", { class: "secondaire", text: D.libelleJours(m) }) : null
         ]),
-        el("td", {}, planifie ? [
+        !voitCharge ? null : el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
           el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])
         ] : [el("span", { class: "secondaire", text: "—" })]),
@@ -334,7 +337,7 @@
         el("th", { text: "Métier et statuts" }),
         el("th", { text: "Téléphones" }),
         el("th", { text: "Capacité" }),
-        el("th", { text: "Cette semaine" }),
+        voitCharge ? el("th", { text: "Cette semaine" }) : null,
         el("th", { text: "Absences" }),
         el("th", { text: "" })
       ])]),
