@@ -117,7 +117,7 @@ h1{
     f.quads.push(q); if (twinkle) loggias.push(q); return q;
   }
   // Ossature porteuse (poteaux, dalles, noyau), tracée en or avant que les façades ne l'habillent
-  var ossature = [];
+  var ossature = [], feux = [];
   function os(a, b, cls, d, t){ ossature.push({a:a, b:b, c:cls, d:d, t:t}) }
 
   // Délai de construction par défaut (la maquette fixe ses propres départs)
@@ -238,6 +238,8 @@ h1{
         }, "e");
         // Tour en retrait
         volume(6,22, 32,48, function(O,a,n,W){ tourVerre(O,a,n,W, 2.6) });
+        // Feux de balisage aux quatre angles du sommet
+        feux = [[6,T_HAUT,22], [32,T_HAUT,22], [32,T_HAUT,48], [6,T_HAUT,48]];
       }};
 
   BAT.construire();
@@ -424,6 +426,28 @@ h1{
         if (n){ ctx.strokeStyle = "rgba(" + COUL[cls] + "," + Math.min(1, ALPHA[cls]*eclat).toFixed(3) + ")"; ctx.stroke(); }
       }
     }
+
+    // feux de balisage : un bref éclat rouge, ensemble, une fois la tour achevée ;
+    // l'angle le plus éloigné, caché derrière la tour, reste éteint
+    if (T > loggiaFin){
+      var cyc = ((T - loggiaFin) % 1.6)/1.6, fl = cyc < .3 ? Math.sin(cyc/.3*Math.PI) : 0;
+      if (fl > .01){
+        var loin = 0, dmax = -1;
+        feux.forEach(function(p, i){
+          var d = (p[0]-cam.eye[0])*(p[0]-cam.eye[0]) + (p[2]-cam.eye[2])*(p[2]-cam.eye[2]);
+          if (d > dmax){ dmax = d; loin = i; }
+        });
+        feux.forEach(function(p, i){
+          if (i === loin) return;
+          var e = ecran(p), r = 7;
+          var g = ctx.createRadialGradient(e[0],e[1],0, e[0],e[1],r);
+          g.addColorStop(0, "rgba(255,90,70," + fl.toFixed(3) + ")");
+          g.addColorStop(.3, "rgba(230,40,30," + (.6*fl).toFixed(3) + ")");
+          g.addColorStop(1, "rgba(230,40,30,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, Math.PI*2); ctx.fill();
+        });
+      }
+    }
   }
 
   window.addEventListener("resize", taille);
@@ -502,6 +526,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=11"></script>
+<script src="/assets/menu.js?v=12"></script>
 </body>
 </html>
