@@ -116,20 +116,25 @@ h1{
     var q = {p:[f.P(s0,t0),f.P(s1,t0),f.P(s1,t1),f.P(s0,t1)], o:o, cur:o, d:d, t:t||1.4};
     f.quads.push(q); if (twinkle) loggias.push(q); return q;
   }
+  // Ossature porteuse (poteaux, dalles, noyau), tracée en or avant que les façades ne l'habillent
+  var ossature = [];
+  function os(a, b, cls, d, t){ ossature.push({a:a, b:b, c:cls, d:d, t:t}) }
 
   // Délai de construction par défaut (la maquette fixe ses propres départs)
   var KM = .05;
   function D(y){ return .3 + y*KM }
 
   var BAT =
-    { aria: "un socle de logements en L aux loggias éclairées et une haute tour de verre de 28 niveaux", th0: Math.atan2(93, 174), construire: function(){
+    { aria: "un socle de logements en L aux loggias éclairées et une haute tour de verre de 28 niveaux, dont l'ossature porteuse monte avant les façades", th0: Math.atan2(93, 174), construire: function(){
         // Première maquette du site, tour portée de 18 à 28 niveaux
         var RDC = 5.2, ETAGE = 3.0, NIV = 9, HAUT = RDC + NIV*ETAGE, ACRO = HAUT + .8;
         var T_NIV = 28, T_ETAGE = 3.9, T_HAUT = T_NIV*T_ETAGE + 1.2;
+        var DECAL = 1.4;   // les façades attendent que l'ossature soit lancée
 
         // Façade du socle, découpée en segments : loggias, atrium, fente dorée, mur-rideau
         function socle(O, a, n, W, dep, segs){
-          var f = Face(O, a, n, W, ACRO); f.dep = dep;
+          dep += DECAL;
+          var f = Face(O, a, n, W, ACRO); f.dep = dep; f.monte = 2.6;
           segs = segs || [[0, W, "log"]];
           L(f, 0,0, W,0, "", dep, 1.4);
           L(f, 0,0, 0,ACRO, "", dep, 2.6);
@@ -167,8 +172,10 @@ h1{
         }
         // Façade de la tour : verre, meneaux fins, bandeau marqué tous les quatre niveaux
         function tourVerre(O, a, n, W, dep){
+          dep += DECAL;
           var f = Face(O, a, n, W, T_HAUT); f.glass = true; f.dep = dep;
           var nm = Math.round(W/1.5), mw = W/nm, montee = 3.6*T_HAUT/71.4;
+          f.monte = montee;
           for (var k=0;k<=nm;k++) L(f, k*mw,0, k*mw,T_HAUT, (k===0||k===nm||k%4===0) ? "v" : "vf", dep + k*.025, montee);
           for (var j=0;j<=T_NIV;j++){
             var t = j*T_ETAGE, fort = (j%4===0 || j===T_NIV);
@@ -184,6 +191,36 @@ h1{
           if (sauf.indexOf("e") < 0) fn([x1,0,z0], [0,0,1],  [1,0,0],  z1-z0, "e");
           if (sauf.indexOf("n") < 0) fn([x1,0,z1], [-1,0,0], [0,0,1],  x1-x0, "n");
           if (sauf.indexOf("o") < 0) fn([x0,0,z1], [0,0,-1], [-1,0,0], z1-z0, "o");
+        }
+
+        // Ossature, niveau par niveau : les poteaux montent d'un étage, puis la dalle se referme dessus
+        function niveau(contour, poteaux, y0, y1, d, t){
+          poteaux.forEach(function(p){ os([p[0],y0,p[1]], [p[0],y1,p[1]], "s", d, t) });
+          for (var i=0;i<contour.length;i++){
+            var a = contour[i], b = contour[(i+1)%contour.length];
+            os([a[0],y1,a[1]], [b[0],y1,b[1]], "sf", d + t*.6, .5);
+          }
+        }
+        function grille(xs, zs, bord){
+          var r = [];
+          xs.forEach(function(x, i){ zs.forEach(function(z, j){
+            if (!bord || i === 0 || j === 0 || i === xs.length-1 || j === zs.length-1) r.push([x, z]);
+          }) });
+          return r;
+        }
+        // Socle en L : trame de poteaux dans l'aile et le corps principal
+        var dalleSocle = [[.4,.4],[69.6,.4],[69.6,41.6],[40.4,41.6],[40.4,13.6],[.4,13.6]];
+        var poteauxSocle = grille([.6,8,16,24,32], [.6,7,13.4]).concat(grille([40.6,48,55,62,69.4], [.6,7,14,21,28,35,41.4]));
+        var cotes = [0, RDC];
+        for (var jn=1;jn<=NIV;jn++) cotes.push(RDC + jn*ETAGE);
+        for (var js=1;js<cotes.length;js++) niveau(dalleSocle, poteauxSocle, cotes[js-1], cotes[js], .2 + (js-1)*.13, .16);
+        // Tour : poteaux de façade et noyau central
+        var dalleTour = [[6.4,22.4],[31.6,22.4],[31.6,47.6],[6.4,47.6]];
+        var poteauxTour = grille([6.5,12.75,19,25.25,31.5], [22.5,28.75,35,41.25,47.5], true);
+        var noyau = [[16,32],[22,32],[22,38],[16,38]];
+        for (var jt=1;jt<=T_NIV;jt++){
+          niveau(dalleTour, poteauxTour, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
+          niveau(noyau, noyau, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
         }
 
         // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
@@ -262,6 +299,7 @@ h1{
 
   var COUL = {"":"236,232,224", f:"236,232,224", v:"170,192,214", vf:"170,192,214"};
   var ALPHA = {"":.62, f:.2, v:.5, vf:.16};
+  var OSS = {s:.6, sf:.32};
 
   function dessiner(T, th){
     camera(th);
@@ -281,6 +319,19 @@ h1{
       ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
     }
 
+    // ossature en or, dessinée sous les façades qui la recouvrent en montant
+    for (var oc in OSS){
+      ctx.beginPath(); var no = 0;
+      for (var oi=0;oi<ossature.length;oi++){
+        var ol = ossature[oi]; if (ol.c !== oc) continue;
+        var op = ease(clamp((T - ol.d)/ol.t)); if (op <= 0) continue;
+        var ob = [ol.a[0]+(ol.b[0]-ol.a[0])*op, ol.a[1]+(ol.b[1]-ol.a[1])*op, ol.a[2]+(ol.b[2]-ol.a[2])*op];
+        var oe0 = ecran(ol.a), oe1 = ecran(ob);
+        ctx.moveTo(oe0[0],oe0[1]); ctx.lineTo(oe1[0],oe1[1]); no++;
+      }
+      if (no){ ctx.strokeStyle = "rgba(214,168,92," + OSS[oc] + ")"; ctx.stroke(); }
+    }
+
     // faces visibles, de la plus lointaine à la plus proche
     var vis = [];
     for (var k=0;k<faces.length;k++){
@@ -294,20 +345,22 @@ h1{
 
     for (var m=0;m<vis.length;m++){
       var f = vis[m];
-      var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,f.H)), c3 = ecran(f.P(0,f.H));
+      // la façade ne masque l'ossature qu'à mesure qu'elle monte
+      var hf = f.monte ? f.H*ease(clamp((T - f.dep)/f.monte)) : f.H;
+      var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,hf)), c3 = ecran(f.P(0,hf)), ch = ecran(f.P(0,f.H));
       ctx.beginPath(); ctx.moveTo(c0[0],c0[1]); ctx.lineTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.closePath();
-      ctx.fillStyle = "#050505"; ctx.fill();
+      if (hf > .01){ ctx.fillStyle = "#050505"; ctx.fill(); }
 
       var lam = Math.max(0, f.n[0]*LUM[0] + f.n[2]*LUM[2]);
       var eclat = .72 + .4*lam;
 
       if (f.glass){
         var ap = ease(clamp((T - f.dep - 3.2)/2.4));
-        if (ap > 0){
+        if (ap > 0 && hf > .01){
           var vv = norm([cam.eye[0]-f.c[0], 0, cam.eye[2]-f.c[2]]);
           var hv = norm([LUM[0]+vv[0], 0, LUM[2]+vv[2]]);
           var spec = Math.pow(Math.max(0, f.n[0]*hv[0] + f.n[2]*hv[2]), 10);
-          var g = ctx.createLinearGradient(0, c3[1], 0, c0[1]);
+          var g = ctx.createLinearGradient(0, ch[1], 0, c0[1]);
           g.addColorStop(0, "rgba(200,216,232," + ((.05 + .2*spec)*ap).toFixed(3) + ")");
           g.addColorStop(1, "rgba(159,182,204," + ((.01 + .04*spec)*ap).toFixed(3) + ")");
           ctx.fillStyle = g; ctx.fill();
@@ -397,6 +450,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=7"></script>
+<script src="/assets/menu.js?v=8"></script>
 </body>
 </html>
