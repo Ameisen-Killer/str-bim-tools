@@ -346,6 +346,27 @@ h1{
       ctx.globalAlpha = 1; ctx.setTransform(dpr,0,0,dpr,0,0);
     }
 
+    // halo au sol : la lumière des loggias du socle qui retombe autour du bâtiment
+    var lum = 0, nl = 0;
+    for (var li=0;li<loggias.length;li++){ var lg = loggias[li]; if (lg.coul) continue; nl++; lum += lg.cur*clamp((T - lg.d)/lg.t); }
+    lum = nl ? lum/nl : 0;
+    if (lum > .005){
+      var hx0 = 1e9, hx1 = -1e9, hy0 = 1e9, hy1 = -1e9;
+      for (var hi=0;hi<24;hi++){
+        var ha = hi/24*Math.PI*2, he = ecran([42 + 50*Math.cos(ha), 0, 17 + 40*Math.sin(ha)]);
+        hx0 = Math.min(hx0, he[0]); hx1 = Math.max(hx1, he[0]); hy0 = Math.min(hy0, he[1]); hy1 = Math.max(hy1, he[1]);
+      }
+      var hrx = (hx1-hx0)/2, hry = Math.max(1, (hy1-hy0)/2);
+      ctx.save();
+      ctx.translate((hx0+hx1)/2, (hy0+hy1)/2); ctx.scale(1, hry/hrx);
+      var hg = ctx.createRadialGradient(0,0,0, 0,0,hrx);
+      hg.addColorStop(0, "rgba(214,168,92," + (.6*lum).toFixed(3) + ")");
+      hg.addColorStop(.45, "rgba(214,168,92," + (.22*lum).toFixed(3) + ")");
+      hg.addColorStop(1, "rgba(214,168,92,0)");
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, hrx, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
     // ligne de sol : cercle d'implantation
     var ps = ease(clamp((T-.1)/2.4));
     if (ps > 0){
@@ -552,6 +573,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=15"></script>
+<script src="/assets/menu.js?v=16"></script>
 </body>
 </html>
