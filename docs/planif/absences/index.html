@@ -116,7 +116,7 @@
 <script src="/planif/assets/donnees.js?v=59"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=87"></script>
+<script src="/planif/assets/ui.js?v=88"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -270,7 +270,10 @@
 
     lignes = vue.masque ? membres.filter(function (m) { return joursDe[m.id] > 0; }) : membres;
 
-    var periodes = D.absences({ depuis: premier, jusqu: dernier, metier: vue.metier || null });
+    // La liste ne garde que les périodes en cours ou à venir (11.10.2026) ; le
+    // calendrier, lui, montre toujours les jours passés de la période affichée.
+    var auj = C.isoAuj();
+    var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier, metier: vue.metier || null });
     // Une période se retient sur son propre motif : chercher « vacances » ne
     // fait pas remonter la maladie de la même personne.
     if (mots.length) periodes = periodes.filter(function (p) {
@@ -524,7 +527,7 @@
 
     if (!periodes.length) {
       hote.appendChild(el("div", { class: "vide",
-        text: barreRecherche && barreRecherche.valeur().trim() ? "Aucune absence pour cette recherche" : "Aucune absence sur la période" }));
+        text: barreRecherche && barreRecherche.valeur().trim() ? "Aucune absence pour cette recherche" : "Aucune absence en cours ou à venir sur la période" }));
       return;
     }
 

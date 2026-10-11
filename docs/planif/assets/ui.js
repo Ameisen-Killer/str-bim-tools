@@ -1491,12 +1491,15 @@
 
     function rend() {
       vide(liste);
-      if (!m.absences.length) {
-        liste.appendChild(el("div", { class: "vide", style: "padding:22px 0", text: "Aucune absence enregistrée" }));
+      // Les périodes terminées ne s'affichent plus (11.10.2026) : elles restent en base
+      var auj = C.isoAuj();
+      var periodes = m.absences.filter(function (a) { return (a.fin || a.debut) >= auj; });
+      if (!periodes.length) {
+        liste.appendChild(el("div", { class: "vide", style: "padding:22px 0", text: "Aucune absence en cours ou à venir" }));
         return;
       }
       var corps = el("tbody");
-      m.absences.forEach(function (a) {
+      periodes.forEach(function (a) {
         var n = Calc.joursTravaillesEntre(m, a.debut, a.fin, D.canton());
         corps.appendChild(el("tr", { class: enCours && enCours.id === a.id ? "en-edition" : "" }, [
           el("td", {}, [

@@ -59,7 +59,7 @@
 <script src="/planif/assets/donnees.js?v=59"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=6"></script>
-<script src="/planif/assets/ui.js?v=87"></script>
+<script src="/planif/assets/ui.js?v=88"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=13"></script>
@@ -182,7 +182,14 @@
     return [m.prenom + " " + m.nom, D.libelleMetier(m.metier), rattachement(m), m.actif ? "" : "inactif",
             m.telInterne, m.telExterne, m.telNatel]
       .concat(D.statutsDe(m).map(D.libelleStatut))
-      .concat(m.absences.map(function (a) { return a.motif; }));
+      .concat(aVenir(m).map(function (a) { return a.motif; }));
+  }
+
+  /* Absences en cours ou à venir : une période terminée ne s'affiche plus
+     (11.10.2026, demande de Tony). Elle reste en base. */
+  function aVenir(m) {
+    var auj = C.isoAuj();
+    return m.absences.filter(function (a) { return (a.fin || a.debut) >= auj; });
   }
 
   /** Numéro cliquable : « 079 123 45 67 » compose tel:0791234567 sans les espaces. */
@@ -291,7 +298,7 @@
     membres.forEach(function (m) {
       var b = voitCharge ? Calc.bilan(m, jours, rep[m.id], D.canton()) : null;
       var pourcent = b && b.capacite > 0 ? Math.min(140, Math.round(b.taux * 100)) : 0;
-      var prochaine = m.absences.filter(function (a) { return (a.fin || a.debut) >= C.isoAuj(); })[0];
+      var periodes = aVenir(m), prochaine = periodes[0];
       var sousTitre = rattachement(m);
 
       corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
@@ -317,9 +324,9 @@
           el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])
         ] : [el("span", { class: "secondaire", text: "—" })]),
         el("td", {}, [
-          m.absences.length
+          periodes.length
             ? el("div", {}, [
-                el("div", { class: "num", text: m.absences.length + (m.absences.length > 1 ? " périodes" : " période") }),
+                el("div", { class: "num", text: periodes.length + (periodes.length > 1 ? " périodes" : " période") }),
                 prochaine ? el("div", { class: "secondaire" }, [UI.surligne(prochaine.motif, mots), " · " + C.fmtCourt(prochaine.debut) + " → " + C.fmtCourt(prochaine.fin)]) : null
               ])
             : el("span", { class: "secondaire", text: "—" })
