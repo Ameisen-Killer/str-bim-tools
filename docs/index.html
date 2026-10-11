@@ -379,7 +379,11 @@ h1{
       var hf = f.monte ? f.H*ease(clamp((T - f.dep)/f.monte)) : f.H;
       var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,hf)), c3 = ecran(f.P(0,hf)), ch = ecran(f.P(0,f.H));
       ctx.beginPath(); ctx.moveTo(c0[0],c0[1]); ctx.lineTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.closePath();
-      if (hf > .01){ ctx.fillStyle = "#050505"; ctx.fill(); }
+      // pendant la montée, la façade reste translucide : l'ossature se devine derrière, puis la façade se ferme
+      if (hf > .01){
+        ctx.globalAlpha = f.monte ? .45 + .55*ease(clamp((T - f.dep - f.monte + .4)/1.8)) : 1;
+        ctx.fillStyle = "#050505"; ctx.fill(); ctx.globalAlpha = 1;
+      }
 
       var lam = Math.max(0, f.n[0]*LUM[0] + f.n[2]*LUM[2]);
       var eclat = .72 + .4*lam;
@@ -495,6 +499,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=9"></script>
+<script src="/assets/menu.js?v=10"></script>
 </body>
 </html>
