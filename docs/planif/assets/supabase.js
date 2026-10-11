@@ -502,6 +502,8 @@
       // Garde-fou provisoire (10.10.2026) : colonnes de « Mon profil » pas encore en base
       // tant que migration-profil.sql n'est pas passée. À retirer ensuite.
       profilEnBase = !!membres.length && "tel_interne" in membres[0];
+      // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
+      natelEnBase = !!membres.length && "tel_natel" in membres[0];
 
       function metierDe(m) { return m.metier || ""; }
       function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -524,7 +526,8 @@
             metier: metierDe(m), statuts: statutsDe(m),
             succursale: m.succursale || "", discipline: m.discipline || "",
             capacite: parseFloat(m.capacite), jours: m.jours || null, actif: m.actif,
-            telInterne: m.tel_interne || "", telExterne: m.tel_externe || "", photo: m.photo || null,
+            telInterne: m.tel_interne || "", telExterne: m.tel_externe || "", telNatel: m.tel_natel || "",
+            photo: m.photo || null,
             absences: absences.filter(function (a) { return a.membre_id === m.id; })
               .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })
           };
@@ -605,12 +608,14 @@
   }
 
   /* Mon profil : téléphones et photo de sa propre fiche, par la fonction
-     regle_profil (même raison que regle_jours). */
-  var profilEnBase = false;
+     regle_profil (même raison que regle_jours). Interne, ligne directe
+     (tel_externe) et natel ; tant que la base n'a pas le natel, l'ancienne
+     fonction à quatre paramètres. */
+  var profilEnBase = false, natelEnBase = false;
   function regleProfil(idMembre, p) {
-    return rpc("regle_profil", {
-      p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || ""
-    });
+    var args = { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || "" };
+    if (natelEnBase) args.p_tel_natel = p.telNatel || "";
+    return rpc("regle_profil", args);
   }
 
   /* Changer son mot de passe : l'ancien est d'abord vérifié par une connexion
@@ -833,6 +838,7 @@
       regleJours: regleJours,
       regleProfil: regleProfil,
       profilEnBase: function () { return profilEnBase; },
+      natelEnBase: function () { return natelEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }

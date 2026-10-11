@@ -209,9 +209,11 @@ create table if not exists public.membres (
                           and jours && array[0.5, 1]::numeric[])),
   actif      boolean not null default true,
   -- Mon profil (10.10.2026) : téléphones et photo (petite image JPEG en
-  -- data URL, 160 × 160), réglés par regle_profil
+  -- data URL, 160 × 160), réglés par regle_profil. Trois numéros depuis le
+  -- 11.10.2026 : interne, ligne directe (tel_externe) et natel.
   tel_interne text not null default '' constraint membres_tel_interne_check check (char_length(tel_interne) <= 40),
   tel_externe text not null default '' constraint membres_tel_externe_check check (char_length(tel_externe) <= 40),
+  tel_natel   text not null default '' constraint membres_tel_natel_check check (char_length(tel_natel) <= 40),
   photo      text constraint membres_photo_check
                check (photo is null or (photo like 'data:image/%' and char_length(photo) <= 120000)),
   cree_le    timestamptz not null default now(),
@@ -1098,13 +1100,16 @@ end $$;
 
 -- Mon profil : chacun règle ses téléphones et sa photo (le super admin, ceux
 -- de tous). Le compte de démonstration, public, ne change pas la photo.
-create or replace function public.regle_profil(p_membre uuid, p_tel_interne text, p_tel_externe text, p_photo text)
+-- p_tel_externe est la ligne directe ; le natel a son propre champ (11.10.2026).
+drop function if exists public.regle_profil(uuid, text, text, text);
+create or replace function public.regle_profil(p_membre uuid, p_tel_interne text, p_tel_externe text, p_tel_natel text, p_photo text)
 returns jsonb
 language plpgsql volatile security definer set search_path = '' as $$
 declare
   v_m     public.membres%rowtype;
   v_int   text := btrim(coalesce(p_tel_interne, ''));
   v_ext   text := btrim(coalesce(p_tel_externe, ''));
+  v_nat   text := btrim(coalesce(p_tel_natel, ''));
   v_photo text := nullif(btrim(coalesce(p_photo, '')), '');
 begin
   if not public.est_autorise() then
@@ -1118,7 +1123,7 @@ begin
   if p_membre is distinct from public.mon_membre() and not coalesce(public.est_super_admin(), false) then
     raise exception 'Tu ne règles que ton propre profil.';
   end if;
-  if char_length(v_int) > 40 or char_length(v_ext) > 40 then
+  if char_length(v_int) > 40 or char_length(v_ext) > 40 or char_length(v_nat) > 40 then
     raise exception 'Numéro de téléphone trop long (40 caractères au plus).';
   end if;
   if v_photo is not null and (v_photo not like 'data:image/%' or char_length(v_photo) > 120000) then
@@ -1130,10 +1135,10 @@ begin
   end if;
 
   update public.membres m
-     set tel_interne = v_int, tel_externe = v_ext, photo = v_photo
+     set tel_interne = v_int, tel_externe = v_ext, tel_natel = v_nat, photo = v_photo
    where m.id = p_membre;
 
-  return jsonb_build_object('tel_interne', v_int, 'tel_externe', v_ext, 'photo', v_photo);
+  return jsonb_build_object('tel_interne', v_int, 'tel_externe', v_ext, 'tel_natel', v_nat, 'photo', v_photo);
 end $$;
 
 -- Qui décide d'un congé : un administrateur du bureau, ou un chef de secteur
@@ -1701,7 +1706,7 @@ begin
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
     'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
-    'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
+    'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'

@@ -38,8 +38,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=43"></script>
-<script src="/planif/assets/donnees.js?v=57"></script>
+<script src="/planif/assets/supabase.js?v=44"></script>
+<script src="/planif/assets/donnees.js?v=58"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=6"></script>
 <script src="/planif/assets/ui.js?v=87"></script>
@@ -50,7 +50,7 @@
 (function () {
   "use strict";
   /* Mon profil (10.10.2026, demande de Tony) : sa photo, ses téléphones
-     interne et externe, ses jours travaillés et son mot de passe. Chacun ne
+     (interne, ligne directe, natel — 11.10.2026), ses jours travaillés et son mot de passe. Chacun ne
      règle que sa propre fiche (D.regleProfil, D.regleJours) ; le nom, le
      métier et l'adresse se changent dans la console. */
   var D = window.Donnees, C = window.Cal, el = UI.el;
@@ -114,7 +114,7 @@
 
     function enregistrePhoto(url, bouton) {
       occupe(bouton, true);
-      return D.regleProfil(moi.id, { telInterne: moi.telInterne, telExterne: moi.telExterne, photo: url })
+      return D.regleProfil(moi.id, { telInterne: moi.telInterne, telExterne: moi.telExterne, telNatel: moi.telNatel, photo: url })
         .then(function () { UI.toast(url ? "Photo enregistrée." : "Photo retirée."); rafraichitBarre(); rend(); })
         .catch(function (e) { occupe(bouton, false); UI.toast(e.message); });
     }
@@ -166,18 +166,21 @@
   function telephones(moi) {
     var pret = D.profilPret();
     var interne = UI.champ({ nom: "tel-interne", label: "Téléphone interne", valeur: moi.telInterne, exemple: "ex. 214", type: "tel", autocomplete: "off" });
-    var externe = UI.champ({ nom: "tel-externe", label: "Téléphone externe", valeur: moi.telExterne, exemple: "ex. 079 123 45 67", type: "tel", autocomplete: "tel" });
-    var ci = interne.querySelector("input"), ce = externe.querySelector("input");
+    var externe = UI.champ({ nom: "tel-externe", label: "Ligne directe", valeur: moi.telExterne, exemple: "ex. 022 869 41 14", type: "tel", autocomplete: "off" });
+    // Le natel attend sa colonne en base (migration-natel.sql) : sans elle, il ne s'enregistrerait pas
+    var natel = D.natelPret() ? UI.champ({ nom: "tel-natel", label: "Natel", valeur: moi.telNatel, exemple: "ex. 079 123 45 67", type: "tel", autocomplete: "tel" }) : null;
+    var ci = interne.querySelector("input"), ce = externe.querySelector("input"), cn = natel ? natel.querySelector("input") : null;
     ci.maxLength = ce.maxLength = 40;
+    if (cn) cn.maxLength = 40;
     var bouton = el("button", { type: "submit", class: "btn btn-or", text: "Enregistrer", disabled: !pret });
     var form = el("form", { class: "pf-form" }, [
-      el("div", { class: "grille-champs" }, [interne, externe]),
+      el("div", { class: "grille-champs" }, [interne, externe, natel]),
       el("div", { class: "pf-actions" }, [bouton])
     ]);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       occupe(bouton, true);
-      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value })
+      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value, telNatel: cn ? cn.value : undefined })
         .then(function () { UI.toast("Téléphones enregistrés."); occupe(bouton, false); })
         .catch(function (err) { occupe(bouton, false); UI.toast(err.message); });
     });

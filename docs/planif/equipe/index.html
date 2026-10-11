@@ -55,8 +55,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=43"></script>
-<script src="/planif/assets/donnees.js?v=57"></script>
+<script src="/planif/assets/supabase.js?v=44"></script>
+<script src="/planif/assets/donnees.js?v=58"></script>
 <script src="/planif/assets/calculs.js?v=13"></script>
 <script src="/planif/assets/version.js?v=6"></script>
 <script src="/planif/assets/ui.js?v=87"></script>
@@ -180,7 +180,7 @@
 
   function champsCherches(m) {
     return [m.prenom + " " + m.nom, D.libelleMetier(m.metier), rattachement(m), m.actif ? "" : "inactif",
-            m.telInterne, m.telExterne]
+            m.telInterne, m.telExterne, m.telNatel]
       .concat(D.statutsDe(m).map(D.libelleStatut))
       .concat(m.absences.map(function (a) { return a.motif; }));
   }
@@ -191,9 +191,9 @@
   }
 
   /* Téléphones de la fiche, tenus par chacun dans « Mon profil » : l'interne
-     (numéro court du bureau) puis l'externe, chacun avec son libellé. */
+     (numéro court du bureau), la ligne directe et le natel, chacun avec son libellé. */
   function telephones(m, mots) {
-    var lignes = [["Int.", m.telInterne], ["Ext.", m.telExterne]].filter(function (l) { return l[1]; });
+    var lignes = [["Int.", m.telInterne], ["Dir.", m.telExterne], ["Natel", m.telNatel]].filter(function (l) { return l[1]; });
     if (!lignes.length) return el("span", { class: "secondaire", text: "—" });
     return el("div", {}, lignes.map(function (l) {
       return el("div", { class: "num" }, [
