@@ -353,15 +353,15 @@ h1{
     if (lum > .005){
       var hx0 = 1e9, hx1 = -1e9, hy0 = 1e9, hy1 = -1e9;
       for (var hi=0;hi<24;hi++){
-        var ha = hi/24*Math.PI*2, he = ecran([42 + 50*Math.cos(ha), 0, 17 + 40*Math.sin(ha)]);
+        var ha = hi/24*Math.PI*2, he = ecran([42 + 58*Math.cos(ha), 0, 17 + 46*Math.sin(ha)]);
         hx0 = Math.min(hx0, he[0]); hx1 = Math.max(hx1, he[0]); hy0 = Math.min(hy0, he[1]); hy1 = Math.max(hy1, he[1]);
       }
       var hrx = (hx1-hx0)/2, hry = Math.max(1, (hy1-hy0)/2);
       ctx.save();
       ctx.translate((hx0+hx1)/2, (hy0+hy1)/2); ctx.scale(1, hry/hrx);
       var hg = ctx.createRadialGradient(0,0,0, 0,0,hrx);
-      hg.addColorStop(0, "rgba(214,168,92," + (.3*lum).toFixed(3) + ")");
-      hg.addColorStop(.45, "rgba(214,168,92," + (.12*lum).toFixed(3) + ")");
+      hg.addColorStop(0, "rgba(214,168,92," + (.6*lum).toFixed(3) + ")");
+      hg.addColorStop(.5, "rgba(214,168,92," + (.26*lum).toFixed(3) + ")");
       hg.addColorStop(1, "rgba(214,168,92,0)");
       ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, hrx, 0, Math.PI*2); ctx.fill();
       ctx.restore();
@@ -573,6 +573,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=17"></script>
+<script src="/assets/menu.js?v=18"></script>
 </body>
 </html>
