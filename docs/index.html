@@ -471,16 +471,19 @@ h1{
     if (e.gamma == null) return;
     incl = Math.max(-25, Math.min(25, e.gamma)) * Math.PI/180 * 1.2;
   });
-  var permis = false;   // iPhone : l'accès à l'inclinaison se demande au premier toucher
+  // iPhone : Safari n'envoie l'inclinaison qu'après une autorisation demandée lors d'un toucher
+  // (« touchend » ou « click », pas « pointerdown »), n'importe où sur la page
+  var permis = false;
   function demanderInclinaison(){
-    if (permis) return; permis = true;
-    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function")
-      DeviceOrientationEvent.requestPermission().catch(function(){});
+    if (permis || !window.DeviceOrientationEvent || typeof DeviceOrientationEvent.requestPermission !== "function") return;
+    permis = true;
+    DeviceOrientationEvent.requestPermission().then(function(r){ if (r !== "granted") permis = false; }).catch(function(){ permis = false; });
   }
+  document.addEventListener("touchend", demanderInclinaison);
+  document.addEventListener("click", demanderInclinaison);
 
   // On peut aussi faire tourner le bâtiment à la main, puis il reprend sa course
   cv.addEventListener("pointerdown", function(e){
-    demanderInclinaison();
     glisse = true; gx = e.clientX; gt = performance.now(); gv = 0;
     cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
   });
@@ -499,6 +502,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=10"></script>
+<script src="/assets/menu.js?v=11"></script>
 </body>
 </html>
