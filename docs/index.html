@@ -117,8 +117,7 @@ h1{
     f.quads.push(q); if (twinkle) loggias.push(q); return q;
   }
   // Ossature porteuse (poteaux, dalles, noyau), tracée en or avant que les façades ne l'habillent
-  var ossature = [], feux = [], cotesNiv = [], grue = null;
-  var AVANCE = .9;   // la trame d'axes se trace seule au début, avant les premiers poteaux
+  var ossature = [], feux = [];
   function os(a, b, cls, d, t){ ossature.push({a:a, b:b, c:cls, d:d, t:t}) }
 
   // Délai de construction par défaut (la maquette fixe ses propres départs)
@@ -130,7 +129,7 @@ h1{
         // Première maquette du site, tour portée de 18 à 28 niveaux
         var RDC = 5.2, ETAGE = 3.0, NIV = 9, HAUT = RDC + NIV*ETAGE, ACRO = HAUT + .8;
         var T_NIV = 28, T_ETAGE = 3.9, T_HAUT = T_NIV*T_ETAGE + 1.2;
-        var DECAL = 1.4 + AVANCE;   // les façades attendent que l'ossature soit lancée
+        var DECAL = 1.4;   // les façades attendent que l'ossature soit lancée
 
         // Façade du socle, découpée en segments : loggias, atrium, fente dorée, mur-rideau
         function socle(O, a, n, W, dep, segs){
@@ -214,25 +213,15 @@ h1{
         var poteauxSocle = grille([.6,8,16,24,32], [.6,7,13.4]).concat(grille([40.6,48,55,62,69.4], [.6,7,14,21,28,35,41.4]));
         var cotes = [0, RDC];
         for (var jn=1;jn<=NIV;jn++) cotes.push(RDC + jn*ETAGE);
-        for (var js=1;js<cotes.length;js++) niveau(dalleSocle, poteauxSocle, cotes[js-1], cotes[js], AVANCE + .2 + (js-1)*.13, .16);
+        for (var js=1;js<cotes.length;js++) niveau(dalleSocle, poteauxSocle, cotes[js-1], cotes[js], .2 + (js-1)*.13, .16);
         // Tour : poteaux de façade et noyau central
         var dalleTour = [[6.4,22.4],[31.6,22.4],[31.6,47.6],[6.4,47.6]];
         var poteauxTour = grille([6.5,12.75,19,25.25,31.5], [22.5,28.75,35,41.25,47.5], true);
         var noyau = [[16,32],[22,32],[22,38],[16,38]];
         for (var jt=1;jt<=T_NIV;jt++){
-          niveau(dalleTour, poteauxTour, (jt-1)*T_ETAGE, jt*T_ETAGE, AVANCE + .5 + (jt-1)*.11, .14);
-          niveau(noyau, noyau, (jt-1)*T_ETAGE, jt*T_ETAGE, AVANCE + .5 + (jt-1)*.11, .14);
+          niveau(dalleTour, poteauxTour, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
+          niveau(noyau, noyau, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
         }
-        // Cotes de niveau posées pendant la montée (socle à droite, tour à gauche)
-        cotesNiv = [
-          {y:0, t:AVANCE + .2, tour:false},
-          {y:RDC, t:AVANCE + .36, tour:false},
-          {y:HAUT, t:AVANCE + .2 + (NIV)*.13 + .16, tour:false},
-          {y:15*T_ETAGE, t:AVANCE + .5 + 14*.11 + .14, tour:true},
-          {y:T_NIV*T_ETAGE, t:AVANCE + .5 + (T_NIV-1)*.11 + .14, tour:true}
-        ];
-        // Grue à tour entre l'aile et la tour : elle monte avec l'ossature, puis s'en va
-        grue = {x:1.5, z:19, debut:AVANCE + .5, duree:T_NIV*.11, haut:T_NIV*T_ETAGE, max:T_HAUT + 4, vise:Math.atan2(35-19, 19-1.5)};
 
         // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
         volume(40,0, 70,42, function(O,a,n,W,cote){
@@ -358,9 +347,7 @@ h1{
       ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
     }
 
-    trame(T);
     maquette(T);
-    cotesDessin(T);
   }
 
   function maquette(T){
@@ -376,8 +363,6 @@ h1{
       }
       if (no){ ctx.strokeStyle = "rgba(214,168,92," + OSS[oc] + ")"; ctx.stroke(); }
     }
-
-    grueDessin(T);
 
     // faces visibles, de la plus lointaine à la plus proche
     var vis = [];
@@ -465,96 +450,6 @@ h1{
     }
   }
 
-  // ---------- Chantier : grue, trame d'axes, cotes de niveau ----------
-  function segs(liste, rgb, a){
-    if (a <= .005 || !liste.length) return;
-    ctx.beginPath();
-    liste.forEach(function(sg){ var e0 = ecran(sg[0]), e1 = ecran(sg[1]); ctx.moveTo(e0[0],e0[1]); ctx.lineTo(e1[0],e1[1]); });
-    ctx.strokeStyle = "rgba(" + rgb + "," + a.toFixed(3) + ")"; ctx.stroke();
-  }
-  function grueDessin(T){
-    if (!grue) return;
-    var a = ease(clamp((T - grue.debut + .3)/.8)) * (1 - ease(clamp((T - loggiaFin + 1)/2.5)));
-    if (a <= .005) return;
-    var monte = clamp((T - grue.debut)/grue.duree)*grue.haut;
-    var h = Math.min(grue.max, Math.max(10, monte + 6));
-    var x = grue.x, z = grue.z, c = 1, L = [];
-    // fût en treillis
-    [[-c,-c],[c,-c],[c,c],[-c,c]].forEach(function(p){ L.push([[x+p[0],0,z+p[1]], [x+p[0],h,z+p[1]]]) });
-    for (var y=0, k=0; y+3<=h; y+=3, k++){
-      var b = k%2 ? -c : c;
-      L.push([[x-c,y,z-c],[x+c,y+3,z-c]], [[x+c,y,z+c],[x-c,y+3,z+c]], [[x-c,y,z+c*b],[x-c,y+3,z-c*b]], [[x+c,y,z-c*b],[x+c,y+3,z+c*b]]);
-    }
-    // flèche et contre-flèche, qui pivotent lentement
-    var ang = grue.vise + .55*Math.sin(T*.35), ux = Math.cos(ang), uz = Math.sin(ang), px = -uz*.7, pz = ux*.7;
-    var LF = 30, LC = 9;
-    function pt(d, dy, lat){ return [x + ux*d + px*lat, h + dy, z + uz*d + pz*lat] }
-    L.push([pt(-LC,0,-1), pt(LF,0,-1)], [pt(-LC,0,1), pt(LF,0,1)], [pt(0,1.4,0), pt(LF,0,0)]);
-    for (var d=0; d<LF; d+=2.5) L.push([pt(d,0,-1), pt(d+1.25,1.4*(1-(d+1.25)/LF),0)], [pt(d+1.25,1.4*(1-(d+1.25)/LF),0), pt(d+2.5,0,1)]);
-    // mât de tête, tirants, lest
-    L.push([pt(0,0,0), pt(0,6,0)], [pt(0,6,0), pt(LF*.65,0,0)], [pt(0,6,0), pt(-LC,0,0)]);
-    L.push([pt(-LC,0,-1), pt(-LC,-2,-1)], [pt(-LC,0,1), pt(-LC,-2,1)], [pt(-LC,-2,-1), pt(-LC,-2,1)], [pt(-LC+2,-2,-1), pt(-LC+2,-2,1)], [pt(-LC,-2,-1), pt(-LC+2,-2,-1)], [pt(-LC,-2,1), pt(-LC+2,-2,1)]);
-    // chariot et câble
-    var ch = 12 + 10*(.5 + .5*Math.sin(T*.5));
-    L.push([pt(ch,0,0), pt(ch,-9,0)], [pt(ch-.8,-9,0), pt(ch+.8,-9,0)]);
-    segs(L, "236,232,224", .32*a);
-  }
-
-  // trame d'axes au sol, tracée en tout premier, qui s'efface une fois le bâtiment achevé
-  var AXES_X = [.6,8,16,24,32,40.6,48,55,62,69.4], AXES_Z = [.6,7,14,21,28,35,41.4,47.5];
-  function trame(T){
-    var fin = 1 - ease(clamp((T - DEBUT_ROT)/2));
-    if (fin <= 0) return;
-    ctx.save();
-    ctx.setLineDash([5,4]);
-    var tous = [];
-    AXES_X.forEach(function(v, i){ tous.push({a:[v,0,-7], b:[v,0,55], nom:String(i+1), d:.1 + i*.04}) });
-    AXES_Z.forEach(function(v, i){ tous.push({a:[-7,0,v], b:[77,0,v], nom:"ABCDEFGH".charAt(i), d:.25 + i*.04}) });
-    ctx.font = "9px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    tous.forEach(function(ax){
-      var p = ease(clamp((T - ax.d)/.8)); if (p <= 0) return;
-      var a = .26*fin*Math.min(1, p*2);
-      var e0 = ecran(ax.a), e1 = ecran([ax.a[0]+(ax.b[0]-ax.a[0])*p, 0, ax.a[2]+(ax.b[2]-ax.a[2])*p]);
-      ctx.beginPath(); ctx.moveTo(e0[0],e0[1]); ctx.lineTo(e1[0],e1[1]);
-      ctx.strokeStyle = "rgba(214,168,92," + a.toFixed(3) + ")"; ctx.stroke();
-      // bulle de repère au départ de l'axe
-      var ab = clamp((T - ax.d)/.4)*fin;
-      ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(e0[0], e0[1], 7, 0, Math.PI*2);
-      ctx.fillStyle = "#050505"; ctx.fill();
-      ctx.strokeStyle = "rgba(214,168,92," + (.55*ab).toFixed(3) + ")"; ctx.stroke();
-      ctx.fillStyle = "rgba(214,168,92," + (.85*ab).toFixed(3) + ")"; ctx.fillText(ax.nom, e0[0], e0[1] + .5);
-      ctx.setLineDash([5,4]);
-    });
-    ctx.restore();
-  }
-
-  // cotes de niveau en police mono, à l'angle le plus à droite du socle ou le plus à gauche de la tour
-  var ANGLES_SOCLE = [[0,0],[70,0],[70,42],[40,42],[40,14],[0,14]], ANGLES_TOUR = [[6,22],[32,22],[32,48],[6,48]];
-  function cotesDessin(T){
-    var fin = 1 - ease(clamp((T - DEBUT_ROT)/1.5));
-    if (fin <= 0) return;
-    ctx.save();
-    ctx.font = "10px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textBaseline = "alphabetic";
-    cotesNiv.forEach(function(cn){
-      var a = ease(clamp((T - cn.t)/.6))*fin; if (a <= .01) return;
-      var best = null;
-      (cn.tour ? ANGLES_TOUR : ANGLES_SOCLE).forEach(function(c){
-        var e = ecran([c[0], cn.y, c[1]]);
-        if (!best || (cn.tour ? e[0] < best[0] : e[0] > best[0])) best = e;
-      });
-      var dir = cn.tour ? -1 : 1, x0 = best[0] + dir*6, x1 = best[0] + dir*52, y = best[1];
-      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y);
-      ctx.strokeStyle = "rgba(214,168,92," + (.45*a).toFixed(3) + ")"; ctx.stroke();
-      var cx = x0 + dir*7;
-      ctx.beginPath(); ctx.moveTo(cx-3.5, y-6); ctx.lineTo(cx+3.5, y-6); ctx.lineTo(cx, y); ctx.closePath();
-      ctx.fillStyle = "rgba(214,168,92," + (.8*a).toFixed(3) + ")"; ctx.fill();
-      ctx.textAlign = cn.tour ? "right" : "left";
-      ctx.fillText((cn.y ? "+ " : "± ") + cn.y.toFixed(2), x0 + dir*14, y - 3);
-    });
-    ctx.restore();
-  }
-
   window.addEventListener("resize", taille);
   taille();
 
@@ -578,13 +473,11 @@ h1{
       th += omega*dt;
     }
 
-    // après la construction, les loggias s'allument et s'éteignent ; au fil des tours, le crépuscule
-    // en allume davantage (jusqu'à deux sur trois), puis le nombre revient doucement à la normale
+    // après la construction, une loggia s'allume ou s'éteint de temps en temps
     if (T > prochaine){
-      prochaine = T + .3;
-      var nuit = .5 - .5*Math.cos((T - DEBUT_ROT)/90*Math.PI*2);
+      prochaine = T + .7;
       var q = loggias[Math.floor(Math.random()*loggias.length)];
-      q.o = Math.random() < .34 + .32*nuit ? .45 + Math.random()*.4 : .02 + Math.random()*.03;
+      q.o = q.o > .3 ? .02 + Math.random()*.03 : .45 + Math.random()*.4;
     }
     if (T > DEBUT_ROT) for (var i=0;i<loggias.length;i++){
       var lq = loggias[i], d = lq.o - lq.cur, pas = dt/2.8;
@@ -602,12 +495,6 @@ h1{
     if (e.gamma == null) return;
     incl = Math.max(-25, Math.min(25, e.gamma)) * Math.PI/180 * 1.2;
   });
-  // Sur ordinateur, la souris fait pivoter un peu la vue selon sa position dans la fenêtre
-  window.addEventListener("pointermove", function(e){
-    if (e.pointerType !== "mouse" || glisse) return;
-    incl = (e.clientX/Math.max(1, window.innerWidth) - .5) * .6;
-  });
-  document.addEventListener("mouseleave", function(){ incl = 0; });
   // iPhone : Safari n'envoie l'inclinaison qu'après une autorisation demandée lors d'un toucher
   // (« touchend » ou « click », pas « pointerdown »), n'importe où sur la page
   var permis = false;
@@ -639,6 +526,6 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=13"></script>
+<script src="/assets/menu.js?v=14"></script>
 </body>
 </html>
