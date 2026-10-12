@@ -370,9 +370,19 @@
        une tâche terminée s'éteint. Pas pendant la frappe d'une recherche. */
     var hotePlan = document.getElementById("plan");
     var avantPlan = UI.enFrappe() ? null : UI.photo(hotePlan);
+    /* Le planning se vide puis se reconstruit : la page raccourcit un instant
+       et le navigateur remontait tout en haut après un décalage (constat de
+       Tony, 12.10.2026). On tient la hauteur pendant la reconstruction, puis
+       on remet la page et le défilement de côté où ils étaient. */
+    var defile = document.getElementById("plan-defile"), corps = document.body;
+    var sx = window.pageXOffset, sy = window.pageYOffset, dx = defile ? defile.scrollLeft : 0;
+    corps.style.minHeight = corps.scrollHeight + "px";
     rendPlan(barres, libres, canton);
-    UI.joue(hotePlan, avantPlan, { entrees: true });
     rendAlertes(canton);
+    corps.style.minHeight = "";
+    if (window.pageYOffset !== sy || window.pageXOffset !== sx) window.scrollTo(sx, sy);
+    if (defile && defile.scrollLeft !== dx) defile.scrollLeft = dx;
+    UI.joue(hotePlan, avantPlan, { entrees: true });
   }
 
   /** Ce qui, dans un membre, peut être cherché : son identité et son rattachement. */
