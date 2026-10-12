@@ -193,13 +193,26 @@
     return !!t.enchaine && t.chargeInge > 0 && t.chargeDessin > 0 && !t.finiDessin && t.statut !== "termine";
   }
 
-  /** Échéance propre d'une part (métier « ingenieur » ou « dessinateur »). */
+  /** Échéance propre d'une part (métier « ingenieur » ou « dessinateur »).
+   *  Part calcul d'une tâche enchaînée : le dernier jour où l'ingénieur
+   *  travaille avant le début du dessin — un dessin qui commence le lundi
+   *  attend un calcul rendu le vendredi, pas le dimanche (demande de Tony,
+   *  12.10.2026) ; de même avant un jour férié, une absence ou un jour non
+   *  travaillé. */
   function finPart(t, role, canton, trouve) {
     if (!t.echeance) return null;
     if (role !== "ingenieur" || !enchainee(t)) return t.echeance;
     trouve = trouve || membreParDefaut;
     var debutDessin = debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton);
-    return C.ajoute(debutDessin, -1);
+    var veille = C.ajoute(debutDessin, -1);
+    var inge = t.ingenieurId ? trouve(t.ingenieurId) : null;
+    if (inge && !inge.actif) inge = null;
+    var cur = veille;
+    for (var garde = 0; garde < 60; garde++) {
+      if ((inge ? capaciteJour(inge, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0)) > 0) return cur;
+      cur = C.ajoute(cur, -1);
+    }
+    return veille;
   }
 
   /** Début de l'affectation d'un membre sur une tâche. */
