@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trukabul · STR Bim Tools</title>
+<meta name="description" content="Trukabul : le petit labyrinthe rond à bille de notre enfance. Penche le téléphone pour amener la bille dans le trou.">
+<!-- Tant que la page n'est pas validée : garder noindex et ne pas l'ajouter au menu -->
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='7' r='2' fill='%23ECE8E0'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=3">
+<style>
+:root{
+  --noir:#050505;
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(236,232,224,.5);
+  --g:clamp(18px,4vw,56px);
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+.page{
+  position:relative;z-index:1;
+  min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;
+  padding-block:max(clamp(18px,3vw,36px),env(safe-area-inset-top)) max(clamp(18px,3vw,36px),env(safe-area-inset-bottom));
+  padding-inline:var(--g);
+}
+.haut,.bas{
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
+}
+.haut a{text-decoration:none;color:inherit}
+.jeu{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(10px,2.2vh,24px);min-height:0}
+.titre{text-align:center}
+.niv{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+h1{margin:6px 0 0;font-weight:200;font-size:clamp(30px,5.4vw,58px);letter-spacing:.16em;text-transform:uppercase;padding-left:.16em}
+.aide{margin:0;font-size:clamp(13px,1.5vw,16px);color:var(--texte-doux);text-align:center;max-width:30em;transition:opacity .6s}
+
+.scene3d{perspective:1100px;width:min(90vw,58svh,620px);aspect-ratio:1}
+.plateau{
+  position:relative;width:100%;height:100%;border-radius:50%;
+  transform-style:preserve-3d;transition:transform .12s linear;
+  box-shadow:0 30px 80px rgba(0,0,0,.8), 0 0 120px rgba(214,168,92,.08);
+}
+canvas#laby{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;border-radius:50%}
+canvas#laby.drag{cursor:grabbing}
+canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+
+.infos{display:flex;gap:clamp(14px,4vw,28px);align-items:center;flex-wrap:wrap;justify-content:center;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-doux)}
+.infos b{font-weight:400;color:var(--texte);font-variant-numeric:tabular-nums}
+button.act{
+  font:inherit;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--or);background:none;border:1px solid rgba(214,168,92,.5);border-radius:999px;padding:10px 18px;cursor:pointer;
+  transition:background .3s, box-shadow .3s;
+}
+button.act:hover{background:rgba(214,168,92,.1);box-shadow:0 0 24px rgba(214,168,92,.25)}
+button.discret{border-color:rgba(236,232,224,.18);color:var(--texte-doux)}
+
+.voile{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:radial-gradient(circle, rgba(5,5,5,.55), rgba(5,5,5,.88) 70%);border-radius:50%;text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .8s ease;transform:translateZ(40px);
+}
+.voile.vu{opacity:1;pointer-events:auto}
+.voile .grand{margin:0;font-weight:200;font-size:clamp(26px,5vw,44px);letter-spacing:.08em;text-transform:uppercase}
+.voile small{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--texte-doux);text-transform:uppercase}
+.voile .or{color:var(--or)}
+@media (max-height:560px) and (orientation:landscape){ .aide{display:none} h1{font-size:22px;margin-top:0} }
+</style>
+<link rel="stylesheet" href="/assets/menu.css?v=4">
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="page">
+  <header class="haut" data-menu-hote><a href="/">STR Bim Tools</a><button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button></header>
+  <main class="jeu">
+    <div class="titre">
+      <div class="niv" id="niv">Niveau 1</div>
+      <h1>Trukabul</h1>
+    </div>
+    <p class="aide" id="aide">Penche ton téléphone pour guider la bille jusqu'au trou du milieu. Sur ordinateur : fais tourner le labyrinthe à la souris ou avec les flèches.</p>
+    <div class="scene3d">
+      <div class="plateau" id="plateau">
+        <canvas id="laby" role="img" aria-label="Labyrinthe rond avec une bille à amener jusqu'au trou central"></canvas>
+        <div class="voile" id="voile">
+          <small class="or" id="voile-niv"></small>
+          <p class="grand" id="bravo">Bravo !</p>
+          <small id="temps-fin"></small>
+          <button class="act" type="button" id="suivant">Niveau suivant</button>
+        </div>
+      </div>
+    </div>
+    <div class="infos">
+      <span>Temps <b id="chrono">0.0 s</b></span>
+      <span>Record <b id="record">—</b></span>
+      <button class="act discret" type="button" id="son">Son : oui</button>
+      <button class="act discret" type="button" id="nouveau">Rejouer</button>
+    </div>
+  </main>
+  <footer class="bas pied">
+    <a class="pied-site" href="/">← str-bim-tools.com</a>
+    <div class="pied-droite">
+      <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
+      <a href="/mentions-legales/">Mentions légales</a>
+      <span class="pied-maj">Dernière mise à jour : <span data-maj>12.10.2026</span></span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById("laby"), ctx = cv.getContext("2d");
+  var fx = document.getElementById("fx"), fctx = fx.getContext("2d");
+  var plateau = document.getElementById("plateau"), voile = document.getElementById("voile");
+  var chronoEl = document.getElementById("chrono"), recordEl = document.getElementById("record"), nivEl = document.getElementById("niv");
+  function clamp(x){ return x<0?0:x>1?1:x }
+  function ease(p){ return p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2 }
+  function aleat(a, b){ return a + Math.random()*(b - a) }
+  function normAng(a){ a %= Math.PI*2; return a < 0 ? a + Math.PI*2 : a }
+  function dansArc(a, a0, l){ return normAng(a - a0) <= l }   // a dans l'arc qui part de a0 (sens direct), de longueur l
+  function stocke(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+  function lit(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+
+  // ---------- Labyrinthe : anneaux concentriques percés d'une ouverture, cloisons dans les couloirs ----------
+  // Unités : rayon intérieur du bouchon = 1
+  var BILLE = .042, EP = .024, TROU = .072;
+  var niveau = +(lit("trukabul.niveau")) || 1;
+  var RAYONS, anneaux, cloisons, naissance = 0;
+
+  function construire(){
+    var nb = Math.min(5, 2 + niveau);                 // anneaux intérieurs : 3, 4, puis 5
+    RAYONS = [.93];
+    for (var i=1;i<=nb;i++) RAYONS.push(.93 - i*(.93 - .22)/nb);
+    anneaux = [{r:RAYONS[0], g0:0, gl:0}]; cloisons = [];
+    var ouv = [];
+    for (var j=1;j<RAYONS.length;j++){
+      var r = RAYONS[j], gl = (BILLE*2 + EP + .05)/r;
+      var g0 = j === 1 ? aleat(0, Math.PI*2) : normAng(ouv[j-2] + aleat(.6*Math.PI, 1.4*Math.PI));
+      ouv.push(g0); anneaux.push({r:r, g0:g0, gl:gl});
+    }
+    // chaque couloir garde un seul passage entre son entrée et sa sortie ; à partir du niveau 2,
+    // ce passage est parfois le long chemin (le court est barré)
+    for (var k=1;k<RAYONS.length-1;k++){
+      var rIn = RAYONS[k+1], rOut = RAYONS[k];
+      var a = ouv[k-1] + anneaux[k].gl/2, b = ouv[k] + anneaux[k+1].gl/2;
+      var d = normAng(b - a), court = d < Math.PI, garderCourt = niveau < 2 || Math.random() < .5;
+      // arc à barrer = celui qui ne doit pas servir
+      var dep, lg;
+      if (court === garderCourt){ dep = b; lg = Math.PI*2 - d; } else { dep = a; lg = d; }
+      var marge = Math.max(.3, (BILLE*2 + EP)/rOut*1.4);
+      if (lg > 2*marge + .2){
+        cloisons.push({a:dep + aleat(marge, lg/2 - .08), r0:rIn, r1:rOut});
+        if (niveau >= 2) cloisons.push({a:dep + aleat(lg/2 + .08, lg - marge), r0:rIn, r1:rOut});
+        else cloisons.push({a:dep + lg - marge, r0:rIn, r1:rOut});
+      }
+    }
+    naissance = performance.now();
+  }
+
+  // ---------- Partie ----------
+  var bille, gagne, debut, fin, record, trace = [];
+  function cleRecord(){ return "trukabul.record." + niveau }
+  function afficheRecord(){ record = +(lit(cleRecord())) || null; recordEl.textContent = record ? record.toFixed(1) + " s" : "—"; }
+
+  function nouvellePartie(){
+    construire();
+    var a = normAng(anneaux[1].g0 + anneaux[1].gl/2 + Math.PI), r = (RAYONS[0] + RAYONS[1])/2;
+    bille = {x:r*Math.cos(a), y:r*Math.sin(a), vx:0, vy:0, chute:0};
+    trace = [];
+    gagne = false; debut = null; fin = null;
+    voile.classList.remove("vu");
+    chronoEl.textContent = "0.0 s";
+    nivEl.textContent = "Niveau " + niveau;
+    afficheRecord();
+  }
+
+  // ---------- Son : petits « tic » métalliques synthétisés, rien à télécharger ----------
+  var audio = null, sonOui = lit("trukabul.son") !== "non";
+  var boutonSon = document.getElementById("son");
+  function majSon(){ boutonSon.textContent = "Son : " + (sonOui ? "oui" : "non"); }
+  majSon();
+  boutonSon.addEventListener("click", function(){ sonOui = !sonOui; stocke("trukabul.son", sonOui ? "oui" : "non"); majSon(); });
+  function reveilAudio(){
+    if (!audio){ var A = window.AudioContext || window.webkitAudioContext; if (A) audio = new A(); }
+    if (audio && audio.state === "suspended") audio.resume();
+  }
+  function tic(force){
+    if (!sonOui || !audio || audio.state !== "running") return;
+    var t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+    o.type = "triangle"; o.frequency.setValueAtTime(1800 + Math.random()*900, t);
+    g.gain.setValueAtTime(Math.min(.25, .05 + force*.12), t); g.gain.exponentialRampToValueAtTime(.0001, t + .06);
+    o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + .07);
+  }
+  function fanfare(){
+    if (!sonOui || !audio || audio.state !== "running") return;
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(function(f, i){
+      var t = audio.currentTime + i*.09, o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + .9);
+      o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + 1);
+    });
+  }
+  function vibre(m){ if (navigator.vibrate) try { navigator.vibrate(m); } catch(e){} }
+  var dernierChoc = 0;
+  function choc(v){
+    var now = performance.now();
+    if (v < .35 || now - dernierChoc < 70) return;
+    dernierChoc = now;
+    tic(v); vibre(Math.round(Math.min(25, 6 + v*8)));
+  }
+
+  // ---------- Gravité : capteurs du téléphone, ou rotation du plateau à la souris / aux flèches ----------
+  var theta = 0, omega = 0, capteur = null, incl = {x:0, y:0};
+  var iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function angleEcran(){
+    if (screen.orientation && typeof screen.orientation.angle === "number") return screen.orientation.angle;
+    return +window.orientation || 0;
+  }
+  window.addEventListener("devicemotion", function(e){
+    var g = e.accelerationIncludingGravity;
+    if (!g || g.x == null || g.y == null) return;
+    // repère de l'appareil (x à droite, y vers le haut) → repère de l'écran (y vers le bas) ; iOS donne les signes inversés
+    var s = iOS ? -1 : 1, gx = -g.x*s, gy = g.y*s;
+    var an = angleEcran()*Math.PI/180, c = Math.cos(an), si = Math.sin(an);
+    var x = gx*c + gy*si, y = -gx*si + gy*c;
+    if (!capteur) document.getElementById("aide").style.opacity = .5;
+    capteur = capteur ? {x: capteur.x*.6 + x*.4, y: capteur.y*.6 + y*.4} : {x:x, y:y};
+  });
+  // iPhone : l'accès aux capteurs se demande lors d'un toucher ; le son aussi a besoin d'un geste
+  var permis = false;
+  function geste(){
+    reveilAudio();
+    if (permis) return;
+    var D = window.DeviceMotionEvent;
+    if (D && typeof D.requestPermission === "function"){
+      permis = true;
+      D.requestPermission().then(function(r){ if (r !== "granted") permis = false; }).catch(function(){ permis = false; });
+    }
+  }
+  document.addEventListener("touchend", geste);
+  document.addEventListener("click", geste);
+  document.addEventListener("keydown", geste);
+
+  // souris / doigt : faire tourner le plateau comme on tourne le bouchon
+  var glisse = false, ga = 0;
+  function angleVers(e){ var r = cv.getBoundingClientRect(); return Math.atan2(e.clientY - r.top - r.height/2, e.clientX - r.left - r.width/2) }
+  cv.addEventListener("pointerdown", function(e){ glisse = true; ga = angleVers(e); cv.classList.add("drag"); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", function(e){
+    if (!glisse) return;
+    var a = angleVers(e), d = a - ga; if (d > Math.PI) d -= 2*Math.PI; if (d < -Math.PI) d += 2*Math.PI;
+    theta += d; ga = a;
+  });
+  function lache(){ glisse = false; cv.classList.remove("drag"); }
+  cv.addEventListener("pointerup", lache); cv.addEventListener("pointercancel", lache);
+  var touches = {};
+  window.addEventListener("keydown", function(e){ if (e.key === "ArrowLeft" || e.key === "ArrowRight"){ touches[e.key] = true; e.preventDefault(); } });
+  window.addEventListener("keyup", function(e){ touches[e.key] = false; });
+  // ordinateur : le plateau s'incline un peu vers la souris, pour le relief
+  window.addEventListener("pointermove", function(e){
+    if (e.pointerType !== "mouse" || capteur) return;
+    incl.x = (e.clientX/innerWidth - .5)*2; incl.y = (e.clientY/innerHeight - .5)*2;
+  });
+
+  // ---------- Physique ----------
+  var G = 3.2, FROT = .6, REBOND = .35, impact = 0;
+  function repousse(nx, ny, pen){
+    bille.x += nx*pen; bille.y += ny*pen;
+    var vn = bille.vx*nx + bille.vy*ny;
+    if (vn < 0){ impact = Math.max(impact, -vn); bille.vx -= (1 + REBOND)*vn*nx; bille.vy -= (1 + REBOND)*vn*ny; }
+  }
+  function contrePoint(px, py, rayon){
+    var dx = bille.x - px, dy = bille.y - py, d = Math.hypot(dx, dy), lim = BILLE + rayon;
+    if (d < lim && d > 1e-6) repousse(dx/d, dy/d, lim - d);
+  }
+  function collisions(){
+    var lim = BILLE + EP/2;
+    anneaux.forEach(function(an){
+      var d = Math.hypot(bille.x, bille.y), a = Math.atan2(bille.y, bille.x);
+      var ouvert = an.gl > 0 && dansArc(a, an.g0, an.gl);
+      if (!ouvert && Math.abs(d - an.r) < lim && d > 1e-6){
+        var s = d < an.r ? -1 : 1;
+        repousse(s*bille.x/d, s*bille.y/d, lim - Math.abs(d - an.r));
+      }
+      if (an.gl > 0){   // bouts arrondis de l'ouverture
+        contrePoint(an.r*Math.cos(an.g0), an.r*Math.sin(an.g0), EP/2);
+        contrePoint(an.r*Math.cos(an.g0 + an.gl), an.r*Math.sin(an.g0 + an.gl), EP/2);
+      }
+    });
+    cloisons.forEach(function(c){
+      var ux = Math.cos(c.a), uy = Math.sin(c.a);
+      var t = Math.max(c.r0, Math.min(c.r1, bille.x*ux + bille.y*uy));
+      contrePoint(t*ux, t*uy, EP/2);
+    });
+    var d = Math.hypot(bille.x, bille.y);   // bord : sécurité
+    if (d > RAYONS[0] - lim) repousse(-bille.x/d, -bille.y/d, d - (RAYONS[0] - lim));
+  }
+
+  function graviteEcran(){ return capteur ? {x:capteur.x/9.81, y:capteur.y/9.81} : {x:0, y:1} }
+
+  function pas(dt){
+    if (bille.chute) return;
+    var g = graviteEcran(), c = Math.cos(-theta), s = Math.sin(-theta);
+    var lx = g.x*c - g.y*s, ly = g.x*s + g.y*c;
+    var sous = 8, h = dt/sous;
+    impact = 0;
+    for (var i=0;i<sous;i++){
+      bille.vx += lx*G*h; bille.vy += ly*G*h;
+      var k = Math.max(0, 1 - FROT*h); bille.vx *= k; bille.vy *= k;
+      var v = Math.hypot(bille.vx, bille.vy), vmax = 2.2;
+      if (v > vmax){ bille.vx *= vmax/v; bille.vy *= vmax/v; }
+      bille.x += bille.vx*h; bille.y += bille.vy*h;
+      collisions();
+    }
+    if (impact) choc(impact);
+    if (debut === null && Math.hypot(bille.vx, bille.vy) > .05) debut = performance.now();
+    trace.push([bille.x, bille.y]); if (trace.length > 14) trace.shift();
+    if (Math.hypot(bille.x, bille.y) < TROU - BILLE*.25) gagner();
+  }
+
+  // ---------- Victoire : la bille tombe, le trou s'illumine, une gerbe d'or jaillit ----------
+  var etincelles = [], ondes = [];
+  function gagner(){
+    if (gagne) return;
+    gagne = true; bille.chute = performance.now();
+    fin = debut === null ? 0 : (performance.now() - debut)/1000;
+    var nouveau = !record || fin < record;
+    if (nouveau){ record = fin; stocke(cleRecord(), String(fin)); recordEl.textContent = fin.toFixed(1) + " s"; }
+    document.getElementById("voile-niv").textContent = "Niveau " + niveau + " réussi";
+    document.getElementById("bravo").textContent = nouveau ? "Nouveau record" : "Bravo !";
+    document.getElementById("temps-fin").textContent = "En " + fin.toFixed(1) + " s";
+    chronoEl.textContent = fin.toFixed(1) + " s";
+    vibre([40, 60, 40, 60, 120]); fanfare();
+    setTimeout(explosion, 420);
+    setTimeout(function(){ voile.classList.add("vu"); }, 1500);
+  }
+  function explosion(){
+    var r = cv.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+    for (var i=0;i<170;i++){
+      var a = Math.random()*Math.PI*2, v = aleat(180, 900);
+      etincelles.push({x:cx, y:cy, vx:Math.cos(a)*v, vy:Math.sin(a)*v - aleat(100, 400), vie:1, d:aleat(.9, 2.2), t:aleat(1, 2.6), blanc:Math.random() < .25});
+    }
+    ondes.push({x:cx, y:cy, t0:performance.now(), rmax:Math.max(innerWidth, innerHeight)*.7});
+    ondes.push({x:cx, y:cy, t0:performance.now() + 160, rmax:Math.max(innerWidth, innerHeight)*.45});
+  }
+  function majFx(dt, now){
+    var w = innerWidth, h = innerHeight, dp = Math.min(window.devicePixelRatio || 1, 2);
+    if (fx.width !== Math.round(w*dp) || fx.height !== Math.round(h*dp)){ fx.width = Math.round(w*dp); fx.height = Math.round(h*dp); }
+    fctx.setTransform(dp,0,0,dp,0,0); fctx.clearRect(0,0,w,h);
+    if (!etincelles.length && !ondes.length) return;
+    fctx.globalCompositeOperation = "lighter";
+    ondes = ondes.filter(function(o){
+      var p = (now - o.t0)/1100; if (p < 0) return true; if (p > 1) return false;
+      fctx.beginPath(); fctx.arc(o.x, o.y, o.rmax*ease(p), 0, Math.PI*2);
+      fctx.lineWidth = 2 + 10*(1-p); fctx.strokeStyle = "rgba(214,168,92," + (.5*(1-p)).toFixed(3) + ")"; fctx.stroke();
+      return true;
+    });
+    etincelles = etincelles.filter(function(e){
+      e.vy += 520*dt; e.vx *= 1 - 1.4*dt; e.vy *= 1 - 1.4*dt;
+      e.x += e.vx*dt; e.y += e.vy*dt; e.vie -= dt/e.t;
+      if (e.vie <= 0) return false;
+      var a = e.vie, sc = e.d*(.6 + .4*Math.sin(now/40 + e.x));
+      fctx.beginPath(); fctx.arc(e.x, e.y, sc*2.2, 0, Math.PI*2);
+      fctx.fillStyle = e.blanc ? "rgba(255,248,230," + a.toFixed(3) + ")" : "rgba(232,184,96," + a.toFixed(3) + ")"; fctx.fill();
+      fctx.beginPath(); fctx.arc(e.x, e.y, sc*7, 0, Math.PI*2);
+      fctx.fillStyle = "rgba(214,168,92," + (.08*a).toFixed(3) + ")"; fctx.fill();
+      return true;
+    });
+    fctx.globalCompositeOperation = "source-over";
+  }
+
+  // ---------- Dessin du bouchon ----------
+  var W = 0, dpr = 1;
+  function taille(){
+    var r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2); W = r.width;
+    cv.width = Math.round(W*dpr); cv.height = Math.round(W*dpr);
+  }
+  window.addEventListener("resize", taille);
+
+  // lumière fixe, en haut à gauche de l'écran : on la ramène dans le repère du plateau
+  function lumiere(){ var c = Math.cos(-theta), s = Math.sin(-theta), x = -.6, y = -.8; return [x*c - y*s, x*s + y*c] }
+
+  function murs(prog, style, dx, dy){
+    ctx.strokeStyle = style;
+    anneaux.forEach(function(an, i){
+      var p = clamp(prog*1.6 - i*.12); if (p <= 0) return;
+      ctx.beginPath();
+      if (an.gl > 0){ var a0 = an.g0 + an.gl, l = (Math.PI*2 - an.gl)*ease(p); ctx.arc(dx, dy, an.r, a0, a0 + l); }
+      else ctx.arc(dx, dy, an.r, 0, Math.PI*2*ease(p));
+      ctx.stroke();
+    });
+    var pc = clamp(prog*1.6 - .6); if (pc <= 0) return;
+    cloisons.forEach(function(c){
+      var r1 = c.r0 + (c.r1 - c.r0)*ease(pc);
+      ctx.beginPath(); ctx.moveTo(dx + c.r0*Math.cos(c.a), dy + c.r0*Math.sin(c.a)); ctx.lineTo(dx + r1*Math.cos(c.a), dy + r1*Math.sin(c.a)); ctx.stroke();
+    });
+  }
+
+  function dessiner(now){
+    var R = W/2*.86;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,W);
+    ctx.translate(W/2, W/2); ctx.rotate(theta); ctx.scale(R, R);
+    var L = lumiere(), prog = clamp((now - naissance)/1400);
+
+    // bague dorée du bouchon, cannelée
+    var bague = ctx.createLinearGradient(L[0]*1.16, L[1]*1.16, -L[0]*1.16, -L[1]*1.16);
+    bague.addColorStop(0, "#f3dcaa"); bague.addColorStop(.35, "#b58a45"); bague.addColorStop(.65, "#5e4520"); bague.addColorStop(1, "#c79a54");
+    ctx.beginPath(); ctx.arc(0,0,1.15,0,Math.PI*2); ctx.arc(0,0,1,0,Math.PI*2,true); ctx.fillStyle = bague; ctx.fill("evenodd");
+    ctx.lineWidth = 1/R;
+    for (var n=0;n<96;n++){
+      var an = n/96*Math.PI*2, ca = Math.cos(an), sa = Math.sin(an);
+      ctx.beginPath(); ctx.moveTo(1.02*ca, 1.02*sa); ctx.lineTo(1.14*ca, 1.14*sa);
+      ctx.strokeStyle = n%2 ? "rgba(0,0,0,.35)" : "rgba(255,240,210,.18)"; ctx.stroke();
+    }
+
+    // fond : velours noir légèrement doré
+    var fond = ctx.createRadialGradient(L[0]*.4, L[1]*.4, .05, 0, 0, 1);
+    fond.addColorStop(0, "#1b1712"); fond.addColorStop(1, "#060505");
+    ctx.beginPath(); ctx.arc(0,0,1,0,Math.PI*2); ctx.fillStyle = fond; ctx.fill();
+    // ombre intérieure de la bague
+    var oi = ctx.createRadialGradient(0,0,.86, 0,0,1);
+    oi.addColorStop(0, "rgba(0,0,0,0)"); oi.addColorStop(1, "rgba(0,0,0,.7)");
+    ctx.fillStyle = oi; ctx.fill();
+
+    // trou central : il respire, et s'allume quand la bille approche
+    var prox = clamp(1 - (Math.hypot(bille.x, bille.y) - TROU)/.5), pulse = .5 + .5*Math.sin(now/420);
+    var eclat = gagne ? clamp((now - bille.chute)/500) : 0;
+    var halo = ctx.createRadialGradient(0,0,TROU*.6, 0,0,TROU*(2.4 + 2.5*eclat));
+    halo.addColorStop(0, "rgba(232,184,96," + (.25 + .25*pulse*.5 + .45*prox + .6*eclat).toFixed(3) + ")");
+    halo.addColorStop(1, "rgba(214,168,92,0)");
+    ctx.beginPath(); ctx.arc(0,0,TROU*(2.4 + 2.5*eclat),0,Math.PI*2); ctx.fillStyle = halo; ctx.fill();
+    var puits = ctx.createRadialGradient(-L[0]*TROU*.3, -L[1]*TROU*.3, 0, 0,0,TROU);
+    puits.addColorStop(0, "#000"); puits.addColorStop(.75, "#050403"); puits.addColorStop(1, "#2a2116");
+    ctx.beginPath(); ctx.arc(0,0,TROU,0,Math.PI*2); ctx.fillStyle = puits; ctx.fill();
+    ctx.lineWidth = 2/R; ctx.strokeStyle = "rgba(240,205,140," + (.7 + .3*prox).toFixed(3) + ")"; ctx.stroke();
+
+    // murs : ombre portée, corps doré, liseré de lumière
+    ctx.lineCap = "round";
+    ctx.lineWidth = EP*1.1; murs(prog, "rgba(0,0,0,.65)", -L[0]*.018, -L[1]*.018);
+    var or = ctx.createLinearGradient(L[0], L[1], -L[0], -L[1]);
+    or.addColorStop(0, "#f1d49a"); or.addColorStop(.5, "#c99a52"); or.addColorStop(1, "#8a6530");
+    ctx.lineWidth = EP; murs(prog, or, 0, 0);
+    ctx.lineWidth = EP*.28; murs(prog, "rgba(255,244,220,.55)", L[0]*.006, L[1]*.006);
+
+    // bille d'acier : traînée, ombre, reflet qui reste du côté de la lumière
+    var ech = 1, bx = bille.x, by = bille.y;
+    if (bille.chute){ var q = clamp((now - bille.chute)/650); ech = 1 - q; bx *= 1 - ease(q); by *= 1 - ease(q); }
+    if (ech > 0){
+      var rb = BILLE*(.45 + .55*ech);
+      for (var t=0;t<trace.length-1 && !bille.chute;t++){
+        var a = t/trace.length;
+        ctx.beginPath(); ctx.arc(trace[t][0], trace[t][1], BILLE*(.3 + .5*a), 0, Math.PI*2);
+        ctx.fillStyle = "rgba(220,226,235," + (.05*a).toFixed(3) + ")"; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(bx - L[0]*.022, by - L[1]*.022, rb*1.05, 0, Math.PI*2); ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fill();
+      var gb = ctx.createRadialGradient(bx + L[0]*rb*.45, by + L[1]*rb*.45, rb*.04, bx, by, rb);
+      gb.addColorStop(0, "#ffffff"); gb.addColorStop(.18, "#e9ecef"); gb.addColorStop(.55, "#8d939b"); gb.addColorStop(.85, "#3a3e44"); gb.addColorStop(1, "#6f6248");
+      ctx.beginPath(); ctx.arc(bx, by, rb, 0, Math.PI*2); ctx.fillStyle = gb; ctx.fill();
+      // reflet doré du bouchon sur le bas de la bille
+      ctx.beginPath(); ctx.arc(bx - L[0]*rb*.55, by - L[1]*rb*.55, rb*.32, 0, Math.PI*2); ctx.fillStyle = "rgba(214,168,92,.25)"; ctx.fill();
+    }
+
+    // couvercle transparent bombé : un reflet large et un liseré, qui glissent avec l'inclinaison
+    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.translate(W/2, W/2); ctx.scale(R, R);
+    var ix = -.35 - incl.x*.25, iy = -.45 - incl.y*.25;
+    ctx.save(); ctx.beginPath(); ctx.arc(0,0,1,0,Math.PI*2); ctx.clip();
+    var dome = ctx.createRadialGradient(ix, iy, .02, ix, iy, .9);
+    dome.addColorStop(0, "rgba(255,255,255,.16)"); dome.addColorStop(.35, "rgba(255,255,255,.05)"); dome.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = dome; ctx.fillRect(-1,-1,2,2);
+    ctx.beginPath(); ctx.ellipse(ix*.9, iy*.9, .42, .14, Math.atan2(iy, ix) + Math.PI/2, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.fill();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(0,0,.995,Math.PI*1.05,Math.PI*1.55); ctx.lineWidth = 3/R; ctx.strokeStyle = "rgba(255,255,255,.22)"; ctx.stroke();
+  }
+
+  // ---------- Inclinaison 3D du plateau ----------
+  var tx = 0, ty = 0;
+  function incline(dt){
+    var cx, cy;
+    if (capteur){ cx = clamp((capteur.x/9.81 + 1)/2)*2 - 1; cy = clamp(((capteur.y/9.81) + 1)/2)*2 - 1; incl.x = cx; incl.y = cy; }
+    else { cx = incl.x; cy = incl.y; }
+    tx += (cx - tx)*Math.min(1, dt*6); ty += (cy - ty)*Math.min(1, dt*6);
+    // le côté où la bille descend s'enfonce, comme un vrai plateau qu'on penche
+    plateau.style.transform = "rotateX(" + (-ty*14 + (capteur ? 0 : 8)).toFixed(2) + "deg) rotateY(" + (tx*14).toFixed(2) + "deg)";
+  }
+
+  // ---------- Boucle ----------
+  var prec = null;
+  function boucle(now){
+    var dt = prec === null ? 0 : Math.min(.04, (now - prec)/1000); prec = now;
+    var cible = (touches.ArrowLeft ? -1 : 0) + (touches.ArrowRight ? 1 : 0);
+    omega += (cible*2.4 - omega)*Math.min(1, dt*8); theta += omega*dt;
+    pas(dt);
+    if (!gagne && debut !== null) chronoEl.textContent = ((now - debut)/1000).toFixed(1) + " s";
+    incline(dt);
+    dessiner(now);
+    majFx(dt, now);
+    requestAnimationFrame(boucle);
+  }
+
+  document.getElementById("suivant").addEventListener("click", function(){ niveau++; stocke("trukabul.niveau", String(niveau)); nouvellePartie(); });
+  document.getElementById("nouveau").addEventListener("click", nouvellePartie);
+  taille();
+  nouvellePartie();
+  requestAnimationFrame(boucle);
+})();
+</script>
+<script src="/assets/menu.js?v=20"></script>
+</body>
+</html>
