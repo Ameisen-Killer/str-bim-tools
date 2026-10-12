@@ -617,6 +617,8 @@
         finiInge: t.finiInge === true,
         finiDessin: t.finiDessin === true,
         enchaine: t.enchaine === true,
+        // Fin propre de la part calcul d'une tâche enchaînée (calculs.js, finPart) ; vide : elle suit le dessin
+        finCalcul: texte(t.finCalcul) || null,
         // 1 la plus importante, 5 par défaut. Réglée par le curseur du formulaire
         // de tâche ; colonne taches.priorite en base.
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
@@ -1199,6 +1201,8 @@
     profilPret: function () { return ADAPTATEUR.profilEnBase ? ADAPTATEUR.profilEnBase() : true; },
     /** La colonne du natel existe en base (migration-natel.sql ; toujours vrai en mode local). */
     natelPret: function () { return ADAPTATEUR.natelEnBase ? ADAPTATEUR.natelEnBase() : true; },
+    /** La base connaît la fin propre du calcul (toujours vrai en mode local). Garde-fou provisoire. */
+    finCalculPret: function () { return ADAPTATEUR.finCalculEnBase ? ADAPTATEUR.finCalculEnBase() : true; },
     /** Compte de démonstration partagé : la photo, vue de tous les visiteurs, ne s'y change pas. */
     photoBloquee: function () {
       return !!ADAPTATEUR.regleProfil && /^demo@/i.test(texte(profil && profil.email) || (global.Sb && global.Sb.email ? global.Sb.email() : ""));
@@ -1366,10 +1370,57 @@
       return Promise.resolve().then(function () {
         var t = D.tache(i); if (!t) throw erreur("Tâche introuvable.");
         var etait = t.statut === "termine";
-        Object.keys(champs).forEach(function (k) { if (k in t) t[k] = champs[k]; });
+        Object.keys(champs).forEach(function (k) { if (k in t || k === "finCalcul") t[k] = champs[k]; });
         accordeParts(t, partsNommees(champs), etait);
         t.maj = new Date().toISOString();
         return sauve().then(function () { return t; });
+      });
+    },
+    /**
+     * Décale une part de `jours` jours (glisser-déposer, flèches, fiche rapide).
+     * Demande de Tony (12.10.2026), pour une tâche enchaînée vue par sa part
+     * calcul : avancer le calcul ne touche pas au dessin (le calcul prend sa
+     * propre fin, finCalcul) ; le retarder jusque sur le dessin repousse le
+     * dessin juste assez pour qu'il commence le jour travaillé qui suit la
+     * fin du calcul. Autrement (part dessin, tâche non enchaînée), c'est
+     * l'échéance de la tâche qui bouge, comme avant. Une date qui tombe un
+     * jour chômé glisse au jour ouvré suivant, dans le sens du geste.
+     * Promesse de { calcul, dessin } (jours de décalage de chaque part), ou null.
+     */
+    decalePart: function (i, role, jours) {
+      return Promise.resolve().then(function () {
+        var t = D.tache(i), Calc = global.Calc, C = global.Cal;
+        if (!t || !jours) return null;
+        var canton = D.canton();
+        function glisse(d) {
+          var pas = jours > 0 ? 1 : -1, garde = 0;
+          while (C.chome(d, canton) && garde++ < 30) d = C.ajoute(d, pas);
+          return d;
+        }
+        if (role !== "ingenieur" || !Calc || !Calc.enchainee(t)) {
+          var ech = glisse(C.ajoute(t.echeance, jours)), delta = C.diff(t.echeance, ech);
+          if (!delta) return null;
+          return D.retoucheTache(i, { echeance: ech, debut: null })
+            .then(function () { return { calcul: delta, dessin: delta }; });
+        }
+        var fin = Calc.finPart(t, "ingenieur", canton);
+        var cible = glisse(C.ajoute(fin, jours));
+        if (cible === fin) return null;
+        var max = Calc.finCalculMax(t, canton);
+        if (cible <= max) {
+          if (!D.finCalculPret()) throw erreur("Pour avancer le calcul sans bouger le dessin, la base doit d'abord être mise à jour (migration-fin-calcul.sql).");
+          return D.retoucheTache(i, { finCalcul: cible === max ? null : cible })
+            .then(function () { return { calcul: C.diff(fin, cible), dessin: 0 }; });
+        }
+        // Le calcul déborde sur le dessin : le dessin commence le jour travaillé qui suit
+        var des = t.dessinateurId ? D.membre(t.dessinateurId) : null;
+        var nouvelle = Calc.finDepuis(t.chargeDessin, Calc.premierJourApres(cible, des, canton), des, canton);
+        if (nouvelle < t.echeance) nouvelle = t.echeance;
+        var avant = t.echeance, champs = { echeance: nouvelle, debut: null };
+        if (D.finCalculPret()) champs.finCalcul = cible;
+        return D.retoucheTache(i, champs).then(function () {
+          return { calcul: C.diff(fin, cible), dessin: C.diff(avant, nouvelle) };
+        });
       });
     },
     suppTache: function (i) {

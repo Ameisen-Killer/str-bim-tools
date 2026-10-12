@@ -357,6 +357,9 @@ create table if not exists public.taches (
   fini_dessin    boolean not null default false,
   -- Le dessin attend le calcul : la part calcul finit la veille du début du dessin.
   enchaine       boolean not null default false,
+  -- Tâche enchaînée : fin propre de la part calcul, quand on l'a avancée
+  -- (12.10.2026). Vide : le dernier jour travaillé avant le début du dessin.
+  fin_calcul     date,
   -- Priorité entre tâches de même échéance : 1 la plus importante, 5 par défaut.
   priorite       smallint not null default 5 check (priorite between 1 and 5),
   cree_le        timestamptz not null default now(),

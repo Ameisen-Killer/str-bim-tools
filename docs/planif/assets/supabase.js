@@ -433,6 +433,8 @@
                 statut: t.statut, avancement: t.avancement };
       o.fini_inge = t.finiInge === true; o.fini_dessin = t.finiDessin === true;
       o.enchaine = t.enchaine === true;
+      // Fin propre de la part calcul (12.10.2026) : écrite seulement si la base a la colonne
+      if (finCalculEnBase) o.fin_calcul = t.finCalcul || null;
       o.priorite = Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5));
       return o;
     },
@@ -613,6 +615,8 @@
     profilEnBase = !!membres.length && "tel_interne" in membres[0];
     // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
     natelEnBase = !!membres.length && "tel_natel" in membres[0];
+    // Garde-fou provisoire (12.10.2026) : fin propre du calcul, migration-fin-calcul.sql. À retirer ensuite.
+    if (taches.length) finCalculEnBase = "fin_calcul" in taches[0];
 
     function metierDe(m) { return m.metier || ""; }
     function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -663,6 +667,7 @@
           statut: t.statut, avancement: t.avancement,
           finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
           enchaine: t.enchaine === true,
+          finCalcul: t.fin_calcul || null,
           priorite: t.priorite,
           cree: t.cree_le, maj: t.maj_le
         };
@@ -719,7 +724,7 @@
      regle_profil (même raison que regle_jours). Interne, ligne directe
      (tel_externe) et natel ; tant que la base n'a pas le natel, l'ancienne
      fonction à quatre paramètres. */
-  var profilEnBase = false, natelEnBase = false;
+  var profilEnBase = false, natelEnBase = false, finCalculEnBase = false;
   function regleProfil(idMembre, p) {
     var args = { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || "" };
     if (natelEnBase) args.p_tel_natel = p.telNatel || "";
@@ -947,6 +952,7 @@
       regleProfil: regleProfil,
       profilEnBase: function () { return profilEnBase; },
       natelEnBase: function () { return natelEnBase; },
+      finCalculEnBase: function () { return finCalculEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }

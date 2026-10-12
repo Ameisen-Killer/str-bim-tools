@@ -152,6 +152,35 @@
     return dernier || C.isoAuj();
   }
 
+  /** Premier jour APRÈS `jour` où la personne travaille (sans personne : le
+   *  premier jour ouvré du canton). */
+  function premierJourApres(jour, membre, canton) {
+    if (membre && !membre.actif) membre = null;
+    var cur = C.ajoute(jour, 1);
+    for (var garde = 0; garde < 1500; garde++) {
+      if ((membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0)) > 0) return cur;
+      cur = C.ajoute(cur, 1);
+    }
+    return C.ajoute(jour, 1);
+  }
+
+  /** Dernier jour d'une charge commencée le jour `debut` (compris), selon les
+   *  jours travaillés de la personne : le dessin repoussé par son calcul. */
+  function finDepuis(charge, debut, membre, canton) {
+    if (membre && !membre.actif) membre = null;
+    var cumul = 0, cur = debut, dernier = null;
+    for (var garde = 0; garde < 1500; garde++) {
+      var cap = membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0);
+      if (cap > 0) {
+        cumul += cap;
+        dernier = cur;
+        if (cumul >= charge - 1e-6) return cur;
+      }
+      cur = C.ajoute(cur, 1);
+    }
+    return dernier || debut;
+  }
+
   /** Premier jour, à partir d'aujourd'hui, où la personne travaille (sans
    *  personne : le premier jour ouvré du canton). Une charge reprise un samedi
    *  ne commence que le lundi (demande de Tony, 10.10.2026). */
@@ -194,14 +223,24 @@
   }
 
   /** Échéance propre d'une part (métier « ingenieur » ou « dessinateur »).
-   *  Part calcul d'une tâche enchaînée : le dernier jour où l'ingénieur
-   *  travaille avant le début du dessin — un dessin qui commence le lundi
-   *  attend un calcul rendu le vendredi, pas le dimanche (demande de Tony,
-   *  12.10.2026) ; de même avant un jour férié, une absence ou un jour non
-   *  travaillé. */
+   *  Part calcul d'une tâche enchaînée : sa propre fin (finCalcul, posée en
+   *  avançant le calcul au tableau de bord), jamais plus tard que la limite
+   *  finCalculMax ; sans fin propre, la limite elle-même — le calcul suit
+   *  alors le dessin. */
   function finPart(t, role, canton, trouve) {
     if (!t.echeance) return null;
     if (role !== "ingenieur" || !enchainee(t)) return t.echeance;
+    var max = finCalculMax(t, canton, trouve);
+    return t.finCalcul && t.finCalcul < max ? t.finCalcul : max;
+  }
+
+  /** Le plus tard où le calcul d'une tâche enchaînée peut finir : le dernier
+   *  jour où l'ingénieur travaille avant le début du dessin — un dessin qui
+   *  commence le lundi attend un calcul rendu le vendredi, pas le dimanche
+   *  (demande de Tony, 12.10.2026) ; de même avant un jour férié, une absence
+   *  ou un jour non travaillé. */
+  function finCalculMax(t, canton, trouve) {
+    if (!t.echeance) return null;
     trouve = trouve || membreParDefaut;
     var debutDessin = debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton);
     var veille = C.ajoute(debutDessin, -1);
@@ -428,6 +467,9 @@
     debutPour: debutPour,
     fenetre: fenetre,
     enchainee: enchainee,
+    finCalculMax: finCalculMax,
+    premierJourApres: premierJourApres,
+    finDepuis: finDepuis,
     finPart: finPart,
     finEffective: finEffective,
     repartition: repartition,

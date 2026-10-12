@@ -103,11 +103,11 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=46"></script>
-<script src="/planif/assets/donnees.js?v=61"></script>
-<script src="/planif/assets/calculs.js?v=14"></script>
-<script src="/planif/assets/version.js?v=11"></script>
-<script src="/planif/assets/ui.js?v=91"></script>
+<script src="/planif/assets/supabase.js?v=47"></script>
+<script src="/planif/assets/donnees.js?v=62"></script>
+<script src="/planif/assets/calculs.js?v=15"></script>
+<script src="/planif/assets/version.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=92"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -1049,7 +1049,10 @@
     var t = D.tache(info.tache.id);
     if (!t) return;
     var champs = {};
-    if (delta) {
+    /* Part calcul d'une tâche enchaînée (12.10.2026) : D.decalePart l'avance
+       sans toucher au dessin, ou repousse le dessin si elle déborde dessus. */
+    var deltaCalcul = delta && info.role === "ingenieur" && Calc.enchainee(t) ? delta : 0;
+    if (delta && !deltaCalcul) {
       // On déplace l'échéance ; le début se recalcule. Une échéance posée sur un
       // jour chômé glisse au prochain jour ouvré dans le sens du déplacement.
       var ech = C.ajoute(t.echeance, delta), pas = delta > 0 ? 1 : -1, garde = 0;
@@ -1075,15 +1078,26 @@
         }
       }
     }
-    if (!Object.keys(champs).length) return;
-    D.retoucheTache(t.id, champs).then(function () {
-      rend();
-      var dits = [];
-      if (delta) dits.push("décalée de " + (delta > 0 ? "+" : "") + delta + " j");
-      if (reaffecte) dits.push("confiée à " + reaffecte);
-      if (libere) dits.push("remise à affecter");
-      UI.toast("Tâche " + dits.join(", ") + ".");
-    }).catch(function (e) { UI.toast(e.message); });
+    if (!Object.keys(champs).length && !deltaCalcul) return;
+    (Object.keys(champs).length ? D.retoucheTache(t.id, champs) : Promise.resolve())
+      .then(function () { return deltaCalcul ? D.decalePart(t.id, "ingenieur", deltaCalcul) : null; })
+      .then(function (r) {
+        rend();
+        var dits = [];
+        if (deltaCalcul) {
+          if (r) dits.push(texteDecalage(r));
+        } else if (delta) dits.push("décalée de " + (delta > 0 ? "+" : "") + delta + " j");
+        if (reaffecte) dits.push("confiée à " + reaffecte);
+        if (libere) dits.push("remise à affecter");
+        if (dits.length) UI.toast((deltaCalcul ? "" : "Tâche ") + dits.join(", ") + ".");
+      }).catch(function (e) { rend(); UI.toast(e.message); });
+  }
+
+  /** « Calcul avancé de 2 j » ; « Calcul décalé de +3 j, dessin repoussé de +2 j ». */
+  function texteDecalage(r) {
+    var j = function (n) { return (n > 0 ? "+" : "") + n + " j"; };
+    if (!r.dessin) return r.calcul < 0 ? "Calcul avancé de " + (-r.calcul) + " j, le dessin ne bouge pas" : "Calcul décalé de " + j(r.calcul);
+    return "Calcul décalé de " + j(r.calcul) + ", dessin repoussé de " + j(r.dessin) + " pour le suivre";
   }
 
   /* -------------------------------------------------------------- fiche */
