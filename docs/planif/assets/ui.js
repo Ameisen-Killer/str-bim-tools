@@ -979,8 +979,12 @@
       ]);
     }
 
+    /* Version 2 (12.10.2026, demande de Tony) : les pages et les outils sur une
+       seule ligne, pour rendre de la hauteur à la page. Trop étroit pour les
+       deux, la ligne se replie (habillage.css) : les outils en haut, les pages
+       dessous, comme avant. */
     hote.appendChild(el("div", { class: "barre" }, [
-      VERSION_AB ? el("div", { class: "barre-h" }, [outilsHaut]) :
+      VERSION_AB ? el("div", { class: "barre-h barre-une-ligne" }, [nav, outilsHaut]) :
       el("div", { class: "barre-h" }, [
         el("div", { class: "fil" + (superAdmin ? " avec-choix" : "") }, [
           el("span", { class: "marque" }, [
@@ -992,7 +996,7 @@
         ]),
         outilsHaut
       ]),
-      nav
+      VERSION_AB ? null : nav
     ]));
 
     /* Cinq sections ne tiennent pas dans la largeur d'un téléphone : la barre

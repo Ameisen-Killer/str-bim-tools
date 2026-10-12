@@ -66,6 +66,11 @@
   font-size:14px;color:var(--texte);
 }
 :root[data-version="v2"] .barre-h > .barre-outils{margin-left:auto}
+/* Pages et outils sur une seule ligne (12.10.2026). wrap-reverse : quand les
+   deux ne tiennent pas, les pages passent sur une ligne à elles, SOUS les
+   outils ; plus étroites que l'écran, elles défilent de côté. */
+:root[data-version="v2"] .barre-une-ligne{flex-wrap:wrap-reverse;row-gap:10px;column-gap:24px}
+:root[data-version="v2"] .barre-une-ligne > .nav-outil{padding:0;flex:0 1 auto;min-width:0;max-width:100%}
 :root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
 /* La maison, première entrée de la barre des pages */
 :root[data-version="v2"] .nav-outil a.nav-maison{display:inline-flex;align-items:center;padding:6px 12px}
