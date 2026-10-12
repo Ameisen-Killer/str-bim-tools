@@ -246,8 +246,14 @@
 :root[data-version="v2"] .prio-etiq.p1{background:#FBE4E2;color:var(--alerte)}
 :root[data-version="v2"] .prio-etiq.p2{background:#FDF0DC;color:#8A5A00}
 
+/* Titre de la page et ses actions sur la même ligne (12.10.2026) */
+:root[data-version="v2"] .entete-ligne{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px}
+:root[data-version="v2"] .entete-ligne h1{min-width:0}
+:root[data-version="v2"] .entete-actions{flex:0 1 auto;margin-left:auto;justify-content:flex-end}
+
 /* --------------------------------------------------------- téléphone */
 @media (max-width:640px){
+  :root[data-version="v2"] .entete-actions{display:none}   /* l'action principale devient le bouton flottant */
   :root[data-version="v2"] .ab-compte-nom,:root[data-version="v2"] .ab-logo-str .marque-mots{display:none}
   :root[data-version="v2"] .ab-marque-barre{margin-left:0}
   :root[data-version="v2"] .ab-logo-barre{width:40px}

@@ -923,7 +923,26 @@
         a.label
       ]));
     });
-    nav.appendChild(pousse);
+    /* Version 2 (12.10.2026, demande de Tony) : les actions de la page sur la
+       ligne de son titre, à droite, plutôt qu'au bout de la barre des pages.
+       Le titre passe dans une ligne .entete-ligne, refaite à chaque appel. */
+    var titre = VERSION_AB ? document.querySelector("main .wrap.entete h1") : null;
+    if (titre) {
+      var ligne = titre.parentNode.classList.contains("entete-ligne") ? titre.parentNode : null;
+      if (!ligne) {
+        ligne = el("div", { class: "entete-ligne" });
+        titre.parentNode.insertBefore(ligne, titre);
+        ligne.appendChild(titre);
+      }
+      var ancienne = ligne.querySelector(".entete-actions");
+      if (ancienne) ancienne.remove();
+      if (pousse.childNodes.length) {
+        pousse.className = "outils entete-actions";
+        ligne.appendChild(pousse);
+      }
+    } else {
+      nav.appendChild(pousse);
+    }
 
     var etiquette = avecBase ? SB.email()
       : (D.estDemo() ? "Jeu de démonstration" : "Données locales");
