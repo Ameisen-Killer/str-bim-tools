@@ -82,6 +82,15 @@
 
   /* ------------------------------------------------------------ en-tête */
 
+  /* Super admin qui regarde l'outil en tant qu'un autre rôle : une pastille
+     à côté de son nom le lui rappelle (en démonstration, le rôle est le jeu). */
+  function vuEn() {
+    if (!D || !D.roleVu || !D.roleVu() || D.enDemo()) return null;
+    var r = (D.rolesDemo() || []).filter(function (x) { return x.actif; })[0];
+    return r ? el("span", { class: "ab-vu-en", title: "Tu vois l'outil comme un " + r.nom.toLowerCase() + " le verrait. Menu du compte : « Admin du site » pour revenir.",
+                            text: "Vue " + r.nom.toLowerCase() }) : null;
+  }
+
   /** Prénom et nom de la personne connectée : sa fiche d'équipe, sinon son adresse. */
   function identite() {
     var moi = D && D.etat() ? D.monMembre() : null;
@@ -155,6 +164,7 @@
       id.photo ? el("span", { class: "ab-avatar a-photo", "aria-hidden": "true" }, [el("img", { src: id.photo, alt: "" })])
         : el("span", { class: "ab-avatar", "aria-hidden": "true", text: initiales(id) }),
       el("span", { class: "ab-moi-nom", text: nom }),
+      vuEn(),
       svg("0 0 14 14", '<path d="M2.5 5 7 9.5 11.5 5"/>', "ab-chevron")
     ]);
     bouton.setAttribute("aria-label", "Compte : " + nom);

@@ -89,6 +89,8 @@
   display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;
   background:#8E9295;color:#fff;font-size:13px;font-weight:500;flex:0 0 auto;
 }
+/* Super admin qui voit l'outil en tant qu'un autre rôle (couleur d'état, pas de marque) */
+:root[data-version="v2"] .ab-vu-en{font-size:12px;font-weight:600;line-height:1.5;padding:1px 8px;border-radius:20px;background:#FCEBD0;color:#8A4B08;white-space:nowrap}
 :root[data-version="v2"] .ab-compte-btn .fleche{font-size:10px;color:var(--texte-faible)}
 :root[data-version="v2"] .ab-menu-compte{left:auto;right:0;min-width:270px}
 :root[data-version="v2"] .ab-menu-compte .ab-menu-sep{border-top:1px solid var(--ligne-faible);margin:4px 0}

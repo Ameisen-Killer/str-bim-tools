@@ -783,6 +783,15 @@
       photo ? [el("img", { src: photo, alt: "" })] : [init || (m ? (m.prenom.charAt(0) + m.nom.charAt(0)).toUpperCase() : "?")]);
   }
 
+  /* Super admin qui regarde l'outil en tant qu'un autre rôle : une pastille
+     à côté de son nom le lui rappelle (en démonstration, le rôle est le jeu). */
+  function vuEn() {
+    if (!D.roleVu || !D.roleVu() || D.enDemo()) return null;
+    var r = (D.rolesDemo() || []).filter(function (x) { return x.actif; })[0];
+    return r ? el("span", { class: "ab-vu-en", title: "Tu vois l'outil comme un " + r.nom.toLowerCase() + " le verrait. Menu du compte : « Admin du site » pour revenir.",
+                            text: "Vue " + r.nom.toLowerCase() }) : null;
+  }
+
   function compteAB(profil) {
     var moi = D.etat() ? D.monMembre() : null;
     var mail = avecBase ? SB.email() : "";
@@ -792,6 +801,7 @@
                                 "aria-label": "Compte : " + nom }, [
       avatar(moi, init),
       el("span", { class: "ab-compte-nom", text: nom }),
+      vuEn(),
       el("span", { class: "fleche", "aria-hidden": "true", text: "▾" })
     ]);
     // Démonstration : voir l'outil avec le rôle choisi (Donnees.roleDemo)

@@ -157,16 +157,21 @@
   };
 
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
-     l'outil comme chacun le verra. Il ne change que le niveau d'accès aux pages
-     (barre, palette, cartes de l'accueil), pas les droits en base. Retenu sur
-     ce navigateur ; par défaut « Administrateur », le statut de Laurent Mercier.
-     Le super admin a le même choix partout (09.10.2026), sous sa propre clé,
-     « Admin du site » par défaut : c'est lui. */
+     l'outil comme chacun le verra. Retenu sur ce navigateur ; par défaut
+     « Administrateur », le statut de Laurent Mercier. Le super admin a le même
+     choix partout (09.10.2026), sous sa propre clé, « Admin du site » par
+     défaut : c'est lui.
+     Depuis le 12.10.2026, le rôle choisi ne règle plus seulement les pages
+     (barre, palette, cartes de l'accueil) : l'interface prend ses statuts et
+     les droits que le bureau leur accorde (profilVu) — boutons, congés à
+     valider, retrait de messages, choix du bureau… exactement ce que verrait
+     une personne de ce rôle. La base, elle, garde les vrais droits. */
   var ROLES_DEMO = [
-    { code: "collaborateur", nom: "Collaborateur", niveau: 0 },
-    { code: "chef_secteur", nom: "Chef de secteur", niveau: 1 },
-    { code: "administrateur", nom: "Administrateur", niveau: 2 },
-    { code: "admin_site", nom: "Admin du site", niveau: 3 }
+    { code: "collaborateur", nom: "Collaborateur", niveau: 0, statuts: [] },
+    { code: "chef_projet", nom: "Chef de projet", niveau: 0, statuts: ["chef_projet"] },
+    { code: "chef_secteur", nom: "Chef de secteur", niveau: 1, statuts: ["chef_secteur"] },
+    { code: "administrateur", nom: "Administrateur", niveau: 2, statuts: ["administrateur"] },
+    { code: "admin_site", nom: "Admin du site", niveau: 3, statuts: null }
   ];
   var CLE_ROLE_DEMO = "planif.demo.role", CLE_ROLE_SUPER = "planif.super.role";
 
@@ -394,13 +399,47 @@
         droits: (brut.droits || []).map(texte),
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
-        bureau: brut.bureau || null, bureaux: brut.bureaux || []
+        bureau: brut.bureau || null, bureaux: brut.bureaux || [],
+        // Droits de chaque groupe du bureau : pour voir l'outil en tant qu'un autre rôle
+        droitsGroupes: Array.isArray(brut.droitsGroupes) ? brut.droitsGroupes : null
       };
       poseListes({ succursales: brut.succursales || [], disciplines: brut.disciplines || [] });
       return profil;
     });
     profilEnCours.catch(function () { profilEnCours = null; });
     return profilEnCours;
+  }
+
+  /* Le profil tel que l'interface doit le voir : le vrai, ou celui du rôle
+     choisi dans « Voir l'outil en tant que » — ni super admin, ni « tout
+     gérer », les statuts du rôle et les droits que le bureau leur donne
+     (droits_groupes ; à défaut, ceux d'un bureau neuf : tous). */
+  var vuEnCache = null;
+  function profilVu() {
+    if (!profil) return profil;
+    var r = D.roleDemo();
+    if (!r || !r.statuts) return profil;
+    if (vuEnCache && vuEnCache.base === profil && vuEnCache.code === r.code) return vuEnCache.vu;
+    var vu = {};
+    Object.keys(profil).forEach(function (k) { vu[k] = profil[k]; });
+    var groupes = profil.droitsGroupes;
+    var droits = [];
+    r.statuts.forEach(function (st) {
+      var accordes = ORDRE_DROITS;
+      if (Array.isArray(groupes)) {
+        var g = groupes.filter(function (x) { return x && x.statut === st; })[0];
+        accordes = g && Array.isArray(g.droits) ? g.droits.map(texte) : [];
+      }
+      accordes.forEach(function (d) { if (droits.indexOf(d) < 0) droits.push(d); });
+    });
+    vu.superAdmin = false;
+    vu.peutTout = false;
+    vu.statuts = r.statuts.slice();
+    vu.droits = ORDRE_DROITS.filter(function (d) { return droits.indexOf(d) >= 0; })
+      .concat(droits.filter(function (d) { return ORDRE_DROITS.indexOf(d) < 0; }));
+    vu.roleVu = r.code;
+    vuEnCache = { base: profil, code: r.code, vu: vu };
+    return vu;
   }
 
   function previens() { abonnes.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } }); }
@@ -914,9 +953,13 @@
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
     chargeProfil: chargeProfil,
-    profil: function () { return profil; },
+    /** Le profil vu par l'interface : celui du rôle choisi dans « Voir
+     *  l'outil en tant que », sinon le vrai. La console lit le vrai (chargeProfil). */
+    profil: function () { return profilVu(); },
+    /** Le rôle simulé (code), ou null quand on voit l'outil avec ses vrais droits. */
+    roleVu: function () { var p = profilVu(); return (p && p.roleVu) || null; },
     /** Tout effacer, importer : réservés au super admin quand la base compte plusieurs bureaux. */
-    peutToutGerer: function () { return !profil || profil.peutTout; },
+    peutToutGerer: function () { var p = profilVu(); return !p || p.peutTout; },
 
     /** À appeler au chargement de chaque page. Renvoie l'état complet.
      *  Le profil passe d'abord : ses listes servent à relire les membres. */
@@ -1041,7 +1084,8 @@
       if (!sa && !D.enDemo()) return null;
       var code = null;
       try { code = global.localStorage.getItem(sa ? CLE_ROLE_SUPER : CLE_ROLE_DEMO); } catch (e) {}
-      return ROLES_DEMO.filter(function (r) { return r.code === code; })[0] || ROLES_DEMO[sa ? 3 : 2];
+      return ROLES_DEMO.filter(function (r) { return r.code === code; })[0] ||
+        ROLES_DEMO.filter(function (r) { return r.code === (sa ? "admin_site" : "administrateur"); })[0];
     },
     /** Titre du choix de rôle dans le menu du compte. */
     titreRolesDemo: function () {
@@ -1064,9 +1108,10 @@
 
     /** Le super admin a tous les droits : c'est lui qui les distribue. */
     aDroit: function (code) {
-      if (!profil) return true;                       // profil pas encore lu
-      if (profil.superAdmin) return true;
-      return (profil.droits || []).indexOf(code) >= 0;
+      var p = profilVu();
+      if (!p) return true;                            // profil pas encore lu
+      if (p.superAdmin) return true;
+      return (p.droits || []).indexOf(code) >= 0;
     },
 
     /** Une tâche me concerne-t-elle ? C'est y tenir une part chargée : le
@@ -1439,12 +1484,15 @@
     },
     /** Puis-je décider des congés de ce membre ? */
     peutValiderConge: function (idMembre) {
-      if (!profil) return true;                          // mode local
-      if (profil.superAdmin) return true;
+      var p = profilVu();
+      if (!p) return true;                               // mode local
+      if (p.superAdmin) return true;
       var moi = D.monMembre(), lui = D.membre(idMembre);
       if (!moi || !lui || moi.id === lui.id) return false;
-      return aStatut(moi, "administrateur") ||
-        (aStatut(moi, "chef_secteur") && !!moi.discipline && moi.discipline === lui.discipline);
+      // Rôle simulé : ses statuts, portés par sa propre fiche (sa discipline)
+      var st = p.roleVu ? p.statuts : statutsDe(moi);
+      return st.indexOf("administrateur") >= 0 ||
+        (st.indexOf("chef_secteur") >= 0 && !!moi.discipline && moi.discipline === lui.discipline);
     },
     /** Les demandes qui attendent ma décision. */
     congesAValider: function () {
