@@ -1201,8 +1201,6 @@
     profilPret: function () { return ADAPTATEUR.profilEnBase ? ADAPTATEUR.profilEnBase() : true; },
     /** La colonne du natel existe en base (migration-natel.sql ; toujours vrai en mode local). */
     natelPret: function () { return ADAPTATEUR.natelEnBase ? ADAPTATEUR.natelEnBase() : true; },
-    /** La base connaît la fin propre du calcul (toujours vrai en mode local). Garde-fou provisoire. */
-    finCalculPret: function () { return ADAPTATEUR.finCalculEnBase ? ADAPTATEUR.finCalculEnBase() : true; },
     /** Compte de démonstration partagé : la photo, vue de tous les visiteurs, ne s'y change pas. */
     photoBloquee: function () {
       return !!ADAPTATEUR.regleProfil && /^demo@/i.test(texte(profil && profil.email) || (global.Sb && global.Sb.email ? global.Sb.email() : ""));
@@ -1414,7 +1412,6 @@
         if (cible === fin) return null;
         var max = Calc.finCalculMax(t, canton);
         if (cible <= max) {
-          if (!D.finCalculPret()) throw erreur("Pour avancer le calcul sans bouger le dessin, la base doit d'abord être mise à jour (migration-fin-calcul.sql).");
           return D.retoucheTache(i, { finCalcul: cible === max ? null : cible })
             .then(function () { return { calcul: C.diff(fin, cible), dessin: 0 }; });
         }
@@ -1422,8 +1419,7 @@
         var des = t.dessinateurId ? D.membre(t.dessinateurId) : null;
         var nouvelle = Calc.finDepuis(t.chargeDessin, Calc.premierJourApres(cible, des, canton), des, canton);
         if (nouvelle < t.echeance) nouvelle = t.echeance;
-        var avant = t.echeance, champs = { echeance: nouvelle, debut: null };
-        if (D.finCalculPret()) champs.finCalcul = cible;
+        var avant = t.echeance, champs = { echeance: nouvelle, debut: null, finCalcul: cible };
         return D.retoucheTache(i, champs).then(function () {
           return { calcul: C.diff(fin, cible), dessin: C.diff(avant, nouvelle) };
         });
