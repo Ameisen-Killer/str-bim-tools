@@ -31,15 +31,14 @@ body{
 }
 .page{
   position:relative;z-index:1;
-  min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;
+  min-height:100svh;display:grid;grid-template-rows:1fr auto;
   padding-block:max(clamp(18px,3vw,36px),env(safe-area-inset-top)) max(clamp(18px,3vw,36px),env(safe-area-inset-bottom));
   padding-inline:var(--g);
 }
-.haut,.bas{
+.bas{
   display:flex;justify-content:space-between;align-items:baseline;gap:16px;
   font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
 }
-.haut a{text-decoration:none;color:inherit}
 .jeu{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(10px,2.2vh,24px);min-height:0}
 .titre{text-align:center}
 .niv{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
@@ -82,7 +81,6 @@ button.discret{border-color:rgba(236,232,224,.18);color:var(--texte-doux)}
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
 <div class="page">
-  <header class="haut" data-menu-hote><a href="/">STR Bim Tools</a><button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button></header>
   <main class="jeu">
     <div class="titre">
       <div class="niv" id="niv">Niveau 1</div>
@@ -107,8 +105,8 @@ button.discret{border-color:rgba(236,232,224,.18);color:var(--texte-doux)}
       <button class="act discret" type="button" id="nouveau">Rejouer</button>
     </div>
   </main>
-  <footer class="bas pied">
-    <a class="pied-site" href="/">← str-bim-tools.com</a>
+  <!-- Pas de menu ni de lien vers l'accueil : choix de Tony (12.10.2026) -->
+  <footer class="bas pied" style="justify-content:center">
     <div class="pied-droite">
       <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
       <a href="/mentions-legales/">Mentions légales</a>
