@@ -104,10 +104,10 @@
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=47"></script>
-<script src="/planif/assets/donnees.js?v=62"></script>
+<script src="/planif/assets/donnees.js?v=63"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=12"></script>
-<script src="/planif/assets/ui.js?v=92"></script>
+<script src="/planif/assets/ui.js?v=93"></script>
 <script src="/planif/assets/tchat.js?v=7"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -1049,17 +1049,10 @@
     var t = D.tache(info.tache.id);
     if (!t) return;
     var champs = {};
-    /* Part calcul d'une tâche enchaînée (12.10.2026) : D.decalePart l'avance
-       sans toucher au dessin, ou repousse le dessin si elle déborde dessus. */
-    var deltaCalcul = delta && info.role === "ingenieur" && Calc.enchainee(t) ? delta : 0;
-    if (delta && !deltaCalcul) {
-      // On déplace l'échéance ; le début se recalcule. Une échéance posée sur un
-      // jour chômé glisse au prochain jour ouvré dans le sens du déplacement.
-      var ech = C.ajoute(t.echeance, delta), pas = delta > 0 ? 1 : -1, garde = 0;
-      while (C.chome(ech, D.canton()) && garde++ < 30) ech = C.ajoute(ech, pas);
-      delta = C.diff(t.echeance, ech);
-      if (delta) { champs.echeance = ech; champs.debut = null; }
-    }
+    /* Le décalage passe par D.decalePart (12.10.2026) : la part calcul d'une
+       tâche enchaînée s'y avance sans toucher au dessin, ou repousse le
+       dessin si elle déborde dessus ; sinon l'échéance de la tâche bouge. */
+    var calculSeul = info.role === "ingenieur" && Calc.enchainee(t);
     var reaffecte = null, libere = false;
     var champ = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
     var actuel = t[champ];
@@ -1078,18 +1071,17 @@
         }
       }
     }
-    if (!Object.keys(champs).length && !deltaCalcul) return;
+    if (!Object.keys(champs).length && !delta) return;
     (Object.keys(champs).length ? D.retoucheTache(t.id, champs) : Promise.resolve())
-      .then(function () { return deltaCalcul ? D.decalePart(t.id, "ingenieur", deltaCalcul) : null; })
+      .then(function () { return delta ? D.decalePart(t.id, info.role, delta) : null; })
       .then(function (r) {
         rend();
         var dits = [];
-        if (deltaCalcul) {
-          if (r) dits.push(texteDecalage(r));
-        } else if (delta) dits.push("décalée de " + (delta > 0 ? "+" : "") + delta + " j");
-        if (reaffecte) dits.push("confiée à " + reaffecte);
-        if (libere) dits.push("remise à affecter");
-        if (dits.length) UI.toast((deltaCalcul ? "" : "Tâche ") + dits.join(", ") + ".");
+        if (r && calculSeul) dits.push(texteDecalage(r));
+        else if (r) dits.push("Tâche décalée de " + (r.dessin > 0 ? "+" : "") + r.dessin + " j");
+        if (reaffecte) dits.push((dits.length ? "" : "Tâche ") + "confiée à " + reaffecte);
+        if (libere) dits.push((dits.length ? "" : "Tâche ") + "remise à affecter");
+        if (dits.length) UI.toast(dits.join(", ") + ".");
       }).catch(function (e) { rend(); UI.toast(e.message); });
   }
 

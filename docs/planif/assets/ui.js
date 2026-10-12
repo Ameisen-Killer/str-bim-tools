@@ -1763,22 +1763,15 @@
     var t = D.tache(id);
     if (!t) return Promise.resolve();
     // Part calcul d'une tâche enchaînée : elle bouge seule, ou repousse le dessin (D.decalePart)
-    if (role === "ingenieur" && global.Calc && global.Calc.enchainee(t)) {
-      return D.decalePart(id, role, jours).then(function (r) {
-        if (apres) apres();
-        if (!r) return;
-        toast(r.dessin ? "Calcul décalé de " + (r.calcul > 0 ? "+" : "") + r.calcul + " j, dessin repoussé de +" + r.dessin + " j pour le suivre."
-                       : r.calcul < 0 ? "Calcul avancé de " + (-r.calcul) + " j, le dessin ne bouge pas." : "Calcul décalé de +" + r.calcul + " j.");
-      }).catch(function (e) { if (apres) apres(); toast(e.message); });
-    }
-    var canton = D.canton(), ech = C.ajoute(t.echeance, jours), pas = jours > 0 ? 1 : -1, garde = 0;
-    while (C.chome(ech, canton) && garde++ < 30) ech = C.ajoute(ech, pas);
-    var delta = C.diff(t.echeance, ech);
-    if (!delta) return Promise.resolve();
-    return D.retoucheTache(id, { echeance: ech, debut: null }).then(function () {
+    var calculSeul = role === "ingenieur" && global.Calc && global.Calc.enchainee(t);
+    return D.decalePart(id, role || "dessinateur", jours).then(function (r) {
       if (apres) apres();
-      toast("Tâche décalée de " + (delta > 0 ? "+" : "") + delta + " j.");
-    }).catch(function (e) { toast(e.message); });
+      if (!r) return;
+      var j = function (n) { return (n > 0 ? "+" : "") + n + " j"; };
+      if (!calculSeul) toast("Tâche décalée de " + j(r.dessin) + ".");
+      else if (r.dessin) toast("Calcul décalé de " + j(r.calcul) + ", dessin repoussé de " + j(r.dessin) + " pour le suivre.");
+      else toast(r.calcul < 0 ? "Calcul avancé de " + (-r.calcul) + " j, le dessin ne bouge pas." : "Calcul décalé de " + j(r.calcul) + ".");
+    }).catch(function (e) { if (apres) apres(); toast(e.message); });
   }
 
   /**

@@ -1400,7 +1400,13 @@
         if (role !== "ingenieur" || !Calc || !Calc.enchainee(t)) {
           var ech = glisse(C.ajoute(t.echeance, jours)), delta = C.diff(t.echeance, ech);
           if (!delta) return null;
-          return D.retoucheTache(i, { echeance: ech, debut: null })
+          var ch = { echeance: ech, debut: null };
+          // Le dessin avancé rattrape la fin propre du calcul : elle n'a plus lieu d'être, il le suit de nouveau
+          if (t.finCalcul && Calc && Calc.enchainee(t)) {
+            var essai = {}; Object.keys(t).forEach(function (k) { essai[k] = t[k]; }); essai.echeance = ech;
+            if (t.finCalcul >= Calc.finCalculMax(essai, canton)) ch.finCalcul = null;
+          }
+          return D.retoucheTache(i, ch)
             .then(function () { return { calcul: delta, dessin: delta }; });
         }
         var fin = Calc.finPart(t, "ingenieur", canton);
