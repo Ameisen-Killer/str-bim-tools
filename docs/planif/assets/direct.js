@@ -33,7 +33,8 @@
 
   var ws = null, ref = 0, joinRef = null, sujet = "", battement = null, jetonEnvoye = "";
   var essais = 0, abandon = false, repli = null;
-  var enAttente = null, touches = { taches: {}, n: 0, noms: [] }, echo = true;
+  // tables : celles qui ont changé, seules relues (12.10.2026)
+  var enAttente = null, touches = { taches: {}, n: 0, noms: [], tables: {} }, echo = true;
   var html = document.documentElement;
 
   function etat(v) { html.setAttribute("data-direct", v); }
@@ -162,6 +163,7 @@
     var mienne = D.ecritureRecente && D.ecritureRecente(2500);
     if (!mienne) echo = false;
     var ligne = d.record || d["new"] || d.old_record || d.old || {};
+    if (d.table) touches.tables[d.table] = true;
     if (!mienne && d.table === "taches" && ligne.id) {
       if (!touches.taches[ligne.id]) {
         touches.taches[ligne.id] = true; touches.n++;
@@ -204,8 +206,8 @@
     if (occupe()) { enAttente = setTimeout(relis, 1200); return; }
     enAttente = null;
     var t = touches, silencieux = echo;
-    touches = { taches: {}, n: 0, noms: [] }; echo = true;
-    D.recharge().then(function () {
+    touches = { taches: {}, n: 0, noms: [], tables: {} }; echo = true;
+    D.recharge(Object.keys(t.tables)).then(function () {
       if (silencieux) return;
       eclat(Object.keys(t.taches));
       annonce(t);

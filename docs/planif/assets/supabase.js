@@ -219,6 +219,7 @@
 
   function requete(chemin, options) {
     options = options || {};
+    noteEcriture(chemin, options.methode);
     return jeton().then(function (t) {
       var entetes = {
         apikey: CLE, Authorization: "Bearer " + t,
@@ -323,8 +324,8 @@
    */
   var PAGE = 1000;
 
-  function litTout(table, ordre) {
-    var base = table + "?select=*&order=" + ordre;
+  function litTout(table, ordre, colonnes) {
+    var base = table + "?select=" + (colonnes || "*") + "&order=" + ordre;
     return requete(base, { plage: "0-" + (PAGE - 1), prefer: "count=exact", avecTotal: true }).then(function (p) {
       var lignes = p.lignes, total = p.total;
       if (total === null) return lignes.length ? suiteSequentielle(base, lignes, lignes.length) : lignes;
@@ -485,125 +486,225 @@
       .then(function (l) { return l || []; });
   }
 
-  /* ------------------------------------------------------------ lecture */
+  /* ------------------------------------------------------ photos des fiches
 
-  function charge() {
-    return Promise.all([
-      litTout("membres", "id"),
-      litTout("absences", "id"),
-      litTout("affaires", "id"),
-      litTout("affaire_membres", "affaire_id,membre_id"),
-      litTout("taches", "id"),
-      litTout("reglages", "id"),
-      litTout("contacts", "id"),
-      litAvis(),
-      litTout("ao_agenda", "jour"),
-      litTout("rendez_vous", "jour"),
-      litTout("conges", "id"),
-      litVeille(),
-      litTout("veille_suivi", "id")
-    ]).then(function (r) {
-      var membres = r[0] || [], absences = r[1] || [], affaires = r[2] || [],
-          liens = r[3] || [], taches = r[4] || [], reglages = (r[5] || [])[0] || {},
-          contacts = r[6] || [], avis = r[7] || [], agenda = r[8] || [], rdv = r[9] || [], conges = r[10] || [], veille = r[11] || [], veilleSuivi = r[12] || [];
-      // Garde-fou provisoire (10.10.2026) : colonnes de « Mon profil » pas encore en base
-      // tant que migration-profil.sql n'est pas passée. À retirer ensuite.
-      profilEnBase = !!membres.length && "tel_interne" in membres[0];
-      // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
-      natelEnBase = !!membres.length && "tel_natel" in membres[0];
+     Demande de Tony (12.10.2026), sur une connexion lente : les photos de
+     « Mon profil » (jusqu'à ~100 Ko chacune) partaient à chaque lecture de la
+     base — chaque page, chaque relecture en direct. Les fiches se lisent
+     désormais sans elles ; une photo n'est demandée que si la fiche a changé
+     depuis (maj_le, que la base touche à chaque modification, photo comprise),
+     et elles sont gardées dans ce navigateur d'une page à l'autre. */
+  var COLONNES_MEMBRES = "id,bureau_id,nom,prenom,email,metier,statuts,succursale,discipline,capacite,jours,actif," +
+                         "tel_interne,tel_externe,tel_natel,cree_le,maj_le";
+  var CLE_PHOTOS = "planif.photos";
+  var photos = null;                      // { id: { m: maj_le, p: photo | null } }
 
-      function metierDe(m) { return m.metier || ""; }
-      function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
+  function photosConnues() {
+    if (photos) return photos;
+    try { photos = JSON.parse(global.localStorage.getItem(CLE_PHOTOS) || "{}") || {}; } catch (e) { photos = {}; }
+    return photos;
+  }
+  function retiensPhotos(lignes) {
+    // Seules les fiches lues restent : un autre bureau, une fiche retirée s'oublient
+    var garde = {};
+    lignes.forEach(function (m) { if (photos[m.id]) garde[m.id] = photos[m.id]; });
+    photos = garde;
+    try { global.localStorage.setItem(CLE_PHOTOS, JSON.stringify(photos)); }
+    catch (e) { try { global.localStorage.removeItem(CLE_PHOTOS); } catch (x) {} }   // trop lourd : la mémoire de la page suffit
+  }
 
-      // Côté de chacun dans l'équipe d'une affaire
-      var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
-      var role = {};
-      membres.forEach(function (m) { role[m.id] = cote(metierDe(m)); });
-
-      return {
-        version: 1,
-        reglages: {
-          canton: reglages.canton || "VD",
-          capaciteDefaut: parseFloat(reglages.capacite_defaut) || 5,
-          demo: false
-        },
-        membres: membres.map(function (m) {
-          return {
-            id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "",
-            metier: metierDe(m), statuts: statutsDe(m),
-            succursale: m.succursale || "", discipline: m.discipline || "",
-            capacite: parseFloat(m.capacite), jours: m.jours || null, actif: m.actif,
-            telInterne: m.tel_interne || "", telExterne: m.tel_externe || "", telNatel: m.tel_natel || "",
-            photo: m.photo || null,
-            absences: absences.filter(function (a) { return a.membre_id === m.id; })
-              .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })
-          };
-        }),
-        affaires: affaires.map(function (a) {
-          var equipe = liens.filter(function (l) { return l.affaire_id === a.id; });
-          return {
-            id: a.id, code: a.code, nom: a.nom, note: a.note || "",
-            teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
-            aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
-            aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
-            ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
-              .map(function (l) { return l.membre_id; }),
-            dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
-              .map(function (l) { return l.membre_id; })
-          };
-        }),
-        taches: taches.map(function (t) {
-          return {
-            id: t.id, affaireId: t.affaire_id, titre: t.titre, note: t.note || "",
-            chargeInge: parseFloat(t.charge_inge), chargeDessin: parseFloat(t.charge_dessin),
-            debut: t.debut, echeance: t.echeance,
-            ingenieurId: t.ingenieur_id, dessinateurId: t.dessinateur_id,
-            statut: t.statut, avancement: t.avancement,
-            finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
-            enchaine: t.enchaine === true,
-            priorite: t.priorite,
-            cree: t.cree_le, maj: t.maj_le
-          };
-        }),
-        contacts: contacts.map(function (c) {
-          return {
-            id: c.id, nom: c.nom || "", prenom: c.prenom || "", societe: c.societe || "",
-            telephone: c.telephone || "", natel: c.natel || "", email: c.email || "",
-            site: c.site || "", role: c.role || "", adresse: c.adresse || "", npa: c.npa || "",
-            localite: c.localite || "", canton: c.canton || "", pays: c.pays || "",
-            observations: c.observations || ""
-          };
-        }),
-        veille: veille.map(function (x) {
-          return { id: x.id, publicationId: x.publication_id, titre: x.titre, description: x.description || "",
-                   adjudicateur: x.adjudicateur || "", canton: x.canton || "", lieu: x.lieu || "",
-                   procedure: x.procedure || "", typePublication: x.type_publication || "", sousType: x.sous_type || "",
-                   cpv: x.cpv || [], bkp: x.bkp || [], publieLe: x.publie_le, delai: x.delai_remise,
-                   lien: x.lien || "", motifs: x.motifs || [] };
-        }),
-        veilleSuivi: veilleSuivi.map(function (x) {
-          return { id: x.id, aoId: x.ao_id, etat: x.etat, affaireId: x.affaire_id || null, par: x.par || null, le: x.le };
-        }),
-        conges: conges.map(function (x) {
-          return { id: x.id, membreId: x.membre_id, debut: x.debut, fin: x.fin, motif: x.motif,
-                   commentaire: x.commentaire || "", statut: x.statut, validePar: x.valide_par || null,
-                   valideLe: x.valide_le || null, reponse: x.reponse || "", absenceId: x.absence_id || null, cree: x.cree_le };
-        }),
-        rdv: rdv.map(function (x) {
-          return { id: x.id, titre: x.titre, jour: x.jour, debut: (x.debut || "").slice(0, 5), fin: (x.fin || "").slice(0, 5),
-                   lieu: x.lieu || "", note: x.note || "", participants: x.participants || [],
-                   creePar: x.cree_par || null, source: x.source, externeId: x.externe_id || null };
-        }),
-        agenda: agenda.map(function (x) {
-          return { id: x.id, affaireId: x.affaire_id, jour: x.jour, heure: (x.heure || "").slice(0, 5),
-                   genre: x.genre, titre: x.titre, lieu: x.lieu || "", note: x.note || "" };
-        }),
-        avis: avis.map(function (a) {
-          return { id: a.id, membreId: a.membre_id, debut: versLocal(a.debut), fin: versLocal(a.fin),
-                   motif: a.motif || "", cree: a.cree_le };
-        })
-      };
+  function litMembres() {
+    return litTout("membres", "id", COLONNES_MEMBRES).then(function (lignes) {
+      var connues = photosConnues();
+      var manquent = lignes.filter(function (m) { return !connues[m.id] || connues[m.id].m !== m.maj_le; })
+        .map(function (m) { return m.id; });
+      var paquets = [];
+      for (var i = 0; i < manquent.length; i += 100) paquets.push(manquent.slice(i, i + 100));
+      return Promise.all(paquets.map(function (ids) {
+        return requete("membres?select=id,photo,maj_le&id=in.(" + ids.map(encodeURIComponent).join(",") + ")");
+      })).then(function (res) {
+        res.forEach(function (l) { (l || []).forEach(function (x) { connues[x.id] = { m: x.maj_le, p: x.photo || null }; }); });
+        lignes.forEach(function (m) { m.photo = connues[m.id] ? connues[m.id].p : null; });
+        if (manquent.length || Object.keys(connues).length !== lignes.length) retiensPhotos(lignes);
+        return lignes;
+      });
+    }, function (e) {
+      // Colonne inconnue (migration du profil ou du natel pas encore passée) : lecture complète, comme avant
+      if (e && e.code === "42703") return litTout("membres", "id");
+      throw e;
     });
+  }
+
+  /* ------------------------------------------------------------ lecture
+
+     Chaque table a sa lecture. La dernière réponse de chacune est gardée : une
+     mise à jour en direct (direct.js) ne relit que les tables qui ont changé,
+     plus celles que cette page vient d'écrire (noteEcriture), et l'état se
+     reconstruit avec les autres telles qu'elles étaient (12.10.2026). Sans
+     liste — chargement, « Rafraîchir », retour sur l'onglet, repli —, tout
+     est relu. */
+  var LECTURES = {
+    membres: litMembres,
+    absences: function () { return litTout("absences", "id"); },
+    affaires: function () { return litTout("affaires", "id"); },
+    affaire_membres: function () { return litTout("affaire_membres", "affaire_id,membre_id"); },
+    taches: function () { return litTout("taches", "id"); },
+    reglages: function () { return litTout("reglages", "id"); },
+    contacts: function () { return litTout("contacts", "id"); },
+    avis: litAvis,
+    ao_agenda: function () { return litTout("ao_agenda", "jour"); },
+    rendez_vous: function () { return litTout("rendez_vous", "jour"); },
+    conges: function () { return litTout("conges", "id"); },
+    veille_ao: litVeille,
+    veille_suivi: function () { return litTout("veille_suivi", "id"); }
+  };
+  // Tables que touchent les fonctions de la base appelées d'ici ; absente : toutes
+  var TABLES_RPC = {
+    presence: [], mon_profil: [], choisit_bureau: [],
+    regle_jours: ["membres"], regle_profil: ["membres"], decide_conge: ["conges", "absences"]
+  };
+  var brut = null, sales = {}, toutSale = false;
+
+  /* Une écriture de cette page : sa table sera relue à la prochaine relecture
+     partielle, même si l'écho du direct n'est pas encore arrivé. */
+  function noteEcriture(chemin, methode) {
+    if (!methode || methode === "GET" || methode === "HEAD") return;
+    var nom = String(chemin).split("?")[0];
+    if (nom.indexOf("rpc/") === 0) {
+      var l = TABLES_RPC[nom.slice(4)];
+      if (!l) { toutSale = true; return; }
+      l.forEach(function (t) { sales[t] = true; });
+    } else if (LECTURES[nom]) {
+      sales[nom] = true;
+    }
+  }
+
+  /** tables : celles à relire (noms de la base) ; absent, tout est relu. */
+  function charge(tables) {
+    var noms = Object.keys(LECTURES), aLire;
+    if (!brut || toutSale || !Array.isArray(tables)) {
+      aLire = noms;
+    } else {
+      aLire = noms.filter(function (t) { return tables.indexOf(t) >= 0 || sales[t]; });
+    }
+    var pris = sales, toutPris = toutSale;
+    sales = {}; toutSale = false;
+    return Promise.all(aLire.map(function (t) { return LECTURES[t](); })).then(function (r) {
+      var neuf = {};
+      noms.forEach(function (t) { neuf[t] = brut ? brut[t] : []; });
+      aLire.forEach(function (t, i) { neuf[t] = r[i] || []; });
+      brut = neuf;
+      return construit(brut);
+    }, function (e) {
+      // Lecture manquée : ce qui était à relire le reste
+      Object.keys(pris).forEach(function (t) { sales[t] = true; });
+      if (toutPris) toutSale = true;
+      throw e;
+    });
+  }
+
+  function construit(b) {
+    var membres = b.membres || [], absences = b.absences || [], affaires = b.affaires || [],
+        liens = b.affaire_membres || [], taches = b.taches || [], reglages = (b.reglages || [])[0] || {},
+        contacts = b.contacts || [], avis = b.avis || [], agenda = b.ao_agenda || [], rdv = b.rendez_vous || [],
+        conges = b.conges || [], veille = b.veille_ao || [], veilleSuivi = b.veille_suivi || [];
+    // Garde-fou provisoire (10.10.2026) : colonnes de « Mon profil » pas encore en base
+    // tant que migration-profil.sql n'est pas passée. À retirer ensuite.
+    profilEnBase = !!membres.length && "tel_interne" in membres[0];
+    // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
+    natelEnBase = !!membres.length && "tel_natel" in membres[0];
+
+    function metierDe(m) { return m.metier || ""; }
+    function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
+
+    // Côté de chacun dans l'équipe d'une affaire
+    var cote = global.Donnees ? global.Donnees.cote : function (r) { return r; };
+    var role = {};
+    membres.forEach(function (m) { role[m.id] = cote(metierDe(m)); });
+
+    return {
+      version: 1,
+      reglages: {
+        canton: reglages.canton || "VD",
+        capaciteDefaut: parseFloat(reglages.capacite_defaut) || 5,
+        demo: false
+      },
+      membres: membres.map(function (m) {
+        return {
+          id: m.id, nom: m.nom, prenom: m.prenom, email: m.email || "",
+          metier: metierDe(m), statuts: statutsDe(m),
+          succursale: m.succursale || "", discipline: m.discipline || "",
+          capacite: parseFloat(m.capacite), jours: m.jours || null, actif: m.actif,
+          telInterne: m.tel_interne || "", telExterne: m.tel_externe || "", telNatel: m.tel_natel || "",
+          photo: m.photo || null,
+          absences: absences.filter(function (a) { return a.membre_id === m.id; })
+            .map(function (a) { return { id: a.id, debut: a.debut, fin: a.fin, motif: a.motif }; })
+        };
+      }),
+      affaires: affaires.map(function (a) {
+        var equipe = liens.filter(function (l) { return l.affaire_id === a.id; });
+        return {
+          id: a.id, code: a.code, nom: a.nom, note: a.note || "",
+          teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
+          aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
+          aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
+          ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
+            .map(function (l) { return l.membre_id; }),
+          dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
+            .map(function (l) { return l.membre_id; })
+        };
+      }),
+      taches: taches.map(function (t) {
+        return {
+          id: t.id, affaireId: t.affaire_id, titre: t.titre, note: t.note || "",
+          chargeInge: parseFloat(t.charge_inge), chargeDessin: parseFloat(t.charge_dessin),
+          debut: t.debut, echeance: t.echeance,
+          ingenieurId: t.ingenieur_id, dessinateurId: t.dessinateur_id,
+          statut: t.statut, avancement: t.avancement,
+          finiInge: t.fini_inge === true, finiDessin: t.fini_dessin === true,
+          enchaine: t.enchaine === true,
+          priorite: t.priorite,
+          cree: t.cree_le, maj: t.maj_le
+        };
+      }),
+      contacts: contacts.map(function (c) {
+        return {
+          id: c.id, nom: c.nom || "", prenom: c.prenom || "", societe: c.societe || "",
+          telephone: c.telephone || "", natel: c.natel || "", email: c.email || "",
+          site: c.site || "", role: c.role || "", adresse: c.adresse || "", npa: c.npa || "",
+          localite: c.localite || "", canton: c.canton || "", pays: c.pays || "",
+          observations: c.observations || ""
+        };
+      }),
+      veille: veille.map(function (x) {
+        return { id: x.id, publicationId: x.publication_id, titre: x.titre, description: x.description || "",
+                 adjudicateur: x.adjudicateur || "", canton: x.canton || "", lieu: x.lieu || "",
+                 procedure: x.procedure || "", typePublication: x.type_publication || "", sousType: x.sous_type || "",
+                 cpv: x.cpv || [], bkp: x.bkp || [], publieLe: x.publie_le, delai: x.delai_remise,
+                 lien: x.lien || "", motifs: x.motifs || [] };
+      }),
+      veilleSuivi: veilleSuivi.map(function (x) {
+        return { id: x.id, aoId: x.ao_id, etat: x.etat, affaireId: x.affaire_id || null, par: x.par || null, le: x.le };
+      }),
+      conges: conges.map(function (x) {
+        return { id: x.id, membreId: x.membre_id, debut: x.debut, fin: x.fin, motif: x.motif,
+                 commentaire: x.commentaire || "", statut: x.statut, validePar: x.valide_par || null,
+                 valideLe: x.valide_le || null, reponse: x.reponse || "", absenceId: x.absence_id || null, cree: x.cree_le };
+      }),
+      rdv: rdv.map(function (x) {
+        return { id: x.id, titre: x.titre, jour: x.jour, debut: (x.debut || "").slice(0, 5), fin: (x.fin || "").slice(0, 5),
+                 lieu: x.lieu || "", note: x.note || "", participants: x.participants || [],
+                 creePar: x.cree_par || null, source: x.source, externeId: x.externe_id || null };
+      }),
+      agenda: agenda.map(function (x) {
+        return { id: x.id, affaireId: x.affaire_id, jour: x.jour, heure: (x.heure || "").slice(0, 5),
+                 genre: x.genre, titre: x.titre, lieu: x.lieu || "", note: x.note || "" };
+      }),
+      avis: avis.map(function (a) {
+        return { id: a.id, membreId: a.membre_id, debut: versLocal(a.debut), fin: versLocal(a.fin),
+                 motif: a.motif || "", cree: a.cree_le };
+      })
+    };
   }
 
   /* Semaine type d'un membre. L'outil n'écrit pas les fiches de membres (la

@@ -1003,9 +1003,11 @@
      * sinon elle remplacerait l'état sous les pieds d'une écriture en route,
      * dont l'écart se calcule justement sur l'état lu.
      */
-    recharge: function () {
+    /** tables (facultatif) : seules ces tables de la base ont changé — le
+     *  direct n'en relit pas plus (supabase.js garde les autres). */
+    recharge: function (tables) {
       var lecture = file.then(function () {
-        return ADAPTATEUR.lire().then(function (brut) {
+        return ADAPTATEUR.lire(tables).then(function (brut) {
           if (!brut) throw erreur("Lecture vide.");
           etat = normalise(brut);
           precedent = copie(etat);
