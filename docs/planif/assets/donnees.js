@@ -126,7 +126,7 @@
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous",
                "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge", "page_secteurs",
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge",
                "planning_equipe", "taches_a_affecter", "conges_secteur", "avancement_secteur"] },
     { code: "chef_projet", nom: "Chef de projet", parent: "chef_secteur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui"] }
@@ -236,7 +236,7 @@
      les applique aussi. */
   var CATEGORIES_DROITS = [
     { titre: "Pages", droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire",
-                               "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales",
+                               "page_affaires", "page_charge", "page_inter", "page_transversales",
                                "page_facturation"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
@@ -252,7 +252,6 @@
     page_annuaire: { titre: "Annuaire", aide: "Le carnet d'adresses du bureau." },
     page_affaires: { titre: "Affaires", aide: "La page Affaires (liste, équipes, carte)." },
     page_charge: { titre: "Tableau de charge", aide: "La carte de charge, une case par personne et par semaine." },
-    page_secteurs: { titre: "Secteurs", aide: "Le module Secteurs : effectifs, charge et projets de chaque secteur." },
     page_inter: { titre: "Appels d'offres", aide: "Le module Inter-secteurs : appels d'offres, agenda des AO, veille simap.ch." },
     page_transversales: { titre: "Affaires transversales", aide: "Les affaires qui touchent plusieurs secteurs." },
     page_facturation: {
@@ -324,7 +323,7 @@
   // Page → droit qui l'ouvre. Accueil, Communication et Tâches sont à tous ; la console au super admin.
   var DROIT_PAGE = {
     tableau: "page_tableau", equipe: "page_equipe", absences: "page_absences", annuaire: "page_annuaire",
-    affaires: "page_affaires", charge: "page_charge", secteurs: "page_secteurs",
+    affaires: "page_affaires", charge: "page_charge",
     veille: "page_inter", ao_publics: "page_inter", ao_prives: "page_inter", agenda_ao: "page_inter",
     transversales: "page_transversales", facturation: "page_facturation"
   };
@@ -795,6 +794,7 @@
         echeance: texte(a.echeance) || null,
         phase: texte(a.phase) || null,
         adresse: texte(a.adresse),
+        succursale: SUCCURSALES[a.succursale] ? a.succursale : "",
         aoType: TYPES_AO[a.aoType] ? a.aoType : null,
         demandeurId: texte(a.demandeurId) || null,
         responsableId: texte(a.responsableId) || null,
@@ -1081,6 +1081,8 @@
       v.aoMontant = mt ? Math.round(parseFloat(mt.replace(",", "."))) : null;
     }
     if ("secteurs" in o) v.secteurs = (o.secteurs || []).map(texte).filter(Boolean);
+    // Succursale de l'affaire (13.10.2026), facultative : seulement quand le formulaire la porte
+    if ("succursale" in o) v.succursale = SUCCURSALES[texte(o.succursale)] ? texte(o.succursale) : "";
     // Mandat : phases SIA et disciplines de chacune, seulement quand le formulaire le porte
     if ("mandat" in o) v.mandat = reprisMandat(o.mandat);
     return v;
@@ -1185,6 +1187,8 @@
     libelleAffaire: function (a) { return a ? (a.code ? a.code + " · " : "") + a.nom : "—"; },
     PARTS: PARTS,
     source: ADAPTATEUR.nom,
+    /** La base connaît la succursale des affaires (vrai en mode local). Garde-fou provisoire, 13.10.2026. */
+    succursaleAffairePrete: function () { return !ADAPTATEUR.succursaleEnBase || ADAPTATEUR.succursaleEnBase(); },
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
     chargeProfil: chargeProfil,
@@ -2271,14 +2275,15 @@
     });
     m("Nicolet", "Fabienne", "administratif", 4);
 
-    function a(code, nom, teinte, ings, dess, phase, adresse) {
+    function a(code, nom, teinte, ings, dess, phase, adresse, succursale) {
       var o = { id: id(), code: code, nom: nom, note: "", teinte: teinte, statut: "active",
-                echeance: null, phase: phase, adresse: adresse || "", ingenieurs: ings, dessinateurs: dess };
+                echeance: null, phase: phase, adresse: adresse || "", succursale: succursale || "",
+                ingenieurs: ings, dessinateurs: dess };
       e.affaires.push(o); return o.id;
     }
-    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2], "51", "Avenue de la Gare 10, 1003 Lausanne");
-    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3], "32", "Route de Divonne 50, 1260 Nyon");
-    var a3 = a("25-031", "Passerelle piétonne", 3, [i1, i2], [d1], "31");
+    var a1 = a("24-118", "Immeuble de logements — gros œuvre", 1, [i1], [d1, d2], "51", "Avenue de la Gare 10, 1003 Lausanne", "lausanne");
+    var a2 = a("25-004", "Halle industrielle — charpente béton", 2, [i2], [d2, d3], "32", "Route de Divonne 50, 1260 Nyon", "nyon");
+    var a3 = a("25-031", "Passerelle piétonne", 3, [i1, i2], [d1], "31", "", "geneve");
 
     function t(aff, titre, ci, cd, ing, des, debut, ech, statut, av) {
       e.taches.push({

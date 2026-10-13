@@ -690,11 +690,11 @@
   ];
 
   /* Barre des pages de la version 2 (07.10.2026, demande de Tony) : l'accueil
-     et les quatre modules, chacun selon son niveau d'accès (Donnees.niveauAcces) ;
+     et les trois modules, chacun selon son niveau d'accès (Donnees.niveauAcces) ;
      la console du super admin après un trait. Les autres pages se rangent sous
      un module, qui reste allumé quand on y est (MODULE_DE). */
   var GROUPES_V2 = [
-    ["accueil", "communication", "taches", "secteurs", "inter"],
+    ["accueil", "communication", "taches", "inter"],
     ["console"]
   ];
   var MODULE_DE = {
@@ -904,7 +904,6 @@
       pages.concat([
         { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
         { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
-        { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
         // Le module s'ouvre sur sa première page permise (la facturation seule, pour certains)
         { cle: "inter", href: (D.lienModule && D.lienModule("inter")) || "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
       ]).forEach(function (p) { parCle[p.cle] = p; });

@@ -21,6 +21,17 @@
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=2">
 <style>
 .imp-periode{display:none}
+/* Succursales (13.10.2026) : le menu à cases prend l'allure des listes voisines */
+#filtres .champ-succursale > label{cursor:pointer}
+#filtres .champ-succursale .mc{display:flex}
+#filtres .champ-succursale .mc-bouton{
+  width:100%;max-width:none;justify-content:space-between;
+  font-family:var(--sans);font-size:15px;font-weight:450;letter-spacing:normal;color:var(--texte);
+  background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;padding:9px 11px;
+}
+#filtres .champ-succursale .mc-bouton.actif{border-color:var(--or)}
+.tete-collante.collee #filtres .champ-succursale .mc-bouton{padding:6px 10px;font-size:14px}
+@media (max-width:640px){#filtres .champ-succursale .mc-bouton{font-size:16px;min-height:44px}}
 /* Export PDF de la liste (09.10.2026) : A4 portrait et serré, une ligne par
    tâche, pour en faire tenir un maximum sur chaque feuille. Les autres pages
    gardent le paysage de planif.css. */
@@ -143,13 +154,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=54"></script>
-<script src="/planif/assets/donnees.js?v=74"></script>
+<script src="/planif/assets/supabase.js?v=55"></script>
+<script src="/planif/assets/donnees.js?v=75"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=109"></script>
+<script src="/planif/assets/ui.js?v=110"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=19"></script>
+<script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/mandat.js?v=2"></script>
 <script>
@@ -157,7 +168,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
-  var filtres = { affaire: "", membre: "", statut: "", masqueTerminees: true };
+  /* succursales : codes cochés (13.10.2026) — rien de coché = toutes. Elles
+     réduisent le menu Affaire et la liste aux affaires de ces succursales. */
+  var filtres = { succursales: [], affaire: "", membre: "", statut: "", masqueTerminees: true };
   /* Rangement : « echeance » (chronologie des échéances, comme avant) ou
      « affaire » (les tâches d'une même affaire ensemble, puis par échéance),
      dans chaque semaine. Retenu sur cet appareil. */
@@ -249,15 +262,43 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   /* --------------------------------------------------------------- filtres */
 
+  /** L'affaire est dans une des succursales cochées (aucune cochée : toutes passent). */
+  function dansSuccursales(a) {
+    return !filtres.succursales.length || (!!a && filtres.succursales.indexOf(a.succursale) >= 0);
+  }
+
+  // Le sélecteur de rangement, sorti une fois de la page : un nouveau rendu des filtres le reprend
+  var blocVue = null;
+
   function rendFiltres() {
     var hote = document.getElementById("filtres");
+    blocVue = blocVue || document.querySelector(".vue-taches");
     UI.vide(hote);
 
-    var chAffaire = UI.champ({
-      nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
-      options: [{ valeur: "", label: "Toutes les affaires" }].concat(
-        D.affaires({ tous: true }).map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }))
+    /* Succursales : menu à cases avant l'affaire ; caché quand le bureau n'en a qu'une */
+    var codes = Object.keys(D.SUCCURSALES);
+    var fSucc = UI.multiChoix({
+      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
+      options: codes.map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; }),
+      valeurs: filtres.succursales,
+      surChange: function (v) {
+        filtres.succursales = v;
+        // L'affaire choisie sort des succursales cochées : le filtre Affaire revient à « Toutes »
+        if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.affaire = "";
+        var neuf = champAffaire();
+        hote.replaceChild(neuf, chAffaire);
+        chAffaire = neuf;
+        dessine();
+      }
     });
+    filtres.succursales = fSucc.valeurs();
+    var chSucc = el("div", { class: "champ champ-succursale" }, [
+      el("label", { text: "Succursale", onclick: function () { fSucc.noeud.querySelector("button").click(); } }),
+      fSucc.noeud
+    ]);
+    if (codes.length < 2) chSucc.style.display = "none";
+
+    var chAffaire = champAffaire();
     var chMembre = UI.champ({
       nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
       options: [{ valeur: "", label: "Toute l'équipe" }, { valeur: "a-affecter", label: "À affecter (sans personne)" }]
@@ -268,14 +309,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       options: [{ valeur: "", label: "Tous les statuts" }].concat(
         Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; }))
     });
-    hote.appendChild(chAffaire); hote.appendChild(chMembre);
+    hote.appendChild(chSucc); hote.appendChild(chAffaire); hote.appendChild(chMembre);
     hote.appendChild(chStatut);
 
     var masque = el("input", { type: "checkbox" });
     masque.checked = filtres.masqueTerminees;
     masque.addEventListener("change", function () { filtres.masqueTerminees = masque.checked; dessine(); });
     hote.appendChild(el("div", { class: "champ champ-vue" }, [
-      document.querySelector(".vue-taches"),
+      blocVue,
       el("label", {
         class: "case", style: "white-space:nowrap",
         title: "Les tâches terminées, et celles dont la part de la personne regardée est rendue"
@@ -283,11 +324,23 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     ]));
 
     // Une recherche dans les deux longues listes (13.10.2026)
-    UI.listeCherchable(chAffaire.querySelector("select"), { large: true });
     UI.listeCherchable(chMembre.querySelector("select"));
-    chAffaire.querySelector("select").addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
     chMembre.querySelector("select").addEventListener("change", function () { filtres.membre = this.value; dessine(); });
     chStatut.querySelector("select").addEventListener("change", function () { filtres.statut = this.value; dessine(); });
+  }
+
+  /** Le menu Affaire : seulement les affaires des succursales cochées. */
+  function champAffaire() {
+    var ch = UI.champ({
+      nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
+      options: [{ valeur: "", label: "Toutes les affaires" }].concat(
+        D.affaires({ tous: true }).filter(dansSuccursales)
+          .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }))
+    });
+    var sel = ch.querySelector("select");
+    UI.listeCherchable(sel, { large: true });
+    sel.addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
+    return ch;
   }
 
   /** Tout ce qui, dans une tâche, peut être cherché. */
@@ -332,6 +385,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var sansPersonne = filtres.membre === "a-affecter";   // tâches dont une charge attend encore quelqu'un
     return D.taches({ affaireId: filtres.affaire || null, membreId: sansPersonne ? null : (filtres.membre || null) })
       .filter(function (t) {
+        if (filtres.succursales.length && !dansSuccursales(D.affaire(t.affaireId))) return false;
         if (sansPersonne && !Calc.nonAffectees(t).length) return false;
         if (filtres.masqueTerminees && !opts.terminees && rendu(t)) return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
@@ -360,7 +414,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (barre) barre.compte(taches.length, selection({ sansTexte: true }).length);
 
     // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [filtres.affaire, filtres.membre, filtres.statut].filter(Boolean).length;
+    var actifs = [filtres.succursales.length, filtres.affaire, filtres.membre, filtres.statut].filter(Boolean).length;
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
@@ -370,6 +424,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
        Tout ce qui restreint la liste y figure, la recherche comprise. */
     var restreint = [];
+    if (filtres.succursales.length) restreint.push(filtres.succursales.map(function (c) { return D.SUCCURSALES[c] || c; }).join(", "));
     if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(D.libelleAffaire(af)); }
     if (filtres.membre) restreint.push(filtres.membre === "a-affecter" ? "À affecter" : D.nomMembre(filtres.membre));
     if (filtres.statut) restreint.push(D.STATUTS_TACHE[filtres.statut]);
@@ -833,7 +888,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur les tâches filtrées." }));
       bloc.appendChild(el("button", {
         class: "btn btn-or", type: "button", text: "Retirer les filtres",
-        onclick: function () { filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
+        onclick: function () { filtres.succursales = []; filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
       }));
     } else {
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le libellé, la note, l'affaire, les personnes et le statut." }));

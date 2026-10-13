@@ -64,13 +64,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=54"></script>
-<script src="/planif/assets/donnees.js?v=74"></script>
+<script src="/planif/assets/supabase.js?v=55"></script>
+<script src="/planif/assets/donnees.js?v=75"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=109"></script>
+<script src="/planif/assets/ui.js?v=110"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=19"></script>
+<script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/mandat.js?v=2"></script>
 <script>
@@ -110,7 +110,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* ------------------------------------------------------------- affichage */
 
   function champsCherches(a) {
-    return [a.code, a.nom, a.adresse, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase)]
+    return [a.code, a.nom, a.adresse, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase), D.SUCCURSALES[a.succursale]]
       .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre))
       .concat(a.responsableId ? [D.nomMembre(a.responsableId), "responsable"] : []);
   }
@@ -185,7 +185,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("td", {}, [
           el("div", { style: "display:flex;align-items:center;gap:9px" }, [
             el("span", { class: "pastille", style: "color:" + t, "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [a.code ? UI.surligne(a.code, mots) : el("span", { style: "opacity:.6;letter-spacing:.02em", text: "sans n°" })])
+            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [a.code ? UI.surligne(a.code, mots) : el("span", { style: "opacity:.6;letter-spacing:.02em", text: "sans n°" })]),
+            // Succursale de l'affaire (13.10.2026)
+            D.SUCCURSALES[a.succursale] ? el("span", { class: "secondaire" }, [UI.surligne(D.SUCCURSALES[a.succursale], mots)]) : null
           ]),
           el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(a.nom, mots)]),
           a.adresse ? el("div", { class: "secondaire" }, [UI.surligne(a.adresse, mots)]) : null,
@@ -309,6 +311,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           options: [{ valeur: "", label: "— Non désigné —" }].concat(UI.optionsParMetier(
             D.membres({ tous: true }).filter(function (m) { return m.actif || (a && m.id === a.responsableId); })))
         }),
+        // Succursale (13.10.2026), facultative : une nouvelle affaire prend celle de la personne qui la crée
+        champSuccursale(a),
         UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, points de vigilance…", large: true })
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
@@ -348,6 +352,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           }
         }
       ]
+    });
+  }
+
+  /** Le choix de la succursale ; absent tant que la base ne la connaît pas, ou sans succursale au bureau. */
+  function champSuccursale(a) {
+    var codes = Object.keys(D.SUCCURSALES);
+    if (!codes.length || !D.succursaleAffairePrete()) return null;
+    var moi = D.monMembre();
+    var valeur = a ? a.succursale : (moi && D.SUCCURSALES[moi.succursale] ? moi.succursale : "");
+    return UI.champ({
+      nom: "succursale", label: "Succursale", type: "select", valeur: valeur,
+      options: [{ valeur: "", label: "— Non renseignée —" }]
+        .concat(codes.map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; }))
     });
   }
 

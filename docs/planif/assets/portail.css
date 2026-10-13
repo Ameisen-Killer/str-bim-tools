@@ -138,7 +138,7 @@ button { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------ modules */
 .ab-modules {
-  display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 16px;
+  display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 16px;
   margin: 18px calc(var(--marge) * -.4) 0;
 }
 .ab-module {
@@ -290,9 +290,8 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-encadres { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .ab-encadres .ab-encadre:last-child { grid-column: 1 / -1; }
 }
-@media (max-width: 980px) {
-  .ab-modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* Trois modules depuis le retrait de Secteurs (13.10.2026) : ils restent sur
+   une ligne jusqu'au téléphone, où ils passent en lignes. */
 @media (max-width: 760px) {
   .ab-encadres { grid-template-columns: minmax(0, 1fr); }
   .ab-modules, .ab-encadres { margin-left: 0; margin-right: 0; }

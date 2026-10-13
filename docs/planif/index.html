@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=35">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=36">
 </head>
 <body>
 
@@ -55,17 +55,7 @@
       <p>Tâches, tableau de bord, affaires et tableau de charge</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
-    <a class="ab-module ab-monte" style="--r:2" data-page="secteurs" href="/planif/secteurs/">
-      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <path class="ic-f" d="M13 52V38a3 3 0 0 1 6 0v14M26 52V28a3 3 0 0 1 6 0v24"/>
-        <rect class="ic-plein" x="39" y="8" width="9" height="44"/>
-        <path class="ic-sol" d="M9 57.5h46"/>
-      </svg>
-      <h2>Secteurs</h2>
-      <p>Effectifs, charge, ressources et projets de chaque secteur</p>
-      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
-    </a>
-    <a class="ab-module ab-monte" style="--r:3" data-page="inter" href="/planif/inter-secteurs/" id="module-inter">
+    <a class="ab-module ab-monte" style="--r:2" data-page="inter" href="/planif/inter-secteurs/" id="module-inter">
       <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
         <path class="ic-f" d="M17 6h21l12 12v37a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z"/>
         <path class="ic-f" d="M38 6v12h12"/>
@@ -110,8 +100,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=54"></script>
-<script src="/planif/assets/donnees.js?v=74"></script>
+<script src="/planif/assets/supabase.js?v=55"></script>
+<script src="/planif/assets/donnees.js?v=75"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/portail.js?v=24"></script>
@@ -181,7 +171,7 @@
 
   /* Arrivée ici depuis une page que son groupe n'ouvre pas (ui.js, chrome) :
      le dire, avec les groupes qui l'ouvrent (droits réglés dans la console) */
-  var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", secteurs: "Secteurs", inter: "Inter-secteurs",
+  var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", inter: "Inter-secteurs",
                      tableau: "Tableau de bord", absences: "Absences et congés", annuaire: "Annuaire", transversales: "Affaires transversales" };
   function refus() {
     var cle = new URLSearchParams(location.search).get("refus");

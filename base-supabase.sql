@@ -316,14 +316,19 @@ create table if not exists public.affaires (
   secteurs     text[] not null default '{}',
   -- Responsable d'affaire (13.10.2026) : une fiche de l'équipe
   responsable_id uuid constraint affaires_responsable_fk references public.membres (id) on delete set null,
+  -- Succursale de l'affaire (13.10.2026), facultative : filtre de la page Tâches
+  succursale text,
   -- Mandat (13.10.2026) : phases SIA et disciplines de chacune, {"31": ["structure", "geotechnique"], …}
   mandat     jsonb not null default '{}'::jsonb constraint affaires_mandat_check check (jsonb_typeof(mandat) = 'object'),
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
   constraint affaires_id_bureau_key   unique (id, bureau_id),
-  constraint affaires_code_bureau_key unique (bureau_id, code)
+  constraint affaires_code_bureau_key unique (bureau_id, code),
+  constraint affaires_succursale_fk foreign key (bureau_id, succursale)
+    references public.succursales (bureau_id, code) on delete set null (succursale)
 );
 create index if not exists affaires_bureau on public.affaires (bureau_id);
+comment on column public.affaires.succursale is 'Code d''une succursale du bureau (table succursales). Vide : non renseignée.';
 comment on column public.affaires.teinte is 'Index 1..8 dans la palette du site : la couleur reste définie côté interface.';
 
 -- Équipe d'une affaire. Le rôle n'est pas répété ici : il est porté par le membre.
@@ -788,7 +793,7 @@ begin
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'chef_secteur', 'Chef de secteur', 'administrateur', 0,
-     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge', 'page_secteurs',
+     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge',
            'planning_equipe', 'taches_a_affecter', 'conges_secteur', 'avancement_secteur'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
