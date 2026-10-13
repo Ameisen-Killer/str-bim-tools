@@ -121,7 +121,7 @@
      pages qui les ont gardées en main voient donc les bons noms. */
   var GROUPES_DEFAUT = [
     { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
-      droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire"] },
+      droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
@@ -236,7 +236,7 @@
   var CATEGORIES_DROITS = [
     { titre: "Pages", droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire",
                                "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales"] },
-    { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter"] },
+    { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
                                              "conges_secteur", "conges_tous", "tchat_moderer"] }
   ];
@@ -256,6 +256,14 @@
       aide: "Le tableau de bord montre tout le monde, et la page Équipe la charge de chacun. Sans ce droit, on n'y voit que ses tâches et les personnes qui y travaillent."
     },
     taches_a_affecter: { titre: "Tâches à affecter", aide: "L'encadré « Tâches à affecter » de l'accueil." },
+    voir_conges_equipe: {
+      titre: "Demandes de l'équipe en attente",
+      aide: "Dans Communication, les demandes de congé des collègues qui attendent une décision. Celles qu'on valide soi-même restent toujours affichées."
+    },
+    voir_absences_avenir: {
+      titre: "Absences à venir",
+      aide: "Dans Communication, les absences de l'équipe des quatre prochaines semaines. Celles en cours restent affichées pour tous."
+    },
     affaires_creer: {
       titre: "Ouvrir une affaire",
       aide: "Créer une nouvelle affaire (et un appel d'offres), et la retirer. Sans ce droit, on travaille normalement sur les affaires existantes."
@@ -288,6 +296,7 @@
     inter: "page_inter", transversales: "page_transversales"
   };
   poseGroupes(null);
+  var DROITS_EN_ATTENTE = ["voir_conges_equipe", "voir_absences_avenir"];
 
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
      l'outil comme chacun le verra. Retenu sur ce navigateur ; par défaut
@@ -1252,6 +1261,8 @@
       var p = profilVu();
       if (!p) return true;                            // profil pas encore lu
       if (p.superAdmin) return true;
+      // Droit ajouté le 13.10.2026 qu'aucun groupe ne connaît encore (migration-droits-vues.sql pas encore passée) : comme avant, pour tous
+      if (DROITS_EN_ATTENTE.indexOf(code) >= 0 && !GROUPES.some(function (g) { return g.droits.indexOf(code) >= 0; })) return true;
       return (p.droits || []).indexOf(code) >= 0;
     },
 

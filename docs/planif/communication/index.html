@@ -93,7 +93,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=49"></script>
-<script src="/planif/assets/donnees.js?v=66"></script>
+<script src="/planif/assets/donnees.js?v=67"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=96"></script>
@@ -344,7 +344,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ]);
     }));
 
-    bloc("Demandes de l'équipe en attente", attente.map(function (c) {
+    // Droit « Voir les demandes de l'équipe en attente » (13.10.2026)
+    if (D.aDroit("voir_conges_equipe")) bloc("Demandes de l'équipe en attente", attente.map(function (c) {
       var m = D.membre(c.membreId);
       return el("li", { class: "cm-demande" }, [
         el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
@@ -421,9 +422,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hote = UI.vide(document.getElementById("liste-absences"));
     var a = auj(), jusqu = C.ajoute(a, HORIZON_ABSENCES), canton = D.canton();
     var l = D.absences({ depuis: a, jusqu: jusqu });
-    var avis = D.avis({ jusqu: jusqu });
-    if (!l.length && !avis.length) {
-      hote.appendChild(el("p", { class: "vide", text: "Aucune absence dans les quatre prochaines semaines." }));
+    /* Les absences à venir : droit « Voir les absences à venir » (13.10.2026).
+       Les avis à l'heure près ne sont plus listés ici (demande de Tony,
+       13.10.2026) : ils restent dans « Qui manque » du jour. */
+    if (!D.aDroit("voir_absences_avenir")) l = l.filter(function (x) { return x.absence.debut <= a; });
+    if (!l.length) {
+      hote.appendChild(el("p", { class: "vide", text: D.aDroit("voir_absences_avenir")
+        ? "Aucune absence dans les quatre prochaines semaines." : "Aucune absence en cours." }));
       return;
     }
     function groupe(titre, lignes) {
@@ -448,21 +453,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
     groupe("En cours", l.filter(function (x) { return x.absence.debut <= a; }).map(ligne));
     groupe("À venir", l.filter(function (x) { return x.absence.debut > a; }).map(ligne));
-    groupe("Avis à l'heure près", avis.map(function (x) {
-      var m = D.membre(x.membreId);
-      return el("li", { class: "cm-personne avis" }, [
-        el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
-        el("span", { class: "cm-lib" }, [
-          el("span", { class: "cm-titre", text: nom(m) + " — " + x.motif }),
-          el("span", { class: "cm-detail", text: periodeAvis(x) })
-        ]),
-        D.peutAbsences(x.membreId) ? UI.boutonIcone("supprimer", "Retirer l'avis", x.motif, function () {
-          UI.confirme("Retirer cet avis ?", "Le bureau ne le verra plus : " + x.motif + ", " + periodeAvis(x) + ".", "Retirer", true).then(function (ok) {
-            if (ok) D.suppAvis(x.id).then(function () { UI.toast("Avis retiré."); rend(); }).catch(function (e) { UI.toast(e.message); });
-          });
-        }) : null
-      ]);
-    }));
   }
 
   /* ================================================================ formulaires */

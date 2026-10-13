@@ -681,7 +681,7 @@ language plpgsql volatile security definer set search_path = '' as $$
 begin
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'tous', 'Tout le monde', null, 0,
-     array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire']),
+     array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire', 'voir_conges_equipe', 'voir_absences_avenir']),
     (p_bureau, 'administrateur', 'Administrateur', null, 0,
      array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'page_transversales', 'conges_tous'])
   on conflict (bureau_id, statut) do nothing;
