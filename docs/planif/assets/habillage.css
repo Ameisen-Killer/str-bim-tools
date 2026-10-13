@@ -191,6 +191,11 @@
 :root[data-version="v2"] .case{border-radius:6px;font-size:14px}
 :root[data-version="v2"] .case:has(input:checked){background:var(--ab-vert-pale);border-color:transparent;color:var(--texte)}
 :root[data-version="v2"] .semaine button{border-radius:6px;font-size:13px}
+/* Rangement des tâches : deux boutons accolés, celui choisi en vert pâle comme la case cochée */
+:root[data-version="v2"] .vue-taches .btn{padding:7px 12px;font-size:14px;letter-spacing:0}
+:root[data-version="v2"] .vue-taches .btn:first-child{border-radius:6px 0 0 6px}
+:root[data-version="v2"] .vue-taches .btn:last-child{border-radius:0 6px 6px 0}
+:root[data-version="v2"] .vue-taches .btn[aria-pressed="true"]{background:var(--ab-vert-pale);border-color:rgba(var(--encre),.16);color:var(--texte);font-weight:600}
 
 /* --------------------------------------------------------- formulaires */
 :root[data-version="v2"] .champ > label,:root[data-version="v2"] .legende{font-size:13px;font-weight:500;color:var(--texte-faible)}
