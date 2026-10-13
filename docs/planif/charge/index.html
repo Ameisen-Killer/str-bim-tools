@@ -62,11 +62,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="16">16 semaines</option>
           <option value="26">26 semaines</option>
         </select>
-        <select id="f-metier" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par métier">
-          <option value="">Toute l'équipe</option>
-          <option value="ingenieur">Ingénieurs</option>
-          <option value="dessinateur">Dessinateurs</option>
-        </select>
+        <!-- Succursales, secteurs, fonctions : menus à cases (UI.multiChoix), plusieurs choix (13.10.2026) -->
+        <span id="f-succursale"></span>
+        <span id="f-secteur"></span>
+        <span id="f-metier"></span>
         <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:260px" aria-label="Ne compter qu'une affaire"></select>
       </div>
 
@@ -123,10 +122,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.carte";
-  var vue = { debut: null, semaines: 12, metier: "", affaire: "" };
+  var vue = { debut: null, semaines: 12, metiers: [], succursales: [], secteurs: [], affaire: "" };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
   if (!memorise0 && window.innerWidth < 760) vue.semaines = 8;
+  // Vue d'avant les choix multiples : un seul métier, sous « metier »
+  if (typeof vue.metier === "string") vue.metiers = vue.metier ? [vue.metier] : [];
+  delete vue.metier;
+  ["metiers", "succursales", "secteurs"].forEach(function (k) { if (!Array.isArray(vue[k])) vue[k] = []; });
+  var filtres = {};
   vue.semaines = [8, 12, 16, 26].indexOf(+vue.semaines) >= 0 ? +vue.semaines : 12;
   vue.debut = C.lundi(vue.debut || C.isoAuj());
   // Une vue mémorisée qui a vieilli repart de la semaine en cours
@@ -155,9 +159,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hz = document.getElementById("horizon");
     hz.value = String(vue.semaines);
     hz.addEventListener("change", function () { vue.semaines = +hz.value; memorise(); rend(); });
-    var fm = document.getElementById("f-metier");
-    fm.value = vue.metier || "";
-    fm.addEventListener("change", function () { vue.metier = fm.value; memorise(); rend(); });
+    /* Succursales, secteurs et fonctions : plusieurs choix, rien de coché =
+       tout ; un menu sans choix possible (une seule succursale) disparaît. */
+    function filtreCases(id, cle, tous, pluriel, liste) {
+      var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
+      var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
+        surChange: function (v) { vue[cle] = v; memorise(); rend(); } });
+      vue[cle] = f.valeurs();
+      var hote = document.getElementById(id);
+      UI.vide(hote).appendChild(f.noeud);
+      hote.style.display = options.length > 1 ? "" : "none";
+      return f;
+    }
+    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES);
+    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
+    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
 
     remplitAffaires();
     var fa = document.getElementById("f-affaire");
@@ -209,7 +225,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ouvertes.forEach(function (t) { if (t.affaireId === vue.affaire) dansAffaire[t.id] = true; });
     }
 
-    var membres = tous.filter(function (m) { return !vue.metier || D.cote(m.metier) === vue.metier; });
+    var membres = tous.filter(function (m) {
+      return (!vue.metiers.length || vue.metiers.indexOf(D.cote(m.metier)) >= 0)
+        && (!vue.succursales.length || vue.succursales.indexOf(m.succursale) >= 0)
+        && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
+    });
     // Affaire choisie : son équipe, et qui y porte une part ouverte
     if (vue.affaire) {
       var a = D.affaire(vue.affaire), garde = Object.create(null);
@@ -267,7 +287,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var fin = Calc.finEffective(t);
       if (!fin) return;
       Calc.nonAffectees(t).forEach(function (na) {
-        if (vue.metier && na.role !== vue.metier) return;
+        if (vue.metiers.length && vue.metiers.indexOf(na.role) < 0) return;
         // En retard : la charge repart d'aujourd'hui, comme au planning (Calc.fenetre)
         var f = Calc.fenetre(na.charge, Calc.finPart(t, na.role, canton), null, canton);
         var ouvres = [], j = f.debut, g = 0;
@@ -299,7 +319,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     UI.defileTexte(document.getElementById("titre-carte"),
       lignes.length + (lignes.length > 1 ? " personnes" : " personne") + " · " + sems.length + " semaines");
     document.getElementById("imp-periode").textContent = p.textContent +
-      (vue.affaire && D.affaire(vue.affaire) ? "  ·  " + D.affaire(vue.affaire).code + " seulement" : "");
+      (vue.affaire && D.affaire(vue.affaire) ? "  ·  " + D.affaire(vue.affaire).code + " seulement" : "") +
+      ["succursales", "secteurs", "metiers"].map(function (k) { return filtres[k] && filtres[k].texte() ? "  ·  " + filtres[k].texte() : ""; }).join("");
     document.getElementById("imp-edition").textContent = "édité le " + C.fmtCH(C.isoAuj());
 
     rendCles(totaux);
