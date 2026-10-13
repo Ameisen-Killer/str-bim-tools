@@ -698,25 +698,25 @@
     ["console"]
   ];
   var MODULE_DE = {
-    absences: "communication", annuaire: "communication",
-    tableau: "taches", affaires: "taches", transversales: "inter", equipe: "taches", charge: "taches"
+    absences: "communication", annuaire: "communication", equipe: "communication",
+    tableau: "taches", affaires: "taches", transversales: "inter", charge: "taches"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
      ouverte en vert clair. Communication : le bureau aujourd'hui, les
-     absences et l'annuaire, pour tous. Tâches : la liste et le tableau de
+     absences, l'équipe (passée de Tâches le 13.10.2026) et l'annuaire. Tâches : la liste et le tableau de
      bord pour tous, puis les pages de gestion pour les chefs de secteur et
      au-delà. Inter-secteurs : appels d'offres et affaires transversales. Une seule page permise : pas de sous-barre. */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [
       { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
       { cle: "absences", href: "/planif/absences/", nom: "Absences et congés" },
+      { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" },
       { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire" }
     ] },
     taches: { nom: "Tâches", pages: [
       { cle: "taches", href: "/planif/taches/", nom: "Tâches" },
       { cle: "tableau", href: "/planif/planning/", nom: "Tableau de bord" },
       { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
-      { cle: "equipe", href: "/planif/equipe/", nom: "Équipe" },
       { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge" }
     ] },
     inter: { nom: "Inter-secteurs", pages: [
