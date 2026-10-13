@@ -1679,3 +1679,8 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .mc-panneau.mc-large{width:min(620px,calc(100vw - 24px));max-width:none}
 .mc-panneau.mc-large .mc-liste{max-height:380px}
 .mc-panneau.mc-large .mc-option span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* Tableau de bord : bilan par semaine des charges sans personne (survol : leurs tâches) */
+.pl-bw.a-aff{cursor:pointer;color:var(--or);border-radius:4px;transition:background .2s}
+.pl-bw.a-aff:hover,.pl-bw.a-aff:focus-visible{background:rgba(var(--or-rvb),.08);outline:none}
+.pl-bw.a-aff.nul{cursor:default;color:var(--texte-faible)}
+.pl-bw.a-aff.nul:hover{background:none}

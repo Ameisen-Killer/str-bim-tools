@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=92">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=93">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 </head>
 <body class="large">
@@ -629,7 +629,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           ])
         ]));
         // data-membre vide : la ligne reçoit aussi les charges qu'on veut remettre à affecter
-        plan.appendChild(el("div", { class: "pl-zone a-affecter", "data-anim": "z|libre|" + r, dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r])]));
+        plan.appendChild(el("div", { class: "pl-zone a-affecter", "data-anim": "z|libre|" + r, dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r]), bilanLibres(libres[r], r, canton)]));
       });
     }
 
@@ -688,6 +688,112 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
       var zone = el("div", { class: "pl-zone", "data-anim": "z|" + m.id, dataset: { membre: m.id, role: D.cote(m.metier) } }, [fond, piste, bilan]);
       plan.appendChild(zone);
+    });
+  }
+
+  /* ---- À affecter : le bilan par semaine (13.10.2026, comme le tableau de
+     charge). Chaque charge sans personne s'étale sur les jours ouvrés de sa
+     fenêtre ; au survol d'une semaine, la liste de ses tâches ; au clic, le
+     détail, d'où l'on ouvre chaque tâche pour l'affecter. */
+  function libresParSemaine(liste, canton) {
+    var ouvresDe = liste.map(function (info) {
+      var ouvres = [], j = info.debut, g = 0;
+      while (j && g++ < 800) { if (C.estOuvre(j, canton)) ouvres.push(j); if (j >= info.fin) break; j = C.ajoute(j, 1); }
+      return ouvres.length ? ouvres : [info.fin];
+    });
+    return sems.map(function (s) {
+      var parts = {}, total = 0;
+      liste.forEach(function (info, i) {
+        var o = ouvresDe[i], n = o.filter(function (x) { return s.jours.indexOf(x) >= 0; }).length;
+        if (!n) return;
+        var q = info.charge * n / o.length;
+        parts[info.tache.id] = (parts[info.tache.id] || 0) + q;
+        total += q;
+      });
+      return { s: s, total: total, parts: parts };
+    });
+  }
+  function bilanLibres(liste, role, canton) {
+    var bilan = el("div", { class: "pl-bilan" });
+    libresParSemaine(liste, canton).forEach(function (w) {
+      var vide = w.total <= 0.005;
+      var cell = el("div", { class: "pl-bw a-aff" + (vide ? " nul" : ""), style: "--span:" + w.s.jours.length,
+        tabindex: vide ? null : "0", role: vide ? null : "button",
+        "aria-label": vide ? null : "S" + w.s.num + " : " + C.fmtJours(Math.round(w.total * 10) / 10) + " j sans personne — voir les tâches" }, [
+        el("span", { text: "S" + w.s.num + "  " + (vide ? "—" : C.fmtJours(Math.round(w.total * 10) / 10) + " j sans personne") })
+      ]);
+      if (!vide) {
+        cell.addEventListener("pointerenter", function (e) { if (e.pointerType !== "touch") montreBulleLibres(cell, w, role); });
+        cell.addEventListener("pointerleave", cacheBulleLibres);
+        cell.addEventListener("focus", function () { montreBulleLibres(cell, w, role); });
+        cell.addEventListener("blur", cacheBulleLibres);
+        cell.addEventListener("click", function () { cacheBulleLibres(); detailLibres(w, role); });
+        cell.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cacheBulleLibres(); detailLibres(w, role); } });
+      }
+      bilan.appendChild(cell);
+    });
+    return bilan;
+  }
+  function partsTriees(w) {
+    return Object.keys(w.parts).map(function (id) { return { t: D.tache(id), j: w.parts[id] }; })
+      .filter(function (x) { return x.t; }).sort(function (a, b) { return b.j - a.j; });
+  }
+  var bulleLibres = null;
+  function montreBulleLibres(cell, w, role) {
+    if (!bulleLibres) { bulleLibres = el("div", { class: "cc-bulle", role: "tooltip" }); document.body.appendChild(bulleLibres); }
+    UI.vide(bulleLibres);
+    var lundi = w.s.jours[0], parts = partsTriees(w);
+    bulleLibres.appendChild(el("div", { class: "t", text: "À affecter · " + (role === "dessinateur" ? "dessin" : "calcul") }));
+    bulleLibres.appendChild(el("div", { class: "s", text: "Semaine " + w.s.num + " · " + C.fmtCourt(lundi) + " → " + C.fmtCourt(C.ajoute(lundi, 4)) }));
+    bulleLibres.appendChild(el("div", { class: "v" }, [el("b", { text: C.fmtJours(Math.round(w.total * 10) / 10) + " j" }), "  de travail sans personne"]));
+    parts.slice(0, 5).forEach(function (x) {
+      var a = D.affaire(x.t.affaireId);
+      bulleLibres.appendChild(el("div", { class: "p" }, [
+        el("span", { class: "code", style: "color:" + UI.teinte(a ? a.teinte : 1), text: a ? a.code : "—" }),
+        el("span", { class: "lib", text: x.t.titre }),
+        el("span", { class: "j", text: C.fmtJours(Math.round(x.j * 10) / 10) + " j" })
+      ]));
+    });
+    if (parts.length > 5) bulleLibres.appendChild(el("div", { class: "s", text: "et " + (parts.length - 5) + " autres" }));
+    bulleLibres.appendChild(el("div", { class: "aide", text: "Clic : le détail de la semaine" }));
+    bulleLibres.classList.add("vue");
+    var r = cell.getBoundingClientRect(), b = bulleLibres.getBoundingClientRect();
+    var x = Math.min(window.innerWidth - b.width - 8, Math.max(8, r.left + r.width / 2 - b.width / 2));
+    var y = r.top - b.height - 10;
+    if (y < 8) y = r.bottom + 10;
+    bulleLibres.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+  }
+  function cacheBulleLibres() { if (bulleLibres) bulleLibres.classList.remove("vue"); }
+  window.addEventListener("scroll", cacheBulleLibres, { passive: true });
+
+  function detailLibres(w, role) {
+    var lundi = w.s.jours[0], liste = el("div", { class: "cc-detail" });
+    partsTriees(w).forEach(function (x) {
+      var t = x.t, a = D.affaire(t.affaireId);
+      liste.appendChild(el("button", { type: "button", class: "cc-det", onclick: function () {
+        UI.ferme(); UI.ficheTache(t.id, { surEnregistrement: rend });
+      } }, [
+        el("span", { class: "pal-teinte", style: "background:" + UI.teinte(a ? a.teinte : 1), "aria-hidden": "true" }),
+        el("span", { class: "lib" }, [
+          el("span", { class: "t", text: t.titre }),
+          el("span", { class: "s", text: (a ? a.code + " · " : "") + (role === "dessinateur" ? "dessin" : "calcul") + " sans personne · échéance " + C.fmtCourt(t.echeance) })
+        ]),
+        el("span", { class: "j", text: C.fmtJours(Math.round(x.j * 10) / 10) + " j" })
+      ]));
+    });
+    UI.ouvre({
+      surtitre: "Semaine " + w.s.num + " · " + C.fmtCourt(lundi) + " → " + C.fmtCourt(C.ajoute(lundi, 4)),
+      titre: "À affecter · " + (role === "dessinateur" ? "dessin" : "calcul"),
+      corps: el("div", {}, [
+        el("p", { class: "aide", style: "font-size:14px;margin:0 0 18px;color:var(--texte-doux)",
+          text: C.fmtJours(Math.round(w.total * 10) / 10) + " j de travail attendent encore quelqu'un cette semaine. Une tâche ouverte se confie depuis sa fiche — ou en glissant sa barre sur une personne." }),
+        liste
+      ]),
+      compacte: true,
+      boutons: [
+        { label: "Toutes les tâches à affecter", gauche: true, action: function () { location.href = "/planif/taches/?membre=a-affecter"; } },
+        { label: "Fermer", or: true, entree: true }
+      ]
     });
   }
 
