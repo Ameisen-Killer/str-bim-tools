@@ -418,8 +418,7 @@
       o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
       o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
       o.secteurs = a.secteurs || [];
-      // Garde-fou provisoire (13.10.2026, migration-responsable.sql) : à retirer ensuite
-      if (responsableEnBase) o.responsable_id = a.responsableId || null;
+      o.responsable_id = a.responsableId || null;
       return o;
     },
     taches: function (t) {
@@ -527,10 +526,6 @@
         if (manquent.length || Object.keys(connues).length !== lignes.length) retiensPhotos(lignes);
         return lignes;
       });
-    }, function (e) {
-      // Colonne inconnue (migration du profil ou du natel pas encore passée) : lecture complète, comme avant
-      if (e && e.code === "42703") return litTout("membres", "id");
-      throw e;
     });
   }
 
@@ -607,13 +602,6 @@
         liens = b.affaire_membres || [], taches = b.taches || [], reglages = (b.reglages || [])[0] || {},
         contacts = b.contacts || [], avis = b.avis || [], agenda = b.ao_agenda || [], rdv = b.rendez_vous || [],
         conges = b.conges || [], veille = b.veille_ao || [], veilleSuivi = b.veille_suivi || [];
-    // Garde-fou provisoire (10.10.2026) : colonnes de « Mon profil » pas encore en base
-    // tant que migration-profil.sql n'est pas passée. À retirer ensuite.
-    profilEnBase = !!membres.length && "tel_interne" in membres[0];
-    // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
-    natelEnBase = !!membres.length && "tel_natel" in membres[0];
-    // Même garde-fou pour le responsable d'affaire (13.10.2026, migration-responsable.sql)
-    responsableEnBase = !!affaires.length && "responsable_id" in affaires[0];
 
     function metierDe(m) { return m.metier || ""; }
     function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -720,13 +708,10 @@
 
   /* Mon profil : téléphones et photo de sa propre fiche, par la fonction
      regle_profil (même raison que regle_jours). Interne, ligne directe
-     (tel_externe) et natel ; tant que la base n'a pas le natel, l'ancienne
-     fonction à quatre paramètres. */
-  var profilEnBase = false, natelEnBase = false, responsableEnBase = false;
+     (tel_externe) et natel. */
   function regleProfil(idMembre, p) {
-    var args = { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || "" };
-    if (natelEnBase) args.p_tel_natel = p.telNatel || "";
-    return rpc("regle_profil", args);
+    return rpc("regle_profil", { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "",
+                                 p_tel_natel: p.telNatel || "", p_photo: p.photo || "" });
   }
 
   /* Changer son mot de passe : l'ancien est d'abord vérifié par une connexion
@@ -948,8 +933,6 @@
       profil: profil,
       regleJours: regleJours,
       regleProfil: regleProfil,
-      profilEnBase: function () { return profilEnBase; },
-      natelEnBase: function () { return natelEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }

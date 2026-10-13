@@ -1349,7 +1349,6 @@
         var m = D.membre(idMembre); if (!m) throw erreur("Membre introuvable.");
         var moi = D.monMembre();
         if (!moi || moi.id !== idMembre) throw erreur("Tu ne règles que ton propre profil.");
-        if (!D.profilPret()) throw erreur("La base n'est pas encore à jour pour le profil.");
         var neuf = {
           telInterne: texte(p.telInterne).trim().slice(0, 40),
           telExterne: texte(p.telExterne).trim().slice(0, 40),
@@ -1365,10 +1364,6 @@
           .then(function () { return D.membre(idMembre) || m; });
       });
     },
-    /** Les colonnes du profil existent en base (toujours vrai en mode local). Garde-fou provisoire. */
-    profilPret: function () { return ADAPTATEUR.profilEnBase ? ADAPTATEUR.profilEnBase() : true; },
-    /** La colonne du natel existe en base (migration-natel.sql ; toujours vrai en mode local). */
-    natelPret: function () { return ADAPTATEUR.natelEnBase ? ADAPTATEUR.natelEnBase() : true; },
     /** Compte de démonstration partagé : la photo, vue de tous les visiteurs, ne s'y change pas. */
     photoBloquee: function () {
       return !!ADAPTATEUR.regleProfil && /^demo@/i.test(texte(profil && profil.email) || (global.Sb && global.Sb.email ? global.Sb.email() : ""));

@@ -46,8 +46,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=51"></script>
-<script src="/planif/assets/donnees.js?v=71"></script>
+<script src="/planif/assets/supabase.js?v=52"></script>
+<script src="/planif/assets/donnees.js?v=72"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=106"></script>
@@ -104,12 +104,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
              "Tu peux tout de même changer ton mot de passe ci-dessous.")
       ], "pf-large");
     }
-    var pret = D.profilPret(), bloquee = D.photoBloquee();
+    var bloquee = D.photoBloquee();
     var entree = el("input", { type: "file", accept: "image/*", hidden: true });
     var choisir = el("button", { type: "button", class: "btn btn-or", text: moi.photo ? "Changer la photo" : "Ajouter une photo",
-      disabled: !pret || bloquee, onclick: function () { entree.click(); } });
+      disabled: bloquee, onclick: function () { entree.click(); } });
     var retirer = moi.photo ? el("button", { type: "button", class: "btn", text: "Retirer",
-      disabled: !pret || bloquee, onclick: function () { enregistrePhoto(null, retirer); } }) : null;
+      disabled: bloquee, onclick: function () { enregistrePhoto(null, retirer); } }) : null;
     entree.addEventListener("change", function () {
       var f = entree.files && entree.files[0];
       entree.value = "";
@@ -137,8 +137,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           el("div", { class: "pf-boutons" }, [choisir, retirer, entree])
         ])
       ]),
-      !pret ? note("Base à mettre à jour : la photo et les téléphones s'enregistreront dès que la migration « Mon profil » sera passée.", true)
-        : bloquee ? note("La photo ne se change pas dans la démonstration : elle est vue de tous les visiteurs.")
+      bloquee ? note("La photo ne se change pas dans la démonstration : elle est vue de tous les visiteurs.")
         : note("Une image carrée de préférence ; elle est recadrée au centre et réduite. Le nom, le métier et l'adresse se changent dans la console.")
     ], "pf-large");
   }
@@ -172,15 +171,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* ---------------------------------------------------------- téléphones */
 
   function telephones(moi) {
-    var pret = D.profilPret();
     var interne = UI.champ({ nom: "tel-interne", label: "Téléphone interne", valeur: moi.telInterne, exemple: "ex. 214", type: "tel", autocomplete: "off" });
     var externe = UI.champ({ nom: "tel-externe", label: "Ligne directe", valeur: moi.telExterne, exemple: "ex. 022 869 41 14", type: "tel", autocomplete: "off" });
-    // Le natel attend sa colonne en base (migration-natel.sql) : sans elle, il ne s'enregistrerait pas
-    var natel = D.natelPret() ? UI.champ({ nom: "tel-natel", label: "Natel", valeur: moi.telNatel, exemple: "ex. 079 123 45 67", type: "tel", autocomplete: "tel" }) : null;
-    var ci = interne.querySelector("input"), ce = externe.querySelector("input"), cn = natel ? natel.querySelector("input") : null;
-    ci.maxLength = ce.maxLength = 40;
-    if (cn) cn.maxLength = 40;
-    var bouton = el("button", { type: "submit", class: "btn btn-or", text: "Enregistrer", disabled: !pret });
+    var natel = UI.champ({ nom: "tel-natel", label: "Natel", valeur: moi.telNatel, exemple: "ex. 079 123 45 67", type: "tel", autocomplete: "tel" });
+    var ci = interne.querySelector("input"), ce = externe.querySelector("input"), cn = natel.querySelector("input");
+    ci.maxLength = ce.maxLength = cn.maxLength = 40;
+    var bouton = el("button", { type: "submit", class: "btn btn-or", text: "Enregistrer" });
     var form = el("form", { class: "pf-form" }, [
       el("div", { class: "grille-champs" }, [interne, externe, natel]),
       el("div", { class: "pf-actions" }, [bouton])
@@ -188,11 +184,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       occupe(bouton, true);
-      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value, telNatel: cn ? cn.value : undefined })
+      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value, telNatel: cn.value })
         .then(function () { UI.toast("Téléphones enregistrés."); occupe(bouton, false); })
         .catch(function (err) { occupe(bouton, false); UI.toast(err.message); });
     });
-    return section("Téléphones", [form, !pret ? note("Base à mettre à jour : enregistrement possible après la migration « Mon profil ».", true) : null]);
+    return section("Téléphones", [form]);
   }
 
   /* ---------------------------------------------------- jours travaillés */
