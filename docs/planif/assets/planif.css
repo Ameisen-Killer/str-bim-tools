@@ -1675,3 +1675,7 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .mc-cherche{width:100%;height:34px;margin-bottom:6px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;font:inherit;font-size:14px;text-transform:none;letter-spacing:normal}
 .mc-cherche:focus{outline:2px solid var(--m-fort,var(--or));outline-offset:-1px}
 .mc-panneau{max-width:360px}
+.mc-panneau.a-droite{left:auto;right:0}
+.mc-panneau.mc-large{width:min(620px,calc(100vw - 24px));max-width:none}
+.mc-panneau.mc-large .mc-liste{max-height:380px}
+.mc-panneau.mc-large .mc-option span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}

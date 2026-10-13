@@ -2710,7 +2710,8 @@
       "aria-label": o.libelle }, [texte, el("span", { class: "mc-fleche", "aria-hidden": "true", text: "▾" })]);
     var liste = el("div", { class: "mc-liste" });
     var cherche = o.options.length > 10 ? el("input", { type: "search", class: "mc-cherche", placeholder: "Chercher…", "aria-label": "Chercher dans la liste" }) : null;
-    var panneau = el("div", { class: "mc-panneau", hidden: true, role: "group", "aria-label": o.libelle }, [
+    // o.large : un panneau large, une ligne par option (les affaires, codes et noms longs)
+    var panneau = el("div", { class: "mc-panneau" + (o.large ? " mc-large" : ""), hidden: true, role: "group", "aria-label": o.libelle }, [
       cherche,
       liste,
       el("div", { class: "mc-pied" }, [
@@ -2737,7 +2738,7 @@
         choisis = c.checked ? choisis.concat([x.valeur]) : choisis.filter(function (v) { return v !== x.valeur; });
         maj(true);
       });
-      liste.appendChild(el("label", { class: "mc-option", dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]));
+      liste.appendChild(el("label", { class: "mc-option", title: x.label, dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]));
       return c;
     });
     function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
@@ -2762,7 +2763,12 @@
     function ouvre(oui) {
       panneau.hidden = !oui;
       bouton.setAttribute("aria-expanded", String(oui));
-      if (oui) { var premier = panneau.querySelector("input"); if (premier) premier.focus(); }
+      if (oui) {
+        // Calé à droite du bouton s'il sortirait de l'écran
+        panneau.classList.remove("a-droite");
+        if (panneau.getBoundingClientRect().right > global.innerWidth - 8) panneau.classList.add("a-droite");
+        var premier = panneau.querySelector("input"); if (premier) premier.focus();
+      }
       else if (cherche && cherche.value) { cherche.value = ""; cherche.dispatchEvent(new Event("input")); }
     }
     bouton.addEventListener("click", function () { ouvre(panneau.hidden); });
