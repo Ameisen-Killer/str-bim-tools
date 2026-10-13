@@ -10,7 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M16 6l10 5v10l-10 5-10-5V11z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M16 12l4 2v4l-4 2-4-2v-4z' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/polices/polices.css?v=3">
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 :root{
   --encre:236,232,224;
@@ -24,7 +24,7 @@
   --texte-doux:rgba(var(--encre),.56);
   --texte-faible:rgba(var(--encre),.34);
   --g:clamp(18px,4vw,56px);
-  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
   --courbe:cubic-bezier(.2,.7,.2,1);
 }
 :root[data-theme="clair"]{
@@ -42,10 +42,10 @@
 }
 :root[data-theme="sombre"]{color-scheme:dark}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;overflow-x:hidden}
+html{scroll-behavior:smooth;overflow-x:hidden;scrollbar-gutter:stable}  /* place de la barre de défilement réservée : rien ne se resserre au chargement */
 body{
   margin:0;background:var(--noir);color:var(--texte);
-  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  font-family:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
   -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.55;
 }
 a{color:inherit}
@@ -102,7 +102,7 @@ button,input{font:inherit;color:inherit}
 .hero h1{margin:14px 0 0;font-weight:200;font-size:clamp(64px,13vw,168px);line-height:.88;letter-spacing:.04em;text-transform:uppercase}
 .hero .chapeau{margin:24px 0 0;max-width:30em;font-size:clamp(16px,1.9vw,21px);color:var(--texte-doux)}
 .compteurs{display:flex;flex-wrap:wrap;gap:12px 36px;margin-top:34px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
-.compteurs b{display:block;font-family:"Inter Tight",sans-serif;font-weight:200;font-size:clamp(34px,4vw,48px);letter-spacing:0;line-height:1;color:var(--texte);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.compteurs b{display:block;font-family:"Inter Tight","Inter Tight repli","Inter Tight repli Android",sans-serif;font-weight:200;font-size:clamp(34px,4vw,48px);letter-spacing:0;line-height:1;color:var(--texte);margin-bottom:8px;font-variant-numeric:tabular-nums}
 .compteurs div:first-child b{color:var(--or)}
 @media (min-width:1000px){
   .hero{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);grid-template-rows:1fr;column-gap:24px;max-width:1360px}

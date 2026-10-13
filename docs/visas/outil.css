@@ -35,8 +35,8 @@
   --texte-faible:rgba(var(--encre),.54);
 
   --g:clamp(16px,3.2vw,48px);
-  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
-  --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
+  --sans:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 
 /* Thème clair : « dessin sur calque ». Papier chaud, trait d'encre, or bruni. */
@@ -64,6 +64,8 @@
 
 *{box-sizing:border-box}
 html,body{margin:0}
+/* Place de la barre de défilement réservée dès le premier rendu : la page ne se resserre pas quand le rapport la remplit */
+html{scrollbar-gutter:stable}
 body{
   background:var(--noir);color:var(--texte);
   font-family:var(--sans);font-weight:300;line-height:1.55;

@@ -14,10 +14,10 @@
 (function(){var r=document.documentElement,m="str";r.setAttribute("data-version","v2");r.setAttribute("data-theme","clair");try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
 </script>
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/polices/polices.css?v=3">
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=86">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=21">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=87">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
      au lieu des 1360 px du reste du site, et s'aligne ainsi sur la barre du
@@ -179,8 +179,10 @@
 <div data-chrome></div>
 <script>
 /* Le bandeau du haut de la page précédente, posé avant le premier rendu ;
-   ui.js (chrome) le remplace à l'identique dès que le profil est lu. */
-(function(){try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),b=JSON.parse(localStorage.getItem("planif.barre:"+(s&&s.email||"local"))||"null"),c=document.querySelector("[data-chrome]"),d=location.pathname.split("/")[2]||"";if(!b||!b.html||!c||c.firstChild)return;c.innerHTML=b.html;c.setAttribute("data-provisoire","");if(b.h)document.documentElement.style.setProperty("--h-chrome",b.h+"px");[].forEach.call(c.querySelectorAll("a[data-dossiers]"),function(a){if((" "+a.getAttribute("data-dossiers")+" ").indexOf(" "+d+" ")>=0)a.setAttribute("aria-current","page");});}catch(e){}})();
+   ui.js (chrome) le remplace à l'identique dès que le profil est lu. De même
+   pour la sous-barre du module (planifSousNav, appelée sous l'en-tête). */
+(function(){var m="local",d=location.pathname.split("/")[2]||"";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=s&&s.email||"local";var b=JSON.parse(localStorage.getItem("planif.barre:"+m)||"null"),c=document.querySelector("[data-chrome]");if(b&&b.html&&c&&!c.firstChild){c.innerHTML=b.html;c.setAttribute("data-provisoire","");if(b.h)document.documentElement.style.setProperty("--h-chrome",b.h+"px");[].forEach.call(c.querySelectorAll("a[data-dossiers]"),function(a){if((" "+a.getAttribute("data-dossiers")+" ").indexOf(" "+d+" ")>=0)a.setAttribute("aria-current","page");});}}catch(e){}
+window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("planif.sousnav:"+m)||"{}")[d],e=document.querySelector("main .entete");if(!t||!e||document.querySelector(".sous-nav-wrap"))return;var w=document.createElement("div");w.className="wrap sous-nav-wrap";w.innerHTML=t;e.parentNode.insertBefore(w,e.nextSibling);var l=w.querySelectorAll("a"),q=location.pathname+location.search,ok=null;[].forEach.call(l,function(a){if(a.getAttribute("href")===q)ok=a;});[].forEach.call(l,function(a){if(!ok&&a.getAttribute("href")===location.pathname)ok=a;});if(ok)ok.setAttribute("aria-current","page");}catch(x){}};})();
 </script>
 
 <main>
@@ -189,6 +191,7 @@
     <p class="chapeau">Les bureaux d'études et les personnes qui y travaillent : leur fiche au planning et, pour celles qui s'y connectent, leur accès. Chacune ne voit que les données de son bureau ; toi, tu passes de l'un à l'autre par le menu du bureau, en haut de page.</p>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
+<script>window.planifSousNav&&planifSousNav();</script>
 
   <div class="wrap large" id="console"></div>
 </main>
@@ -199,7 +202,7 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=49"></script>
 <script src="/planif/assets/donnees.js?v=66"></script>
-<script src="/planif/assets/ui.js?v=95"></script>
+<script src="/planif/assets/ui.js?v=96"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script>
 (function () {

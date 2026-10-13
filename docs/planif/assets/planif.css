@@ -41,8 +41,8 @@ html{scrollbar-gutter:stable}
   --texte-faible:rgba(var(--encre),.54);
 
   --g:clamp(16px,3.2vw,48px);
-  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
-  --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
+  --sans:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
 
   /* Teintes d'affaire : huit nuances sourdes, dans l'esprit « dessin de nuit ».
      Jamais en aplat : filet, texte, ou fond a faible opacite. */

@@ -2,7 +2,7 @@
 .menu-btn{
   display:inline-flex;align-items:center;gap:12px;padding:6px 0;margin:-6px 0;
   background:none;border:0;color:inherit;cursor:pointer;
-  font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  font-family:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
   transition:color .35s ease;
 }
 .menu-btn:hover,.menu-btn:focus-visible{color:#D6A85C;outline:none}
@@ -33,7 +33,7 @@
   padding:max(96px,12vh) clamp(18px,4vw,56px) max(40px,env(safe-area-inset-bottom));
   clip-path:inset(0 0 100% 0);
   transition:clip-path .95s cubic-bezier(.76,0,.24,1);
-  color:#ECE8E0;font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#ECE8E0;font-family:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 .menu[hidden]{display:flex!important;visibility:hidden}
 .menu-ouvert .menu{clip-path:inset(0 0 0 0)}
@@ -62,15 +62,15 @@
 }
 .menu a:hover::after,.menu a:focus-visible::after{transform:scaleX(1)}
 .menu a:focus-visible{outline:none}
-.menu .num{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:12px;letter-spacing:.2em;color:#D6A85C}
+.menu .num{font-family:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;font-size:12px;letter-spacing:.2em;color:#D6A85C}
 .menu .nom{font-weight:200;font-size:clamp(38px,7vw,88px);line-height:1;letter-spacing:.02em;transition:transform .8s cubic-bezier(.76,0,.24,1)}
 .menu a:hover .nom{transform:translateX(12px)}
-.menu .desc{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,232,224,.45);text-align:right}
+.menu .desc{font-family:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,232,224,.45);text-align:right}
 .menu .ici{color:#D6A85C}
 .menu-pied{
   width:100%;max-width:1160px;margin:clamp(28px,6vh,56px) auto 0;
   display:flex;justify-content:space-between;gap:16px;
-  font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(236,232,224,.34);
+  font-family:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(236,232,224,.34);
   opacity:0;transition:opacity .4s ease;
 }
 .menu-ouvert .menu-pied{opacity:1;transition:opacity 1.2s ease .7s}

@@ -11,7 +11,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='7' r='2' fill='%23ECE8E0'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/polices/polices.css?v=3">
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 :root{
   --noir:#050505;
@@ -19,13 +19,13 @@
   --texte:#ECE8E0;
   --texte-doux:rgba(236,232,224,.5);
   --g:clamp(18px,4vw,56px);
-  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
   margin:0;background:var(--noir);color:var(--texte);
-  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  font-family:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
   -webkit-font-smoothing:antialiased;overflow-x:hidden;
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
 }
@@ -76,7 +76,7 @@ button.discret{border-color:rgba(236,232,224,.18);color:var(--texte-doux)}
 .voile .or{color:var(--or)}
 @media (max-height:560px) and (orientation:landscape){ .aide{display:none} h1{font-size:22px;margin-top:0} }
 </style>
-<link rel="stylesheet" href="/assets/menu.css?v=4">
+<link rel="stylesheet" href="/assets/menu.css?v=5">
 </head>
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
@@ -515,6 +515,6 @@ button.discret{border-color:rgba(236,232,224,.18);color:var(--texte-doux)}
   requestAnimationFrame(boucle);
 })();
 </script>
-<script src="/assets/menu.js?v=20"></script>
+<script src="/assets/menu.js?v=21"></script>
 </body>
 </html>

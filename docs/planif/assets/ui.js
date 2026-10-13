@@ -734,13 +734,32 @@
     });
     if (!module) return;
     var l = module.pages.filter(function (p) { return !D.pagePermise || D.pagePermise(p.cle); });
-    if (l.length < 2) return;
+    if (l.length < 2) { memoriseSousNav(module, null); return; }
     var entete = document.querySelector("main .entete");
     if (!entete) return;
     var nav = el("nav", { class: "sous-nav", "aria-label": module.nom }, l.map(function (p) {
       return el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null, text: p.nom });
     }));
     entete.parentNode.insertBefore(el("div", { class: "wrap sous-nav-wrap" }, [nav]), entete.nextSibling);
+    memoriseSousNav(module, nav);
+  }
+
+  /* La sous-barre d'un module, gardée comme le bandeau (13.10.2026) : elle
+     arrivait une fois la base lue et poussait toute la page vers le bas. La
+     page suivante du module la pose avant son premier rendu (planifSousNav,
+     script en ligne sous l'en-tête), sousNav() la remplace à l'identique. */
+  function memoriseSousNav(module, nav) {
+    try {
+      var cle = "planif.sousnav:" + ((avecBase && SB.email()) || "local");
+      var tout = JSON.parse(global.localStorage.getItem(cle) || "{}"), html = "";
+      if (nav) {
+        var copie = nav.cloneNode(true);
+        [].forEach.call(copie.querySelectorAll("[aria-current]"), function (n) { n.removeAttribute("aria-current"); });
+        html = copie.outerHTML;
+      }
+      module.pages.forEach(function (p) { tout[dossierDe(p.href)] = html; });
+      global.localStorage.setItem(cle, JSON.stringify(tout));
+    } catch (e) {}
   }
 
   /* ------------------------------------------------- barre de la version 2

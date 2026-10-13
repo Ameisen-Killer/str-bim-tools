@@ -31,8 +31,8 @@
   --texte-doux:rgba(var(--encre),.82);
   --texte-faible:rgba(var(--encre),.66);
 
-  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --sans:"Inter","Inter repli","Inter repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Inter","Inter repli","Inter repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
 
   /* Teintes d'affaire, lisibles sur blanc */
   --t1:var(--m-fort); --t2:#2B5A8A; --t3:#1F7A70; --t4:#B0561A;
