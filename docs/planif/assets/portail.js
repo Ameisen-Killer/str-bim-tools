@@ -226,14 +226,21 @@
   }
 
   /* Pendule, sur la ligne du « Bonjour » (13.10.2026, demande de Tony) : les
-     aiguilles seules, aux couleurs de la marque, sans chiffres ni contour. Pas de trotteuse (rien ne doit tourner
+     aiguilles vertes, douze points (midi plus gros et vert), sans chiffres ni contour. Pas de trotteuse (rien ne doit tourner
      en continu) : les aiguilles se posent une fois par minute, à la minute. */
   var penduleMinuterie = null;
   function pendule() {
-    // Les aiguilles seules, sans aucun contour (13.10.2026, demande de Tony)
-    var dessin = svg("0 0 100 100",
+    // Les aiguilles, sans aucun contour, et douze points : onze petits noirs,
+    // celui de midi plus gros et vert (13.10.2026, demande de Tony)
+    var points = "";
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      points += '<circle class="' + (i ? "pd-point" : "pd-midi") + '" cx="' + (50 + 46 * Math.sin(a)).toFixed(2) +
+        '" cy="' + (50 - 46 * Math.cos(a)).toFixed(2) + '" r="' + (i ? 1.9 : 3.4) + '"/>';
+    }
+    var dessin = svg("0 0 100 100", points +
       '<g class="pd-aig-h"><line x1="50" y1="54" x2="50" y2="22"/></g>' +
-      '<g class="pd-aig-m"><line x1="50" y1="54" x2="50" y2="6"/></g>' +
+      '<g class="pd-aig-m"><line x1="50" y1="54" x2="50" y2="10"/></g>' +
       '<circle class="pd-axe" cx="50" cy="50" r="5"/>', "ab-pendule-svg");
     var boite = el("div", { class: "ab-pendule", role: "img" }, [dessin]);
     var h = dessin.querySelector(".pd-aig-h"), m = dessin.querySelector(".pd-aig-m");
