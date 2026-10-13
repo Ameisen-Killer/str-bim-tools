@@ -1971,7 +1971,7 @@
     champs.push(boiteNote);
 
     var corps = el("div", {}, [
-      ligne("Affaire", a ? a.code + " · " + a.nom : "—"),
+      ligne("Affaire", a ? D.libelleAffaire(a) : "—"),
       ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId, "ingenieur")) : "—"),
       ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId, "dessinateur")) : "—"),
       ligne("Échéance", C.fmtLong(t.echeance)),
@@ -2111,7 +2111,7 @@
 
     var chAffaire = champ({
       nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
-      options: affaires.map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; })
+      options: affaires.map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; })
     });
 
     var boiteIng = el("div", { class: "champ" }, [el("label", { for: "c-ingenieurId", text: "Ingénieur" })]);

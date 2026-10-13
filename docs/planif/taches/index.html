@@ -127,11 +127,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=50"></script>
-<script src="/planif/assets/donnees.js?v=70"></script>
+<script src="/planif/assets/supabase.js?v=51"></script>
+<script src="/planif/assets/donnees.js?v=71"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=105"></script>
+<script src="/planif/assets/ui.js?v=106"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=18"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -199,7 +199,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var chAffaire = UI.champ({
       nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
       options: [{ valeur: "", label: "Toutes les affaires" }].concat(
-        D.affaires({ tous: true }).map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; }))
+        D.affaires({ tous: true }).map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }))
     });
     var chMembre = UI.champ({
       nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
@@ -304,7 +304,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
        Tout ce qui restreint la liste y figure, la recherche comprise. */
     var restreint = [];
-    if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(af.code + " · " + af.nom); }
+    if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(D.libelleAffaire(af)); }
     if (filtres.membre) restreint.push(filtres.membre === "a-affecter" ? "À affecter" : D.nomMembre(filtres.membre));
     if (filtres.statut) restreint.push(D.STATUTS_TACHE[filtres.statut]);
     if (filtres.masqueTerminees) restreint.push("Terminées masquées");
@@ -445,7 +445,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             // Affaire concernée, sous le libellé : numéro dans sa teinte, puis nom
             el("div", { class: "affaire-ligne", style: "display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:13.5px;line-height:1.4;color:var(--texte-doux)" }, [
               el("span", { class: "pastille", style: "color:" + teinte + ";align-self:center", "aria-hidden": "true" }),
-              el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne(a ? a.code : "—", mots)]),
+              el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne((a && a.code) || "—", mots)]),
               a ? el("span", {}, [UI.surligne(a.nom, mots)]) : null
             ]),
             t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null

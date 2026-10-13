@@ -71,11 +71,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=50"></script>
-<script src="/planif/assets/donnees.js?v=70"></script>
+<script src="/planif/assets/supabase.js?v=51"></script>
+<script src="/planif/assets/donnees.js?v=71"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=105"></script>
+<script src="/planif/assets/ui.js?v=106"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=18"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -219,8 +219,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var b = el("button", {
         type: "button", class: "ca-point" + (choisi === a.id ? " choisi" : ""),
         style: "--tt:" + UI.teinte(a.teinte) + ";left:" + Math.round(e[0]) + "px;top:" + Math.round(e[1]) + "px",
-        "aria-label": a.code + " · " + a.nom + " — " + a.adresse
-      }, [el("i", { "aria-hidden": "true" }), el("b", { text: a.code })]);
+        "aria-label": D.libelleAffaire(a) + " — " + a.adresse
+      }, [el("i", { "aria-hidden": "true" }), el("b", { text: a.code || a.nom })]);
       b.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
       b.addEventListener("click", function (ev) { ev.stopPropagation(); ouvreBulle(a); });
       hotePoints.appendChild(b);
@@ -235,7 +235,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     fermeBulle();
     choisi = a.id;
     var n = D.taches({ affaireId: a.id, sansTerminees: true }).length;
-    bulle = el("div", { class: "ca-bulle", role: "dialog", "aria-label": a.code + " · " + a.nom }, [
+    bulle = el("div", { class: "ca-bulle", role: "dialog", "aria-label": D.libelleAffaire(a) }, [
       el("button", { type: "button", class: "ferme", "aria-label": "Fermer", text: "×", onclick: fermeBulle }),
       el("div", { class: "code", style: "color:" + UI.teinte(a.teinte), text: a.code }),
       el("div", { class: "nom", text: a.nom }),
@@ -404,8 +404,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           el("div", { class: "num-section", text: g[1] + " · " + g[0].length }),
           el("ul", {}, g[0].map(function (a) {
             return el("li", {}, [el("a", {
-              class: "lien-doux", href: "/planif/affaires/?q=" + encodeURIComponent(a.code),
-              title: "Ouvrir dans la liste des affaires pour compléter l'adresse", text: a.code + " · " + a.nom
+              class: "lien-doux", href: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom),
+              title: "Ouvrir dans la liste des affaires pour compléter l'adresse", text: D.libelleAffaire(a)
             })]);
           }))
         ]));

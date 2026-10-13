@@ -63,11 +63,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=50"></script>
-<script src="/planif/assets/donnees.js?v=70"></script>
+<script src="/planif/assets/supabase.js?v=51"></script>
+<script src="/planif/assets/donnees.js?v=71"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=105"></script>
+<script src="/planif/assets/ui.js?v=106"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=18"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -183,7 +183,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("td", {}, [
           el("div", { style: "display:flex;align-items:center;gap:9px" }, [
             el("span", { class: "pastille", style: "color:" + t, "aria-hidden": "true" }),
-            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [UI.surligne(a.code, mots)])
+            el("span", { class: "num", style: "color:" + t + ";font-size:12px;letter-spacing:.1em" }, [a.code ? UI.surligne(a.code, mots) : el("span", { style: "opacity:.6;letter-spacing:.02em", text: "sans n°" })])
           ]),
           el("div", { class: "principal", style: "margin-top:4px" }, [UI.surligne(a.nom, mots)]),
           a.adresse ? el("div", { class: "secondaire" }, [UI.surligne(a.adresse, mots)]) : null,
@@ -206,13 +206,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           ])
         ]),
         el("td", { class: "actions" }, [
-          UI.lienIcone("taches", "Tâches", a.code + " · " + a.nom, "/planif/taches/?affaire=" + encodeURIComponent(a.id)),
+          UI.lienIcone("taches", "Tâches", D.libelleAffaire(a), "/planif/taches/?affaire=" + encodeURIComponent(a.id)),
           // Sans adresse, pas de carte : le bouton ne paraît pas
           a.adresse ? UI.lienIcone("carte", "Voir sur Google Maps", a.code + " · " + a.adresse, D.lienCarte(a), true) : null,
-          UI.boutonIcone("modifier", "Modifier", a.code + " · " + a.nom, function () { formulaire(a.id); }),
+          UI.boutonIcone("modifier", "Modifier", D.libelleAffaire(a), function () { formulaire(a.id); }),
           // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
           D.aDroit("affaires_creer")
-            ? UI.boutonIcone("supprimer", "Supprimer", a.code + " · " + a.nom, function () { supprime(a, taches.length); })
+            ? UI.boutonIcone("supprimer", "Supprimer", D.libelleAffaire(a), function () { supprime(a, taches.length); })
             : null
         ])
       ]), a.id));
@@ -266,7 +266,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
-        UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042" }),
+        UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042", aide: "Facultatif : à ajouter plus tard s'il n'est pas encore attribué." }),
         // Phase SIA 112
         UI.champ({
           nom: "phase", label: "Phase SIA", type: "select", valeur: a && a.phase ? a.phase : "",
@@ -306,7 +306,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     UI.ouvre({
       surtitre: a ? "Modifier" : "Nouvelle affaire",
-      titre: a ? a.code + " · " + a.nom : "Affaire",
+      titre: a ? D.libelleAffaire(a) : "Affaire",
       corps: corps,
       boutons: [
         { label: "Annuler" },
@@ -326,7 +326,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function supprime(a, nbTaches) {
     UI.confirme(
-      "Supprimer l'affaire " + a.code + " ?",
+      "Supprimer l'affaire " + (a.code || "« " + a.nom + " »") + " ?",
       nbTaches ? "Ses " + nbTaches + (nbTaches > 1 ? " tâches seront supprimées" : " tâche sera supprimée") + " en même temps. Cette action est définitive."
         : "Cette action est définitive.",
       "Supprimer", true

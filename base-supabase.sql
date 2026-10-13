@@ -299,7 +299,7 @@ create table if not exists public.affaires (
   id         uuid primary key default gen_random_uuid(),
   bureau_id  uuid not null default public.bureau_par_defaut()
              constraint affaires_bureau_fk references public.bureaux (id) on delete cascade,
-  code       text not null,
+  code       text,          -- numéro d'affaire, facultatif (13.10.2026) : vide = null (plusieurs affaires sans numéro)
   nom        text not null,
   note       text not null default '',
   teinte     smallint not null default 1 check (teinte between 1 and 8),

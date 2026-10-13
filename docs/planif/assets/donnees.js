@@ -982,11 +982,11 @@
   function cleContact(c) { return ((c.nom || c.societe) + " " + c.prenom).trim(); }
 
   function valideAffaire(o, idExistant) {
-    if (!texte(o.code)) throw erreur("Le numéro d'affaire est obligatoire.");
     if (!texte(o.nom)) throw erreur("Le libellé de l'affaire est obligatoire.");
     var code = texte(o.code);
-    var double = etat.affaires.some(function (a) {
-      return a.id !== idExistant && a.code.toLowerCase() === code.toLowerCase();
+    // Le numéro est facultatif (13.10.2026) ; s'il est donné, il reste unique dans le bureau
+    var double = !!code && etat.affaires.some(function (a) {
+      return a.id !== idExistant && a.code && a.code.toLowerCase() === code.toLowerCase();
     });
     if (double) throw erreur("Une affaire porte déjà le numéro « " + code + " ».");
     var v = {
@@ -1114,6 +1114,8 @@
     PHASES: PHASES,
     ORDRE_PHASES: ORDRE_PHASES,
     libellePhase: libellePhase,
+    /** « 26-801 · Immeuble… », ou le nom seul pour une affaire sans numéro (13.10.2026). */
+    libelleAffaire: function (a) { return a ? (a.code ? a.code + " · " : "") + a.nom : "—"; },
     PARTS: PARTS,
     source: ADAPTATEUR.nom,
 
@@ -1949,7 +1951,7 @@
     return { coll: "absences", id: i, avant: copie(m ? m.absences || [] : []) };
   }
   function nomTache(i) { var t = D.tache(i); return t ? "« " + t.titre + " »" : "la tâche"; }
-  function nomAffaire(i) { var a = D.affaire(i); return a ? "l'affaire " + a.code : "l'affaire"; }
+  function nomAffaire(i) { var a = D.affaire(i); return a ? "l'affaire " + (a.code || a.nom) : "l'affaire"; }
   function nomContact(i) {
     var c = D.contact(i); return c ? "la fiche " + ((c.prenom ? c.prenom + " " : "") + (c.nom || c.societe)).trim() : "la fiche";
   }
@@ -1989,7 +1991,7 @@
     function (i) { return "suppression de " + nomTache(i); });
 
   annulable("ajouteAffaire", null,
-    function (o) { return "création de l'affaire " + texte(o.code); },
+    function (o) { return "création de l'affaire " + (texte(o.code) || texte(o.nom)); },
     function (a) { return [{ coll: "affaires", id: a.id, avant: null }]; });
   annulable("majAffaire", function (i) { return [photo("affaires", i)]; },
     function (i) { return "modification de " + nomAffaire(i); });

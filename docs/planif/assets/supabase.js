@@ -409,7 +409,8 @@
       return o;
     },
     affaires: function (a) {
-      var o = { id: a.id, code: a.code, nom: a.nom, note: a.note || "",
+      // Sans numéro : null en base (plusieurs affaires sans numéro dans un bureau)
+      var o = { id: a.id, code: a.code || null, nom: a.nom, note: a.note || "",
                 teinte: a.teinte, statut: a.statut, echeance: vide(a.echeance) };
       o.phase = a.phase || null;
       o.adresse = a.adresse || "";
@@ -644,7 +645,7 @@
       affaires: affaires.map(function (a) {
         var equipe = liens.filter(function (l) { return l.affaire_id === a.id; });
         return {
-          id: a.id, code: a.code, nom: a.nom, note: a.note || "",
+          id: a.id, code: a.code || "", nom: a.nom, note: a.note || "",
           teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
           aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
           aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
