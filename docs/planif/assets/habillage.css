@@ -71,6 +71,17 @@
    outils ; plus étroites que l'écran, elles défilent de côté. */
 :root[data-version="v2"] .barre-une-ligne{flex-wrap:wrap-reverse;row-gap:10px;column-gap:24px}
 :root[data-version="v2"] .barre-une-ligne > .nav-outil{padding:0;flex:0 1 auto;min-width:0;max-width:100%}
+/* La recherche au milieu (13.10.2026) : pages et outils se partagent la place
+   restante à parts égales, la case tombe au centre de la barre. Écran étroit :
+   elle revient en tête des outils, sur leur ligne. */
+:root[data-version="v2"] .barre-h > .barre-centre + .barre-outils{margin-left:0}
+@media (min-width:901px){
+  :root[data-version="v2"] .barre-une-ligne > .nav-outil{flex:1 1 0;min-width:auto}
+  :root[data-version="v2"] .barre-h > .barre-centre{flex:0 1 400px;margin-left:0;justify-content:center}
+  :root[data-version="v2"] .barre-h > .barre-centre + .barre-outils{flex:1 1 0;justify-content:flex-end}
+  :root[data-version="v2"] .barre-centre .btn-palette{width:100%;justify-content:flex-start;padding:8px 10px 8px 13px;color:var(--texte-doux)}
+  :root[data-version="v2"] .barre-centre .btn-palette kbd{margin-left:auto}
+}
 :root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
 /* La maison, première entrée de la barre des pages */
 :root[data-version="v2"] .nav-outil a.nav-maison{display:inline-flex;align-items:center;padding:6px 12px}

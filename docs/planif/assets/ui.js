@@ -976,9 +976,14 @@
       avecBase ? el("button", { type: "button", onclick: deconnecte, text: "Quitter" }) : null
     ]);
 
+    /* Version 2 : la recherche au milieu de la barre (13.10.2026, demande de
+       Tony), entre les pages et les outils ; sur un écran étroit, elle
+       reprend sa place en tête des outils (habillage.css). */
+    var centre = null;
     if (VERSION_AB) {
+      centre = palette ? el("div", { class: "barre-outils barre-centre" }, [palette]) : null;
       outilsHaut = el("div", { class: "barre-outils" }, [
-        palette, placeEnLigne(), bureauCourant(profil), compteAB(profil), logoMarque()
+        placeEnLigne(), bureauCourant(profil), compteAB(profil), logoMarque()
       ]);
     }
 
@@ -987,7 +992,7 @@
        deux, la ligne se replie (habillage.css) : les outils en haut, les pages
        dessous, comme avant. */
     hote.appendChild(el("div", { class: "barre" }, [
-      VERSION_AB ? el("div", { class: "barre-h barre-une-ligne" }, [nav, outilsHaut]) :
+      VERSION_AB ? el("div", { class: "barre-h barre-une-ligne" }, [nav, centre, outilsHaut]) :
       el("div", { class: "barre-h" }, [
         el("div", { class: "fil" + (superAdmin ? " avec-choix" : "") }, [
           el("span", { class: "marque" }, [
