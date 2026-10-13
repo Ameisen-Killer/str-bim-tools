@@ -125,7 +125,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=110"></script>
+<script src="/planif/assets/ui.js?v=111"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -215,7 +215,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
        demande de Tony) ; une affaire cochée qui en sort est décochée. */
     function rendAffaires() {
       var optAffaires = D.affaires({ tous: true }).filter(function (a) {
-        return (!mesAffaires || mesAffaires[a.id]) && (!vue.succursales.length || vue.succursales.indexOf(a.succursale) >= 0);
+        return (!mesAffaires || mesAffaires[a.id]) && (!vue.succursales.length || vue.succursales.indexOf(a.succursale || "_") >= 0);
       }).map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
       filtres.affaires = UI.multiChoix({ libelle: "Filtrer : affaires", tous: mien ? "Toutes mes affaires" : "Toutes les affaires",
         pluriel: "affaires", options: optAffaires, valeurs: vue.affaires, large: true,
@@ -227,9 +227,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     /* Succursales, secteurs et fonctions (13.10.2026, demande de Tony) : des
        menus à cases, plusieurs choix possibles, rien de coché = tout. Un menu
        sans choix possible (une seule succursale) disparaît. */
-    function filtreCases(id, cle, tous, pluriel, liste, apres) {
+    function filtreCases(id, cle, tous, pluriel, liste, apres, toutCoche) {
       var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
       var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
+        toutCoche: toutCoche,
         surChange: function (v) { vue[cle] = v; if (apres) apres(); memorise(); rend(); } });
       vue[cle] = f.valeurs();
       var hote = document.getElementById(id);
@@ -237,7 +238,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       hote.style.display = options.length > 1 ? "" : "none";
       return f;
     }
-    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES, rendAffaires);
+    /* Succursales (13.10.2026) : « Toutes » s'affiche toutes cases cochées ;
+       « Non renseignée » (« _ ») dès qu'une personne ou une affaire n'en a pas. */
+    var listeSucc = {};
+    Object.keys(D.SUCCURSALES).forEach(function (c) { listeSucc[c] = D.SUCCURSALES[c]; });
+    if (D.membres({ planifies: true }).some(function (m) { return !m.succursale; })
+        || D.affaires({ tous: true }).some(function (a) { return !a.succursale; })) listeSucc._ = "Non renseignée";
+    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", listeSucc, rendAffaires, true);
     rendAffaires();
     filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
     filtres.cotes = filtreCases("f-cote", "cotes", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
@@ -370,7 +377,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     membres = membres.filter(function (m) {
         return (!lesMembres.length || lesMembres.indexOf(m.id) >= 0) && (!mien || mien.gens[m.id])
           && (!vue.cotes.length || vue.cotes.indexOf(D.cote(m.metier)) >= 0) && (!dansAffaire || dansAffaire[m.id])
-          && (!vue.succursales.length || vue.succursales.indexOf(m.succursale) >= 0)
+          && (!vue.succursales.length || vue.succursales.indexOf(m.succursale || "_") >= 0)
           && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
       })
       .map(function (m, i) { return { m: m, i: i }; })
