@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- une jauge : le cadran en arc, ses graduations, l'aiguille -->
+  <path d="M6 33a18 18 0 0 1 36 0"/>
+  <path d="M24 15v3M11.3 20.3l2.1 2.1M36.7 20.3l-2.1 2.1"/>
+  <path d="M24 33l7-9"/>
+  <circle cx="24" cy="33" r="2.6"/>
+</svg>

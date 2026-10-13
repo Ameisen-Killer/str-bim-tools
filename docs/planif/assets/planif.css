@@ -486,6 +486,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
 .ico-carte{--ico:url(/planif/icons/map_marker.svg?v=1)}
 .ico-jours{--ico:url(/planif/icons/calendar_week.svg?v=1)}
+.ico-avancement{--ico:url(/planif/icons/gauge.svg?v=1)}   /* avancement et facturation du mandat */
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}

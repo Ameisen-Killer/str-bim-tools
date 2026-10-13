@@ -266,12 +266,15 @@
     PAGES.concat([
       { nom: "Communication", href: "/planif/communication/", mots: "rendez-vous agenda absences conges vacances bureau aujourd'hui qui est la" },
       { nom: "Secteurs", href: "/planif/secteurs/", mots: "disciplines secteur ressources projets charge equipe" },
-      { nom: "Inter-secteurs", href: "/planif/inter-secteurs/", mots: "appels d'offres ao offre soumission agenda transversal secteurs" }
+      { nom: "Inter-secteurs", href: D.lienModule ? D.lienModule("inter") : "/planif/inter-secteurs/", mots: "appels d'offres ao offre soumission agenda transversal secteurs veille simap" }
     ], console_).forEach(function (x) { parHref[x.href.split("/")[2] || "accueil"] = x; });
     return ["accueil", "communication", "planning", "taches", "absences", "annuaire",
             "affaires", "equipe", "charge", "secteurs", "inter-secteurs", "console"]
       .filter(function (c) { return !D.pagePermise || D.pagePermise(CLES[c] || c); })
-      .map(function (c) { return parHref[c]; }).filter(Boolean);
+      .map(function (c) { return parHref[c]; }).filter(Boolean)
+      // La facturation (13.10.2026) : une page d'Inter-secteurs qu'on cherche par son nom
+      .concat(D.pagePermise && D.pagePermise("facturation")
+        ? [{ nom: "Facturation", href: "/planif/inter-secteurs/?vue=facturation", mots: "facturation avancement honoraires phases sia mandat jauges secteurs" }] : []);
   }
 
   /* Le texte de recherche de chaque objet, plié une fois par ouverture */

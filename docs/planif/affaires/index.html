@@ -16,8 +16,9 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=101">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=1">
 </head>
 <body class="large">
 
@@ -63,14 +64,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=52"></script>
-<script src="/planif/assets/donnees.js?v=72"></script>
+<script src="/planif/assets/supabase.js?v=53"></script>
+<script src="/planif/assets/donnees.js?v=73"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=108"></script>
+<script src="/planif/assets/ui.js?v=109"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=18"></script>
+<script src="/planif/assets/palette.js?v=19"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
+<script src="/planif/assets/mandat.js?v=1"></script>
 <script>
 (function () {
   "use strict";
@@ -196,10 +198,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           enRetard ? el("div", { class: "secondaire", style: "color:var(--alerte)", text: enRetard + (enRetard > 1 ? " en retard" : " en retard") }) : null
         ]),
         el("td", { class: "num", text: a.echeance ? C.fmtCH(a.echeance) : "—" }),
-        el("td", {}, a.phase ? [
+        el("td", {}, (a.phase ? [
           el("div", { class: "num" }, [UI.surligne(a.phase, mots)]),
           D.PHASES[a.phase] ? el("div", { class: "secondaire" }, [UI.surligne(D.PHASES[a.phase], mots)]) : null
-        ] : [el("span", { class: "secondaire", text: "—" })]),
+        ] : [el("span", { class: "secondaire", text: "—" })]).concat([resumeMandat(a)])),
         el("td", {}, [
           el("span", { class: "statut s-" + (a.statut === "active" ? "en_cours" : a.statut === "terminee" ? "termine" : "attente") }, [
             el("i", { "aria-hidden": "true" }), UI.surligne(D.STATUTS_AFFAIRE[a.statut], mots)
@@ -209,6 +211,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           UI.lienIcone("taches", "Tâches", D.libelleAffaire(a), "/planif/taches/?affaire=" + encodeURIComponent(a.id)),
           // Sans adresse, pas de carte : le bouton ne paraît pas
           a.adresse ? UI.lienIcone("carte", "Voir sur Google Maps", a.code + " · " + a.adresse, D.lienCarte(a), true) : null,
+          // Avancement (et facturation, pour qui la voit) des phases du mandat
+          D.phasesMandat(a).length
+            ? UI.boutonIcone("avancement", D.voitFacturation() ? "Avancement et facturation" : "Avancement", D.libelleAffaire(a),
+                function () { Mandat.saisie(a.id, { surEnregistrement: dessine }); })
+            : null,
           UI.boutonIcone("modifier", "Modifier", D.libelleAffaire(a), function () { formulaire(a.id); }),
           // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
           D.aDroit("affaires_creer")
@@ -230,6 +237,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ])]),
       corps
     ]));
+  }
+
+  /* Sous la phase en cours : les phases du mandat et l'avancement moyen */
+  function resumeMandat(a) {
+    var ph = D.phasesMandat(a);
+    if (!ph.length) return null;
+    var av = Math.round(ph.reduce(function (s, p) { return s + D.valeurPhase(a, p.phase, "avancement"); }, 0) / ph.length);
+    var texte = "Mandat " + ph.map(function (p) { return p.phase; }).join(" ") + " · " + av + " %";
+    if (D.voitFacturation()) {
+      var fa = Math.round(ph.reduce(function (s, p) { return s + D.valeurPhase(a, p.phase, "facturation"); }, 0) / ph.length);
+      texte += " · fact. " + fa + " %";
+    }
+    return el("div", { class: "secondaire", style: "margin-top:4px;font-size:12.5px", title: "Phases du mandat, avancement moyen" + (D.voitFacturation() ? " et facturation moyenne" : ""), text: texte });
   }
 
   /* ------------------------------------------------------------ formulaire */
@@ -264,6 +284,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       })(i);
     }
 
+    // Le mandat ne s'enregistre qu'une fois la base à jour (migration-facturation.sql)
+    var editeurMandat = D.mandatPret() ? Mandat.editeur(a ? a.mandat : {}) : null;
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042", aide: "Facultatif : à ajouter plus tard s'il n'est pas encore attribué." }),
@@ -291,6 +313,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, points de vigilance…", large: true })
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
+        el("div", { class: "legende", text: "Mandat : phases SIA et disciplines" }),
+        D.mandatPret()
+          ? el("p", { class: "aide", style: "margin:0 0 10px", text: "Coche, pour chaque phase du mandat, les disciplines concernées. L'avancement et la facturation se suivent ensuite phase par phase (bouton jauge de la liste, page Facturation)." })
+          : Mandat.bandeauBase(),
+        editeurMandat
+      ]),
+      el("fieldset", { style: "margin-top:26px" }, [
         el("div", { class: "legende", text: "Teinte de l'affaire" }),
         teintes
       ]),
@@ -315,6 +344,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             var v = UI.lit(corps);
             var radio = corps.querySelector("input[name=teinte]:checked");
             v.teinte = radio ? radio.value : 1;
+            if (editeurMandat) v.mandat = Mandat.litEditeur(editeurMandat);
             var p = a ? D.majAffaire(a.id, v) : D.ajouteAffaire(v);
             return p.then(function () { dessine(); UI.toast(a ? "Affaire modifiée." : "Affaire créée."); })
               .catch(function (e) { UI.toast(e.message); return false; });

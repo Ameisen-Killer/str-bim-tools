@@ -16,8 +16,9 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=101">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=1">
 <style>
 .imp-periode{display:none}
 /* Export PDF de la liste (09.10.2026) : A4 portrait et serré, une ligne par
@@ -131,6 +132,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       </div>
       <!-- Téléphone seulement : la barre du haut y cache ses actions -->
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
+      <!-- Une affaire filtrée qui a un mandat : son avancement, à saisir d'ici (13.10.2026) -->
+      <div id="mandat-affaire"></div>
       <div class="defile" id="liste"></div>
     </section>
   </div>
@@ -140,14 +143,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=52"></script>
-<script src="/planif/assets/donnees.js?v=72"></script>
+<script src="/planif/assets/supabase.js?v=53"></script>
+<script src="/planif/assets/donnees.js?v=73"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=108"></script>
+<script src="/planif/assets/ui.js?v=109"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=18"></script>
+<script src="/planif/assets/palette.js?v=19"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
+<script src="/planif/assets/mandat.js?v=1"></script>
 <script>
 (function () {
   "use strict";
@@ -216,6 +220,32 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (p.get("nouvelle") === "1") formulaire(null);
     if (p.get("tache")) formulaire(p.get("tache"));
   }).catch(UI.echec);
+
+  /* L'affaire filtrée a un mandat : ses phases, son avancement moyen et la
+     fenêtre de saisie — le responsable d'affaire y saisit son avancement sans
+     avoir la page Affaires. */
+  function rendMandat() {
+    var hote = UI.vide(document.getElementById("mandat-affaire"));
+    var a = filtres.affaire ? D.affaire(filtres.affaire) : null;
+    var ph = a ? D.phasesMandat(a) : [];
+    if (!ph.length || !window.Mandat) return;
+    var voit = D.voitFacturation();
+    function moyenne(genre) { return Math.round(ph.reduce(function (s, p) { return s + D.valeurPhase(a, p.phase, genre); }, 0) / ph.length); }
+    var av = moyenne("avancement"), fa = voit ? moyenne("facturation") : null;
+    hote.appendChild(el("div", { class: "mj-bandeau" }, [
+      el("div", { class: "mj-bandeau-txt" }, [
+        el("b", { text: "Mandat · phases " + ph.map(function (p) { return p.phase; }).join(", ") }),
+        el("div", { class: "mj-bandeau-jauges" }, [
+          Mandat.jauge(av, "avancement"),
+          voit ? Mandat.jauge(fa, "facturation", { alerte: fa > av }) : null
+        ])
+      ]),
+      el("button", { class: "btn", type: "button", onclick: function () { Mandat.saisie(a.id, { surEnregistrement: dessine }); } }, [
+        el("span", { class: "ico-txt", style: "--ico:url(/planif/icons/gauge.svg?v=1)", "aria-hidden": "true" }),
+        D.peutSaisirMandat(a) ? (voit ? "Saisir l'avancement et la facturation" : "Saisir l'avancement") : "Voir l'avancement"
+      ])
+    ]));
+  }
 
   /* --------------------------------------------------------------- filtres */
 
@@ -323,6 +353,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hote = document.getElementById("liste");
     if (affichage) affichage.fin();
     // Les lignes glissent vers leur nouvelle place (UI.joue, en fin de rendu)
+    rendMandat();
     var avantListe = UI.enFrappe() ? null : UI.photo(hote);
     UI.vide(hote);
     suivi.debut();

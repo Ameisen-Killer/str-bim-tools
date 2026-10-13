@@ -16,9 +16,10 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=101">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
-<link rel="stylesheet" href="/planif/assets/inter.css?v=4">
+<link rel="stylesheet" href="/planif/assets/inter.css?v=5">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=1">
 </head>
 <body class="large">
 
@@ -35,23 +36,22 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      secteurs. Les appels d'offres (une affaire en phase « AO » : public ou
      privé, demandeur pris dans l'annuaire, date de remise = échéance de
      l'affaire, secteurs concernés, résultat), leur agenda (attaché à l'AO, non
-     à une personne) et les affaires qui font intervenir plusieurs secteurs.
-     Deux pages choisies par la sous-barre (ui.js, SOUS_NAV) : « Appels
-     d'offres » (veille, AO, agenda) et, avec ?vue=transversales, « Affaires
-     transversales » ; chacune son titre depuis le 13.10.2026. -->
+     à une personne), les affaires qui font intervenir plusieurs secteurs et
+     la facturation. Six pages choisies par la sous-barre (ui.js, SOUS_NAV ;
+     donnees.js, PAGES_INTER), par ?vue= (13.10.2026) : la veille simap.ch
+     (sans paramètre), publics, prives, agenda, transversales, facturation. -->
 <main>
   <div class="wrap entete">
-    <h1><span id="nom-inter">Appels d'offres</span> <span id="titre-inter" class="compte-titre"></span></h1>
+    <h1><span id="nom-inter">Veille simap.ch</span> <span id="titre-inter" class="compte-titre"></span></h1>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
-<script>if (/(^|[?&])vue=transversales(&|$)/.test(location.search.slice(1))) document.getElementById("nom-inter").textContent = "Affaires transversales";</script>
+<script>(function(){var v=new URLSearchParams(location.search).get("vue"),t={publics:"AO publics",prives:"AO privés",agenda:"Agenda des AO",transversales:"Affaires transversales",facturation:"Facturation"}[v];if(t){document.getElementById("nom-inter").textContent=t;document.title=t+" · Planification";}})();</script>
 <script>window.planifSousNav&&planifSousNav();</script>
   <div class="wrap" data-bandeau></div>
   <div class="wrap">
-    <section class="section" id="veille" data-vue="ao">
+    <section class="section" id="veille" data-vue="veille">
       <div class="tete-section">
         <div>
-          <h2>Veille simap.ch <span id="compte-veille" class="compte-titre"></span></h2>
           <p class="is-chapeau">Les appels d'offres publiés à Genève, Vaud et Valais qui touchent la structure ou le génie civil, relevés chaque matin sur simap.ch.</p>
         </div>
         <div class="outils">
@@ -68,7 +68,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     <section class="section" id="ao" data-vue="ao">
       <div class="tete-section">
-        <h2>Appels d'offres</h2>
+        <div>
+          <p class="is-chapeau" id="chapeau-ao"></p>
+        </div>
         <div class="outils">
           <select id="f-resultat" class="btn" aria-label="Filtrer par résultat">
             <option value="en_cours">En cours</option>
@@ -76,31 +78,47 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             <option value="perdu">Perdus ou abandonnés</option>
             <option value="">Tous</option>
           </select>
-          <select id="f-type" class="btn" aria-label="Filtrer par type">
-            <option value="">Public et privé</option>
-            <option value="public">Public</option>
-            <option value="prive">Privé</option>
-          </select>
         </div>
       </div>
       <div class="defile" id="liste-ao"></div>
     </section>
 
-    <section class="section" id="agenda" data-vue="ao">
+    <section class="section" id="agenda" data-vue="agenda">
       <div class="tete-section">
-        <h2>Agenda des appels d'offres</h2>
+        <div>
+          <p class="is-chapeau">Les rendez-vous des appels d'offres en cours : visites, questions, remises, ouvertures des offres.</p>
+        </div>
         <div class="outils">
+          <select id="f-type" class="btn" aria-label="Filtrer par type">
+            <option value="">Public et privé</option>
+            <option value="public">AO publics</option>
+            <option value="prive">AO privés</option>
+          </select>
           <label class="case"><input type="checkbox" id="f-passes"> Voir les 30 derniers jours</label>
-          <button class="btn" type="button" id="btn-rdv">Ajouter un rendez-vous</button>
         </div>
       </div>
       <div id="liste-agenda"></div>
     </section>
 
-    <section class="section" id="transversal" data-vue="trans">
+    <section class="section" id="facturation" data-vue="facturation">
       <div class="tete-section">
         <div>
-          <h2>Affaires transversales</h2>
+          <p class="is-chapeau">L'avancement et la facturation de chaque phase du mandat, secteur par secteur. Un clic sur une affaire ouvre la saisie des pourcentages et leur historique.</p>
+        </div>
+        <div class="outils fa-outils">
+          <select id="f-secteur" class="btn" aria-label="Secteur"><option value="">Tous les secteurs</option></select>
+          <label class="case"><input type="checkbox" id="f-terminees"> Voir les affaires terminées</label>
+        </div>
+      </div>
+      <div class="fa-legende" aria-hidden="true">
+        <span><i></i>Avancement</span><span><i class="fact"></i>Facturé</span><span><i class="alerte"></i>Facturé au-delà de l'avancement</span>
+      </div>
+      <div id="liste-facturation"></div>
+    </section>
+
+    <section class="section" id="transversal" data-vue="transversales">
+      <div class="tete-section">
+        <div>
           <p class="is-chapeau">Les affaires en cours qui font intervenir plusieurs secteurs : ceux déclarés sur l'affaire, et ceux des personnes qui y travaillent.</p>
         </div>
       </div>
@@ -113,28 +131,40 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=52"></script>
-<script src="/planif/assets/donnees.js?v=72"></script>
+<script src="/planif/assets/supabase.js?v=53"></script>
+<script src="/planif/assets/donnees.js?v=73"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=108"></script>
+<script src="/planif/assets/ui.js?v=109"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=18"></script>
+<script src="/planif/assets/palette.js?v=19"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
+<script src="/planif/assets/mandat.js?v=1"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
   var JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-  var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle" };
-  // La page affichée : les appels d'offres, ou les affaires transversales (?vue=transversales)
-  var VUE = new URLSearchParams(location.search).get("vue") === "transversales" ? "trans" : "ao";
-  [].forEach.call(document.querySelectorAll("[data-vue]"), function (s) { s.hidden = s.getAttribute("data-vue") !== VUE; });
-  if (VUE === "trans") document.title = "Affaires transversales · Planification";
+  var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle", secteur: "", terminees: false };
+  /* La page affichée (?vue=, 13.10.2026) : sa clé de droit (donnees.js,
+     DROIT_PAGE) et la section qu'elle montre. Les AO publics et privés
+     partagent la section « ao », leur type en plus. */
+  var VUES = {
+    "": { cle: "veille", section: "veille" },
+    publics: { cle: "ao_publics", section: "ao", type: "public" },
+    prives: { cle: "ao_prives", section: "ao", type: "prive" },
+    agenda: { cle: "agenda_ao", section: "agenda" },
+    transversales: { cle: "transversales", section: "transversales" },
+    facturation: { cle: "facturation", section: "facturation" }
+  };
+  var VUE = VUES[new URLSearchParams(location.search).get("vue") || ""] || VUES[""];
+  [].forEach.call(document.querySelectorAll("[data-vue]"), function (s) { s.hidden = s.getAttribute("data-vue") !== VUE.section; });
 
   if (!UI.session()) return;
 
   D.pret().then(function () {
+    // Une page du module qui n'est pas permise : la première qui l'est
+    if (!D.pagePermise(VUE.cle) && D.pagePermise("inter")) { location.replace(D.lienModule("inter")); return; }
     chrome();
     UI.pied();
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
@@ -145,7 +175,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (location.hash === "#veille") setTimeout(function () { document.getElementById("veille").scrollIntoView(); }, 50);
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
-    document.getElementById("btn-rdv").addEventListener("click", function () { formEvenement(null, {}); });
+    document.getElementById("f-secteur").addEventListener("change", function () { filtres.secteur = this.value; rend(); });
+    document.getElementById("f-terminees").addEventListener("change", function () { filtres.terminees = this.checked; rend(); });
+    if (VUE.type) document.getElementById("chapeau-ao").textContent = VUE.type === "public"
+      ? "Les appels d'offres publics (marchés publics, souvent repris de la veille simap.ch) : remise, demandeur, honoraires offerts, résultat."
+      : "Les appels d'offres privés (maîtres d'ouvrage privés, sur invitation) : remise, demandeur, honoraires offerts, résultat.";
 
     D.surRechargement(rend);
     rend();
@@ -155,10 +189,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function chrome() {
     var actions = [];
-    if (VUE === "ao" && D.aDroit("affaires_creer")) {
-      actions.push({ label: "Nouvel appel d'offres", or: true, icone: "ico-ajout-affaire", action: function () { formAO(null); } });
+    if ((VUE.section === "ao" || VUE.section === "veille") && D.aDroit("affaires_creer")) {
+      actions.push({ label: "Nouvel appel d'offres", or: true, icone: "ico-ajout-affaire",
+                     action: function () { formAO(null, { aoType: VUE.type || "public" }); } });
     }
-    UI.chrome(VUE === "trans" ? "transversales" : "inter", actions);
+    if (VUE.section === "agenda") {
+      actions.push({ label: "Ajouter un rendez-vous", or: true, action: function () { formEvenement(null, {}); } });
+    }
+    UI.chrome(VUE.cle, actions);
   }
 
   /* ================================================================ outils */
@@ -185,7 +223,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function pastilleAffaire(a) {
     return el("span", { class: "is-affaire" }, [
       el("span", { class: "pastille", style: "color:" + UI.teinte(a.teinte), "aria-hidden": "true" }),
-      el("span", { class: "num is-code", style: "color:" + UI.teinte(a.teinte), text: a.code }),
+      a.code ? el("span", { class: "num is-code", style: "color:" + UI.teinte(a.teinte), text: a.code }) : null,
       el("span", { class: "is-nom", text: a.nom })
     ]);
   }
@@ -211,19 +249,28 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* ================================================================ rendu */
 
   function rend() {
-    if (VUE === "trans") {
+    var titre = document.getElementById("titre-inter");
+    if (VUE.section === "transversales") {
       var nt = listeTransversales();
-      document.getElementById("titre-inter").textContent = nt + (nt > 1 ? " affaires transversales" : " affaire transversale");
-      return;
+      titre.textContent = nt + (nt > 1 ? " affaires transversales" : " affaire transversale");
+    } else if (VUE.section === "veille") {
+      var n = D.veilleNouvelles().length;
+      titre.textContent = n ? n + (n > 1 ? " nouvelles publications" : " nouvelle publication") : "";
+      listeVeille();
+    } else if (VUE.section === "ao") {
+      // Un AO sans type paraît dans les deux pages, signalé, jusqu'à ce qu'on le classe
+      var aos = appelsDOffres().filter(function (a) { return !a.aoType || a.aoType === VUE.type; });
+      var nEnCours = aos.filter(enCours).length;
+      var nRdv = D.agenda({ depuis: auj() }).filter(function (r) { return aos.some(function (a) { return a.id === r.affaireId; }); }).length;
+      titre.textContent = nEnCours + " en cours · " + nRdv + (nRdv > 1 ? " rendez-vous à venir" : " rendez-vous à venir");
+      listeAO(aos);
+    } else if (VUE.section === "agenda") {
+      var nr = listeAgenda();
+      titre.textContent = nr + (nr > 1 ? " rendez-vous" : " rendez-vous") + (filtres.passes ? "" : " à venir");
+    } else if (VUE.section === "facturation") {
+      var nf = listeFacturation();
+      titre.textContent = nf + (nf > 1 ? " affaires au mandat" : " affaire au mandat");
     }
-    var aos = appelsDOffres();
-    var nEnCours = aos.filter(enCours).length;
-    var nRdv = D.agenda({ depuis: auj() }).length;
-    document.getElementById("titre-inter").textContent =
-      nEnCours + (nEnCours > 1 ? " AO en cours" : " AO en cours") + " · " + nRdv + (nRdv > 1 ? " rendez-vous à venir" : " rendez-vous à venir");
-    listeVeille();
-    listeAO(aos);
-    listeAgenda();
   }
 
   /* ------------------------------------------------------- veille simap.ch */
@@ -234,8 +281,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hote = UI.vide(document.getElementById("liste-veille"));
     // « Nouvelles » : ni écartées ni retenues, et dont la remise n'est pas passée
     var l = filtres.veille === "nouvelle" ? D.veilleNouvelles() : D.veille({ etat: filtres.veille });
-    var n = D.veilleNouvelles().length;
-    document.getElementById("compte-veille").textContent = n ? n + (n > 1 ? " nouvelles" : " nouvelle") : "";
     if (!l.length) {
       hote.appendChild(el("p", { class: "vide", text: filtres.veille === "nouvelle"
         ? "Aucune nouvelle publication. La veille se met à jour chaque matin de semaine."
@@ -262,7 +307,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
               (jours < 0 ? " · passée" : jours === 0 ? " · aujourd'hui" : " · dans " + jours + " j") : "Remise : non indiquée"]),
           el("span", { class: "is-motifs" }, v.motifs.slice(0, 4).map(function (m) { return el("span", { class: "etiq is-motif", text: m }); })),
           el("span", { class: "is-pub-actions" }, s ? [
-            s.etat === "retenue" && aff ? el("button", { type: "button", class: "btn btn-nu", text: "Ouvrir " + aff.code, onclick: function () { formAO(aff.id); } }) : null,
+            s.etat === "retenue" && aff ? el("button", { type: "button", class: "btn btn-nu", text: "Ouvrir " + (aff.code || "l'AO"), onclick: function () { formAO(aff.id); } }) : null,
             el("button", { type: "button", class: "btn btn-nu", text: s.etat === "retenue" ? "Remettre en veille" : "Rétablir", onclick: function () { marque(v, null); } })
           ] : [
             D.aDroit("affaires_creer") ? el("button", { type: "button", class: "btn btn-or", text: "Créer l'AO", onclick: function () { creeDepuisVeille(v); } }) : null,
@@ -305,7 +350,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function listeAO(aos) {
     var hote = UI.vide(document.getElementById("liste-ao"));
     var l = aos.filter(function (a) {
-      if (filtres.type && a.aoType !== filtres.type) return false;
       if (filtres.resultat === "en_cours") return enCours(a);
       if (filtres.resultat === "gagne") return a.aoResultat === "gagne";
       if (filtres.resultat === "perdu") return a.aoResultat === "perdu" || a.aoResultat === "abandonne";
@@ -314,11 +358,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     if (!l.length) {
       hote.appendChild(el("p", { class: "vide", text: aos.length ? "Aucun appel d'offres pour ces filtres." :
-        "Aucun appel d'offres pour l'instant." + (D.aDroit("affaires_creer") ? " « Nouvel appel d'offres », en haut, en ouvre un." : "") }));
+        (VUE.type === "prive" ? "Aucun appel d'offres privé pour l'instant." : "Aucun appel d'offres public pour l'instant.") + (D.aDroit("affaires_creer") ? " « Nouvel appel d'offres », en haut, en ouvre un." : "") }));
       return;
     }
     var t = el("table", { class: "liste is-table" });
-    t.appendChild(el("thead", {}, [el("tr", {}, ["Appel d'offres", "Type", "Demandeur", "Secteurs", "Remise", "Honoraires", "Prochain rendez-vous", "Résultat"].map(function (h) { return el("th", { text: h }); }))]));
+    t.appendChild(el("thead", {}, [el("tr", {}, ["Appel d'offres", "Demandeur", "Secteurs", "Remise", "Honoraires", "Prochain rendez-vous", "Résultat"].map(function (h) { return el("th", { text: h }); }))]));
     var corps = el("tbody");
     l.forEach(function (a) {
       var demandeur = a.demandeurId ? D.contact(a.demandeurId) : null;
@@ -328,8 +372,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         onclick: function (e) { if (!e.target.closest("a")) formAO(a.id); },
         onkeydown: function (e) { if (e.key === "Enter") formAO(a.id); }
       }, [
-        el("td", {}, [pastilleAffaire(a)]),
-        el("td", { text: a.aoType ? D.TYPES_AO[a.aoType] : "—" }),
+        el("td", {}, [pastilleAffaire(a), a.aoType ? null : el("span", { class: "etiq is-a-classer", title: "Ouvre l'AO pour choisir public ou privé", text: "type à préciser" })]),
         el("td", {}, [demandeur ? el("a", { class: "lien-doux", href: "/planif/annuaire/?q=" + encodeURIComponent(demandeur.societe || demandeur.nom), text: nomContact(demandeur) }) : el("span", { class: "is-faible", text: "—" })]),
         el("td", {}, secteursDe(a).length ? secteursDe(a).map(function (s) { return etiquetteSecteur(s.code, s.declare); }) : [el("span", { class: "is-faible", text: "—" })]),
         el("td", { class: "is-remise" + (enCours(a) && n !== null && n < 0 ? " depassee" : enCours(a) && n !== null && n <= 7 ? " proche" : "") }, a.echeance ? [
@@ -353,10 +396,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function listeAgenda() {
     var hote = UI.vide(document.getElementById("liste-agenda"));
     var depuis = filtres.passes ? C.ajoute(auj(), -30) : auj();
-    var l = D.agenda({ depuis: depuis });
+    var l = D.agenda({ depuis: depuis }).filter(function (r) {
+      var a = D.affaire(r.affaireId);
+      return !filtres.type || !a || !a.aoType || a.aoType === filtres.type;
+    });
     if (!l.length) {
-      hote.appendChild(el("p", { class: "vide", text: "Aucun rendez-vous à venir. Visites, questions, remises et ouvertures des offres se notent ici." }));
-      return;
+      hote.appendChild(el("p", { class: "vide", text: "Aucun rendez-vous à venir. Visites, questions, remises et ouvertures des offres se notent ici (« Ajouter un rendez-vous », en haut)." }));
+      return 0;
     }
     var semaine = null, ul = null;
     l.forEach(function (r) {
@@ -392,6 +438,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("span", { class: "etiq is-genre " + r.genre, text: D.GENRES_AGENDA[r.genre] })
       ])]));
     });
+    return l.length;
   }
 
   /* ------------------------------------------------------- affaires transversales */
@@ -426,6 +473,105 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     return l.length;
   }
 
+  /* ------------------------------------------------------- facturation
+     Secteur par secteur (= discipline du mandat), les affaires dont une phase
+     le concerne ; pour chaque phase, la jauge d'avancement et celle du
+     facturé de ce secteur. Un clic ouvre la saisie (mandat.js). */
+  function listeFacturation() {
+    var hote = UI.vide(document.getElementById("liste-facturation"));
+    if (!D.mandatPret()) hote.appendChild(Mandat.bandeauBase());
+    var affaires = D.affaires({ tous: filtres.terminees }).filter(function (a) { return D.phasesMandat(a).length; });
+    var parSecteur = {};
+    affaires.forEach(function (a) {
+      D.phasesMandat(a).forEach(function (p) {
+        p.disciplines.forEach(function (d) {
+          var s = parSecteur[d] || (parSecteur[d] = {});
+          (s[a.id] || (s[a.id] = { a: a, phases: [] })).phases.push(p.phase);
+        });
+      });
+    });
+    var codes = D.rangeDisciplines(Object.keys(parSecteur));
+
+    // Le choix du secteur suit les secteurs présents
+    var choix = document.getElementById("f-secteur");
+    if (filtres.secteur && codes.indexOf(filtres.secteur) < 0) filtres.secteur = "";
+    UI.vide(choix);
+    choix.appendChild(el("option", { value: "", text: "Tous les secteurs" }));
+    codes.forEach(function (c) { choix.appendChild(el("option", { value: c, text: nomSecteur(c) })); });
+    choix.value = filtres.secteur;
+
+    if (!codes.length) {
+      hote.appendChild(el("p", { class: "vide", text: "Aucune affaire n'a encore de mandat décrit. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
+    }
+    codes.filter(function (c) { return !filtres.secteur || c === filtres.secteur; }).forEach(function (code) {
+      var lignes = Object.keys(parSecteur[code]).map(function (k) { return parSecteur[code][k]; })
+        .sort(function (x, y) { return (x.a.code || "~").localeCompare(y.a.code || "~", "fr", { numeric: true }) || x.a.nom.localeCompare(y.a.nom, "fr"); });
+      var nPhases = 0, sAv = 0, sFa = 0, aFacturer = 0, dAvance = 0;
+      lignes.forEach(function (x) {
+        x.phases.forEach(function (p) {
+          var av = D.valeurMandat(x.a.id, p, code, "avancement"), fa = D.valeurMandat(x.a.id, p, code, "facturation");
+          nPhases++; sAv += av; sFa += fa;
+          if (av > fa) aFacturer++;
+          if (fa > av) dAvance++;
+        });
+      });
+      var moyAv = Math.round(sAv / nPhases), moyFa = Math.round(sFa / nPhases);
+      var bloc = el("section", { class: "fa-secteur", "aria-label": nomSecteur(code) });
+      bloc.appendChild(el("div", { class: "fa-secteur-tete" }, [
+        el("div", { class: "fa-secteur-nom" }, [
+          el("span", { class: "etiq fa-sigle", text: D.sigleDiscipline(code) }),
+          el("h3", { text: nomSecteur(code) }),
+          el("span", { class: "fa-secteur-compte", text: lignes.length + (lignes.length > 1 ? " affaires · " : " affaire · ") + nPhases + (nPhases > 1 ? " phases" : " phase") })
+        ]),
+        el("div", { class: "fa-secteur-moy", title: "Moyenne des phases du secteur" }, [
+          Mandat.jauge(moyAv, "avancement"),
+          Mandat.jauge(moyFa, "facturation", { alerte: moyFa > moyAv })
+        ]),
+        aFacturer || dAvance ? el("div", { class: "fa-signaux" }, [
+          aFacturer ? el("span", { class: "etiq fa-signal", text: aFacturer + (aFacturer > 1 ? " phases avancées au-delà du facturé" : " phase avancée au-delà du facturé") }) : null,
+          dAvance ? el("span", { class: "etiq fa-signal alerte", text: dAvance + (dAvance > 1 ? " phases facturées d'avance" : " phase facturée d'avance") }) : null
+        ]) : null
+      ]));
+      lignes.forEach(function (x) {
+        var a = x.a, resp = a.responsableId ? D.membre(a.responsableId) : null;
+        function ouvre() { Mandat.saisie(a.id, { discipline: code, surEnregistrement: rend }); }
+        bloc.appendChild(el("div", { class: "fa-affaire", tabindex: "0", role: "button",
+          "aria-label": "Avancement et facturation de " + D.libelleAffaire(a),
+          onclick: ouvre, onkeydown: function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvre(); } } }, [
+          el("div", { class: "fa-aff-nom" }, [
+            pastilleAffaire(a),
+            el("div", { class: "fa-aff-sous", text: [resp ? "Responsable : " + resp.prenom + " " + resp.nom : "",
+              a.phase ? "en phase " + a.phase : "", a.statut !== "active" ? D.STATUTS_AFFAIRE[a.statut].toLowerCase() : ""].filter(Boolean).join(" · ") || "—" })
+          ]),
+          el("div", { class: "fa-phases" }, x.phases.map(function (p) {
+            var av = D.valeurMandat(a.id, p, code, "avancement"), fa = D.valeurMandat(a.id, p, code, "facturation");
+            return el("div", { class: "fa-phase" + (fa > av ? " alerte" : "") + (av >= 100 && fa >= 100 ? " fini" : "") }, [
+              el("div", { class: "fa-phase-nom", title: D.libellePhase(p) }, [el("b", { text: p }), el("span", { text: D.PHASES[p] || "" })]),
+              Mandat.jauge(av, "avancement", { court: "Av." }),
+              Mandat.jauge(fa, "facturation", { court: "Fact.", alerte: fa > av })
+            ]);
+          }))
+        ]));
+      });
+      hote.appendChild(bloc);
+    });
+
+    // Les affaires en cours dont le mandat n'est pas encore décrit
+    var sans = D.affaires().filter(function (a) { return a.phase !== "AO" && !D.phasesMandat(a).length; });
+    if (sans.length && D.mandatPret()) {
+      var vers = D.pagePermise("affaires");
+      hote.appendChild(el("details", { class: "fa-sans" }, [
+        el("summary", { text: sans.length + (sans.length > 1 ? " affaires en cours sans mandat décrit" : " affaire en cours sans mandat décrit") }),
+        el("ul", {}, sans.map(function (a) {
+          return el("li", {}, [vers
+            ? el("a", { class: "lien-doux", href: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom), text: D.libelleAffaire(a) })
+            : D.libelleAffaire(a)]);
+        }))
+      ]));
+    }
+    return affaires.length;
+  }
+
   /* ================================================================ formulaires */
 
   /** Ce qu'il faut renvoyer à majAffaire pour ne rien perdre de l'affaire. */
@@ -456,7 +602,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /** Prochain numéro libre : AO-2026-01, AO-2026-02… */
   function codeSuivant() {
     var an = C.dt(auj()).getFullYear(), pris = {};
-    D.affaires({ tous: true }).forEach(function (a) { pris[a.code.toLowerCase()] = true; });
+    D.affaires({ tous: true }).forEach(function (a) { if (a.code) pris[a.code.toLowerCase()] = true; });
     for (var i = 1; i < 1000; i++) { var c = "AO-" + an + "-" + deux(i); if (!pris[c.toLowerCase()]) return c; }
     return "AO-" + an;
   }

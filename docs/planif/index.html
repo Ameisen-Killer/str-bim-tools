@@ -110,8 +110,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=52"></script>
-<script src="/planif/assets/donnees.js?v=72"></script>
+<script src="/planif/assets/supabase.js?v=53"></script>
+<script src="/planif/assets/donnees.js?v=73"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/portail.js?v=24"></script>
@@ -221,11 +221,12 @@
     // Sur la carte Inter-secteurs : les nouvelles publications de la veille simap.ch
     var inter = document.getElementById("module-inter"), vieux = inter.querySelector(".ab-badge");
     if (vieux) vieux.remove();
-    var nv = D.veilleNouvelles().length;
+    // La veille est la première page du module ; sans elle, le module s'ouvre sur sa première page permise
+    var nv = D.pagePermise("veille") ? D.veilleNouvelles().length : 0;
     if (nv) {
       inter.href = "/planif/inter-secteurs/#veille";
       inter.appendChild(el("span", { class: "ab-badge veille", text: nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication") }));
-    } else inter.href = "/planif/inter-secteurs/";
+    } else inter.href = D.lienModule("inter");
   }
 
   /** Plus importante d'abord : échéance, puis priorité (1 avant 5), puis libellé. */

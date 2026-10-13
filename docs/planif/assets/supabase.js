@@ -399,6 +399,16 @@
   }
 
 
+  /* Garde-fou provisoire (13.10.2026) : tant que migration-facturation.sql n'est
+     pas passée, la table mandat_saisies et la colonne affaires.mandat manquent.
+     La lecture tolère alors l'absence de la table, et rien de la facturation
+     n'est écrit. À retirer quand la migration est passée. */
+  var mandatEnBase = false;
+  function litSaisies() {
+    return litTout("mandat_saisies", "id").then(function (l) { mandatEnBase = true; return l; },
+      function () { mandatEnBase = false; return []; });
+  }
+
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -419,6 +429,7 @@
       o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
       o.secteurs = a.secteurs || [];
       o.responsable_id = a.responsableId || null;
+      if (mandatEnBase) o.mandat = a.mandat || {};
       return o;
     },
     taches: function (t) {
@@ -438,6 +449,10 @@
        (« 2026-10-02T14:00 »), la base en timestamptz. */
     avis: function (a) {
       return { id: a.id, membre_id: a.membreId, debut: versInstant(a.debut), fin: versInstant(a.fin), motif: a.motif };
+    },
+    // Une saisie d'avancement ou de facturation : qui et quand, la base les pose
+    saisies: function (x) {
+      return { id: x.id, affaire_id: x.affaireId, phase: x.phase, discipline: x.discipline, genre: x.genre, valeur: x.valeur };
     },
     veilleSuivi: function (x) {
       return { id: x.id, ao_id: x.aoId, etat: x.etat, affaire_id: x.affaireId || null, par: x.par || null };
@@ -550,7 +565,8 @@
     rendez_vous: function () { return litTout("rendez_vous", "jour"); },
     conges: function () { return litTout("conges", "id"); },
     veille_ao: litVeille,
-    veille_suivi: function () { return litTout("veille_suivi", "id"); }
+    veille_suivi: function () { return litTout("veille_suivi", "id"); },
+    mandat_saisies: litSaisies
   };
   // Tables que touchent les fonctions de la base appelées d'ici ; absente : toutes
   var TABLES_RPC = {
@@ -601,7 +617,8 @@
     var membres = b.membres || [], absences = b.absences || [], affaires = b.affaires || [],
         liens = b.affaire_membres || [], taches = b.taches || [], reglages = (b.reglages || [])[0] || {},
         contacts = b.contacts || [], avis = b.avis || [], agenda = b.ao_agenda || [], rdv = b.rendez_vous || [],
-        conges = b.conges || [], veille = b.veille_ao || [], veilleSuivi = b.veille_suivi || [];
+        conges = b.conges || [], veille = b.veille_ao || [], veilleSuivi = b.veille_suivi || [],
+        saisies = b.mandat_saisies || [];
 
     function metierDe(m) { return m.metier || ""; }
     function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -638,6 +655,7 @@
           aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
           aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
           responsableId: a.responsable_id || null,
+          mandat: a.mandat || {},
           ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
             .map(function (l) { return l.membre_id; }),
           dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
@@ -673,6 +691,10 @@
                  procedure: x.procedure || "", typePublication: x.type_publication || "", sousType: x.sous_type || "",
                  cpv: x.cpv || [], bkp: x.bkp || [], publieLe: x.publie_le, delai: x.delai_remise,
                  lien: x.lien || "", motifs: x.motifs || [] };
+      }),
+      saisies: saisies.map(function (x) {
+        return { id: x.id, affaireId: x.affaire_id, phase: x.phase, discipline: x.discipline, genre: x.genre,
+                 valeur: x.valeur, par: x.par || null, le: x.le };
       }),
       veilleSuivi: veilleSuivi.map(function (x) {
         return { id: x.id, aoId: x.ao_id, etat: x.etat, affaireId: x.affaire_id || null, par: x.par || null, le: x.le };
@@ -840,6 +862,9 @@
     var dRdv = compare(av.rdv || [], etat.rdv || [], VERS_BASE.rdv);
     var dConges = compare(av.conges || [], etat.conges || [], VERS_BASE.conges);
     var dSuivi = compare(av.veilleSuivi || [], etat.veilleSuivi || [], VERS_BASE.veilleSuivi);
+    // Saisies : on n'en ajoute que de nouvelles (une correction est une nouvelle saisie) ;
+    // celles d'une affaire supprimée partent avec elle, en cascade
+    var saisiesNeuves = mandatEnBase ? compare(av.saisies || [], etat.saisies || [], VERS_BASE.saisies).ajouts : [];
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -887,6 +912,10 @@
     suite = suite.then(function () { return appliqueTable("ao_agenda", dAgenda); });
     suite = suite.then(function () { return appliqueTable("rendez_vous", dRdv); });
     suite = suite.then(function () { return appliqueTable("conges", dConges); });
+    // Insertion simple : la table n'a pas de règle de modification
+    if (saisiesNeuves.length) suite = suite.then(function () {
+      return requete("mandat_saisies", { methode: "POST", corps: saisiesNeuves, prefer: "return=minimal" });
+    });
     if (dSuivi.retraits.length) suite = suite.then(function () { return effaceLot("veille_suivi", dSuivi.retraits); });
     suite = suite.then(function () { return appliqueTable("veille_suivi", dSuivi); });
     if (liensNeufs.length) suite = suite.then(function () { return insere("affaire_membres", liensNeufs); });
@@ -933,6 +962,7 @@
       profil: profil,
       regleJours: regleJours,
       regleProfil: regleProfil,
+      mandatEnBase: function () { return mandatEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }

@@ -1,0 +1,130 @@
+/* Mandat, avancement et facturation (13.10.2026) — mandat.js et page
+   Facturation d'Inter-secteurs. Chargée après planif.css et habillage.css.
+   Avancement dans l'accent de la marque, facturation en bleu ; un facturé
+   au-delà de l'avancement passe en rouge. */
+
+/* ------------------------------------------------------------- jauges */
+.mj{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;line-height:1.2}
+.mj-lib{flex:none;min-width:4.6em;color:var(--texte-faible)}
+.mj-piste{flex:1 1 auto;min-width:40px;height:8px;border-radius:99px;background:rgba(var(--encre),.09);overflow:hidden}
+.mj-rempli{display:block;height:100%;border-radius:99px;background:var(--or);transition:width .35s ease}
+.mj-facturation .mj-rempli{background:var(--bleu)}
+.mj.alerte .mj-rempli{background:var(--alerte)}
+.mj.alerte .mj-val{color:var(--alerte)}
+.mj-val{flex:none;min-width:3.4em;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.mj.vide .mj-val{color:var(--texte-faible);font-weight:450}
+
+.mj-base{margin:0 0 14px;padding:10px 12px;border-radius:8px;background:#FBE4E2;color:var(--alerte);font-size:14px;font-weight:600}
+
+/* ------------------------------------------------- éditeur (fiche affaire) */
+.mj-editeur{display:flex;flex-direction:column;gap:6px}
+.mj-ed-ligne{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);align-items:center;gap:6px 14px;
+  padding:6px 8px;border-radius:8px;border:1px solid transparent}
+.mj-ed-ligne.pris{background:var(--m-pale);border-color:rgba(var(--or-rvb),.18)}
+.mj-ed-phase{display:flex;align-items:baseline;gap:8px;min-width:0;font-size:14px}
+.mj-ed-phase b{font-variant-numeric:tabular-nums;color:var(--or)}
+.mj-ed-phase span{color:var(--texte-doux);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mj-ed-disc{display:flex;flex-wrap:wrap;gap:6px}
+.mj-case{font-weight:600;font-size:12.5px;padding:5px 9px}
+.mj-sigles{margin-top:6px;line-height:1.6}
+@media (max-width:640px){
+  .mj-ed-ligne{grid-template-columns:1fr}
+  .mj-case{padding:8px 11px}
+}
+
+/* ------------------------------------------------------- fenêtre de saisie */
+.mj-intro{margin:0 0 12px}
+.mj-phase{border:1px solid rgba(var(--encre),.10);border-radius:10px;padding:10px 12px 6px;margin-bottom:12px;background:#fff}
+.mj-phase-tete{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 18px;
+  padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--ligne-faible)}
+.mj-phase-nom{display:flex;align-items:baseline;gap:8px;font-size:15px}
+.mj-phase-nom b{color:var(--or);font-variant-numeric:tabular-nums}
+.mj-phase-moy{display:flex;flex-direction:column;gap:3px;width:min(260px,100%)}
+.mj-ligne{display:grid;grid-template-columns:minmax(90px,1fr) minmax(150px,1.5fr) minmax(150px,1.5fr);gap:6px 16px;
+  align-items:start;padding:8px 4px;border-radius:6px}
+.mj-ligne + .mj-ligne{border-top:1px solid var(--ligne-faible)}
+.mj-ligne.vise{background:var(--m-pale)}
+.mj-disc{display:flex;flex-direction:column;min-width:0;padding-top:6px}
+.mj-disc b{font-size:13px}
+.mj-disc span{font-size:12.5px;color:var(--texte-faible);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mj-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mj-cell-l{display:flex;align-items:center;gap:6px}
+.mj-cell-l .mj{flex:1 1 auto}
+.mj-cell-l .mj-val{display:none}
+.mj-input{width:64px;text-align:right;font-variant-numeric:tabular-nums}
+.mj-input:disabled{opacity:.7;background:#F4F5F2}
+.mj-pc{color:var(--texte-faible);font-size:13px}
+.mj-meta{font-size:11.5px;color:var(--texte-faible)}
+.mj-cell-facturation .mj-input{color:var(--bleu)}
+@media (max-width:560px){
+  .mj-ligne{grid-template-columns:1fr 1fr}
+  .mj-disc{grid-column:1 / -1;flex-direction:row;align-items:baseline;gap:8px;padding-top:0}
+  .mj-input{width:58px;font-size:16px}
+}
+
+/* Historique */
+.mj-histo{margin-top:6px}
+.mj-histo summary{cursor:pointer;font-weight:600;padding:6px 0}
+.mj-histo-outils{margin:4px 0 8px}
+.mj-histo-liste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;font-size:13.5px}
+.mj-histo-liste li{display:grid;grid-template-columns:76px 86px 110px minmax(0,1fr);gap:4px 12px;align-items:baseline;
+  padding:6px 2px;border-top:1px solid var(--ligne-faible)}
+.mj-histo-case b{color:var(--or)}
+.mj-histo-facturation .mj-histo-genre{color:var(--bleu)}
+.mj-histo-val{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mj-histo-qui{color:var(--texte-faible);font-size:12.5px}
+@media (max-width:560px){
+  .mj-histo-liste li{grid-template-columns:auto auto 1fr}
+  .mj-histo-qui{grid-column:1 / -1}
+}
+
+/* ------------------------------------------------- page Facturation */
+.fa-outils{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.fa-legende{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 14px;font-size:13px;color:var(--texte-faible)}
+.fa-legende i{display:inline-block;width:18px;height:8px;border-radius:99px;margin-right:6px;vertical-align:middle;background:var(--or)}
+.fa-legende i.fact{background:var(--bleu)}
+.fa-legende i.alerte{background:var(--alerte)}
+.fa-secteur{background:#fff;border:1px solid rgba(var(--encre),.10);border-radius:10px;margin-bottom:16px;overflow:hidden}
+.fa-secteur-tete{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;padding:12px 14px;background:#FAFAF8;border-bottom:1px solid var(--ligne-faible)}
+.fa-secteur-nom{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1 1 220px}
+.fa-secteur-nom h3{margin:0;font-size:17px}
+.fa-sigle{border-color:transparent;background:var(--m-pale);color:var(--or);font-weight:700}
+.fa-secteur-compte{font-size:13px;color:var(--texte-faible)}
+.fa-secteur-moy{display:flex;flex-direction:column;gap:4px;width:min(300px,100%)}
+.fa-signaux{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.fa-signal{font-size:12px;border-color:transparent;background:#EAF1F8;color:var(--bleu)}
+.fa-signal.alerte{background:#FBE4E2;color:var(--alerte)}
+.fa-affaire{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);gap:10px 18px;padding:12px 14px;
+  border-top:1px solid var(--ligne-faible);cursor:pointer;transition:background .15s}
+.fa-affaire:first-of-type{border-top:0}
+.fa-affaire:hover{background:#FAFAF8}
+.fa-affaire:focus-visible{outline:2px solid var(--or);outline-offset:-2px}
+.fa-aff-nom{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fa-aff-nom .is-affaire{flex-wrap:wrap}
+.fa-aff-sous{font-size:12.5px;color:var(--texte-faible)}
+.fa-phases{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.fa-phase{border:1px solid rgba(var(--encre),.09);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;gap:4px;background:#fff}
+.fa-phase.alerte{border-color:rgba(var(--alerte-rvb),.45)}
+.fa-phase.fini{background:#F6F7F4}
+.fa-phase-nom{display:flex;align-items:baseline;gap:6px;font-size:13px;min-width:0}
+.fa-phase-nom b{color:var(--or);font-variant-numeric:tabular-nums}
+.fa-phase-nom span{color:var(--texte-doux);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fa-phase .mj{font-size:12px}
+.fa-phase .mj-lib{min-width:3.4em}
+.fa-sans{margin-top:8px}
+.fa-sans ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+@media (max-width:640px){
+  .fa-affaire{grid-template-columns:1fr}
+  .fa-phases{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+@media print{
+  .fa-affaire{break-inside:avoid}
+  .mj-rempli{transition:none}
+}
+
+/* Page Tâches : l'affaire filtrée et son mandat */
+.mj-bandeau{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 18px;
+  margin:0 0 14px;padding:10px 14px;background:#fff;border:1px solid rgba(var(--encre),.10);border-radius:10px}
+.mj-bandeau-txt{display:flex;flex-direction:column;gap:6px;flex:1 1 260px;min-width:0;font-size:14px}
+.mj-bandeau-jauges{display:flex;flex-direction:column;gap:4px;max-width:360px}
+@media print{.mj-bandeau{display:none}}

@@ -316,6 +316,8 @@ create table if not exists public.affaires (
   secteurs     text[] not null default '{}',
   -- Responsable d'affaire (13.10.2026) : une fiche de l'équipe
   responsable_id uuid constraint affaires_responsable_fk references public.membres (id) on delete set null,
+  -- Mandat (13.10.2026) : phases SIA et disciplines de chacune, {"31": ["structure", "geotechnique"], …}
+  mandat     jsonb not null default '{}'::jsonb constraint affaires_mandat_check check (jsonb_typeof(mandat) = 'object'),
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
   constraint affaires_id_bureau_key   unique (id, bureau_id),
@@ -550,6 +552,44 @@ create table if not exists public.messages (
 );
 create index if not exists messages_bureau on public.messages (bureau_id, cree_le desc);
 
+-- ------------------------------------------- avancement et facturation ---
+-- Facturation (13.10.2026) : l'avancement et la facturation (%) de chaque
+-- phase du mandat, par discipline. Une ligne par saisie, jamais modifiée : la
+-- valeur en cours d'une case (affaire, phase, discipline, genre) est la plus
+-- récente ; les autres font l'historique. Qui et quand sont posés par la
+-- base (garde_mandat_saisie), pas par l'outil.
+create table if not exists public.mandat_saisies (
+  id          uuid primary key default gen_random_uuid(),
+  bureau_id   uuid not null default public.bureau_par_defaut()
+              constraint mandat_saisies_bureau_fk references public.bureaux (id) on delete cascade,
+  affaire_id  uuid not null,
+  phase       text not null constraint mandat_saisies_phase_check check (phase ~ '^[0-9]{2}$'),
+  discipline  text not null constraint mandat_saisies_discipline_check check (discipline ~ '^[a-z][a-z0-9_]{0,39}$'),
+  genre       text not null constraint mandat_saisies_genre_check check (genre in ('avancement', 'facturation')),
+  valeur      smallint not null constraint mandat_saisies_valeur_check check (valeur between 0 and 100),
+  par         uuid constraint mandat_saisies_par_fk references public.membres (id) on delete set null,
+  le          timestamptz not null default now(),
+  constraint mandat_saisies_affaire_fk foreign key (affaire_id, bureau_id)
+    references public.affaires (id, bureau_id) on delete cascade
+);
+create index if not exists mandat_saisies_affaire on public.mandat_saisies (affaire_id, phase, discipline, genre, le desc);
+create index if not exists mandat_saisies_bureau on public.mandat_saisies (bureau_id);
+comment on table public.mandat_saisies is
+  'Avancement et facturation (%) de chaque phase du mandat, par discipline. Une ligne par saisie : la plus récente fait foi, les autres font l''historique.';
+
+create or replace function public.garde_mandat_saisie()
+returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  new.par := public.mon_membre();
+  new.le := now();
+  return new;
+end $$;
+revoke all on function public.garde_mandat_saisie() from public, anon, authenticated;
+drop trigger if exists garde on public.mandat_saisies;
+create trigger garde before insert on public.mandat_saisies
+  for each row execute function public.garde_mandat_saisie();
+
 -- ------------------------------------------------------------------- news ---
 -- News du bureau (13.10.2026) : des articles mis en forme (gras, listes,
 -- liens, images…) en tête de Communication. Tout le bureau les lit ; les
@@ -743,12 +783,13 @@ begin
      array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire', 'voir_conges_equipe', 'voir_absences_avenir']),
     (p_bureau, 'administrateur', 'Administrateur', null, 0,
      array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'page_transversales', 'conges_tous',
-           'news_rediger', 'news_archiver', 'news_supprimer'])
+           'news_rediger', 'news_archiver', 'news_supprimer',
+           'page_facturation', 'facturation_saisir', 'avancement_tous'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'chef_secteur', 'Chef de secteur', 'administrateur', 0,
      array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge', 'page_secteurs',
-           'planning_equipe', 'taches_a_affecter', 'conges_secteur'])
+           'planning_equipe', 'taches_a_affecter', 'conges_secteur', 'avancement_secteur'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'chef_projet', 'Chef de projet', 'chef_secteur', 0,
@@ -849,7 +890,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -857,7 +898,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences')
   loop
@@ -1062,6 +1103,45 @@ create policy "droit de supprimer (suppression)" on public.news for delete to au
   using (bureau_id = (select public.bureau_courant())
          and (select public.a_droit('news_supprimer'))
          and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
+
+-- Avancement et facturation. Qui saisit : la facturation, le droit « Saisir
+-- la facturation » ; l'avancement, le responsable de l'affaire, le chef du
+-- secteur (droit « Avancement de son secteur », pour sa discipline) ou le
+-- droit « Avancement de toutes les affaires ». Toujours sur une case du mandat.
+create or replace function public.peut_saisir_mandat(p_affaire uuid, p_phase text, p_discipline text, p_genre text)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1
+      from public.affaires a
+     where a.id = p_affaire
+       and a.bureau_id = public.bureau_courant()
+       and jsonb_typeof(a.mandat -> p_phase) = 'array'
+       and (a.mandat -> p_phase) ? p_discipline
+       and case p_genre
+             when 'facturation' then public.a_droit('facturation_saisir')
+             when 'avancement' then
+               public.a_droit('avancement_tous')
+               or (a.responsable_id is not null and a.responsable_id = public.mon_membre())
+               or (public.a_droit('avancement_secteur') and exists (
+                     select 1 from public.membres moi
+                      where moi.id = public.mon_membre() and moi.discipline = p_discipline))
+             else false
+           end);
+$$;
+-- L'avancement, tout le bureau le lit ; la facturation, ceux qui ont la page
+-- ou le droit de la saisir. Pas de modification : une correction est une
+-- nouvelle saisie. Retirer une saisie : le super admin seul.
+create policy "bureau courant (lecture)" on public.mandat_saisies for select to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and (genre = 'avancement'
+              or (select public.a_droit('page_facturation'))
+              or (select public.a_droit('facturation_saisir'))));
+create policy "droit de saisir (création)" on public.mandat_saisies for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and public.peut_saisir_mandat(affaire_id, phase, discipline, genre));
+create policy "super admin (suppression)" on public.mandat_saisies for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (select public.est_super_admin()));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -1973,6 +2053,7 @@ begin
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
     'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
     'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
+    'public.peut_saisir_mandat(uuid, text, text, text)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)',
@@ -2393,7 +2474,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_suivi', 'messages', 'reglages'] loop
+  foreach t in array array['taches', 'affaires', 'affaire_membres', 'membres', 'absences', 'avis', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_suivi', 'messages', 'mandat_saisies', 'reglages'] loop
     if not exists (
       select 1 from pg_publication_tables
        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

@@ -699,13 +699,16 @@
   ];
   var MODULE_DE = {
     absences: "communication", annuaire: "communication", equipe: "communication",
-    tableau: "taches", affaires: "taches", transversales: "inter", charge: "taches"
+    tableau: "taches", affaires: "taches", charge: "taches",
+    veille: "inter", ao_publics: "inter", ao_prives: "inter", agenda_ao: "inter", transversales: "inter", facturation: "inter"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
      ouverte en vert clair. Communication : le bureau aujourd'hui, les
      absences, l'équipe (passée de Tâches le 13.10.2026) et l'annuaire. Tâches : la liste et le tableau de
      bord pour tous, puis les pages de gestion pour les chefs de secteur et
-     au-delà. Inter-secteurs : appels d'offres et affaires transversales. Une seule page permise : pas de sous-barre. */
+     au-delà. Inter-secteurs (13.10.2026) : veille simap.ch, AO publics, AO
+     privés, agenda des AO, affaires transversales et facturation — la liste
+     vit dans donnees.js (PAGES_INTER). Une seule page permise : pas de sous-barre. */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [
       { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui" },
@@ -719,10 +722,7 @@
       { cle: "affaires", href: "/planif/affaires/", nom: "Affaires" },
       { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge" }
     ] },
-    inter: { nom: "Inter-secteurs", pages: [
-      { cle: "inter", href: "/planif/inter-secteurs/", nom: "Appels d'offres" },
-      { cle: "transversales", href: "/planif/inter-secteurs/?vue=transversales", nom: "Affaires transversales" }
-    ] }
+    inter: { nom: "Inter-secteurs", pages: D.PAGES_INTER || [] }
   };
 
   function sousNav(actif) {
@@ -905,7 +905,8 @@
         { cle: "communication", href: "/planif/communication/", nom: "Communication", court: "Comm." },
         { cle: "taches", href: "/planif/taches/", nom: "Tâches", court: "Tâches" },
         { cle: "secteurs", href: "/planif/secteurs/", nom: "Secteurs", court: "Secteurs" },
-        { cle: "inter", href: "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
+        // Le module s'ouvre sur sa première page permise (la facturation seule, pour certains)
+        { cle: "inter", href: (D.lienModule && D.lienModule("inter")) || "/planif/inter-secteurs/", nom: "Inter-secteurs", court: "AO" }
       ]).forEach(function (p) { parCle[p.cle] = p; });
       pages = [];
       GROUPES_V2.forEach(function (g) {

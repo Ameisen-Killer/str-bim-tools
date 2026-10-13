@@ -80,3 +80,6 @@
   .is-pub-actions{margin-left:0;width:100%}
   .is-pub-actions .btn{flex:1 1 auto;justify-content:center}
 }
+
+/* AO sans type (13.10.2026) : il paraît dans AO publics et AO privés jusqu'à ce qu'on le classe */
+.is-a-classer{margin-left:8px;font-size:11.5px;border-color:transparent;background:#FFF1D6;color:#8A5A00}

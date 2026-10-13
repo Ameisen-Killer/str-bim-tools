@@ -124,10 +124,10 @@
       droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous",
-               "news_rediger", "news_archiver", "news_supprimer"] },
+               "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge", "page_secteurs",
-               "planning_equipe", "taches_a_affecter", "conges_secteur"] },
+               "planning_equipe", "taches_a_affecter", "conges_secteur", "avancement_secteur"] },
     { code: "chef_projet", nom: "Chef de projet", parent: "chef_secteur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui"] }
   ];
@@ -236,10 +236,12 @@
      les applique aussi. */
   var CATEGORIES_DROITS = [
     { titre: "Pages", droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire",
-                               "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales"] },
+                               "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales",
+                               "page_facturation"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
                                              "conges_secteur", "conges_tous", "tchat_moderer"] },
+    { titre: "Avancement et facturation", droits: ["avancement_secteur", "avancement_tous", "facturation_saisir"] },
     { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] }
   ];
   var ORDRE_DROITS = [].concat.apply([], CATEGORIES_DROITS.map(function (c) { return c.droits; }));
@@ -253,6 +255,22 @@
     page_secteurs: { titre: "Secteurs", aide: "Le module Secteurs : effectifs, charge et projets de chaque secteur." },
     page_inter: { titre: "Appels d'offres", aide: "Le module Inter-secteurs : appels d'offres, agenda des AO, veille simap.ch." },
     page_transversales: { titre: "Affaires transversales", aide: "Les affaires qui touchent plusieurs secteurs." },
+    page_facturation: {
+      titre: "Facturation",
+      aide: "La page Facturation (Inter-secteurs) : avancement et facturation de chaque phase, secteur par secteur. Elle montre aussi les pourcentages facturés, que les autres ne voient pas."
+    },
+    avancement_secteur: {
+      titre: "Avancement de son secteur",
+      aide: "Saisir l'avancement (%) des phases pour sa discipline, sur toutes les affaires. Le responsable d'une affaire saisit toujours celui de son affaire."
+    },
+    avancement_tous: {
+      titre: "Avancement de toutes les affaires",
+      aide: "Saisir l'avancement (%) de chaque phase et de chaque discipline, sur toutes les affaires."
+    },
+    facturation_saisir: {
+      titre: "Saisir la facturation",
+      aide: "Saisir le pourcentage facturé de chaque phase et de chaque discipline. Ce droit fait aussi voir la facturation."
+    },
     planning_equipe: {
       titre: "Planning de toute l'équipe",
       aide: "Le tableau de bord montre tout le monde, et la page Équipe la charge de chacun. Sans ce droit, on n'y voit que ses tâches et les personnes qui y travaillent."
@@ -307,8 +325,20 @@
   var DROIT_PAGE = {
     tableau: "page_tableau", equipe: "page_equipe", absences: "page_absences", annuaire: "page_annuaire",
     affaires: "page_affaires", charge: "page_charge", secteurs: "page_secteurs",
-    inter: "page_inter", transversales: "page_transversales"
+    veille: "page_inter", ao_publics: "page_inter", ao_prives: "page_inter", agenda_ao: "page_inter",
+    transversales: "page_transversales", facturation: "page_facturation"
   };
+  /* Les pages du module Inter-secteurs (13.10.2026 : la veille, les AO publics,
+     les AO privés et leur agenda séparés ; la facturation). « inter » est le
+     module : il s'ouvre dès qu'une de ses pages est permise, sur la première. */
+  var PAGES_INTER = [
+    { cle: "veille", href: "/planif/inter-secteurs/", nom: "Veille simap.ch" },
+    { cle: "ao_publics", href: "/planif/inter-secteurs/?vue=publics", nom: "AO publics" },
+    { cle: "ao_prives", href: "/planif/inter-secteurs/?vue=prives", nom: "AO privés" },
+    { cle: "agenda_ao", href: "/planif/inter-secteurs/?vue=agenda", nom: "Agenda des AO" },
+    { cle: "transversales", href: "/planif/inter-secteurs/?vue=transversales", nom: "Affaires transversales" },
+    { cle: "facturation", href: "/planif/inter-secteurs/?vue=facturation", nom: "Facturation" }
+  ];
   poseGroupes(null);
 
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
@@ -422,6 +452,27 @@
   };
   // « AO » vient avant les phases SIA, rangées par numéro
   var ORDRE_PHASES = ["AO"].concat(Object.keys(PHASES).filter(function (k) { return k !== "AO"; }).sort());
+  // Les phases d'un mandat : les phases SIA seules
+  var PHASES_MANDAT = ORDRE_PHASES.filter(function (k) { return k !== "AO"; });
+  var RE_CODE = /^[a-z][a-z0-9_]{0,39}$/;
+
+  /* Le mandat d'une affaire (13.10.2026) : les phases SIA pour lesquelles le
+     bureau est mandaté, et les disciplines de chacune —
+     { "31": ["geotechnique", "structure"], "32": ["structure"] }. Phases par
+     numéro, disciplines par code : la base garde la même forme (affaires.mandat). */
+  function reprisMandat(m) {
+    var out = {};
+    if (!m || typeof m !== "object" || Array.isArray(m)) return out;
+    Object.keys(m).filter(function (p) { return /^\d{2}$/.test(p); }).sort().forEach(function (p) {
+      var vus = {}, l = (Array.isArray(m[p]) ? m[p] : []).map(texte).filter(function (c) {
+        if (!RE_CODE.test(c) || vus[c]) return false;
+        return (vus[c] = true);
+      }).sort();
+      if (l.length) out[p] = l;
+    });
+    return out;
+  }
+  var GENRES_SAISIE = { avancement: "Avancement", facturation: "Facturation" };
 
   /* Appels d'offres et leur agenda (module Inter-secteurs, 06.10.2026) */
   var TYPES_AO = { public: "Public", prive: "Privé" };
@@ -481,7 +532,9 @@
       version: VERSION,
       reglages: { canton: "VD", capaciteDefaut: 5, demo: false },
       membres: [], affaires: [], taches: [], contacts: [], avis: [], agenda: [], rdv: [], conges: [],
-      veille: [], veilleSuivi: []
+      veille: [], veilleSuivi: [],
+      // Avancement et facturation (%) du mandat, une ligne par saisie (historique)
+      saisies: []
     };
   }
 
@@ -748,6 +801,7 @@
         aoResultat: RESULTATS_AO[a.aoResultat] ? a.aoResultat : null,
         aoMontant: a.aoMontant == null || a.aoMontant === "" ? null : Math.max(0, nombre(a.aoMontant, 0)),
         secteurs: (a.secteurs || []).map(texte).filter(Boolean),
+        mandat: reprisMandat(a.mandat),
         ingenieurs: (a.ingenieurs || []).map(texte),
         dessinateurs: (a.dessinateurs || []).map(texte)
       });
@@ -829,6 +883,14 @@
                    creePar: texte(r.creePar) || null, source: r.source === "outlook" ? "outlook" : "planif",
                    externeId: texte(r.externeId) || null });
     });
+    (brut.saisies || []).forEach(function (x) {
+      var v = parseInt(x.valeur, 10);
+      if (!texte(x.affaireId) || !/^\d{2}$/.test(texte(x.phase)) || !RE_CODE.test(texte(x.discipline)) ||
+          !GENRES_SAISIE[x.genre] || !(v >= 0 && v <= 100)) return;
+      e.saisies.push({ id: texte(x.id) || id(), affaireId: texte(x.affaireId), phase: texte(x.phase),
+                       discipline: texte(x.discipline), genre: x.genre, valeur: v,
+                       par: texte(x.par) || null, le: texte(x.le) || new Date().toISOString() });
+    });
     (brut.agenda || []).forEach(function (r) {
       if (!texte(r.jour) || !texte(r.affaireId)) return;
       var h = texte(r.heure).slice(0, 5);
@@ -875,6 +937,7 @@
     (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
     (e.avis || []).forEach(function (a) { a.id = neuf(a.id); a.membreId = neuf(a.membreId); });
     (e.agenda || []).forEach(function (r) { r.id = neuf(r.id); r.affaireId = neuf(r.affaireId); });
+    (e.saisies || []).forEach(function (x) { x.id = neuf(x.id); x.affaireId = neuf(x.affaireId); x.par = neuf(x.par); });
     (e.rdv || []).forEach(function (r) { r.id = neuf(r.id); r.participants = r.participants.map(neuf); r.creePar = neuf(r.creePar); });
     (e.veilleSuivi || []).forEach(function (x) { x.id = neuf(x.id); x.affaireId = neuf(x.affaireId); x.par = neuf(x.par); });
     (e.conges || []).forEach(function (c) { c.id = neuf(c.id); c.membreId = neuf(c.membreId); c.validePar = neuf(c.validePar); c.absenceId = neuf(c.absenceId); });
@@ -892,6 +955,8 @@
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
     e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
     e.agenda = (e.agenda || []).filter(function (r) { return vraisA[r.affaireId]; });
+    e.saisies = (e.saisies || []).filter(function (x) { return vraisA[x.affaireId]; });
+    e.saisies.forEach(function (x) { if (!vraisM[x.par]) x.par = null; });
     e.conges = (e.conges || []).filter(function (c) { return vraisM[c.membreId]; });
     (e.rdv || []).forEach(function (r) {
       r.participants = r.participants.filter(function (x) { return vraisM[x]; });
@@ -1016,6 +1081,8 @@
       v.aoMontant = mt ? Math.round(parseFloat(mt.replace(",", "."))) : null;
     }
     if ("secteurs" in o) v.secteurs = (o.secteurs || []).map(texte).filter(Boolean);
+    // Mandat : phases SIA et disciplines de chacune, seulement quand le formulaire le porte
+    if ("mandat" in o) v.mandat = reprisMandat(o.mandat);
     return v;
   }
 
@@ -1239,6 +1306,13 @@
        console au super admin. Ce n'est qu'un rangement de l'interface : les
        données du bureau restent lisibles. */
     DROIT_PAGE: DROIT_PAGE,
+    PAGES_INTER: PAGES_INTER,
+    /** L'adresse d'un module : sa première page permise (Inter-secteurs), sinon la sienne. */
+    lienModule: function (cle) {
+      if (cle !== "inter") return null;
+      var p = PAGES_INTER.filter(function (x) { return D.pagePermise(x.cle); })[0];
+      return (p || PAGES_INTER[0]).href;
+    },
     /** 3 : la console est ouverte (super admin, ou rôle « Admin du site ») ; 0 sinon. */
     niveauAcces: function () {
       var r = D.roleDemo();
@@ -1274,6 +1348,7 @@
     /** cle : celle de la barre des pages (« tableau », « inter »…) ; inconnue : permise. */
     pagePermise: function (cle) {
       if (cle === "console") return D.niveauAcces() >= 3;
+      if (cle === "inter") return PAGES_INTER.some(function (p) { return D.pagePermise(p.cle); });
       var d = DROIT_PAGE[cle];
       return !d || D.aDroit(d);
     },
@@ -1482,6 +1557,7 @@
         etat.affaires = etat.affaires.filter(function (a) { return a.id !== i; });
         etat.taches = etat.taches.filter(function (t) { return t.affaireId !== i; });
         etat.agenda = (etat.agenda || []).filter(function (r) { return r.affaireId !== i; });
+        etat.saisies = (etat.saisies || []).filter(function (x) { return x.affaireId !== i; });
         return sauve();
       });
     },
@@ -1863,6 +1939,114 @@
       });
     },
 
+    /* ------------------------------------------------ mandat, avancement, facturation
+       Le mandat d'une affaire : ses phases SIA et les disciplines de chacune.
+       Pour chaque case (phase × discipline), deux pourcentages — l'avancement
+       et la facturation — saisis au fil du temps : chaque saisie est gardée,
+       la plus récente fait foi (13.10.2026). La base applique les mêmes
+       règles (peut_saisir_mandat) et ne montre la facturation qu'à ceux qui
+       ont la page ou le droit de la saisir. */
+    PHASES_MANDAT: PHASES_MANDAT,
+    GENRES_SAISIE: GENRES_SAISIE,
+    /** La base connaît-elle le mandat ? (migration-facturation.sql ; toujours vrai en local) */
+    mandatPret: function () { return !ADAPTATEUR.mandatEnBase || ADAPTATEUR.mandatEnBase(); },
+    /** « STR », « GEO », « ENV », « GC » : le sigle d'une discipline, pour les cases serrées. */
+    sigleDiscipline: function (code) {
+      var mots = String(code || "").split("_").filter(Boolean);
+      var sigle = mots.length > 1 ? mots.map(function (m) { return m.charAt(0); }).join("") : String(code || "").slice(0, 3);
+      // Deux disciplines du même sigle (administrateurs, administration) : une lettre de plus
+      var autres = Object.keys(DISCIPLINES).filter(function (c) { return c !== code; });
+      if (mots.length <= 1 && autres.some(function (c) { return c.split("_").length <= 1 && c.slice(0, 3) === sigle; })) sigle = String(code).slice(0, 4);
+      return sigle.toUpperCase();
+    },
+    /** Disciplines rangées comme la liste du bureau ; les codes inconnus à la fin. */
+    rangeDisciplines: function (codes) {
+      var ordre = Object.keys(DISCIPLINES);
+      function rang(c) { var i = ordre.indexOf(c); return i < 0 ? 999 : i; }
+      return (codes || []).slice().sort(function (a, b) { return rang(a) - rang(b) || (a < b ? -1 : 1); });
+    },
+    /** Les phases du mandat : [{ phase, disciplines }], dans l'ordre des phases. */
+    phasesMandat: function (a) {
+      var m = (a && a.mandat) || {};
+      return Object.keys(m).sort().map(function (p) { return { phase: p, disciplines: D.rangeDisciplines(m[p]) }; });
+    },
+    /** La dernière saisie d'une case : { valeur, par, le… }, ou null. */
+    saisieMandat: function (idAffaire, phase, discipline, genre) {
+      return dernieresSaisies()[idAffaire + "|" + phase + "|" + discipline + "|" + genre] || null;
+    },
+    /** Pourcentage d'une case (0 sans saisie). */
+    valeurMandat: function (idAffaire, phase, discipline, genre) {
+      var x = D.saisieMandat(idAffaire, phase, discipline, genre);
+      return x ? x.valeur : 0;
+    },
+    /** Pourcentage d'une phase : la moyenne de ses disciplines (ou de la seule
+     *  discipline donnée). null si la phase n'est pas au mandat. */
+    valeurPhase: function (a, phase, genre, discipline) {
+      var l = ((a && a.mandat) || {})[phase];
+      if (!l || !l.length) return null;
+      if (discipline) return l.indexOf(discipline) >= 0 ? D.valeurMandat(a.id, phase, discipline, genre) : null;
+      return Math.round(l.reduce(function (s, d) { return s + D.valeurMandat(a.id, phase, d, genre); }, 0) / l.length);
+    },
+    /** Les saisies d'une affaire, la plus récente d'abord (opts.phase, opts.discipline, opts.genre). */
+    historiqueMandat: function (idAffaire, opts) {
+      opts = opts || {};
+      return (etat.saisies || []).filter(function (x) {
+        return x.affaireId === idAffaire && (!opts.phase || x.phase === opts.phase) &&
+          (!opts.discipline || x.discipline === opts.discipline) && (!opts.genre || x.genre === opts.genre);
+      }).sort(function (x, y) { return instant(y.le) - instant(x.le); });
+    },
+    /** Voir la facturation : la page, ou le droit de la saisir. */
+    voitFacturation: function () { return D.aDroit("page_facturation") || D.aDroit("facturation_saisir"); },
+    peutSaisirFacturation: function () { return D.aDroit("facturation_saisir"); },
+    /** Saisir l'avancement d'une discipline : le responsable de l'affaire, le
+     *  chef de ce secteur, ou le droit sur toutes les affaires. */
+    peutSaisirAvancement: function (a, discipline) {
+      if (!a) return false;
+      if (D.aDroit("avancement_tous")) return true;
+      var moi = D.monMembre();
+      if (!moi) return false;
+      if (a.responsableId && a.responsableId === moi.id) return true;
+      return D.aDroit("avancement_secteur") && !!moi.discipline && moi.discipline === discipline;
+    },
+    /** Peut-on saisir quoi que ce soit sur cette affaire ? */
+    peutSaisirMandat: function (a) {
+      if (!a) return false;
+      if (D.peutSaisirFacturation()) return true;
+      return D.phasesMandat(a).some(function (p) {
+        return p.disciplines.some(function (d) { return D.peutSaisirAvancement(a, d); });
+      });
+    },
+    /**
+     * Enregistre des pourcentages : items [{ phase, discipline, genre, valeur }].
+     * Une valeur égale à la valeur en cours n'est pas resaisie. Promesse du
+     * nombre de saisies faites.
+     */
+    saisitMandat: function (idAffaire, items) {
+      return Promise.resolve().then(function () {
+        var a = D.affaire(idAffaire); if (!a) throw erreur("Affaire introuvable.");
+        if (!D.mandatPret()) throw erreur("La base n'est pas encore à jour : la facturation attend sa migration.");
+        var moi = D.monMembre(), maintenant = new Date().toISOString(), neuves = [];
+        (items || []).forEach(function (o) {
+          var phase = texte(o.phase), disc = texte(o.discipline), genre = o.genre;
+          if (!GENRES_SAISIE[genre]) return;
+          if ((a.mandat[phase] || []).indexOf(disc) < 0) throw erreur("La phase " + phase + " n'est pas au mandat pour cette discipline.");
+          var v = Math.round(nombre(o.valeur, NaN));
+          if (!(v >= 0 && v <= 100)) throw erreur("Un pourcentage va de 0 à 100.");
+          if (genre === "facturation" && !D.peutSaisirFacturation()) throw erreur("Saisir la facturation demande le droit « Saisir la facturation ».");
+          if (genre === "avancement" && !D.peutSaisirAvancement(a, disc)) {
+            throw erreur("L'avancement de " + (DISCIPLINES[disc] || disc) + " se saisit par le responsable de l'affaire ou le chef du secteur.");
+          }
+          var avant = D.saisieMandat(a.id, phase, disc, genre);
+          if (avant ? avant.valeur === v : v === 0) return;
+          neuves.push({ id: id(), affaireId: a.id, phase: phase, discipline: disc, genre: genre, valeur: v,
+                        par: moi ? moi.id : null, le: maintenant });
+        });
+        if (!neuves.length) return 0;
+        etat.saisies = (etat.saisies || []).concat(neuves);
+        return sauve().then(function () { return neuves.length; });
+      });
+    },
+
     /* ------------------------------------------------ sauvegarde / reprise */
     exporte: function () { return copie(etat); },
     importe: function (brut) {
@@ -1918,6 +2102,22 @@
       return "Espace " + texte(profil && profil.bureau && profil.bureau.nom || "de travail");
     }
   };
+
+  /* La dernière saisie de chaque case, retrouvée d'un coup (« affaire|phase|
+     discipline|genre ») et gardée tant que l'état ne bouge pas. */
+  function instant(t) { var n = Date.parse(t); return isFinite(n) ? n : 0; }
+  var cacheSaisies = null;
+  function dernieresSaisies() {
+    var l = (etat && etat.saisies) || [];
+    if (cacheSaisies && cacheSaisies.v === version && cacheSaisies.l === l && cacheSaisies.n === l.length) return cacheSaisies.par;
+    var par = Object.create(null);
+    l.forEach(function (x) {
+      var k = x.affaireId + "|" + x.phase + "|" + x.discipline + "|" + x.genre, p = par[k];
+      if (!p || instant(x.le) >= instant(p.le)) par[k] = x;
+    });
+    cacheSaisies = { v: version, l: l, n: l.length, par: par };
+    return par;
+  }
 
   /* ---------------------------------------------------------- annuler
      Chaque écriture sur une tâche, une affaire, une absence ou une fiche
@@ -1994,7 +2194,9 @@
   annulable("suppAffaire", function (i) {
     return [photo("affaires", i)].concat(etat.taches
       .filter(function (t) { return t.affaireId === i; })
-      .map(function (t) { return { coll: "taches", id: t.id, avant: copie(t) }; }));
+      .map(function (t) { return { coll: "taches", id: t.id, avant: copie(t) }; }))
+      .concat((etat.saisies || []).filter(function (x) { return x.affaireId === i; })
+        .map(function (x) { return { coll: "saisies", id: x.id, avant: copie(x) }; }));
   }, function (i) { return "suppression de " + nomAffaire(i); });
 
   annulable("ajouteAbsence", function (i) { return [photoAbsences(i)]; },
@@ -2099,6 +2301,35 @@
     t(a3, "Étude de variantes", 2.5, 1, i1, d1, C.ajoute(l, 3), C.ajoute(l, 9), "a_faire", 0);
     t(a3, "Dossier d'appel d'offres", 1, 2, i2, d1, C.ajoute(l, 10), C.ajoute(l, 16), "a_faire", 0);
     t(a1, "Reprise des plans après remarques", 0, 2, null, d1, C.ajoute(l, -5), C.ajoute(l, -1), "a_faire", 0);
+
+    // Mandats, avancement et facturation : un historique de quelques mois pour la page Facturation
+    function mandat(aff, m) { e.affaires.forEach(function (x) { if (x.id === aff) x.mandat = m; }); }
+    mandat(a1, { "31": ["geotechnique", "structure"], "32": ["geotechnique", "structure"], "33": ["structure"],
+                 "41": ["structure"], "51": ["genie_civil", "structure"], "52": ["structure"] });
+    mandat(a2, { "31": ["structure"], "32": ["environnement", "structure"], "33": ["structure"] });
+    mandat(a3, { "21": ["genie_civil", "structure"], "31": ["genie_civil", "geotechnique", "structure"] });
+    function sa(aff, phase, disc, genre, valeurs, par) {
+      // valeurs : une par mois, la dernière ce mois-ci
+      valeurs.forEach(function (v, k) {
+        var d = new Date(); d.setDate(5); d.setMonth(d.getMonth() - (valeurs.length - 1 - k));
+        e.saisies.push({ id: id(), affaireId: aff, phase: phase, discipline: disc, genre: genre, valeur: v,
+                         par: par, le: d.toISOString() });
+      });
+    }
+    ["31", "32", "33", "41"].forEach(function (p) {
+      sa(a1, p, "structure", "avancement", [60, 100], i1); sa(a1, p, "structure", "facturation", [50, 100], i1);
+    });
+    ["31", "32"].forEach(function (p) {
+      sa(a1, p, "geotechnique", "avancement", [100], i1); sa(a1, p, "geotechnique", "facturation", [100], i1);
+    });
+    sa(a1, "51", "structure", "avancement", [20, 45, 70], i1); sa(a1, "51", "structure", "facturation", [20, 40, 60], i1);
+    sa(a1, "51", "genie_civil", "avancement", [10, 30], i1); sa(a1, "51", "genie_civil", "facturation", [0, 40], i1);
+    sa(a2, "31", "structure", "avancement", [80, 100], i2); sa(a2, "31", "structure", "facturation", [50, 100], i1);
+    sa(a2, "32", "structure", "avancement", [25, 55], i2); sa(a2, "32", "structure", "facturation", [30], i1);
+    sa(a2, "32", "environnement", "avancement", [40], i2);
+    sa(a3, "21", "structure", "avancement", [100], i1); sa(a3, "21", "structure", "facturation", [100], i1);
+    sa(a3, "21", "genie_civil", "avancement", [100], i1); sa(a3, "21", "genie_civil", "facturation", [80], i1);
+    sa(a3, "31", "structure", "avancement", [15], i2);
 
     var sophie = e.membres.find(function (x) { return x.id === d3; });
     sophie.absences.push({ id: id(), debut: C.ajoute(l, 8), fin: C.ajoute(l, 12), motif: "Vacances" });
