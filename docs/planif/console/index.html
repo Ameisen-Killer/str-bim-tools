@@ -193,7 +193,7 @@
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=49"></script>
-<script src="/planif/assets/donnees.js?v=65"></script>
+<script src="/planif/assets/donnees.js?v=66"></script>
 <script src="/planif/assets/ui.js?v=93"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script>
@@ -925,17 +925,8 @@
   // Intitulés courts des trois groupes d'origine, tant qu'ils gardent leur nom
   var COURTS = { administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet" };
 
-  /** Les groupes d'un bureau tels que la base les donne ; base pas encore mise
-   *  à jour (migration-groupes.sql) : ceux d'origine, avec les droits cochés. */
-  function groupesBrutsDe(b) {
-    if (b && Array.isArray(b.groupes)) return b.groupes;
-    return D.GROUPES_DEFAUT.map(function (g) {
-      var d = b && b.droits && b.droits[g.code];
-      return { code: g.code, nom: g.nom, parent: g.parent, ordre: g.ordre,
-               droits: Array.isArray(d) ? d.concat(g.droits.filter(function (x) { return d.indexOf(x) < 0 && ["affaires_creer", "taches_autrui", "absences_autrui"].indexOf(x) < 0; })) : g.droits };
-    });
-  }
-  function groupesEnBase(b) { return !!(b && Array.isArray(b.groupes)); }
+  /** Les groupes d'un bureau tels que la base les donne. */
+  function groupesBrutsDe(b) { return (b && b.groupes) || []; }
   /** Les groupes d'un bureau rangés en arbre, de haut en bas, sans « Tout le monde ». */
   function groupesDe(idBureau) { return D.rangeGroupes(groupesBrutsDe(bureau(idBureau))); }
   function groupeTous(b) {
@@ -974,7 +965,7 @@
   /** Une case du tableau : un droit pour un groupe, enregistré au clic.
    *  Héritée (d'un groupe placé dessous, ou de Tout le monde) : cochée
    *  d'office, sans clic possible — c'est sur le groupe d'origine qu'on agit. */
-  function caseDroit(b, g, droit, infos, lecture) {
+  function caseDroit(b, g, droit, infos) {
     var propre = infos.propres.indexOf(droit) >= 0;
     var sources = !propre && infos.herites[droit];
     var input = el("input", {
@@ -987,7 +978,6 @@
       var noms = sources.map(function (c) { return nomGroupe(b, c); }).join(", ");
       return el("label", { class: "case-droit herite", title: "Hérité de : " + noms }, [input]);
     }
-    if (lecture) input.disabled = true;
     input.addEventListener("change", function () {
       var voulu = input.checked;
       var liste = infos.propres.filter(function (x) { return x !== droit; });
@@ -1039,7 +1029,6 @@
   /** Créer (g nul) ou modifier un groupe : son nom et le groupe sous lequel il se range. */
   function formulaireGroupe(b, g, parentPropose) {
     if (!b) return UI.toast("Crée d'abord un bureau.");
-    if (!groupesEnBase(b)) return UI.toast("Lance d'abord migration-groupes.sql dans Supabase.");
     var socle = !!(g && g.code === "tous");
     var chNom = UI.champ({ nom: "nom", label: "Nom du groupe", valeur: g ? g.nom : "", exemple: "Responsable BIM", large: true });
     var champs = [chNom];
@@ -1095,11 +1084,11 @@
     });
   }
 
-  function ligneGroupe(b, g, voisins, lecture) {
+  function ligneGroupe(b, g, voisins) {
     var n = membresDuGroupe(b, g.code), socle = g.code === "tous";
     var i = voisins.indexOf(g);
     var parent = !socle && g.parent ? nomGroupe(b, g.parent) : "";
-    var actions = el("div", { class: "groupe-actions" }, lecture ? [] : [
+    var actions = el("div", { class: "groupe-actions" }, [
       socle ? null : el("button", { type: "button", class: "ordre-btn", text: "↑", title: "Monter", "aria-label": "Monter « " + g.nom + " »",
         disabled: i <= 0 ? true : null, onclick: function () { deplaceGroupe(b, g, -1); } }),
       socle ? null : el("button", { type: "button", class: "ordre-btn", text: "↓", title: "Descendre", "aria-label": "Descendre « " + g.nom + " »",
@@ -1140,14 +1129,7 @@
       hotes.filtreDroits.appendChild(el("option", { value: x.id, selected: x.id === b.id }, [x.nom]));
     });
 
-    var lecture = !groupesEnBase(b);
-    hotes.nouveauGroupe.hidden = lecture;
-    if (lecture) {
-      hotes.droits.appendChild(el("p", { class: "perte", style: "margin:0 0 20px" }, [
-        el("b", { text: "Base à mettre à jour. " }),
-        "Lance migration-groupes.sql dans Supabase (SQL Editor) : la console pourra alors créer, renommer et ranger les groupes et cocher leurs droits. En attendant, le tableau montre les réglages en lecture seule."
-      ]));
-    }
+    hotes.nouveauGroupe.hidden = false;
 
     var groupes = groupesDe(b.id), bruts = groupesBrutsDe(b), tous = groupeTous(b);
     var tousRange = { code: "tous", nom: tous.nom, parent: null, niveau: 0 };
@@ -1156,9 +1138,9 @@
     var arbre = el("ul", { class: "groupes-arbre" });
     groupes.forEach(function (g) {
       var voisins = groupes.filter(function (x) { return x.parent === g.parent; });
-      arbre.appendChild(ligneGroupe(b, g, voisins, lecture));
+      arbre.appendChild(ligneGroupe(b, g, voisins));
     });
-    arbre.appendChild(ligneGroupe(b, tousRange, [], lecture));
+    arbre.appendChild(ligneGroupe(b, tousRange, []));
     hotes.droits.appendChild(el("div", { class: "legende", text: "Hiérarchie des groupes" }));
     hotes.droits.appendChild(el("p", { class: "aide groupes-aide",
       text: "Du plus large au plus étroit. Un groupe a d'office tout ce que peuvent faire les groupes rangés sous lui, et tout ce que peut faire « " + tous.nom + " ». On entre dans un groupe depuis « Utilisateurs »." }));
@@ -1183,7 +1165,7 @@
           el("div", { class: "principal", text: D.DROITS[d].titre }),
           el("div", { class: "secondaire", text: D.DROITS[d].aide })
         ])].concat(colonnes.map(function (g) {
-          return el("td", { class: "col-groupe" + (g.code === "tous" ? " socle" : "") }, [caseDroit(b, g, d, infos[g.code], lecture)]);
+          return el("td", { class: "col-groupe" + (g.code === "tous" ? " socle" : "") }, [caseDroit(b, g, d, infos[g.code])]);
         }))));
       });
     });

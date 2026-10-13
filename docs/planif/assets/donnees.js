@@ -281,9 +281,6 @@
       aide: "Au tchat du bureau. Sans ce droit, chacun ne retire que ses propres messages."
     }
   };
-  // Droits venus avec les groupes libres : une base pas encore mise à jour ne
-  // les connaît pas, on les déduit alors des groupes d'origine.
-  var DROITS_ANCIENS = ["affaires_creer", "taches_autrui", "absences_autrui"];
   // Page → droit qui l'ouvre. Accueil, Communication et Tâches sont à tous ; la console au super admin.
   var DROIT_PAGE = {
     tableau: "page_tableau", equipe: "page_equipe", absences: "page_absences", annuaire: "page_annuaire",
@@ -521,20 +518,13 @@
         // Mode local : un seul utilisateur, sur sa propre machine — tous les droits.
         poseGroupes(null);
         profil = { multi: false, superAdmin: false, peutTout: true, metier: "", statuts: [],
-                   droits: ORDRE_DROITS.slice(), bureau: null, bureaux: [], groupesEnBase: true };
+                   droits: ORDRE_DROITS.slice(), bureau: null, bureaux: [] };
         return profil;
       }
       if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
-      // Les groupes du bureau ; absents, la base n'a pas encore reçu migration-groupes.sql
-      var groupesEnBase = Array.isArray(brut.groupes);
-      poseGroupes(groupesEnBase ? brut.groupes : null);
+      // Les groupes du bureau : noms, hiérarchie et droits de toutes les listes
+      poseGroupes(brut.groupes);
       var statuts = (brut.statuts || []).map(texte).filter(function (s) { return STATUTS[s]; });
-      var droits = (brut.droits || []).map(texte);
-      if (!groupesEnBase) {
-        droitsDesStatuts(GROUPES, statuts).forEach(function (d) {
-          if (DROITS_ANCIENS.indexOf(d) < 0 && droits.indexOf(d) < 0) droits.push(d);
-        });
-      }
       profil = {
         multi: true, email: brut.email || "", superAdmin: !!brut.superAdmin,
         // Fiche du planning rattachée à cette adresse dans la console (vide : accès sans fiche)
@@ -545,8 +535,7 @@
         /* Les droits que ses groupes lui accordent (hérités compris), réunis
            par la base. Ils servent à ne pas proposer l'impossible ; c'est la
            base qui tranche. */
-        droits: droits,
-        groupesEnBase: groupesEnBase,
+        droits: (brut.droits || []).map(texte),
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
         bureau: brut.bureau || null, bureaux: brut.bureaux || []
@@ -1085,8 +1074,6 @@
     droitsGroupe: droitsGroupe,
     /** Les groupes du bureau affiché, rangés en arbre (sans « Tout le monde »). */
     groupes: function () { return rangeGroupes(GROUPES); },
-    /** Faux tant que la base n'a pas reçu migration-groupes.sql. */
-    groupesEnBase: function () { return !profil || profil.groupesEnBase !== false; },
     compareMembres: compareMembres,
     parMetier: parMetier,
     SUCCURSALES: SUCCURSALES,
