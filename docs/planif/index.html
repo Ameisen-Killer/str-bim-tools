@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=34">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=35">
 </head>
 <body>
 
@@ -258,6 +258,67 @@
     return jj(iso);
   }
 
+  /* ------------------------------------------------ info-bulle
+     Au survol d'une ligne (13.10.2026, demande de Tony : plus belle que la
+     bulle du navigateur) : une carte blanche qui suit le pointeur — titre,
+     sous-titre, quelques lignes « libellé / valeur », et ce que fait le clic.
+     contenu() rend { point, titre, sous, lignes: [[libellé, valeur, classe]], pied }. */
+  var carte = null, minuterieCarte = 0, dernierPointeur = { x: 0, y: 0 };
+  function bulle(noeud, contenu) {
+    noeud.addEventListener("pointerenter", function (e) {
+      if (e.pointerType === "touch") return;
+      dernierPointeur = { x: e.clientX, y: e.clientY };
+      clearTimeout(minuterieCarte);
+      minuterieCarte = setTimeout(function () { montreCarte(contenu()); }, carte && carte.classList.contains("vu") ? 0 : 280);
+    });
+    noeud.addEventListener("pointermove", function (e) { dernierPointeur = { x: e.clientX, y: e.clientY }; placeCarte(); });
+    noeud.addEventListener("pointerleave", cacheCarte);
+    noeud.addEventListener("pointerdown", cacheCarte);
+    return noeud;
+  }
+  function montreCarte(c) {
+    if (!carte) { carte = el("div", { class: "ab-carte", role: "tooltip" }); document.body.appendChild(carte); }
+    Portail.vide(carte);
+    carte.appendChild(el("div", { class: "ab-carte-titre" }, [
+      c.point ? el("span", { class: "ab-point " + c.point, "aria-hidden": "true" }) : null,
+      el("span", { text: c.titre })
+    ]));
+    if (c.sous) carte.appendChild(el("div", { class: "ab-carte-sous", text: c.sous }));
+    if (c.lignes && c.lignes.length) {
+      carte.appendChild(el("dl", { class: "ab-carte-lignes" }, [].concat.apply([], c.lignes.map(function (l) {
+        return [el("dt", { text: l[0] }), el("dd", { class: l[2] || "", text: l[1] })];
+      }))));
+    }
+    if (c.pied) carte.appendChild(el("div", { class: "ab-carte-pied", text: c.pied }));
+    carte.classList.add("vu");
+    placeCarte();
+  }
+  function placeCarte() {
+    if (!carte || !carte.classList.contains("vu")) return;
+    var w = carte.offsetWidth, h = carte.offsetHeight, x = dernierPointeur.x + 16, y = dernierPointeur.y + 20;
+    if (x + w > window.innerWidth - 10) x = Math.max(10, dernierPointeur.x - w - 12);
+    if (y + h > window.innerHeight - 10) y = Math.max(10, dernierPointeur.y - h - 14);
+    carte.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+  }
+  function cacheCarte() {
+    clearTimeout(minuterieCarte);
+    if (carte) carte.classList.remove("vu");
+  }
+  window.addEventListener("scroll", cacheCarte, { passive: true });
+
+  /** La carte d'une tâche : affaire en sous-titre, parts, échéance (rouge en retard), priorité. */
+  function bulleTache(t, parts, clic) {
+    var af = D.affaire(t.affaireId), n = C.diff(auj(), t.echeance);
+    var lignes = parts.filter(function (p) { return p[1]; }).concat([
+      ["Échéance", C.fmtLong(t.echeance), n < 0 ? "rouge" : ""],
+      ["", n < 0 ? Math.abs(n) + " j de retard" : n === 0 ? "Aujourd'hui" : n === 1 ? "Demain" : "Dans " + n + " j", n < 0 ? "rouge" : n < 7 ? "orange" : ""]
+    ]);
+    if (t.priorite < 5) lignes.push(["Priorité", t.priorite + " sur 5" + (t.priorite === 1 ? " · la plus haute" : "")]);
+    if (t.statut && D.STATUTS_TACHE[t.statut]) lignes.push(["Statut", D.STATUTS_TACHE[t.statut]]);
+    return { point: urgence(t.echeance), titre: t.titre, sous: af ? (af.code ? af.code + " · " : "") + (af.nom || "") : "",
+             lignes: lignes, pied: "Clic : " + clic };
+  }
+
   function liste(hote, lignes, total, plus) {
     var ul = el("ul", { class: "ab-liste" });
     lignes.forEach(function (li) { ul.appendChild(el("li", {}, [li])); });
@@ -291,18 +352,16 @@
       // Le pouce à droite de l'échéance (13.10.2026, demande de Tony) : à côté du
       // lien, pas dedans, pour qu'un clic sur lui n'ouvre pas la tâche
       return el("div", { class: "ab-avec-pouce" }, [
-        el("a", {
-          class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
-          title: libelle(t) + "\n" + parts + " · échéance " + C.fmtLong(t.echeance) +
-                 (t.priorite < 5 ? " · priorité " + t.priorite : "")
+        bulle(el("a", {
+          class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id)
         }, [
           el("span", { class: "ab-point " + u, "aria-hidden": "true" }),
           el("span", { class: "ab-lib", text: libelle(t) }),
           el("span", { class: "ab-quand" + (u === "rouge" ? " rouge" : "") }, [
-            t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
+            t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite }) : null,
             q
           ])
-        ]),
+        ]), function () { return bulleTache(t, [["Ma part", parts]], "ouvrir la tâche"); }),
         pouce(t, moi)
       ]);
     }), miennes.length, document.getElementById("voir-prio").href);
@@ -317,8 +376,8 @@
       var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
     });
     var quoi = roles.length === 1 ? "le " + D.PARTS[roles[0]].label.toLowerCase() : "ma part";
-    return el("button", {
-      type: "button", class: "ab-pouce", title: "Terminer " + quoi,
+    return bulle(el("button", {
+      type: "button", class: "ab-pouce",
       "aria-label": "Terminer " + quoi + " de « " + t.titre + " »",
       onclick: function (e) {
         var b = e.currentTarget;
@@ -333,7 +392,8 @@
           dessine();
         }).catch(function (err) { b.disabled = false; annonce(err.message); });
       }
-    });
+    }), function () { return { titre: "Terminer " + quoi, pied: roles.length === 1 && t[D.PARTS[roles[0] === "ingenieur" ? "dessinateur" : "ingenieur"].charge] > 0
+      ? "L'autre part reste ouverte" : "La tâche passe « Terminé »" }; });
   }
 
   /* Bandeau d'annonce en bas de l'écran, avec « Annuler » après un pouce */
@@ -400,9 +460,9 @@
           etat: manque >= dus - 0.01 ? "rouge" : "orange",
           periode: p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin),
           motif: p.motif || "Absence",
-          titre: m.prenom + " " + m.nom + "\n" +
-            periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
-            "\n" + C.fmtJours(manque) + " j d'absence sur " + C.fmtJours(dus) + " j travaillés"
+          lignesBulle: periodes.map(function (a) {
+            return [a.motif || "Absence", C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : "")];
+          }).concat([["Cette semaine", C.fmtJours(manque) + " j d'absence sur " + C.fmtJours(dus) + " j travaillés"]])
         });
       }
       /* Les jours que sa semaine type laisse libres (13.10.2026, demande de
@@ -420,7 +480,8 @@
         lignes.push({
           m: m, debut: g[0][0], etat: g[1], motif: g[2],
           periode: g[0].map(jj).join(", "),
-          titre: m.prenom + " " + m.nom + "\n" + g[0].map(function (j) { return g[3] + JOURS[C.dt(j).getDay()]; }).join("\n")
+          lignesBulle: [[g[2], g[0].map(function (j) { return JOURS[C.dt(j).getDay()] + " " + jj(j); }).join(", ")],
+                        ["", g[1] === "off" ? "Ne travaille pas ce jour-là (semaine type)" : "Ne travaille qu'une demi-journée (semaine type)"]]
         });
       });
     });
@@ -432,12 +493,15 @@
     if (!lignes.length) { videMessage(hote, "Personne n'est absent cette semaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
       // Vers la page Absences, sur la période et à la ligne de la personne (13.10.2026)
-      return el("a", { class: "ab-ligne trois", href: "/planif/absences/?membre=" + encodeURIComponent(x.m.id) + "&date=" + x.debut, title: x.titre }, [
+      return bulle(el("a", { class: "ab-ligne trois", href: "/planif/absences/?membre=" + encodeURIComponent(x.m.id) + "&date=" + x.debut }, [
         el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
         el("span", { class: "ab-periode", text: x.periode }),
         el("span", { class: "ab-quand", text: x.motif })
-      ]);
+      ]), function () {
+        return { point: x.etat, titre: x.m.prenom + " " + x.m.nom, sous: D.libelleMetier ? D.libelleMetier(x.m.metier) : "",
+                 lignes: x.lignesBulle, pied: "Clic : voir dans le tableau des absences" };
+      });
     }), lignes.length, "/planif/absences/");
   }
 
@@ -463,17 +527,16 @@
         return D.PARTS[x.role].label + " " + C.fmtJours(x.charge) + " j";
       }).join(" · ");
       var retard = C.diff(auj(), t.echeance) < 0;
-      return el("a", {
-        class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
-        title: libelle(t) + "\nÀ affecter : " + attend + " · échéance " + C.fmtLong(t.echeance)
+      return bulle(el("a", {
+        class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id)
       }, [
         el("span", { class: "ab-point" + (retard ? " rouge" : ""), "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: libelle(t) }),
         el("span", { class: "ab-quand" + (retard ? " rouge" : "") }, [
-          t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
+          t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite }) : null,
           jj(t.echeance)
         ])
-      ]);
+      ]), function () { return bulleTache(t, [["À affecter", attend]], "ouvrir la tâche pour l'affecter"); });
     }), l.length, "/planif/taches/?membre=a-affecter");
   }
 })();

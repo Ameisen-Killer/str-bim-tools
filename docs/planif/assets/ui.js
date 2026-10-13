@@ -2784,31 +2784,37 @@
   }
 
   /* ------------------------------------------------ liste avec recherche
-     Pose une recherche sur un <select> existant (13.10.2026, demande de
-     Tony : membres et affaires de la page Tâches). Le select garde son
-     allure et sa valeur — le code qui l'écoute ne change pas — mais au clic
-     (ou flèche bas, Entrée, Espace, une lettre tapée) s'ouvre un panneau :
-     champ de recherche, puis les options, intertitres compris. On filtre en
-     tapant (sans accents, plusieurs mots), flèches pour choisir, Entrée pour
-     poser, Échap pour fermer. Sur téléphone, le sélecteur natif reste.
+     Pose une recherche sur un <select> (13.10.2026, demande de Tony). Le
+     select garde son allure et sa valeur — le code qui l'écoute ne change
+     pas — mais au clic (ou flèche bas, Entrée, Espace, une lettre tapée)
+     s'ouvre un panneau flottant : champ de recherche, puis les options,
+     intertitres compris. On filtre en tapant (sans accents, plusieurs mots),
+     flèches pour choisir, Entrée pour poser, Échap pour fermer.
+     Tout menu d'au moins LC_SEUIL choix en profite d'office, sur toutes les
+     pages (data-natif sur le select pour s'en passer) ; sur téléphone, le
+     sélecteur natif reste.
        listeCherchable(select, { large })  */
+  var LC_SEUIL = 12;
+  function lcPossible() {
+    try { return !!(global.matchMedia && global.matchMedia("(hover: hover) and (pointer: fine)").matches); } catch (e) { return false; }
+  }
   function listeCherchable(select, o) {
     o = o || {};
-    if (!select || select.dataset.cherchable) return;
-    try { if (global.matchMedia && !global.matchMedia("(hover: hover) and (pointer: fine)").matches) return; } catch (e) { return; }
+    if (!select || select.dataset.cherchable || !lcPossible()) return;
     select.dataset.cherchable = "1";
-    var hote = select.parentNode;
-    hote.classList.add("lc-hote");
+    if (o.large) select.dataset.large = "1";
     var panneau = null, champ = null, liste = null, lignes = [], actif = -1;
 
     function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 
     function ouvre(texte) {
-      if (panneau) return;
+      if (panneau || select.disabled) return;
       champ = el("input", { type: "search", class: "lc-cherche", placeholder: "Chercher…", "aria-label": "Chercher dans la liste",
         autocomplete: "off", spellcheck: "false" });
       liste = el("div", { class: "lc-liste", role: "listbox" });
-      panneau = el("div", { class: "lc-panneau" + (o.large ? " lc-large" : "") }, [champ, liste]);
+      // Les listes longues en texte (affaires) : un panneau large, une ligne par choix
+      var large = select.dataset.large || [].some.call(select.options, function (op) { return op.textContent.length > 38; });
+      panneau = el("div", { class: "lc-panneau" + (large ? " lc-large" : "") }, [champ, liste]);
       lignes = [];
       [].forEach.call(select.children, function (n) {
         if (n.tagName === "OPTGROUP") {
@@ -2817,24 +2823,35 @@
           [].forEach.call(n.children, function (op) { ajoute(op, n.label, t); });
         } else ajoute(n, "", null);
       });
-      hote.appendChild(panneau);
-      if (panneau.getBoundingClientRect().right > global.innerWidth - 8) panneau.classList.add("a-droite");
+      document.body.appendChild(panneau);
+      place();
       champ.value = texte || "";
       filtre();
       var choisie = lignes.filter(function (l) { return l.op.value === select.value && !l.n.hidden; })[0];
       active(choisie ? lignes.indexOf(choisie) : premiere(), true);
-      champ.focus();
+      champ.focus({ preventScroll: true });
       champ.addEventListener("input", function () { filtre(); active(premiere(), true); });
       champ.addEventListener("keydown", clavier);
       document.addEventListener("pointerdown", dehors, true);
+      document.addEventListener("scroll", defile, true);
+      global.addEventListener("resize", fermeSeul);
+    }
+    /** Sous le menu, ou au-dessus s'il manque de place ; jamais hors de l'écran. */
+    function place() {
+      var r = select.getBoundingClientRect();
+      panneau.style.minWidth = Math.max(r.width, 300) + "px";
+      var h = panneau.offsetHeight, w = panneau.offsetWidth;
+      var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
+      panneau.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
+      panneau.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
     }
     function ajoute(op, groupe, intertitre) {
-      var n = el("div", { class: "lc-option" + (op.value === select.value ? " choisie" : ""), role: "option", text: op.textContent,
-        title: op.textContent, "aria-selected": String(op.value === select.value) });
+      var n = el("div", { class: "lc-option" + (op.value === select.value ? " choisie" : "") + (op.disabled ? " inactive" : ""),
+        role: "option", text: op.textContent, title: op.textContent, "aria-selected": String(op.value === select.value) });
       var l = { op: op, n: n, t: intertitre, texte: simplifie(op.textContent + " " + groupe) };
       // pointerdown : le champ garde le focus, rien ne se ferme avant le choix
       n.addEventListener("pointerdown", function (e) { e.preventDefault(); });
-      n.addEventListener("click", function () { pose(l); });
+      n.addEventListener("click", function () { if (!op.disabled) pose(l); });
       n.addEventListener("pointermove", function () { var i = lignes.indexOf(l); if (i !== actif) active(i, false); });
       lignes.push(l);
       liste.appendChild(n);
@@ -2842,7 +2859,7 @@
     function filtre() {
       var mots = simplifie(champ.value).split(/\s+/).filter(Boolean), vus = [];
       lignes.forEach(function (l) {
-        // « Toutes les affaires », « Toute l'équipe » : le premier choix reste à portée pendant une recherche
+        // « Toutes les affaires », « Toute l'équipe », « — » : le choix vide reste à portée pendant une recherche
         var ok = !mots.length || l.op.value === "" || mots.every(function (m) { return l.texte.indexOf(m) >= 0; });
         l.n.hidden = !ok;
         if (ok && l.t) vus.push(l.t);
@@ -2853,61 +2870,82 @@
       if (aucun && !rien) liste.appendChild(el("div", { class: "lc-rien", text: "Aucun résultat" }));
       else if (!aucun && rien) rien.remove();
     }
+    function utilisable(l, avecTexte) { return !l.n.hidden && !l.op.disabled && (!avecTexte || l.op.value !== ""); }
     function premiere() {
-      var mots = champ.value.trim();
-      for (var i = 0; i < lignes.length; i++) if (!lignes[i].n.hidden && (!mots || lignes[i].op.value !== "")) return i;
+      var mots = !!champ.value.trim();
+      for (var i = 0; i < lignes.length; i++) if (utilisable(lignes[i], mots)) return i;
       return -1;
     }
-    function active(i, defile) {
+    function active(i, defileVers) {
       if (lignes[actif]) lignes[actif].n.classList.remove("actif");
       actif = i;
       if (!lignes[i]) return;
       lignes[i].n.classList.add("actif");
-      if (defile) {
+      if (defileVers) {
         var n = lignes[i].n, h = liste.clientHeight;
         if (n.offsetTop < liste.scrollTop) liste.scrollTop = n.offsetTop - 30;
         else if (n.offsetTop + n.offsetHeight > liste.scrollTop + h) liste.scrollTop = n.offsetTop + n.offsetHeight - h + 6;
       }
     }
     function bouge(pas) {
-      for (var i = actif + pas; i >= 0 && i < lignes.length; i += pas) if (!lignes[i].n.hidden) { active(i, true); return; }
+      for (var i = actif + pas; i >= 0 && i < lignes.length; i += pas) if (utilisable(lignes[i])) { active(i, true); return; }
     }
     function clavier(e) {
       if (e.key === "ArrowDown") { e.preventDefault(); bouge(1); }
       else if (e.key === "ArrowUp") { e.preventDefault(); bouge(-1); }
-      else if (e.key === "Enter") { e.preventDefault(); if (lignes[actif]) pose(lignes[actif]); }
+      else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); if (lignes[actif]) pose(lignes[actif]); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ferme(true); }
-      else if (e.key === "Tab") ferme(false);
+      else if (e.key === "Tab") { e.preventDefault(); ferme(true); }
     }
     function pose(l) {
       var change = select.value !== l.op.value;
       select.value = l.op.value;
       ferme(true);
-      if (change) select.dispatchEvent(new Event("change", { bubbles: true }));
+      if (change) {
+        select.dispatchEvent(new Event("input", { bubbles: true }));
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     }
     function dehors(e) { if (panneau && !panneau.contains(e.target) && e.target !== select) ferme(false); }
+    function defile(e) { if (panneau && !panneau.contains(e.target)) ferme(false); }
+    function fermeSeul() { ferme(false); }
     function ferme(rendFocus) {
       if (!panneau) return;
       panneau.remove();
       panneau = null; lignes = []; actif = -1;
       document.removeEventListener("pointerdown", dehors, true);
-      if (rendFocus) select.focus();
+      document.removeEventListener("scroll", defile, true);
+      global.removeEventListener("resize", fermeSeul);
+      if (rendFocus) select.focus({ preventScroll: true });
     }
 
     // Le menu natif ne s'ouvre plus : le panneau le remplace
     select.addEventListener("mousedown", function (e) {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || select.disabled) return;
       e.preventDefault();
-      if (panneau) ferme(true); else { select.focus(); ouvre(""); }
+      if (panneau) ferme(true); else { select.focus({ preventScroll: true }); ouvre(""); }
     });
     select.addEventListener("keydown", function (e) {
-      if (e.ctrlKey || e.metaKey) return;
-      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " " || e.key === "F4") {
+      if (e.ctrlKey || e.metaKey || panneau) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " " || e.key === "F4" ||
+          (e.key === "Enter" && !select.form)) {
         e.preventDefault(); ouvre("");
       } else if (e.key.length === 1 && !e.altKey) {
         e.preventDefault(); ouvre(e.key);
       }
     });
+  }
+  /* D'office : le premier geste sur un long menu le dote de sa recherche (les
+     écouteurs posés ici, à la capture, servent dès ce geste-là) */
+  if (global.document) {
+    var lcAuto = function (e) {
+      var s = e.target;
+      if (!s || s.tagName !== "SELECT" || s.multiple || s.size > 1 || s.dataset.cherchable || s.dataset.natif) return;
+      if (s.options.length < LC_SEUIL) return;
+      listeCherchable(s);
+    };
+    document.addEventListener("mousedown", lcAuto, true);
+    document.addEventListener("keydown", lcAuto, true);
   }
 
   /* --------------------------------------------- calendrier des dates

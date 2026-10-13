@@ -210,6 +210,25 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-point.vert { background: var(--vert-ok); }
 .ab-point.off { background: var(--gris-point); }
 .ab-point.demi { background: linear-gradient(90deg, var(--orange) 50%, var(--gris-point) 50%); }
+/* Info-bulle des lignes de l'accueil (13.10.2026) : une carte qui suit le pointeur */
+.ab-carte {
+  position: fixed; left: 0; top: 0; z-index: 95; width: max-content; max-width: min(360px, calc(100vw - 20px));
+  padding: 12px 15px 11px; border-radius: 12px; background: #fff; color: var(--texte);
+  border: 1px solid rgba(30, 34, 38, .08); box-shadow: 0 14px 38px rgba(30, 34, 38, .18), 0 2px 6px rgba(30, 34, 38, .06);
+  font-size: 14px; line-height: 1.4; pointer-events: none; opacity: 0; transition: opacity .15s;
+}
+.ab-carte.vu { opacity: 1; }
+.ab-carte-titre { display: flex; align-items: baseline; gap: 9px; font-size: 15px; font-weight: 600; }
+.ab-carte-titre .ab-point { flex: none; width: 10px; height: 10px; transform: translateY(1px); }
+.ab-carte-sous { margin-top: 2px; color: var(--vert-texte); font-size: 13px; font-weight: 500; }
+.ab-carte-lignes { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 10px 0 0; padding-top: 9px; border-top: 1px solid var(--filet); }
+.ab-carte-lignes dt { color: var(--faible); font-size: 12.5px; padding-top: 1px; white-space: nowrap; }
+.ab-carte-lignes dd { margin: 0; }
+.ab-carte-lignes dd.rouge { color: var(--rouge-texte); font-weight: 600; }
+.ab-carte-lignes dd.orange { color: #B86200; }
+.ab-carte-pied { margin-top: 9px; color: var(--faible); font-size: 12px; }
+@media (hover: none) { .ab-carte { display: none; } }
+
 /* Mes tâches : le pouce à droite de la ligne (13.10.2026) */
 .ab-avec-pouce { display: flex; align-items: center; gap: 4px; }
 .ab-avec-pouce .ab-ligne { flex: 1; min-width: 0; }
