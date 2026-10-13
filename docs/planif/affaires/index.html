@@ -49,6 +49,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         <div class="tete-section seule-action">
           <div class="outils">
             <a class="btn seul-mobile" href="/planif/carte/"><span class="ico-txt ico-carte" aria-hidden="true"></span>Carte des affaires</a>
+            <!-- Succursales : menu à cases (UI.multiChoix), plusieurs choix (13.10.2026) -->
+            <span id="f-succursale"></span>
             <label class="case" style="text-transform:none;letter-spacing:.04em">
               <input type="checkbox" id="voir-terminees"> Voir les affaires terminées
             </label>
@@ -64,8 +66,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=55"></script>
-<script src="/planif/assets/donnees.js?v=75"></script>
+<script src="/planif/assets/supabase.js?v=56"></script>
+<script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=110"></script>
@@ -79,6 +81,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var barre = null;                                 // recherche instantanée
+  var succursales = [];                             // codes cochés ; aucun : toutes
+  var fSucc = null;
   var suivi = UI.suiviApparitions();
 
   if (!UI.session()) return;
@@ -103,9 +107,26 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
+    rendSuccursales();
     D.surRechargement(dessine);
     dessine();
   }).catch(UI.echec);
+
+  /* Filtre Succursale (13.10.2026) : plusieurs choix, rien de coché = toutes ;
+     caché quand le bureau n'a qu'une succursale. */
+  function rendSuccursales() {
+    var codes = Object.keys(D.SUCCURSALES);
+    fSucc = UI.multiChoix({
+      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
+      options: codes.map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; }),
+      valeurs: succursales,
+      surChange: function (v) { succursales = v; dessine(); }
+    });
+    succursales = fSucc.valeurs();
+    var hote = UI.vide(document.getElementById("f-succursale"));
+    hote.appendChild(fSucc.noeud);
+    hote.style.display = codes.length > 1 ? "" : "none";
+  }
 
   /* ------------------------------------------------------------- affichage */
 
@@ -119,7 +140,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     opts = opts || {};
     var tous = opts.tous || document.getElementById("voir-terminees").checked;
     var mots = opts.sansTexte || !barre ? [] : barre.termes();
-    return D.affaires({ tous: tous }).filter(function (a) { return UI.correspond(champsCherches(a), mots); });
+    return D.affaires({ tous: tous }).filter(function (a) {
+      if (succursales.length && succursales.indexOf(a.succursale) < 0) return false;
+      return UI.correspond(champsCherches(a), mots);
+    });
   }
 
   function dessine() {
@@ -134,6 +158,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     if (!affaires.length) {
       var q = barre ? barre.valeur().trim() : "";
+      if (!q && succursales.length) {
+        hote.appendChild(el("div", { class: "sans-resultat" }, [
+          el("p", { class: "q", text: "Aucune affaire dans " + (succursales.length > 1 ? "ces succursales" : "cette succursale") }),
+          el("button", { class: "btn btn-or", type: "button", text: "Toutes les succursales",
+            onclick: function () { succursales = []; fSucc.pose([]); dessine(); } })
+        ]));
+        return;
+      }
       if (!q) {
         hote.appendChild(el("div", { class: "vide", text: "Aucune affaire — commence par en créer une" }));
         return;
@@ -355,10 +387,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
   }
 
-  /** Le choix de la succursale ; absent tant que la base ne la connaît pas, ou sans succursale au bureau. */
+  /** Le choix de la succursale ; absent quand le bureau n'a aucune succursale. */
   function champSuccursale(a) {
     var codes = Object.keys(D.SUCCURSALES);
-    if (!codes.length || !D.succursaleAffairePrete()) return null;
+    if (!codes.length) return null;
     var moi = D.monMembre();
     var valeur = a ? a.succursale : (moi && D.SUCCURSALES[moi.succursale] ? moi.succursale : "");
     return UI.champ({

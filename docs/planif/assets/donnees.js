@@ -1187,8 +1187,6 @@
     libelleAffaire: function (a) { return a ? (a.code ? a.code + " · " : "") + a.nom : "—"; },
     PARTS: PARTS,
     source: ADAPTATEUR.nom,
-    /** La base connaît la succursale des affaires (vrai en mode local). Garde-fou provisoire, 13.10.2026. */
-    succursaleAffairePrete: function () { return !ADAPTATEUR.succursaleEnBase || ADAPTATEUR.succursaleEnBase(); },
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
     chargeProfil: chargeProfil,

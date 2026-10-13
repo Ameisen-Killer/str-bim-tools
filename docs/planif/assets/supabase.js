@@ -420,8 +420,7 @@
       o.secteurs = a.secteurs || [];
       o.responsable_id = a.responsableId || null;
       o.mandat = a.mandat || {};
-      // Garde-fou provisoire (13.10.2026) : la colonne n'est écrite qu'une fois la migration passée
-      if (succursaleEnBase) o.succursale = a.succursale || null;
+      o.succursale = a.succursale || null;
       return o;
     },
     taches: function (t) {
@@ -536,19 +535,6 @@
     });
   }
 
-  /* Garde-fou provisoire (13.10.2026, migration-succursale-affaires.sql) :
-     tant que la base ignore affaires.succursale, rien n'y est écrit. Lu sur
-     la première ligne (select=*), ou par une requête d'essai si la table est vide. */
-  var succursaleEnBase = false;
-  function litAffaires() {
-    return litTout("affaires", "id").then(function (l) {
-      if (l.length) { succursaleEnBase = "succursale" in l[0]; return l; }
-      return requete("affaires?select=succursale&limit=1").then(
-        function () { succursaleEnBase = true; return l; },
-        function () { succursaleEnBase = false; return l; });
-    });
-  }
-
   /* ------------------------------------------------------------ lecture
 
      Chaque table a sa lecture. La dernière réponse de chacune est gardée : une
@@ -560,7 +546,7 @@
   var LECTURES = {
     membres: litMembres,
     absences: function () { return litTout("absences", "id"); },
-    affaires: litAffaires,
+    affaires: function () { return litTout("affaires", "id"); },
     affaire_membres: function () { return litTout("affaire_membres", "affaire_id,membre_id"); },
     taches: function () { return litTout("taches", "id"); },
     reglages: function () { return litTout("reglages", "id"); },
@@ -968,7 +954,6 @@
       profil: profil,
       regleJours: regleJours,
       regleProfil: regleProfil,
-      succursaleEnBase: function () { return succursaleEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }
