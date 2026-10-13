@@ -55,14 +55,13 @@
   /* --------------------------------------------------------------- droits */
 
   function profilSuper() { var p = D && D.profil ? D.profil() : null; return !!(p && p.superAdmin); }
-  function peutRediger() { return !manquante && D.aDroit("news_rediger"); }
+  function peutRediger() { return D.aDroit("news_rediger"); }
   function peutModifier(n) {
-    if (manquante) return false;
     if (profilSuper() || !enBase()) return peutRediger() || profilSuper();
     return D.aDroit("news_rediger") && !!n.auteurId && n.auteurId === monId();
   }
-  function peutArchiver() { return !manquante && D.aDroit("news_archiver"); }
-  function peutSupprimer() { return !manquante && D.aDroit("news_supprimer"); }
+  function peutArchiver() { return D.aDroit("news_archiver"); }
+  function peutSupprimer() { return D.aDroit("news_supprimer"); }
 
   /* ------------------------------------------------------------ nettoyage
      Liste blanche : ce que la barre d'outils sait produire, rien d'autre.
@@ -173,7 +172,7 @@
 
   /* --------------------------------------------------------------- données */
 
-  var liste = [], manquante = false;
+  var liste = [];
 
   function charge() {
     if (!enBase()) {
@@ -181,15 +180,8 @@
       return Promise.resolve(liste);
     }
     return SB.requete("news?select=" + CHAMPS + "&order=cree_le.desc&limit=" + LIMITE).then(function (r) {
-      manquante = false;
       liste = (r || []).map(depuisBase).sort(recentesDabord);
       return liste;
-    }, function (e) {
-      // Table absente : la base n'a pas encore reçu migration-news.sql
-      if (e && (e.code === "PGRST205" || e.code === "42P01")) {
-        manquante = true; liste = []; return liste;
-      }
-      throw e;
     });
   }
 
@@ -321,20 +313,14 @@
     hote.appendChild(el("div", { class: "tete-section" }, [
       el("h2", { text: etat.archives ? "News archivées" : "News du bureau" }), outils
     ]));
-    if (manquante) {
-      hote.appendChild(el("p", { class: "perte nw-base" }, [
-        el("b", { text: "Base à mettre à jour. " }),
-        "Lance migration-news.sql dans Supabase (SQL Editor) pour publier les news du bureau."
-      ]));
-    }
     var l = el("div", { class: "nw-liste" });
-    if (!montrees.length && !manquante) {
+    if (!montrees.length) {
       l.appendChild(el("p", { class: "nw-vide", text: etat.archives ? "Aucune news archivée."
         : peutRediger() ? "Aucune news pour l'instant. « Rédiger une news » publie la première." : "Aucune news pour l'instant." }));
     }
     montrees.forEach(function (n) { l.appendChild(carte(n)); });
     hote.appendChild(l);
-    if (!enBase() && !manquante && (compteDemo() || (D.enDemo && D.enDemo()))) {
+    if (!enBase() && (compteDemo() || (D.enDemo && D.enDemo()))) {
       hote.appendChild(el("p", { class: "nw-aide", text: "Démo : les news que tu rédiges restent dans ce navigateur, personne d'autre ne les voit." }));
     }
   }
