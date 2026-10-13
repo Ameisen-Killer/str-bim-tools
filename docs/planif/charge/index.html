@@ -290,6 +290,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     // Charges sans personne, étalées sur les jours ouvrés de leur fenêtre
     var libres = sems.map(function () { return 0; });
+    // Le détail par semaine (13.10.2026) : quelles parts attendent quelqu'un, pour la bulle et la fenêtre
+    detailLibres = sems.map(function (s) { return { aAffecter: true, s: s, charge: 0, parts: {} }; });
     var indexJour = Object.create(null);
     sems.forEach(function (s, k) { s.jours.forEach(function (j) { indexJour[j] = k; }); });
     ouvertes.forEach(function (t) {
@@ -303,7 +305,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var ouvres = [], j = f.debut, g = 0;
         while (g++ < 800) { if (C.estOuvre(j, canton)) ouvres.push(j); if (j >= f.fin) break; j = C.ajoute(j, 1); }
         if (!ouvres.length) ouvres = [f.fin];
-        ouvres.forEach(function (x) { if (x in indexJour) libres[indexJour[x]] += na.charge / ouvres.length; });
+        ouvres.forEach(function (x) {
+          if (!(x in indexJour)) return;
+          var k = indexJour[x], j = na.charge / ouvres.length, cle = t.id + "|" + na.role;
+          libres[k] += j;
+          detailLibres[k].charge += j;
+          detailLibres[k].parts[cle] = (detailLibres[k].parts[cle] || 0) + j;
+        });
       });
     });
 
@@ -409,6 +417,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       hote.appendChild(el("div", {
         class: "cc-case cc-synth " + c.palier + " " + classe, "data-col": k, style: "--i:" + k,
         "data-anim": "c|" + classe + "|" + s.jours[0], "data-bulle": c.bulle ? titre + " · S" + s.num + "\n" + c.bulle : "",
+        "data-libre": classe === "a-affecter" && c.bulle ? String(k) : null,
+        tabindex: classe === "a-affecter" && c.bulle ? "0" : null,
+        onclick: classe === "a-affecter" && c.bulle ? function () { ouvreSemaine(detailLibres[k]); } : null,
         role: "gridcell"
       }, [el("span", { class: "val", text: c.texte })]));
     });
@@ -463,16 +474,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   /* ------------------------------------------------ survol : ligne, colonne, bulle */
 
-  var bulle = null, survolee = null;
+  var bulle = null, survolee = null, detailLibres = [];
   function montreBulle(cell) {
     if (!bulle) { bulle = el("div", { class: "cc-bulle", role: "tooltip" }); document.body.appendChild(bulle); }
     UI.vide(bulle);
     var cle = cell.getAttribute("data-cle"), c = cle ? detail[cle] : null;
+    var libre = cell.getAttribute("data-libre");
+    if (libre !== null && detailLibres[+libre]) c = detailLibres[+libre];
     if (c) {
       var lundi = c.s.jours[0];
-      bulle.appendChild(el("div", { class: "t", text: c.m.prenom + " " + c.m.nom }));
+      bulle.appendChild(el("div", { class: "t", text: c.aAffecter ? "À affecter" : c.m.prenom + " " + c.m.nom }));
       bulle.appendChild(el("div", { class: "s", text: "Semaine " + c.s.num + " · " + C.fmtCourt(lundi) + " → " + C.fmtCourt(C.ajoute(lundi, 4)) }));
-      if (c.palier === "ferme") bulle.appendChild(el("div", { class: "v", text: "Aucun jour travaillé" }));
+      if (c.aAffecter) bulle.appendChild(el("div", { class: "v" }, [el("b", { text: C.fmtJours(Math.round(c.charge * 10) / 10) + " j" }), "  de travail sans personne"]));
+      else if (c.palier === "ferme") bulle.appendChild(el("div", { class: "v", text: "Aucun jour travaillé" }));
       else bulle.appendChild(el("div", { class: "v" + (c.palier === "trop" ? " alerte" : "") }, [
         el("b", { text: c.capacite > 0 ? pourcent(c.taux) : "Surcharge" }),
         "  " + C.fmtJours(Math.round(c.charge * 10) / 10) + " j sur " + C.fmtJours(Math.round(c.capacite * 10) / 10) + " j"
@@ -485,7 +499,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var a = D.affaire(t.affaireId);
         bulle.appendChild(el("div", { class: "p" }, [
           el("span", { class: "code", style: "color:" + UI.teinte(a ? a.teinte : 1), text: a ? a.code : "—" }),
-          el("span", { class: "lib", text: t.titre }),
+          // À affecter : quelle part attend quelqu'un (calcul ou dessin)
+          el("span", { class: "lib", text: t.titre + (c.aAffecter ? " · " + (x.k.split("|")[1] === "dessinateur" ? "dessin" : "calcul") : "") }),
           el("span", { class: "j", text: C.fmtJours(Math.round(x.j * 10) / 10) + " j" })
         ]));
       });
@@ -537,7 +552,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var lundi = c.s.jours[0];
     var corps = el("div", {});
     corps.appendChild(el("p", { class: "aide", style: "font-size:14px;margin:0 0 18px;color:var(--texte-doux)" },
-      [c.palier === "ferme" ? "Aucun jour travaillé cette semaine." :
+      [c.aAffecter ? C.fmtJours(Math.round(c.charge * 10) / 10) + " j de travail attendent encore quelqu'un cette semaine." :
+       c.palier === "ferme" ? "Aucun jour travaillé cette semaine." :
         C.fmtJours(Math.round(c.charge * 10) / 10) + " j de travail pour " + C.fmtJours(Math.round(c.capacite * 10) / 10) + " j disponibles" +
         (c.capacite > 0 ? " — " + pourcent(c.taux) + "." : ".") + (c.absents ? " Absent " + c.absents + (c.absents > 1 ? " jours." : " jour.") : "")]));
     var parts = Object.keys(c.parts).map(function (k) { return { k: k, j: c.parts[k] }; }).sort(function (a, b) { return b.j - a.j; });
@@ -554,7 +570,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           el("span", { class: "pal-teinte", style: "background:" + UI.teinte(a ? a.teinte : 1), "aria-hidden": "true" }),
           el("span", { class: "lib" }, [
             el("span", { class: "t", text: t.titre }),
-            el("span", { class: "s", text: (a ? a.code + " · " : "") + D.METIERS[role] + " · échéance " + C.fmtCourt(t.echeance) })
+            el("span", { class: "s", text: (a ? a.code + " · " : "") + (c.aAffecter ? (role === "dessinateur" ? "dessin" : "calcul") + " sans personne" : D.METIERS[role]) + " · échéance " + C.fmtCourt(t.echeance) })
           ]),
           el("span", { class: "j", text: C.fmtJours(Math.round(x.j * 10) / 10) + " j" })
         ]));
@@ -563,9 +579,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
     UI.ouvre({
       surtitre: "Semaine " + c.s.num + " · " + C.fmtCourt(lundi) + " → " + C.fmtCourt(C.ajoute(lundi, 4)),
-      titre: c.m.prenom + " " + c.m.nom,
+      titre: c.aAffecter ? "À affecter" : c.m.prenom + " " + c.m.nom,
       corps: corps, compacte: true,
-      boutons: [
+      boutons: c.aAffecter ? [
+        { label: "Toutes les tâches à affecter", gauche: true, action: function () { location.href = "/planif/taches/?membre=a-affecter"; } },
+        { label: "Fermer", or: true, entree: true }
+      ] : [
         { label: "Ses tâches", gauche: true, action: function () { location.href = "/planif/taches/?membre=" + encodeURIComponent(c.m.id); } },
         { label: "Voir au planning", action: function () { versPlanning(c.m.id, lundi); } },
         { label: "Fermer", or: true, entree: true }
