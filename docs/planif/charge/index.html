@@ -66,7 +66,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         <span id="f-succursale"></span>
         <span id="f-secteur"></span>
         <span id="f-metier"></span>
-        <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:260px" aria-label="Ne compter qu'une affaire"></select>
+        <span id="f-affaire"></span>
       </div>
 
       <div class="cles" id="cles"></div>
@@ -122,13 +122,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.carte";
-  var vue = { debut: null, semaines: 12, metiers: [], succursales: [], secteurs: [], affaire: "" };
+  var vue = { debut: null, semaines: 12, metiers: [], succursales: [], secteurs: [], affaires: [] };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
   if (!memorise0 && window.innerWidth < 760) vue.semaines = 8;
   // Vue d'avant les choix multiples : un seul métier, sous « metier »
   if (typeof vue.metier === "string") vue.metiers = vue.metier ? [vue.metier] : [];
   delete vue.metier;
+  if (typeof vue.affaire === "string") vue.affaires = vue.affaire ? [vue.affaire] : [];
+  delete vue.affaire;
+  if (!Array.isArray(vue.affaires)) vue.affaires = [];
   ["metiers", "succursales", "secteurs"].forEach(function (k) { if (!Array.isArray(vue[k])) vue[k] = []; });
   var filtres = {};
   vue.semaines = [8, 12, 16, 26].indexOf(+vue.semaines) >= 0 ? +vue.semaines : 12;
@@ -176,22 +179,26 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
 
     remplitAffaires();
-    var fa = document.getElementById("f-affaire");
-    fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
 
 
     D.surRechargement(function () { remplitAffaires(); rend(); });
     rend();
   }).catch(UI.echec);
 
+  /* Les affaires comptées (13.10.2026 : plusieurs, menu à cases large, une
+     ligne par affaire) : seule leur part de charge est comptée. */
+  var listeAffaires = null;
   function remplitAffaires() {
-    var fa = UI.vide(document.getElementById("f-affaire"));
-    fa.appendChild(el("option", { value: "" }, ["Toutes les affaires"]));
-    D.affaires({}).forEach(function (a) {
-      fa.appendChild(el("option", { value: a.id }, [a.code + " · " + a.nom]));
-    });
-    if (vue.affaire && !D.affaire(vue.affaire)) vue.affaire = "";
-    fa.value = vue.affaire || "";
+    // Relecture de la base : le menu n'est refait que si la liste des affaires a changé
+    var ids = D.affaires({}).map(function (a) { return a.id + a.code + a.nom; }).join("|");
+    if (ids === listeAffaires) return;
+    listeAffaires = ids;
+    filtres.affaires = UI.multiChoix({ libelle: "Ne compter que certaines affaires", tous: "Toutes les affaires", pluriel: "affaires",
+      large: true, valeurs: vue.affaires,
+      options: D.affaires({}).map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; }),
+      surChange: function (v) { vue.affaires = v; memorise(); rend(); } });
+    vue.affaires = filtres.affaires.valeurs();
+    UI.vide(document.getElementById("f-affaire")).appendChild(filtres.affaires.noeud);
   }
 
   function decale(n) { vue.debut = C.ajoute(vue.debut, 7 * n); memorise(); rend(); }
@@ -220,9 +227,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var tous = D.membres({ planifies: true });
     var rep = Calc.repartition(ouvertes, tous, canton);
     var dansAffaire = null;
-    if (vue.affaire) {
+    if (vue.affaires.length) {
       dansAffaire = Object.create(null);
-      ouvertes.forEach(function (t) { if (t.affaireId === vue.affaire) dansAffaire[t.id] = true; });
+      ouvertes.forEach(function (t) { if (vue.affaires.indexOf(t.affaireId) >= 0) dansAffaire[t.id] = true; });
     }
 
     var membres = tous.filter(function (m) {
@@ -231,11 +238,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
     });
     // Affaire choisie : son équipe, et qui y porte une part ouverte
-    if (vue.affaire) {
-      var a = D.affaire(vue.affaire), garde = Object.create(null);
-      if (a) a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { garde[i] = true; });
+    if (vue.affaires.length) {
+      var garde = Object.create(null);
+      vue.affaires.forEach(function (id) {
+        var a = D.affaire(id);
+        if (a) a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { garde[i] = true; });
+      });
       ouvertes.forEach(function (t) {
-        if (t.affaireId !== vue.affaire) return;
+        if (vue.affaires.indexOf(t.affaireId) < 0) return;
         if (t.ingenieurId) garde[t.ingenieurId] = true;
         if (t.dessinateurId) garde[t.dessinateurId] = true;
       });
@@ -283,7 +293,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var indexJour = Object.create(null);
     sems.forEach(function (s, k) { s.jours.forEach(function (j) { indexJour[j] = k; }); });
     ouvertes.forEach(function (t) {
-      if (vue.affaire && t.affaireId !== vue.affaire) return;
+      if (vue.affaires.length && vue.affaires.indexOf(t.affaireId) < 0) return;
       var fin = Calc.finEffective(t);
       if (!fin) return;
       Calc.nonAffectees(t).forEach(function (na) {
@@ -319,7 +329,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     UI.defileTexte(document.getElementById("titre-carte"),
       lignes.length + (lignes.length > 1 ? " personnes" : " personne") + " · " + sems.length + " semaines");
     document.getElementById("imp-periode").textContent = p.textContent +
-      (vue.affaire && D.affaire(vue.affaire) ? "  ·  " + D.affaire(vue.affaire).code + " seulement" : "") +
+      (vue.affaires.length ? "  ·  " + vue.affaires.map(function (id) { var a = D.affaire(id); return a ? a.code : ""; }).filter(Boolean).join(", ") + " seulement" : "") +
       ["succursales", "secteurs", "metiers"].map(function (k) { return filtres[k] && filtres[k].texte() ? "  ·  " + filtres[k].texte() : ""; }).join("");
     document.getElementById("imp-edition").textContent = "édité le " + C.fmtCH(C.isoAuj());
 
@@ -382,7 +392,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         [l.libre === null ? "Pas avant S" + (derniere.num + 1) : l.libre === 0 ? "Maintenant" : "S" + sems[l.libre].num]));
     });
     if (!lignes.length) {
-      hote.appendChild(el("div", { class: "cc-vide", text: vue.affaire ? "Personne ne travaille sur cette affaire." : "Aucun ingénieur ni dessinateur à afficher." }));
+      hote.appendChild(el("div", { class: "cc-vide", text: vue.affaires.length ? (vue.affaires.length > 1 ? "Personne ne travaille sur ces affaires." : "Personne ne travaille sur cette affaire.") : "Aucun ingénieur ni dessinateur à afficher." }));
     }
 
     if (!premier) UI.joue(hote, avant);
@@ -568,7 +578,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function versPlanning(idMembre, lundi) {
     var v = {};
     try { v = JSON.parse(localStorage.getItem("planif.vue") || "{}") || {}; } catch (e) {}
-    v.debut = lundi; v.membre = idMembre; v.affaire = vue.affaire || "";
+    // Le tableau de bord reprend la personne, la semaine et les affaires comptées
+    v.debut = lundi; v.membres = [idMembre]; v.affaires = vue.affaires.slice();
+    delete v.membre; delete v.affaire;
     try { localStorage.setItem("planif.vue", JSON.stringify(v)); } catch (e) {}
     location.href = "/planif/planning/";
   }
