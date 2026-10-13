@@ -225,42 +225,22 @@
     return id;
   }
 
-  /* Pendule à aiguilles, à droite sous le compte (13.10.2026, demande de Tony) :
-     sans chiffres, aux couleurs de la marque — traits des minutes, index des
-     heures plus longs, quarts appuyés. Pas de trotteuse (rien ne doit tourner
+  /* Pendule, sur la ligne du « Bonjour » (13.10.2026, demande de Tony) : les
+     aiguilles seules, aux couleurs de la marque, sans chiffres ni contour. Pas de trotteuse (rien ne doit tourner
      en continu) : les aiguilles se posent une fois par minute, à la minute. */
   var penduleMinuterie = null;
   function pendule() {
-    // Épurée (13.10.2026, sur le modèle fourni par Tony) : ni cadran ni anneau,
-    // des points pour les minutes, des traits pour les heures, posés sur un
-    // rectangle aux coins arrondis (superellipse), un peu plus large que haut.
-    var CX = 62, CY = 50, DEMI_L = 58, DEMI_H = 46, N = 4.5;
-    function bord(a, k) {     // point du bord dans la direction a (0 = midi), à k fois la distance
-      var dx = Math.sin(a), dy = -Math.cos(a);
-      var r = 1 / Math.pow(Math.pow(Math.abs(dx / DEMI_L), N) + Math.pow(Math.abs(dy / DEMI_H), N), 1 / N);
-      return [(CX + dx * r * k).toFixed(2), (CY + dy * r * k).toFixed(2)];
-    }
-    var traits = "";
-    for (var i = 0; i < 60; i++) {
-      var a = i * Math.PI / 30;
-      if (i % 5) {
-        var p = bord(a, .955);
-        traits += '<circle class="pd-point" cx="' + p[0] + '" cy="' + p[1] + '" r="1.25"/>';
-      } else {
-        var p1 = bord(a, i % 15 ? .83 : .78), p2 = bord(a, 1);
-        traits += '<line class="' + (i % 15 ? "pd-heure" : "pd-quart") + '" x1="' + p1[0] + '" y1="' + p1[1] + '" x2="' + p2[0] + '" y2="' + p2[1] + '"/>';
-      }
-    }
-    var dessin = svg("0 0 124 100", traits +
-      '<g class="pd-aig-h"><line x1="62" y1="52" x2="62" y2="25"/></g>' +
-      '<g class="pd-aig-m"><line x1="62" y1="52" x2="62" y2="12"/></g>' +
-      '<circle class="pd-axe" cx="62" cy="50" r="4.2"/>', "ab-pendule-svg");
+    // Les aiguilles seules, sans aucun contour (13.10.2026, demande de Tony)
+    var dessin = svg("0 0 100 100",
+      '<g class="pd-aig-h"><line x1="50" y1="54" x2="50" y2="22"/></g>' +
+      '<g class="pd-aig-m"><line x1="50" y1="54" x2="50" y2="6"/></g>' +
+      '<circle class="pd-axe" cx="50" cy="50" r="5"/>', "ab-pendule-svg");
     var boite = el("div", { class: "ab-pendule", role: "img" }, [dessin]);
     var h = dessin.querySelector(".pd-aig-h"), m = dessin.querySelector(".pd-aig-m");
     function tourne() {
       var d = new Date(), mi = d.getMinutes(), he = (d.getHours() % 12) + mi / 60;
-      h.setAttribute("transform", "rotate(" + (he * 30).toFixed(2) + " 62 50)");
-      m.setAttribute("transform", "rotate(" + (mi * 6) + " 62 50)");
+      h.setAttribute("transform", "rotate(" + (he * 30).toFixed(2) + " 50 50)");
+      m.setAttribute("transform", "rotate(" + (mi * 6) + " 50 50)");
       boite.setAttribute("aria-label", "Il est " + d.getHours() + " h " + (mi < 10 ? "0" : "") + mi);
       // Prochain passage : la minute suivante (un onglet en arrière-plan rattrape au retour)
       penduleMinuterie = setTimeout(tourne, 60000 - d.getSeconds() * 1000 - d.getMilliseconds() + 50);
