@@ -210,6 +210,33 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-point.vert { background: var(--vert-ok); }
 .ab-point.off { background: var(--gris-point); }
 .ab-point.demi { background: linear-gradient(90deg, var(--orange) 50%, var(--gris-point) 50%); }
+/* Mes tâches : le pouce à droite de la ligne (13.10.2026) */
+.ab-avec-pouce { display: flex; align-items: center; gap: 4px; }
+.ab-avec-pouce .ab-ligne { flex: 1; min-width: 0; }
+.ab-pouce {
+  flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: none;
+  color: var(--faible); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: color .2s, background-color .2s;
+}
+.ab-pouce::before {
+  content: ""; width: 21px; height: 21px; background-color: currentColor;
+  -webkit-mask: url(/planif/icons/thumb_up.svg?v=1) center/contain no-repeat;
+  mask: url(/planif/icons/thumb_up.svg?v=1) center/contain no-repeat;
+}
+.ab-pouce:hover { color: var(--vert-texte); background: var(--m-pale); }
+.ab-pouce:focus-visible { outline: 2px solid var(--vert-texte); outline-offset: 1px; }
+.ab-pouce:disabled { opacity: .4; cursor: default; }
+.ab-annonce {
+  position: fixed; left: 50%; bottom: 24px; z-index: 90; transform: translate(-50%, 12px);
+  max-width: calc(100% - 32px); padding: 11px 18px; border-radius: 10px;
+  background: var(--texte); color: #fff; font-size: 15px; box-shadow: 0 6px 22px rgba(0, 0, 0, .18);
+  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+}
+.ab-annonce.vu { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.ab-annonce button {
+  margin-left: 14px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600;
+  color: var(--vert-clair); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
 .ab-lib { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ab-quand { color: var(--faible); white-space: nowrap; text-align: right; display: flex; align-items: center; gap: 8px; }
 .ab-quand.rouge { color: var(--rouge-texte); }

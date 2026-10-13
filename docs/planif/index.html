@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=33">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=34">
 </head>
 <body>
 
@@ -288,19 +288,74 @@
       var parts = ["ingenieur", "dessinateur"].filter(function (r) {
         var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
       }).map(function (r) { return D.PARTS[r].label + " " + C.fmtJours(t[D.PARTS[r].charge]) + " j"; }).join(" · ");
-      return el("a", {
-        class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
-        title: libelle(t) + "\n" + parts + " · échéance " + C.fmtLong(t.echeance) +
-               (t.priorite < 5 ? " · priorité " + t.priorite : "")
-      }, [
-        el("span", { class: "ab-point " + u, "aria-hidden": "true" }),
-        el("span", { class: "ab-lib", text: libelle(t) }),
-        el("span", { class: "ab-quand" + (u === "rouge" ? " rouge" : "") }, [
-          t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
-          q
-        ])
+      // Le pouce à droite de l'échéance (13.10.2026, demande de Tony) : à côté du
+      // lien, pas dedans, pour qu'un clic sur lui n'ouvre pas la tâche
+      return el("div", { class: "ab-avec-pouce" }, [
+        el("a", {
+          class: "ab-ligne", href: "/planif/taches/?tache=" + encodeURIComponent(t.id),
+          title: libelle(t) + "\n" + parts + " · échéance " + C.fmtLong(t.echeance) +
+                 (t.priorite < 5 ? " · priorité " + t.priorite : "")
+        }, [
+          el("span", { class: "ab-point " + u, "aria-hidden": "true" }),
+          el("span", { class: "ab-lib", text: libelle(t) }),
+          el("span", { class: "ab-quand" + (u === "rouge" ? " rouge" : "") }, [
+            t.priorite < 5 ? el("span", { class: "ab-prio p" + t.priorite, text: "P" + t.priorite, title: "Priorité " + t.priorite }) : null,
+            q
+          ])
+        ]),
+        pouce(t, moi)
       ]);
     }), miennes.length, document.getElementById("voir-prio").href);
+  }
+
+  /* Terminer d'un clic, comme le pouce de la page Tâches : il ne ferme que ce
+     qui me revient (le calcul de l'ingénieur, le dessin du dessinateur, les
+     deux si je porte tout) ; la tâche passe « Terminé » à la dernière part
+     fermée. La ligne quitte alors la liste ; « Annuler » la ramène. */
+  function pouce(t, moi) {
+    var roles = ["ingenieur", "dessinateur"].filter(function (r) {
+      var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
+    });
+    var quoi = roles.length === 1 ? "le " + D.PARTS[roles[0]].label.toLowerCase() : "ma part";
+    return el("button", {
+      type: "button", class: "ab-pouce", title: "Terminer " + quoi,
+      "aria-label": "Terminer " + quoi + " de « " + t.titre + " »",
+      onclick: function (e) {
+        var b = e.currentTarget;
+        if (b.disabled) return;
+        b.disabled = true;
+        var champs = {};
+        roles.forEach(function (r) { champs[D.PARTS[r].fini] = true; });
+        D.retoucheTache(t.id, champs).then(function () {
+          var apres = D.tache(t.id);
+          annonce((roles.length === 1 ? D.PARTS[roles[0]].label + " terminé." : "Ta part est terminée.") +
+                  (apres && apres.statut === "termine" ? " Tâche terminée." : ""), true);
+          dessine();
+        }).catch(function (err) { b.disabled = false; annonce(err.message); });
+      }
+    });
+  }
+
+  /* Bandeau d'annonce en bas de l'écran, avec « Annuler » après un pouce */
+  var boiteAnnonce = null, minuterieAnnonce = 0;
+  function annonce(texte, annulable) {
+    if (!boiteAnnonce) {
+      boiteAnnonce = el("div", { class: "ab-annonce", role: "status" });
+      document.body.appendChild(boiteAnnonce);
+    }
+    Portail.vide(boiteAnnonce);
+    boiteAnnonce.appendChild(document.createTextNode(texte));
+    if (annulable && D.annule) {
+      boiteAnnonce.appendChild(el("button", { type: "button", text: "Annuler", onclick: function () {
+        D.annule().then(function (lib) {
+          dessine();
+          annonce(lib ? "Annulé." : "Rien à annuler.");
+        }).catch(function (err) { annonce(err.message); });
+      } }));
+    }
+    boiteAnnonce.classList.add("vu");
+    clearTimeout(minuterieAnnonce);
+    minuterieAnnonce = setTimeout(function () { boiteAnnonce.classList.remove("vu"); }, annulable ? 6000 : 3000);
   }
 
   /* ----------------------------------------------- absences de l'équipe
