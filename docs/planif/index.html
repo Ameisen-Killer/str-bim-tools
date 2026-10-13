@@ -63,7 +63,7 @@
         <path class="ic-f" d="M21 33h22M21 40h22M21 47h22"/>
       </svg>
       <h2>Inter-secteurs</h2>
-      <p>Veille simap.ch, appels d'offres et leur agenda, affaires transversales</p>
+      <p>Veille simap.ch, appels d'offres et leur agenda, facturation</p>
       <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
     </a>
   </nav>
@@ -101,7 +101,7 @@
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=56"></script>
-<script src="/planif/assets/donnees.js?v=76"></script>
+<script src="/planif/assets/donnees.js?v=77"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/portail.js?v=24"></script>
@@ -172,7 +172,7 @@
   /* Arrivée ici depuis une page que son groupe n'ouvre pas (ui.js, chrome) :
      le dire, avec les groupes qui l'ouvrent (droits réglés dans la console) */
   var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", inter: "Inter-secteurs",
-                     tableau: "Tableau de bord", absences: "Absences et congés", annuaire: "Annuaire", transversales: "Affaires transversales" };
+                     tableau: "Tableau de bord", absences: "Absences et congés", annuaire: "Annuaire" };
   function refus() {
     var cle = new URLSearchParams(location.search).get("refus");
     if (!cle) return;

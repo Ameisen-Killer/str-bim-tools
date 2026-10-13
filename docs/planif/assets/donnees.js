@@ -123,7 +123,7 @@
     { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
       droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous",
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "conges_tous",
                "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge",
@@ -236,7 +236,7 @@
      les applique aussi. */
   var CATEGORIES_DROITS = [
     { titre: "Pages", droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire",
-                               "page_affaires", "page_charge", "page_inter", "page_transversales",
+                               "page_affaires", "page_charge", "page_inter",
                                "page_facturation"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
@@ -253,7 +253,6 @@
     page_affaires: { titre: "Affaires", aide: "La page Affaires (liste, équipes, carte)." },
     page_charge: { titre: "Tableau de charge", aide: "La carte de charge, une case par personne et par semaine." },
     page_inter: { titre: "Appels d'offres", aide: "Le module Inter-secteurs : appels d'offres, agenda des AO, veille simap.ch." },
-    page_transversales: { titre: "Affaires transversales", aide: "Les affaires qui touchent plusieurs secteurs." },
     page_facturation: {
       titre: "Facturation",
       aide: "La page Facturation (Inter-secteurs) : avancement et facturation de chaque phase, secteur par secteur. Elle montre aussi les pourcentages facturés, que les autres ne voient pas."
@@ -325,7 +324,7 @@
     tableau: "page_tableau", equipe: "page_equipe", absences: "page_absences", annuaire: "page_annuaire",
     affaires: "page_affaires", charge: "page_charge",
     veille: "page_inter", ao_publics: "page_inter", ao_prives: "page_inter", agenda_ao: "page_inter",
-    transversales: "page_transversales", facturation: "page_facturation"
+    facturation: "page_facturation"
   };
   /* Les pages du module Inter-secteurs (13.10.2026 : la veille, les AO publics,
      les AO privés et leur agenda séparés ; la facturation). « inter » est le
@@ -335,7 +334,6 @@
     { cle: "ao_publics", href: "/planif/inter-secteurs/?vue=publics", nom: "AO publics" },
     { cle: "ao_prives", href: "/planif/inter-secteurs/?vue=prives", nom: "AO privés" },
     { cle: "agenda_ao", href: "/planif/inter-secteurs/?vue=agenda", nom: "Agenda des AO" },
-    { cle: "transversales", href: "/planif/inter-secteurs/?vue=transversales", nom: "Affaires transversales" },
     { cle: "facturation", href: "/planif/inter-secteurs/?vue=facturation", nom: "Facturation" }
   ];
   poseGroupes(null);

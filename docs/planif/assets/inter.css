@@ -10,8 +10,6 @@
 .is-affaire .pastille{align-self:center}
 .is-code{font-size:12.5px;font-weight:600;white-space:nowrap}
 .is-nom{font-weight:500}
-.is-lien-affaire{text-decoration:none;color:var(--texte)}
-.is-lien-affaire:hover .is-nom{color:var(--or);text-decoration:underline;text-underline-offset:3px}
 .is-secteur{margin:0 4px 4px 0;background:#F0F1EE;border-color:transparent}
 .is-secteur.declare{background:var(--m-pale);color:var(--or);font-weight:600}
 .is-remise{white-space:nowrap}

@@ -700,14 +700,14 @@
   var MODULE_DE = {
     absences: "communication", annuaire: "communication", equipe: "communication",
     tableau: "taches", affaires: "taches", charge: "taches",
-    veille: "inter", ao_publics: "inter", ao_prives: "inter", agenda_ao: "inter", transversales: "inter", facturation: "inter"
+    veille: "inter", ao_publics: "inter", ao_prives: "inter", agenda_ao: "inter", facturation: "inter"
   };
   /* Sous-barre d'un module, sous le titre de la page (07.10.2026) : la page
      ouverte en vert clair. Communication : le bureau aujourd'hui, les
      absences, l'équipe (passée de Tâches le 13.10.2026) et l'annuaire. Tâches : la liste et le tableau de
      bord pour tous, puis les pages de gestion pour les chefs de secteur et
      au-delà. Inter-secteurs (13.10.2026) : veille simap.ch, AO publics, AO
-     privés, agenda des AO, affaires transversales et facturation — la liste
+     privés, agenda des AO et facturation — la liste
      vit dans donnees.js (PAGES_INTER). Une seule page permise : pas de sous-barre. */
   var SOUS_NAV = {
     communication: { nom: "Communication", pages: [

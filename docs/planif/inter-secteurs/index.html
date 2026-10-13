@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
-<link rel="stylesheet" href="/planif/assets/inter.css?v=5">
+<link rel="stylesheet" href="/planif/assets/inter.css?v=6">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=2">
 </head>
 <body class="large">
@@ -36,16 +36,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      secteurs. Les appels d'offres (une affaire en phase « AO » : public ou
      privé, demandeur pris dans l'annuaire, date de remise = échéance de
      l'affaire, secteurs concernés, résultat), leur agenda (attaché à l'AO, non
-     à une personne), les affaires qui font intervenir plusieurs secteurs et
-     la facturation. Six pages choisies par la sous-barre (ui.js, SOUS_NAV ;
-     donnees.js, PAGES_INTER), par ?vue= (13.10.2026) : la veille simap.ch
-     (sans paramètre), publics, prives, agenda, transversales, facturation. -->
+     à une personne) et la facturation. Cinq pages choisies par la sous-barre
+     (ui.js, SOUS_NAV ; donnees.js, PAGES_INTER), par ?vue= (13.10.2026) : la
+     veille simap.ch (sans paramètre), publics, prives, agenda, facturation.
+     Les affaires transversales ont été retirées le 13.10.2026. -->
 <main>
   <div class="wrap entete">
     <h1><span id="nom-inter">Veille simap.ch</span> <span id="titre-inter" class="compte-titre"></span></h1>
     <div class="filet-or" aria-hidden="true"></div>
   </div>
-<script>(function(){var v=new URLSearchParams(location.search).get("vue"),t={publics:"AO publics",prives:"AO privés",agenda:"Agenda des AO",transversales:"Affaires transversales",facturation:"Facturation"}[v];if(t){document.getElementById("nom-inter").textContent=t;document.title=t+" · Planification";}})();</script>
+<script>(function(){var v=new URLSearchParams(location.search).get("vue"),t={publics:"AO publics",prives:"AO privés",agenda:"Agenda des AO",facturation:"Facturation"}[v];if(t){document.getElementById("nom-inter").textContent=t;document.title=t+" · Planification";}})();</script>
 <script>window.planifSousNav&&planifSousNav();</script>
   <div class="wrap" data-bandeau></div>
   <div class="wrap">
@@ -118,15 +118,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       </div>
       <div id="liste-facturation"></div>
     </section>
-
-    <section class="section" id="transversal" data-vue="transversales">
-      <div class="tete-section">
-        <div>
-          <p class="is-chapeau">Les affaires en cours qui font intervenir plusieurs secteurs : ceux déclarés sur l'affaire, et ceux des personnes qui y travaillent.</p>
-        </div>
-      </div>
-      <div class="defile" id="liste-trans"></div>
-    </section>
   </div>
 </main>
 
@@ -135,12 +126,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=56"></script>
-<script src="/planif/assets/donnees.js?v=76"></script>
+<script src="/planif/assets/donnees.js?v=77"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=113"></script>
+<script src="/planif/assets/ui.js?v=114"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
-<script src="/planif/assets/palette.js?v=20"></script>
+<script src="/planif/assets/palette.js?v=21"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
 <script>
@@ -157,7 +148,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     publics: { cle: "ao_publics", section: "ao", type: "public" },
     prives: { cle: "ao_prives", section: "ao", type: "prive" },
     agenda: { cle: "agenda_ao", section: "agenda" },
-    transversales: { cle: "transversales", section: "transversales" },
     facturation: { cle: "facturation", section: "facturation" }
   };
   var VUE = VUES[new URLSearchParams(location.search).get("vue") || ""] || VUES[""];
@@ -252,10 +242,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function rend() {
     var titre = document.getElementById("titre-inter");
-    if (VUE.section === "transversales") {
-      var nt = listeTransversales();
-      titre.textContent = nt + (nt > 1 ? " affaires transversales" : " affaire transversale");
-    } else if (VUE.section === "veille") {
+    if (VUE.section === "veille") {
       var n = D.veilleNouvelles().length;
       titre.textContent = n ? n + (n > 1 ? " nouvelles publications" : " nouvelle publication") : "";
       listeVeille();
@@ -440,38 +427,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("span", { class: "etiq is-genre " + r.genre, text: D.GENRES_AGENDA[r.genre] })
       ])]));
     });
-    return l.length;
-  }
-
-  /* ------------------------------------------------------- affaires transversales */
-  function listeTransversales() {
-    var hote = UI.vide(document.getElementById("liste-trans"));
-    var l = D.affaires().filter(function (a) { return a.phase !== "AO"; }).map(function (a) {
-      return { a: a, secteurs: secteursDe(a) };
-    }).filter(function (x) { return x.secteurs.length >= 2; })
-      .sort(function (x, y) { return y.secteurs.length - x.secteurs.length || x.a.code.localeCompare(y.a.code, "fr", { numeric: true }); });
-    if (!l.length) {
-      hote.appendChild(el("p", { class: "vide", text: "Aucune affaire en cours ne fait intervenir plusieurs secteurs." }));
-      return 0;
-    }
-    var t = el("table", { class: "liste is-table" });
-    t.appendChild(el("thead", {}, [el("tr", {}, ["Affaire", "Phase", "Secteurs", "Équipe", "Tâches ouvertes", "Prochaine échéance", ""].map(function (h) { return el("th", { text: h }); }))]));
-    var corps = el("tbody");
-    l.forEach(function (x) {
-      var a = x.a, ouvertes = D.taches({ affaireId: a.id, sansTerminees: true });
-      var proch = ouvertes.filter(function (t) { return t.echeance && t.echeance >= auj(); })[0];
-      corps.appendChild(el("tr", {}, [
-        el("td", {}, [el("a", { class: "is-lien-affaire", href: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" }, [pastilleAffaire(a)])]),
-        el("td", { class: "is-faible", text: a.phase ? D.libellePhase(a.phase) : "—" }),
-        el("td", {}, x.secteurs.map(function (s) { return etiquetteSecteur(s.code, s.declare); })),
-        el("td", { class: "num", text: String(a.ingenieurs.length + a.dessinateurs.length) }),
-        el("td", { class: "num", text: String(ouvertes.length) }),
-        el("td", { text: proch ? jourCourt(proch.echeance) : "—" }),
-        el("td", { class: "actions" }, [el("button", { type: "button", class: "btn btn-nu", text: "Secteurs…", onclick: function () { formSecteurs(a.id); } })])
-      ]));
-    });
-    t.appendChild(corps);
-    hote.appendChild(t);
     return l.length;
   }
 
@@ -747,23 +702,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         .catch(function (e) { UI.toast(e.message); return false; });
     } });
     UI.ouvre({ surtitre: "Agenda des appels d'offres", titre: r ? r.titre : "Nouveau rendez-vous", corps: corps, compacte: true, boutons: boutons });
-  }
-
-  /** Secteurs déclarés sur une affaire en cours (les autres s'en déduisent). */
-  function formSecteurs(id) {
-    var a = D.affaire(id); if (!a) return;
-    var corps = el("div", {}, [
-      el("p", { class: "aide", style: "margin-bottom:12px", text: "Coche les secteurs qui interviennent sur cette affaire. Ceux des personnes qui y travaillent s'ajoutent d'eux-mêmes." }),
-      casesSecteurs(a.secteurs)
-    ]);
-    UI.ouvre({ surtitre: "Secteurs de l'affaire", titre: D.libelleAffaire(a), corps: corps, compacte: true, boutons: [
-      { label: "Annuler" },
-      { label: "Enregistrer", or: true, entree: true, action: function () {
-        var o = base(a); o.secteurs = UI.lit(corps).secteurs || [];
-        return D.majAffaire(a.id, o).then(function () { UI.toast("Secteurs enregistrés."); rend(); })
-          .catch(function (e) { UI.toast(e.message); return false; });
-      } }
-    ] });
   }
 })();
 </script>
