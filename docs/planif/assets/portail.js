@@ -213,9 +213,9 @@
     vide(hote);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
-      // Au centre : la pendule, la date dessous
-      el("div", { class: "ab-centre" }, [pendule(), date]),
-      el("div", { class: "ab-qui" }, [ia, el("div", { class: "ab-moi" }, [bouton, menu])])
+      // À droite : le Dashboard IA, le compte, puis la pendule et la date dessous
+      el("div", { class: "ab-qui" }, [ia, el("div", { class: "ab-moi" }, [bouton, menu]),
+        el("div", { class: "ab-centre" }, [pendule(), date])])
     ]));
     [].forEach.call(hote.querySelectorAll("img"), function (n) {
       for (var i = 0; i < images.length; i++) {
@@ -225,7 +225,7 @@
     return id;
   }
 
-  /* Pendule à aiguilles, au centre de l'en-tête (13.10.2026, demande de Tony) :
+  /* Pendule à aiguilles, à droite sous le compte (13.10.2026, demande de Tony) :
      sans chiffres, aux couleurs de la marque — traits des minutes, index des
      heures plus longs, quarts appuyés. Pas de trotteuse (rien ne doit tourner
      en continu) : les aiguilles se posent une fois par minute, à la minute. */
