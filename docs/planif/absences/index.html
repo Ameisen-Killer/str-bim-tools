@@ -25,7 +25,11 @@
 .pl-nom .pose-plus{margin-left:auto;align-self:center;width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;
   font-size:16px;font-weight:600;color:var(--m-fort,var(--or));background:var(--m-pale,transparent);opacity:0;transition:opacity .2s}
 .pl-nom.pose-absence:hover .pose-plus,.pl-nom.pose-absence:focus-visible .pose-plus{opacity:1}
-.pl-zone.pose-absence{cursor:copy}
+.pl-zone.pose-absence{cursor:cell;user-select:none;-webkit-user-select:none}
+.pose-selection{position:absolute;top:3px;bottom:3px;z-index:3;pointer-events:none;border-radius:6px;
+  background:color-mix(in srgb,var(--m-clair,#D5E8AC) 70%,transparent);border:2px solid var(--m-fort,var(--or));
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--m-encre,var(--texte))}
+.pose-selection[hidden]{display:none}
 .pl-zone.pose-absence .bt{cursor:pointer}
 @media (hover:none){.pl-nom .pose-plus{opacity:.8}}
 @media print{.pl-nom .pose-plus{display:none}}
@@ -442,7 +446,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
          jour libre de sa ligne, une absence qui commence ce jour-là
          (13.10.2026, demande de Tony). */
       var peut = D.peutAbsences(m.id);
-      function poser(debut) { UI.nouvelleAbsence({ membreId: m.id, debut: debut || "", surChangement: rend }); }
+      function poser(debut, fin) {
+        UI.nouvelleAbsence({ membreId: m.id, debut: debut || "", fin: fin && fin !== debut ? fin : "", surChangement: rend });
+      }
       var nom = el("div", peut ? {
         class: "pl-nom pose-absence", role: "button", tabindex: "0",
         title: "Poser une absence pour " + m.prenom + " " + m.nom,
@@ -497,12 +503,48 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
       var zone = el("div", { class: "pl-zone" + (peut ? " pose-absence" : ""), dataset: { membre: m.id } }, [fond, piste]);
       if (peut) {
-        zone.title = "Cliquer sur un jour pour poser une absence à " + m.prenom;
-        zone.addEventListener("click", function (e) {
-          if (e.target.closest(".bt")) return;               // une absence existante : sa fenêtre à elle
+        /* Une case : l'absence de ce jour ; glisser sur plusieurs cases (souris,
+           stylet) : du premier au dernier jour balayé, surlignés pendant le
+           geste. Au doigt, un toucher pose un jour (le glisser fait défiler). */
+        zone.title = "Cliquer sur un jour, ou glisser sur plusieurs, pour poser une absence à " + m.prenom;
+        var marque = el("div", { class: "pose-selection", hidden: true, "aria-hidden": "true" });
+        zone.appendChild(marque);
+        var choix = null, parSouris = false;
+        var colonne = function (e) {
           var r = zone.getBoundingClientRect();
-          var i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / (r.width / n))));
-          poser(jours[i]);
+          return Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / (r.width / n))));
+        };
+        var montre = function () {
+          var d = Math.min(choix.a, choix.b), f = Math.max(choix.a, choix.b);
+          marque.style.left = (d / n * 100) + "%";
+          marque.style.width = ((f - d + 1) / n * 100) + "%";
+          marque.textContent = f > d ? (f - d + 1) + " j" : "";
+          marque.hidden = false;
+        };
+        zone.addEventListener("pointerdown", function (e) {
+          parSouris = e.pointerType !== "touch";
+          if (!parSouris || e.button > 0 || e.target.closest(".bt")) return;   // une absence existante : sa fenêtre à elle
+          choix = { a: colonne(e), b: colonne(e) };
+          if (zone.setPointerCapture) zone.setPointerCapture(e.pointerId);
+          montre();
+          e.preventDefault();
+        });
+        zone.addEventListener("pointermove", function (e) {
+          if (!choix) return;
+          var c = colonne(e);
+          if (c !== choix.b) { choix.b = c; montre(); }
+        });
+        zone.addEventListener("pointerup", function () {
+          if (!choix) return;
+          var d = Math.min(choix.a, choix.b), f = Math.max(choix.a, choix.b);
+          choix = null;
+          marque.hidden = true;
+          poser(jours[d], jours[f]);
+        });
+        zone.addEventListener("pointercancel", function () { choix = null; marque.hidden = true; });
+        zone.addEventListener("click", function (e) {
+          if (parSouris || e.target.closest(".bt")) return;
+          poser(jours[colonne(e)]);
         });
       }
       plan.appendChild(zone);
