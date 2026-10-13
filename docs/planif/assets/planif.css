@@ -1599,3 +1599,54 @@ html.palette-ouverte{overflow:hidden}
   .ac-prevenir,.ac-semaine-fil,#ac-poser{display:none}
   .ac-salut .l{opacity:1;transform:none;animation:none}
 }
+
+/* ------------------------------------------------ calendrier des dates
+   Le nôtre (ui.js, ouvreCalendrier, 13.10.2026), à la place du sélecteur
+   natif, sur ordinateur. html.dp-maison : l'icône native s'efface, la nôtre
+   la remplace dans le champ. */
+html.dp-maison input[type="date"]::-webkit-calendar-picker-indicator{display:none}
+html.dp-maison input[type="date"],html.dp-maison:root[data-version] .champ input[type="date"]{
+  padding-right:38px;cursor:pointer;
+  background-image:url(/planif/icons/calendar_week.svg?v=1);background-repeat:no-repeat;
+  background-position:right 11px center;background-size:18px;
+}
+html.dp-maison input[type="date"]:disabled{cursor:default}
+.dp{
+  position:fixed;z-index:85;width:292px;padding:12px 12px 10px;background:#fff;color:var(--texte);
+  border-radius:12px;box-shadow:0 18px 48px rgba(30,34,38,.22),0 2px 6px rgba(30,34,38,.08);
+  font-family:var(--sans);letter-spacing:normal;text-transform:none;animation:dp-entre .16s ease-out;
+}
+@keyframes dp-entre{from{opacity:0;transform:translateY(-4px)}}
+.dp-tete{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
+.dp-titre{flex:1;border:0;background:none;border-radius:8px;padding:6px 8px;font:inherit;font-size:15.5px;font-weight:700;color:var(--texte);cursor:pointer}
+.dp-titre:hover{background:var(--m-voile,rgba(0,0,0,.05))}
+.dp-fleche{width:34px;height:34px;border:0;border-radius:8px;background:none;font-size:22px;line-height:1;color:var(--texte-doux);cursor:pointer}
+.dp-fleche:hover{background:var(--m-voile,rgba(0,0,0,.05));color:var(--texte)}
+.dp-grille{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-js{text-align:center;font-size:11.5px;font-weight:600;color:var(--texte-faible);padding:4px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.dp-js.we{color:rgba(var(--encre),.38)}
+.dp-j{
+  position:relative;height:36px;border:0;border-radius:9px;background:none;cursor:pointer;
+  font:inherit;font-size:14px;font-variant-numeric:tabular-nums;color:var(--texte);
+}
+.dp-j:hover:not([disabled]){background:var(--m-voile,rgba(0,0,0,.05))}
+.dp-j:focus-visible{outline:2px solid var(--m-fort,var(--or));outline-offset:-2px}
+.dp-j.we,.dp-j.ferie{color:rgba(var(--encre),.42)}
+.dp-j.ferie::after{content:"";position:absolute;left:50%;bottom:5px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--m-vif,var(--or))}
+.dp-j.autre{color:rgba(var(--encre),.25)}
+.dp-j.auj{box-shadow:inset 0 0 0 1.5px var(--m-fort,var(--or));font-weight:700}
+.dp-j.plage{background:var(--m-pale,rgba(0,0,0,.04));border-radius:0}
+.dp-j.borne{background:var(--m-clair,rgba(0,0,0,.08));font-weight:700}
+.dp-j.choisi,.dp-j.choisi:hover{background:var(--m-fort,var(--or));color:#fff;font-weight:700}
+.dp-j.choisi.ferie::after{background:#fff}
+.dp-j.hors,.dp-j[disabled]{color:rgba(var(--encre),.18);cursor:default;text-decoration:line-through}
+.dp-grille.dp-mois{grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 0}
+.dp-m{height:44px;border:0;border-radius:9px;background:none;font:inherit;font-size:14px;cursor:pointer;color:var(--texte)}
+.dp-m:hover{background:var(--m-voile,rgba(0,0,0,.05))}
+.dp-m.auj{box-shadow:inset 0 0 0 1.5px var(--m-fort,var(--or))}
+.dp-m.choisi{background:var(--m-fort,var(--or));color:#fff;font-weight:700}
+.dp-pied{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--ligne-faible)}
+.dp-lien{border:0;background:none;padding:6px 8px;border-radius:8px;font:inherit;font-size:13.5px;color:var(--texte-doux);cursor:pointer}
+.dp-lien:hover{background:var(--m-voile,rgba(0,0,0,.05));color:var(--texte)}
+.dp-lien.fort{color:var(--m-fort,var(--or));font-weight:600}
+@media print{.dp{display:none!important}}

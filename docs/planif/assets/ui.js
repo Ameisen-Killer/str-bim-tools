@@ -2696,6 +2696,200 @@
   }
   global.addEventListener("scroll", cacheBulle, { passive: true });
 
+  /* --------------------------------------------- calendrier des dates
+     Le petit calendrier natif (Chrome, Edge) ne se laisse pas habiller : sur
+     ordinateur, tout champ de date ouvre le nôtre (13.10.2026, demande de
+     Tony), aux couleurs de la marque — semaine du lundi, week-ends et jours
+     fériés du canton grisés (nom du férié au survol), aujourd'hui cerclé, et
+     pour une fin de période (champ « fin » à côté d'un « debut »), la période
+     surlignée et les jours d'avant le début écartés. Clavier : flèches, Pg
+     préc./suiv. (mois), Entrée, Échap ; Alt+↓ l'ouvre depuis le champ.
+     Sur téléphone, le sélecteur natif reste : il y est fait pour le doigt.
+     La saisie au clavier dans le champ (jj.mm.aaaa) marche toujours. */
+  var JOURS_DP = ["lu", "ma", "me", "je", "ve", "sa", "di"];
+  var dpOuvert = null;
+  function dpPossible() {
+    try {
+      return !!(global.matchMedia && global.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+        global.CSS && CSS.supports && CSS.supports("selector(::-webkit-calendar-picker-indicator)"));
+    } catch (e) { return false; }
+  }
+  function dpFerme(rendFocus) {
+    if (!dpOuvert) return;
+    var o = dpOuvert;
+    dpOuvert = null;
+    o.boite.remove();
+    document.removeEventListener("pointerdown", o.dehors, true);
+    global.removeEventListener("resize", o.fermer);
+    document.removeEventListener("scroll", o.defile, true);
+    if (rendFocus) o.input.focus();
+  }
+  /** Le champ « debut » qui va avec ce champ « fin » (même formulaire), s'il existe. */
+  function dpDebutDe(input) {
+    if (input.name !== "fin") return null;
+    var cadre = input.closest("form, .modale-boite, .grille-champs, .section") || document;
+    return cadre.querySelector('input[type="date"][name="debut"]');
+  }
+  function dpFinDe(input) {
+    if (input.name !== "debut") return null;
+    var cadre = input.closest("form, .modale-boite, .grille-champs, .section") || document;
+    return cadre.querySelector('input[type="date"][name="fin"]');
+  }
+  function dpPose(input, valeur) {
+    input.value = valeur;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    // Un début posé après la fin : la fin suit
+    var fin = dpFinDe(input);
+    if (fin && valeur && fin.value && fin.value < valeur) dpPose(fin, valeur);
+  }
+
+  function ouvreCalendrier(input) {
+    if (dpOuvert && dpOuvert.input === input) return;
+    dpFerme(false);
+    var canton = D && D.canton ? D.canton() : "VD", auj = C.isoAuj();
+    var debutLie = dpDebutDe(input), borne = debutLie && debutLie.value ? debutLie.value : "";
+    var min = [input.min, borne].filter(Boolean).sort().pop() || "", max = input.max || "";
+    var choisi = input.value || "";
+    var focus = choisi || (borne && borne > auj ? borne : auj);
+    var mois = focus.slice(0, 7), vueAnnee = false, survol = "";
+
+    var titre = el("button", { type: "button", class: "dp-titre", title: "Choisir le mois" });
+    var prec = el("button", { type: "button", class: "dp-fleche", "aria-label": "Mois précédent", text: "‹" });
+    var suiv = el("button", { type: "button", class: "dp-fleche", "aria-label": "Mois suivant", text: "›" });
+    var grille = el("div", { class: "dp-grille", role: "grid" });
+    var boite = el("div", { class: "dp", role: "dialog", "aria-label": "Choisir une date" }, [
+      el("div", { class: "dp-tete" }, [prec, titre, suiv]),
+      grille,
+      el("div", { class: "dp-pied" }, [
+        input.required ? el("span") : el("button", { type: "button", class: "dp-lien", text: "Effacer",
+          onclick: function () { dpPose(input, ""); dpFerme(true); } }),
+        el("button", { type: "button", class: "dp-lien fort", text: "Aujourd'hui",
+          onclick: function () { if (!hors(auj)) { dpPose(input, auj); dpFerme(true); } else { mois = auj.slice(0, 7); focus = auj; dessine(); } } })
+      ])
+    ]);
+    function hors(j) { return (min && j < min) || (max && j > max); }
+    function decaleMois(m, n) {
+      var d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1);
+      return d.getFullYear() + "-" + (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1);
+    }
+    function dessine() {
+      vide(grille);
+      var an = +mois.slice(0, 4), m = +mois.slice(5, 7) - 1;
+      if (vueAnnee) {
+        titre.textContent = String(an);
+        prec.setAttribute("aria-label", "Année précédente"); suiv.setAttribute("aria-label", "Année suivante");
+        grille.className = "dp-grille dp-mois";
+        C.MOIS.forEach(function (nom, i) {
+          var cle = an + "-" + (i < 9 ? "0" : "") + (i + 1);
+          grille.appendChild(el("button", { type: "button", class: "dp-m" + (cle === auj.slice(0, 7) ? " auj" : "") + (choisi && cle === choisi.slice(0, 7) ? " choisi" : ""),
+            text: nom.slice(0, 4) === "juil" ? "juil." : nom.length > 5 ? nom.slice(0, 4) + "." : nom,
+            onclick: function () { mois = cle; vueAnnee = false; dessine(); } }));
+        });
+        return;
+      }
+      titre.textContent = C.MOIS[m].charAt(0).toUpperCase() + C.MOIS[m].slice(1) + " " + an;
+      prec.setAttribute("aria-label", "Mois précédent"); suiv.setAttribute("aria-label", "Mois suivant");
+      grille.className = "dp-grille";
+      JOURS_DP.forEach(function (j, i) { grille.appendChild(el("span", { class: "dp-js" + (i > 4 ? " we" : ""), text: j })); });
+      var premier = mois + "-01", j = C.lundi(premier);
+      var bout = choisi || survol;
+      for (var k = 0; k < 42; k++, j = C.ajoute(j, 1)) {
+        var d = C.dt(j), dow = (d.getDay() + 6) % 7;
+        var nomFerie = C.ferie(j, canton);
+        var classes = ["dp-j"];
+        if (j.slice(0, 7) !== mois) classes.push("autre");
+        if (dow > 4) classes.push("we");
+        if (nomFerie) classes.push("ferie");
+        if (j === auj) classes.push("auj");
+        if (j === choisi) classes.push("choisi");
+        if (borne && j === borne) classes.push("borne");
+        if (borne && bout && j > borne && j < bout) classes.push("plage");
+        if (hors(j)) classes.push("hors");
+        (function (jour) {
+          grille.appendChild(el("button", {
+            type: "button", class: classes.join(" "), tabindex: jour === focus ? "0" : "-1",
+            dataset: { jour: jour }, disabled: hors(jour) ? true : null,
+            title: C.fmtLong(jour) + (nomFerie ? " — " + nomFerie : ""),
+            "aria-label": C.fmtLong(jour) + (nomFerie ? ", " + nomFerie : ""),
+            "aria-selected": jour === choisi ? "true" : "false",
+            onclick: function () { dpPose(input, jour); dpFerme(true); },
+            onmouseenter: function () { if (borne && !choisi) { survol = jour; marquePlage(); } }
+          }, [String(d.getDate())]));
+        })(j);
+        if (k === 34 && C.ajoute(j, 1).slice(0, 7) !== mois && C.ajoute(j, 1) > mois + "-28") break;   // 5 semaines suffisent
+      }
+    }
+    function marquePlage() {
+      [].forEach.call(grille.querySelectorAll(".dp-j"), function (b) {
+        var jour = b.dataset.jour;
+        b.classList.toggle("plage", !!(borne && survol && jour > borne && jour < survol));
+      });
+    }
+    function bouge(n) {
+      focus = C.ajoute(focus, n);
+      if (focus.slice(0, 7) !== mois) mois = focus.slice(0, 7);
+      dessine();
+      var b = grille.querySelector('[data-jour="' + focus + '"]');
+      if (b) b.focus();
+    }
+    prec.addEventListener("click", function () { mois = vueAnnee ? decaleMois(mois, -12) : decaleMois(mois, -1); dessine(); });
+    suiv.addEventListener("click", function () { mois = vueAnnee ? decaleMois(mois, 12) : decaleMois(mois, 1); dessine(); });
+    titre.addEventListener("click", function () { vueAnnee = !vueAnnee; dessine(); });
+    boite.addEventListener("keydown", function (e) {
+      var k = e.key;
+      if (k === "Escape") { e.preventDefault(); e.stopPropagation(); dpFerme(true); return; }
+      if (vueAnnee || !e.target.classList.contains("dp-j")) return;
+      var pas = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[k];
+      if (pas) { e.preventDefault(); focus = e.target.dataset.jour; bouge(pas); return; }
+      if (k === "PageUp" || k === "PageDown") {
+        e.preventDefault(); focus = e.target.dataset.jour;
+        var cible = C.dt(focus); cible.setMonth(cible.getMonth() + (k === "PageUp" ? -1 : 1));
+        bouge(C.diff(focus, C.iso(cible)));
+      }
+    });
+    boite.addEventListener("mouseleave", function () { if (survol) { survol = ""; marquePlage(); } });
+
+    document.body.appendChild(boite);
+    dessine();
+    // Sous le champ, ou au-dessus s'il manque de place ; jamais hors de l'écran
+    var r = input.getBoundingClientRect(), h = boite.offsetHeight, w = boite.offsetWidth;
+    var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
+    boite.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
+    boite.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
+
+    var o = {
+      input: input, boite: boite,
+      dehors: function (e) { if (!boite.contains(e.target) && e.target !== input) dpFerme(false); },
+      fermer: function () { dpFerme(false); },
+      defile: function (e) { if (!boite.contains(e.target)) dpFerme(false); }
+    };
+    dpOuvert = o;
+    document.addEventListener("pointerdown", o.dehors, true);
+    global.addEventListener("resize", o.fermer);
+    document.addEventListener("scroll", o.defile, true);
+  }
+
+  if (global.document) {
+    if (dpPossible()) document.documentElement.classList.add("dp-maison");
+    document.addEventListener("click", function (e) {
+      var input = e.target && e.target.closest ? e.target.closest('input[type="date"]') : null;
+      if (!input || input.disabled || input.readOnly || !dpPossible()) return;
+      e.preventDefault();
+      ouvreCalendrier(input);
+    }, true);
+    document.addEventListener("keydown", function (e) {
+      var t = e.target;
+      if (!t || !t.matches || !t.matches('input[type="date"]') || !dpPossible()) return;
+      if (e.altKey && e.key === "ArrowDown") {
+        e.preventDefault();
+        ouvreCalendrier(t);
+        setTimeout(function () { var b = dpOuvert && dpOuvert.boite.querySelector('.dp-j[tabindex="0"]'); if (b) b.focus(); }, 0);
+      } else if (e.key === "Escape" && dpOuvert && dpOuvert.input === t) { e.preventDefault(); e.stopPropagation(); dpFerme(false); }
+      else if (e.key === "Tab" && dpOuvert) dpFerme(false);
+    }, true);
+  }
+
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
     ouvre: ouvre, ferme: ferme, confirme: confirme,
