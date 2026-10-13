@@ -213,7 +213,9 @@
     vide(hote);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
-      el("div", { class: "ab-qui" }, [ia, date, el("div", { class: "ab-moi" }, [bouton, menu])])
+      // Au centre : la pendule, la date dessous
+      el("div", { class: "ab-centre" }, [pendule(), date]),
+      el("div", { class: "ab-qui" }, [ia, el("div", { class: "ab-moi" }, [bouton, menu])])
     ]));
     [].forEach.call(hote.querySelectorAll("img"), function (n) {
       for (var i = 0; i < images.length; i++) {
@@ -221,6 +223,41 @@
       }
     });
     return id;
+  }
+
+  /* Pendule à aiguilles, au centre de l'en-tête (13.10.2026, demande de Tony) :
+     sans chiffres, aux couleurs de la marque — traits des minutes, index des
+     heures plus longs, quarts appuyés. Pas de trotteuse (rien ne doit tourner
+     en continu) : les aiguilles se posent une fois par minute, à la minute. */
+  var penduleMinuterie = null;
+  function pendule() {
+    var traits = "";
+    for (var i = 0; i < 60; i++) {
+      var a = i * Math.PI / 30, quart = i % 15 === 0, heure = i % 5 === 0;
+      var r1 = quart ? 34.5 : heure ? 37.5 : 41.8, r2 = 44.6;
+      traits += '<line class="' + (quart ? "pd-quart" : heure ? "pd-heure" : "pd-minute") + '" x1="' + (50 + r1 * Math.sin(a)).toFixed(2) +
+        '" y1="' + (50 - r1 * Math.cos(a)).toFixed(2) + '" x2="' + (50 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (50 - r2 * Math.cos(a)).toFixed(2) + '"/>';
+    }
+    var dessin = svg("0 0 100 100",
+      '<defs><radialGradient id="pd-fond" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#F3F4F0"/></radialGradient></defs>' +
+      '<circle class="pd-anneau" cx="50" cy="50" r="48.2"/>' +
+      '<circle class="pd-face" cx="50" cy="50" r="46.4" fill="url(#pd-fond)"/>' + traits +
+      '<g class="pd-aig-h"><line x1="50" y1="57" x2="50" y2="27.5"/></g>' +
+      '<g class="pd-aig-m"><line x1="50" y1="59" x2="50" y2="13.5"/></g>' +
+      '<circle class="pd-axe" cx="50" cy="50" r="3.2"/><circle class="pd-axe-c" cx="50" cy="50" r="1.2"/>', "ab-pendule-svg");
+    var boite = el("div", { class: "ab-pendule", role: "img" }, [dessin]);
+    var h = dessin.querySelector(".pd-aig-h"), m = dessin.querySelector(".pd-aig-m");
+    function tourne() {
+      var d = new Date(), mi = d.getMinutes(), he = (d.getHours() % 12) + mi / 60;
+      h.setAttribute("transform", "rotate(" + (he * 30).toFixed(2) + " 50 50)");
+      m.setAttribute("transform", "rotate(" + (mi * 6) + " 50 50)");
+      boite.setAttribute("aria-label", "Il est " + d.getHours() + " h " + (mi < 10 ? "0" : "") + mi);
+      // Prochain passage : la minute suivante (un onglet en arrière-plan rattrape au retour)
+      penduleMinuterie = setTimeout(tourne, 60000 - d.getSeconds() * 1000 - d.getMilliseconds() + 50);
+    }
+    clearTimeout(penduleMinuterie);
+    tourne();
+    return boite;
   }
 
   /* Fenêtre volante du Dashboard IA : « À venir », sous le logo de la marque

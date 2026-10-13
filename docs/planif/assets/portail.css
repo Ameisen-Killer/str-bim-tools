@@ -47,7 +47,21 @@ button { font: inherit; color: inherit; }
 
 
 /* ------------------------------------------------------------ en-tête */
-.ab-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
+.ab-entete { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 24px; padding-left: clamp(0px, 2vw, 30px); }
+.ab-entete > .ab-qui { justify-self: end; }
+/* Pendule à aiguilles, au centre (13.10.2026) */
+.ab-centre { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ab-centre .ab-date { text-align: center; font-size: 15px; }
+.ab-pendule { width: clamp(96px, 8.6vw, 128px); aspect-ratio: 1; filter: drop-shadow(0 8px 18px rgba(30, 34, 38, .12)) drop-shadow(0 1px 2px rgba(30, 34, 38, .08)); }
+.ab-pendule-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ab-pendule .pd-anneau { fill: var(--m-clair); }
+.ab-pendule .pd-minute { stroke: rgba(30, 34, 38, .22); stroke-width: .7; stroke-linecap: round; }
+.ab-pendule .pd-heure { stroke: var(--m-fort); stroke-width: 1.6; stroke-linecap: round; }
+.ab-pendule .pd-quart { stroke: var(--m-encre, var(--m-fort)); stroke-width: 2.8; stroke-linecap: round; }
+.ab-pendule .pd-aig-h line { stroke: #1E2226; stroke-width: 3.6; stroke-linecap: round; }
+.ab-pendule .pd-aig-m line { stroke: #1E2226; stroke-width: 2.3; stroke-linecap: round; }
+.ab-pendule .pd-axe { fill: var(--m-fort); }
+.ab-pendule .pd-axe-c { fill: #fff; }
 .ab-marque { display: block; text-decoration: none; flex: 0 1 auto; min-width: 0; }
 /* Logo de la marque : celui du bureau (pavé + texte, proportions 2,95 × 1) ou STR Bim Tools */
 .ab-logo-str { font-size: clamp(16px, 1.55vw, 22px); }
@@ -246,7 +260,8 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 @media (max-width: 640px) {
   .ab-badge { position: static; grid-column: 2; justify-self: start; margin-top: 4px; font-size: 12px; }
   .ab-page { padding-top: 14px; }
-  .ab-entete { padding-left: 0; align-items: center; }
+  .ab-entete { padding-left: 0; align-items: center; gap: 12px; }
+  .ab-pendule { width: 64px; }
   .ab-logo { height: 58px; }
   .ab-logo-str { font-size: 13px; }
   .ab-date { display: none; }
