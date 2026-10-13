@@ -153,8 +153,6 @@
 :root[data-version="v2"] .entete h1 .compte-titre{font-size:clamp(14px,1.3vw,18px);font-weight:500;color:var(--texte-faible);letter-spacing:0}
 :root[data-version="v2"] .entete .chapeau{font-size:17px;color:var(--texte-faible)}
 :root[data-version="v2"] .filet-or{display:none}
-:root[data-version="v2"] .decor-place{display:none}
-:root[data-version="v2"] .entete.avec-decor{display:block;min-height:0}
 :root[data-version="v2"] .surtitre,:root[data-version="v2"] .num-section{font-size:13px;font-weight:600;color:var(--or)}
 
 /* --------------------------------------------------------- cartes */

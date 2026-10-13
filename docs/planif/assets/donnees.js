@@ -1521,12 +1521,6 @@
         return sauve().then(function () { return v; });
       });
     },
-    suppAvis: function (i) {
-      return Promise.resolve().then(function () {
-        etat.avis = (etat.avis || []).filter(function (a) { return a.id !== i; });
-        return sauve();
-      });
-    },
 
     /* -------------------------------------------------------- affaires */
     affaires: function (opts) {
@@ -2206,9 +2200,6 @@
   annulable("ajouteAvis", null,
     function () { return "avis d'absence"; },
     function (a) { return [{ coll: "avis", id: a.id, avant: null }]; });
-  annulable("suppAvis", function (i) { return [photo("avis", i)]; },
-    function () { return "retrait de l'avis d'absence"; });
-
   annulable("ajouteContact", null,
     function (o) { return "création de la fiche " + (texte(o.nom) || texte(o.societe)); },
     function (c) { return [{ coll: "contacts", id: c.id, avant: null }]; });

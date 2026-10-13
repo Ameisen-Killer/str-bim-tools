@@ -590,14 +590,11 @@
     ouvre: ouvre,
     ferme: ferme,
     bascule: function () { if (ouvert) ferme(); else ouvre(); },
-    estOuvert: function () { return ouvert; },
     installeFenetre: installeFenetre,
     monte: monte,
     recu: recu,
     nonLus: nonLus,
     depuisBase: depuisBase,
-    /** Le message vient-il de la personne connectée ? (direct.js, pour ne pas s'annoncer à soi-même) */
-    deMoi: function (m) { var moi = monId(); return !!(moi && m && m.auteurId === moi); },
     nomDe: function (id) { var m = id && D ? D.membre(id) : null; return m ? m.prenom + " " + m.nom : "un collègue"; }
   };
 })(window);
