@@ -214,7 +214,7 @@
     // La veille est la première page du module ; sans elle, le module s'ouvre sur sa première page permise
     var nv = D.pagePermise("veille") ? D.veilleNouvelles().length : 0;
     if (nv) {
-      inter.href = "/planif/inter-secteurs/#veille";
+      inter.href = "/planif/inter-secteurs/";
       inter.appendChild(el("span", { class: "ab-badge veille", text: nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication") }));
     } else inter.href = D.lienModule("inter");
   }

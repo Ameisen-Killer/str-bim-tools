@@ -165,7 +165,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     document.getElementById("f-resultat").addEventListener("change", function () { filtres.resultat = this.value; rend(); });
     document.getElementById("f-veille").addEventListener("change", function () { filtres.veille = this.value; rend(); });
-    if (location.hash === "#veille") setTimeout(function () { document.getElementById("veille").scrollIntoView(); }, 50);
+    /* La veille est une page à part (13.10.2026) : un ancien lien en #veille ne
+       saute plus sous le titre, la page s'ouvre en haut. */
+    if (location.hash === "#veille") {
+      history.replaceState(null, "", location.pathname + location.search);
+      window.scrollTo(0, 0);
+    }
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
     document.getElementById("f-terminees").addEventListener("change", function () { filtres.terminees = this.checked; rend(); });
