@@ -306,7 +306,8 @@
   /* ----------------------------------------------- absences de l'équipe
      Cette semaine (13.10.2026, demande de Tony ; la semaine prochaine
      auparavant), du lundi au vendredi. L'équipe, c'est le secteur
-     (discipline) de la personne connectée quand elle en a un, sinon tout le
+     (discipline) de la personne connectée quand elle en a un, plus les
+     administratifs et les personnes sans secteur (13.10.2026), sinon tout le
      bureau. Seuls les absents y figurent (demande de Tony, 06.10.2026) :
      rouge, absent toute la semaine ; orange, une partie. Seuls comptent les
      jours que la personne aurait travaillés. S'y ajoutent les jours off et
@@ -315,7 +316,10 @@
     var hote = Portail.vide(document.getElementById("abs"));
     var lundi = C.lundi(auj()), vendredi = C.ajoute(lundi, 4), canton = D.canton();
     var secteur = moi && moi.discipline ? moi.discipline : "";
-    var gens = D.membres({}).filter(function (m) { return !secteur || m.discipline === secteur; });
+    // Le secteur, plus l'administration et qui n'a pas de secteur : ils servent tout le bureau (13.10.2026)
+    var gens = D.membres({}).filter(function (m) {
+      return !secteur || m.discipline === secteur || !m.discipline || m.metier === "administratif";
+    });
     document.getElementById("abs-quand").textContent = "(cette semaine" +
       (secteur && D.DISCIPLINES[secteur] ? " · " + D.DISCIPLINES[secteur] : "") + ")";
     document.getElementById("abs-quand").title = "Semaine " + C.semaineISO(lundi).num + ", du " + C.fmtLong(lundi) + " au " + C.fmtLong(vendredi);
