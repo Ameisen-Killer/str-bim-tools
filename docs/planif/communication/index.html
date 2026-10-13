@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=96">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
-<link rel="stylesheet" href="/planif/assets/communication.css?v=11">
+<link rel="stylesheet" href="/planif/assets/communication.css?v=12">
 </head>
 <body class="large">
 
@@ -205,6 +205,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     return out;
   }
 
+  /** La page Absences, ouverte sur la période de ce jour et à la ligne de cette personne. */
+  function versAbsences(idMembre, jour) {
+    return "/planif/absences/?membre=" + encodeURIComponent(idMembre) + "&date=" + jour;
+  }
+
   function periodeAvis(a) {
     var j1 = a.debut.slice(0, 10), j2 = a.fin.slice(0, 10), h1 = a.debut.slice(11), h2 = a.fin.slice(11);
     if (j1 === j2) return (j1 === auj() ? "" : jourCourt(j1) + " ") + h1 + " – " + h2;
@@ -238,14 +243,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var ul = el("ul", { class: "cm-liste" });
       manque.forEach(function (x) {
         var enCours = x.avis && x.avis.debut <= maintenant() && maintenant() < x.avis.fin;
-        ul.appendChild(el("li", { class: "cm-personne " + x.genre }, [
+        // Vers la page Absences, à la ligne de la personne (13.10.2026)
+        ul.appendChild(el("li", {}, [el("a", { class: "cm-personne cm-lien " + x.genre, href: versAbsences(x.membre.id, a),
+          title: "Voir " + nom(x.membre) + " dans le calendrier des absences" }, [
           el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(x.membre) }),
           el("span", { class: "cm-lib" }, [
             el("span", { class: "cm-titre", text: nom(x.membre) }),
             el("span", { class: "cm-detail", text: x.detail })
           ]),
           el("span", { class: "etiq cm-genre " + x.genre + (enCours ? " encours" : ""), text: enCours ? "En ce moment" : GENRES[x.genre] })
-        ]));
+        ])]));
       });
       hote.appendChild(ul);
     }
@@ -461,7 +468,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     function ligne(x) {
       var m = x.membre, ab = x.absence, fin = ab.fin || ab.debut;
       var n = Calc.joursTravaillesEntre(m, ab.debut < a ? a : ab.debut, fin, canton);
-      return el("li", {}, [el("button", { type: "button", class: "cm-absence", onclick: function () { UI.absences(m.id, rend); } }, [
+      // Vers la page Absences, sur la période et à la ligne de la personne (13.10.2026)
+      return el("li", {}, [el("a", { class: "cm-absence", href: versAbsences(m.id, ab.debut < a ? a : ab.debut),
+        title: "Voir " + nom(m) + " dans le calendrier des absences" }, [
         el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
         el("span", { class: "cm-lib" }, [
           el("span", { class: "cm-titre", text: nom(m) }),
