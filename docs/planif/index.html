@@ -89,7 +89,7 @@
 
     <section class="ab-encadre ab-monte" style="--r:5" aria-labelledby="t-abs">
       <div class="ab-encadre-tete">
-        <h3 id="t-abs">Absences de l'équipe <small id="abs-quand">(semaine prochaine)</small></h3>
+        <h3 id="t-abs">Absences de l'équipe <small id="abs-quand">(cette semaine)</small></h3>
         <a class="ab-voir" href="/planif/absences/">Voir tout</a>
       </div>
       <div id="abs"></div>
@@ -304,17 +304,18 @@
   }
 
   /* ----------------------------------------------- absences de l'équipe
-     La semaine prochaine, du lundi au vendredi. L'équipe, c'est le secteur
+     Cette semaine (13.10.2026, demande de Tony ; la semaine prochaine
+     auparavant), du lundi au vendredi. L'équipe, c'est le secteur
      (discipline) de la personne connectée quand elle en a un, sinon tout le
      bureau. Seuls les absents y figurent (demande de Tony, 06.10.2026) :
      rouge, absent toute la semaine ; orange, une partie. Seuls comptent les
      jours que la personne aurait travaillés. */
   function absences(moi) {
     var hote = Portail.vide(document.getElementById("abs"));
-    var lundi = C.ajoute(C.lundi(auj()), 7), vendredi = C.ajoute(lundi, 4), canton = D.canton();
+    var lundi = C.lundi(auj()), vendredi = C.ajoute(lundi, 4), canton = D.canton();
     var secteur = moi && moi.discipline ? moi.discipline : "";
     var gens = D.membres({}).filter(function (m) { return !secteur || m.discipline === secteur; });
-    document.getElementById("abs-quand").textContent = "(semaine prochaine" +
+    document.getElementById("abs-quand").textContent = "(cette semaine" +
       (secteur && D.DISCIPLINES[secteur] ? " · " + D.DISCIPLINES[secteur] : "") + ")";
     document.getElementById("abs-quand").title = "Semaine " + C.semaineISO(lundi).num + ", du " + C.fmtLong(lundi) + " au " + C.fmtLong(vendredi);
 
@@ -337,7 +338,7 @@
       return da < db ? -1 : da > db ? 1 : D.compareMembres(a.m, b.m);
     });
 
-    if (!lignes.length) { videMessage(hote, "Personne n'est absent la semaine prochaine."); return; }
+    if (!lignes.length) { videMessage(hote, "Personne n'est absent cette semaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
       var p = x.periodes[0];
       var periode = p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin);
