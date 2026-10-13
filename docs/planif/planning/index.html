@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=90">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=91">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 </head>
 <body class="large">
@@ -69,12 +69,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="14" selected>2 semaines</option>
           <option value="28">4 semaines</option>
         </select>
-        <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:240px" aria-label="Filtrer par affaire"></select>
-        <!-- Succursales, secteurs, fonctions : menus à cases (UI.multiChoix), plusieurs choix -->
+        <span id="f-affaire"></span>
+        <!-- Affaires, succursales, secteurs, fonctions, membres : menus à cases (UI.multiChoix), plusieurs choix -->
         <span id="f-succursale"></span>
         <span id="f-secteur"></span>
         <span id="f-cote"></span>
-        <select id="f-membre" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:200px" aria-label="Filtrer par membre"></select>
+        <span id="f-membre"></span>
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
         </label>
@@ -125,7 +125,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=69"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=101"></script>
+<script src="/planif/assets/ui.js?v=102"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=18"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -136,7 +136,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   var CLE_VUE = "planif.vue";
   var filtres = {};               // menus à cases : succursales, secteurs, fonctions
-  var vue = { debut: null, duree: 14, affaire: "", succursales: [], secteurs: [], cotes: [], membre: null, occupes: false };
+  // membres : null tant qu'aucun choix n'a été fait (première ouverture : soi)
+  var vue = { debut: null, duree: 14, affaires: [], succursales: [], secteurs: [], cotes: [], membres: null, occupes: false };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
   // Vue d'avant les choix multiples (13.10.2026) : une seule fonction, retenue sous « cote »
@@ -144,6 +145,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   if (vue.cote) { vue.cotes = [vue.cote]; }
   delete vue.cote; delete vue.succursale; delete vue.secteur;
   if (!Array.isArray(vue.succursales)) vue.succursales = [];
+  // Une affaire, un membre (d'avant le 13.10.2026, ou posés par la carte de charge) : en liste
+  if (typeof vue.affaire === "string") vue.affaires = vue.affaire ? [vue.affaire] : [];
+  if (typeof vue.membre === "string") vue.membres = vue.membre ? [vue.membre] : [];
+  delete vue.affaire; delete vue.membre;
+  if (!Array.isArray(vue.affaires)) vue.affaires = [];
+  if (vue.membres != null && !Array.isArray(vue.membres)) vue.membres = [];
   if (!Array.isArray(vue.secteurs)) vue.secteurs = [];
   // Première visite sur un écran étroit : une seule semaine, sinon tout est illisible.
   if (!memorise0 && window.innerWidth < 760) vue.duree = 7;
@@ -180,7 +187,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     UI.chrome("tableau", [{ label: "Exporter en PDF", icone: "ico-export", action: exportePdf }, {
       label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache",
       // Sur place : le formulaire complet s'ouvre sans quitter le tableau de bord
-      action: function () { UI.formulaireTache(null, { affaireId: vue.affaire, surEnregistrement: rend }); }
+      action: function () { UI.formulaireTache(null, { affaireId: vue.affaires.length === 1 ? vue.affaires[0] : "", surEnregistrement: rend }); }
     }]);
     UI.pied();
     // Collée sous la barre, la recherche se resserre (planif.css)
@@ -199,19 +206,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     duree.addEventListener("change", function () { vue.duree = parseInt(duree.value, 10); memorise(); rend(); });
 
     mien = perimetre();
-    var fa = document.getElementById("f-affaire");
-    fa.appendChild(el("option", { value: "" }, [mien ? "Toutes mes affaires" : "Toutes les affaires"]));
     var mesAffaires = null;
     if (mien) {
       mesAffaires = Object.create(null);
       D.taches({ sansTerminees: false }).forEach(function (t) { if (mien.taches[t.id]) mesAffaires[t.affaireId] = true; });
     }
-    D.affaires({ tous: true }).filter(function (a) { return !mesAffaires || mesAffaires[a.id]; }).forEach(function (a) {
-      fa.appendChild(el("option", { value: a.id, selected: a.id === vue.affaire }, [a.code + " · " + a.nom]));
-    });
-    fa.value = vue.affaire || "";
-    if (fa.value !== (vue.affaire || "")) vue.affaire = "";
-    fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
+    var optAffaires = D.affaires({ tous: true }).filter(function (a) { return !mesAffaires || mesAffaires[a.id]; })
+      .map(function (a) { return { valeur: a.id, label: a.code + " · " + a.nom }; });
+    filtres.affaires = UI.multiChoix({ libelle: "Filtrer : affaires", tous: mien ? "Toutes mes affaires" : "Toutes les affaires",
+      pluriel: "affaires", options: optAffaires, valeurs: vue.affaires,
+      surChange: function (v) { vue.affaires = v; memorise(); rend(); } });
+    vue.affaires = filtres.affaires.valeurs();
+    UI.vide(document.getElementById("f-affaire")).appendChild(filtres.affaires.noeud);
 
     /* Succursales, secteurs et fonctions (13.10.2026, demande de Tony) : des
        menus à cases, plusieurs choix possibles, rien de coché = tout. Un menu
@@ -232,21 +238,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     // Première ouverture : chacun se voit d'abord lui-même. Le choix fait ensuite
     // dans la liste est mémorisé comme les autres filtres, « Toute l'équipe » compris.
-    if (vue.membre == null) {
+    if (vue.membres == null) {
       var moi = D.monMembre();
-      vue.membre = moi && moi.actif && D.PLANIFIES[moi.metier] ? moi.id : "";
+      vue.membres = moi && moi.actif && D.PLANIFIES[moi.metier] ? [moi.id] : [];
       memorise();
     }
-    var fm = document.getElementById("f-membre");
-    UI.vide(fm).appendChild(el("option", { value: "" }, ["Toute l'équipe"]));
+    var optMembres = [];
     D.parMetier(D.membres({ planifies: true })).forEach(function (g) {
-      var groupe = el("optgroup", { label: g.titre });
-      g.membres.forEach(function (m) { groupe.appendChild(el("option", { value: m.id }, [m.prenom + " " + m.nom])); });
-      fm.appendChild(groupe);
+      g.membres.forEach(function (m) { optMembres.push({ valeur: m.id, label: m.prenom + " " + m.nom, groupe: g.titre }); });
     });
-    fm.value = vue.membre || "";
-    if (fm.value !== (vue.membre || "")) { vue.membre = ""; fm.value = ""; }   // fiche devenue inactive ou supprimée
-    fm.addEventListener("change", function () { vue.membre = fm.value; memorise(); rend(); });
+    filtres.membres = UI.multiChoix({ libelle: "Filtrer : membres", tous: "Toute l'équipe", pluriel: "membres",
+      options: optMembres, valeurs: vue.membres,
+      surChange: function (v) { vue.membres = v; memorise(); rend(); } });
+    vue.membres = filtres.membres.valeurs();             // fiche devenue inactive ou supprimée : retirée
+    var fm = document.getElementById("f-membre");
+    UI.vide(fm).appendChild(filtres.membres.noeud);
     // Collaborateur : ses lignes sont fixées par ses tâches, pas de choix de personne
     if (mien) fm.style.display = "none";
 
@@ -289,19 +295,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function rend() {
     var canton = D.canton();
     mien = perimetre();
-    var unMembre = mien ? "" : vue.membre;
+    var lesMembres = mien ? [] : (vue.membres || []);
     jours = C.serie(vue.debut, vue.duree);
     sems = Calc.semaines(jours);
 
     var taches = D.taches({ sansTerminees: false }).filter(function (t) {
-      if (vue.affaire && t.affaireId !== vue.affaire) return false;
+      if (vue.affaires.length && vue.affaires.indexOf(t.affaireId) < 0) return false;
       return true;
     });
 
     membres = D.membres({ planifies: true }).slice();   // administrateurs, administratifs et non désignés n'ont pas de planning
     // La répartition ne dépend ni de la semaine affichée ni de la durée : changer
     // de semaine ne la recalcule pas. Seuls les données, le filtre d'affaire ou le canton la périment.
-    var cle = D.version() + "|" + (vue.affaire || "") + "|" + canton + "|" + C.isoAuj();
+    var cle = D.version() + "|" + vue.affaires.join(",") + "|" + canton + "|" + C.isoAuj();
     if (cacheRep.cle !== cle) {
       // Les tâches terminées restent dessinées mais ne pèsent plus sur la charge,
       // comme sur la page Équipe et dans les alertes
@@ -349,9 +355,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Un administratif ne porte pas de tâches : il ne paraît pas ici.
     var ORDRE_COTES = { ingenieur: 0, dessinateur: 1 };
     // Affaire choisie : seulement son équipe, sinon ses barres se perdent parmi des dizaines de lignes vides
-    var dansAffaire = vue.affaire ? membresAffaire(vue.affaire, taches) : null;
+    var dansAffaire = null;
+    vue.affaires.forEach(function (id) {
+      var d = membresAffaire(id, taches.filter(function (t) { return t.affaireId === id; }));
+      dansAffaire = dansAffaire || Object.create(null);
+      Object.keys(d).forEach(function (k) { dansAffaire[k] = true; });
+    });
     membres = membres.filter(function (m) {
-        return (!unMembre || m.id === unMembre) && (!mien || mien.gens[m.id])
+        return (!lesMembres.length || lesMembres.indexOf(m.id) >= 0) && (!mien || mien.gens[m.id])
           && (!vue.cotes.length || vue.cotes.indexOf(D.cote(m.metier)) >= 0) && (!dansAffaire || dansAffaire[m.id])
           && (!vue.succursales.length || vue.succursales.indexOf(m.succursale) >= 0)
           && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
@@ -480,10 +491,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var taux = capacite > 0 ? Math.round(charge / capacite * 100) : 0;
     var auj = C.isoAuj();
     // Les trois autres chiffres suivent le filtre : le retard aussi, sinon il compte pour toute l'équipe
-    var retard = D.taches({ sansTerminees: true, membreId: mien ? mien.moi : (vue.membre || null) }).filter(function (t) {
+    var choisis = mien ? [] : (vue.membres || []);
+    var retard = D.taches({ sansTerminees: true, membreId: mien ? mien.moi : null }).filter(function (t) {
       if (mien && !mien.taches[t.id]) return false;
+      if (choisis.length && choisis.indexOf(t.ingenieurId) < 0 && choisis.indexOf(t.dessinateurId) < 0) return false;
       if (!t.echeance || t.echeance >= auj) return false;
-      if (vue.affaire && t.affaireId !== vue.affaire) return false;
+      if (vue.affaires.length && vue.affaires.indexOf(t.affaireId) < 0) return false;
       // En recherche, seuls les retards des personnes restées à l'écran
       return !vusRecherche
         || (t.ingenieurId && vusRecherche[t.ingenieurId])
@@ -901,11 +914,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (!x) { UI.toast("La part " + nomPart + " de cette tâche n'est pas planifiée."); return; }
 
     if (vue.cotes.length && vue.cotes.indexOf(autre) < 0) vue.cotes = vue.cotes.concat([autre]);
-    if (!mien && vue.membre) vue.membre = x.membreId || "";
+    if (!mien && vue.membres.length && x.membreId && vue.membres.indexOf(x.membreId) < 0) vue.membres = vue.membres.concat([x.membreId]);
     var dernier = C.ajoute(vue.debut, vue.duree - 1);
     if (x.fin < vue.debut || x.debut > dernier) vue.debut = C.lundi(x.debut);
     if (filtres.cotes) filtres.cotes.pose(vue.cotes);
-    document.getElementById("f-membre").value = vue.membre || "";
+    if (filtres.membres) filtres.membres.pose(vue.membres);
     memorise();
     rend();
 
@@ -1150,8 +1163,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var liste = cacheAlertes.liste.filter(function (al) {
       // Collaborateur : ses tâches, et sa propre surcharge
       if (mien && (al.tacheId ? !mien.taches[al.tacheId] : al.membreId !== mien.moi)) return false;
-      if (!vue.affaire) return true;
-      if (al.tacheId) { var t = D.tache(al.tacheId); return t && t.affaireId === vue.affaire; }
+      if (!vue.affaires.length) return true;
+      if (al.tacheId) { var t = D.tache(al.tacheId); return t && vue.affaires.indexOf(t.affaireId) >= 0; }
       return true;
     });
     document.getElementById("titre-alertes").textContent =
@@ -1178,11 +1191,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      planning — sans lui, la feuille sortirait filtrée sans le dire. */
   function exportePdf() {
     var restreint = [];
-    ["f-affaire", "f-membre"].forEach(function (id) {
-      var sel = document.getElementById(id);
-      if (sel && sel.value && sel.selectedIndex >= 0) restreint.push(sel.options[sel.selectedIndex].text);
-    });
-    ["succursales", "secteurs", "cotes"].forEach(function (k) { if (filtres[k] && filtres[k].texte()) restreint.push(filtres[k].texte()); });
+    ["affaires", "succursales", "secteurs", "cotes", "membres"].forEach(function (k) { if (filtres[k] && filtres[k].texte()) restreint.push(filtres[k].texte()); });
     if (vue.occupes) restreint.push("Sans qui n'a rien");
     var cherche = barreRecherche && barreRecherche.valeur ? barreRecherche.valeur().trim() : "";
     if (cherche) restreint.push("« " + cherche + " »");

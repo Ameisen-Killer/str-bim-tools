@@ -1670,3 +1670,8 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .mc-lien{border:0;background:none;font:inherit;font-size:13px;color:var(--m-fort,var(--or));cursor:pointer;padding:4px 6px;border-radius:6px}
 .mc-lien:hover{background:var(--m-voile,rgba(0,0,0,.04))}
 @media print{.mc-panneau{display:none!important}}
+.mc-groupe{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--texte-faible);padding:8px 8px 3px}
+.mc-groupe[hidden],.mc-option[hidden]{display:none}
+.mc-cherche{width:100%;height:34px;margin-bottom:6px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;font:inherit;font-size:14px;text-transform:none;letter-spacing:normal}
+.mc-cherche:focus{outline:2px solid var(--m-fort,var(--or));outline-offset:-1px}
+.mc-panneau{max-width:360px}

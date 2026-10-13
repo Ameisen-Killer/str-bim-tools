@@ -2697,9 +2697,11 @@
   global.addEventListener("scroll", cacheBulle, { passive: true });
 
   /* ------------------------------------------------ filtre à cases
-     Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : succursales,
-     secteurs, fonctions du tableau de bord). Rien de coché = tout.
-       multiChoix({ libelle, tous, pluriel, options:[{valeur,label}], valeurs:[], surChange(valeurs) })
+     Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : affaires,
+     succursales, secteurs, fonctions, membres du tableau de bord). Rien de
+     coché = tout. Une option peut porter un « groupe » (intertitre) ; au-delà
+     de dix options, un champ de recherche filtre la liste.
+       multiChoix({ libelle, tous, pluriel, options:[{valeur,label,groupe}], valeurs:[], surChange(valeurs) })
      Renvoie { noeud, valeurs(), pose(valeurs) }. */
   function multiChoix(o) {
     var choisis = (o.valeurs || []).slice();
@@ -2707,7 +2709,9 @@
     var bouton = el("button", { type: "button", class: "btn mc-bouton", "aria-haspopup": "true", "aria-expanded": "false",
       "aria-label": o.libelle }, [texte, el("span", { class: "mc-fleche", "aria-hidden": "true", text: "▾" })]);
     var liste = el("div", { class: "mc-liste" });
+    var cherche = o.options.length > 10 ? el("input", { type: "search", class: "mc-cherche", placeholder: "Chercher…", "aria-label": "Chercher dans la liste" }) : null;
     var panneau = el("div", { class: "mc-panneau", hidden: true, role: "group", "aria-label": o.libelle }, [
+      cherche,
       liste,
       el("div", { class: "mc-pied" }, [
         el("button", { type: "button", class: "mc-lien", text: "Tout afficher", onclick: function () { choisis = []; maj(true); } })
@@ -2720,14 +2724,31 @@
       return t ? t.label : v;
     }
     // Les cases, construites une fois ; un changement ne fait que les recocher
+    var groupe = null, intertitres = [];
     var cases = o.options.map(function (x) {
+      if (x.groupe && x.groupe !== groupe) {
+        groupe = x.groupe;
+        var t = el("div", { class: "mc-groupe", text: x.groupe });
+        intertitres.push(t);
+        liste.appendChild(t);
+      }
       var c = el("input", { type: "checkbox", value: x.valeur });
       c.addEventListener("change", function () {
         choisis = c.checked ? choisis.concat([x.valeur]) : choisis.filter(function (v) { return v !== x.valeur; });
         maj(true);
       });
-      liste.appendChild(el("label", { class: "mc-option" }, [c, el("span", { text: x.label })]));
+      liste.appendChild(el("label", { class: "mc-option", dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]));
       return c;
+    });
+    function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+    if (cherche) cherche.addEventListener("input", function () {
+      var mots = simplifie(cherche.value).split(/\s+/).filter(Boolean), vus = {};
+      cases.forEach(function (c) {
+        var lab = c.parentNode, ok = mots.every(function (m) { return lab.dataset.texte.indexOf(m) >= 0; });
+        lab.hidden = !ok;
+        if (ok) vus[lab.dataset.groupe] = true;
+      });
+      intertitres.forEach(function (t) { t.hidden = !vus[t.textContent]; });
     });
     function maj(prevenir) {
       choisis = choisis.filter(function (v) { return o.options.some(function (x) { return x.valeur === v; }); });
@@ -2742,6 +2763,7 @@
       panneau.hidden = !oui;
       bouton.setAttribute("aria-expanded", String(oui));
       if (oui) { var premier = panneau.querySelector("input"); if (premier) premier.focus(); }
+      else if (cherche && cherche.value) { cherche.value = ""; cherche.dispatchEvent(new Event("input")); }
     }
     bouton.addEventListener("click", function () { ouvre(panneau.hidden); });
     document.addEventListener("pointerdown", function (e) { if (!panneau.hidden && !noeud.contains(e.target)) ouvre(false); });
