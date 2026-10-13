@@ -2957,21 +2957,23 @@
     document.addEventListener("scroll", o.defile, true);
   }
 
-  /* ------------------------------------------------- l'heure, en grand
-     La pendule native (deux colonnes qui défilent) remplacée sur ordinateur
-     (13.10.2026, demande de Tony) : l'heure affichée en grand sur un bandeau
-     aux couleurs de la marque, puis les 24 heures en pastilles — celles du
-     bureau (7 h – 19 h) en avant, l'heure qu'il est cerclée — et les minutes
-     de 5 en 5, quarts d'heure soulignés. Une heure, puis une minute : c'est
-     posé. Pour une fin (« fin » à côté de « debut », « heureFin » à côté de
-     « heureDebut »), ce qui tombe avant le début est écarté et la durée
-     s'affiche. Clavier : flèches, Entrée, Échap. */
+  /* ------------------------------------------------- choisir une heure
+     La pendule native remplacée sur ordinateur (13.10.2026, demande de
+     Tony), à la façon des agendas : une liste de créneaux d'un quart
+     d'heure, qu'on fait défiler — un clic, et l'heure est posée. La liste
+     s'ouvre sur l'heure du champ, sinon sur une heure utile (le prochain
+     quart d'heure en journée, 8 h la nuit). Pour une fin (« fin » à côté de
+     « debut », « heureFin » à côté de « heureDebut ») : la liste part du
+     début, chaque créneau dit sa durée, et des raccourcis (30 min, 1 h…)
+     donnent la fin d'un geste. Le trait « maintenant » situe l'heure qu'il
+     est. Saisir l'heure au clavier dans le champ marche toujours. */
   var DEBUTS_LIES = { fin: "debut", heureFin: "heureDebut" };
   function deuxChiffres(n) { return (n < 10 ? "0" : "") + n; }
+  function hhmm(min) { return deuxChiffres(Math.floor(min / 60)) + ":" + deuxChiffres(min % 60); }
   function dureeTexte(min) {
     if (min <= 0) return "";
     var h = Math.floor(min / 60), m = min % 60;
-    return (h ? h + " h" : "") + (h && m ? " " : "") + (m ? deuxChiffres(m) + (h ? "" : " min") : "");
+    return h ? h + " h" + (m ? " " + deuxChiffres(m) : "") : m + " min";
   }
   function ouvreHorloge(input) {
     if (dpOuvert && dpOuvert.input === input) return;
@@ -2980,92 +2982,73 @@
     var nomDebut = DEBUTS_LIES[input.name];
     var lie = nomDebut ? cadre.querySelector('input[type="time"][name="' + nomDebut + '"]') : null;
     var depuis = lie && lie.value ? (+lie.value.slice(0, 2)) * 60 + (+lie.value.slice(3, 5)) : null;
-    var v = input.value || "", h = v ? +v.slice(0, 2) : null, m = v ? +v.slice(3, 5) : null;
-    var maintenant = new Date(), hNow = maintenant.getHours();
+    var valeur = input.value ? (+input.value.slice(0, 2)) * 60 + (+input.value.slice(3, 5)) : null;
+    var d = new Date(), maintenant = d.getHours() * 60 + d.getMinutes();
 
-    var hh = el("button", { type: "button", class: "hz-chiffre", title: "Choisir l'heure" });
-    var mm = el("button", { type: "button", class: "hz-chiffre", title: "Choisir les minutes" });
-    var duree = el("div", { class: "hz-duree" });
-    var heures = el("div", { class: "hz-grille hz-heures", role: "group", "aria-label": "Heures" });
-    var minutes = el("div", { class: "hz-grille hz-minutes", role: "group", "aria-label": "Minutes" });
-    var boite = el("div", { class: "dp hz", role: "dialog", "aria-label": "Choisir une heure" }, [
-      el("div", { class: "hz-tete" }, [
-        el("div", { class: "hz-affiche" }, [hh, el("span", { class: "hz-deux", text: ":" }), mm]),
-        duree
+    function pose(min) { dpPose(input, hhmm(min)); dpFerme(true); }
+
+    // Les raccourcis d'une fin : la durée d'un geste
+    var raccourcis = depuis != null ? el("div", { class: "hl-raccourcis", role: "group", "aria-label": "Durées" },
+      [30, 60, 90, 120, 180, 240].filter(function (x) { return depuis + x < 24 * 60; }).map(function (x) {
+        return el("button", { type: "button", class: "hl-chip" + (valeur === depuis + x ? " choisi" : ""),
+          text: dureeTexte(x), title: "Fin à " + hhmm(depuis + x).replace(":", " h "), onclick: function () { pose(depuis + x); } });
+      })) : null;
+
+    var liste = el("div", { class: "hl-liste", role: "listbox", "aria-label": "Heures" });
+    var premier = depuis != null ? depuis + 15 - (depuis % 15) : 0;
+    var cible = null, ligneMaint = null;
+    for (var t = premier; t < 24 * 60; t += 15) (function (min) {
+      // Le trait « maintenant », entre deux créneaux, le jour même
+      if (!ligneMaint && maintenant < min && maintenant >= min - 15 && depuis == null) {
+        ligneMaint = el("div", { class: "hl-maint", "aria-hidden": "true" }, [el("span", { text: "maintenant · " + hhmm(maintenant) })]);
+        liste.appendChild(ligneMaint);
+      }
+      var choisi = valeur === min;
+      var b = el("button", { type: "button", role: "option", "aria-selected": choisi ? "true" : "false",
+        class: "hl-c" + (min % 60 === 0 ? " pleine" : "") + (min < 7 * 60 || min > 19 * 60 ? " calme" : "") + (choisi ? " choisi" : ""),
+        onclick: function () { pose(min); } }, [
+        el("span", { class: "hl-h", text: hhmm(min) }),
+        depuis != null ? el("span", { class: "hl-d", text: dureeTexte(min - depuis) }) : null
+      ]);
+      liste.appendChild(b);
+      if (choisi) cible = b;
+    })(t);
+    // Rien de choisi : l'heure utile (le prochain quart d'heure en journée, sinon 8 h ; pour une fin, +1 h)
+    if (!cible) {
+      var utile = depuis != null ? depuis + 60 : (maintenant >= 7 * 60 && maintenant < 19 * 60 ? maintenant + 15 - (maintenant % 15) : 8 * 60);
+      [].some.call(liste.querySelectorAll(".hl-c"), function (b) {
+        if (b.querySelector(".hl-h").textContent >= hhmm(utile)) { cible = b; b.classList.add("vise"); return true; }
+        return false;
+      });
+    }
+
+    var boite = el("div", { class: "dp hl" + (depuis != null ? " avec-duree" : ""), role: "dialog", "aria-label": "Choisir une heure" }, [
+      el("div", { class: "hl-tete" }, [
+        el("span", { class: "ico-txt ico-horloge", "aria-hidden": "true" }),
+        el("span", { text: depuis != null ? "Fin — début à " + hhmm(depuis) : "Choisir l'heure" })
       ]),
-      el("div", { class: "hz-legende", text: "Heure" }), heures,
-      el("div", { class: "hz-legende", text: "Minutes" }), minutes,
-      el("div", { class: "dp-pied" }, [
-        input.required ? el("span") : el("button", { type: "button", class: "dp-lien", text: "Effacer",
-          onclick: function () { dpPose(input, ""); dpFerme(true); } }),
-        el("button", { type: "button", class: "dp-lien", text: "Maintenant", onclick: function () {
-          h = maintenant.getHours(); m = Math.round(maintenant.getMinutes() / 5) * 5;
-          if (m === 60) { m = 0; h = (h + 1) % 24; }
-          dessine(); } }),
-        el("button", { type: "button", class: "btn btn-or hz-ok", text: "OK", onclick: valide })
+      raccourcis,
+      liste,
+      input.required ? null : el("div", { class: "dp-pied" }, [
+        el("button", { type: "button", class: "dp-lien", text: "Effacer", onclick: function () { dpPose(input, ""); dpFerme(true); } }),
+        el("span", { class: "hl-astuce", text: "ou tape l'heure dans le champ" })
       ])
     ]);
-    function interdit(hx, mx) {
-      if (depuis == null) return false;
-      return mx == null ? hx * 60 + 55 <= depuis : hx * 60 + mx <= depuis;
-    }
-    function valide() {
-      if (h == null) { dpFerme(true); return; }
-      if (m == null) m = 0;
-      dpPose(input, deuxChiffres(h) + ":" + deuxChiffres(m));
-      dpFerme(true);
-    }
-    function dessine() {
-      hh.textContent = h == null ? "--" : deuxChiffres(h);
-      mm.textContent = m == null ? "--" : deuxChiffres(m);
-      duree.textContent = depuis != null && h != null
-        ? (interdit(h, m == null ? 0 : m) ? "avant le début" : "durée " + dureeTexte(h * 60 + (m || 0) - depuis))
-        : (h != null ? "" : "");
-      vide(heures);
-      for (var i = 0; i < 24; i++) (function (x) {
-        heures.appendChild(el("button", { type: "button",
-          class: "hz-p" + (x < 7 || x > 19 ? " calme" : "") + (x === h ? " choisi" : "") + (x === hNow ? " maint" : ""),
-          disabled: interdit(x, null) ? true : null, text: deuxChiffres(x), "aria-label": x + " heures",
-          onclick: function () {
-            h = x;
-            if (m == null || interdit(h, m)) m = interdit(h, 0) ? Math.ceil(((depuis % 60) + 1) / 5) * 5 % 60 : 0;
-            dessine();
-            var b = minutes.querySelector(".choisi") || minutes.querySelector("button:not([disabled])");
-            if (b) b.focus();
-          } }));
-      })(i);
-      vide(minutes);
-      for (var k = 0; k < 60; k += 5) (function (x) {
-        minutes.appendChild(el("button", { type: "button",
-          class: "hz-p" + (x % 15 === 0 ? " quart" : "") + (x === m ? " choisi" : ""),
-          disabled: h != null && interdit(h, x) ? true : null, text: deuxChiffres(x), "aria-label": x + " minutes",
-          onclick: function () {
-            m = x;
-            if (h == null) h = depuis != null ? Math.min(23, Math.floor(depuis / 60) + 1) : Math.max(7, Math.min(19, hNow));
-            dessine();
-            valide();
-          } }));
-      })(k);
-    }
-    hh.addEventListener("click", function () { var b = heures.querySelector(".choisi") || heures.querySelector("button:not([disabled])"); if (b) b.focus(); });
-    mm.addEventListener("click", function () { var b = minutes.querySelector(".choisi") || minutes.querySelector("button:not([disabled])"); if (b) b.focus(); });
     boite.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); dpFerme(true); return; }
-      var grille = e.target.parentNode;
-      if (!grille || !grille.classList || !grille.classList.contains("hz-grille")) return;
-      var pas = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6 }[e.key];
-      if (!pas) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      var l = [].slice.call(liste.querySelectorAll(".hl-c")), i = l.indexOf(document.activeElement);
       e.preventDefault();
-      var l = [].slice.call(grille.children), i = l.indexOf(e.target) + pas;
-      while (i >= 0 && i < l.length && l[i].disabled) i += pas > 0 ? 1 : -1;
-      if (l[i]) l[i].focus();
+      var n = l[Math.max(0, Math.min(l.length - 1, i < 0 ? 0 : i + (e.key === "ArrowDown" ? 1 : -1)))];
+      if (n) { n.focus(); n.scrollIntoView({ block: "nearest" }); }
     });
 
     document.body.appendChild(boite);
-    dessine();
     dpPlace(boite, input);
+    // Le créneau choisi (ou utile) un peu sous le haut de la liste
+    if (cible) liste.scrollTop = Math.max(0, cible.offsetTop - liste.offsetTop - 44);
     var o = {
-      input: input, boite: boite,
+      input: input, boite: boite, focus: cible,
       dehors: function (e) { if (!boite.contains(e.target) && e.target !== input) dpFerme(false); },
       fermer: function () { dpFerme(false); },
       defile: function (e) { if (!boite.contains(e.target)) dpFerme(false); }
@@ -3097,7 +3080,10 @@
       if (e.altKey && e.key === "ArrowDown") {
         e.preventDefault();
         if (t.type === "time") ouvreHorloge(t); else ouvreCalendrier(t);
-        setTimeout(function () { var b = dpOuvert && dpOuvert.boite.querySelector('.dp-j[tabindex="0"], .hz-p.choisi, .hz-heures .hz-p:not([disabled])'); if (b) b.focus(); }, 0);
+        setTimeout(function () {
+          var b = dpOuvert && (dpOuvert.focus || dpOuvert.boite.querySelector('.dp-j[tabindex="0"]'));
+          if (b) b.focus({ preventScroll: true });
+        }, 0);
       } else if (e.key === "Escape" && dpOuvert && dpOuvert.input === t) { e.preventDefault(); e.stopPropagation(); dpFerme(false); }
       else if (e.key === "Tab" && dpOuvert) dpFerme(false);
     }, true);
