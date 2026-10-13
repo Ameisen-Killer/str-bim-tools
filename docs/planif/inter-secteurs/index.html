@@ -106,6 +106,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <p class="is-chapeau">L'avancement et la facturation de chaque phase du mandat, secteur par secteur. Un clic sur une affaire ouvre la saisie des pourcentages et leur historique.</p>
         </div>
         <div class="outils fa-outils">
+          <!-- Succursales et affaires : menus à cases (UI.multiChoix), avant le secteur (13.10.2026) -->
+          <span id="f-fa-succursale"></span>
+          <span id="f-fa-affaire"></span>
           <select id="f-secteur" class="btn" aria-label="Secteur"><option value="">Tous les secteurs</option></select>
           <label class="case"><input type="checkbox" id="f-terminees"> Voir les affaires terminées</label>
         </div>
@@ -477,9 +480,48 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      Secteur par secteur (= discipline du mandat), les affaires dont une phase
      le concerne ; pour chaque phase, la jauge d'avancement et celle du
      facturé de ce secteur. Un clic ouvre la saisie (mandat.js). */
+  /* Succursales et affaires de la facturation (13.10.2026) : menus à cases,
+     retenus sur cet appareil. Le menu des affaires suit les succursales
+     cochées ; « Non renseignée » (« _ ») dès qu'une affaire au mandat n'a pas
+     de succursale. Un menu n'est refait que si ses choix changent : il reste
+     ouvert pendant qu'on coche. */
+  var CLE_FACTU = "planif.facturation.filtres";
+  var factu = { succursales: [], affaires: [] };
+  try {
+    var lu = JSON.parse(localStorage.getItem(CLE_FACTU) || "{}") || {};
+    ["succursales", "affaires"].forEach(function (k) { if (Array.isArray(lu[k])) factu[k] = lu[k].map(String); });
+  } catch (e) {}
+  function retiensFactu() { try { localStorage.setItem(CLE_FACTU, JSON.stringify(factu)); } catch (e) {} }
+  var menusFactu = { succursales: { cle: null }, affaires: { cle: null } };
+
+  function menuFactu(nom, idHote, options, reglages) {
+    var m = menusFactu[nom], cle = JSON.stringify(options);
+    if (m.cle === cle) return;
+    m.cle = cle;
+    var f = UI.multiChoix({ libelle: "Filtrer : " + reglages.pluriel, tous: reglages.tous, pluriel: reglages.pluriel,
+      options: options, valeurs: factu[nom], large: reglages.large,
+      surChange: function (v) { factu[nom] = v; retiensFactu(); rend(); } });
+    factu[nom] = f.valeurs();
+    var hote = UI.vide(document.getElementById(idHote));
+    hote.appendChild(f.noeud);
+    hote.style.display = options.length > 1 ? "" : "none";
+  }
+
+  function dansSuccursalesFactu(a) {
+    return !factu.succursales.length || factu.succursales.indexOf(a.succursale || "_") >= 0;
+  }
+
   function listeFacturation() {
     var hote = UI.vide(document.getElementById("liste-facturation"));
-    var affaires = D.affaires({ tous: filtres.terminees }).filter(function (a) { return D.phasesMandat(a).length; });
+    var auMandat = D.affaires({ tous: filtres.terminees }).filter(function (a) { return D.phasesMandat(a).length; });
+
+    var optSucc = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
+    if (auMandat.some(function (a) { return !a.succursale; })) optSucc.push({ valeur: "_", label: "Non renseignée" });
+    menuFactu("succursales", "f-fa-succursale", optSucc, { tous: "Toutes les succursales", pluriel: "succursales" });
+    var dansSucc = auMandat.filter(dansSuccursalesFactu);
+    menuFactu("affaires", "f-fa-affaire", dansSucc.map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }),
+      { tous: "Toutes les affaires", pluriel: "affaires", large: true });
+    var affaires = dansSucc.filter(function (a) { return !factu.affaires.length || factu.affaires.indexOf(a.id) >= 0; });
     var parSecteur = {};
     affaires.forEach(function (a) {
       D.phasesMandat(a).forEach(function (p) {
@@ -499,7 +541,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     codes.forEach(function (c) { choix.appendChild(el("option", { value: c, text: nomSecteur(c) })); });
     choix.value = filtres.secteur;
 
-    if (!codes.length) {
+    if (!codes.length && auMandat.length) {
+      hote.appendChild(el("p", { class: "vide", text: "Aucune affaire au mandat dans les succursales choisies." }));
+    } else if (!codes.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire n'a encore de mandat décrit. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
     }
     codes.filter(function (c) { return !filtres.secteur || c === filtres.secteur; }).forEach(function (code) {
@@ -556,7 +600,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     // Les affaires en cours dont le mandat n'est pas encore décrit
-    var sans = D.affaires().filter(function (a) { return a.phase !== "AO" && !D.phasesMandat(a).length; });
+    var sans = D.affaires().filter(function (a) { return a.phase !== "AO" && !D.phasesMandat(a).length && dansSuccursalesFactu(a); });
     if (sans.length) {
       var vers = D.pagePermise("affaires");
       hote.appendChild(el("details", { class: "fa-sans" }, [
