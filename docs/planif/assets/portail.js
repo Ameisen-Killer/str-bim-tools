@@ -198,6 +198,12 @@
     document.addEventListener("click", function (e) { if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !menu.hidden) { ouvre(false); bouton.focus(); } });
 
+    // Dashboard IA (13.10.2026, demande de Tony) : annoncé, pas encore ouvert
+    var ia = el("button", { type: "button", class: "ab-ia", "aria-haspopup": "dialog", onclick: function () { fenetreIA(m); } }, [
+      svg("0 0 24 24", '<path d="M10 3.5l1.6 4.4 4.4 1.6-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6zM18 13l.9 2.1 2.1.9-2.1.9L18 19l-.9-2.1-2.1-.9 2.1-.9z"/>', "ab-ia-etincelle"),
+      el("span", { class: "ab-ia-lib", text: "Dashboard IA" }),
+      svg("0 0 24 24", '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', "ab-ia-sortie")
+    ]);
     var date = el("div", { class: "ab-date", text: dateDuJour() });
     setInterval(function () { date.textContent = dateDuJour(); }, 60000);
 
@@ -207,7 +213,7 @@
     vide(hote);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
-      el("div", { class: "ab-qui" }, [date, el("div", { class: "ab-moi" }, [bouton, menu])])
+      el("div", { class: "ab-qui" }, [ia, date, el("div", { class: "ab-moi" }, [bouton, menu])])
     ]));
     [].forEach.call(hote.querySelectorAll("img"), function (n) {
       for (var i = 0; i < images.length; i++) {
@@ -215,6 +221,40 @@
       }
     });
     return id;
+  }
+
+  /* Fenêtre volante du Dashboard IA : « À venir », sous le logo de la marque
+     (le bureau ; STR Bim Tools en démonstration, où rien ne rappelle le
+     bureau). Échap, la croix ou un clic à côté la ferment. */
+  function fenetreIA(marque) {
+    var avant = document.activeElement;
+    var fermer = el("button", { type: "button", class: "ab-fen-fermer", "aria-label": "Fermer", text: "×" });
+    var logo = marque === "ab"
+      ? el("img", { class: "ab-fen-logo", src: "/planif/assets/logo-ab.svg?v=1", alt: "", width: "150", height: "200" })
+      : el("span", { class: "marque-str ab-logo-str ab-fen-str" }, [
+          svg("0 0 100 100", LOGO_STR),
+          el("span", { class: "marque-mots" }, [el("b", { text: "STR Bim Tools" }), el("span", { text: "Planification" })])
+        ]);
+    var boite = el("div", { class: "ab-fen", role: "dialog", "aria-modal": "true", "aria-labelledby": "ab-fen-titre" }, [
+      fermer, logo,
+      el("h2", { id: "ab-fen-titre", class: "ab-fen-titre" }, [
+        svg("0 0 24 24", '<path d="M10 3.5l1.6 4.4 4.4 1.6-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6zM18 13l.9 2.1 2.1.9-2.1.9L18 19l-.9-2.1-2.1-.9 2.1-.9z"/>', "ab-ia-etincelle"),
+        "Dashboard IA"
+      ]),
+      el("p", { class: "ab-fen-avenir", text: "À venir" })
+    ]);
+    var voile = el("div", { class: "ab-voile" }, [boite]);
+    function ferme() {
+      document.removeEventListener("keydown", touche);
+      voile.remove();
+      if (avant && avant.focus) avant.focus();
+    }
+    function touche(e) { if (e.key === "Escape") ferme(); }
+    fermer.addEventListener("click", ferme);
+    voile.addEventListener("click", function (e) { if (e.target === voile) ferme(); });
+    document.addEventListener("keydown", touche);
+    document.body.appendChild(voile);
+    fermer.focus();
   }
 
   /* En-tête de l'accueil d'emblée (13.10.2026, demande de Tony) : logo, date,
