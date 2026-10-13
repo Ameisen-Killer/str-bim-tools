@@ -106,10 +106,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <p class="is-chapeau">L'avancement et la facturation de chaque phase du mandat, secteur par secteur. Un clic sur une affaire ouvre la saisie des pourcentages et leur historique.</p>
         </div>
         <div class="outils fa-outils">
-          <!-- Succursales et affaires : menus à cases (UI.multiChoix), avant le secteur (13.10.2026) -->
+          <!-- Succursales, affaires, secteurs : menus à cases (UI.multiChoix, 13.10.2026) -->
           <span id="f-fa-succursale"></span>
           <span id="f-fa-affaire"></span>
-          <select id="f-secteur" class="btn" aria-label="Secteur"><option value="">Tous les secteurs</option></select>
+          <span id="f-fa-secteur"></span>
           <label class="case"><input type="checkbox" id="f-terminees"> Voir les affaires terminées</label>
         </div>
       </div>
@@ -142,13 +142,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
-<script src="/planif/assets/mandat.js?v=2"></script>
+<script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
   var JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
-  var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle", secteur: "", terminees: false };
+  var filtres = { resultat: "en_cours", type: "", passes: false, veille: "nouvelle", terminees: false };
   /* La page affichée (?vue=, 13.10.2026) : sa clé de droit (donnees.js,
      DROIT_PAGE) et la section qu'elle montre. Les AO publics et privés
      partagent la section « ao », leur type en plus. */
@@ -178,7 +178,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (location.hash === "#veille") setTimeout(function () { document.getElementById("veille").scrollIntoView(); }, 50);
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
-    document.getElementById("f-secteur").addEventListener("change", function () { filtres.secteur = this.value; rend(); });
     document.getElementById("f-terminees").addEventListener("change", function () { filtres.terminees = this.checked; rend(); });
     if (VUE.type) document.getElementById("chapeau-ao").textContent = VUE.type === "public"
       ? "Les appels d'offres publics (marchés publics, souvent repris de la veille simap.ch) : remise, demandeur, honoraires offerts, résultat."
@@ -486,13 +485,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      de succursale. Un menu n'est refait que si ses choix changent : il reste
      ouvert pendant qu'on coche. */
   var CLE_FACTU = "planif.facturation.filtres";
-  var factu = { succursales: [], affaires: [] };
+  var factu = { succursales: [], affaires: [], secteurs: [] };
   try {
     var lu = JSON.parse(localStorage.getItem(CLE_FACTU) || "{}") || {};
-    ["succursales", "affaires"].forEach(function (k) { if (Array.isArray(lu[k])) factu[k] = lu[k].map(String); });
+    ["succursales", "affaires", "secteurs"].forEach(function (k) { if (Array.isArray(lu[k])) factu[k] = lu[k].map(String); });
   } catch (e) {}
   function retiensFactu() { try { localStorage.setItem(CLE_FACTU, JSON.stringify(factu)); } catch (e) {} }
-  var menusFactu = { succursales: { cle: null }, affaires: { cle: null } };
+  var menusFactu = { succursales: { cle: null }, affaires: { cle: null }, secteurs: { cle: null } };
 
   function menuFactu(nom, idHote, options, reglages) {
     var m = menusFactu[nom], cle = JSON.stringify(options);
@@ -533,20 +532,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
     var codes = D.rangeDisciplines(Object.keys(parSecteur));
 
-    // Le choix du secteur suit les secteurs présents
-    var choix = document.getElementById("f-secteur");
-    if (filtres.secteur && codes.indexOf(filtres.secteur) < 0) filtres.secteur = "";
-    UI.vide(choix);
-    choix.appendChild(el("option", { value: "", text: "Tous les secteurs" }));
-    codes.forEach(function (c) { choix.appendChild(el("option", { value: c, text: nomSecteur(c) })); });
-    choix.value = filtres.secteur;
+    // Le choix des secteurs suit les secteurs présents
+    menuFactu("secteurs", "f-fa-secteur", codes.map(function (c) { return { valeur: c, label: nomSecteur(c) }; }),
+      { tous: "Tous les secteurs", pluriel: "secteurs" });
 
     if (!codes.length && auMandat.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire au mandat dans les succursales choisies." }));
     } else if (!codes.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire n'a encore de mandat décrit. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
     }
-    codes.filter(function (c) { return !filtres.secteur || c === filtres.secteur; }).forEach(function (code) {
+    codes.filter(function (c) { return !factu.secteurs.length || factu.secteurs.indexOf(c) >= 0; }).forEach(function (code) {
       var lignes = Object.keys(parSecteur[code]).map(function (k) { return parSecteur[code][k]; })
         .sort(function (x, y) { return (x.a.code || "~").localeCompare(y.a.code || "~", "fr", { numeric: true }) || x.a.nom.localeCompare(y.a.nom, "fr"); });
       var nPhases = 0, sAv = 0, sFa = 0, aFacturer = 0, dAvance = 0;

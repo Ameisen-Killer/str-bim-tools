@@ -109,9 +109,20 @@
     var corps = el("div", { class: "mj-saisie" });
     var titre = { surtitre: voitFact ? "Avancement et facturation" : "Avancement du mandat", titre: D.libelleAffaire(a) };
 
+    /* En bas à gauche, vers le détail de l'affaire (13.10.2026, demande de Tony) :
+       sa fiche dans la page Affaires — opts.detail l'ouvre sur place quand on y
+       est déjà —, ou ses tâches pour qui n'a pas la page Affaires. */
+    function boutonDetail() {
+      if (opts.detail) return { label: "Détail de l'affaire", gauche: true, action: function () { setTimeout(opts.detail, 0); } };
+      var vers = D.pagePermise && !D.pagePermise("affaires")
+        ? { label: "Tâches de l'affaire", href: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" }
+        : { label: "Détail de l'affaire", href: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) };
+      return { label: vers.label, gauche: true, action: function () { location.href = vers.href; return false; } };
+    }
+
     if (!phases.length) {
       corps.appendChild(el("p", { class: "vide", text: "Aucune phase au mandat de cette affaire. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
-      UI.ouvre({ surtitre: titre.surtitre, titre: titre.titre, corps: corps, compacte: true, boutons: [{ label: "Fermer" }] });
+      UI.ouvre({ surtitre: titre.surtitre, titre: titre.titre, corps: corps, compacte: true, boutons: [boutonDetail(), { label: "Fermer" }] });
       return;
     }
 
@@ -181,6 +192,7 @@
     UI.ouvre({
       surtitre: titre.surtitre, titre: titre.titre, corps: corps,
       boutons: peutQuelqueChose ? [
+        boutonDetail(),
         { label: "Annuler" },
         { label: "Enregistrer", or: true, entree: true, action: function () {
           var items = [], faux = null;
@@ -197,7 +209,7 @@
             if (opts.surEnregistrement) opts.surEnregistrement();
           }).catch(function (e) { UI.toast(e.message); return false; });
         } }
-      ] : [{ label: "Fermer" }]
+      ] : [boutonDetail(), { label: "Fermer" }]
     });
   }
 

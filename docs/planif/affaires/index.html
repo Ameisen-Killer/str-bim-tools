@@ -74,7 +74,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
-<script src="/planif/assets/mandat.js?v=2"></script>
+<script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
   "use strict";
@@ -112,6 +112,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
     D.surRechargement(function () { if (optionsSuccursales().length !== nbOptSucc) rendSuccursales(); dessine(); });
     dessine();
+
+    /* « Détail de l'affaire » (fenêtre d'avancement, 13.10.2026) : ?affaire=<id>
+       ouvre sa fiche ; la recherche (?q=) l'isole dans la liste derrière. */
+    var url = new URL(location.href), demandee = D.affaire(url.searchParams.get("affaire") || "");
+    if (url.searchParams.has("affaire")) {
+      url.searchParams.delete("affaire");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+    if (demandee) {
+      if (demandee.statut === "terminee") { document.getElementById("voir-terminees").checked = true; dessine(); }
+      formulaire(demandee.id);
+    }
   }).catch(UI.echec);
 
   /* Le choix des succursales : celles du bureau, plus « Non renseignée » (« _ »,
@@ -265,7 +277,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           // Avancement (et facturation, pour qui la voit) des phases du mandat
           D.phasesMandat(a).length
             ? UI.boutonIcone("avancement", D.voitFacturation() ? "Avancement et facturation" : "Avancement", D.libelleAffaire(a),
-                function () { Mandat.saisie(a.id, { surEnregistrement: dessine }); })
+                function () { Mandat.saisie(a.id, { surEnregistrement: dessine, detail: function () { formulaire(a.id); } }); })
             : null,
           UI.boutonIcone("modifier", "Modifier", D.libelleAffaire(a), function () { formulaire(a.id); }),
           // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
