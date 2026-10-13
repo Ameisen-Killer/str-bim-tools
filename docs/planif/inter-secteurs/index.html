@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
 <link rel="stylesheet" href="/planif/assets/inter.css?v=6">
-<link rel="stylesheet" href="/planif/assets/mandat.css?v=2">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=3">
 </head>
 <body class="large">
 
@@ -499,26 +499,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     codes.filter(function (c) { return !factu.secteurs.length || factu.secteurs.indexOf(c) >= 0; }).forEach(function (code) {
       var lignes = Object.keys(parSecteur[code]).map(function (k) { return parSecteur[code][k]; })
         .sort(function (x, y) { return (x.a.code || "~").localeCompare(y.a.code || "~", "fr", { numeric: true }) || x.a.nom.localeCompare(y.a.nom, "fr"); });
-      var nPhases = 0, sAv = 0, sFa = 0, aFacturer = 0, dAvance = 0;
+      var nPhases = 0, aFacturer = 0, dAvance = 0;
       lignes.forEach(function (x) {
         x.phases.forEach(function (p) {
           var av = D.valeurMandat(x.a.id, p, code, "avancement"), fa = D.valeurMandat(x.a.id, p, code, "facturation");
-          nPhases++; sAv += av; sFa += fa;
+          nPhases++;
           if (av > fa) aFacturer++;
           if (fa > av) dAvance++;
         });
       });
-      var moyAv = Math.round(sAv / nPhases), moyFa = Math.round(sFa / nPhases);
       var bloc = el("section", { class: "fa-secteur", "aria-label": nomSecteur(code) });
       bloc.appendChild(el("div", { class: "fa-secteur-tete" }, [
         el("div", { class: "fa-secteur-nom" }, [
           el("span", { class: "etiq fa-sigle", text: D.sigleDiscipline(code) }),
           el("h3", { text: nomSecteur(code) }),
           el("span", { class: "fa-secteur-compte", text: lignes.length + (lignes.length > 1 ? " affaires · " : " affaire · ") + nPhases + (nPhases > 1 ? " phases" : " phase") })
-        ]),
-        el("div", { class: "fa-secteur-moy", title: "Moyenne des phases du secteur" }, [
-          Mandat.jauge(moyAv, "avancement"),
-          Mandat.jauge(moyFa, "facturation", { alerte: moyFa > moyAv })
         ]),
         aFacturer || dAvance ? el("div", { class: "fa-signaux" }, [
           aFacturer ? el("span", { class: "etiq fa-signal", text: aFacturer + (aFacturer > 1 ? " phases avancées au-delà du facturé" : " phase avancée au-delà du facturé") }) : null,

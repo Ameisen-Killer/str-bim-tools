@@ -89,7 +89,6 @@
 .fa-secteur-nom h3{margin:0;font-size:17px}
 .fa-sigle{border-color:transparent;background:var(--m-pale);color:var(--or);font-weight:700}
 .fa-secteur-compte{font-size:13px;color:var(--texte-faible)}
-.fa-secteur-moy{display:flex;flex-direction:column;gap:4px;width:min(300px,100%)}
 .fa-signaux{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .fa-signal{font-size:12px;border-color:transparent;background:#EAF1F8;color:var(--bleu)}
 .fa-signal.alerte{background:#FBE4E2;color:var(--alerte)}
