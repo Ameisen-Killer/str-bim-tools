@@ -407,6 +407,21 @@ table.liste tr.groupe-taches:hover td,table.liste tr.groupe-vide:hover td{backgr
 .groupe-taches .compte{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
 .groupe-taches.actuelle h3{color:var(--or)}
 .groupe-taches.retard h3{color:var(--alerte)}
+/* Tâches rangées par affaire (13.10.2026) : l'affaire en sous-titre dans la semaine,
+   elle ne se répète plus sous chaque libellé */
+table.liste tr.groupe-affaire td{padding:18px 0 6px;border-bottom:1px solid rgba(var(--encre),.07)}
+table.liste tr.groupe-taches + tr.groupe-affaire td{padding-top:12px}
+table.liste tr.groupe-affaire:hover td{background:none}
+.groupe-affaire .ga{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:15px;color:var(--texte)}
+.groupe-affaire .ga .pastille{align-self:center}
+.groupe-affaire .ga .num{font-family:var(--mono);font-size:12px;letter-spacing:.08em;white-space:nowrap}
+.groupe-affaire .compte{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+table.liste.par-affaire .affaire-ligne{display:none!important}
+/* Les deux boutons de rangement, accolés */
+.vue-taches{display:flex;flex-wrap:wrap;margin-top:14px}
+.vue-taches .btn + .btn{margin-left:-1px}
+.vue-taches .btn[aria-pressed="true"]{position:relative;color:var(--or);border-color:rgba(var(--or-rvb),.6);background:rgba(var(--or-rvb),.08)}
+.tete-collante.collee .vue-taches{margin-top:10px}
 table.liste tr.groupe-vide td{padding:14px 0}
 
 /* terminer une tâche d'un clic */

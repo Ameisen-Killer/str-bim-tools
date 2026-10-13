@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=96">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=97">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 <style>
 .imp-periode{display:none}
@@ -73,6 +73,13 @@
   #liste .groupe-taches h3{display:inline-flex;gap:0 8px;font-size:9pt;font-weight:600;margin:0}
   #liste .groupe-taches .compte{font-size:6pt;letter-spacing:.06em}
   #liste table.liste tr.groupe-vide td{padding:2pt 0;font-size:6.5pt}
+  /* Par affaire : l'affaire en sous-titre, une ligne */
+  #liste table.liste tr.groupe-affaire td{padding:3pt 0 1pt}
+  #liste tr.groupe-affaire{break-after:avoid}
+  #liste .groupe-affaire .ga{font-size:7.5pt;gap:5px}
+  #liste .groupe-affaire .ga .num{font-size:6.5pt}
+  #liste .groupe-affaire .ga .pastille{width:5px;height:5px}
+  #liste .groupe-affaire .compte{font-size:6pt;letter-spacing:.04em}
 }
 </style>
 </head>
@@ -115,6 +122,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <span>Filtres</span><span id="nb-filtres" class="or"></span>
         </button>
         <div class="grille-champs" id="filtres" style="max-width:1100px"></div>
+        <!-- Deux rangements, toujours par semaine (13.10.2026, demande de Tony) -->
+        <div class="vue-taches" role="group" aria-label="Rangement de la liste">
+          <button class="btn" type="button" data-vue="echeance" aria-pressed="true">Par échéance</button>
+          <button class="btn" type="button" data-vue="affaire" aria-pressed="false">Par affaire</button>
+        </div>
       </div>
       <!-- Téléphone seulement : la barre du haut y cache ses actions -->
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
@@ -141,6 +153,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var filtres = { affaire: "", membre: "", statut: "", masqueTerminees: true };
+  /* Rangement : « echeance » (chronologie des échéances, comme avant) ou
+     « affaire » (les tâches d'une même affaire ensemble, puis par échéance),
+     dans chaque semaine. Retenu sur cet appareil. */
+  var vue = "echeance";
+  try { if (localStorage.getItem("planif.taches.vue") === "affaire") vue = "affaire"; } catch (e) {}
   var barre = null;                                 // recherche instantanée
   var suivi = UI.suiviApparitions();
 
@@ -150,6 +167,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var p = new URLSearchParams(location.search);
     if (p.get("affaire")) filtres.affaire = p.get("affaire");
     if (p.get("membre")) filtres.membre = p.get("membre");
+    if (p.get("vue") === "affaire" || p.get("vue") === "echeance") vue = p.get("vue");
     // Ouverte depuis le menu, sans consigne : chacun voit d'abord ses propres tâches.
     // « ?membre= » vide, ou un lien qui vise une affaire, laissent la vue sur toute l'équipe.
     else if (!p.has("membre") && !filtres.affaire) {
@@ -183,6 +201,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     rendFiltres();
+    [].forEach.call(document.querySelectorAll(".vue-taches [data-vue]"), function (b) {
+      b.addEventListener("click", function () {
+        if (vue === b.getAttribute("data-vue")) return;
+        vue = b.getAttribute("data-vue");
+        try { localStorage.setItem("planif.taches.vue", vue); } catch (e) {}
+        dessine();
+      });
+    });
     D.surRechargement(dessine);
     dessine();
 
@@ -285,6 +311,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function dessine() {
     var taches = selection();
     var mots = barre ? barre.termes() : [];
+    var parAffaire = vue === "affaire";
+    [].forEach.call(document.querySelectorAll(".vue-taches [data-vue]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-vue") === vue));
+    });
     var hote = document.getElementById("liste");
     if (affichage) affichage.fin();
     // Les lignes glissent vers leur nouvelle place (UI.joue, en fin de rendu)
@@ -310,6 +340,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (filtres.masqueTerminees) restreint.push("Terminées masquées");
     var cherche = barre && barre.valeur().trim();
     if (cherche) restreint.push("« " + cherche + " »");
+    if (parAffaire) restreint.push("Par affaire");
     document.getElementById("imp-filtres").textContent = restreint.length ? restreint.join("  ·  ") : "Toutes les tâches";
     document.getElementById("imp-edition").textContent =
       taches.length + (taches.length > 1 ? " tâches" : " tâche") + "  ·  " + C.fmtJours(charge) +
@@ -335,16 +366,32 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       return { t: t, i: i, debut: debut, groupe: groupe };
     });
     function rang(g) { return g === "retard" ? 0 : g === "passe" ? 2 : 1; }
+    /* Par affaire : dans chaque semaine, les affaires par numéro (puis nom),
+       les tâches sans affaire à la fin ; l'ordre des échéances ensuite, celui
+       de la liste (x.i). */
+    var cleAffaire = {};
+    function cleDe(id) {
+      if (id in cleAffaire) return cleAffaire[id];
+      var a = id && D.affaire(id);
+      return (cleAffaire[id] = a ? "0" + (a.code || "~") + " " + (a.nom || "") : "1");
+    }
     infos.sort(function (x, y) {
-      return rang(x.groupe) - rang(y.groupe) || (x.groupe < y.groupe ? -1 : x.groupe > y.groupe ? 1 : 0) || x.i - y.i;
+      return rang(x.groupe) - rang(y.groupe) || (x.groupe < y.groupe ? -1 : x.groupe > y.groupe ? 1 : 0) ||
+        (parAffaire ? cleDe(x.t.affaireId).localeCompare(cleDe(y.t.affaireId), "fr", { numeric: true }) ||
+                      (x.t.affaireId || "").localeCompare(y.t.affaireId || "") : 0) ||
+        x.i - y.i;
     });
-    var bilans = {};
+    var bilans = {}, bilansAffaire = {};
     infos.forEach(function (o) {
       var b = bilans[o.groupe] || (bilans[o.groupe] = { n: 0, charge: 0 });
       b.n++; b.charge += Calc.chargeTotale(o.t);
+      if (!parAffaire) return;
+      var k = o.groupe + "|" + (o.t.affaireId || "");
+      var ba = bilansAffaire[k] || (bilansAffaire[k] = { n: 0, charge: 0 });
+      ba.n++; ba.charge += Calc.chargeTotale(o.t);
     });
 
-    hote.appendChild(el("table", { class: "liste", style: "min-width:900px" }, [
+    hote.appendChild(el("table", { class: "liste" + (parAffaire ? " par-affaire" : ""), style: "min-width:900px" }, [
       el("thead", {}, [el("tr", {}, [
         el("th", { text: "Tâche" }),
         el("th", { text: "Affectations" }),
@@ -357,7 +404,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     ]));
 
     // La semaine en cours s'affiche toujours, même vide, sauf pendant une recherche
-    var semaineVue = !!mots.length || !!bilans[lundi], groupeCourant = null;
+    var semaineVue = !!mots.length || !!bilans[lundi], groupeCourant = null, affaireCourante = null;
 
     // 150 lignes tout de suite, la suite en approchant du bas de la page
     affichage = UI.paquets({ elements: infos, taille: 150, hote: hote, ajoute: function (o) {
@@ -370,7 +417,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           ]));
         }
         groupeCourant = o.groupe;
+        affaireCourante = null;
         corps.appendChild(titreGroupe(o.groupe, bilans[o.groupe]));
+      }
+      if (parAffaire && (o.t.affaireId || "") !== affaireCourante) {
+        affaireCourante = o.t.affaireId || "";
+        corps.appendChild(titreAffaire(o.groupe, affaireCourante, bilansAffaire[o.groupe + "|" + affaireCourante]));
       }
       corps.appendChild(ligne(o.t, o.debut));
     } });
@@ -391,6 +443,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           el("div", { class: "num-section", text: sous }),
           el("h3", {}, [
             titre,
+            el("span", { class: "compte", text: b.n + (b.n > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(b.charge) + " j" })
+          ])
+        ])
+      ]);
+    }
+
+    /* Sous-titre d'affaire, dans une semaine : numéro dans sa teinte, nom, bilan */
+    function titreAffaire(g, id, b) {
+      var a = id ? D.affaire(id) : null, teinte = UI.teinte(a ? a.teinte : 1);
+      return el("tr", { class: "groupe-affaire", "data-anim": "ga|" + g + "|" + id }, [
+        el("td", { colspan: "6" }, [
+          el("div", { class: "ga", style: "--tt:" + teinte }, [
+            a ? el("span", { class: "pastille", style: "color:" + teinte, "aria-hidden": "true" }) : null,
+            a ? el("span", { class: "num", style: "color:" + teinte }, [UI.surligne(a.code || "—", mots)]) : null,
+            el("span", { class: "nom" }, [a ? UI.surligne(a.nom || "", mots) : "Sans affaire"]),
             el("span", { class: "compte", text: b.n + (b.n > 1 ? " tâches" : " tâche") + " · " + C.fmtJours(b.charge) + " j" })
           ])
         ])
