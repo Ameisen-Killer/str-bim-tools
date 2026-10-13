@@ -69,9 +69,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="14" selected>2 semaines</option>
           <option value="28">4 semaines</option>
         </select>
-        <span id="f-affaire"></span>
-        <!-- Affaires, succursales, secteurs, fonctions, membres : menus à cases (UI.multiChoix), plusieurs choix -->
+        <!-- Succursales, affaires, secteurs, fonctions, membres : menus à cases (UI.multiChoix), plusieurs choix -->
         <span id="f-succursale"></span>
+        <span id="f-affaire"></span>
         <span id="f-secteur"></span>
         <span id="f-cote"></span>
         <span id="f-membre"></span>
@@ -211,28 +211,34 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       mesAffaires = Object.create(null);
       D.taches({ sansTerminees: false }).forEach(function (t) { if (mien.taches[t.id]) mesAffaires[t.affaireId] = true; });
     }
-    var optAffaires = D.affaires({ tous: true }).filter(function (a) { return !mesAffaires || mesAffaires[a.id]; })
-      .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
-    filtres.affaires = UI.multiChoix({ libelle: "Filtrer : affaires", tous: mien ? "Toutes mes affaires" : "Toutes les affaires",
-      pluriel: "affaires", options: optAffaires, valeurs: vue.affaires, large: true,
-      surChange: function (v) { vue.affaires = v; memorise(); rend(); } });
-    vue.affaires = filtres.affaires.valeurs();
-    UI.vide(document.getElementById("f-affaire")).appendChild(filtres.affaires.noeud);
+    /* Le menu des affaires : seulement celles des succursales cochées (13.10.2026,
+       demande de Tony) ; une affaire cochée qui en sort est décochée. */
+    function rendAffaires() {
+      var optAffaires = D.affaires({ tous: true }).filter(function (a) {
+        return (!mesAffaires || mesAffaires[a.id]) && (!vue.succursales.length || vue.succursales.indexOf(a.succursale) >= 0);
+      }).map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
+      filtres.affaires = UI.multiChoix({ libelle: "Filtrer : affaires", tous: mien ? "Toutes mes affaires" : "Toutes les affaires",
+        pluriel: "affaires", options: optAffaires, valeurs: vue.affaires, large: true,
+        surChange: function (v) { vue.affaires = v; memorise(); rend(); } });
+      vue.affaires = filtres.affaires.valeurs();
+      UI.vide(document.getElementById("f-affaire")).appendChild(filtres.affaires.noeud);
+    }
 
     /* Succursales, secteurs et fonctions (13.10.2026, demande de Tony) : des
        menus à cases, plusieurs choix possibles, rien de coché = tout. Un menu
        sans choix possible (une seule succursale) disparaît. */
-    function filtreCases(id, cle, tous, pluriel, liste) {
+    function filtreCases(id, cle, tous, pluriel, liste, apres) {
       var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
       var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
-        surChange: function (v) { vue[cle] = v; memorise(); rend(); } });
+        surChange: function (v) { vue[cle] = v; if (apres) apres(); memorise(); rend(); } });
       vue[cle] = f.valeurs();
       var hote = document.getElementById(id);
       UI.vide(hote).appendChild(f.noeud);
       hote.style.display = options.length > 1 ? "" : "none";
       return f;
     }
-    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES);
+    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES, rendAffaires);
+    rendAffaires();
     filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
     filtres.cotes = filtreCases("f-cote", "cotes", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
 
