@@ -296,7 +296,6 @@
     inter: "page_inter", transversales: "page_transversales"
   };
   poseGroupes(null);
-  var DROITS_EN_ATTENTE = ["voir_conges_equipe", "voir_absences_avenir"];
 
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
      l'outil comme chacun le verra. Retenu sur ce navigateur ; par défaut
@@ -1261,8 +1260,6 @@
       var p = profilVu();
       if (!p) return true;                            // profil pas encore lu
       if (p.superAdmin) return true;
-      // Droit ajouté le 13.10.2026 qu'aucun groupe ne connaît encore (migration-droits-vues.sql pas encore passée) : comme avant, pour tous
-      if (DROITS_EN_ATTENTE.indexOf(code) >= 0 && !GROUPES.some(function (g) { return g.droits.indexOf(code) >= 0; })) return true;
       return (p.droits || []).indexOf(code) >= 0;
     },
 
