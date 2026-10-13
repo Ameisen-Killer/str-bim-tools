@@ -88,7 +88,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=112"></script>
+<script src="/planif/assets/ui.js?v=113"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -164,10 +164,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     hz.addEventListener("change", function () { vue.semaines = +hz.value; memorise(); rend(); });
     /* Succursales, secteurs et fonctions : plusieurs choix, rien de coché =
        tout ; un menu sans choix possible (une seule succursale) disparaît. */
-    function filtreCases(id, cle, tous, pluriel, liste, toutCoche) {
+    function filtreCases(id, cle, tous, pluriel, liste) {
       var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
       var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
-        toutCoche: toutCoche,
         surChange: function (v) { vue[cle] = v; memorise(); rend(); } });
       vue[cle] = f.valeurs();
       var hote = document.getElementById(id);
@@ -175,9 +174,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       hote.style.display = options.length > 1 ? "" : "none";
       return f;
     }
-    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES, true);
-    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES, true);
-    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" }, true);
+    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES);
+    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
+    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
 
     remplitAffaires();
 

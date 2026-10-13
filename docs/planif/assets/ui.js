@@ -2702,9 +2702,9 @@
      coché = tout. Une option peut porter un « groupe » (intertitre) ; au-delà
      de dix options, un champ de recherche filtre la liste.
        multiChoix({ libelle, tous, pluriel, options:[{valeur,label,groupe}], valeurs:[], surChange(valeurs) })
-     o.toutCoche (13.10.2026, succursales) : « tout » s'affiche toutes cases
-     cochées ; on décoche ce qu'on ne veut pas voir, la dernière case cochée
-     ne se décoche pas, et tout cocher revient à « tout » (rien de retenu).
+     Tous les menus (13.10.2026, demande de Tony) : « tout » s'affiche toutes
+     cases cochées ; on décoche ce qu'on ne veut pas voir, la dernière case
+     cochée ne se décoche pas, et tout cocher revient à « tout » (rien de retenu).
      Partout (13.10.2026, demande de Tony) : la case coche ou décoche, un clic
      sur l'intitulé n'affiche que ce choix.
      Renvoie { noeud, valeurs(), pose(valeurs) }. */
@@ -2740,10 +2740,10 @@
       }
       var c = el("input", { type: "checkbox", value: x.valeur });
       c.addEventListener("change", function () {
-        var base = o.toutCoche && !choisis.length ? o.options.map(function (y) { return y.valeur; }) : choisis;
+        var base = !choisis.length ? o.options.map(function (y) { return y.valeur; }) : choisis;
         base = c.checked ? base.filter(function (v) { return v !== x.valeur; }).concat([x.valeur]) : base.filter(function (v) { return v !== x.valeur; });
-        if (o.toutCoche && !base.length) { c.checked = true; return; }   // au moins une case
-        choisis = o.toutCoche && base.length >= o.options.length ? [] : base;
+        if (!base.length) { c.checked = true; return; }   // au moins une case
+        choisis = base.length >= o.options.length ? [] : base;
         maj(true);
       });
       var ligne = el("label", { class: "mc-option", title: x.label, dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]);
@@ -2769,12 +2769,12 @@
     });
     function maj(prevenir) {
       choisis = choisis.filter(function (v) { return o.options.some(function (x) { return x.valeur === v; }); });
-      if (o.toutCoche && choisis.length >= o.options.length) choisis = [];
+      if (choisis.length >= o.options.length) choisis = [];
       texte.textContent = !choisis.length ? o.tous
         : choisis.length === 1 ? libelleDe(choisis[0])
         : choisis.length + " " + o.pluriel;
       bouton.classList.toggle("actif", choisis.length > 0);
-      cases.forEach(function (c) { c.checked = (o.toutCoche && !choisis.length) || choisis.indexOf(c.value) >= 0; });
+      cases.forEach(function (c) { c.checked = !choisis.length || choisis.indexOf(c.value) >= 0; });
       if (prevenir && o.surChange) o.surChange(choisis.slice());
     }
     function ouvre(oui) {

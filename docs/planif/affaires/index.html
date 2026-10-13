@@ -70,7 +70,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=112"></script>
+<script src="/planif/assets/ui.js?v=113"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -136,7 +136,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     nbOptSucc = options.length;
     fSucc = UI.multiChoix({
       libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: options, valeurs: succursales, toutCoche: true,
+      options: options, valeurs: succursales,
       surChange: function (v) { succursales = v; retiensSuccursales(v); dessine(); }
     });
     succursales = fSucc.valeurs();
