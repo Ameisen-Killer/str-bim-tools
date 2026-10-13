@@ -2783,6 +2783,133 @@
     };
   }
 
+  /* ------------------------------------------------ liste avec recherche
+     Pose une recherche sur un <select> existant (13.10.2026, demande de
+     Tony : membres et affaires de la page Tâches). Le select garde son
+     allure et sa valeur — le code qui l'écoute ne change pas — mais au clic
+     (ou flèche bas, Entrée, Espace, une lettre tapée) s'ouvre un panneau :
+     champ de recherche, puis les options, intertitres compris. On filtre en
+     tapant (sans accents, plusieurs mots), flèches pour choisir, Entrée pour
+     poser, Échap pour fermer. Sur téléphone, le sélecteur natif reste.
+       listeCherchable(select, { large })  */
+  function listeCherchable(select, o) {
+    o = o || {};
+    if (!select || select.dataset.cherchable) return;
+    try { if (global.matchMedia && !global.matchMedia("(hover: hover) and (pointer: fine)").matches) return; } catch (e) { return; }
+    select.dataset.cherchable = "1";
+    var hote = select.parentNode;
+    hote.classList.add("lc-hote");
+    var panneau = null, champ = null, liste = null, lignes = [], actif = -1;
+
+    function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+
+    function ouvre(texte) {
+      if (panneau) return;
+      champ = el("input", { type: "search", class: "lc-cherche", placeholder: "Chercher…", "aria-label": "Chercher dans la liste",
+        autocomplete: "off", spellcheck: "false" });
+      liste = el("div", { class: "lc-liste", role: "listbox" });
+      panneau = el("div", { class: "lc-panneau" + (o.large ? " lc-large" : "") }, [champ, liste]);
+      lignes = [];
+      [].forEach.call(select.children, function (n) {
+        if (n.tagName === "OPTGROUP") {
+          var t = el("div", { class: "lc-groupe", text: n.label });
+          liste.appendChild(t);
+          [].forEach.call(n.children, function (op) { ajoute(op, n.label, t); });
+        } else ajoute(n, "", null);
+      });
+      hote.appendChild(panneau);
+      if (panneau.getBoundingClientRect().right > global.innerWidth - 8) panneau.classList.add("a-droite");
+      champ.value = texte || "";
+      filtre();
+      var choisie = lignes.filter(function (l) { return l.op.value === select.value && !l.n.hidden; })[0];
+      active(choisie ? lignes.indexOf(choisie) : premiere(), true);
+      champ.focus();
+      champ.addEventListener("input", function () { filtre(); active(premiere(), true); });
+      champ.addEventListener("keydown", clavier);
+      document.addEventListener("pointerdown", dehors, true);
+    }
+    function ajoute(op, groupe, intertitre) {
+      var n = el("div", { class: "lc-option" + (op.value === select.value ? " choisie" : ""), role: "option", text: op.textContent,
+        title: op.textContent, "aria-selected": String(op.value === select.value) });
+      var l = { op: op, n: n, t: intertitre, texte: simplifie(op.textContent + " " + groupe) };
+      // pointerdown : le champ garde le focus, rien ne se ferme avant le choix
+      n.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+      n.addEventListener("click", function () { pose(l); });
+      n.addEventListener("pointermove", function () { var i = lignes.indexOf(l); if (i !== actif) active(i, false); });
+      lignes.push(l);
+      liste.appendChild(n);
+    }
+    function filtre() {
+      var mots = simplifie(champ.value).split(/\s+/).filter(Boolean), vus = [];
+      lignes.forEach(function (l) {
+        // « Toutes les affaires », « Toute l'équipe » : le premier choix reste à portée pendant une recherche
+        var ok = !mots.length || l.op.value === "" || mots.every(function (m) { return l.texte.indexOf(m) >= 0; });
+        l.n.hidden = !ok;
+        if (ok && l.t) vus.push(l.t);
+      });
+      [].forEach.call(liste.querySelectorAll(".lc-groupe"), function (t) { t.hidden = vus.indexOf(t) < 0; });
+      var rien = liste.querySelector(".lc-rien");
+      var aucun = mots.length && !lignes.some(function (l) { return !l.n.hidden && l.op.value !== ""; });
+      if (aucun && !rien) liste.appendChild(el("div", { class: "lc-rien", text: "Aucun résultat" }));
+      else if (!aucun && rien) rien.remove();
+    }
+    function premiere() {
+      var mots = champ.value.trim();
+      for (var i = 0; i < lignes.length; i++) if (!lignes[i].n.hidden && (!mots || lignes[i].op.value !== "")) return i;
+      return -1;
+    }
+    function active(i, defile) {
+      if (lignes[actif]) lignes[actif].n.classList.remove("actif");
+      actif = i;
+      if (!lignes[i]) return;
+      lignes[i].n.classList.add("actif");
+      if (defile) {
+        var n = lignes[i].n, h = liste.clientHeight;
+        if (n.offsetTop < liste.scrollTop) liste.scrollTop = n.offsetTop - 30;
+        else if (n.offsetTop + n.offsetHeight > liste.scrollTop + h) liste.scrollTop = n.offsetTop + n.offsetHeight - h + 6;
+      }
+    }
+    function bouge(pas) {
+      for (var i = actif + pas; i >= 0 && i < lignes.length; i += pas) if (!lignes[i].n.hidden) { active(i, true); return; }
+    }
+    function clavier(e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); bouge(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); bouge(-1); }
+      else if (e.key === "Enter") { e.preventDefault(); if (lignes[actif]) pose(lignes[actif]); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); ferme(true); }
+      else if (e.key === "Tab") ferme(false);
+    }
+    function pose(l) {
+      var change = select.value !== l.op.value;
+      select.value = l.op.value;
+      ferme(true);
+      if (change) select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function dehors(e) { if (panneau && !panneau.contains(e.target) && e.target !== select) ferme(false); }
+    function ferme(rendFocus) {
+      if (!panneau) return;
+      panneau.remove();
+      panneau = null; lignes = []; actif = -1;
+      document.removeEventListener("pointerdown", dehors, true);
+      if (rendFocus) select.focus();
+    }
+
+    // Le menu natif ne s'ouvre plus : le panneau le remplace
+    select.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      if (panneau) ferme(true); else { select.focus(); ouvre(""); }
+    });
+    select.addEventListener("keydown", function (e) {
+      if (e.ctrlKey || e.metaKey) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " " || e.key === "F4") {
+        e.preventDefault(); ouvre("");
+      } else if (e.key.length === 1 && !e.altKey) {
+        e.preventDefault(); ouvre(e.key);
+      }
+    });
+  }
+
   /* --------------------------------------------- calendrier des dates
      Le petit calendrier natif (Chrome, Edge) ne se laisse pas habiller : sur
      ordinateur, tout champ de date ouvre le nôtre (13.10.2026, demande de
@@ -3091,7 +3218,7 @@
 
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
-    ouvre: ouvre, ferme: ferme, confirme: confirme, multiChoix: multiChoix,
+    ouvre: ouvre, ferme: ferme, confirme: confirme, multiChoix: multiChoix, listeCherchable: listeCherchable,
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,

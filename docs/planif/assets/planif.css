@@ -1699,6 +1699,25 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .mc-lien{border:0;background:none;font:inherit;font-size:13px;color:var(--m-fort,var(--or));cursor:pointer;padding:4px 6px;border-radius:6px}
 .mc-lien:hover{background:var(--m-voile,rgba(0,0,0,.04))}
 @media print{.mc-panneau{display:none!important}}
+/* Liste avec recherche (UI.listeCherchable) : le panneau sous le select */
+.lc-hote{position:relative}
+.lc-panneau{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:45;width:max(100%,300px);max-width:calc(100vw - 24px);padding:8px;
+  background:#fff;border:1px solid var(--ligne);border-radius:10px;box-shadow:0 14px 36px rgba(30,34,38,.16);
+  font-family:var(--sans,inherit);text-transform:none;letter-spacing:normal;color:var(--texte);
+}
+.lc-panneau.lc-large{width:max(100%,min(620px,calc(100vw - 24px)))}
+.lc-panneau.a-droite{left:auto;right:0}
+.lc-cherche{width:100%;height:36px;margin-bottom:6px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;font:inherit;font-size:14px;color:inherit;background:#fff}
+.lc-cherche:focus{outline:2px solid var(--m-fort,var(--or));outline-offset:-1px}
+.lc-liste{max-height:340px;overflow-y:auto;position:relative}
+.lc-option{padding:7px 10px;border-radius:7px;cursor:pointer;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-option.actif{background:var(--m-voile,rgba(0,0,0,.05))}
+.lc-option.choisie{font-weight:600;color:var(--m-fort,var(--or))}
+.lc-option[hidden],.lc-groupe[hidden]{display:none}
+.lc-groupe{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--texte-faible);padding:10px 10px 3px}
+.lc-rien{padding:10px;font-size:14px;color:var(--texte-faible)}
+@media print{.lc-panneau{display:none!important}}
 .mc-groupe{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--texte-faible);padding:8px 8px 3px}
 .mc-groupe[hidden],.mc-option[hidden]{display:none}
 .mc-cherche{width:100%;height:34px;margin-bottom:6px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;font:inherit;font-size:14px;text-transform:none;letter-spacing:normal}
