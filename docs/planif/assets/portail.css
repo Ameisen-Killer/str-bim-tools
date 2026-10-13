@@ -298,17 +298,22 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .tc-annonce::after { content: "  Lire →"; font-weight: 700; color: var(--m-clair); white-space: nowrap; }
 .tc-annonce.vu { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 
-/* Tout remonter (13.10.2026, demande de Tony) : sur ordinateur, le « Bonjour »
-   vient sous le logo, à côté de la colonne de droite (compte, pendule, date),
-   au lieu d'attendre qu'elle se termine. L'en-tête et son conteneur se
-   fondent dans la grille de la page (display: contents). */
+/* Tout remonter (13.10.2026, demande de Tony) : sur ordinateur, logo et
+   compte sur la première ligne ; le « Bonjour » sur la ligne de la pendule
+   (sa date dessous), puis les cartes. L'en-tête et son conteneur se fondent
+   dans la grille de la page (display: contents). */
 @media (min-width: 641px) {
   .ab-page { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-content: start; }
   .ab-page > * { grid-column: 1 / -1; }
   .ab-page > #entete, .ab-page > #entete > .ab-entete { display: contents; }
   .ab-page .ab-marque { grid-column: 1; grid-row: 1; justify-self: start; padding-left: clamp(0px, 2vw, 30px); }
-  .ab-page .ab-qui { grid-column: 2; grid-row: 1 / span 3; align-self: start; gap: 10px; }
-  .ab-page .ab-centre { gap: 6px; }
-  .ab-page > .ab-salut { grid-column: 1; grid-row: 2; margin-top: 14px; }
+  .ab-page .ab-qui { grid-column: 2; grid-row: 1; align-self: start; gap: 10px; }
+  .ab-page .ab-centre { grid-column: 2; grid-row: 2 / span 2; align-self: center; justify-self: end; gap: 6px; margin-top: 8px; }
+  .ab-page > .ab-salut { grid-column: 1; grid-row: 2; align-self: end; margin-top: 8px; }
   .ab-page > .ab-sous-titre { grid-column: 1; grid-row: 3; align-self: start; }
+}
+/* Téléphone : logo, pendule, puis le compte */
+@media (max-width: 640px) {
+  .ab-entete .ab-centre { order: 2; margin-left: auto; }
+  .ab-entete .ab-qui { order: 3; }
 }
