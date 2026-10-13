@@ -231,20 +231,23 @@
      en continu) : les aiguilles se posent une fois par minute, à la minute. */
   var penduleMinuterie = null;
   function pendule() {
+    // Épuré (13.10.2026, sur le modèle fourni par Tony) : ni cadran ni anneau,
+    // des points pour les minutes, des traits pour les heures
     var traits = "";
     for (var i = 0; i < 60; i++) {
-      var a = i * Math.PI / 30, quart = i % 15 === 0, heure = i % 5 === 0;
-      var r1 = quart ? 34.5 : heure ? 37.5 : 41.8, r2 = 44.6;
-      traits += '<line class="' + (quart ? "pd-quart" : heure ? "pd-heure" : "pd-minute") + '" x1="' + (50 + r1 * Math.sin(a)).toFixed(2) +
-        '" y1="' + (50 - r1 * Math.cos(a)).toFixed(2) + '" x2="' + (50 + r2 * Math.sin(a)).toFixed(2) + '" y2="' + (50 - r2 * Math.cos(a)).toFixed(2) + '"/>';
+      var a = i * Math.PI / 30, sx = Math.sin(a), cy = Math.cos(a);
+      if (i % 5) {
+        traits += '<circle class="pd-point" cx="' + (50 + 45 * sx).toFixed(2) + '" cy="' + (50 - 45 * cy).toFixed(2) + '" r="1.25"/>';
+      } else {
+        var r1 = i % 15 ? 39.5 : 37;
+        traits += '<line class="' + (i % 15 ? "pd-heure" : "pd-quart") + '" x1="' + (50 + r1 * sx).toFixed(2) + '" y1="' + (50 - r1 * cy).toFixed(2) +
+          '" x2="' + (50 + 47.5 * sx).toFixed(2) + '" y2="' + (50 - 47.5 * cy).toFixed(2) + '"/>';
+      }
     }
-    var dessin = svg("0 0 100 100",
-      '<defs><radialGradient id="pd-fond" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#F3F4F0"/></radialGradient></defs>' +
-      '<circle class="pd-anneau" cx="50" cy="50" r="48.2"/>' +
-      '<circle class="pd-face" cx="50" cy="50" r="46.4" fill="url(#pd-fond)"/>' + traits +
-      '<g class="pd-aig-h"><line x1="50" y1="57" x2="50" y2="27.5"/></g>' +
-      '<g class="pd-aig-m"><line x1="50" y1="59" x2="50" y2="13.5"/></g>' +
-      '<circle class="pd-axe" cx="50" cy="50" r="3.2"/><circle class="pd-axe-c" cx="50" cy="50" r="1.2"/>', "ab-pendule-svg");
+    var dessin = svg("0 0 100 100", traits +
+      '<g class="pd-aig-h"><line x1="50" y1="52" x2="50" y2="24"/></g>' +
+      '<g class="pd-aig-m"><line x1="50" y1="52" x2="50" y2="9"/></g>' +
+      '<circle class="pd-axe" cx="50" cy="50" r="4.2"/>', "ab-pendule-svg");
     var boite = el("div", { class: "ab-pendule", role: "img" }, [dessin]);
     var h = dessin.querySelector(".pd-aig-h"), m = dessin.querySelector(".pd-aig-m");
     function tourne() {

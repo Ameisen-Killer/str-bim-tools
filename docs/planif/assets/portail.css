@@ -52,16 +52,14 @@ button { font: inherit; color: inherit; }
 /* Pendule à aiguilles, au centre (13.10.2026) */
 .ab-centre { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ab-centre .ab-date { text-align: center; font-size: 15px; }
-.ab-pendule { width: clamp(96px, 8.6vw, 128px); aspect-ratio: 1; filter: drop-shadow(0 8px 18px rgba(30, 34, 38, .12)) drop-shadow(0 1px 2px rgba(30, 34, 38, .08)); }
+.ab-pendule { width: clamp(96px, 8.6vw, 128px); aspect-ratio: 1; }
 .ab-pendule-svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ab-pendule .pd-anneau { fill: var(--m-clair); }
-.ab-pendule .pd-minute { stroke: rgba(30, 34, 38, .22); stroke-width: .7; stroke-linecap: round; }
-.ab-pendule .pd-heure { stroke: var(--m-fort); stroke-width: 1.6; stroke-linecap: round; }
-.ab-pendule .pd-quart { stroke: var(--m-encre, var(--m-fort)); stroke-width: 2.8; stroke-linecap: round; }
-.ab-pendule .pd-aig-h line { stroke: #1E2226; stroke-width: 3.6; stroke-linecap: round; }
-.ab-pendule .pd-aig-m line { stroke: #1E2226; stroke-width: 2.3; stroke-linecap: round; }
+.ab-pendule .pd-point { fill: var(--m-vif); }
+.ab-pendule .pd-heure { stroke: var(--m-fort); stroke-width: 2.6; }
+.ab-pendule .pd-quart { stroke: var(--m-fort); stroke-width: 3.2; }
+.ab-pendule .pd-aig-h line { stroke: var(--texte); stroke-width: 4.4; stroke-linecap: round; }
+.ab-pendule .pd-aig-m line { stroke: var(--texte); stroke-width: 1.9; stroke-linecap: round; }
 .ab-pendule .pd-axe { fill: var(--m-fort); }
-.ab-pendule .pd-axe-c { fill: #fff; }
 .ab-marque { display: block; text-decoration: none; flex: 0 1 auto; min-width: 0; }
 /* Logo de la marque : celui du bureau (pavé + texte, proportions 2,95 × 1) ou STR Bim Tools */
 .ab-logo-str { font-size: clamp(16px, 1.55vw, 22px); }
