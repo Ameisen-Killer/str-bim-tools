@@ -88,7 +88,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=111"></script>
+<script src="/planif/assets/ui.js?v=112"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -176,8 +176,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       return f;
     }
     filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES, true);
-    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
-    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
+    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES, true);
+    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" }, true);
 
     remplitAffaires();
 

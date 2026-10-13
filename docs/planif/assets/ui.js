@@ -2705,6 +2705,8 @@
      o.toutCoche (13.10.2026, succursales) : « tout » s'affiche toutes cases
      cochées ; on décoche ce qu'on ne veut pas voir, la dernière case cochée
      ne se décoche pas, et tout cocher revient à « tout » (rien de retenu).
+     Partout (13.10.2026, demande de Tony) : la case coche ou décoche, un clic
+     sur l'intitulé n'affiche que ce choix.
      Renvoie { noeud, valeurs(), pose(valeurs) }. */
   function multiChoix(o) {
     var choisis = (o.valeurs || []).slice();
@@ -2744,7 +2746,15 @@
         choisis = o.toutCoche && base.length >= o.options.length ? [] : base;
         maj(true);
       });
-      liste.appendChild(el("label", { class: "mc-option", title: x.label, dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]));
+      var ligne = el("label", { class: "mc-option", title: x.label, dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]);
+      // L'intitulé (et le blanc autour) : seulement ce choix ; la case garde son rôle
+      ligne.addEventListener("click", function (e) {
+        if (e.target === c) return;
+        e.preventDefault();
+        choisis = [x.valeur];
+        maj(true);
+      });
+      liste.appendChild(ligne);
       return c;
     });
     function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }

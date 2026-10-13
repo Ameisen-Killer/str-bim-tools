@@ -125,7 +125,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=76"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=111"></script>
+<script src="/planif/assets/ui.js?v=112"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=20"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -246,8 +246,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         || D.affaires({ tous: true }).some(function (a) { return !a.succursale; })) listeSucc._ = "Non renseignée";
     filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", listeSucc, rendAffaires, true);
     rendAffaires();
-    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
-    filtres.cotes = filtreCases("f-cote", "cotes", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
+    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES, null, true);
+    filtres.cotes = filtreCases("f-cote", "cotes", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" }, null, true);
 
     // Première ouverture : chacun se voit d'abord lui-même. Le choix fait ensuite
     // dans la liste est mémorisé comme les autres filtres, « Toute l'équipe » compris.
