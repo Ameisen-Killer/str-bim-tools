@@ -192,10 +192,12 @@ create table if not exists public.membres (
   -- secteur, chef de projet — ou rien de tout cela.
   metier     text constraint membres_metier_check
                check (metier is null or metier in ('ingenieur', 'dessinateur', 'administratif')),
+  -- Les groupes de la personne : codes de droits_groupes (13.10.2026, groupes libres)
   statuts    text[] not null default '{}' constraint membres_statuts_check
                check (statuts is not null
                       and array_position(statuts, null::text) is null
-                      and statuts <@ array['administrateur', 'chef_secteur', 'chef_projet']::text[]),
+                      and array_to_string(statuts, ' ') ~ '^([a-z][a-z0-9_]{0,39}( |$))*$'
+                      and not ('tous' = any (statuts))),
   succursale text,
   discipline text,
   capacite   numeric(3,1) not null default 5 check (capacite > 0 and capacite <= 7),
@@ -250,7 +252,7 @@ comment on column public.membres.email is
 comment on column public.membres.metier is
   'Le métier exercé : ingenieur, dessinateur ou administratif. Vide : membre pas encore désigné. Seuls ingénieurs et dessinateurs portent des tâches.';
 comment on column public.membres.statuts is
-  'Place dans la société, cumulable avec le métier et entre eux : administrateur (associé), chef_secteur, chef_projet. Tableau vide : aucune de ces casquettes.';
+  'Groupes de la personne (codes de droits_groupes), cumulables avec le métier et entre eux. Tableau vide : Tout le monde seulement.';
 comment on column public.membres.succursale is 'Code d''une succursale du bureau (table succursales).';
 comment on column public.membres.discipline is 'Code d''une discipline du bureau (table disciplines).';
 
@@ -642,37 +644,85 @@ create table if not exists public.reglages (
 );
 comment on column public.reglages.id is 'Historique (une seule ligne avant les bureaux) : toujours vrai.';
 
--- ------------------------------------------------- droits d'un groupe ---
--- Ce que chaque groupe a le droit de faire, bureau par bureau. Les groupes
--- sont les statuts portés par les membres ; qui n'en porte aucun est un
--- utilisateur « lambda » et travaille sur ce qui le concerne, rien d'autre.
+-- ------------------------------------------------- groupes du bureau ---
+-- Les groupes de chaque bureau et ce qu'ils ont le droit de faire (13.10.2026 :
+-- groupes libres). La console en crée, les renomme, les range sous un groupe
+-- supérieur et coche leurs droits. Un groupe a aussi les droits des groupes
+-- placés sous lui ; « tous » (Tout le monde) est le socle : chaque membre en
+-- fait partie. Les membres portent les codes de leurs groupes (membres.statuts).
 -- La liste des droits est ouverte : un droit ajouté plus tard à l'outil
 -- n'oblige pas à toucher au schéma. Un code inconnu de l'outil ne fait rien.
 create table if not exists public.droits_groupes (
   bureau_id uuid not null references public.bureaux (id) on delete cascade,
   statut    text not null constraint droits_groupes_statut_check
-            check (statut in ('administrateur', 'chef_secteur', 'chef_projet')),
+            check (statut ~ '^[a-z][a-z0-9_]{0,39}$'),
+  nom       text not null default '' constraint droits_groupes_nom_check
+            check (char_length(btrim(nom)) between 1 and 40),
+  parent    text,
+  ordre     integer not null default 0,
   droits    text[] not null default '{}' constraint droits_groupes_droits_check
             check (droits is not null and array_position(droits, null::text) is null),
   maj_le    timestamptz not null default now(),
-  primary key (bureau_id, statut)
+  primary key (bureau_id, statut),
+  constraint droits_groupes_parent_fk foreign key (bureau_id, parent)
+    references public.droits_groupes (bureau_id, statut) on delete set null (parent),
+  constraint droits_groupes_parent_check
+    check (parent is distinct from statut and (statut <> 'tous' or parent is null) and parent is distinct from 'tous')
 );
 comment on table public.droits_groupes is
-  'Droits accordés à chaque groupe, bureau par bureau. Lue par les membres du bureau, écrite seulement par la console du super admin.';
+  'Groupes de chaque bureau et leurs droits : nom, groupe supérieur (parent), rang parmi ses voisins. Un groupe a aussi les droits des groupes placés sous lui ; « tous » est le socle commun à chaque membre. Lue par les membres du bureau, écrite seulement par la console du super admin.';
+comment on column public.droits_groupes.statut is
+  'Code du groupe, porté dans membres.statuts. tous : Tout le monde.';
 
--- Tous les droits que mes statuts m'accordent, réunis. Aucun statut : rien.
+-- Les groupes d'un bureau neuf, avec leurs droits d'origine
+create or replace function public.groupes_par_defaut(p_bureau uuid)
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+begin
+  insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
+    (p_bureau, 'tous', 'Tout le monde', null, 0,
+     array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire']),
+    (p_bureau, 'administrateur', 'Administrateur', null, 0,
+     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'page_transversales', 'conges_tous'])
+  on conflict (bureau_id, statut) do nothing;
+  insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
+    (p_bureau, 'chef_secteur', 'Chef de secteur', 'administrateur', 0,
+     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge', 'page_secteurs',
+           'planning_equipe', 'taches_a_affecter', 'conges_secteur'])
+  on conflict (bureau_id, statut) do nothing;
+  insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
+    (p_bureau, 'chef_projet', 'Chef de projet', 'chef_secteur', 0,
+     array['affaires_creer', 'taches_autrui', 'absences_autrui'])
+  on conflict (bureau_id, statut) do nothing;
+end $$;
+revoke all on function public.groupes_par_defaut(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------- mes droits ---
+-- Tous les droits que mes groupes m'accordent : ceux de Tout le monde, ceux de
+-- chacun de mes groupes et ceux des groupes placés sous eux, à toute profondeur.
 create or replace function public.mes_droits()
 returns text[]
 language sql stable security definer set search_path = '' as $$
-  select coalesce((
-    select array_agg(distinct d)
+  with recursive moi as (
+    select m.bureau_id, m.statuts
       from public.acces a
       join public.membres m on m.id = a.membre_id
-      join public.droits_groupes g
-        on g.bureau_id = m.bureau_id and g.statut = any (m.statuts)
-      cross join lateral unnest(g.droits) as d
      where a.email = lower(coalesce(auth.jwt() ->> 'email', ''))
-       and a.actif), '{}'::text[]);
+       and a.actif
+  ), portee (bureau_id, statut) as (
+    select g.bureau_id, g.statut
+      from public.droits_groupes g
+      join moi on g.bureau_id = moi.bureau_id
+     where g.statut = 'tous' or g.statut = any (moi.statuts)
+    union
+    select g.bureau_id, g.statut
+      from public.droits_groupes g
+      join portee p on g.bureau_id = p.bureau_id and g.parent = p.statut
+  )
+  select coalesce(array_agg(distinct d), '{}'::text[])
+    from portee p
+    join public.droits_groupes g on g.bureau_id = p.bureau_id and g.statut = p.statut
+    cross join lateral unnest(g.droits) as d;
 $$;
 
 -- Le super admin passe partout : c'est lui qui distribue les droits.
@@ -693,18 +743,13 @@ begin
   end loop;
 end $$;
 
--- Un bureau naît avec sa ligne de réglages (canton, capacité par défaut)
--- Un bureau neuf part avec ses réglages et les droits d'origine : les trois
--- groupes reçoivent les trois droits, à ajuster ensuite depuis la console.
+-- Un bureau neuf part avec ses réglages et ses groupes d'origine
 create or replace function public.bureau_cree_reglages()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.reglages (bureau_id) values (new.id) on conflict (bureau_id) do nothing;
-  insert into public.droits_groupes (bureau_id, statut, droits)
-  select new.id, s, array['affaires_creer', 'taches_autrui', 'absences_autrui']
-    from unnest(array['administrateur', 'chef_secteur', 'chef_projet']) as s
-  on conflict (bureau_id, statut) do nothing;
+  perform public.groupes_par_defaut(new.id);
   return new;
 end $$;
 
@@ -730,12 +775,8 @@ begin
   on conflict (email) do update set super_admin = true, actif = true;
 end $$;
 
--- Droits d'origine des bureaux déjà là (le déclencheur ne couvre que les neufs)
-insert into public.droits_groupes (bureau_id, statut, droits)
-select b.id, s, array['affaires_creer', 'taches_autrui', 'absences_autrui']
-  from public.bureaux b,
-       unnest(array['administrateur', 'chef_secteur', 'chef_projet']) as s
-on conflict (bureau_id, statut) do nothing;
+-- Groupes d'origine des bureaux déjà là (le déclencheur ne couvre que les neufs)
+select public.groupes_par_defaut(b.id) from public.bureaux b;
 
 -- =========================================================== sécurité (RLS) ==
 -- On repart de zéro : les politiques existantes de ces tables sont retirées.
@@ -929,7 +970,8 @@ create policy "bureau courant (suppression)" on public.veille_suivi for delete t
   using (bureau_id = (select public.bureau_courant()));
 -- Tchat : tout le bureau lit ; chacun écrit en son nom (jamais le compte de
 -- démonstration, partagé et public : ses messages restent sur son écran) ;
--- on retire les siens, le super admin tous. Pas de modification.
+-- on retire les siens ; ceux des autres avec le droit « tchat_moderer » (le
+-- super admin passe partout). Pas de modification.
 create policy "bureau courant (lecture)" on public.messages for select to authenticated
   using (bureau_id = (select public.bureau_courant()));
 create policy "en son nom (création)" on public.messages for insert to authenticated
@@ -938,7 +980,7 @@ create policy "en son nom (création)" on public.messages for insert to authenti
               and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
 create policy "les siens (suppression)" on public.messages for delete to authenticated
   using (bureau_id = (select public.bureau_courant())
-         and (auteur_id = (select public.mon_membre()) or (select public.est_super_admin())));
+         and (auteur_id = (select public.mon_membre()) or (select public.a_droit('tchat_moderer'))));
 
 -- Droits des groupes : chacun voit ce que son bureau accorde (l'outil s'en
 -- sert pour ne pas proposer l'impossible) ; seule la console les écrit.
@@ -1008,6 +1050,11 @@ begin
     'bureaux', case when v_acces.super_admin then coalesce((
         select jsonb_agg(jsonb_build_object('id', x.id, 'nom', x.nom, 'actif', x.actif) order by lower(x.nom))
         from public.bureaux x), '[]'::jsonb) end,
+    'groupes', coalesce((
+        select jsonb_agg(jsonb_build_object('code', g.statut, 'nom', g.nom, 'parent', g.parent,
+                                            'ordre', g.ordre, 'droits', to_jsonb(g.droits))
+               order by g.ordre, g.nom)
+        from public.droits_groupes g where g.bureau_id = v_bureau.id), '[]'::jsonb),
     'succursales', coalesce((
         select jsonb_agg(jsonb_build_object(
                  'code', s.code, 'nom', s.nom,
@@ -1144,8 +1191,9 @@ begin
   return jsonb_build_object('tel_interne', v_int, 'tel_externe', v_ext, 'tel_natel', v_nat, 'photo', v_photo);
 end $$;
 
--- Qui décide d'un congé : un administrateur du bureau, ou un chef de secteur
--- de la même discipline — jamais pour soi-même ; le super admin, toujours.
+-- Qui décide d'un congé : le droit « tous les congés », ou « les congés de son
+-- secteur » pour une personne de la même discipline — jamais pour soi-même ;
+-- le super admin, toujours.
 create or replace function public.peut_valider_conge(p_membre uuid)
 returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -1155,8 +1203,8 @@ language sql stable security definer set search_path = '' as $$
       join public.membres lui on lui.id = p_membre and lui.bureau_id = moi.bureau_id
      where moi.id = public.mon_membre()
        and moi.id <> lui.id
-       and ('administrateur' = any (moi.statuts)
-            or ('chef_secteur' = any (moi.statuts) and moi.discipline is not null
+       and (public.a_droit('conges_tous')
+            or (public.a_droit('conges_secteur') and moi.discipline is not null
                 and moi.discipline = lui.discipline)));
 $$;
 
@@ -1221,6 +1269,11 @@ begin
           'droits', coalesce((
               select jsonb_object_agg(g.statut, to_jsonb(g.droits))
               from public.droits_groupes g where g.bureau_id = b.id), '{}'::jsonb),
+          'groupes', coalesce((
+              select jsonb_agg(jsonb_build_object('code', g.statut, 'nom', g.nom, 'parent', g.parent,
+                                                  'ordre', g.ordre, 'droits', to_jsonb(g.droits))
+                     order by g.ordre, g.nom)
+              from public.droits_groupes g where g.bureau_id = b.id), '[]'::jsonb),
           'activite', greatest(
               (select max(t.maj_le) from public.taches   t where t.bureau_id = b.id),
               (select max(x.maj_le) from public.affaires x where x.bureau_id = b.id),
@@ -1478,16 +1531,17 @@ begin
     end if;
   end if;
 
-  -- Les statuts : nettoyés, dédoublonnés, rangés dans l'ordre de la hiérarchie.
+  -- Les groupes : nettoyés, dédoublonnés, seulement ceux du bureau (Tout le
+  -- monde n'a pas à être coché : chacun en fait partie).
   if v_statuts is null and p ? 'statuts' then
-    select coalesce(array_agg(d.s order by array_position(
-             array['administrateur', 'chef_secteur', 'chef_projet']::text[], d.s)), '{}')
+    select coalesce(array_agg(d.s order by g.ordre, g.nom), '{}')
       into v_statuts
       from (select distinct btrim(x.valeur) as s
               from jsonb_array_elements_text(
                      case when jsonb_typeof(p -> 'statuts') = 'array' then p -> 'statuts' else '[]'::jsonb end
                    ) as x(valeur)) d
-     where d.s in ('administrateur', 'chef_secteur', 'chef_projet');
+      join public.droits_groupes g on g.bureau_id = v_bureau and g.statut = d.s
+     where d.s <> 'tous';
   end if;
 
   -- ------------------------------------------------------------ la fiche ---
@@ -1620,8 +1674,8 @@ begin
   if v_bureau is null or not exists (select 1 from public.bureaux x where x.id = v_bureau) then
     raise exception 'Ce bureau n''existe pas.';
   end if;
-  if v_statut not in ('administrateur', 'chef_secteur', 'chef_projet') then
-    raise exception 'Groupe inconnu.';
+  if not exists (select 1 from public.droits_groupes g where g.bureau_id = v_bureau and g.statut = v_statut) then
+    raise exception 'Ce groupe n''existe plus.';
   end if;
 
   select coalesce(array_agg(distinct d.code), '{}'::text[])
@@ -1632,10 +1686,138 @@ begin
                  ) as x(valeur)) d
    where d.code ~ '^[a-z][a-z0-9_]{0,39}$';
 
-  insert into public.droits_groupes (bureau_id, statut, droits)
-  values (v_bureau, v_statut, v_droits)
-  on conflict (bureau_id, statut) do update
-    set droits = excluded.droits, maj_le = now();
+  update public.droits_groupes g
+     set droits = v_droits, maj_le = now()
+   where g.bureau_id = v_bureau and g.statut = v_statut;
+end $$;
+
+-- Crée ou modifie un groupe. { bureauId, code, nom, parent }
+-- Sans code : un groupe neuf, sans droits, rangé en dernier sous son
+-- supérieur. « parent » : code du groupe supérieur, vide pour un groupe de
+-- tête ; absent, la place ne change pas. Renvoie le code du groupe.
+create or replace function public.console_enregistre_groupe(p jsonb)
+returns text
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_bureau uuid := nullif(p ->> 'bureauId', '')::uuid;
+  v_code   text := nullif(btrim(coalesce(p ->> 'code', '')), '');
+  v_nom    text := regexp_replace(btrim(coalesce(p ->> 'nom', '')), '\s+', ' ', 'g');
+  v_parent text := nullif(btrim(coalesce(p ->> 'parent', '')), '');
+  v_place  boolean := p ? 'parent';
+  v_g      public.droits_groupes%rowtype;
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  if v_bureau is null or not exists (select 1 from public.bureaux x where x.id = v_bureau) then
+    raise exception 'Ce bureau n''existe pas.';
+  end if;
+  if v_nom = '' then
+    raise exception 'Donne un nom au groupe.';
+  end if;
+  if char_length(v_nom) > 40 then
+    raise exception 'Nom trop long (40 caractères au plus).';
+  end if;
+  if exists (select 1 from public.droits_groupes g
+              where g.bureau_id = v_bureau and lower(g.nom) = lower(v_nom)
+                and g.statut is distinct from v_code) then
+    raise exception 'Un groupe porte déjà ce nom.';
+  end if;
+
+  if v_code is not null then
+    select * into v_g from public.droits_groupes g where g.bureau_id = v_bureau and g.statut = v_code;
+    if not found then
+      raise exception 'Ce groupe n''existe plus.';
+    end if;
+  end if;
+
+  if v_place and v_parent is not null then
+    if v_code = 'tous' then
+      raise exception '« Tout le monde » reste le socle : il ne se range sous aucun groupe.';
+    end if;
+    if v_parent = 'tous' then
+      raise exception 'Aucun groupe ne se range sous « Tout le monde » : tous en héritent déjà.';
+    end if;
+    if not exists (select 1 from public.droits_groupes g where g.bureau_id = v_bureau and g.statut = v_parent) then
+      raise exception 'Le groupe supérieur n''existe plus.';
+    end if;
+    -- Pas de boucle : le supérieur ne peut pas être le groupe lui-même ni l'un de ses subordonnés
+    if v_code is not null and exists (
+      with recursive sous (statut) as (
+        select v_code
+        union
+        select g.statut from public.droits_groupes g join sous s on g.parent = s.statut
+         where g.bureau_id = v_bureau)
+      select 1 from sous where statut = v_parent) then
+      raise exception 'Un groupe ne se range ni sous lui-même ni sous l''un de ses subordonnés.';
+    end if;
+  end if;
+
+  if v_code is null then
+    v_code := 'g_' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
+    insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits)
+    values (v_bureau, v_code, v_nom, v_parent,
+            coalesce((select max(g.ordre) + 1 from public.droits_groupes g
+                       where g.bureau_id = v_bureau and g.parent is not distinct from v_parent
+                         and g.statut <> 'tous'), 0),
+            '{}');
+  else
+    update public.droits_groupes g
+       set nom = v_nom,
+           parent = case when v_place then v_parent else g.parent end,
+           ordre = case when v_place and v_parent is distinct from g.parent
+                        then coalesce((select max(x.ordre) + 1 from public.droits_groupes x
+                                        where x.bureau_id = v_bureau and x.parent is not distinct from v_parent
+                                          and x.statut <> 'tous'), 0)
+                        else g.ordre end,
+           maj_le = now()
+     where g.bureau_id = v_bureau and g.statut = v_code;
+  end if;
+  return v_code;
+end $$;
+
+-- Range des groupes voisins. { bureauId, codes: [...] } : chacun prend le rang
+-- de sa place dans la liste.
+create or replace function public.console_ordonne_groupes(p jsonb)
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_bureau uuid := nullif(p ->> 'bureauId', '')::uuid;
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  update public.droits_groupes g
+     set ordre = x.rang - 1, maj_le = now()
+    from jsonb_array_elements_text(
+           case when jsonb_typeof(p -> 'codes') = 'array' then p -> 'codes' else '[]'::jsonb end
+         ) with ordinality as x(code, rang)
+   where g.bureau_id = v_bureau and g.statut = x.code;
+end $$;
+
+-- Supprime un groupe. Ses membres le quittent (ils gardent leurs autres
+-- groupes) ; les groupes rangés sous lui remontent d'un cran.
+create or replace function public.console_supprime_groupe(p_bureau uuid, p_code text)
+returns void
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_g public.droits_groupes%rowtype;
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  if p_code = 'tous' then
+    raise exception '« Tout le monde » ne se supprime pas : c''est le socle de chaque membre.';
+  end if;
+  select * into v_g from public.droits_groupes g where g.bureau_id = p_bureau and g.statut = p_code;
+  if not found then
+    raise exception 'Ce groupe n''existe plus.';
+  end if;
+  update public.droits_groupes g set parent = v_g.parent, maj_le = now()
+   where g.bureau_id = p_bureau and g.parent = p_code;
+  update public.membres m set statuts = array_remove(m.statuts, p_code), maj_le = now()
+   where m.bureau_id = p_bureau and p_code = any (m.statuts);
+  delete from public.droits_groupes g where g.bureau_id = p_bureau and g.statut = p_code;
 end $$;
 
 -- Supprime une personne : sa fiche, son accès, ses absences, ses équipes.
@@ -1712,7 +1894,9 @@ begin
     'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
     'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
-    'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)'
+    'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)',
+    'public.console_enregistre_groupe(jsonb)', 'public.console_ordonne_groupes(jsonb)',
+    'public.console_supprime_groupe(uuid, text)'
   ] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated', f);

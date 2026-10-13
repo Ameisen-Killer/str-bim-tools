@@ -275,17 +275,11 @@
     return requete("rpc/" + nom, { methode: "POST", corps: args || {}, garde: !!(options && options.garde) });
   }
 
-  /* Profil de la personne connectée : bureau, droits, succursales et
-     disciplines du bureau. Pour le super admin, en plus, les droits de chaque
-     groupe du bureau affiché : « Voir l'outil en tant que » s'en sert. */
+  /* Profil de la personne connectée : bureau, droits, groupes du bureau
+     (noms, hiérarchie, droits : « Voir l'outil en tant que » s'en sert),
+     succursales et disciplines. */
   function profil() {
-    return rpc("mon_profil").then(function (p) {
-      if (!p || !p.autorise || !p.superAdmin) return p;
-      return requete("droits_groupes?select=statut,droits").then(function (l) {
-        p.droitsGroupes = Array.isArray(l) ? l : null;
-        return p;
-      }, function () { return p; });
-    });
+    return rpc("mon_profil");
   }
 
   /* Qui a l'outil sous les yeux en ce moment, dans le bureau affiché.

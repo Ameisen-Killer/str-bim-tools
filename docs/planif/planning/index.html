@@ -103,12 +103,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=48"></script>
-<script src="/planif/assets/donnees.js?v=64"></script>
+<script src="/planif/assets/supabase.js?v=49"></script>
+<script src="/planif/assets/donnees.js?v=65"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
-<script src="/planif/assets/version.js?v=12"></script>
+<script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=93"></script>
-<script src="/planif/assets/tchat.js?v=7"></script>
+<script src="/planif/assets/tchat.js?v=8"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
 <script>
@@ -128,14 +128,14 @@
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
   }
 
-  /* Collaborateur (niveau d'accès 0, demande de Tony du 07.10.2026) : le tableau
-     de bord ne montre que ses tâches. Chacune garde ses deux parts : le calcul
+  /* Sans le droit « Planning de toute l'équipe » (demande de Tony du
+     07.10.2026, droit depuis le 13.10.2026) : le tableau de bord ne montre que ses tâches. Chacune garde ses deux parts : le calcul
      d'une tâche dont il fait le dessin paraît chez l'ingénieur qui le porte, et
      inversement. Les lignes : lui et les personnes qui portent ces parts.
-     Renvoie null (tout voir) à partir de chef de secteur, sinon
+     Renvoie null (tout voir) avec ce droit, sinon
      { moi, taches: {id: true}, gens: {id: true} }. */
   function perimetre() {
-    if (D.niveauAcces() >= 1) return null;
+    if (D.aDroit("planning_equipe")) return null;
     var moi = D.monMembre(), p = { moi: moi ? moi.id : null, taches: Object.create(null), gens: Object.create(null) };
     if (!moi) return p;
     p.gens[moi.id] = true;

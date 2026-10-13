@@ -43,7 +43,7 @@
       <div class="plan-barre repliable" id="f-barre">
         <select id="f-succursale" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par succursale"></select>
         <select id="f-discipline" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par discipline"></select>
-        <select id="f-statut" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par statut"></select>
+        <select id="f-statut" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par groupe"></select>
         <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:320px" aria-label="Filtrer par affaire"></select>
       </div>
     </div>
@@ -55,12 +55,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=48"></script>
-<script src="/planif/assets/donnees.js?v=64"></script>
+<script src="/planif/assets/supabase.js?v=49"></script>
+<script src="/planif/assets/donnees.js?v=65"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
-<script src="/planif/assets/version.js?v=12"></script>
+<script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=93"></script>
-<script src="/planif/assets/tchat.js?v=7"></script>
+<script src="/planif/assets/tchat.js?v=8"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
 <script>
@@ -145,7 +145,7 @@
     // « Qui sont les chefs de projet ? » — la question se pose sans passer par la recherche
     var ft = document.getElementById("f-statut");
     if (D.STATUTS[filtres.statut] === undefined) filtres.statut = "";
-    ft.appendChild(el("option", { value: "" }, ["Tous les statuts"]));
+    ft.appendChild(el("option", { value: "" }, ["Tous les groupes"]));
     D.ORDRE_STATUTS.forEach(function (s) {
       ft.appendChild(el("option", { value: s }, [D.STATUTS_PLURIEL[s]]));
     });
@@ -289,7 +289,7 @@
     // Charge de la semaine en cours, pour situer chacun d'un coup d'œil. Pas pour
     // un collaborateur (11.10.2026, demande de Tony) : la charge des autres ne le
     // regarde pas, comme au tableau de bord.
-    var voitCharge = D.niveauAcces() >= 1;
+    var voitCharge = D.aDroit("planning_equipe");
     var jours = C.serie(C.lundi(C.isoAuj()), 7);
     var rep = voitCharge ? repartitionCourante() : {};
     var planifie = !!D.PLANIFIES[s.metier];

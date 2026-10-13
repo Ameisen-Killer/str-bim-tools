@@ -154,7 +154,8 @@
 
   function peutRetirer(m) {
     var moi = monId(), p = D.profil ? D.profil() : null;
-    return !!(moi && m.auteurId === moi) || !!(p && p.superAdmin && enBase());
+    // Ceux des autres : le droit « Retirer les messages des autres » (le super admin passe partout)
+    return !!(moi && m.auteurId === moi) || !!(p && enBase() && D.aDroit("tchat_moderer"));
   }
 
   /* --------------------------------------------------------------- non lus */

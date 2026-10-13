@@ -120,6 +120,48 @@
   table.matrice td:first-child{padding-left:0;text-align:left;width:100%;min-width:180px}
   table.matrice td:last-child{padding-right:0}
   table.matrice input[type=checkbox]{accent-color:var(--or);width:18px;height:18px;margin:0;cursor:pointer}
+  /* Groupes et droits (13.10.2026) : la hiérarchie en arbre, puis le tableau
+     groupes en colonnes × fonctions en lignes. La première colonne reste en
+     place quand le tableau défile de côté (téléphone, nombreux groupes). */
+  .groupes-aide{margin:8px 0 14px;font-size:13.5px;color:var(--texte-faible);max-width:56em}
+  .groupes-arbre{list-style:none;margin:0;padding:0;max-width:760px}
+  .groupe-ligne{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:8px 0 8px calc(var(--niveau, 0) * 26px);border-top:1px solid var(--ligne-faible)}
+  .groupe-ligne.socle{border-top:1px dashed var(--ligne);margin-top:6px}
+  .groupe-nom{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;min-width:0}
+  .groupe-nom .principal{font-size:15px;font-weight:600}
+  .groupe-nom .secondaire{font-size:12.5px;color:var(--texte-faible)}
+  .groupe-branche{color:var(--texte-faible);font-size:13px}
+  .groupe-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+  .ordre-btn{width:30px;height:30px;border:1px solid var(--ligne);border-radius:6px;background:none;cursor:pointer;
+    font-size:14px;line-height:1;color:var(--texte-doux);transition:border-color .2s,color .2s}
+  .ordre-btn:hover:not([disabled]){border-color:var(--or);color:var(--or)}
+  .ordre-btn[disabled]{opacity:.3;cursor:default}
+  .droits-defile{overflow-x:auto;scrollbar-width:thin;margin-top:4px}
+  table.droits-matrice{border-collapse:separate;border-spacing:0;min-width:100%}
+  table.droits-matrice th,table.droits-matrice td{padding:8px 10px;border-bottom:1px solid var(--ligne-faible);vertical-align:middle}
+  table.droits-matrice th{font-size:12.5px;font-weight:600;color:var(--texte);text-align:center;vertical-align:bottom;background:rgb(var(--fond-rvb))}
+  table.droits-matrice th.col-groupe{min-width:92px;max-width:130px}
+  table.droits-matrice .nom-col{display:block;white-space:normal;line-height:1.25}
+  table.droits-matrice .nb-col{display:block;font-weight:400;font-size:11.5px;color:var(--texte-faible);margin-top:2px}
+  table.droits-matrice .col-fonction{position:sticky;left:0;z-index:1;background:rgb(var(--fond-rvb));text-align:left;min-width:220px;max-width:360px}
+  table.droits-matrice td.col-fonction .principal{font-size:14.5px}
+  table.droits-matrice td.col-fonction .secondaire{font-size:12px;color:var(--texte-faible);line-height:1.4;margin-top:2px}
+  table.droits-matrice td.col-groupe{text-align:center}
+  table.droits-matrice .socle{background:rgba(var(--encre),.025)}
+  table.droits-matrice tr.categorie td{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--or);
+    padding-top:20px;border-bottom:1px solid var(--ligne)}
+  table.droits-matrice tr:not(.categorie):hover td.col-groupe{background:rgba(var(--or-rvb),.06)}
+  .case-droit{display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:36px;cursor:pointer}
+  .case-droit input{accent-color:var(--or);width:19px;height:19px;margin:0;cursor:pointer}
+  .case-droit.herite{cursor:help}
+  .case-droit.herite input{opacity:.38;cursor:help}
+  @media (max-width:640px){
+    table.droits-matrice .col-fonction{min-width:150px;max-width:190px}
+    table.droits-matrice td.col-fonction .secondaire{display:none}
+    .groupe-ligne{flex-wrap:wrap;padding-left:calc(var(--niveau, 0) * 16px)}
+    .ordre-btn{width:40px;height:40px}
+  }
   .compacte fieldset > p.aide{margin-top:8px;font-size:12.5px;color:var(--texte-faible);line-height:1.45}
   .compacte fieldset > p.aide + *{margin-top:12px}
   .perte{margin-top:18px;border-left:2px solid var(--alerte);padding:8px 0 8px 12px;font-size:13.5px;color:var(--texte-doux)}
@@ -150,8 +192,8 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=48"></script>
-<script src="/planif/assets/donnees.js?v=64"></script>
+<script src="/planif/assets/supabase.js?v=49"></script>
+<script src="/planif/assets/donnees.js?v=65"></script>
 <script src="/planif/assets/ui.js?v=93"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
 <script>
@@ -295,6 +337,9 @@
     });
 
     hotes.titreDroits = el("h2");
+    hotes.nouveauGroupe = el("button", { class: "btn btn-or", type: "button", onclick: function () { formulaireGroupe(bureauDesDroits(), null); } }, [
+      el("span", { class: "ico-txt ico-ajout-membre", "aria-hidden": "true" }), "Nouveau groupe"
+    ]);
     hotes.filtreDroits = el("select", {
       class: "btn", style: "text-transform:none;letter-spacing:.04em;max-width:320px", "aria-label": "Bureau dont on règle les droits"
     });
@@ -302,7 +347,8 @@
     hotes.droits = el("div", { class: "defile" });
     hotes.vue.appendChild(el("section", { class: "section", id: "droits" }, [
       el("div", { class: "tete-section" }, [
-        el("div", {}, [el("div", { class: "num-section", text: "03 — Droits" }), hotes.titreDroits])
+        el("div", {}, [el("div", { class: "num-section", text: "03 — Groupes et droits" }), hotes.titreDroits]),
+        el("div", { class: "outils" }, [hotes.nouveauGroupe])
       ]),
       el("div", { class: "plan-barre", style: "margin-top:4px" }, [hotes.filtreDroits]),
       hotes.droits
@@ -329,7 +375,7 @@
   var SECTIONS = [
     { cle: "bureaux", label: "Bureaux" },
     { cle: "utilisateurs", label: "Utilisateurs" },
-    { cle: "droits", label: "Droits" },
+    { cle: "droits", label: "Groupes et droits" },
     { cle: "mise-en-route", label: "Mise en route" }
   ];
 
@@ -367,7 +413,7 @@
     var valeurs = {
       bureaux: etat.bureaux.length,
       utilisateurs: personnes().length,
-      droits: "",
+      droits: (function () { var b = bureauDesDroits(); return b ? groupesDe(b.id).length + 1 : ""; })(),
       "mise-en-route": ""
     };
     SECTIONS.forEach(function (s) {
@@ -797,7 +843,7 @@
     return [nomDe(p), p.email, nomBureau(p.bureauId), D.libelleMetier(p.metier),
             rattachement(p), situation(p).texte, connexionTexte(p),
             p.superAdmin ? "super admin" : ""]
-      .concat(D.statutsDe(p).map(D.libelleStatut));
+      .concat(groupesDeP(p).map(function (g) { return g.nom; }));
   }
 
   function selection(sansTexte) {
@@ -864,13 +910,57 @@
     ]));
   }
 
-  /* ------------------------------------------------------------------ droits
-     Les droits se donnent à des groupes, jamais à une personne : on coche la
-     case au croisement d'un groupe et d'un droit. Qui ne porte aucun statut est
-     un utilisateur « lambda » — il n'a aucun de ces droits et mène son propre
-     travail, sans pouvoir engager celui des autres.
+  /* ----------------------------------------------------- groupes et droits
+     Les droits se donnent à des groupes, jamais à une personne (13.10.2026 :
+     groupes libres, demande de Tony). Chaque bureau a ses groupes : la console
+     les crée, les renomme, les range sous un groupe supérieur et les supprime.
+     Le tableau met les groupes en colonnes et les fonctions en lignes : on
+     coche la case au croisement. Un groupe a aussi tout ce qu'ont les groupes
+     placés sous lui, et tout ce qu'a « Tout le monde », le socle de chaque
+     membre : ces cases-là sont cochées d'office, en demi-teinte.
      L'interface ne fait que refléter la base : les mêmes règles y sont posées
-     en RLS, une requête lancée hors de l'outil se heurte aux mêmes refus. */
+     (mes_droits, a_droit, RLS) ; une requête lancée hors de l'outil se heurte
+     aux mêmes refus. */
+
+  // Intitulés courts des trois groupes d'origine, tant qu'ils gardent leur nom
+  var COURTS = { administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet" };
+
+  /** Les groupes d'un bureau tels que la base les donne ; base pas encore mise
+   *  à jour (migration-groupes.sql) : ceux d'origine, avec les droits cochés. */
+  function groupesBrutsDe(b) {
+    if (b && Array.isArray(b.groupes)) return b.groupes;
+    return D.GROUPES_DEFAUT.map(function (g) {
+      var d = b && b.droits && b.droits[g.code];
+      return { code: g.code, nom: g.nom, parent: g.parent, ordre: g.ordre,
+               droits: Array.isArray(d) ? d.concat(g.droits.filter(function (x) { return d.indexOf(x) < 0 && ["affaires_creer", "taches_autrui", "absences_autrui"].indexOf(x) < 0; })) : g.droits };
+    });
+  }
+  function groupesEnBase(b) { return !!(b && Array.isArray(b.groupes)); }
+  /** Les groupes d'un bureau rangés en arbre, de haut en bas, sans « Tout le monde ». */
+  function groupesDe(idBureau) { return D.rangeGroupes(groupesBrutsDe(bureau(idBureau))); }
+  function groupeTous(b) {
+    return groupesBrutsDe(b).filter(function (g) { return (g.code || g.statut) === "tous"; })[0] ||
+      { code: "tous", nom: "Tout le monde", droits: [] };
+  }
+  function nomGroupe(b, code) {
+    if (code === "tous") return groupeTous(b).nom;
+    var g = groupesDe(b.id).filter(function (x) { return x.code === code; })[0];
+    return g ? g.nom : code;
+  }
+  function courtGroupe(g) {
+    var origine = D.GROUPES_DEFAUT.filter(function (x) { return x.code === g.code && x.nom === g.nom; })[0];
+    return origine && COURTS[g.code] ? COURTS[g.code] : g.nom;
+  }
+  /** Les groupes que porte une personne, dans l'ordre de la hiérarchie de son bureau. */
+  function groupesDeP(p) {
+    var l = p.statuts || [];
+    return groupesDe(p.bureauId).filter(function (g) { return l.indexOf(g.code) >= 0; });
+  }
+  function membresDuGroupe(b, code) {
+    return (etat.membres || []).filter(function (m) {
+      return m.bureauId === b.id && m.actif && (code === "tous" || (m.statuts || []).indexOf(code) >= 0);
+    }).length;
+  }
 
   /** Le bureau dont on règle les droits : celui choisi, sinon le sien. */
   function bureauDesDroits() {
@@ -881,35 +971,153 @@
     return (prof && prof.bureau && bureau(prof.bureau.id)) || etat.bureaux[0];
   }
 
-  /** Une case du tableau : un droit pour un groupe, enregistré au clic. */
-  function caseDroit(b, statut, droit, accordes) {
-    var avant = accordes.indexOf(droit) >= 0;
+  /** Une case du tableau : un droit pour un groupe, enregistré au clic.
+   *  Héritée (d'un groupe placé dessous, ou de Tout le monde) : cochée
+   *  d'office, sans clic possible — c'est sur le groupe d'origine qu'on agit. */
+  function caseDroit(b, g, droit, infos, lecture) {
+    var propre = infos.propres.indexOf(droit) >= 0;
+    var sources = !propre && infos.herites[droit];
     var input = el("input", {
       type: "checkbox",
-      "aria-label": D.DROITS[droit].titre + " — " + D.STATUTS_PLURIEL[statut] + " de " + b.nom
+      "aria-label": D.DROITS[droit].titre + " — " + g.nom + " (" + b.nom + ")"
     });
-    input.checked = avant;
+    input.checked = propre || !!sources;
+    if (sources) {
+      input.disabled = true;
+      var noms = sources.map(function (c) { return nomGroupe(b, c); }).join(", ");
+      return el("label", { class: "case-droit herite", title: "Hérité de : " + noms }, [input]);
+    }
+    if (lecture) input.disabled = true;
     input.addEventListener("change", function () {
       var voulu = input.checked;
-      var liste = D.ORDRE_DROITS.filter(function (x) {
-        return x === droit ? voulu : accordes.indexOf(x) >= 0;
-      });
-      // Un code que cette version de l'outil ne connaît pas encore reste en place
-      accordes.forEach(function (x) { if (D.ORDRE_DROITS.indexOf(x) < 0) liste.push(x); });
+      var liste = infos.propres.filter(function (x) { return x !== droit; });
+      if (voulu) liste.push(droit);
       input.disabled = true;
-      SB.rpc("console_enregistre_droits", { p: { bureauId: b.id, statut: statut, droits: liste } })
+      SB.rpc("console_enregistre_droits", { p: { bureauId: b.id, statut: g.code, droits: liste } })
         .then(function () {
-          UI.toast(D.STATUTS_PLURIEL[statut] + " : " + (voulu ? "droit accordé" : "droit retiré") +
+          UI.toast(g.nom + " : " + (voulu ? "droit accordé" : "droit retiré") +
                    " — " + D.DROITS[droit].titre.toLowerCase() + ".");
           return apresChangement();
         })
         .catch(function (e) {
           UI.toast(e.message);
-          input.checked = avant;
+          input.checked = !voulu;
           input.disabled = false;
         });
     });
-    return el("label", { class: "case", style: "justify-content:center" }, [input]);
+    return el("label", { class: "case-droit", title: propre ? "Cliquer pour retirer" : "Cliquer pour accorder" }, [input]);
+  }
+
+  /* -------------------------------------------- hiérarchie des groupes */
+
+  /** Monte ou descend un groupe parmi ses voisins (même supérieur). */
+  function deplaceGroupe(b, g, sens) {
+    var voisins = groupesDe(b.id).filter(function (x) { return x.parent === g.parent; });
+    var i = voisins.map(function (x) { return x.code; }).indexOf(g.code), k = i + sens;
+    if (i < 0 || k < 0 || k >= voisins.length) return;
+    var codes = voisins.map(function (x) { return x.code; });
+    codes[i] = codes[k]; codes[k] = g.code;
+    SB.rpc("console_ordonne_groupes", { p: { bureauId: b.id, codes: codes } })
+      .then(apresChangement)
+      .catch(function (e) { UI.toast(e.message); });
+  }
+
+  /** Les groupes sous lesquels g peut se ranger : ni lui-même, ni l'un de ses subordonnés. */
+  function superieursPossibles(b, g) {
+    var l = groupesDe(b.id), exclus = {};
+    if (g) {
+      exclus[g.code] = true;
+      var change = true;
+      while (change) {
+        change = false;
+        l.forEach(function (x) { if (!exclus[x.code] && exclus[x.parent]) { exclus[x.code] = true; change = true; } });
+      }
+    }
+    return l.filter(function (x) { return !exclus[x.code]; });
+  }
+
+  /** Créer (g nul) ou modifier un groupe : son nom et le groupe sous lequel il se range. */
+  function formulaireGroupe(b, g, parentPropose) {
+    if (!b) return UI.toast("Crée d'abord un bureau.");
+    if (!groupesEnBase(b)) return UI.toast("Lance d'abord migration-groupes.sql dans Supabase.");
+    var socle = !!(g && g.code === "tous");
+    var chNom = UI.champ({ nom: "nom", label: "Nom du groupe", valeur: g ? g.nom : "", exemple: "Responsable BIM", large: true });
+    var champs = [chNom];
+    if (!socle) {
+      champs.push(UI.champ({
+        nom: "parent", label: "Rangé sous", type: "select", large: true,
+        valeur: g ? (g.parent || "") : (parentPropose || ""),
+        options: [{ valeur: "", label: "— En tête de la hiérarchie —" }].concat(superieursPossibles(b, g).map(function (x) {
+          return { valeur: x.code, label: (x.niveau ? new Array(x.niveau + 1).join("\u00a0\u00a0\u00a0") + "↳ " : "") + x.nom };
+        })),
+        aide: "Le groupe supérieur a d'office tout ce que ce groupe peut faire."
+      }));
+    }
+    var corps = el("div", {}, [
+      el("div", { class: "grille-champs" }, champs),
+      socle ? el("p", { class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible)",
+        text: "Le socle : chaque membre du bureau en fait partie, et tous les groupes ont ce qu'il peut faire. Il se renomme, mais ne se range sous aucun groupe et ne se supprime pas." }) : null
+    ]);
+    UI.ouvre({
+      surtitre: (g ? "Modifier le groupe" : "Nouveau groupe") + " · " + b.nom,
+      titre: g ? g.nom : "Nouveau groupe",
+      compacte: true,
+      corps: corps,
+      boutons: [
+        { label: "Annuler" },
+        { label: g ? "Enregistrer" : "Créer", or: true, entree: true, action: function () {
+          var v = UI.lit(corps);
+          var nom = String(v.nom || "").trim();
+          if (!nom) { UI.toast("Donne un nom au groupe."); return false; }
+          var donnees = { bureauId: b.id, code: g ? g.code : null, nom: nom };
+          if (!socle) donnees.parent = v.parent || null;
+          return SB.rpc("console_enregistre_groupe", { p: donnees }).then(function () {
+            UI.toast(g ? "Groupe enregistré." : "Groupe « " + nom + " » créé : coche maintenant ce qu'il peut faire.");
+            return apresChangement();
+          }).catch(function (e) { UI.toast(e.message); return false; });
+        } }
+      ]
+    });
+  }
+
+  function supprimeGroupe(b, g) {
+    var n = membresDuGroupe(b, g.code);
+    var sous = groupesDe(b.id).filter(function (x) { return x.parent === g.code; });
+    var texte = "Le groupe « " + g.nom + " » disparaît avec ses droits." +
+      (n ? " " + nb(n, "personne le quitte", "personnes le quittent") + " (elles gardent leurs autres groupes)." : "") +
+      (sous.length ? " " + sous.map(function (x) { return "« " + x.nom + " »"; }).join(", ") +
+        (sous.length > 1 ? " remontent" : " remonte") + " d'un cran." : "");
+    UI.confirme("Supprimer ce groupe ?", texte, "Supprimer", true).then(function (oui) {
+      if (!oui) return;
+      SB.rpc("console_supprime_groupe", { p_bureau: b.id, p_code: g.code })
+        .then(function () { UI.toast("Groupe « " + g.nom + " » supprimé."); return apresChangement(); })
+        .catch(function (e) { UI.toast(e.message); });
+    });
+  }
+
+  function ligneGroupe(b, g, voisins, lecture) {
+    var n = membresDuGroupe(b, g.code), socle = g.code === "tous";
+    var i = voisins.indexOf(g);
+    var parent = !socle && g.parent ? nomGroupe(b, g.parent) : "";
+    var actions = el("div", { class: "groupe-actions" }, lecture ? [] : [
+      socle ? null : el("button", { type: "button", class: "ordre-btn", text: "↑", title: "Monter", "aria-label": "Monter « " + g.nom + " »",
+        disabled: i <= 0 ? true : null, onclick: function () { deplaceGroupe(b, g, -1); } }),
+      socle ? null : el("button", { type: "button", class: "ordre-btn", text: "↓", title: "Descendre", "aria-label": "Descendre « " + g.nom + " »",
+        disabled: i < 0 || i >= voisins.length - 1 ? true : null, onclick: function () { deplaceGroupe(b, g, 1); } }),
+      socle ? null : el("button", { type: "button", class: "ordre-btn plus", text: "+", title: "Nouveau groupe sous « " + g.nom + " »",
+        "aria-label": "Nouveau groupe sous « " + g.nom + " »", onclick: function () { formulaireGroupe(b, null, g.code); } }),
+      UI.boutonIcone("modifier", socle ? "Renommer" : "Modifier", g.nom, function () { formulaireGroupe(b, g); }),
+      socle ? null : UI.boutonIcone("supprimer", "Supprimer", g.nom, function () { supprimeGroupe(b, g); })
+    ]);
+    return el("li", { class: "groupe-ligne" + (socle ? " socle" : ""), style: "--niveau:" + (g.niveau || 0) }, [
+      el("div", { class: "groupe-nom" }, [
+        g.niveau ? el("span", { class: "groupe-branche", "aria-hidden": "true", text: "└" }) : null,
+        el("span", { class: "principal", text: g.nom }),
+        el("span", { class: "secondaire", text: socle ? "chaque membre · " + nb(n, "personne", "personnes")
+          : nb(n, "personne", "personnes") + (parent ? " · sous " + parent : "") })
+      ]),
+      actions
+    ]);
   }
 
   function dessineDroits() {
@@ -919,6 +1127,7 @@
 
     if (!etat.bureaux.length) {
       hotes.filtreDroits.hidden = true;
+      hotes.nouveauGroupe.hidden = true;
       hotes.droits.appendChild(el("div", { class: "vide", text: "Aucun bureau : crée d'abord un bureau." }));
       return;
     }
@@ -931,47 +1140,60 @@
       hotes.filtreDroits.appendChild(el("option", { value: x.id, selected: x.id === b.id }, [x.nom]));
     });
 
-    var corps = el("tbody");
-    D.ORDRE_STATUTS.forEach(function (s) {
-      var accordes = (b.droits && b.droits[s]) || [];
-      var n = (etat.membres || []).filter(function (m) {
-        return m.bureauId === b.id && m.actif && D.aStatut(m, s);
-      }).length;
-      var cellules = [el("td", {}, [
-        el("div", { class: "principal", text: D.STATUTS_PLURIEL[s] }),
-        el("div", { class: "secondaire", text: n
-          ? n + (n > 1 ? " personnes" : " personne")
-          : "personne — à cocher dans « Utilisateurs »" })
-      ])];
-      D.ORDRE_DROITS.forEach(function (d) {
-        cellules.push(el("td", { class: "num" }, [caseDroit(b, s, d, accordes)]));
-      });
-      corps.appendChild(el("tr", {}, cellules));
-    });
-
-    hotes.droits.appendChild(el("table", { class: "liste" }, [
-      el("thead", {}, [el("tr", {}, [el("th", { text: "Groupe" })].concat(
-        D.ORDRE_DROITS.map(function (d) {
-          return el("th", { class: "num", title: D.DROITS[d].aide, text: D.DROITS[d].titre });
-        })
-      ))]),
-      corps
-    ]));
-
-    var legende = el("div", { style: "margin-top:22px;max-width:56em" }, [
-      el("div", { class: "legende", text: "Ce que veut dire chaque droit" })
-    ]);
-    D.ORDRE_DROITS.forEach(function (d) {
-      legende.appendChild(el("p", { style: "margin-top:10px;font-size:14px;color:var(--texte-doux)" }, [
-        el("b", { text: D.DROITS[d].titre + " — " }),
-        D.DROITS[d].aide
+    var lecture = !groupesEnBase(b);
+    hotes.nouveauGroupe.hidden = lecture;
+    if (lecture) {
+      hotes.droits.appendChild(el("p", { class: "perte", style: "margin:0 0 20px" }, [
+        el("b", { text: "Base à mettre à jour. " }),
+        "Lance migration-groupes.sql dans Supabase (SQL Editor) : la console pourra alors créer, renommer et ranger les groupes et cocher leurs droits. En attendant, le tableau montre les réglages en lecture seule."
       ]));
+    }
+
+    var groupes = groupesDe(b.id), bruts = groupesBrutsDe(b), tous = groupeTous(b);
+    var tousRange = { code: "tous", nom: tous.nom, parent: null, niveau: 0 };
+
+    // ---- la hiérarchie : un arbre, voisins réordonnables
+    var arbre = el("ul", { class: "groupes-arbre" });
+    groupes.forEach(function (g) {
+      var voisins = groupes.filter(function (x) { return x.parent === g.parent; });
+      arbre.appendChild(ligneGroupe(b, g, voisins, lecture));
     });
-    legende.appendChild(el("p", {
-      class: "aide", style: "margin-top:18px;font-size:13.5px;color:var(--texte-faible)",
-      text: "Une personne qui ne porte aucun de ces trois statuts n'a aucun de ces droits : elle crée et modifie les tâches dont une part est la sienne, gère ses propres absences, et travaille normalement sur les affaires existantes. Les statuts se cochent dans « Utilisateurs ». Toi, super admin, tu passes partout."
-    }));
-    hotes.droits.appendChild(legende);
+    arbre.appendChild(ligneGroupe(b, tousRange, [], lecture));
+    hotes.droits.appendChild(el("div", { class: "legende", text: "Hiérarchie des groupes" }));
+    hotes.droits.appendChild(el("p", { class: "aide groupes-aide",
+      text: "Du plus large au plus étroit. Un groupe a d'office tout ce que peuvent faire les groupes rangés sous lui, et tout ce que peut faire « " + tous.nom + " ». On entre dans un groupe depuis « Utilisateurs »." }));
+    hotes.droits.appendChild(arbre);
+
+    // ---- le tableau : groupes en colonnes, fonctions en lignes
+    var colonnes = groupes.concat([tousRange]);
+    var infos = {};
+    colonnes.forEach(function (g) { infos[g.code] = D.droitsGroupe(bruts, g.code); });
+
+    var tete = el("tr", {}, [el("th", { class: "col-fonction", text: "Fonction" })].concat(colonnes.map(function (g) {
+      return el("th", { class: "col-groupe" + (g.code === "tous" ? " socle" : ""), title: g.nom + " — " + nb(membresDuGroupe(b, g.code), "personne", "personnes") }, [
+        el("span", { class: "nom-col", text: g.nom }),
+        el("span", { class: "nb-col", text: String(membresDuGroupe(b, g.code)) })
+      ]);
+    })));
+    var corps = el("tbody");
+    D.CATEGORIES_DROITS.forEach(function (cat) {
+      corps.appendChild(el("tr", { class: "categorie" }, [el("td", { colspan: String(colonnes.length + 1), text: cat.titre })]));
+      cat.droits.forEach(function (d) {
+        corps.appendChild(el("tr", {}, [el("td", { class: "col-fonction" }, [
+          el("div", { class: "principal", text: D.DROITS[d].titre }),
+          el("div", { class: "secondaire", text: D.DROITS[d].aide })
+        ])].concat(colonnes.map(function (g) {
+          return el("td", { class: "col-groupe" + (g.code === "tous" ? " socle" : "") }, [caseDroit(b, g, d, infos[g.code], lecture)]);
+        }))));
+      });
+    });
+
+    hotes.droits.appendChild(el("div", { class: "legende", style: "margin-top:34px", text: "Droits de chaque groupe" }));
+    hotes.droits.appendChild(el("p", { class: "aide groupes-aide",
+      text: "Une case pleine se coche et se décoche ; une case en demi-teinte est héritée (survole-la pour savoir d'où) : on la règle sur le groupe d'origine. Toi, super admin, tu passes partout. Les pages et ce qu'on voit ne sont qu'un rangement de l'interface ; les actions, la base les applique aussi." }));
+    hotes.droits.appendChild(el("div", { class: "droits-defile" }, [
+      el("table", { class: "droits-matrice" }, [el("thead", {}, [tete]), corps])
+    ]));
   }
 
   /* ------------------------------------------------- réglages sur la ligne
@@ -1051,27 +1273,28 @@
     });
   }
 
-  /* Les statuts se cochent sur la ligne : trois bascules, allumées quand la
-     personne les porte. C'est le geste courant — désigner les associés, les
-     chefs de secteur et les chefs de projet d'un bureau entier sans ouvrir
-     quatre-vingts fiches. La fiche, elle, garde les cases en toutes lettres. */
+  /* Les groupes se cochent sur la ligne : une bascule par groupe du bureau,
+     allumée quand la personne en fait partie. C'est le geste courant —
+     désigner les associés, les chefs de secteur et les chefs de projet d'un
+     bureau entier sans ouvrir quatre-vingts fiches. La fiche, elle, garde les
+     cases en toutes lettres. */
   function basculesStatuts(p) {
     if (!p.fiche) return el("span", { class: "secondaire", text: "—" });
     var boite = el("div", { class: "statuts-ligne bascules" });
-    D.ORDRE_STATUTS.forEach(function (s) {
-      var porte = D.aStatut(p, s);
+    var avant = groupesDeP(p).map(function (g) { return g.code; });
+    groupesDe(p.bureauId).forEach(function (g) {
+      var s = g.code, porte = avant.indexOf(s) >= 0;
       var b = el("button", {
         type: "button", class: "etiq statut " + s + (porte ? " porte" : ""),
-        title: D.STATUTS[s] + (porte ? " — cliquer pour retirer" : " — cliquer pour ajouter"),
+        title: g.nom + (porte ? " — cliquer pour retirer" : " — cliquer pour ajouter"),
         "aria-pressed": porte ? "true" : "false",
-        "aria-label": D.STATUTS[s] + " de " + nomDe(p)
-      }, [D.STATUTS_COURTS[s]]);
+        "aria-label": g.nom + " de " + nomDe(p)
+      }, [courtGroupe(g)]);
       b.addEventListener("click", function () {
-        var avant = D.statutsDe(p);
         var apres = porte ? avant.filter(function (x) { return x !== s; }) : avant.concat([s]);
         b.disabled = true;
         enregistreVite(p, { statuts: apres },
-          nomDe(p) + (porte ? " n'est plus " : " est ") + D.STATUTS[s].toLowerCase() + ".",
+          nomDe(p) + (porte ? " quitte le groupe « " : " entre dans le groupe « ") + g.nom + " ».",
           function () { b.disabled = false; });
       });
       boite.appendChild(b);
@@ -1161,11 +1384,16 @@
       })),
       aide: "Un seul. Seuls les ingénieurs et les dessinateurs paraissent au planning."
     });
-    // Les statuts se cumulent entre eux et avec le métier : on peut être
-    // ingénieur, administrateur et chef de projet à la fois.
-    var chStatuts = UI.cases("statuts", D.ORDRE_STATUTS.map(function (s) {
-      return { valeur: s, label: D.STATUTS[s] };
-    }), p ? D.statutsDe(p) : []);
+    // Les groupes se cumulent entre eux et avec le métier : on peut être
+    // ingénieur, administrateur et chef de projet à la fois. Ce sont ceux du
+    // bureau choisi : la liste suit le menu « Bureau ».
+    var chStatuts = el("div");
+    function remplitGroupes(idBureau, coches) {
+      UI.vide(chStatuts).appendChild(UI.cases("statuts", groupesDe(idBureau).map(function (g) {
+        return { valeur: g.code, label: g.nom };
+      }), coches));
+    }
+    remplitGroupes(bureauInit, p ? groupesDeP(p).map(function (g) { return g.code; }) : []);
     var chCap    = UI.champ({
       nom: "capacite", label: "Capacité (j/sem.)", type: "number", pas: "0.5", min: "0.5", max: "7", inputmode: "decimal",
       valeur: p && p.capacite != null ? p.capacite : capDefaut,
@@ -1193,11 +1421,11 @@
     ]);
 
     var statuts = el("fieldset", {}, [
-      el("div", { class: "legende", text: "Statuts dans la société" }),
+      el("div", { class: "legende", text: "Groupes" }),
       chStatuts,
       el("p", {
         class: "aide", style: "margin-top:10px;font-size:13px;color:var(--texte-faible);max-width:46em",
-        text: "À cocher autant que nécessaire, ou aucune. Un administrateur est un associé du bureau. Ces statuts s'ajoutent au métier : on peut être ingénieur, administrateur et chef de projet à la fois."
+        text: "À cocher autant que nécessaire, ou aucun : chacun fait déjà partie de « Tout le monde ». Les groupes s'ajoutent au métier : on peut être ingénieur, administrateur et chef de projet à la fois. Ce que chaque groupe peut faire se règle dans « Groupes et droits »."
       })
     ]);
 
@@ -1264,6 +1492,7 @@
 
     selBureau.addEventListener("change", function () {
       remplitListes(selSucc.value, selDisc.value);
+      remplitGroupes(selBureau.value, (UI.lit(chStatuts).statuts || []));
       majAdresse();
     });
     selSucc.addEventListener("change", function () { remplitListes(selSucc.value, selDisc.value); });

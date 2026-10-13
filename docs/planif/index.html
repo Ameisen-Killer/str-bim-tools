@@ -105,12 +105,12 @@
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=48"></script>
-<script src="/planif/assets/donnees.js?v=64"></script>
+<script src="/planif/assets/supabase.js?v=49"></script>
+<script src="/planif/assets/donnees.js?v=65"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
-<script src="/planif/assets/version.js?v=12"></script>
+<script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/portail.js?v=14"></script>
-<script src="/planif/assets/tchat.js?v=7"></script>
+<script src="/planif/assets/tchat.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -173,13 +173,19 @@
     main.classList.remove("ab-attente");
   }
 
-  /* Arrivée ici depuis une page hors de son niveau (ui.js, chrome) : le dire */
-  var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", secteurs: "Secteurs", inter: "Inter-secteurs" };
+  /* Arrivée ici depuis une page que son groupe n'ouvre pas (ui.js, chrome) :
+     le dire, avec les groupes qui l'ouvrent (droits réglés dans la console) */
+  var NOMS_PAGES = { affaires: "Affaires", equipe: "Équipe", charge: "Charge", secteurs: "Secteurs", inter: "Inter-secteurs",
+                     tableau: "Tableau de bord", absences: "Absences et congés", annuaire: "Annuaire", transversales: "Affaires transversales" };
   function refus() {
     var cle = new URLSearchParams(location.search).get("refus");
     if (!cle) return;
     history.replaceState(null, "", location.pathname + location.hash);
-    var qui = D.NIVEAUX_PAGES[cle] >= 2 ? "aux administrateurs du bureau" : "aux chefs de secteur et aux administrateurs du bureau";
+    var droit = D.DROIT_PAGE[cle], groupes = D.groupes();
+    var noms = droit ? groupes.filter(function (g) {
+      return D.droitsGroupe(groupes, g.code).tous.indexOf(droit) >= 0;
+    }).map(function (g) { return g.nom; }) : [];
+    var qui = noms.length ? "aux groupes : " + noms.join(", ") : "à certains groupes du bureau";
     var nav = document.querySelector(".ab-modules");
     nav.parentNode.insertBefore(el("p", { class: "ab-message ab-refus",
       text: "La page « " + (NOMS_PAGES[cle] || cle) + " » est réservée " + qui + "." }), nav);
@@ -343,11 +349,12 @@
   }
 
   /* ----------------------------------------------- tâches à affecter
-     Les tâches dont une part chargée attend encore quelqu'un. Réservé aux
-     chefs de secteur et au-delà (demande de Tony, 07.10.2026) : en dessous,
+     Les tâches dont une part chargée attend encore quelqu'un. Réservé au
+     droit « Tâches à affecter » (chefs de secteur et au-delà au départ,
+     demande de Tony du 07.10.2026) : sans lui,
      l'encadré disparaît et les deux autres se partagent la largeur. */
   function aAffecter() {
-    var chef = D.niveauAcces() >= 1;
+    var chef = D.aDroit("taches_a_affecter");
     document.getElementById("encadre-aff").style.display = chef ? "" : "none";
     document.querySelector(".ab-encadres").classList.toggle("deux", !chef);
     if (!chef) return;

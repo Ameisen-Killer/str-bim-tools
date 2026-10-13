@@ -112,30 +112,153 @@
     administratif: "Administratifs", "": "À désigner"
   };
 
-  // Du plus large au plus étroit : c'est l'ordre d'affichage des étiquettes.
-  var ORDRE_STATUTS = ["administrateur", "chef_secteur", "chef_projet"];
-  var STATUTS = {
-    administrateur: "Administrateur", chef_secteur: "Chef de secteur", chef_projet: "Chef de projet"
-  };
-  // Version courte, pour les listes denses (colonne de la console, étiquettes)
-  var STATUTS_COURTS = {
-    administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet"
-  };
+  /* Les groupes du bureau (13.10.2026 : groupes libres, réglés dans la
+     console). Les membres en portent les codes dans « statuts » ; chaque groupe
+     a un nom, un groupe supérieur (parent) et un rang parmi ses voisins. Un
+     groupe a aussi les droits des groupes placés sous lui ; « Tout le monde »
+     (tous) est le socle commun à chaque membre. Les listes ci-dessous suivent
+     les groupes du bureau (poseGroupes) : elles se remplissent sur place, les
+     pages qui les ont gardées en main voient donc les bons noms. */
+  var GROUPES_DEFAUT = [
+    { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
+      droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire"] },
+    { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous"] },
+    { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge", "page_secteurs",
+               "planning_equipe", "taches_a_affecter", "conges_secteur"] },
+    { code: "chef_projet", nom: "Chef de projet", parent: "chef_secteur", ordre: 0,
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui"] }
+  ];
+  // Intitulés des trois groupes d'origine, tant qu'ils gardent leur nom
+  var COURTS_ORIGINE = { administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet" };
   // « Chefs de secteur », et non « chef de secteurs » : le pluriel ne s'ajoute pas à la fin
-  var STATUTS_PLURIEL = {
-    administrateur: "Administrateurs", chef_secteur: "Chefs de secteur", chef_projet: "Chefs de projet"
-  };
+  var PLURIELS_ORIGINE = { administrateur: "Administrateurs", chef_secteur: "Chefs de secteur", chef_projet: "Chefs de projet" };
+
+  var GROUPES = [];               // groupes du bureau, tels que lus
+  var ORDRE_STATUTS = [];         // codes des groupes, dans l'ordre de la hiérarchie (sans « tous »)
+  var STATUTS = {};               // code → nom
+  var STATUTS_COURTS = {};        // code → intitulé court, pour les listes denses
+  var STATUTS_PLURIEL = {};       // code → nom au pluriel
   function libelleStatut(s) { return STATUTS[s] || s; }
 
-  /* Les droits accordés aux groupes, cochés bureau par bureau dans la console.
-     Qui ne porte aucun statut n'en a aucun : c'est l'utilisateur « lambda ».
+  function texteGroupe(v) { return v == null ? "" : String(v).trim(); }
+  function normaliseGroupe(g) {
+    return {
+      code: texteGroupe(g.code || g.statut), nom: texteGroupe(g.nom) || texteGroupe(g.code || g.statut),
+      parent: texteGroupe(g.parent) || null, ordre: Number(g.ordre) || 0,
+      droits: Array.isArray(g.droits) ? g.droits.map(texteGroupe).filter(Boolean) : []
+    };
+  }
+
+  /** Les groupes rangés comme un arbre, de haut en bas : chaque groupe suivi de
+   *  ceux placés sous lui, voisins par rang puis par nom. Sans « Tout le monde ».
+   *  Chaque élément reçoit « niveau » (0 en tête). Un supérieur inconnu vaut
+   *  « pas de supérieur » ; une boucle éventuelle est coupée. */
+  function rangeGroupes(liste) {
+    var l = (liste || []).map(normaliseGroupe).filter(function (g) { return g.code && g.code !== "tous"; });
+    var codes = {}; l.forEach(function (g) { codes[g.code] = true; });
+    var vus = {}, out = [];
+    function enfants(parent) {
+      return l.filter(function (g) { return (codes[g.parent] ? g.parent : null) === parent; })
+        .sort(function (a, b) { return a.ordre - b.ordre || a.nom.localeCompare(b.nom, "fr", { sensitivity: "base" }); });
+    }
+    function descend(parent, niveau) {
+      enfants(parent).forEach(function (g) {
+        if (vus[g.code]) return;
+        vus[g.code] = true;
+        g.niveau = niveau;
+        out.push(g);
+        descend(g.code, niveau + 1);
+      });
+    }
+    descend(null, 0);
+    // Pris dans une boucle : rangés à la fin, en tête de leur branche
+    l.forEach(function (g) { if (!vus[g.code]) { vus[g.code] = true; g.niveau = 0; out.push(g); descend(g.code, 1); } });
+    return out;
+  }
+
+  /** Ce qu'un groupe peut faire : ses droits propres, et ceux qu'il tient de
+   *  « Tout le monde » et des groupes placés sous lui, avec leur origine.
+   *  { propres: [...], herites: { droit: [codes] }, tous: [...] } */
+  function droitsGroupe(liste, code) {
+    var l = (liste || []).map(normaliseGroupe), par = {};
+    l.forEach(function (g) { par[g.code] = g; });
+    var g = par[code] || { droits: [] };
+    var herites = {};
+    function note(d, source) { (herites[d] || (herites[d] = [])).indexOf(source) < 0 && herites[d].push(source); }
+    var vus = {}; vus[code] = true;
+    (function descend(c) {
+      l.forEach(function (x) {
+        if (x.parent !== c || vus[x.code] || x.code === "tous") return;
+        vus[x.code] = true;
+        x.droits.forEach(function (d) { note(d, x.code); });
+        descend(x.code);
+      });
+    })(code);
+    if (code !== "tous" && par.tous) par.tous.droits.forEach(function (d) { note(d, "tous"); });
+    var tous = g.droits.slice();
+    Object.keys(herites).forEach(function (d) { if (tous.indexOf(d) < 0) tous.push(d); });
+    return { propres: g.droits.slice(), herites: herites, tous: tous };
+  }
+
+  /** Les droits de quelqu'un qui porte ces groupes (Tout le monde compris). */
+  function droitsDesStatuts(liste, statuts) {
+    var out = droitsGroupe(liste, "tous").tous.slice();
+    (statuts || []).forEach(function (s) {
+      droitsGroupe(liste, s).tous.forEach(function (d) { if (out.indexOf(d) < 0) out.push(d); });
+    });
+    return out;
+  }
+
+  /** Les groupes du bureau affiché : noms et ordre de toutes les listes. */
+  function poseGroupes(liste) {
+    GROUPES = (Array.isArray(liste) && liste.length ? liste : GROUPES_DEFAUT).map(normaliseGroupe);
+    var ranges = rangeGroupes(GROUPES);
+    ORDRE_STATUTS.length = 0;
+    [STATUTS, STATUTS_COURTS, STATUTS_PLURIEL].forEach(function (o) { Object.keys(o).forEach(function (k) { delete o[k]; }); });
+    ranges.forEach(function (g) {
+      ORDRE_STATUTS.push(g.code);
+      var origine = GROUPES_DEFAUT.filter(function (x) { return x.code === g.code && x.nom === g.nom; })[0];
+      STATUTS[g.code] = g.nom;
+      STATUTS_COURTS[g.code] = origine ? COURTS_ORIGINE[g.code] : g.nom;
+      STATUTS_PLURIEL[g.code] = origine ? PLURIELS_ORIGINE[g.code] : g.nom;
+    });
+    vuEnCache = null;
+  }
+
+  /* Les droits que la console coche, groupe par groupe (13.10.2026 : tout ce
+     qui était écrit en dur — pages, vues, congés, tchat — est devenu un droit).
      Ajouter un droit se fait ici — la base accepte n'importe quel code, elle ne
-     juge que ce qu'elle sait appliquer (a_droit, base-supabase.sql). */
-  var ORDRE_DROITS = ["affaires_creer", "taches_autrui", "absences_autrui"];
+     juge que ce qu'elle sait appliquer (a_droit, base-supabase.sql). Les pages
+     et les vues ne sont qu'un rangement de l'interface ; les actions, la base
+     les applique aussi. */
+  var CATEGORIES_DROITS = [
+    { titre: "Pages", droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire",
+                               "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales"] },
+    { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter"] },
+    { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
+                                             "conges_secteur", "conges_tous", "tchat_moderer"] }
+  ];
+  var ORDRE_DROITS = [].concat.apply([], CATEGORIES_DROITS.map(function (c) { return c.droits; }));
   var DROITS = {
+    page_tableau: { titre: "Tableau de bord", aide: "La page Tableau de bord (planning par personne)." },
+    page_equipe: { titre: "Équipe", aide: "La page Équipe : les fiches et les téléphones de chacun." },
+    page_absences: { titre: "Absences et congés", aide: "La page des absences et des congés de l'équipe." },
+    page_annuaire: { titre: "Annuaire", aide: "Le carnet d'adresses du bureau." },
+    page_affaires: { titre: "Affaires", aide: "La page Affaires (liste, équipes, carte)." },
+    page_charge: { titre: "Tableau de charge", aide: "La carte de charge, une case par personne et par semaine." },
+    page_secteurs: { titre: "Secteurs", aide: "Le module Secteurs : effectifs, charge et projets de chaque secteur." },
+    page_inter: { titre: "Appels d'offres", aide: "Le module Inter-secteurs : appels d'offres, agenda des AO, veille simap.ch." },
+    page_transversales: { titre: "Affaires transversales", aide: "Les affaires qui touchent plusieurs secteurs." },
+    planning_equipe: {
+      titre: "Planning de toute l'équipe",
+      aide: "Le tableau de bord montre tout le monde, et la page Équipe la charge de chacun. Sans ce droit, on n'y voit que ses tâches et les personnes qui y travaillent."
+    },
+    taches_a_affecter: { titre: "Tâches à affecter", aide: "L'encadré « Tâches à affecter » de l'accueil." },
     affaires_creer: {
       titre: "Ouvrir une affaire",
-      aide: "Créer une nouvelle affaire, et la retirer. Sans ce droit, on travaille normalement sur les affaires existantes."
+      aide: "Créer une nouvelle affaire (et un appel d'offres), et la retirer. Sans ce droit, on travaille normalement sur les affaires existantes."
     },
     taches_autrui: {
       titre: "Créer des tâches pour les autres",
@@ -143,18 +266,31 @@
     },
     absences_autrui: {
       titre: "Poser les absences des autres",
-      aide: "Et régler leurs jours travaillés. Sans ce droit, chacun ne gère que ses propres absences et ses propres jours."
+      aide: "Et régler leurs jours travaillés, modifier tous les rendez-vous. Sans ce droit, chacun ne gère que ses propres absences, ses jours et ses rendez-vous."
+    },
+    conges_secteur: {
+      titre: "Valider les congés de son secteur",
+      aide: "Accepter ou refuser les demandes de congé des personnes de sa discipline — jamais les siennes."
+    },
+    conges_tous: {
+      titre: "Valider tous les congés",
+      aide: "Accepter ou refuser toutes les demandes de congé du bureau — jamais les siennes."
+    },
+    tchat_moderer: {
+      titre: "Retirer les messages des autres",
+      aide: "Au tchat du bureau. Sans ce droit, chacun ne retire que ses propres messages."
     }
   };
-
-  /* Niveau demandé par chaque page (voir niveauAcces) */
-  var NIVEAUX_PAGES = {
-    accueil: 0, communication: 0, tableau: 0, taches: 0, absences: 0, annuaire: 0,
-    equipe: 0,                       // ouverte aux collaborateurs (11.10.2026) : téléphones de chacun
-    affaires: 1, charge: 1, secteurs: 1,
-    inter: 2, transversales: 2,
-    console: 3
+  // Droits venus avec les groupes libres : une base pas encore mise à jour ne
+  // les connaît pas, on les déduit alors des groupes d'origine.
+  var DROITS_ANCIENS = ["affaires_creer", "taches_autrui", "absences_autrui"];
+  // Page → droit qui l'ouvre. Accueil, Communication et Tâches sont à tous ; la console au super admin.
+  var DROIT_PAGE = {
+    tableau: "page_tableau", equipe: "page_equipe", absences: "page_absences", annuaire: "page_annuaire",
+    affaires: "page_affaires", charge: "page_charge", secteurs: "page_secteurs",
+    inter: "page_inter", transversales: "page_transversales"
   };
+  poseGroupes(null);
 
   /* Démonstration : rôle choisi dans le menu du compte (07.10.2026), pour voir
      l'outil comme chacun le verra. Retenu sur ce navigateur ; par défaut
@@ -166,13 +302,16 @@
      les droits que le bureau leur accorde (profilVu) — boutons, congés à
      valider, retrait de messages, choix du bureau… exactement ce que verrait
      une personne de ce rôle. La base, elle, garde les vrais droits. */
-  var ROLES_DEMO = [
-    { code: "collaborateur", nom: "Collaborateur", niveau: 0, statuts: [] },
-    { code: "chef_projet", nom: "Chef de projet", niveau: 0, statuts: ["chef_projet"] },
-    { code: "chef_secteur", nom: "Chef de secteur", niveau: 1, statuts: ["chef_secteur"] },
-    { code: "administrateur", nom: "Administrateur", niveau: 2, statuts: ["administrateur"] },
-    { code: "admin_site", nom: "Admin du site", niveau: 3, statuts: null }
-  ];
+  /* Depuis le 13.10.2026, la liste suit les groupes du bureau : du plus
+     étroit au plus large, entre « Collaborateur » (Tout le monde seulement)
+     et « Admin du site ». */
+  function rolesDemoListe() {
+    return [{ code: "collaborateur", nom: "Collaborateur", statuts: [] }]
+      .concat(rangeGroupes(GROUPES).reverse().map(function (g) {
+        return { code: g.code, nom: g.nom, statuts: [g.code] };
+      }))
+      .concat([{ code: "admin_site", nom: "Admin du site", statuts: null }]);
+  }
   var CLE_ROLE_DEMO = "planif.demo.role", CLE_ROLE_SUPER = "planif.super.role";
 
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
@@ -380,28 +519,37 @@
     profilEnCours = lecture.then(function (brut) {
       if (!brut) {
         // Mode local : un seul utilisateur, sur sa propre machine — tous les droits.
+        poseGroupes(null);
         profil = { multi: false, superAdmin: false, peutTout: true, metier: "", statuts: [],
-                   droits: ORDRE_DROITS.slice(), bureau: null, bureaux: [] };
+                   droits: ORDRE_DROITS.slice(), bureau: null, bureaux: [], groupesEnBase: true };
         return profil;
       }
       if (!brut.autorise) throw erreur(REFUS[brut.motif] || REFUS.inconnu);
+      // Les groupes du bureau ; absents, la base n'a pas encore reçu migration-groupes.sql
+      var groupesEnBase = Array.isArray(brut.groupes);
+      poseGroupes(groupesEnBase ? brut.groupes : null);
+      var statuts = (brut.statuts || []).map(texte).filter(function (s) { return STATUTS[s]; });
+      var droits = (brut.droits || []).map(texte);
+      if (!groupesEnBase) {
+        droitsDesStatuts(GROUPES, statuts).forEach(function (d) {
+          if (DROITS_ANCIENS.indexOf(d) < 0 && droits.indexOf(d) < 0) droits.push(d);
+        });
+      }
       profil = {
         multi: true, email: brut.email || "", superAdmin: !!brut.superAdmin,
         // Fiche du planning rattachée à cette adresse dans la console (vide : accès sans fiche)
         membreId: brut.membreId || null,
         // Métier et statuts de cette fiche : sur quoi s'appuieront les droits d'accès
         metier: METIERS[brut.metier] ? brut.metier : "",
-        statuts: ORDRE_STATUTS.filter(function (s) {
-          return (brut.statuts || []).indexOf(s) >= 0;
-        }),
-        /* Les droits que ses statuts lui accordent, réunis par la base. Ils
-           servent à ne pas proposer l'impossible ; c'est la base qui tranche. */
-        droits: (brut.droits || []).map(texte),
+        statuts: ORDRE_STATUTS.filter(function (s) { return statuts.indexOf(s) >= 0; }),
+        /* Les droits que ses groupes lui accordent (hérités compris), réunis
+           par la base. Ils servent à ne pas proposer l'impossible ; c'est la
+           base qui tranche. */
+        droits: droits,
+        groupesEnBase: groupesEnBase,
         // Tout effacer, importer : réservés au super admin quand il y a plusieurs bureaux
         peutTout: !!brut.superAdmin,
-        bureau: brut.bureau || null, bureaux: brut.bureaux || [],
-        // Droits de chaque groupe du bureau : pour voir l'outil en tant qu'un autre rôle
-        droitsGroupes: Array.isArray(brut.droitsGroupes) ? brut.droitsGroupes : null
+        bureau: brut.bureau || null, bureaux: brut.bureaux || []
       };
       poseListes({ succursales: brut.succursales || [], disciplines: brut.disciplines || [] });
       return profil;
@@ -412,8 +560,8 @@
 
   /* Le profil tel que l'interface doit le voir : le vrai, ou celui du rôle
      choisi dans « Voir l'outil en tant que » — ni super admin, ni « tout
-     gérer », les statuts du rôle et les droits que le bureau leur donne
-     (droits_groupes ; à défaut, ceux d'un bureau neuf : tous). */
+     gérer », le groupe du rôle et les droits que le bureau lui donne, hérités
+     compris (droits_groupes ; à défaut, ceux d'un bureau neuf). */
   var vuEnCache = null;
   function profilVu() {
     if (!profil) return profil;
@@ -422,16 +570,7 @@
     if (vuEnCache && vuEnCache.base === profil && vuEnCache.code === r.code) return vuEnCache.vu;
     var vu = {};
     Object.keys(profil).forEach(function (k) { vu[k] = profil[k]; });
-    var groupes = profil.droitsGroupes;
-    var droits = [];
-    r.statuts.forEach(function (st) {
-      var accordes = ORDRE_DROITS;
-      if (Array.isArray(groupes)) {
-        var g = groupes.filter(function (x) { return x && x.statut === st; })[0];
-        accordes = g && Array.isArray(g.droits) ? g.droits.map(texte) : [];
-      }
-      accordes.forEach(function (d) { if (droits.indexOf(d) < 0) droits.push(d); });
-    });
+    var droits = droitsDesStatuts(GROUPES, r.statuts);
     vu.superAdmin = false;
     vu.peutTout = false;
     vu.statuts = r.statuts.slice();
@@ -550,9 +689,10 @@
     return METIERS[v] ? v : "";
   }
   function reprisStatuts(m) {
-    var l = (Array.isArray(m.statuts) ? m.statuts : []).map(texte);
-    if (m.metier === undefined && texte(m.role) === "administrateur") l.push("administrateur");
-    return ORDRE_STATUTS.filter(function (s) { return l.indexOf(s) >= 0; });
+    // Tous les codes sont gardés : les groupes du bureau ne sont peut-être pas encore lus
+    var l = (Array.isArray(m.statuts) ? m.statuts : []).map(texte).filter(Boolean);
+    if (m.metier === undefined && texte(m.role) === "administrateur" && l.indexOf("administrateur") < 0) l.push("administrateur");
+    return l;
   }
 
   /** Complète un état lu du stockage : champs manquants, migrations. */
@@ -939,6 +1079,14 @@
     aStatut: aStatut,
     DROITS: DROITS,
     ORDRE_DROITS: ORDRE_DROITS,
+    CATEGORIES_DROITS: CATEGORIES_DROITS,
+    GROUPES_DEFAUT: GROUPES_DEFAUT,
+    rangeGroupes: rangeGroupes,
+    droitsGroupe: droitsGroupe,
+    /** Les groupes du bureau affiché, rangés en arbre (sans « Tout le monde »). */
+    groupes: function () { return rangeGroupes(GROUPES); },
+    /** Faux tant que la base n'a pas reçu migration-groupes.sql. */
+    groupesEnBase: function () { return !profil || profil.groupesEnBase !== false; },
     compareMembres: compareMembres,
     parMetier: parMetier,
     SUCCURSALES: SUCCURSALES,
@@ -1067,19 +1215,17 @@
        servent pour ne pas proposer l'impossible ; c'est la base (RLS) qui
        tranche pour de bon, avec exactement les mêmes règles. */
 
-    /* Accès aux pages selon le statut (demande de Tony, 07.10.2026) :
-       0 tout le monde (chefs de projet compris), 1 chefs de secteur,
-       2 administrateurs du bureau, 3 super admin (la console). Le statut le
-       plus haut l'emporte. Mode local : tout sauf la console. Ce n'est qu'un
-       rangement de l'interface : les données du bureau restent lisibles. */
-    NIVEAUX_PAGES: NIVEAUX_PAGES,
+    /* Accès aux pages (07.10.2026, par statut ; 13.10.2026, par droit) :
+       chaque page s'ouvre avec son droit (DROIT_PAGE), coché groupe par groupe
+       dans la console. Accueil, Communication et Tâches sont à tous, la
+       console au super admin. Ce n'est qu'un rangement de l'interface : les
+       données du bureau restent lisibles. */
+    DROIT_PAGE: DROIT_PAGE,
+    /** 3 : la console est ouverte (super admin, ou rôle « Admin du site ») ; 0 sinon. */
     niveauAcces: function () {
       var r = D.roleDemo();
-      if (r) return r.niveau;
-      if (!profil || !profil.multi) return 2;
-      if (profil.superAdmin) return 3;
-      var st = profil.statuts || [];
-      return st.indexOf("administrateur") >= 0 ? 2 : st.indexOf("chef_secteur") >= 0 ? 1 : 0;
+      if (r) return r.code === "admin_site" ? 3 : 0;
+      return profil && profil.multi && profil.superAdmin ? 3 : 0;
     },
     /** Rôle simulé : en démonstration, et pour le super admin partout ;
      *  null sinon. */
@@ -1088,8 +1234,11 @@
       if (!sa && !D.enDemo()) return null;
       var code = null;
       try { code = global.localStorage.getItem(sa ? CLE_ROLE_SUPER : CLE_ROLE_DEMO); } catch (e) {}
-      return ROLES_DEMO.filter(function (r) { return r.code === code; })[0] ||
-        ROLES_DEMO.filter(function (r) { return r.code === (sa ? "admin_site" : "administrateur"); })[0];
+      var roles = rolesDemoListe();
+      // Par défaut : l'admin du site pour lui, le groupe de tête en démonstration
+      return roles.filter(function (r) { return r.code === code; })[0] ||
+        roles.filter(function (r) { return r.code === (sa ? "admin_site" : "administrateur"); })[0] ||
+        roles[sa ? roles.length - 1 : Math.max(0, roles.length - 2)];
     },
     /** Titre du choix de rôle dans le menu du compte. */
     titreRolesDemo: function () {
@@ -1098,7 +1247,7 @@
     /** Les rôles du menu, avec « actif » ; null hors démonstration. */
     rolesDemo: function () {
       var r = D.roleDemo();
-      return r ? ROLES_DEMO.map(function (x) { return { code: x.code, nom: x.nom, actif: x.code === r.code }; }) : null;
+      return r ? rolesDemoListe().map(function (x) { return { code: x.code, nom: x.nom, actif: x.code === r.code }; }) : null;
     },
     choisitRoleDemo: function (code) {
       var sa = !!(profil && profil.multi && profil.superAdmin);
@@ -1106,8 +1255,9 @@
     },
     /** cle : celle de la barre des pages (« tableau », « inter »…) ; inconnue : permise. */
     pagePermise: function (cle) {
-      var n = NIVEAUX_PAGES[cle];
-      return n == null || n <= D.niveauAcces();
+      if (cle === "console") return D.niveauAcces() >= 3;
+      var d = DROIT_PAGE[cle];
+      return !d || D.aDroit(d);
     },
 
     /** Le super admin a tous les droits : c'est lui qui les distribue. */
@@ -1544,10 +1694,9 @@
       if (p.superAdmin) return true;
       var moi = D.monMembre(), lui = D.membre(idMembre);
       if (!moi || !lui || moi.id === lui.id) return false;
-      // Rôle simulé : ses statuts, portés par sa propre fiche (sa discipline)
-      var st = p.roleVu ? p.statuts : statutsDe(moi);
-      return st.indexOf("administrateur") >= 0 ||
-        (st.indexOf("chef_secteur") >= 0 && !!moi.discipline && moi.discipline === lui.discipline);
+      // Rôle simulé : ses droits, avec la discipline de sa propre fiche
+      return D.aDroit("conges_tous") ||
+        (D.aDroit("conges_secteur") && !!moi.discipline && moi.discipline === lui.discipline);
     },
     /** Les demandes qui attendent ma décision. */
     congesAValider: function () {
