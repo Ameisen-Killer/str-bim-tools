@@ -510,15 +510,25 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var marque = el("div", { class: "pose-selection", hidden: true, "aria-hidden": "true" });
         zone.appendChild(marque);
         var choix = null, parSouris = false;
+        /* Les colonnes n'ont pas toutes la même largeur (week-ends resserrés) :
+           la case visée et le cadre se calent sur les cases réelles du fond. */
+        var cases = fond.children;
         var colonne = function (e) {
-          var r = zone.getBoundingClientRect();
-          return Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / (r.width / n))));
+          for (var i = 0; i < cases.length; i++) {
+            var r = cases[i].getBoundingClientRect();
+            if (e.clientX < r.right) return i;
+          }
+          return cases.length - 1;
         };
         var montre = function () {
           var d = Math.min(choix.a, choix.b), f = Math.max(choix.a, choix.b);
-          marque.style.left = (d / n * 100) + "%";
-          marque.style.width = ((f - d + 1) / n * 100) + "%";
-          marque.textContent = f > d ? (f - d + 1) + " j" : "";
+          var z = zone.getBoundingClientRect(), rd = cases[d].getBoundingClientRect(), rf = cases[f].getBoundingClientRect();
+          marque.style.left = (rd.left - z.left) + "px";
+          marque.style.width = (rf.right - rd.left) + "px";
+          // Les jours que la personne aurait travaillés : ni week-end, ni férié, ni jour off (½ pour une demi-journée)
+          var ouvres = Calc.joursTravaillesEntre(m, jours[d], jours[f], canton);
+          marque.textContent = f > d || ouvres !== 1 ? C.fmtJours(ouvres) + " j" : "";
+          marque.title = C.fmtJours(ouvres) + (ouvres > 1 ? " jours travaillés" : " jour travaillé");
           marque.hidden = false;
         };
         zone.addEventListener("pointerdown", function (e) {
