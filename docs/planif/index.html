@@ -376,7 +376,8 @@
 
     if (!lignes.length) { videMessage(hote, "Personne n'est absent cette semaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
-      return el("a", { class: "ab-ligne trois", href: "/planif/absences/", title: x.titre }, [
+      // Vers la page Absences, sur la période et à la ligne de la personne (13.10.2026)
+      return el("a", { class: "ab-ligne trois", href: "/planif/absences/?membre=" + encodeURIComponent(x.m.id) + "&date=" + x.debut, title: x.titre }, [
         el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
         el("span", { class: "ab-periode", text: x.periode }),

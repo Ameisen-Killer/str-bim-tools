@@ -25,6 +25,9 @@
 .pl-nom .pose-plus{margin-left:auto;align-self:center;width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;
   font-size:16px;font-weight:600;color:var(--m-fort,var(--or));background:var(--m-pale,transparent);opacity:0;transition:opacity .2s}
 .pl-nom.pose-absence:hover .pose-plus,.pl-nom.pose-absence:focus-visible .pose-plus{opacity:1}
+/* Arrivée depuis une absence de l'accueil : la ligne de la personne s'éclaire */
+.pl-nom.cible{background:rgba(var(--or-rvb),.09);border-radius:6px}
+.cible-arrivee{transition:background .6s,box-shadow .6s}
 .pl-zone.pose-absence{cursor:cell;user-select:none;-webkit-user-select:none}
 .pose-selection{position:absolute;top:3px;bottom:3px;z-index:3;pointer-events:none;border-radius:6px;
   background:color-mix(in srgb,var(--m-clair,#D5E8AC) 70%,transparent);border:2px solid var(--m-fort,var(--or));
@@ -157,6 +160,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   vue.mois = parseInt(vue.mois, 10);
   vue.mois = isNaN(vue.mois) ? 1 : Math.min(3, Math.max(0, vue.mois));
   vue.debut = cale(vue.debut || C.isoAuj());
+  /* Arrivée depuis une absence (accueil, 13.10.2026) : ?membre=…&date=… —
+     la période qui contient ce jour, puis la ligne de la personne, mise en
+     évidence (allerA, après le premier rendu). */
+  var allerA = (function () {
+    var q = new URLSearchParams(location.search), m = q.get("membre"), j = q.get("date");
+    if (!m && !j) return null;
+    history.replaceState(null, "", location.pathname + location.hash);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(j || "")) vue.debut = cale(j);
+    return { membre: m || "" };
+  })();
 
   var jours = [], lignes = [], jaugeParJour = {}, nomsParJour = {}, joursDe = {};
   // Nom explicite : « barre » est déjà la fonction qui dessine une barre du planning
@@ -220,8 +233,26 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     D.surRechargement(rend);
+    // La personne visée ne doit pas être cachée par le filtre de métier
+    if (allerA && allerA.membre) {
+      var visee = D.membre(allerA.membre);
+      if (visee && vue.metier && D.cote(visee.metier) !== vue.metier) { vue.metier = ""; fr.value = ""; }
+    }
     rend();
+    if (allerA && allerA.membre) montreLigne(allerA.membre);
   }).catch(UI.echec);
+
+  /** Amène la ligne d'une personne sous les yeux et l'éclaire un moment. */
+  function montreLigne(id) {
+    var zone = document.querySelector('.pl-zone[data-membre="' + id + '"]');
+    if (!zone) return;
+    var nom = zone.previousElementSibling;
+    [zone, nom].forEach(function (n) { if (n) n.classList.add("cible", "cible-arrivee"); });
+    setTimeout(function () { zone.scrollIntoView({ block: "center", behavior: "smooth" }); }, 80);
+    setTimeout(function () {
+      [zone, nom].forEach(function (n) { if (n) n.classList.remove("cible", "cible-arrivee"); });
+    }, 3200);
+  }
 
   function decale(n) {
     vue.debut = vue.mois === 0 ? C.ajoute(vue.debut, 7 * n) : C.ajouteMois(vue.debut, n);
