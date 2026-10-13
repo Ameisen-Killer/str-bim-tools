@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- deux bulles de conversation, comme la carte Communication de l'accueil -->
+  <path d="M8 6h20a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H15l-6 5v-5H8a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4z"/>
+  <path d="M36 18h4a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4h-1v5l-6-5H22a4 4 0 0 1-4-4v-4"/>
+</svg>

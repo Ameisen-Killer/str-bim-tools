@@ -123,7 +123,8 @@
     { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
       droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous"] },
+      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "page_transversales", "conges_tous",
+               "news_rediger", "news_archiver", "news_supprimer"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge", "page_secteurs",
                "planning_equipe", "taches_a_affecter", "conges_secteur"] },
@@ -238,7 +239,8 @@
                                "page_affaires", "page_charge", "page_secteurs", "page_inter", "page_transversales"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
-                                             "conges_secteur", "conges_tous", "tchat_moderer"] }
+                                             "conges_secteur", "conges_tous", "tchat_moderer"] },
+    { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] }
   ];
   var ORDRE_DROITS = [].concat.apply([], CATEGORIES_DROITS.map(function (c) { return c.droits; }));
   var DROITS = {
@@ -283,6 +285,18 @@
     conges_tous: {
       titre: "Valider tous les congés",
       aide: "Accepter ou refuser toutes les demandes de congé du bureau — jamais les siennes."
+    },
+    news_rediger: {
+      titre: "Rédiger les news",
+      aide: "Publier une news dans Communication, et modifier les siennes. Sans ce droit, on lit les news."
+    },
+    news_archiver: {
+      titre: "Archiver les news",
+      aide: "Retirer une news de la une (elle reste lisible dans les archives), ou la remettre en ligne."
+    },
+    news_supprimer: {
+      titre: "Supprimer les news",
+      aide: "Effacer une news pour de bon, archives comprises."
     },
     tchat_moderer: {
       titre: "Retirer les messages des autres",

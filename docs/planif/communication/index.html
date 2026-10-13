@@ -16,9 +16,9 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=87">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=88">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
-<link rel="stylesheet" href="/planif/assets/communication.css?v=9">
+<link rel="stylesheet" href="/planif/assets/communication.css?v=10">
 </head>
 <body class="large">
 
@@ -32,7 +32,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 </script>
 
 <!-- Module Communication (06.10.2026) : le bureau aujourd'hui
-     (qui manque, les rendez-vous du jour) à côté du tchat du bureau (tchat.js), l'agenda interne des rendez-vous (participants, lieu ; la
+     (qui manque, les rendez-vous du jour) à côté des news du bureau (news.js ; le tchat,
+     tchat.js, s'ouvre en fenêtre volante par le bouton « Tchat » depuis le 13.10.2026), l'agenda interne des rendez-vous (participants, lieu ; la
      réplication avec Outlook viendra) et les absences et congés à venir.
      Sous le titre (07.10.2026) : la sous-barre « Le bureau aujourd'hui » / « Absences et congés »
      , Annuaire (ui.js, SOUS_NAV) ; la page Absences porte le même titre « Communication ». -->
@@ -44,7 +45,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script>window.planifSousNav&&planifSousNav();</script>
   <div class="wrap" data-bandeau></div>
   <div class="wrap">
-    <!-- En haut : le bureau aujourd'hui, compacté à gauche ; le tchat à droite -->
+    <!-- En haut : le bureau aujourd'hui, compacté à gauche ; les news du bureau
+         à droite (13.10.2026 : le tchat est passé dans une fenêtre volante) -->
     <div class="cm-haut">
       <section class="section cm-bureau" id="bureau">
         <div class="tete-section"><h2 id="titre-jour">Aujourd'hui</h2></div>
@@ -54,9 +56,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         <div id="rdv-jour"></div>
       </section>
 
-      <section class="section cm-tchat" id="tchat">
-        <div class="tete-section"><h2>Tchat du bureau</h2></div>
-        <div class="tc" id="tchat-hote"></div>
+      <section class="section cm-news" id="news" aria-label="News du bureau">
+        <div class="tete-section"><h2>News du bureau</h2></div>
       </section>
     </div>
 
@@ -93,12 +94,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=49"></script>
-<script src="/planif/assets/donnees.js?v=68"></script>
+<script src="/planif/assets/donnees.js?v=69"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=97"></script>
+<script src="/planif/assets/ui.js?v=98"></script>
 <script src="/planif/assets/palette.js?v=17"></script>
-<script src="/planif/assets/tchat.js?v=8"></script>
+<script src="/planif/assets/tchat.js?v=9"></script>
+<script src="/planif/assets/news.js?v=1"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
 <script>
 (function () {
@@ -132,7 +134,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     D.surRechargement(rend);
     rend();
-    Tchat.monte(document.getElementById("tchat-hote"));
+    // Le tchat : fenêtre volante (bouton « Tchat », #tchat dans l'adresse) ; à sa place, les news
+    Tchat.installeFenetre();
+    boutonTchatMobile();
+    News.monte(document.getElementById("news"));
     // Un avis qui se termine quitte la liste sans attendre une modification
     setInterval(function () { if (!document.hidden && !document.querySelector(".modale.ouverte")) rend(); }, 5 * 60000);
   }).catch(UI.echec);
@@ -148,10 +153,24 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function chrome() {
     var actions = [];
+    // Le tchat du bureau, en fenêtre volante (13.10.2026), avec ses messages non lus
+    actions.push({ label: "Tchat", icone: "ico-tchat", tchat: true, action: function () { Tchat.bascule(); } });
     actions.push({ label: "Nouveau rendez-vous", or: true, icone: "ico-ajout-tache", action: function () { formRdv(null, {}); } });
     actions.push({ label: "Prévenir le bureau", icone: "ico-lien", action: formAvis });
     actions.push({ label: "Demander un congé", icone: "ico-absence", action: function () { formConge(); } });
     UI.chrome("communication", actions);
+  }
+
+  /* Téléphone : les actions de l'en-tête y sont cachées (le bouton flottant
+     prend « Nouveau rendez-vous ») ; le tchat a sa bulle, en bas à gauche. */
+  function boutonTchatMobile() {
+    document.body.appendChild(el("button", { type: "button", class: "tc-mobile", "aria-label": "Tchat du bureau",
+      onclick: function () { Tchat.bascule(); } }, [
+      el("span", { class: "ico-txt ico-tchat", "aria-hidden": "true" }),
+      el("span", { class: "nav-badge", dataset: { tchat: "" }, hidden: true })
+    ]));
+    // Les pastilles « non lus » (ui.js) se mettent à jour, celle-ci comprise
+    window.dispatchEvent(new CustomEvent("planif:tchat-lu"));
   }
 
   /* ================================================================ calculs */

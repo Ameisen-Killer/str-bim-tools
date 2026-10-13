@@ -942,7 +942,9 @@
     (actions || []).forEach(function (a) {
       pousse.appendChild(el("button", { class: "btn" + (a.or ? " btn-or" : ""), type: "button", onclick: a.action }, [
         a.icone ? el("span", { class: "ico-txt " + a.icone, "aria-hidden": "true" }) : null,
-        a.label
+        a.label,
+        // a.tchat : la pastille des messages non lus (bouton Tchat de Communication)
+        a.tchat ? el("span", { class: "nav-badge", dataset: { tchat: "" }, hidden: true }) : null
       ]));
     });
     /* Version 2 (12.10.2026, demande de Tony) : les actions de la page sur la

@@ -445,6 +445,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
   -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
 }
 .ico-ajout-tache{--ico:url(/planif/icons/clipboard_add.svg?v=1)}
+.ico-tchat{--ico:url(/planif/icons/chat.svg?v=1)}
+.ico-rediger{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
 .ico-absence{--ico:url(/planif/icons/valise.svg?v=1)}
 /* Au survol du bouton, la valise se balance au bout de sa poignée : on part ! */
 .btn:hover > .ico-absence,.btn:focus-visible > .ico-absence{animation:valise .9s ease-in-out;transform-origin:46% 22%}

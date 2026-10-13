@@ -196,10 +196,13 @@
     if (!dernierConnu || m.creeLe > dernierConnu) dernierConnu = m.creeLe;
     global.dispatchEvent(new CustomEvent("planif:message", { detail: { type: "INSERT", message: m } }));
     var UI = global.UI;
-    if (m.auteurId === monId() || /^\/planif\/communication\//.test(location.pathname)) return;
+    // Rien à annoncer : son propre message, ou la fenêtre du tchat déjà ouverte
+    if (m.auteurId === monId() || ouvert) return;
     var auteur = D.membre(m.auteurId), extrait = m.texte.replace(/\s+/g, " ");
     var texte = "Tchat · " + (auteur ? auteur.prenom : "un collègue") + " : " + (extrait.length > 70 ? extrait.slice(0, 68) + "…" : extrait);
-    if (UI) UI.toast(texte, { label: "Lire", action: function () { location.href = "/planif/communication/#tchat"; } });
+    if (UI) UI.toast(texte, { label: "Lire", action: function () {
+      if (fenetreIci) ouvre(); else location.href = "/planif/communication/#tchat";
+    } });
     else annonce(texte);
   }
 
@@ -350,10 +353,13 @@
       vu();
     }
     function vu() {
-      if (document.hidden || !liste.length || !pres()) return;
+      // Fenêtre fermée (display:none) : rien n'est sous les yeux
+      if (document.hidden || !liste.length || !hote.getClientRects().length || !pres()) return;
       marqueLu(liste[liste.length - 1].creeLe);
     }
     fil.addEventListener("scroll", function () { if (pres()) { nouveaux.hidden = true; vu(); } });
+    // Appelé à l'ouverture de la fenêtre : on descend au dernier message, qui devient lu
+    hote.tchatVu = function () { enBas(false); };
 
     function dessine(garderPosition) {
       var etaitEnBas = pres(), hauteurAvant = fil.scrollHeight, hautAvant = fil.scrollTop;
@@ -491,7 +497,101 @@
     });
   }
 
+  /* ------------------------------------------------------ fenêtre volante
+     Depuis le 13.10.2026 (demande de Tony), le tchat ne vit plus dans la
+     page Communication : il s'ouvre dans une fenêtre volante, par le bouton
+     « Tchat » à gauche de « Nouveau rendez-vous » (ou #tchat dans l'adresse).
+     Elle ne bloque pas la page ; on la déplace par son titre (position
+     retenue dans le navigateur) ; sur téléphone, elle prend tout l'écran.
+     Échap la ferme. Ouverte, elle le reste d'une page à l'autre de l'onglet. */
+  var ouvert = false, fenetre = null, fenetreIci = false, CLE_POS = "planif.tchat.pos", CLE_OUVERT = "planif.tchat.ouvert";
+
+  function place(x, y) {
+    var l = Math.max(8, Math.min(x, global.innerWidth - fenetre.offsetWidth - 8));
+    var h = Math.max(8, Math.min(y, global.innerHeight - fenetre.offsetHeight - 8));
+    fenetre.style.left = l + "px"; fenetre.style.top = h + "px";
+    fenetre.style.right = "auto"; fenetre.style.bottom = "auto";
+    return { x: l, y: h };
+  }
+  function petitEcran() { return global.matchMedia && global.matchMedia("(max-width: 640px)").matches; }
+
+  function construitFenetre() {
+    if (fenetre) return fenetre;
+    var UI = global.UI, el = UI.el;
+    var corps = el("div", { class: "tc" });
+    var titre = el("h2", { id: "tc-fen-titre", text: "Tchat du bureau" });
+    var tete = el("div", { class: "tc-fen-tete", title: "Déplacer la fenêtre" }, [
+      el("span", { class: "ico-txt ico-tchat", "aria-hidden": "true" }), titre,
+      el("button", { type: "button", class: "tc-fermer", "aria-label": "Fermer le tchat", title: "Fermer (Échap)", text: "×",
+        onclick: function () { ferme(); } })
+    ]);
+    fenetre = el("section", { class: "tc-fenetre", role: "dialog", "aria-modal": "false", "aria-labelledby": "tc-fen-titre", hidden: true }, [tete, corps]);
+    document.body.appendChild(fenetre);
+
+    // Déplacer par le titre (souris ou doigt), pas sur téléphone où elle est plein écran
+    var depart = null;
+    tete.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("button") || petitEcran() || e.button > 0) return;
+      var r = fenetre.getBoundingClientRect();
+      depart = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      tete.setPointerCapture && tete.setPointerCapture(e.pointerId);
+      fenetre.classList.add("deplacee");
+      e.preventDefault();
+    });
+    tete.addEventListener("pointermove", function (e) { if (depart) place(e.clientX - depart.dx, e.clientY - depart.dy); });
+    function lache() {
+      if (!depart) return;
+      depart = null;
+      ecrit(CLE_POS, JSON.stringify({ x: parseInt(fenetre.style.left, 10), y: parseInt(fenetre.style.top, 10) }));
+    }
+    tete.addEventListener("pointerup", lache);
+    tete.addEventListener("pointercancel", lache);
+    global.addEventListener("resize", function () {
+      if (!fenetre.hidden && !petitEcran() && fenetre.style.left) place(parseInt(fenetre.style.left, 10), parseInt(fenetre.style.top, 10));
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && ouvert && !document.querySelector(".modale.ouverte") && fenetre.contains(document.activeElement)) ferme();
+    });
+    return fenetre;
+  }
+
+  function ouvre() {
+    var f = construitFenetre(), premiere = !f.querySelector(".tc-fil");
+    f.hidden = false;
+    ouvert = true;
+    ecrit(CLE_OUVERT, "1");
+    if (!petitEcran()) {
+      var pos = null;
+      try { pos = JSON.parse(lit(CLE_POS) || "null"); } catch (e) { pos = null; }
+      if (pos && typeof pos.x === "number") place(pos.x, pos.y);
+    }
+    var hote = f.querySelector(".tc");
+    if (premiere) monte(hote).then(function () { if (hote.tchatVu) hote.tchatVu(); });
+    else if (hote.tchatVu) hote.tchatVu();
+    var saisie = f.querySelector(".tc-saisie");
+    if (saisie && !petitEcran()) saisie.focus();
+    global.dispatchEvent(new CustomEvent("planif:tchat-fenetre", { detail: { ouvert: true } }));
+  }
+  function ferme() {
+    if (!fenetre) return;
+    fenetre.hidden = true;
+    ouvert = false;
+    try { global.localStorage.removeItem(CLE_OUVERT); } catch (e) {}
+    global.dispatchEvent(new CustomEvent("planif:tchat-fenetre", { detail: { ouvert: false } }));
+  }
+  /** La page accueille la fenêtre (Communication) : #tchat ou une fenêtre restée ouverte la rouvrent. */
+  function installeFenetre() {
+    fenetreIci = true;
+    if (location.hash === "#tchat" || lit(CLE_OUVERT) === "1") ouvre();
+    global.addEventListener("hashchange", function () { if (location.hash === "#tchat") ouvre(); });
+  }
+
   global.Tchat = {
+    ouvre: ouvre,
+    ferme: ferme,
+    bascule: function () { if (ouvert) ferme(); else ouvre(); },
+    estOuvert: function () { return ouvert; },
+    installeFenetre: installeFenetre,
     monte: monte,
     recu: recu,
     nonLus: nonLus,
