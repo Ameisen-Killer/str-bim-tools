@@ -447,7 +447,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
          (13.10.2026, demande de Tony). */
       var peut = D.peutAbsences(m.id);
       function poser(debut, fin) {
-        UI.nouvelleAbsence({ membreId: m.id, debut: debut || "", fin: fin && fin !== debut ? fin : "", surChangement: rend });
+        // Un seul jour cliqué : début et fin remplis tous les deux
+        UI.nouvelleAbsence({ membreId: m.id, debut: debut || "", fin: fin || debut || "", surChangement: rend });
       }
       var nom = el("div", peut ? {
         class: "pl-nom pose-absence", role: "button", tabindex: "0",
