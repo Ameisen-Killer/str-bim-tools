@@ -158,7 +158,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=77"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=114"></script>
+<script src="/planif/assets/ui.js?v=115"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=21"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -231,8 +231,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         dessine();
       });
     });
-    // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
-    D.surRechargement(function () { if (optionsSuccursales().length !== nbOptSucc) rendFiltres(); dessine(); });
+    D.surRechargement(dessine);
     dessine();
 
     if (p.get("nouvelle") === "1") formulaire(null);
@@ -422,6 +421,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var affichage = null;                             // paquets en cours, à arrêter au prochain rendu
 
   function dessine() {
+    // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
+    if (nbOptSucc >= 0 && optionsSuccursales().length !== nbOptSucc) rendFiltres();
     var taches = selection();
     var mots = barre ? barre.termes() : [];
     var parAffaire = vue === "affaire";

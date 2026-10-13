@@ -202,7 +202,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=56"></script>
 <script src="/planif/assets/donnees.js?v=77"></script>
-<script src="/planif/assets/ui.js?v=114"></script>
+<script src="/planif/assets/ui.js?v=115"></script>
 <script src="/planif/assets/palette.js?v=21"></script>
 <script>
 (function () {
@@ -518,7 +518,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       (s.disciplines || []).forEach(function (c) { if (parCode[c]) avec[parCode[c].cle] = true; });
       return { cle: cle(), code: s.code, nom: s.nom, membres: s.membres || 0, avec: avec };
     });
-    var pertes = [];                                    // retraits qui touchent des membres
+    var pertes = [];                                    // retraits qui touchent des membres ou des affaires
 
     var champs = el("div", { class: "grille-champs" }, [
       UI.champ({ nom: "nom", label: "Nom du bureau", valeur: b ? b.nom : "", exemple: "Bureau d'études Exemple SA", large: true }),
@@ -549,6 +549,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       liste.splice(liste.indexOf(obj), 1);
       if (obj.code && obj.membres) {
         pertes.push(obj.membres + (obj.membres > 1 ? " membres perdront leur " : " membre perdra sa ") + genre + " « " + obj.nom + " ».");
+      }
+      // Une succursale retirée l'est aussi des affaires qui y sont rattachées (13.10.2026)
+      if (obj.code && genre === "succursale") {
+        pertes.push("Les affaires rattachées à « " + obj.nom + " » n'auront plus de succursale.");
       }
       dessine();
     }

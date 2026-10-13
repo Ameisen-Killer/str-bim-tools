@@ -2698,9 +2698,9 @@
 
   /* ------------------------------------------------ filtre à cases
      Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : affaires,
-     succursales, secteurs, fonctions, membres du tableau de bord). Rien de
-     coché = tout. Une option peut porter un « groupe » (intertitre) ; au-delà
-     de dix options, un champ de recherche filtre la liste.
+     succursales, secteurs, fonctions, membres). Aucune valeur retenue = tout,
+     affiché toutes cases cochées. Une option peut porter un « groupe »
+     (intertitre) ; au-delà de dix options, un champ de recherche filtre la liste.
        multiChoix({ libelle, tous, pluriel, options:[{valeur,label,groupe}], valeurs:[], surChange(valeurs) })
      Tous les menus (13.10.2026, demande de Tony) : « tout » s'affiche toutes
      cases cochées ; on décoche ce qu'on ne veut pas voir, la dernière case

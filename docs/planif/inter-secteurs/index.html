@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Appels d'offres · Planification</title>
+<title>Veille simap.ch · Planification</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4F5F2">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%236B5233'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23E9D6B0' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -129,7 +129,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=77"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=114"></script>
+<script src="/planif/assets/ui.js?v=115"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=21"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -501,7 +501,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     } else if (!codes.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire n'a encore de mandat décrit. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
     }
+    var affichees = {};                             // le compteur du titre : les affaires montrées
     codes.filter(function (c) { return !factu.secteurs.length || factu.secteurs.indexOf(c) >= 0; }).forEach(function (code) {
+      Object.keys(parSecteur[code]).forEach(function (id) { affichees[id] = true; });
       var lignes = Object.keys(parSecteur[code]).map(function (k) { return parSecteur[code][k]; })
         .sort(function (x, y) { return (x.a.code || "~").localeCompare(y.a.code || "~", "fr", { numeric: true }) || x.a.nom.localeCompare(y.a.nom, "fr"); });
       var nPhases = 0, aFacturer = 0, dAvance = 0;
@@ -562,7 +564,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         }))
       ]));
     }
-    return affaires.length;
+    return Object.keys(affichees).length;
   }
 
   /* ================================================================ formulaires */
