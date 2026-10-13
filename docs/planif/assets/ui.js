@@ -861,6 +861,8 @@
   function chrome(actif, actions) {
     var hote = document.querySelector("[data-chrome]");
     if (!hote) return;
+    // Les images déjà décodées (photo du compte, logo) : reprises telles quelles
+    var images = [].slice.call(hote.querySelectorAll("img"));
     vide(hote);
 
     // Profil connu une fois les données (ou le seul profil, pour la console) chargées
@@ -907,7 +909,8 @@
           "aria-current": p.cle === actif ? "page" : null }, [dessinAB("0 0 24 24", MAISON)]));
         return;
       }
-      nav.appendChild(el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null }, [
+      nav.appendChild(el("a", { href: chemin(p.href), "aria-current": p.cle === actif ? "page" : null,
+                                dataset: { dossiers: dossiersDe(p) } }, [
         el("span", { class: "long", text: p.nom }),
         el("span", { class: "court", text: p.court }),
         // Communication : les messages du tchat pas encore lus (tchat.js)
@@ -1007,6 +1010,14 @@
       nav.scrollLeft = Math.max(0, courant.offsetLeft - (nav.clientWidth - courant.offsetWidth) / 2);
     }
 
+    // Mêmes images qu'avant : on garde les anciennes, sans attendre un nouveau décodage
+    [].forEach.call(hote.querySelectorAll("img"), function (n) {
+      for (var i = 0; i < images.length; i++) {
+        if (images[i].src === n.src) { n.parentNode.replaceChild(images.splice(i, 1)[0], n); return; }
+      }
+    });
+    hote.removeAttribute("data-provisoire");
+
     synchroniseTheme();
     suitPresence();
     dessineEnLigne();                       // le compte déjà connu, sans attendre le battement
@@ -1025,6 +1036,35 @@
     }
 
     mesureChrome(hote);
+    memoriseBarre(hote);
+  }
+
+  /* Bandeau du haut sans à-coup d'une page à l'autre (13.10.2026, demande de
+     Tony : il se reconstruisait à chaque page, une fois la base lue). Chaque
+     page garde une copie du bandeau dans le navigateur ; la page suivante la
+     pose avant son premier rendu (petit script en ligne sous [data-chrome],
+     qui allume le module d'après data-dossiers), puis chrome() la remplace
+     par le vrai, à l'identique, dès que le profil est lu. Entre les deux, les
+     liens marchent ; les boutons attendent le vrai bandeau. */
+  function dossierDe(href) { return String(href).split("/")[2] || ""; }
+  /** Les dossiers de /planif/ où ce lien de la barre est la page ouverte : la sienne et celles de son module. */
+  function dossiersDe(p) {
+    var l = [dossierDe(p.href)];
+    if (SOUS_NAV[p.cle]) SOUS_NAV[p.cle].pages.forEach(function (x) {
+      var d = dossierDe(x.href);
+      if (l.indexOf(d) < 0) l.push(d);
+    });
+    return l.join(" ");
+  }
+  function memoriseBarre(hote) {
+    try {
+      var mail = (avecBase && SB.email()) || "local";
+      var copie = hote.cloneNode(true);
+      // Ni les actions d'une page, ni la page ouverte : la suivante a les siennes
+      [].forEach.call(copie.querySelectorAll(".pousse"), function (n) { n.remove(); });
+      [].forEach.call(copie.querySelectorAll("[aria-current]"), function (n) { n.removeAttribute("aria-current"); });
+      global.localStorage.setItem("planif.barre:" + mail, JSON.stringify({ html: copie.innerHTML, h: hauteurChrome }));
+    } catch (e) {}
   }
 
   /* Hauteur de la barre du haut, publiée en --h-chrome : les en-têtes qui se

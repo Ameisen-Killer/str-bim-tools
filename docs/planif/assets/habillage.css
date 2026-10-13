@@ -276,3 +276,12 @@
   :root[data-version="v2"] body{background:#fff}
   :root[data-version="v2"] .section{box-shadow:none;padding:0;border-radius:0}
 }
+
+/* D'une page à l'autre sans à-coup (13.10.2026) : transition de navigation du
+   navigateur (Chrome, Edge, Samsung Internet ; ignorée ailleurs). Le bandeau
+   du haut, déjà posé avant le premier rendu (voir chrome() dans ui.js), reste
+   en place ; seul le contenu passe d'une page à l'autre, en fondu bref. */
+@view-transition{navigation:auto}
+:root[data-version="v2"] .barre{view-transition-name:planif-barre}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
+::view-transition-group(planif-barre){animation-duration:0s}
