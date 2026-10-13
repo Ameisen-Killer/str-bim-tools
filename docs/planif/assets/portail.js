@@ -202,12 +202,33 @@
     setInterval(function () { date.textContent = dateDuJour(); }, 60000);
 
     pied();
+    // Les images déjà décodées (logo, photo) de la copie posée avant le rendu : gardées telles quelles
+    var images = [].slice.call(hote.querySelectorAll("img"));
     vide(hote);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
       el("div", { class: "ab-qui" }, [date, el("div", { class: "ab-moi" }, [bouton, menu])])
     ]));
+    [].forEach.call(hote.querySelectorAll("img"), function (n) {
+      for (var i = 0; i < images.length; i++) {
+        if (images[i].src === n.src) { n.parentNode.replaceChild(images.splice(i, 1)[0], n); return; }
+      }
+    });
     return id;
+  }
+
+  /* En-tête de l'accueil d'emblée (13.10.2026, demande de Tony) : logo, date,
+     compte et « Bonjour … » sont gardés dans le navigateur ; à la visite
+     suivante, un petit script en ligne de l'accueil les pose avant le premier
+     rendu, et entete() les remplace à l'identique une fois la base lue. */
+  function memoriseEntete() {
+    try {
+      var e = document.getElementById("entete"), h = document.getElementById("salut");
+      var mail = (avecBase && SB.email()) || "local";
+      global.localStorage.setItem("planif.entete:" + mail, JSON.stringify({
+        entete: e ? e.innerHTML : "", salut: h ? h.innerHTML : ""
+      }));
+    } catch (x) {}
   }
 
   /* ------------------------------------------------------------ fraîcheur
@@ -227,6 +248,6 @@
   global.Portail = {
     el: el, vide: vide, svg: svg, majuscule: majuscule,
     avecBase: avecBase, session: session, echec: echec, deconnecte: deconnecte,
-    identite: identite, entete: entete, versionPubliee: versionPubliee, surRetour: surRetour, JOURS: JOURS
+    identite: identite, entete: entete, memoriseEntete: memoriseEntete, versionPubliee: versionPubliee, surRetour: surRetour, JOURS: JOURS
   };
 })(window);

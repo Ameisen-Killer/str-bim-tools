@@ -24,6 +24,11 @@
   <div id="entete"></div>
 
   <h1 class="ab-salut" id="salut">Bonjour</h1>
+  <script>
+  /* L'en-tête (logo, date, compte) et le « Bonjour » de la visite précédente,
+     posés avant le premier rendu ; portail.js les remplace à l'identique. */
+  (function(){try{var s=JSON.parse(localStorage.getItem("planif.session")||"null"),b=JSON.parse(localStorage.getItem("planif.entete:"+(s&&s.email||"local"))||"null"),e=document.getElementById("entete"),h=document.getElementById("salut");if(!b)return;if(b.entete&&e&&!e.firstChild){e.innerHTML=b.entete;var d=e.querySelector(".ab-date"),t=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});if(d)d.textContent=t.charAt(0).toUpperCase()+t.slice(1);}if(b.salut&&h)h.innerHTML=b.salut;}catch(x){}})();
+  </script>
   <p class="ab-sous-titre">Bienvenue sur ton espace de travail</p>
 
   <!-- Les quatre entrées vers les modules. -->
@@ -109,7 +114,7 @@
 <script src="/planif/assets/donnees.js?v=66"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/portail.js?v=14"></script>
+<script src="/planif/assets/portail.js?v=15"></script>
 <script src="/planif/assets/tchat.js?v=8"></script>
 <script>
 (function () {
@@ -124,6 +129,7 @@
   D.pret().then(function () {
     var id = Portail.entete(document.getElementById("entete"));
     salut(id);
+    Portail.memoriseEntete();
     cartesPermises();
     refus();
     Portail.surRetour(dessine);
