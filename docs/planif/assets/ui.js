@@ -2696,6 +2696,64 @@
   }
   global.addEventListener("scroll", cacheBulle, { passive: true });
 
+  /* ------------------------------------------------ filtre à cases
+     Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : succursales,
+     secteurs, fonctions du tableau de bord). Rien de coché = tout.
+       multiChoix({ libelle, tous, pluriel, options:[{valeur,label}], valeurs:[], surChange(valeurs) })
+     Renvoie { noeud, valeurs(), pose(valeurs) }. */
+  function multiChoix(o) {
+    var choisis = (o.valeurs || []).slice();
+    var texte = el("span", { class: "mc-texte" });
+    var bouton = el("button", { type: "button", class: "btn mc-bouton", "aria-haspopup": "true", "aria-expanded": "false",
+      "aria-label": o.libelle }, [texte, el("span", { class: "mc-fleche", "aria-hidden": "true", text: "▾" })]);
+    var liste = el("div", { class: "mc-liste" });
+    var panneau = el("div", { class: "mc-panneau", hidden: true, role: "group", "aria-label": o.libelle }, [
+      liste,
+      el("div", { class: "mc-pied" }, [
+        el("button", { type: "button", class: "mc-lien", text: "Tout afficher", onclick: function () { choisis = []; maj(true); } })
+      ])
+    ]);
+    var noeud = el("div", { class: "mc" }, [bouton, panneau]);
+
+    function libelleDe(v) {
+      var t = o.options.filter(function (x) { return x.valeur === v; })[0];
+      return t ? t.label : v;
+    }
+    function maj(prevenir) {
+      choisis = choisis.filter(function (v) { return o.options.some(function (x) { return x.valeur === v; }); });
+      texte.textContent = !choisis.length ? o.tous
+        : choisis.length === 1 ? libelleDe(choisis[0])
+        : choisis.length + " " + o.pluriel;
+      bouton.classList.toggle("actif", choisis.length > 0);
+      vide(liste);
+      o.options.forEach(function (x) {
+        var c = el("input", { type: "checkbox", value: x.valeur });
+        c.checked = choisis.indexOf(x.valeur) >= 0;
+        c.addEventListener("change", function () {
+          choisis = c.checked ? choisis.concat([x.valeur]) : choisis.filter(function (v) { return v !== x.valeur; });
+          maj(true);
+        });
+        liste.appendChild(el("label", { class: "mc-option" }, [c, el("span", { text: x.label })]));
+      });
+      if (prevenir && o.surChange) o.surChange(choisis.slice());
+    }
+    function ouvre(oui) {
+      panneau.hidden = !oui;
+      bouton.setAttribute("aria-expanded", String(oui));
+      if (oui) { var premier = panneau.querySelector("input"); if (premier) premier.focus(); }
+    }
+    bouton.addEventListener("click", function () { ouvre(panneau.hidden); });
+    document.addEventListener("pointerdown", function (e) { if (!panneau.hidden && !noeud.contains(e.target)) ouvre(false); });
+    noeud.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panneau.hidden) { e.stopPropagation(); ouvre(false); bouton.focus(); } });
+    maj(false);
+    return {
+      noeud: noeud,
+      valeurs: function () { return choisis.slice(); },
+      pose: function (v) { choisis = (v || []).slice(); maj(false); },
+      texte: function () { return choisis.length ? choisis.map(libelleDe).join(", ") : ""; }
+    };
+  }
+
   /* --------------------------------------------- calendrier des dates
      Le petit calendrier natif (Chrome, Edge) ne se laisse pas habiller : sur
      ordinateur, tout champ de date ouvre le nôtre (13.10.2026, demande de
@@ -2892,7 +2950,7 @@
 
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
-    ouvre: ouvre, ferme: ferme, confirme: confirme,
+    ouvre: ouvre, ferme: ferme, confirme: confirme, multiChoix: multiChoix,
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,

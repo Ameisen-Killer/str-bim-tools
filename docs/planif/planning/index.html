@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=89">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=90">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 </head>
 <body class="large">
@@ -70,13 +70,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="28">4 semaines</option>
         </select>
         <select id="f-affaire" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:240px" aria-label="Filtrer par affaire"></select>
-        <select id="f-succursale" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:200px" aria-label="Filtrer par succursale"></select>
-        <select id="f-secteur" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:220px" aria-label="Filtrer par secteur"></select>
-        <select id="f-cote" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par fonction">
-          <option value="">Fonction</option>
-          <option value="ingenieur">Ingénieurs</option>
-          <option value="dessinateur">Dessinateurs</option>
-        </select>
+        <!-- Succursales, secteurs, fonctions : menus à cases (UI.multiChoix), plusieurs choix -->
+        <span id="f-succursale"></span>
+        <span id="f-secteur"></span>
+        <span id="f-cote"></span>
         <select id="f-membre" class="btn" style="text-transform:none;letter-spacing:.04em;max-width:200px" aria-label="Filtrer par membre"></select>
         <label class="case" style="text-transform:none;letter-spacing:.04em">
           <input type="checkbox" id="f-occupes"> Masquer qui n'a rien
@@ -128,7 +125,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=69"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
-<script src="/planif/assets/ui.js?v=99"></script>
+<script src="/planif/assets/ui.js?v=100"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=18"></script>
 <script src="/planif/assets/direct.js?v=14"></script>
@@ -138,9 +135,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.vue";
-  var vue = { debut: null, duree: 14, affaire: "", succursale: "", secteur: "", cote: "", membre: null, occupes: false };
+  var filtres = {};               // menus à cases : succursales, secteurs, fonctions
+  var vue = { debut: null, duree: 14, affaire: "", succursales: [], secteurs: [], cotes: [], membre: null, occupes: false };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
+  // Vue d'avant les choix multiples (13.10.2026) : une seule fonction, retenue sous « cote »
+  if (!Array.isArray(vue.cotes)) vue.cotes = [];
+  if (vue.cote) { vue.cotes = [vue.cote]; }
+  delete vue.cote; delete vue.succursale; delete vue.secteur;
+  if (!Array.isArray(vue.succursales)) vue.succursales = [];
+  if (!Array.isArray(vue.secteurs)) vue.secteurs = [];
   // Première visite sur un écran étroit : une seule semaine, sinon tout est illisible.
   if (!memorise0 && window.innerWidth < 760) vue.duree = 7;
   if (!vue.debut) vue.debut = C.lundi(C.isoAuj());
@@ -209,24 +213,22 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (fa.value !== (vue.affaire || "")) vue.affaire = "";
     fa.addEventListener("change", function () { vue.affaire = fa.value; memorise(); rend(); });
 
-    /* Succursale et secteur (13.10.2026, demande de Tony) : les listes du
-       bureau ; un menu sans choix possible (une seule succursale) disparaît. */
-    function filtreListe(id, cle, tout, liste) {
-      var sel = document.getElementById(id), codes = Object.keys(liste);
-      UI.vide(sel).appendChild(el("option", { value: "" }, [tout]));
-      codes.forEach(function (c) { sel.appendChild(el("option", { value: c }, [liste[c]])); });
-      sel.style.display = codes.length > 1 ? "" : "none";
-      sel.value = vue[cle] || "";
-      if (sel.value !== (vue[cle] || "")) { vue[cle] = ""; sel.value = ""; }
-      sel.addEventListener("change", function () { vue[cle] = sel.value; memorise(); rend(); });
+    /* Succursales, secteurs et fonctions (13.10.2026, demande de Tony) : des
+       menus à cases, plusieurs choix possibles, rien de coché = tout. Un menu
+       sans choix possible (une seule succursale) disparaît. */
+    function filtreCases(id, cle, tous, pluriel, liste) {
+      var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
+      var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
+        surChange: function (v) { vue[cle] = v; memorise(); rend(); } });
+      vue[cle] = f.valeurs();
+      var hote = document.getElementById(id);
+      UI.vide(hote).appendChild(f.noeud);
+      hote.style.display = options.length > 1 ? "" : "none";
+      return f;
     }
-    filtreListe("f-succursale", "succursale", "Toutes les succursales", D.SUCCURSALES);
-    filtreListe("f-secteur", "secteur", "Tous les secteurs", D.DISCIPLINES);
-
-    var fr = document.getElementById("f-cote");
-    fr.value = vue.cote || "";
-    if (fr.value !== (vue.cote || "")) vue.cote = "";
-    fr.addEventListener("change", function () { vue.cote = fr.value; memorise(); rend(); });
+    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES);
+    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
+    filtres.cotes = filtreCases("f-cote", "cotes", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
 
     // Première ouverture : chacun se voit d'abord lui-même. Le choix fait ensuite
     // dans la liste est mémorisé comme les autres filtres, « Toute l'équipe » compris.
@@ -350,8 +352,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var dansAffaire = vue.affaire ? membresAffaire(vue.affaire, taches) : null;
     membres = membres.filter(function (m) {
         return (!unMembre || m.id === unMembre) && (!mien || mien.gens[m.id])
-          && (!vue.cote || D.cote(m.metier) === vue.cote) && (!dansAffaire || dansAffaire[m.id])
-          && (!vue.succursale || m.succursale === vue.succursale) && (!vue.secteur || m.discipline === vue.secteur);
+          && (!vue.cotes.length || vue.cotes.indexOf(D.cote(m.metier)) >= 0) && (!dansAffaire || dansAffaire[m.id])
+          && (!vue.succursales.length || vue.succursales.indexOf(m.succursale) >= 0)
+          && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
       })
       .map(function (m, i) { return { m: m, i: i }; })
       .sort(function (x, y) {
@@ -372,7 +375,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var libres = {};
     cacheRep.aAffecter.forEach(function (info) {
       if (info.fin < premier || info.debut > dernier) return;
-      if (vue.cote && info.role !== vue.cote) return;
+      if (vue.cotes.length && vue.cotes.indexOf(info.role) < 0) return;
       if (mien && !mien.taches[info.tache.id]) return;
       (libres[info.role] || (libres[info.role] = [])).push(info);
     });
@@ -897,11 +900,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     cacheLien(); UI.cacheBulle();
     if (!x) { UI.toast("La part " + nomPart + " de cette tâche n'est pas planifiée."); return; }
 
-    if (vue.cote) vue.cote = autre;
+    if (vue.cotes.length && vue.cotes.indexOf(autre) < 0) vue.cotes = vue.cotes.concat([autre]);
     if (!mien && vue.membre) vue.membre = x.membreId || "";
     var dernier = C.ajoute(vue.debut, vue.duree - 1);
     if (x.fin < vue.debut || x.debut > dernier) vue.debut = C.lundi(x.debut);
-    document.getElementById("f-cote").value = vue.cote || "";
+    if (filtres.cotes) filtres.cotes.pose(vue.cotes);
     document.getElementById("f-membre").value = vue.membre || "";
     memorise();
     rend();
@@ -1175,10 +1178,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      planning — sans lui, la feuille sortirait filtrée sans le dire. */
   function exportePdf() {
     var restreint = [];
-    ["f-affaire", "f-succursale", "f-secteur", "f-cote", "f-membre"].forEach(function (id) {
+    ["f-affaire", "f-membre"].forEach(function (id) {
       var sel = document.getElementById(id);
       if (sel && sel.value && sel.selectedIndex >= 0) restreint.push(sel.options[sel.selectedIndex].text);
     });
+    ["succursales", "secteurs", "cotes"].forEach(function (k) { if (filtres[k] && filtres[k].texte()) restreint.push(filtres[k].texte()); });
     if (vue.occupes) restreint.push("Sans qui n'a rien");
     var cherche = barreRecherche && barreRecherche.valeur ? barreRecherche.valeur().trim() : "";
     if (cherche) restreint.push("« " + cherche + " »");

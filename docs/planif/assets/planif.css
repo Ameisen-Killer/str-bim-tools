@@ -1650,3 +1650,23 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .dp-lien:hover{background:var(--m-voile,rgba(0,0,0,.05));color:var(--texte)}
 .dp-lien.fort{color:var(--m-fort,var(--or));font-weight:600}
 @media print{.dp{display:none!important}}
+
+/* Filtre à cases (ui.js, multiChoix, 13.10.2026) : plusieurs valeurs cochées */
+.mc{position:relative;display:inline-flex}
+.mc-bouton{text-transform:none;letter-spacing:.04em;gap:10px;max-width:240px}
+.mc-bouton .mc-texte{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-bouton .mc-fleche{font-size:11px;opacity:.7}
+.mc-bouton.actif{border-color:var(--m-fort,var(--or));background:var(--m-pale,transparent)}
+.mc-panneau{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:45;min-width:230px;max-width:320px;padding:8px;
+  background:#fff;border:1px solid var(--ligne);border-radius:10px;box-shadow:0 14px 36px rgba(30,34,38,.16);
+}
+.mc-panneau[hidden]{display:none}
+.mc-liste{display:flex;flex-direction:column;max-height:300px;overflow-y:auto}
+.mc-option{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:14px;text-transform:none;letter-spacing:normal}
+.mc-option:hover{background:var(--m-voile,rgba(0,0,0,.04))}
+.mc-option input{accent-color:var(--m-fort,var(--or));width:17px;height:17px;margin:0;flex:none}
+.mc-pied{border-top:1px solid var(--ligne-faible);margin-top:6px;padding-top:6px;display:flex;justify-content:flex-end}
+.mc-lien{border:0;background:none;font:inherit;font-size:13px;color:var(--m-fort,var(--or));cursor:pointer;padding:4px 6px;border-radius:6px}
+.mc-lien:hover{background:var(--m-voile,rgba(0,0,0,.04))}
+@media print{.mc-panneau{display:none!important}}
