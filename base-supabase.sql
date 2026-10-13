@@ -314,6 +314,8 @@ create table if not exists public.affaires (
   ao_montant   numeric(12,0) check (ao_montant is null or ao_montant >= 0),
   -- Secteurs (disciplines) qui interviennent : affaires et AO transversaux
   secteurs     text[] not null default '{}',
+  -- Responsable d'affaire (13.10.2026) : une fiche de l'équipe
+  responsable_id uuid constraint affaires_responsable_fk references public.membres (id) on delete set null,
   cree_le    timestamptz not null default now(),
   maj_le     timestamptz not null default now(),
   constraint affaires_id_bureau_key   unique (id, bureau_id),

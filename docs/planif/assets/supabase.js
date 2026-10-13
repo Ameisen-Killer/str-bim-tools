@@ -417,6 +417,8 @@
       o.ao_type = a.aoType || null; o.demandeur_id = a.demandeurId || null;
       o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
       o.secteurs = a.secteurs || [];
+      // Garde-fou provisoire (13.10.2026, migration-responsable.sql) : à retirer ensuite
+      if (responsableEnBase) o.responsable_id = a.responsableId || null;
       return o;
     },
     taches: function (t) {
@@ -609,6 +611,8 @@
     profilEnBase = !!membres.length && "tel_interne" in membres[0];
     // Même garde-fou pour le natel (11.10.2026, migration-natel.sql)
     natelEnBase = !!membres.length && "tel_natel" in membres[0];
+    // Même garde-fou pour le responsable d'affaire (13.10.2026, migration-responsable.sql)
+    responsableEnBase = !!affaires.length && "responsable_id" in affaires[0];
 
     function metierDe(m) { return m.metier || ""; }
     function statutsDe(m) { return Array.isArray(m.statuts) ? m.statuts : []; }
@@ -644,6 +648,7 @@
           teinte: a.teinte, statut: a.statut, echeance: a.echeance, phase: a.phase || null, adresse: a.adresse || "",
           aoType: a.ao_type || null, demandeurId: a.demandeur_id || null, aoResultat: a.ao_resultat || null,
           aoMontant: a.ao_montant == null ? null : parseFloat(a.ao_montant), secteurs: a.secteurs || [],
+          responsableId: a.responsable_id || null,
           ingenieurs: equipe.filter(function (l) { return role[l.membre_id] === "ingenieur"; })
             .map(function (l) { return l.membre_id; }),
           dessinateurs: equipe.filter(function (l) { return role[l.membre_id] === "dessinateur"; })
@@ -716,7 +721,7 @@
      regle_profil (même raison que regle_jours). Interne, ligne directe
      (tel_externe) et natel ; tant que la base n'a pas le natel, l'ancienne
      fonction à quatre paramètres. */
-  var profilEnBase = false, natelEnBase = false;
+  var profilEnBase = false, natelEnBase = false, responsableEnBase = false;
   function regleProfil(idMembre, p) {
     var args = { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "", p_photo: p.photo || "" };
     if (natelEnBase) args.p_tel_natel = p.telNatel || "";

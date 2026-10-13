@@ -1720,3 +1720,5 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .hl-maint::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--alerte,#C0392B)}
 .dp.hl .dp-pied{margin:4px 10px 0;padding-top:6px}
 .hl-astuce{font-size:11.5px;color:var(--texte-faible)}
+/* Responsable d'affaire (13.10.2026) : son nom encadré, en tête de l'équipe */
+.etiq.resp{box-shadow:inset 0 0 0 1.5px currentColor;font-weight:650}

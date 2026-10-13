@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=95">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=96">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 </head>
 <body class="large">
@@ -63,8 +63,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=49"></script>
-<script src="/planif/assets/donnees.js?v=69"></script>
+<script src="/planif/assets/supabase.js?v=50"></script>
+<script src="/planif/assets/donnees.js?v=70"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=105"></script>
@@ -109,7 +109,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function champsCherches(a) {
     return [a.code, a.nom, a.adresse, a.note, D.STATUTS_AFFAIRE[a.statut], D.libellePhase(a.phase)]
-      .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre));
+      .concat(a.ingenieurs.concat(a.dessinateurs).map(D.nomMembre))
+      .concat(a.responsableId ? [D.nomMembre(a.responsableId), "responsable"] : []);
   }
 
   function selection(opts) {
@@ -163,13 +164,17 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
       var equipe = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px" });
       // Un nom cherché s'affiche en entier, pour que le passage trouvé soit visible
+      // Le responsable d'affaire (13.10.2026) : en tête, son nom encadré
       function etiquette(m, classe) {
         var cherche = mots.length && UI.correspond([m.prenom + " " + m.nom], mots);
         var nom = cherche ? m.prenom + " " + m.nom : m.prenom + " " + m.nom.charAt(0) + ".";
-        return el("span", { class: "etiq " + classe }, [UI.surligne(nom, mots)]);
+        var resp = m.id === a.responsableId;
+        return el("span", { class: "etiq " + classe + (resp ? " resp" : ""), title: resp ? "Responsable d'affaire" : null }, [UI.surligne(nom, mots)]);
       }
       // Ingénieurs puis dessinateurs, par ordre alphabétique dans chaque groupe
-      function tries(ids) { return ids.map(D.membre).filter(Boolean).sort(D.compareMembres); }
+      function tries(ids) { return ids.filter(function (x) { return x !== a.responsableId; }).map(D.membre).filter(Boolean).sort(D.compareMembres); }
+      var resp = a.responsableId ? D.membre(a.responsableId) : null;
+      if (resp) equipe.appendChild(etiquette(resp, D.cote(resp.metier) === "dessinateur" ? "des" : "ing"));
       tries(a.ingenieurs).forEach(function (m) { equipe.appendChild(etiquette(m, "ing")); });
       tries(a.dessinateurs).forEach(function (m) { equipe.appendChild(etiquette(m, "des")); });
       if (!equipe.childNodes.length) equipe.appendChild(el("span", { class: "secondaire", text: "Aucun membre affecté" }));
@@ -277,6 +282,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           options: Object.keys(D.STATUTS_AFFAIRE).map(function (k) { return { valeur: k, label: D.STATUTS_AFFAIRE[k] }; })
         }),
         UI.champ({ nom: "echeance", label: "Échéance générale", type: "date", valeur: a ? a.echeance : "", aide: "Facultative : repère d'ensemble." }),
+        // Responsable d'affaire (13.10.2026) : une personne de l'équipe du bureau
+        UI.champ({
+          nom: "responsableId", label: "Responsable d'affaire", type: "select", valeur: a && a.responsableId ? a.responsableId : "",
+          options: [{ valeur: "", label: "— Non désigné —" }].concat(UI.optionsParMetier(
+            D.membres({ tous: true }).filter(function (m) { return m.actif || (a && m.id === a.responsableId); })))
+        }),
         UI.champ({ nom: "note", label: "Note", type: "textarea", valeur: a ? a.note : "", exemple: "Contexte, points de vigilance…", large: true })
       ]),
       el("fieldset", { style: "margin-top:26px" }, [

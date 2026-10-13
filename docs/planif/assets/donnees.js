@@ -744,6 +744,7 @@
         adresse: texte(a.adresse),
         aoType: TYPES_AO[a.aoType] ? a.aoType : null,
         demandeurId: texte(a.demandeurId) || null,
+        responsableId: texte(a.responsableId) || null,
         aoResultat: RESULTATS_AO[a.aoResultat] ? a.aoResultat : null,
         aoMontant: a.aoMontant == null || a.aoMontant === "" ? null : Math.max(0, nombre(a.aoMontant, 0)),
         secteurs: (a.secteurs || []).map(texte).filter(Boolean),
@@ -877,7 +878,7 @@
     (e.rdv || []).forEach(function (r) { r.id = neuf(r.id); r.participants = r.participants.map(neuf); r.creePar = neuf(r.creePar); });
     (e.veilleSuivi || []).forEach(function (x) { x.id = neuf(x.id); x.affaireId = neuf(x.affaireId); x.par = neuf(x.par); });
     (e.conges || []).forEach(function (c) { c.id = neuf(c.id); c.membreId = neuf(c.membreId); c.validePar = neuf(c.validePar); c.absenceId = neuf(c.absenceId); });
-    e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); });
+    e.affaires.forEach(function (a) { a.demandeurId = neuf(a.demandeurId); a.responsableId = neuf(a.responsableId); });
 
     // Références orphelines : la base les refuserait, on les coupe ici.
     var vraisM = {}, vraisA = {};
@@ -886,6 +887,7 @@
     e.affaires.forEach(function (a) {
       a.ingenieurs = a.ingenieurs.filter(function (x) { return vraisM[x]; });
       a.dessinateurs = a.dessinateurs.filter(function (x) { return vraisM[x]; });
+      if (a.responsableId && !vraisM[a.responsableId]) a.responsableId = null;
     });
     e.taches = e.taches.filter(function (t) { return vraisA[t.affaireId]; });
     e.avis = (e.avis || []).filter(function (a) { return vraisM[a.membreId]; });
@@ -1002,6 +1004,11 @@
     // Inter-secteurs) ; le formulaire des affaires ne les connaît pas et les laisse en l'état.
     if ("aoType" in o) v.aoType = TYPES_AO[o.aoType] ? o.aoType : null;
     if ("demandeurId" in o) v.demandeurId = texte(o.demandeurId) || null;
+    // Responsable d'affaire : seulement quand le formulaire le porte (13.10.2026)
+    if ("responsableId" in o) {
+      v.responsableId = texte(o.responsableId) || null;
+      if (v.responsableId && !D.membre(v.responsableId)) throw erreur("Ce responsable n'est plus dans l'équipe.");
+    }
     if ("aoResultat" in o) v.aoResultat = RESULTATS_AO[o.aoResultat] ? o.aoResultat : null;
     if ("aoMontant" in o) {
       var mt = texte(o.aoMontant).replace(/['’\s]/g, "");
