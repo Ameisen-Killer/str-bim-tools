@@ -18,6 +18,18 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=88">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
+<style>
+/* Poser une absence d'un clic (13.10.2026) : la personne, ou un jour libre de sa ligne */
+.pl-nom.pose-absence{cursor:pointer;border-radius:6px;transition:background .2s}
+.pl-nom.pose-absence:hover,.pl-nom.pose-absence:focus-visible{background:var(--m-voile,rgba(0,0,0,.04));outline:none}
+.pl-nom .pose-plus{margin-left:auto;align-self:center;width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;
+  font-size:16px;font-weight:600;color:var(--m-fort,var(--or));background:var(--m-pale,transparent);opacity:0;transition:opacity .2s}
+.pl-nom.pose-absence:hover .pose-plus,.pl-nom.pose-absence:focus-visible .pose-plus{opacity:1}
+.pl-zone.pose-absence{cursor:copy}
+.pl-zone.pose-absence .bt{cursor:pointer}
+@media (hover:none){.pl-nom .pose-plus{opacity:.8}}
+@media print{.pl-nom .pose-plus{display:none}}
+</style>
 </head>
 <body class="large">
 
@@ -425,15 +437,28 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         ]));
       }
       var nb = joursDe[m.id];
-      plan.appendChild(el("div", { class: "pl-nom" }, [
+      /* Avec le droit (le sien, ou « Poser les absences des autres ») : un clic
+         sur la personne ouvre une nouvelle absence pour elle ; un clic sur un
+         jour libre de sa ligne, une absence qui commence ce jour-là
+         (13.10.2026, demande de Tony). */
+      var peut = D.peutAbsences(m.id);
+      function poser(debut) { UI.nouvelleAbsence({ membreId: m.id, debut: debut || "", surChangement: rend }); }
+      var nom = el("div", peut ? {
+        class: "pl-nom pose-absence", role: "button", tabindex: "0",
+        title: "Poser une absence pour " + m.prenom + " " + m.nom,
+        onclick: function () { poser(); },
+        onkeydown: function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); poser(); } }
+      } : { class: "pl-nom" }, [
         el("div", { class: "pl-membre" }, [
           el("div", {}, [
             el("div", { class: "n", text: m.prenom + " " + m.nom }),
             el("div", { class: "r", text: D.libelleMetier(m.metier) }),
             el("div", { class: "c", text: nb ? C.fmtJours(nb) + " j d'absence" : "—" })
-          ])
+          ]),
+          peut ? el("span", { class: "pose-plus", "aria-hidden": "true", text: "+" }) : null
         ])
-      ]));
+      ]);
+      plan.appendChild(nom);
 
       var fond = el("div", { class: "pl-fond", "aria-hidden": "true" });
       jours.forEach(function (j) {
@@ -470,7 +495,17 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       // Ligne vide laissée nue : sur une équipe entière, répéter « aucune
       // absence » à chaque ligne remplit le calendrier de bruit.
 
-      plan.appendChild(el("div", { class: "pl-zone", dataset: { membre: m.id } }, [fond, piste]));
+      var zone = el("div", { class: "pl-zone" + (peut ? " pose-absence" : ""), dataset: { membre: m.id } }, [fond, piste]);
+      if (peut) {
+        zone.title = "Cliquer sur un jour pour poser une absence à " + m.prenom;
+        zone.addEventListener("click", function (e) {
+          if (e.target.closest(".bt")) return;               // une absence existante : sa fenêtre à elle
+          var r = zone.getBoundingClientRect();
+          var i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / (r.width / n))));
+          poser(jours[i]);
+        });
+      }
+      plan.appendChild(zone);
     });
 
     /* ---- dernière ligne : combien d'absents chaque jour ---- */
