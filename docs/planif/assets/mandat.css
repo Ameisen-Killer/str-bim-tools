@@ -126,3 +126,14 @@
 .mj-bandeau-txt{display:flex;flex-direction:column;gap:6px;flex:1 1 260px;min-width:0;font-size:14px}
 .mj-bandeau-jauges{display:flex;flex-direction:column;gap:4px;max-width:360px}
 @media print{.mj-bandeau{display:none}}
+
+/* Export PDF de la page Facturation (13.10.2026) : filtres, chapeau et liste
+   des affaires sans mandat hors papier ; ce que retiennent les filtres se lit
+   dans l'en-tête imprimé. Une affaire ne se coupe pas entre deux pages. */
+@media print{
+  #facturation .tete-section,.fa-sans{display:none!important}
+  .fa-secteur{border-radius:0;margin-bottom:10px}
+  .fa-secteur-tete{break-after:avoid;padding:6px 10px}
+  .fa-affaire{break-inside:avoid;cursor:default;padding:6px 10px}
+  .fa-legende{margin:0 0 8px;font-size:9pt}
+}

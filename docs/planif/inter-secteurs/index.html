@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/planif.css?v=103">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 <link rel="stylesheet" href="/planif/assets/inter.css?v=6">
-<link rel="stylesheet" href="/planif/assets/mandat.css?v=3">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
 </head>
 <body class="large">
 
@@ -101,6 +101,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     </section>
 
     <section class="section" id="facturation" data-vue="facturation">
+      <!-- en-tête du papier : invisible à l'écran, imprimé en tête du PDF -->
+      <div class="entete-impression">
+        <h1>Facturation</h1>
+        <div class="ligne"><span id="fa-imp-filtres"></span><span id="fa-imp-edition"></span></div>
+      </div>
+      <!-- Sur téléphone, la barre masque ses actions : l'export garde son bouton dans la page -->
+      <button class="btn seul-mobile" type="button" id="fa-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
       <div class="tete-section">
         <div>
           <p class="is-chapeau">L'avancement et la facturation de chaque phase du mandat, secteur par secteur. Un clic sur une affaire ouvre la saisie des pourcentages et leur historique.</p>
@@ -174,6 +181,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
     document.getElementById("f-terminees").addEventListener("change", function () { filtres.terminees = this.checked; rend(); });
+    document.getElementById("fa-pdf").addEventListener("click", exportePdf);
     if (VUE.type) document.getElementById("chapeau-ao").textContent = VUE.type === "public"
       ? "Les appels d'offres publics (marchés publics, souvent repris de la veille simap.ch) : remise, demandeur, honoraires offerts, résultat."
       : "Les appels d'offres privés (maîtres d'ouvrage privés, sur invitation) : remise, demandeur, honoraires offerts, résultat.";
@@ -192,6 +200,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
     if (VUE.section === "agenda") {
       actions.push({ label: "Ajouter un rendez-vous", or: true, action: function () { formEvenement(null, {}); } });
+    }
+    if (VUE.section === "facturation") {
+      actions.push({ label: "Exporter en PDF", icone: "ico-export", action: exportePdf });
     }
     UI.chrome(VUE.cle, actions);
   }
@@ -457,7 +468,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var m = menusFactu[nom], cle = JSON.stringify(options);
     if (m.cle === cle) return;
     m.cle = cle;
-    var f = UI.multiChoix({ libelle: "Filtrer : " + reglages.pluriel, tous: reglages.tous, pluriel: reglages.pluriel,
+    var f = m.menu = UI.multiChoix({ libelle: "Filtrer : " + reglages.pluriel, tous: reglages.tous, pluriel: reglages.pluriel,
       options: options, valeurs: factu[nom], large: reglages.large,
       surChange: function (v) { factu[nom] = v; retiensFactu(); rend(); } });
     factu[nom] = f.valeurs();
@@ -564,8 +575,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         }))
       ]));
     }
+    /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi */
+    var restreint = ["succursales", "affaires", "secteurs"].map(function (k) {
+      var m = menusFactu[k].menu;
+      return m && factu[k].length ? m.texte() : "";
+    }).filter(Boolean);
+    if (filtres.terminees) restreint.push("Affaires terminées comprises");
+    document.getElementById("fa-imp-filtres").textContent = restreint.length ? restreint.join("  ·  ") : "Toutes les affaires au mandat";
+    document.getElementById("fa-imp-edition").textContent = "édité le " + C.fmtCH(C.isoAuj());
     return Object.keys(affichees).length;
   }
+
+  /** Export PDF de la facturation : la fenêtre d'impression du navigateur. */
+  function exportePdf() { UI.imprime("facturation-" + C.isoAuj()); }
 
   /* ================================================================ formulaires */
 
