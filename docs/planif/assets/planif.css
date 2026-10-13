@@ -10,6 +10,11 @@
    parchemin sur fond noir, un filet d'encre sur fond clair.
    Le thème est posé sur <html data-theme="sombre|clair"> avant le premier
    rendu (script en tête de chaque page) : aucun éclair de la mauvaise couleur. */
+/* La place de la barre de défilement est réservée dès le premier rendu
+   (13.10.2026, demande de Tony) : sans cela, elle n'apparaît qu'une fois la
+   page remplie, et toute la page se resserre d'un coup de sa largeur. */
+html{scrollbar-gutter:stable}
+
 :root{
   color-scheme:dark;
   --encre:236,232,224;          /* couleur du trait et du texte */

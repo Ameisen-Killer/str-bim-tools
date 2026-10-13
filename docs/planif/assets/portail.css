@@ -31,7 +31,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Place de la barre de défilement réservée dès le premier rendu : la page ne
+   se resserre plus quand elle apparaît, une fois les encadrés remplis. */
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
 body {
   margin: 0; background: var(--fond); color: var(--texte);
   font-family: var(--police); font-size: 16px; font-weight: 450; line-height: 1.4;
