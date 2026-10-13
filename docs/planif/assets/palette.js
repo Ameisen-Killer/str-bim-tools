@@ -226,7 +226,7 @@
   var PAGES = [
     { nom: "Accueil", href: "/planif/", mots: "bienvenue salut aujourd'hui mes taches avis" },
     { nom: "Tableau de bord", href: "/planif/planning/", mots: "planning barres semaines" },
-    { nom: "Carte de charge", href: "/planif/charge/", mots: "charge occupation disponibilite qui est libre surcharge semaines" },
+    { nom: "Tableau de charge", href: "/planif/charge/", mots: "charge occupation disponibilite qui est libre surcharge semaines" },
     { nom: "Tâches", href: "/planif/taches/", mots: "liste" },
     { nom: "Affaires", href: "/planif/affaires/", mots: "projets" },
     { nom: "Équipe", href: "/planif/equipe/", mots: "membres personnes" },
