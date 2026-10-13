@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
-<link rel="stylesheet" href="/planif/assets/mandat.css?v=1">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=2">
 </head>
 <body class="large">
 
@@ -64,15 +64,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=53"></script>
-<script src="/planif/assets/donnees.js?v=73"></script>
+<script src="/planif/assets/supabase.js?v=54"></script>
+<script src="/planif/assets/donnees.js?v=74"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=109"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=19"></script>
-<script src="/planif/assets/direct.js?v=14"></script>
-<script src="/planif/assets/mandat.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/mandat.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -284,8 +284,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       })(i);
     }
 
-    // Le mandat ne s'enregistre qu'une fois la base à jour (migration-facturation.sql)
-    var editeurMandat = D.mandatPret() ? Mandat.editeur(a ? a.mandat : {}) : null;
+    var editeurMandat = Mandat.editeur(a ? a.mandat : {});
     var corps = el("div", {}, [
       el("div", { class: "grille-champs" }, [
         UI.champ({ nom: "code", label: "Numéro d'affaire", valeur: a ? a.code : "", exemple: "25-042", aide: "Facultatif : à ajouter plus tard s'il n'est pas encore attribué." }),
@@ -314,9 +313,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
         el("div", { class: "legende", text: "Mandat : phases SIA et disciplines" }),
-        D.mandatPret()
-          ? el("p", { class: "aide", style: "margin:0 0 10px", text: "Coche, pour chaque phase du mandat, les disciplines concernées. L'avancement et la facturation se suivent ensuite phase par phase (bouton jauge de la liste, page Facturation)." })
-          : Mandat.bandeauBase(),
+        el("p", { class: "aide", style: "margin:0 0 10px", text: "Coche, pour chaque phase du mandat, les disciplines concernées. L'avancement et la facturation se suivent ensuite phase par phase (bouton jauge de la liste, page Facturation)." }),
         editeurMandat
       ]),
       el("fieldset", { style: "margin-top:26px" }, [
@@ -344,7 +341,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             var v = UI.lit(corps);
             var radio = corps.querySelector("input[name=teinte]:checked");
             v.teinte = radio ? radio.value : 1;
-            if (editeurMandat) v.mandat = Mandat.litEditeur(editeurMandat);
+            v.mandat = Mandat.litEditeur(editeurMandat);
             var p = a ? D.majAffaire(a.id, v) : D.ajouteAffaire(v);
             return p.then(function () { dessine(); UI.toast(a ? "Affaire modifiée." : "Affaire créée."); })
               .catch(function (e) { UI.toast(e.message); return false; });

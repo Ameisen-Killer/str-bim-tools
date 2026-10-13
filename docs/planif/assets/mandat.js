@@ -52,17 +52,19 @@
     return jour + h + (x.par ? " · " + D.nomMembre(x.par) : "");
   }
 
-  function bandeauBase() {
-    return el("p", { class: "mj-base", text: "Base à mettre à jour : la facturation attend sa migration (migration-facturation.sql). " +
-      "Le mandat et les pourcentages ne s'enregistrent pas encore." });
-  }
-
   /* ------------------------------------------------------------ éditeur */
+
+  /** Administrateurs, Administration : des secteurs du bureau, pas des disciplines d'un mandat. */
+  function administrative(c) {
+    function plie(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+    return /^admin/.test(plie(c)) || /^admin/.test(plie(D.DISCIPLINES[c]));
+  }
 
   /** Une ligne par phase SIA ; les disciplines du bureau en cases, par leur sigle. */
   function editeur(mandat) {
     var m = mandat || {};
-    var codes = Object.keys(D.DISCIPLINES);
+    // Les disciplines techniques seules : pas de case pour l'administration (13.10.2026, demande de Tony)
+    var codes = Object.keys(D.DISCIPLINES).filter(function (c) { return !administrative(c); });
     var phases = D.PHASES_MANDAT.concat(Object.keys(m).filter(function (p) { return D.PHASES_MANDAT.indexOf(p) < 0; })).sort();
     var boite = el("div", { class: "mj-editeur" });
     phases.forEach(function (p) {
@@ -102,10 +104,9 @@
     opts = opts || {};
     var a = D.affaire(idAffaire);
     if (!a) return;
-    var phases = D.phasesMandat(a), pret = D.mandatPret();
+    var phases = D.phasesMandat(a);
     var voitFact = D.voitFacturation();
     var corps = el("div", { class: "mj-saisie" });
-    if (!pret) corps.appendChild(bandeauBase());
     var titre = { surtitre: voitFact ? "Avancement et facturation" : "Avancement du mandat", titre: D.libelleAffaire(a) };
 
     if (!phases.length) {
@@ -132,7 +133,7 @@
         var cells = {};
         function cellule(genre) {
           var x = D.saisieMandat(a.id, p.phase, d, genre);
-          var peut = pret && (genre === "facturation" ? D.peutSaisirFacturation() : D.peutSaisirAvancement(a, d));
+          var peut = genre === "facturation" ? D.peutSaisirFacturation() : D.peutSaisirAvancement(a, d);
           var input = el("input", { type: "number", min: "0", max: "100", step: "1", inputmode: "numeric", class: "mj-input",
             "aria-label": (genre === "avancement" ? "Avancement " : "Facturé ") + p.phase + " " + nomDisc(d) + " (%)",
             disabled: !peut, title: peut ? null : (genre === "facturation" ? "Demande le droit « Saisir la facturation »" :
@@ -240,5 +241,5 @@
     return boite;
   }
 
-  global.Mandat = { jauge: jauge, editeur: editeur, litEditeur: litEditeur, saisie: saisie, bandeauBase: bandeauBase };
+  global.Mandat = { jauge: jauge, editeur: editeur, litEditeur: litEditeur, saisie: saisie };
 })(window);

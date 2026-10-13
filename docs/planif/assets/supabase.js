@@ -399,16 +399,6 @@
   }
 
 
-  /* Garde-fou provisoire (13.10.2026) : tant que migration-facturation.sql n'est
-     pas passée, la table mandat_saisies et la colonne affaires.mandat manquent.
-     La lecture tolère alors l'absence de la table, et rien de la facturation
-     n'est écrit. À retirer quand la migration est passée. */
-  var mandatEnBase = false;
-  function litSaisies() {
-    return litTout("mandat_saisies", "id").then(function (l) { mandatEnBase = true; return l; },
-      function () { mandatEnBase = false; return []; });
-  }
-
   var VERS_BASE = {
     membres: function (m) {
       var o = { id: m.id, nom: m.nom, prenom: m.prenom, email: vide(m.email),
@@ -429,7 +419,7 @@
       o.ao_resultat = a.aoResultat || null; o.ao_montant = a.aoMontant == null ? null : a.aoMontant;
       o.secteurs = a.secteurs || [];
       o.responsable_id = a.responsableId || null;
-      if (mandatEnBase) o.mandat = a.mandat || {};
+      o.mandat = a.mandat || {};
       return o;
     },
     taches: function (t) {
@@ -566,7 +556,7 @@
     conges: function () { return litTout("conges", "id"); },
     veille_ao: litVeille,
     veille_suivi: function () { return litTout("veille_suivi", "id"); },
-    mandat_saisies: litSaisies
+    mandat_saisies: function () { return litTout("mandat_saisies", "id"); }
   };
   // Tables que touchent les fonctions de la base appelées d'ici ; absente : toutes
   var TABLES_RPC = {
@@ -864,7 +854,7 @@
     var dSuivi = compare(av.veilleSuivi || [], etat.veilleSuivi || [], VERS_BASE.veilleSuivi);
     // Saisies : on n'en ajoute que de nouvelles (une correction est une nouvelle saisie) ;
     // celles d'une affaire supprimée partent avec elle, en cascade
-    var saisiesNeuves = mandatEnBase ? compare(av.saisies || [], etat.saisies || [], VERS_BASE.saisies).ajouts : [];
+    var saisiesNeuves = compare(av.saisies || [], etat.saisies || [], VERS_BASE.saisies).ajouts;
     var liensAv = tousLiens(av), liensAp = tousLiens(etat);
     var cleAv = parId(liensAv), cleAp = parId(liensAp);
     var liensNeufs = liensAp.filter(function (l) { return !cleAv[l.id]; })
@@ -962,7 +952,6 @@
       profil: profil,
       regleJours: regleJours,
       regleProfil: regleProfil,
-      mandatEnBase: function () { return mandatEnBase; },
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }

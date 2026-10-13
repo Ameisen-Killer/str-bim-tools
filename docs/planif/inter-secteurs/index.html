@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/planif.css?v=102">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=23">
 <link rel="stylesheet" href="/planif/assets/inter.css?v=5">
-<link rel="stylesheet" href="/planif/assets/mandat.css?v=1">
+<link rel="stylesheet" href="/planif/assets/mandat.css?v=2">
 </head>
 <body class="large">
 
@@ -131,15 +131,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=6"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=53"></script>
-<script src="/planif/assets/donnees.js?v=73"></script>
+<script src="/planif/assets/supabase.js?v=54"></script>
+<script src="/planif/assets/donnees.js?v=74"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
 <script src="/planif/assets/version.js?v=13"></script>
 <script src="/planif/assets/ui.js?v=109"></script>
 <script src="/planif/assets/tchat.js?v=9"></script>
 <script src="/planif/assets/palette.js?v=19"></script>
-<script src="/planif/assets/direct.js?v=14"></script>
-<script src="/planif/assets/mandat.js?v=1"></script>
+<script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/mandat.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -479,7 +479,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      facturé de ce secteur. Un clic ouvre la saisie (mandat.js). */
   function listeFacturation() {
     var hote = UI.vide(document.getElementById("liste-facturation"));
-    if (!D.mandatPret()) hote.appendChild(Mandat.bandeauBase());
     var affaires = D.affaires({ tous: filtres.terminees }).filter(function (a) { return D.phasesMandat(a).length; });
     var parSecteur = {};
     affaires.forEach(function (a) {
@@ -558,7 +557,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     // Les affaires en cours dont le mandat n'est pas encore décrit
     var sans = D.affaires().filter(function (a) { return a.phase !== "AO" && !D.phasesMandat(a).length; });
-    if (sans.length && D.mandatPret()) {
+    if (sans.length) {
       var vers = D.pagePermise("affaires");
       hote.appendChild(el("details", { class: "fa-sans" }, [
         el("summary", { text: sans.length + (sans.length > 1 ? " affaires en cours sans mandat décrit" : " affaire en cours sans mandat décrit") }),

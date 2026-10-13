@@ -14,7 +14,6 @@
 .mj-val{flex:none;min-width:3.4em;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .mj.vide .mj-val{color:var(--texte-faible);font-weight:450}
 
-.mj-base{margin:0 0 14px;padding:10px 12px;border-radius:8px;background:#FBE4E2;color:var(--alerte);font-size:14px;font-weight:600}
 
 /* ------------------------------------------------- éditeur (fiche affaire) */
 .mj-editeur{display:flex;flex-direction:column;gap:6px}

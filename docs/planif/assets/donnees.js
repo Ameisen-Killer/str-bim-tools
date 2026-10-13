@@ -1948,8 +1948,6 @@
        ont la page ou le droit de la saisir. */
     PHASES_MANDAT: PHASES_MANDAT,
     GENRES_SAISIE: GENRES_SAISIE,
-    /** La base connaît-elle le mandat ? (migration-facturation.sql ; toujours vrai en local) */
-    mandatPret: function () { return !ADAPTATEUR.mandatEnBase || ADAPTATEUR.mandatEnBase(); },
     /** « STR », « GEO », « ENV », « GC » : le sigle d'une discipline, pour les cases serrées. */
     sigleDiscipline: function (code) {
       var mots = String(code || "").split("_").filter(Boolean);
@@ -2024,7 +2022,6 @@
     saisitMandat: function (idAffaire, items) {
       return Promise.resolve().then(function () {
         var a = D.affaire(idAffaire); if (!a) throw erreur("Affaire introuvable.");
-        if (!D.mandatPret()) throw erreur("La base n'est pas encore à jour : la facturation attend sa migration.");
         var moi = D.monMembre(), maintenant = new Date().toISOString(), neuves = [];
         (items || []).forEach(function (o) {
           var phase = texte(o.phase), disc = texte(o.discipline), genre = o.genre;
