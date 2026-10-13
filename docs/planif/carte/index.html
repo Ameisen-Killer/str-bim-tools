@@ -244,12 +244,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         n + (n > 1 ? " tâches ouvertes" : " tâche ouverte")].filter(Boolean).join(" · ") }),
       el("div", { class: "liens" }, [
         el("a", { class: "btn btn-or", href: D.lienCarte(a), target: "_blank", rel: "noopener noreferrer", text: "Google Maps" }),
+        // La fiche de l'affaire dans la page Affaires (13.10.2026)
+        !D.pagePermise || D.pagePermise("affaires") ? el("a", { class: "btn", href: lienDetail(a), text: "Détail" }) : null,
         el("a", { class: "btn", href: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=", text: "Tâches" })
       ])
     ]);
     bulle.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
     carte.appendChild(bulle);
     dessinePoints();
+  }
+  /** Page Affaires, liste réduite à l'affaire et sa fiche ouverte (?affaire=). */
+  function lienDetail(a) {
+    return "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id);
   }
   function placeBulle() {
     if (!bulle || !choisi || !positions[choisi]) return;
@@ -404,8 +410,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           el("div", { class: "num-section", text: g[1] + " · " + g[0].length }),
           el("ul", {}, g[0].map(function (a) {
             return el("li", {}, [el("a", {
-              class: "lien-doux", href: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom),
-              title: "Ouvrir dans la liste des affaires pour compléter l'adresse", text: D.libelleAffaire(a)
+              class: "lien-doux", href: lienDetail(a),
+              title: "Ouvrir la fiche de l'affaire pour compléter l'adresse", text: D.libelleAffaire(a)
             })]);
           }))
         ]));
