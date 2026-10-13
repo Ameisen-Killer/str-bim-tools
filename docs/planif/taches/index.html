@@ -168,8 +168,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   "use strict";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
-  /* succursales : codes cochés (13.10.2026) — rien de coché = toutes. Elles
-     réduisent le menu Affaire et la liste aux affaires de ces succursales. */
+  /* succursales : codes cochés (13.10.2026), « _ » pour non renseignée — rien
+     de coché = toutes. Elles réduisent le menu Affaire et la liste aux affaires
+     de ces succursales. */
   var filtres = { succursales: [], affaire: "", membre: "", statut: "", masqueTerminees: true };
   /* Rangement : « echeance » (chronologie des échéances, comme avant) ou
      « affaire » (les tâches d'une même affaire ensemble, puis par échéance),
@@ -184,6 +185,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   D.pret().then(function () {
     var p = new URLSearchParams(location.search);
     if (p.get("affaire")) filtres.affaire = p.get("affaire");
+    // Les succursales retenues, sauf si le lien vise une affaire qui n'y est pas
+    filtres.succursales = succursalesRetenues();
+    if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.succursales = [];
     if (p.get("membre")) filtres.membre = p.get("membre");
     if (p.get("vue") === "affaire" || p.get("vue") === "echeance") vue = p.get("vue");
     // Ouverte depuis le menu, sans consigne : chacun voit d'abord ses propres tâches.
@@ -227,7 +231,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         dessine();
       });
     });
-    D.surRechargement(dessine);
+    // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
+    D.surRechargement(function () { if (optionsSuccursales().length !== nbOptSucc) rendFiltres(); dessine(); });
     dessine();
 
     if (p.get("nouvelle") === "1") formulaire(null);
@@ -264,8 +269,25 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   /** L'affaire est dans une des succursales cochées (aucune cochée : toutes passent). */
   function dansSuccursales(a) {
-    return !filtres.succursales.length || (!!a && filtres.succursales.indexOf(a.succursale) >= 0);
+    return !filtres.succursales.length || (!!a && filtres.succursales.indexOf(a.succursale || "_") >= 0);
   }
+
+  /* Le choix des succursales : celles du bureau, plus « Non renseignée » (« _ »,
+     qu'aucun code ne peut prendre) dès qu'une affaire n'en a pas. Retenu sur
+     cet appareil (13.10.2026). */
+  var CLE_SUCC = "planif.taches.succursales";
+  function optionsSuccursales() {
+    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
+    if (D.affaires({ tous: true }).some(function (a) { return !a.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
+    return o;
+  }
+  function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
+  function retiensSuccursales(v) { try { localStorage.setItem(CLE_SUCC, JSON.stringify(v)); } catch (e) {} }
+  function succursalesRetenues() {
+    try { var v = JSON.parse(localStorage.getItem(CLE_SUCC) || "[]"); return Array.isArray(v) ? v.map(String) : []; }
+    catch (e) { return []; }
+  }
+  var nbOptSucc = -1;
 
   // Le sélecteur de rangement, sorti une fois de la page : un nouveau rendu des filtres le reprend
   var blocVue = null;
@@ -275,14 +297,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     blocVue = blocVue || document.querySelector(".vue-taches");
     UI.vide(hote);
 
-    /* Succursales : menu à cases avant l'affaire ; caché quand le bureau n'en a qu'une */
-    var codes = Object.keys(D.SUCCURSALES);
+    /* Succursales : menu à cases avant l'affaire ; caché quand il n'offre qu'un choix */
+    var options = optionsSuccursales();
+    nbOptSucc = options.length;
     var fSucc = UI.multiChoix({
       libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: codes.map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; }),
+      options: options,
       valeurs: filtres.succursales,
       surChange: function (v) {
         filtres.succursales = v;
+        retiensSuccursales(v);
         // L'affaire choisie sort des succursales cochées : le filtre Affaire revient à « Toutes »
         if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.affaire = "";
         var neuf = champAffaire();
@@ -296,7 +320,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       el("label", { text: "Succursale", onclick: function () { fSucc.noeud.querySelector("button").click(); } }),
       fSucc.noeud
     ]);
-    if (codes.length < 2) chSucc.style.display = "none";
+    if (options.length < 2) chSucc.style.display = "none";
 
     var chAffaire = champAffaire();
     var chMembre = UI.champ({
@@ -424,7 +448,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
        Tout ce qui restreint la liste y figure, la recherche comprise. */
     var restreint = [];
-    if (filtres.succursales.length) restreint.push(filtres.succursales.map(function (c) { return D.SUCCURSALES[c] || c; }).join(", "));
+    if (filtres.succursales.length) restreint.push(filtres.succursales.map(nomSuccursale).join(", "));
     if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(D.libelleAffaire(af)); }
     if (filtres.membre) restreint.push(filtres.membre === "a-affecter" ? "À affecter" : D.nomMembre(filtres.membre));
     if (filtres.statut) restreint.push(D.STATUTS_TACHE[filtres.statut]);
@@ -888,7 +912,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur les tâches filtrées." }));
       bloc.appendChild(el("button", {
         class: "btn btn-or", type: "button", text: "Retirer les filtres",
-        onclick: function () { filtres.succursales = []; filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
+        onclick: function () { filtres.succursales = []; retiensSuccursales([]); filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
       }));
     } else {
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le libellé, la note, l'affaire, les personnes et le statut." }));
