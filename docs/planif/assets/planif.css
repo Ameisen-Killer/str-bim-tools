@@ -1604,7 +1604,13 @@ html.palette-ouverte{overflow:hidden}
    Le nôtre (ui.js, ouvreCalendrier, 13.10.2026), à la place du sélecteur
    natif, sur ordinateur. html.dp-maison : l'icône native s'efface, la nôtre
    la remplace dans le champ. */
-html.dp-maison input[type="date"]::-webkit-calendar-picker-indicator{display:none}
+html.dp-maison input[type="date"]::-webkit-calendar-picker-indicator,
+html.dp-maison input[type="time"]::-webkit-calendar-picker-indicator{display:none}
+html.dp-maison input[type="time"],html.dp-maison:root[data-version] .champ input[type="time"]{
+  padding-right:38px;cursor:pointer;
+  background-image:url(/planif/icons/clock.svg?v=1);background-repeat:no-repeat;
+  background-position:right 11px center;background-size:17px;
+}
 html.dp-maison input[type="date"],html.dp-maison:root[data-version] .champ input[type="date"]{
   padding-right:38px;cursor:pointer;
   background-image:url(/planif/icons/calendar_week.svg?v=1);background-repeat:no-repeat;
@@ -1684,3 +1690,34 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .pl-bw.a-aff:hover,.pl-bw.a-aff:focus-visible{background:rgba(var(--or-rvb),.08);outline:none}
 .pl-bw.a-aff.nul{cursor:default;color:var(--texte-faible)}
 .pl-bw.a-aff.nul:hover{background:none}
+
+/* L'heure, en grand (ui.js, ouvreHorloge, 13.10.2026) */
+.dp.hz{width:304px;padding:0 0 10px;overflow:hidden}
+.hz-tete{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:16px 18px 14px;
+  background:linear-gradient(135deg,var(--m-fort,#4D7A1C),var(--m-vif,#8DB750));color:#fff;
+}
+.hz-affiche{display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums}
+.hz-chiffre{
+  border:0;background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:2px 8px;cursor:pointer;
+  font:inherit;font-size:42px;font-weight:700;line-height:1.05;letter-spacing:-.02em;transition:background .2s;
+}
+.hz-chiffre:hover,.hz-chiffre:focus-visible{background:rgba(255,255,255,.24);outline:none}
+.hz-deux{font-size:38px;font-weight:300;opacity:.85;animation:hz-bat 1s steps(2,start) infinite}
+@keyframes hz-bat{50%{opacity:.25}}
+.hz-duree{font-size:12.5px;font-weight:600;opacity:.92;padding-bottom:6px;text-align:right}
+.hz-legende{padding:12px 16px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--texte-faible)}
+.hz-grille{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:0 12px}
+.hz-p{
+  position:relative;height:34px;border:0;border-radius:9px;background:none;cursor:pointer;
+  font:inherit;font-size:14px;font-variant-numeric:tabular-nums;color:var(--texte);transition:background .15s,transform .15s;
+}
+.hz-p:hover:not([disabled]){background:var(--m-voile,rgba(0,0,0,.05));transform:translateY(-1px)}
+.hz-p:focus-visible{outline:2px solid var(--m-fort,var(--or));outline-offset:-2px}
+.hz-p.calme{color:rgba(var(--encre),.4)}
+.hz-p.maint{box-shadow:inset 0 0 0 1.5px var(--m-fort,var(--or))}
+.hz-p.quart{font-weight:700}
+.hz-p.choisi,.hz-p.choisi:hover{background:var(--m-fort,var(--or));color:#fff;font-weight:700;transform:none}
+.hz-p[disabled]{color:rgba(var(--encre),.16);cursor:default;text-decoration:line-through}
+.dp.hz .dp-pied{margin:10px 12px 0;align-items:center}
+.hz-ok{min-height:32px;padding:4px 16px}

@@ -2957,21 +2957,147 @@
     document.addEventListener("scroll", o.defile, true);
   }
 
+  /* ------------------------------------------------- l'heure, en grand
+     La pendule native (deux colonnes qui défilent) remplacée sur ordinateur
+     (13.10.2026, demande de Tony) : l'heure affichée en grand sur un bandeau
+     aux couleurs de la marque, puis les 24 heures en pastilles — celles du
+     bureau (7 h – 19 h) en avant, l'heure qu'il est cerclée — et les minutes
+     de 5 en 5, quarts d'heure soulignés. Une heure, puis une minute : c'est
+     posé. Pour une fin (« fin » à côté de « debut », « heureFin » à côté de
+     « heureDebut »), ce qui tombe avant le début est écarté et la durée
+     s'affiche. Clavier : flèches, Entrée, Échap. */
+  var DEBUTS_LIES = { fin: "debut", heureFin: "heureDebut" };
+  function deuxChiffres(n) { return (n < 10 ? "0" : "") + n; }
+  function dureeTexte(min) {
+    if (min <= 0) return "";
+    var h = Math.floor(min / 60), m = min % 60;
+    return (h ? h + " h" : "") + (h && m ? " " : "") + (m ? deuxChiffres(m) + (h ? "" : " min") : "");
+  }
+  function ouvreHorloge(input) {
+    if (dpOuvert && dpOuvert.input === input) return;
+    dpFerme(false);
+    var cadre = input.closest("form, .modale-boite, .grille-champs, .section") || document;
+    var nomDebut = DEBUTS_LIES[input.name];
+    var lie = nomDebut ? cadre.querySelector('input[type="time"][name="' + nomDebut + '"]') : null;
+    var depuis = lie && lie.value ? (+lie.value.slice(0, 2)) * 60 + (+lie.value.slice(3, 5)) : null;
+    var v = input.value || "", h = v ? +v.slice(0, 2) : null, m = v ? +v.slice(3, 5) : null;
+    var maintenant = new Date(), hNow = maintenant.getHours();
+
+    var hh = el("button", { type: "button", class: "hz-chiffre", title: "Choisir l'heure" });
+    var mm = el("button", { type: "button", class: "hz-chiffre", title: "Choisir les minutes" });
+    var duree = el("div", { class: "hz-duree" });
+    var heures = el("div", { class: "hz-grille hz-heures", role: "group", "aria-label": "Heures" });
+    var minutes = el("div", { class: "hz-grille hz-minutes", role: "group", "aria-label": "Minutes" });
+    var boite = el("div", { class: "dp hz", role: "dialog", "aria-label": "Choisir une heure" }, [
+      el("div", { class: "hz-tete" }, [
+        el("div", { class: "hz-affiche" }, [hh, el("span", { class: "hz-deux", text: ":" }), mm]),
+        duree
+      ]),
+      el("div", { class: "hz-legende", text: "Heure" }), heures,
+      el("div", { class: "hz-legende", text: "Minutes" }), minutes,
+      el("div", { class: "dp-pied" }, [
+        input.required ? el("span") : el("button", { type: "button", class: "dp-lien", text: "Effacer",
+          onclick: function () { dpPose(input, ""); dpFerme(true); } }),
+        el("button", { type: "button", class: "dp-lien", text: "Maintenant", onclick: function () {
+          h = maintenant.getHours(); m = Math.round(maintenant.getMinutes() / 5) * 5;
+          if (m === 60) { m = 0; h = (h + 1) % 24; }
+          dessine(); } }),
+        el("button", { type: "button", class: "btn btn-or hz-ok", text: "OK", onclick: valide })
+      ])
+    ]);
+    function interdit(hx, mx) {
+      if (depuis == null) return false;
+      return mx == null ? hx * 60 + 55 <= depuis : hx * 60 + mx <= depuis;
+    }
+    function valide() {
+      if (h == null) { dpFerme(true); return; }
+      if (m == null) m = 0;
+      dpPose(input, deuxChiffres(h) + ":" + deuxChiffres(m));
+      dpFerme(true);
+    }
+    function dessine() {
+      hh.textContent = h == null ? "--" : deuxChiffres(h);
+      mm.textContent = m == null ? "--" : deuxChiffres(m);
+      duree.textContent = depuis != null && h != null
+        ? (interdit(h, m == null ? 0 : m) ? "avant le début" : "durée " + dureeTexte(h * 60 + (m || 0) - depuis))
+        : (h != null ? "" : "");
+      vide(heures);
+      for (var i = 0; i < 24; i++) (function (x) {
+        heures.appendChild(el("button", { type: "button",
+          class: "hz-p" + (x < 7 || x > 19 ? " calme" : "") + (x === h ? " choisi" : "") + (x === hNow ? " maint" : ""),
+          disabled: interdit(x, null) ? true : null, text: deuxChiffres(x), "aria-label": x + " heures",
+          onclick: function () {
+            h = x;
+            if (m == null || interdit(h, m)) m = interdit(h, 0) ? Math.ceil(((depuis % 60) + 1) / 5) * 5 % 60 : 0;
+            dessine();
+            var b = minutes.querySelector(".choisi") || minutes.querySelector("button:not([disabled])");
+            if (b) b.focus();
+          } }));
+      })(i);
+      vide(minutes);
+      for (var k = 0; k < 60; k += 5) (function (x) {
+        minutes.appendChild(el("button", { type: "button",
+          class: "hz-p" + (x % 15 === 0 ? " quart" : "") + (x === m ? " choisi" : ""),
+          disabled: h != null && interdit(h, x) ? true : null, text: deuxChiffres(x), "aria-label": x + " minutes",
+          onclick: function () {
+            m = x;
+            if (h == null) h = depuis != null ? Math.min(23, Math.floor(depuis / 60) + 1) : Math.max(7, Math.min(19, hNow));
+            dessine();
+            valide();
+          } }));
+      })(k);
+    }
+    hh.addEventListener("click", function () { var b = heures.querySelector(".choisi") || heures.querySelector("button:not([disabled])"); if (b) b.focus(); });
+    mm.addEventListener("click", function () { var b = minutes.querySelector(".choisi") || minutes.querySelector("button:not([disabled])"); if (b) b.focus(); });
+    boite.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); dpFerme(true); return; }
+      var grille = e.target.parentNode;
+      if (!grille || !grille.classList || !grille.classList.contains("hz-grille")) return;
+      var pas = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6 }[e.key];
+      if (!pas) return;
+      e.preventDefault();
+      var l = [].slice.call(grille.children), i = l.indexOf(e.target) + pas;
+      while (i >= 0 && i < l.length && l[i].disabled) i += pas > 0 ? 1 : -1;
+      if (l[i]) l[i].focus();
+    });
+
+    document.body.appendChild(boite);
+    dessine();
+    dpPlace(boite, input);
+    var o = {
+      input: input, boite: boite,
+      dehors: function (e) { if (!boite.contains(e.target) && e.target !== input) dpFerme(false); },
+      fermer: function () { dpFerme(false); },
+      defile: function (e) { if (!boite.contains(e.target)) dpFerme(false); }
+    };
+    dpOuvert = o;
+    document.addEventListener("pointerdown", o.dehors, true);
+    global.addEventListener("resize", o.fermer);
+    document.addEventListener("scroll", o.defile, true);
+  }
+  /** Sous le champ, ou au-dessus s'il manque de place ; jamais hors de l'écran. */
+  function dpPlace(boite, input) {
+    var r = input.getBoundingClientRect(), h = boite.offsetHeight, w = boite.offsetWidth;
+    var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
+    boite.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
+    boite.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
+  }
+
   if (global.document) {
     if (dpPossible()) document.documentElement.classList.add("dp-maison");
     document.addEventListener("click", function (e) {
-      var input = e.target && e.target.closest ? e.target.closest('input[type="date"]') : null;
+      var input = e.target && e.target.closest ? e.target.closest('input[type="date"], input[type="time"]') : null;
       if (!input || input.disabled || input.readOnly || !dpPossible()) return;
       e.preventDefault();
-      ouvreCalendrier(input);
+      if (input.type === "time") ouvreHorloge(input); else ouvreCalendrier(input);
     }, true);
     document.addEventListener("keydown", function (e) {
       var t = e.target;
-      if (!t || !t.matches || !t.matches('input[type="date"]') || !dpPossible()) return;
+      if (!t || !t.matches || !t.matches('input[type="date"], input[type="time"]') || !dpPossible()) return;
       if (e.altKey && e.key === "ArrowDown") {
         e.preventDefault();
-        ouvreCalendrier(t);
-        setTimeout(function () { var b = dpOuvert && dpOuvert.boite.querySelector('.dp-j[tabindex="0"]'); if (b) b.focus(); }, 0);
+        if (t.type === "time") ouvreHorloge(t); else ouvreCalendrier(t);
+        setTimeout(function () { var b = dpOuvert && dpOuvert.boite.querySelector('.dp-j[tabindex="0"], .hz-p.choisi, .hz-heures .hz-p:not([disabled])'); if (b) b.focus(); }, 0);
       } else if (e.key === "Escape" && dpOuvert && dpOuvert.input === t) { e.preventDefault(); e.stopPropagation(); dpFerme(false); }
       else if (e.key === "Tab" && dpOuvert) dpFerme(false);
     }, true);

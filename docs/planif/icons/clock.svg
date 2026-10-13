@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#000" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- une horloge : cadran et aiguilles -->
+  <circle cx="24" cy="24" r="18"/>
+  <path d="M24 13v11l7 5"/>
+</svg>
