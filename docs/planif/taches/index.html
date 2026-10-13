@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=97">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=98">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=22">
 <style>
 .imp-periode{display:none}
@@ -122,7 +122,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <span>Filtres</span><span id="nb-filtres" class="or"></span>
         </button>
         <div class="grille-champs" id="filtres" style="max-width:1100px"></div>
-        <!-- Deux rangements, toujours par semaine (13.10.2026, demande de Tony) -->
+        <!-- Deux rangements, toujours par semaine (13.10.2026, demande de Tony) ;
+             rendFiltres les range juste à gauche de « Masquer les terminées » -->
         <div class="vue-taches" role="group" aria-label="Rangement de la liste">
           <button class="btn" type="button" data-vue="echeance" aria-pressed="true">Par échéance</button>
           <button class="btn" type="button" data-vue="affaire" aria-pressed="false">Par affaire</button>
@@ -243,7 +244,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var masque = el("input", { type: "checkbox" });
     masque.checked = filtres.masqueTerminees;
     masque.addEventListener("change", function () { filtres.masqueTerminees = masque.checked; dessine(); });
-    hote.appendChild(el("div", { class: "champ", style: "justify-content:flex-end" }, [
+    hote.appendChild(el("div", { class: "champ champ-vue" }, [
+      document.querySelector(".vue-taches"),
       el("label", {
         class: "case", style: "white-space:nowrap",
         title: "Les tâches terminées, et celles dont la part de la personne regardée est rendue"

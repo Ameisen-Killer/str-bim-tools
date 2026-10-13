@@ -418,10 +418,14 @@ table.liste tr.groupe-affaire:hover td{background:none}
 .groupe-affaire .compte{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
 table.liste.par-affaire .affaire-ligne{display:none!important}
 /* Les deux boutons de rangement, accolés */
-.vue-taches{display:flex;flex-wrap:wrap;margin-top:14px}
+/* … juste à gauche de « Masquer les terminées », dans la grille des filtres (deux colonnes) */
+.grille-champs .champ-vue{grid-column:span 2;flex-direction:row;flex-wrap:wrap;align-items:flex-end;justify-content:flex-end;gap:10px}
+.vue-taches{display:flex}
+.vue-taches .btn{padding:7px 12px;letter-spacing:.08em;white-space:nowrap}
 .vue-taches .btn + .btn{margin-left:-1px}
 .vue-taches .btn[aria-pressed="true"]{position:relative;color:var(--or);border-color:rgba(var(--or-rvb),.6);background:rgba(var(--or-rvb),.08)}
-.tete-collante.collee .vue-taches{margin-top:10px}
+.tete-collante.collee .vue-taches .btn{padding:5px 10px}
+@media (max-width:860px){.grille-champs .champ-vue{grid-column:auto;justify-content:flex-start}}
 table.liste tr.groupe-vide td{padding:14px 0}
 
 /* terminer une tâche d'un clic */
