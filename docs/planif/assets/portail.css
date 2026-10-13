@@ -51,7 +51,7 @@ button { font: inherit; color: inherit; }
 /* Pendule à aiguilles, à droite sous le compte, la date dessous (13.10.2026) */
 .ab-centre { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ab-centre .ab-date { text-align: center; font-size: 15px; }
-.ab-pendule { width: clamp(84px, 7vw, 104px); aspect-ratio: 1; }
+.ab-pendule { width: clamp(104px, 8.6vw, 130px); aspect-ratio: 124 / 100; }
 .ab-pendule-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ab-pendule .pd-point { fill: var(--m-vif); }
 .ab-pendule .pd-heure { stroke: var(--m-fort); stroke-width: 2.6; }
@@ -258,7 +258,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-badge { position: static; grid-column: 2; justify-self: start; margin-top: 4px; font-size: 12px; }
   .ab-page { padding-top: 14px; }
   .ab-entete { padding-left: 0; align-items: center; gap: 12px; }
-  .ab-pendule { width: 64px; }
+  .ab-pendule { width: 74px; }
   .ab-logo { height: 58px; }
   .ab-logo-str { font-size: 13px; }
   .ab-date { display: none; }
