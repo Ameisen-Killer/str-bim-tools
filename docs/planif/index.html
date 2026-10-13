@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=23">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=24">
 </head>
 <body>
 
@@ -309,7 +309,8 @@
      (discipline) de la personne connectée quand elle en a un, sinon tout le
      bureau. Seuls les absents y figurent (demande de Tony, 06.10.2026) :
      rouge, absent toute la semaine ; orange, une partie. Seuls comptent les
-     jours que la personne aurait travaillés. */
+     jours que la personne aurait travaillés. S'y ajoutent les jours off et
+     demi-journées de sa semaine type (gris ; à demi orange). */
   function absences(moi) {
     var hote = Portail.vide(document.getElementById("abs"));
     var lundi = C.lundi(auj()), vendredi = C.ajoute(lundi, 4), canton = D.canton();
@@ -319,38 +320,63 @@
       (secteur && D.DISCIPLINES[secteur] ? " · " + D.DISCIPLINES[secteur] : "") + ")";
     document.getElementById("abs-quand").title = "Semaine " + C.semaineISO(lundi).num + ", du " + C.fmtLong(lundi) + " au " + C.fmtLong(vendredi);
 
-    var lignes = gens.map(function (m) {
+    var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+    var semaine = [0, 1, 2, 3, 4].map(function (i) { return C.ajoute(lundi, i); })
+      .filter(function (j) { return C.estOuvre(j, canton); });
+
+    var lignes = [];
+    gens.forEach(function (m) {
       var dus = Calc.joursTravaillesEntre(m, lundi, vendredi, canton);
       var periodes = (m.absences || []).filter(function (a) { return a.debut <= vendredi && (a.fin || a.debut) >= lundi; });
       var manque = periodes.reduce(function (s, a) {
         var de = a.debut < lundi ? lundi : a.debut, a2 = (a.fin || a.debut) > vendredi ? vendredi : (a.fin || a.debut);
         return s + Calc.joursTravaillesEntre(m, de, a2, canton);
       }, 0);
-      // Rouge : absent tous les jours qu'il aurait travaillés ; orange : une partie
-      return { m: m, etat: manque >= dus - 0.01 ? "rouge" : "orange", periodes: periodes, dus: dus, manque: manque };
-    }).filter(function (x) {
       // Seuls les absents : une absence qui ne tombe que sur des jours non travaillés ne compte pas
-      return x.periodes.length && x.manque > 0;
+      if (periodes.length && manque > 0) {
+        var p = periodes[0];
+        lignes.push({
+          m: m, debut: p.debut < lundi ? lundi : p.debut,
+          // Rouge : absent tous les jours qu'il aurait travaillés ; orange : une partie
+          etat: manque >= dus - 0.01 ? "rouge" : "orange",
+          periode: p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin),
+          motif: p.motif || "Absence",
+          titre: m.prenom + " " + m.nom + "\n" +
+            periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
+            "\n" + C.fmtJours(manque) + " j d'absence sur " + C.fmtJours(dus) + " j travaillés"
+        });
+      }
+      /* Les jours que sa semaine type laisse libres (13.10.2026, demande de
+         Tony : comme « Qui manque » de Communication) — jour off, demi-journée —
+         hors des jours déjà couverts par une absence. */
+      var couverts = function (j) { return periodes.some(function (a) { return a.debut <= j && (a.fin || a.debut) >= j; }); };
+      var off = [], demi = [];
+      semaine.forEach(function (j) {
+        if (couverts(j)) return;
+        var poids = Calc.poidsJour(m, j);
+        if (poids === 0) off.push(j); else if (poids > 0 && poids < 1) demi.push(j);
+      });
+      [[off, "off", "Jour off", "Ne travaille pas le "], [demi, "demi", "½ journée", "Demi-journée le "]].forEach(function (g) {
+        if (!g[0].length) return;
+        lignes.push({
+          m: m, debut: g[0][0], etat: g[1], motif: g[2],
+          periode: g[0].map(jj).join(", "),
+          titre: m.prenom + " " + m.nom + "\n" + g[0].map(function (j) { return g[3] + JOURS[C.dt(j).getDay()]; }).join("\n")
+        });
+      });
     });
     // Le premier parti d'abord, puis par nom
     lignes.sort(function (a, b) {
-      var da = a.periodes[0].debut, db = b.periodes[0].debut;
-      return da < db ? -1 : da > db ? 1 : D.compareMembres(a.m, b.m);
+      return a.debut < b.debut ? -1 : a.debut > b.debut ? 1 : D.compareMembres(a.m, b.m);
     });
 
     if (!lignes.length) { videMessage(hote, "Personne n'est absent cette semaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
-      var p = x.periodes[0];
-      var periode = p.debut === (p.fin || p.debut) ? jj(p.debut) : jj(p.debut) + " – " + jj(p.fin);
-      var motif = p.motif || "Absence";
-      var titre = x.m.prenom + " " + x.m.nom + "\n" +
-        x.periodes.map(function (a) { return (a.motif || "Absence") + " : " + C.fmtLong(a.debut) + (a.fin && a.fin !== a.debut ? " → " + C.fmtLong(a.fin) : ""); }).join("\n") +
-        "\n" + C.fmtJours(x.manque) + " j d'absence sur " + C.fmtJours(x.dus) + " j travaillés";
-      return el("a", { class: "ab-ligne trois", href: "/planif/absences/", title: titre }, [
+      return el("a", { class: "ab-ligne trois", href: "/planif/absences/", title: x.titre }, [
         el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
-        el("span", { class: "ab-periode", text: periode }),
-        el("span", { class: "ab-quand", text: motif })
+        el("span", { class: "ab-periode", text: x.periode }),
+        el("span", { class: "ab-quand", text: x.motif })
       ]);
     }), lignes.length, "/planif/absences/");
   }

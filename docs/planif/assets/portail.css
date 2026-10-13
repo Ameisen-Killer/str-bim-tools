@@ -198,6 +198,8 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-point.rouge { background: var(--rouge); }
 .ab-point.orange { background: var(--orange); }
 .ab-point.vert { background: var(--vert-ok); }
+.ab-point.off { background: var(--gris-point); }
+.ab-point.demi { background: linear-gradient(90deg, var(--orange) 50%, var(--gris-point) 50%); }
 .ab-lib { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ab-quand { color: var(--faible); white-space: nowrap; text-align: right; display: flex; align-items: center; gap: 8px; }
 .ab-quand.rouge { color: var(--rouge-texte); }
