@@ -2719,22 +2719,23 @@
       var t = o.options.filter(function (x) { return x.valeur === v; })[0];
       return t ? t.label : v;
     }
+    // Les cases, construites une fois ; un changement ne fait que les recocher
+    var cases = o.options.map(function (x) {
+      var c = el("input", { type: "checkbox", value: x.valeur });
+      c.addEventListener("change", function () {
+        choisis = c.checked ? choisis.concat([x.valeur]) : choisis.filter(function (v) { return v !== x.valeur; });
+        maj(true);
+      });
+      liste.appendChild(el("label", { class: "mc-option" }, [c, el("span", { text: x.label })]));
+      return c;
+    });
     function maj(prevenir) {
       choisis = choisis.filter(function (v) { return o.options.some(function (x) { return x.valeur === v; }); });
       texte.textContent = !choisis.length ? o.tous
         : choisis.length === 1 ? libelleDe(choisis[0])
         : choisis.length + " " + o.pluriel;
       bouton.classList.toggle("actif", choisis.length > 0);
-      vide(liste);
-      o.options.forEach(function (x) {
-        var c = el("input", { type: "checkbox", value: x.valeur });
-        c.checked = choisis.indexOf(x.valeur) >= 0;
-        c.addEventListener("change", function () {
-          choisis = c.checked ? choisis.concat([x.valeur]) : choisis.filter(function (v) { return v !== x.valeur; });
-          maj(true);
-        });
-        liste.appendChild(el("label", { class: "mc-option" }, [c, el("span", { text: x.label })]));
-      });
+      cases.forEach(function (c) { c.checked = choisis.indexOf(c.value) >= 0; });
       if (prevenir && o.surChange) o.surChange(choisis.slice());
     }
     function ouvre(oui) {
