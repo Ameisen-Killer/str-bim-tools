@@ -18,6 +18,12 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=105">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<style>
+/* « 31 Ingénieurs » : même titre que les intertitres du calendrier des
+   absences (planif.css .pl-groupe h3, habillage.css h3) — 14.10.2026 */
+:root[data-version="v2"] .tete-section h2.titre-metier{font-size:clamp(21px,2.4vw,28px);font-weight:650}
+@media print{:root[data-version="v2"] .tete-section h2.titre-metier{font-size:12pt}}
+</style>
 </head>
 <body class="large">
 
@@ -137,7 +143,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   /* --------------------------------------------------------------- filtres
      Rangés comme ceux de la page Tâches (14.10.2026) : Succursale,
-     Discipline, Groupe et Affaire, tous en menus à cases. */
+     Discipline, Rôle (les groupes de la fiche « groupes ») et Affaire, tous
+     en menus à cases. */
 
   /** Dans une des succursales cochées (aucune cochée : tout passe). */
   function dansSuccursales(x) {
@@ -226,8 +233,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
     chDisc = champDiscipline(); chAffaire = champAffaire();
     // « Qui sont les chefs de projet ? » — la question se pose sans passer par la recherche
-    var chGroupe = champCases("Groupe", "groupes", {
-      libelle: "Filtrer : groupes", tous: "Tous les groupes", pluriel: "groupes", options: optionsGroupes()
+    var chGroupe = champCases("Rôle", "groupes", {
+      libelle: "Filtrer : rôles", tous: "Tous les rôles", pluriel: "rôles", options: optionsGroupes()
     });
 
     hote.appendChild(chSucc); hote.appendChild(chDisc); hote.appendChild(chGroupe); hote.appendChild(chAffaire);
@@ -334,17 +341,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     var hote = UI.vide(document.getElementById("sections"));
-    var n = 0;
     SECTIONS.forEach(function (s) {
       var membres = selection(s.metier);
       if (s.masqueSiVide && !membres.length) return;
-      n++;
       var liste = el("div", { class: "defile" });
       hote.appendChild(el("section", { class: "section" }, [
         el("div", { class: "tete-section" }, [
+          // Le nombre devant le métier, sans ligne « 01 — Ingénieurs » au-dessus (14.10.2026, demande de Tony)
           el("div", {}, [
-            el("div", { class: "num-section", text: (n < 10 ? "0" : "") + n + " — " + s.titre }),
-            el("h2", { text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
+            el("h2", { class: "titre-metier", text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
           ]),
         ]),
         liste
