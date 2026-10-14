@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=104">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=105">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 </head>
 <body class="large">
@@ -76,9 +76,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var suivi = UI.suiviApparitions();
   var CLE_FILTRES = "planif.equipe.filtres";
   var CLE_AFFAIRE = "planif.equipe.affaire";         // ancien réglage, repris une fois
-  /* succursales : codes cochés (14.10.2026), « _ » pour non renseignée —
-     rien de coché = toutes. Elles réduisent les menus Discipline et Affaire. */
-  var filtres = { affaire: "", succursales: [], discipline: "", statut: "" };
+  /* Menus à cases (14.10.2026) : les codes cochés, rien de coché = tout.
+     « _ » pour une succursale ou une discipline non renseignée. Les
+     succursales réduisent les menus Discipline et Affaire. */
+  var filtres = { succursales: [], disciplines: [], groupes: [], affaires: [] };
 
   // Une section par métier. Les membres pas encore désignés viennent en tête :
   // c'est là qu'il reste du travail. Les statuts, eux, se cumulent : ils ne
@@ -116,15 +117,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       surEntree: function () { var l = selection(); if (l.length === 1) UI.absences(l[0].id, dessine); }
     });
 
-    try { Object.assign(filtres, JSON.parse(localStorage.getItem(CLE_FILTRES) || "{}")); } catch (e) {}
-    try { if (!filtres.affaire) filtres.affaire = localStorage.getItem(CLE_AFFAIRE) || ""; } catch (e) {}
-    // Ancien réglage à une seule succursale, repris en case cochée
-    if (!Array.isArray(filtres.succursales)) filtres.succursales = [];
-    if (filtres.succursale) { filtres.succursales = [String(filtres.succursale)]; }
-    delete filtres.succursale;
-    filtres.succursales = filtres.succursales.map(String);
-    if (!D.affaire(filtres.affaire)) filtres.affaire = "";
-    if (D.STATUTS[filtres.statut] === undefined) filtres.statut = "";
+    var lu = {};
+    try { lu = JSON.parse(localStorage.getItem(CLE_FILTRES) || "{}") || {}; } catch (e) {}
+    try { if (!lu.affaire && !lu.affaires) lu.affaire = localStorage.getItem(CLE_AFFAIRE) || ""; } catch (e) {}
+    // Anciens réglages à une seule valeur (succursale, discipline, statut, affaire) repris en cases cochées
+    [["succursales", "succursale"], ["disciplines", "discipline"], ["groupes", "statut"], ["affaires", "affaire"]].forEach(function (c) {
+      var v = Array.isArray(lu[c[0]]) ? lu[c[0]] : (lu[c[1]] ? [lu[c[1]]] : []);
+      filtres[c[0]] = v.map(String);
+    });
 
     rendFiltres();
     D.surRechargement(dessine);
@@ -136,8 +136,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }
 
   /* --------------------------------------------------------------- filtres
-     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale (menu à
-     cases), Discipline, Groupe, Affaire. */
+     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale,
+     Discipline, Groupe et Affaire, tous en menus à cases. */
 
   /** Dans une des succursales cochées (aucune cochée : tout passe). */
   function dansSuccursales(x) {
@@ -151,83 +151,90 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (D.membres({ tous: true }).some(function (m) { return !m.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
     return o;
   }
-  var nbOptSucc = -1;
 
-  /** Disciplines proposées : celles des succursales cochées (toutes si aucune, ou « Non renseignée »). */
-  function disciplinesProposees() {
-    var codes = filtres.succursales;
-    if (!codes.length || codes.indexOf("_") >= 0) return D.disciplinesDe("");
-    var vu = {};
-    codes.forEach(function (c) { D.disciplinesDe(c).forEach(function (k) { vu[k] = true; }); });
-    return Object.keys(D.DISCIPLINES).filter(function (k) { return vu[k]; });
+  /** Disciplines proposées : celles des succursales cochées (toutes si aucune, ou « Non renseignée »),
+   *  plus « Non renseignée » dès qu'une fiche n'en a pas. */
+  function optionsDisciplines() {
+    var codes = filtres.succursales, cles;
+    if (!codes.length || codes.indexOf("_") >= 0) cles = D.disciplinesDe("");
+    else {
+      var vu = {};
+      codes.forEach(function (c) { D.disciplinesDe(c).forEach(function (k) { vu[k] = true; }); });
+      cles = Object.keys(D.DISCIPLINES).filter(function (k) { return vu[k]; });
+    }
+    var o = cles.map(function (k) { return { valeur: k, label: D.DISCIPLINES[k] }; });
+    if (o.length && D.membres({ tous: true }).some(function (m) { return !m.discipline; })) o.push({ valeur: "_", label: "Non renseignée" });
+    return o;
+  }
+
+  function optionsGroupes() {
+    return D.ORDRE_STATUTS.map(function (s) { return { valeur: s, label: D.STATUTS_PLURIEL[s] }; });
+  }
+
+  /** Les affaires des succursales cochées. */
+  function optionsAffaires() {
+    return D.affaires({ tous: true }).filter(dansSuccursales)
+      .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
+  }
+
+  // Les menus se refont quand une option paraît ou disparaît (« Non renseignée », un groupe, une affaire)
+  var empreinte = "";
+  function empreinteOptions() {
+    return [optionsSuccursales(), optionsDisciplines(), optionsGroupes(), optionsAffaires()].map(function (o) {
+      return o.map(function (x) { return x.valeur; }).join(",");
+    }).join("|");
+  }
+
+  /** Un menu à cases et son libellé, rangé comme une liste de la ligne de filtres. */
+  function champCases(libelle, cle, o, apres) {
+    o.surChange = function (v) { filtres[cle] = v; if (apres) apres(); memorise(); dessine(); };
+    o.valeurs = filtres[cle];
+    var f = UI.multiChoix(o);
+    filtres[cle] = f.valeurs();
+    var ch = el("div", { class: "champ champ-mc" }, [
+      el("label", { text: libelle, onclick: function () { f.noeud.querySelector("button").click(); } }),
+      f.noeud
+    ]);
+    // Caché quand il n'offre qu'un choix (un bureau sans succursales ni disciplines n'affiche pas ces filtres)
+    if (o.options.length < 2) ch.style.display = "none";
+    return ch;
   }
 
   function rendFiltres() {
     var hote = UI.vide(document.getElementById("filtres"));
 
-    // Succursales et disciplines sont celles du bureau : un bureau qui n'en a pas n'affiche pas ces filtres
-    var options = optionsSuccursales();
-    nbOptSucc = options.length;
-    var fSucc = UI.multiChoix({
+    var chDisc, chAffaire;
+    var chSucc = champCases("Succursale", "succursales", {
       libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: options, valeurs: filtres.succursales,
-      surChange: function (v) {
-        filtres.succursales = v;
-        // Discipline et affaire sorties des succursales cochées : retour à « Toutes »
-        var neufD = champDiscipline(), neufA = champAffaire();
-        hote.replaceChild(neufD, chDisc); chDisc = neufD;
-        hote.replaceChild(neufA, chAffaire); chAffaire = neufA;
-        memorise(); dessine();
-      }
+      options: optionsSuccursales()
+    }, function () {
+      // Les succursales changent : Discipline et Affaire ne gardent que ce qui en relève
+      var d = champDiscipline(), a = champAffaire();
+      hote.replaceChild(d, chDisc); chDisc = d;
+      hote.replaceChild(a, chAffaire); chAffaire = a;
+      empreinte = empreinteOptions();
     });
-    filtres.succursales = fSucc.valeurs();
-    var chSucc = el("div", { class: "champ champ-mc" }, [
-      el("label", { text: "Succursale", onclick: function () { fSucc.noeud.querySelector("button").click(); } }),
-      fSucc.noeud
-    ]);
-    if (options.length < 2) chSucc.style.display = "none";
-
-    var chDisc = champDiscipline();
+    chDisc = champDiscipline(); chAffaire = champAffaire();
     // « Qui sont les chefs de projet ? » — la question se pose sans passer par la recherche
-    var chStatut = UI.champ({
-      nom: "f-statut", label: "Groupe", type: "select", valeur: filtres.statut,
-      options: [{ valeur: "", label: "Tous les groupes" }].concat(
-        D.ORDRE_STATUTS.map(function (s) { return { valeur: s, label: D.STATUTS_PLURIEL[s] }; }))
+    var chGroupe = champCases("Groupe", "groupes", {
+      libelle: "Filtrer : groupes", tous: "Tous les groupes", pluriel: "groupes", options: optionsGroupes()
     });
-    chStatut.querySelector("select").addEventListener("change", function () { filtres.statut = this.value; memorise(); dessine(); });
-    var chAffaire = champAffaire();
 
-    hote.appendChild(chSucc); hote.appendChild(chDisc); hote.appendChild(chStatut); hote.appendChild(chAffaire);
+    hote.appendChild(chSucc); hote.appendChild(chDisc); hote.appendChild(chGroupe); hote.appendChild(chAffaire);
+    empreinte = empreinteOptions();
     memorise();
   }
 
-  /** Le menu Discipline : celles des succursales cochées ; caché si le bureau n'en a pas. */
   function champDiscipline() {
-    var cles = disciplinesProposees();
-    if (cles.indexOf(filtres.discipline) < 0) filtres.discipline = "";
-    var ch = UI.champ({
-      nom: "f-discipline", label: "Discipline", type: "select", valeur: filtres.discipline,
-      options: [{ valeur: "", label: "Toutes les disciplines" }].concat(
-        cles.map(function (k) { return { valeur: k, label: D.DISCIPLINES[k] }; }))
+    return champCases("Discipline", "disciplines", {
+      libelle: "Filtrer : disciplines", tous: "Toutes les disciplines", pluriel: "disciplines", options: optionsDisciplines()
     });
-    if (!Object.keys(D.DISCIPLINES).length) ch.style.display = "none";
-    ch.querySelector("select").addEventListener("change", function () { filtres.discipline = this.value; memorise(); dessine(); });
-    return ch;
   }
 
-  /** Le menu Affaire : seulement les affaires des succursales cochées. */
   function champAffaire() {
-    if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.affaire = "";
-    var ch = UI.champ({
-      nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
-      options: [{ valeur: "", label: "Toutes les affaires" }].concat(
-        D.affaires({ tous: true }).filter(dansSuccursales)
-          .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }))
+    return champCases("Affaire", "affaires", {
+      libelle: "Filtrer : affaires", tous: "Toutes les affaires", pluriel: "affaires", options: optionsAffaires(), large: true
     });
-    var sel = ch.querySelector("select");
-    UI.listeCherchable(sel, { large: true });
-    sel.addEventListener("change", function () { filtres.affaire = this.value; memorise(); dessine(); });
-    return ch;
   }
 
   /* ------------------------------------------------------------- affichage */
@@ -270,24 +277,28 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function selection(metier, sansTexte) {
     var mots = sansTexte || !barre ? [] : barre.termes();
-    var dans = filtres.affaire ? membresAffaire(filtres.affaire) : null;
+    var dans = filtres.affaires.length ? membresAffaires(filtres.affaires) : null;
     return D.membres({ metier: metier == null ? null : metier, tous: true })
       .filter(function (m) {
         if (!dansSuccursales(m)) return false;
-        if (filtres.discipline && m.discipline !== filtres.discipline) return false;
-        if (filtres.statut && !D.aStatut(m, filtres.statut)) return false;
+        if (filtres.disciplines.length && filtres.disciplines.indexOf(m.discipline || "_") < 0) return false;
+        if (filtres.groupes.length && !filtres.groupes.some(function (g) { return D.aStatut(m, g); })) return false;
         return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots);
       });
   }
 
-  // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche
-  function membresAffaire(id) {
-    var a = D.affaire(id), dans = Object.create(null);
-    if (!a) return dans;
-    a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
-    D.taches({ affaireId: id }).forEach(function (t) {
-      if (t.ingenieurId) dans[t.ingenieurId] = true;
-      if (t.dessinateurId) dans[t.dessinateurId] = true;
+  // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche ;
+  // plusieurs affaires cochées : dans l'une au moins
+  function membresAffaires(ids) {
+    var dans = Object.create(null);
+    ids.forEach(function (id) {
+      var a = D.affaire(id);
+      if (!a) return;
+      a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
+      D.taches({ affaireId: id }).forEach(function (t) {
+        if (t.ingenieurId) dans[t.ingenieurId] = true;
+        if (t.dessinateurId) dans[t.dessinateurId] = true;
+      });
     });
     return dans;
   }
@@ -307,9 +318,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (barre) barre.compte(selection().length, selection(null, true).length);
 
     // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    // « Non renseignée » paraît ou disparaît avec la dernière fiche sans succursale
-    if (nbOptSucc >= 0 && optionsSuccursales().length !== nbOptSucc) rendFiltres();
-    var actifs = [filtres.affaire, filtres.succursales.length, filtres.discipline, filtres.statut].filter(Boolean).length;
+    // Une option paraît ou disparaît (« Non renseignée », une affaire créée…) : les menus se refont
+    if (empreinte && empreinteOptions() !== empreinte) rendFiltres();
+    var actifs = [filtres.succursales.length, filtres.disciplines.length, filtres.groupes.length, filtres.affaires.length].filter(Boolean).length;
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     var hote = UI.vide(document.getElementById("sections"));
@@ -335,7 +346,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function rendListe(s, membres, hote) {
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
-    var filtre = filtres.affaire || filtres.succursales.length || filtres.discipline || filtres.statut;
+    var filtre = filtres.succursales.length || filtres.disciplines.length || filtres.groupes.length || filtres.affaires.length;
 
     if (!membres.length) {
       hote.appendChild(q

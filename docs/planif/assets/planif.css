@@ -907,7 +907,9 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
    titre s'en va. Même mécanique que l'en-tête du planning : --h-chrome est la
    hauteur mesurée de la barre du haut (ui.js). */
 .tete-collante{
-  position:sticky;top:var(--h-chrome,0px);z-index:12;
+  /* Au-dessus de l'en-tête collé du calendrier (z-index 12, plus bas dans la
+     page) : les menus à cases des filtres s'ouvrent par-dessus (14.10.2026) */
+  position:sticky;top:var(--h-chrome,0px);z-index:13;
   background:var(--noir);
   padding-bottom:16px;margin-bottom:10px;
   border-bottom:1px solid var(--ligne);
