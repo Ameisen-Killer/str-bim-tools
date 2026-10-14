@@ -261,13 +261,14 @@
   }
 
   /* Fenêtre volante du Dashboard IA : « À venir », sous le logo de la marque
+     (le pavé AB sans ses trois lignes de texte, 14.10.2026)
      (le bureau ; STR Bim Tools en démonstration, où rien ne rappelle le
      bureau). Échap, la croix ou un clic à côté la ferment. */
   function fenetreIA(marque) {
     var avant = document.activeElement;
     var fermer = el("button", { type: "button", class: "ab-fen-fermer", "aria-label": "Fermer", text: "×" });
     var logo = marque === "ab"
-      ? el("img", { class: "ab-fen-logo", src: "/planif/assets/logo-ab.svg?v=1", alt: "", width: "150", height: "200" })
+      ? el("img", { class: "ab-fen-logo", src: "/planif/assets/logo-ab-marque.svg?v=1", alt: "", width: "158", height: "150" })
       : el("span", { class: "marque-str ab-logo-str ab-fen-str" }, [
           svg("0 0 100 100", LOGO_STR),
           el("span", { class: "marque-mots" }, [el("b", { text: "STR Bim Tools" }), el("span", { text: "Planification" })])
