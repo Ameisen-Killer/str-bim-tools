@@ -91,7 +91,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   // c'est là qu'il reste du travail. Les statuts, eux, se cumulent : ils ne
   // rangent personne dans une section, ils s'affichent en étiquettes.
   var SECTIONS = [
-    { metier: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", masqueSiVide: true },
+    // fixe : le titre ne s'accorde pas — « 2 À désigner », comme au calendrier des absences (14.10.2026)
+    { metier: "", titre: "À désigner", sing: "membre à désigner", plur: "membres à désigner", fixe: "À désigner", masqueSiVide: true },
     { metier: "ingenieur", titre: "Ingénieurs", sing: "ingénieur", plur: "ingénieurs" },
     { metier: "dessinateur", titre: "Dessinateurs", sing: "dessinateur", plur: "dessinateurs" },
     { metier: "administratif", titre: "Administratifs", sing: "administratif", plur: "administratifs" }
@@ -349,7 +350,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("div", { class: "tete-section" }, [
           // Le nombre devant le métier, sans ligne « 01 — Ingénieurs » au-dessus (14.10.2026, demande de Tony)
           el("div", {}, [
-            el("h2", { class: "titre-metier", text: membres.length + " " + (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); }) })
+            el("h2", { class: "titre-metier", text: membres.length + " " + (s.fixe || (membres.length > 1 ? s.plur : s.sing).replace(/^./, function (c) { return c.toUpperCase(); })) })
           ]),
         ]),
         liste
