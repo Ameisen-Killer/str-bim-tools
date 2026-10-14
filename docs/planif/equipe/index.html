@@ -136,6 +136,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     rendFiltres();
     D.surRechargement(dessine);
     dessine();
+
+    /* Arrivée depuis un jour off de l'accueil (14.10.2026) : ?jours=<membre>
+       ouvre ses jours travaillés. */
+    var versJours = new URLSearchParams(location.search).get("jours");
+    if (versJours) {
+      history.replaceState(null, "", location.pathname + location.hash);
+      if (D.membre(versJours)) UI.joursTravailles(versJours, dessine);
+    }
   }).catch(UI.echec);
 
   function memorise() {

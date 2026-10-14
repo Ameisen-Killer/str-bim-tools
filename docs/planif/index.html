@@ -469,7 +469,7 @@
       [[off, "off", "Jour off", "Ne travaille pas le "], [demi, "demi", "½ journée", "Demi-journée le "]].forEach(function (g) {
         if (!g[0].length) return;
         lignes.push({
-          m: m, debut: g[0][0], etat: g[1], motif: g[2],
+          m: m, debut: g[0][0], etat: g[1], motif: g[2], semaineType: true,
           periode: g[0].map(jj).join(", "),
           lignesBulle: [[g[2], g[0].map(function (j) { return JOURS[C.dt(j).getDay()] + " " + jj(j); }).join(", ")],
                         ["", g[1] === "off" ? "Ne travaille pas ce jour-là (semaine type)" : "Ne travaille qu'une demi-journée (semaine type)"]]
@@ -483,15 +483,18 @@
 
     if (!lignes.length) { videMessage(hote, "Personne n'est absent cette semaine."); return; }
     liste(hote, lignes.slice(0, LIGNES).map(function (x) {
-      // Vers la page Absences, sur la période et à la ligne de la personne (13.10.2026)
-      return bulle(el("a", { class: "ab-ligne trois", href: "/planif/absences/?membre=" + encodeURIComponent(x.m.id) + "&date=" + x.debut }, [
+      // Vers la page Absences, sur la période et à la ligne de la personne (13.10.2026) ;
+      // jour off ou demi-journée : vers ses jours travaillés, page Équipe (14.10.2026)
+      var href = x.semaineType ? "/planif/equipe/?jours=" + encodeURIComponent(x.m.id)
+        : "/planif/absences/?membre=" + encodeURIComponent(x.m.id) + "&date=" + x.debut;
+      return bulle(el("a", { class: "ab-ligne trois", href: href }, [
         el("span", { class: "ab-point " + x.etat, "aria-hidden": "true" }),
         el("span", { class: "ab-lib", text: x.m.prenom + (x.m.nom ? " " + x.m.nom.charAt(0) + "." : "") }),
         el("span", { class: "ab-periode", text: x.periode }),
         el("span", { class: "ab-quand", text: x.motif })
       ]), function () {
         return { point: x.etat, titre: x.m.prenom + " " + x.m.nom, sous: D.libelleMetier ? D.libelleMetier(x.m.metier) : "",
-                 lignes: x.lignesBulle, pied: "Clic : voir dans le tableau des absences" };
+                 lignes: x.lignesBulle, pied: x.semaineType ? "Clic : voir ses jours travaillés" : "Clic : voir dans le tableau des absences" };
       });
     }), lignes.length, "/planif/absences/");
   }
