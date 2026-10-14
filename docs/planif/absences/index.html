@@ -151,12 +151,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var CLE_VUE = "planif.absences";
   /* mois : 1 à 3 mois affichés, ou 0 pour une semaine (07.10.2026) ; la
      période part alors du lundi, sinon du premier du mois. */
-  /* succursales, metiers : codes cochés (14.10.2026), « _ » pour non
-     renseignée / à désigner — rien de coché = tout. */
-  var vue = { debut: null, mois: 1, metiers: [], groupes: [], masque: false, succursales: [] };
+  /* succursales, metiers (le menu « Rôles ») : codes cochés (14.10.2026),
+     « _ » pour non renseignée / à désigner, « g:… » pour un groupe
+     (administrateurs) — rien de coché = tout. */
+  var vue = { debut: null, mois: 1, metiers: [], masque: false, succursales: [] };
   try { Object.assign(vue, JSON.parse(localStorage.getItem(CLE_VUE) || "{}")); } catch (e) {}
   vue.succursales = Array.isArray(vue.succursales) ? vue.succursales.map(String) : [];
-  vue.groupes = Array.isArray(vue.groupes) ? vue.groupes.map(String) : [];
+  delete vue.groupes;   // menu Groupe retiré le 14.10.2026
   // Ancien réglage à un seul métier, repris en case cochée
   if (!Array.isArray(vue.metiers)) vue.metiers = [];
   if (vue.metier) vue.metiers = [String(vue.metier)];
@@ -237,7 +238,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (allerA && allerA.membre) {
       var visee = D.membre(allerA.membre);
       if (visee && !dansMetiers(visee)) vue.metiers = [];
-      if (visee && !dansGroupes(visee)) vue.groupes = [];
       if (visee && !dansSuccursales(visee)) vue.succursales = [];
     }
     rendFiltres();
@@ -246,39 +246,20 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }).catch(UI.echec);
 
   /* --------------------------------------------------------------- filtres
-     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale, Métier et
-     Groupe (administrateurs, chefs de secteur…) en menus à cases, puis la
-     case « Masquer qui n'a rien ». */
+     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale et Rôles
+     (les métiers et les administrateurs) en menus à cases, puis la case
+     « Masquer qui n'a rien ». */
 
   /** La personne est dans une des succursales cochées (aucune cochée : toutes passent). */
   function dansSuccursales(m) {
     return !vue.succursales.length || (!!m && vue.succursales.indexOf(m.succursale || "_") >= 0);
   }
   function metierDe(m) { return D.METIERS[m.metier] ? m.metier : "_"; }
-  /** La personne exerce un des métiers cochés (aucun coché : tous passent). */
+  /** La personne a un des rôles cochés : son métier, ou un groupe « g:… » (aucun coché : tous passent). */
   function dansMetiers(m) {
-    return !vue.metiers.length || (!!m && vue.metiers.indexOf(metierDe(m)) >= 0);
-  }
-
-  /* Groupe, sur cette page seulement (14.10.2026, demande de Tony) : les
-     groupes du bureau sans les chefs de secteur et de projet, à leur place
-     les ingénieurs et les dessinateurs (« metier:… », le métier de la fiche). */
-  var GROUPES_ECARTES = { chef_secteur: true, chef_projet: true };
-  var METIERS_GROUPE = ["ingenieur", "dessinateur"];
-
-  /** La personne est dans un des groupes cochés (aucun coché : tous passent). */
-  function dansGroupes(m) {
-    return !vue.groupes.length || (!!m && vue.groupes.some(function (g) {
-      return g.indexOf("metier:") === 0 ? m.metier === g.slice(7) : D.aStatut(m, g);
+    return !vue.metiers.length || (!!m && vue.metiers.some(function (v) {
+      return v.indexOf("g:") === 0 ? D.aStatut(m, v.slice(2)) : metierDe(m) === v;
     }));
-  }
-  function optionsGroupes() {
-    return D.ORDRE_STATUTS.filter(function (g) { return !GROUPES_ECARTES[g]; })
-      .map(function (g) { return { valeur: g, label: D.STATUTS_PLURIEL[g] }; })
-      .concat(METIERS_GROUPE.map(function (c) { return { valeur: "metier:" + c, label: D.TITRES_METIERS[c] }; }));
-  }
-  function nomGroupe(g) {
-    return g.indexOf("metier:") === 0 ? D.TITRES_METIERS[g.slice(7)] || g : D.STATUTS_PLURIEL[g] || g;
   }
 
   /* Les succursales du bureau, plus « Non renseignée » (« _ », qu'aucun code
@@ -288,17 +269,22 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (D.membres().some(function (m) { return !m.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
     return o;
   }
-  /* Les trois métiers, plus « À désigner » dès qu'une personne n'en a pas. */
+  /* Rôles : les trois métiers, les administrateurs (le groupe), puis
+     « À désigner » dès qu'une personne n'a pas de métier. */
+  var GROUPES_ROLES = ["administrateur"];
   function optionsMetiers() {
     var o = Object.keys(D.METIERS).map(function (c) { return { valeur: c, label: D.TITRES_METIERS[c] }; });
+    GROUPES_ROLES.forEach(function (g) { if (D.STATUTS[g] !== undefined) o.push({ valeur: "g:" + g, label: D.STATUTS_PLURIEL[g] }); });
     if (D.membres().some(function (m) { return metierDe(m) === "_"; })) o.push({ valeur: "_", label: D.TITRES_METIERS[""] });
     return o;
   }
   function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
-  function nomMetier(c) { return D.TITRES_METIERS[c === "_" ? "" : c] || c; }
+  function nomMetier(c) {
+    return c.indexOf("g:") === 0 ? D.STATUTS_PLURIEL[c.slice(2)] || c.slice(2) : D.TITRES_METIERS[c === "_" ? "" : c] || c;
+  }
   var nbOptions = "";
   function compteOptions() {
-    return [optionsSuccursales(), optionsMetiers(), optionsGroupes()].map(function (o) {
+    return [optionsSuccursales(), optionsMetiers()].map(function (o) {
       return o.map(function (x) { return x.valeur; }).join(",");
     }).join("|");
   }
@@ -326,25 +312,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
     vue.succursales = succ.menu.valeurs();
 
-    var met = champCases("Métier", {
-      libelle: "Filtrer : métiers", tous: "Toute l'équipe", pluriel: "métiers",
+    var met = champCases("Rôles", {
+      libelle: "Filtrer : rôles", tous: "Toute l'équipe", pluriel: "rôles",
       options: optionsMetiers(), valeurs: vue.metiers,
       surChange: function (v) { vue.metiers = v; memorise(); rend(); }
     });
     vue.metiers = met.menu.valeurs();
 
-    var grp = champCases("Groupe", {
-      libelle: "Filtrer : groupes", tous: "Tous les groupes", pluriel: "groupes",
-      options: optionsGroupes(), valeurs: vue.groupes,
-      surChange: function (v) { vue.groupes = v; memorise(); rend(); }
-    });
-    vue.groupes = grp.menu.valeurs();
 
     var masque = el("input", { type: "checkbox" });
     masque.checked = !!vue.masque;
     masque.addEventListener("change", function () { vue.masque = masque.checked; memorise(); rend(); });
 
-    hote.appendChild(succ.champ); hote.appendChild(met.champ); hote.appendChild(grp.champ);
+    hote.appendChild(succ.champ); hote.appendChild(met.champ);
     hote.appendChild(el("div", { class: "champ champ-vue" }, [
       el("label", { class: "case", style: "white-space:nowrap", title: "Ne garder que les personnes absentes sur la période affichée" },
         [masque, "Masquer qui n'a rien"])
@@ -405,11 +385,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Regroupés par métier, par ordre alphabétique dans chacun
     // « Non renseignée », « À désigner » paraissent ou disparaissent avec la dernière personne concernée
     if (nbOptions && compteOptions() !== nbOptions) rendFiltres();
-    var tous = [].concat.apply([], D.parMetier(D.membres().filter(function (m) { return dansSuccursales(m) && dansMetiers(m) && dansGroupes(m); }))
+    var tous = [].concat.apply([], D.parMetier(D.membres().filter(function (m) { return dansSuccursales(m) && dansMetiers(m); }))
       .map(function (g) { return g.membres; }));
 
     // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [vue.succursales.length, vue.metiers.length, vue.groupes.length, vue.masque].filter(Boolean).length;
+    var actifs = [vue.succursales.length, vue.metiers.length, vue.masque].filter(Boolean).length;
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
@@ -445,7 +425,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // calendrier, lui, montre toujours les jours passés de la période affichée.
     var auj = C.isoAuj();
     var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier })
-      .filter(function (p) { return dansSuccursales(p.membre) && dansMetiers(p.membre) && dansGroupes(p.membre); });
+      .filter(function (p) { return dansSuccursales(p.membre) && dansMetiers(p.membre); });
     // Une période se retient sur son propre motif : chercher « vacances » ne
     // fait pas remonter la maladie de la même personne.
     if (mots.length) periodes = periodes.filter(function (p) {
@@ -484,7 +464,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /** Les métiers retenus ; court : pour la case étroite de l'en-tête du calendrier. */
   function libelleMetier(court) {
     if (!vue.metiers.length) return "Toute l'équipe";
-    if (court && vue.metiers.length > 1) return vue.metiers.length + " métiers";
+    if (court && vue.metiers.length > 1) return vue.metiers.length + " rôles";
     return vue.metiers.map(nomMetier).join(", ");
   }
 
@@ -496,7 +476,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     document.getElementById("imp-periode").textContent =
       libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
       (vue.succursales.length ? "  ·  " + vue.succursales.map(nomSuccursale).join(", ") : "") +
-      (vue.groupes.length ? "  ·  " + vue.groupes.map(nomGroupe).join(", ") : "") +
       (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());
@@ -586,10 +565,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       if (metierDe(m) !== groupeCourant) {
         groupeCourant = metierDe(m);
         var nbGroupe = lignes.filter(function (x) { return metierDe(x) === groupeCourant; }).length;
+        // Le nombre devant le métier : « 3 Ingénieurs », « 1 Dessinateur » (14.10.2026, demande de Tony)
         plan.appendChild(el("div", { class: "pl-groupe" }, [
           el("div", {}, [
-            el("div", { class: "num-section", text: nbGroupe + (nbGroupe > 1 ? " membres" : " membre") }),
-            el("h3", { text: D.TITRES_METIERS[groupeCourant] })
+            el("h3", { style: "margin-top:0", text: nbGroupe + " " + (nbGroupe > 1 || !D.METIERS[groupeCourant]
+              ? D.TITRES_METIERS[groupeCourant] : D.METIERS[groupeCourant]) })
           ])
         ]));
       }
