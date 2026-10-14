@@ -341,6 +341,13 @@
     } catch (e) {}
     var icone = document.querySelector("link[rel=icon]");
     if (icone) icone.href = m === "ab" ? "/planif/assets/logo-ab-marque.svg?v=1" : ICONE_STR;
+    // Le pavé AB en tête des PDF d'export (14.10.2026, demande de Tony) ;
+    // rien en démonstration ni pour STR Bim Tools
+    Array.prototype.forEach.call(document.querySelectorAll(".entete-impression"), function (t) {
+      var l = t.querySelector(".imp-logo");
+      if (m === "ab" && !l) { t.insertBefore(dessinAB(VUE_AB, LOGO_AB, "imp-logo"), t.firstChild); t.classList.add("avec-logo"); }
+      if (m !== "ab" && l) { t.removeChild(l); t.classList.remove("avec-logo"); }
+    });
   }
 
   /**

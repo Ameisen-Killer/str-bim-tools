@@ -1464,6 +1464,9 @@ html.palette-ouverte{overflow:hidden}
   .entete{display:none}
   .entete-impression{display:block;margin-bottom:10px;border-bottom:1px solid var(--ligne);padding-bottom:6px}
   .entete-impression h1{font-size:15pt;font-weight:200;line-height:1.1}
+  /* le pavé AB du bureau à gauche du titre et de sa ligne (ui.js, appliqueMarque) */
+  .entete-impression.avec-logo{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12pt;align-items:center}
+  .entete-impression .imp-logo{grid-row:1 / 3;display:block;height:34pt;width:auto}
   .entete-impression .ligne{
     display:flex;justify-content:space-between;gap:16px;margin-top:5px;
     font-family:var(--mono);font-size:7.5pt;letter-spacing:.06em;color:var(--texte-doux);
