@@ -64,6 +64,9 @@ button { font: inherit; color: inherit; }
 .ab-logo { display: block; height: clamp(76px, 7.2vw, 108px); width: auto; max-width: 100%; }
 
 .ab-qui { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; padding-top: 4px; }
+/* Colonne de droite (compte, pendule) : fondue dans l'en-tête sur téléphone,
+   une colonne à part sur ordinateur (plus bas) */
+.ab-droite { display: contents; }
 .ab-date { color: var(--faible); font-size: 17px; }
 /* Bouton « Dashboard IA » (13.10.2026) et sa fenêtre volante « À venir » */
 .ab-ia {
@@ -342,15 +345,19 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 
 /* Tout remonter (13.10.2026, demande de Tony) : sur ordinateur, logo et
    compte sur la première ligne ; le « Bonjour » sur la ligne de la pendule
-   (sa date dessous), puis les cartes. L'en-tête et son conteneur se fondent
+   (sa date dessous), puis les cartes. Depuis le 14.10.2026 la pendule suit
+   le compte de près, dans sa colonne. L'en-tête et son conteneur se fondent
    dans la grille de la page (display: contents). */
 @media (min-width: 641px) {
   .ab-page { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-content: start; }
   .ab-page > * { grid-column: 1 / -1; }
   .ab-page > #entete, .ab-page > #entete > .ab-entete { display: contents; }
   .ab-page .ab-marque { grid-column: 1; grid-row: 1; justify-self: start; padding-left: clamp(0px, 2vw, 30px); }
-  .ab-page .ab-qui { grid-column: 2; grid-row: 1; align-self: start; gap: 10px; }
-  .ab-page .ab-centre { grid-column: 2; grid-row: 2 / span 2; align-self: center; justify-self: end; gap: 6px; margin-top: 8px; }
+  /* Dashboard IA à côté de la photo, la pendule remontée juste dessous
+     (14.10.2026, demande de Tony) : une colonne qui couvre les trois lignes */
+  .ab-page .ab-droite { grid-column: 2; grid-row: 1 / span 3; align-self: start; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .ab-page .ab-qui { flex-direction: row; align-items: center; gap: 18px; }
+  .ab-page .ab-centre { gap: 6px; }
   .ab-page > .ab-salut { grid-column: 1; grid-row: 2; align-self: end; margin-top: 8px; }
   .ab-page > .ab-sous-titre { grid-column: 1; grid-row: 3; align-self: start; }
 }

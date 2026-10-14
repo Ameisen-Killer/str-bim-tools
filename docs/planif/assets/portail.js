@@ -213,9 +213,12 @@
     vide(hote);
     hote.appendChild(el("header", { class: "ab-entete" }, [
       marque,
-      // À droite : le Dashboard IA et le compte ; la pendule et sa date, sur la ligne du « Bonjour » (portail.css)
-      el("div", { class: "ab-qui" }, [ia, el("div", { class: "ab-moi" }, [bouton, menu])]),
-      el("div", { class: "ab-centre" }, [pendule(), date])
+      // À droite : le Dashboard IA à côté du compte, la pendule et sa date juste
+      // dessous, en une colonne qui ne dépend plus de la hauteur du logo (portail.css)
+      el("div", { class: "ab-droite" }, [
+        el("div", { class: "ab-qui" }, [ia, el("div", { class: "ab-moi" }, [bouton, menu])]),
+        el("div", { class: "ab-centre" }, [pendule(), date])
+      ])
     ]));
     [].forEach.call(hote.querySelectorAll("img"), function (n) {
       for (var i = 0; i < images.length; i++) {
