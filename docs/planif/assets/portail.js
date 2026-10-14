@@ -146,11 +146,11 @@
     var m = appliqueMarque();
     // Plus de bouton « Accueil » ici (06.10.2026) : on y est déjà
 
-    /* Le logo de la marque : celui du bureau tel quel (assets/logo-ab-horizontal.svg,
-       relevé sur son fichier), ou STR Bim Tools (pavé et texte). */
+    /* Le logo de la marque : le pavé AB du bureau, sans ses trois lignes de texte
+       (assets/logo-ab-marque.svg, 14.10.2026), ou STR Bim Tools (pavé et texte). */
     var marque = el("a", { class: "ab-marque", href: "/planif/", "aria-label": D.nomEspace() + " — accueil" }, [
       m === "ab"
-        ? el("img", { class: "ab-logo", src: "/planif/assets/logo-ab-horizontal.svg?v=1", alt: "", width: "443", height: "150" })
+        ? el("img", { class: "ab-logo", src: "/planif/assets/logo-ab-marque.svg?v=1", alt: "", width: "158", height: "150" })
         : el("span", { class: "marque-str ab-logo-str" }, [
             svg("0 0 100 100", LOGO_STR),
             el("span", { class: "marque-mots" }, [el("b", { text: "STR Bim Tools" }), el("span", { text: D.enDemo() ? "Espace démo" : "Planification" })])
