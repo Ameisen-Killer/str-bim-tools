@@ -392,13 +392,20 @@ table.liste tr.groupe-taches:hover td,table.liste tr.groupe-vide:hover td{backgr
 .groupe-taches.retard h3{color:var(--alerte)}
 /* Tâches rangées par affaire (13.10.2026) : l'affaire en sous-titre dans la semaine,
    elle ne se répète plus sous chaque libellé */
-table.liste tr.groupe-affaire td{padding:18px 0 6px;border-bottom:1px solid rgba(var(--encre),.07)}
+/* Plus visible (14.10.2026, demande de Tony) : un bandeau dans la teinte de
+   l'affaire, filet à gauche, numéro et nom en gras — sous le titre de la
+   semaine, qui reste le plus grand. */
+table.liste tr.groupe-affaire td{padding:16px 0 6px;border-bottom:0}
 table.liste tr.groupe-taches + tr.groupe-affaire td{padding-top:12px}
 table.liste tr.groupe-affaire:hover td{background:none}
-.groupe-affaire .ga{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:15px;color:var(--texte)}
-.groupe-affaire .ga .pastille{align-self:center}
-.groupe-affaire .ga .num{font-family:var(--mono);font-size:12px;letter-spacing:.08em;white-space:nowrap}
-.groupe-affaire .compte{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+.groupe-affaire .ga{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:18px;font-weight:600;color:var(--texte);
+  padding:9px 14px;border-left:4px solid var(--tt,var(--or));border-radius:4px 8px 8px 4px;
+  background:color-mix(in srgb,var(--tt,var(--or)) 10%,transparent)}
+.groupe-affaire .ga .pastille{align-self:center;width:10px;height:10px}
+.groupe-affaire .ga .num{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.06em;white-space:nowrap}
+.groupe-affaire .ga .nom{font-weight:650}
+.groupe-affaire .compte{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:400;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+@media (max-width:640px){.groupe-affaire .ga{font-size:16px;padding:8px 10px}.groupe-affaire .ga .num{font-size:13px}.groupe-affaire .compte{margin-left:0;flex-basis:100%}}
 table.liste.par-affaire .affaire-ligne{display:none!important}
 /* Les deux boutons de rangement, accolés */
 /* … juste à gauche de « Masquer les terminées », sur la ligne des filtres : les listes
