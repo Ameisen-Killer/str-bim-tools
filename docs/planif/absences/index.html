@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=103">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=104">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 <style>
 /* Poser une absence d'un clic (13.10.2026) : la personne, ou un jour libre de sa ligne */
@@ -71,10 +71,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap">
     <section class="section">
-      <!-- La recherche reste sous les yeux quand on descend ; l'en-tête du
-           planning se colle juste en dessous (--h-collee). -->
-      <div class="tete-collante seule-recherche">
+      <!-- Recherche et filtres restent sous les yeux quand on descend ; l'en-tête
+           du planning se colle juste en dessous (--h-collee). Filtres rangés
+           comme ceux de la page Tâches (14.10.2026). -->
+      <div class="tete-collante">
         <div data-recherche></div>
+        <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between">
+          <span>Filtres</span><span id="nb-filtres" class="or"></span>
+        </button>
+        <div class="grille-champs filtres-ligne" id="filtres"></div>
       </div>
       <div class="plan-barre">
         <button class="btn" type="button" id="prec" aria-label="Mois précédent">◀<span class="txt"> Précédent</span></button>
@@ -88,15 +93,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="2">2 mois</option>
           <option value="3">3 mois</option>
         </select>
-        <select id="f-metier" class="btn" style="text-transform:none;letter-spacing:.04em" aria-label="Filtrer par métier">
-          <option value="">Toute l'équipe</option>
-          <option value="ingenieur">Ingénieurs</option>
-          <option value="dessinateur">Dessinateurs</option>
-          <option value="administratif">Administratifs</option>
-        </select>
-        <label class="case" style="text-transform:none;letter-spacing:.04em">
-          <input type="checkbox" id="f-masque"> Masquer qui n'a rien
-        </label>
       </div>
 
       <!-- Téléphone seulement : la barre du haut y cache ses actions au profit
@@ -142,7 +138,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/supabase.js?v=56"></script>
 <script src="/planif/assets/donnees.js?v=78"></script>
 <script src="/planif/assets/calculs.js?v=15"></script>
-<script src="/planif/assets/version.js?v=13"></script>
+<script src="/planif/assets/version.js?v=14"></script>
 <script src="/planif/assets/ui.js?v=115"></script>
 <script src="/planif/assets/tchat.js?v=10"></script>
 <script src="/planif/assets/palette.js?v=21"></script>
@@ -155,8 +151,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var CLE_VUE = "planif.absences";
   /* mois : 1 à 3 mois affichés, ou 0 pour une semaine (07.10.2026) ; la
      période part alors du lundi, sinon du premier du mois. */
-  var vue = { debut: null, mois: 1, metier: "", masque: false };
+  /* succursales : codes cochés (14.10.2026), « _ » pour non renseignée —
+     rien de coché = toutes. */
+  var vue = { debut: null, mois: 1, metier: "", masque: false, succursales: [] };
   try { Object.assign(vue, JSON.parse(localStorage.getItem(CLE_VUE) || "{}")); } catch (e) {}
+  vue.succursales = Array.isArray(vue.succursales) ? vue.succursales.map(String) : [];
   vue.mois = parseInt(vue.mois, 10);
   vue.mois = isNaN(vue.mois) ? 1 : Math.min(3, Math.max(0, vue.mois));
   vue.debut = cale(vue.debut || C.isoAuj());
@@ -215,15 +214,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       memorise(); rend();
     });
 
-    var fr = document.getElementById("f-metier");
-    fr.value = vue.metier || "";
-    fr.addEventListener("change", function () { vue.metier = fr.value; memorise(); rend(); });
-
-    var fm = document.getElementById("f-masque");
-    fm.checked = !!vue.masque;
-    fm.addEventListener("change", function () { vue.masque = fm.checked; memorise(); rend(); });
-
     document.getElementById("pdf").addEventListener("click", exportePdf);
+    document.getElementById("btn-filtres").addEventListener("click", function () {
+      var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
+      this.setAttribute("aria-expanded", String(ouvert));
+    });
 
     barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -233,14 +228,71 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     D.surRechargement(rend);
-    // La personne visée ne doit pas être cachée par le filtre de métier
+    // La personne visée ne doit pas être cachée par les filtres
     if (allerA && allerA.membre) {
       var visee = D.membre(allerA.membre);
-      if (visee && vue.metier && D.cote(visee.metier) !== vue.metier) { vue.metier = ""; fr.value = ""; }
+      if (visee && vue.metier && D.cote(visee.metier) !== vue.metier) vue.metier = "";
+      if (visee && !dansSuccursales(visee)) vue.succursales = [];
     }
+    rendFiltres();
     rend();
     if (allerA && allerA.membre) montreLigne(allerA.membre);
   }).catch(UI.echec);
+
+  /* --------------------------------------------------------------- filtres
+     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale (menu à
+     cases), Métier, puis la case « Masquer qui n'a rien ». */
+
+  /** La personne est dans une des succursales cochées (aucune cochée : toutes passent). */
+  function dansSuccursales(m) {
+    return !vue.succursales.length || (!!m && vue.succursales.indexOf(m.succursale || "_") >= 0);
+  }
+
+  /* Les succursales du bureau, plus « Non renseignée » (« _ », qu'aucun code
+     ne peut prendre) dès qu'une personne n'en a pas. */
+  function optionsSuccursales() {
+    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
+    if (D.membres().some(function (m) { return !m.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
+    return o;
+  }
+  function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
+  var nbOptSucc = -1;
+
+  function rendFiltres() {
+    var hote = UI.vide(document.getElementById("filtres"));
+
+    // Succursales : caché quand il n'offre qu'un choix
+    var options = optionsSuccursales();
+    nbOptSucc = options.length;
+    var fSucc = UI.multiChoix({
+      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
+      options: options, valeurs: vue.succursales,
+      surChange: function (v) { vue.succursales = v; memorise(); rend(); }
+    });
+    vue.succursales = fSucc.valeurs();
+    var chSucc = el("div", { class: "champ champ-mc" }, [
+      el("label", { text: "Succursale", onclick: function () { fSucc.noeud.querySelector("button").click(); } }),
+      fSucc.noeud
+    ]);
+    if (options.length < 2) chSucc.style.display = "none";
+
+    var chMetier = UI.champ({
+      nom: "f-metier", label: "Métier", type: "select", valeur: vue.metier || "",
+      options: [{ valeur: "", label: "Toute l'équipe" }, { valeur: "ingenieur", label: "Ingénieurs" },
+                { valeur: "dessinateur", label: "Dessinateurs" }, { valeur: "administratif", label: "Administratifs" }]
+    });
+    chMetier.querySelector("select").addEventListener("change", function () { vue.metier = this.value; memorise(); rend(); });
+
+    var masque = el("input", { type: "checkbox" });
+    masque.checked = !!vue.masque;
+    masque.addEventListener("change", function () { vue.masque = masque.checked; memorise(); rend(); });
+
+    hote.appendChild(chSucc); hote.appendChild(chMetier);
+    hote.appendChild(el("div", { class: "champ champ-vue" }, [
+      el("label", { class: "case", style: "white-space:nowrap", title: "Ne garder que les personnes absentes sur la période affichée" },
+        [masque, "Masquer qui n'a rien"])
+    ]));
+  }
 
   /** Amène la ligne d'une personne sous les yeux et l'éclaire un moment. */
   function montreLigne(id) {
@@ -294,7 +346,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var premier = jours[0], dernier = jours[jours.length - 1];
 
     // Regroupés par métier, par ordre alphabétique dans chacun
-    var tous = [].concat.apply([], D.parMetier(D.membres({ metier: vue.metier || null })).map(function (g) { return g.membres; }));
+    var tous = [].concat.apply([], D.parMetier(D.membres({ metier: vue.metier || null }).filter(dansSuccursales)).map(function (g) { return g.membres; }));
+
+    // « Non renseignée » paraît ou disparaît avec la dernière personne sans succursale
+    if (nbOptSucc >= 0 && optionsSuccursales().length !== nbOptSucc) rendFiltres();
+    // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
+    var actifs = [vue.succursales.length, vue.metier, vue.masque].filter(Boolean).length;
+    document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
        du bas, liste des périodes — porte donc sur ce qui reste affiché,
@@ -328,7 +386,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // La liste ne garde que les périodes en cours ou à venir (11.10.2026) ; le
     // calendrier, lui, montre toujours les jours passés de la période affichée.
     var auj = C.isoAuj();
-    var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier, metier: vue.metier || null });
+    var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier, metier: vue.metier || null })
+      .filter(function (p) { return dansSuccursales(p.membre); });
     // Une période se retient sur son propre motif : chercher « vacances » ne
     // fait pas remonter la maladie de la même personne.
     if (mots.length) periodes = periodes.filter(function (p) {
@@ -375,6 +434,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var cherche = barreRecherche && barreRecherche.valeur().trim();
     document.getElementById("imp-periode").textContent =
       libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
+      (vue.succursales.length ? "  ·  " + vue.succursales.map(nomSuccursale).join(", ") : "") +
       (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());

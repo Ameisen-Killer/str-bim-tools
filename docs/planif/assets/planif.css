@@ -406,6 +406,18 @@ table.liste.par-affaire .affaire-ligne{display:none!important}
 .grille-champs.filtres-ligne{display:flex;flex-wrap:wrap;align-items:flex-end}
 .filtres-ligne > .champ{flex:1 1 170px}
 .filtres-ligne > .champ-vue{flex:0 0 auto}
+/* Menu à cases (succursales) dans une ligne de filtres : il prend l'allure des
+   listes voisines (Tâches, Absences et congés, Équipe — 14.10.2026) */
+.grille-champs.filtres-ligne .champ-mc > label{cursor:pointer}
+.grille-champs.filtres-ligne .champ-mc .mc{display:flex}
+.grille-champs.filtres-ligne .champ-mc .mc-bouton{
+  width:100%;max-width:none;justify-content:space-between;
+  font-family:var(--sans);font-size:15px;font-weight:450;letter-spacing:normal;color:var(--texte);
+  background:#fff;border:1px solid rgba(var(--encre),.18);border-radius:6px;padding:9px 11px;
+}
+.grille-champs.filtres-ligne .champ-mc .mc-bouton.actif{border-color:var(--or)}
+.tete-collante.collee .grille-champs.filtres-ligne .champ-mc .mc-bouton{padding:6px 10px;font-size:14px}
+@media (max-width:640px){.grille-champs.filtres-ligne .champ-mc .mc-bouton{font-size:16px;min-height:44px}}
 .champ-vue{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:10px}
 .vue-taches{display:flex}
 .vue-taches .btn{padding:7px 12px;letter-spacing:.08em;white-space:nowrap}
