@@ -167,8 +167,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     return o;
   }
 
+  /* Groupe (14.10.2026, demande de Tony, comme sur Absences et congés) : les
+     groupes du bureau sans les chefs de secteur et de projet, à leur place
+     les ingénieurs et les dessinateurs (« metier:… », le métier de la fiche). */
+  var GROUPES_ECARTES = { chef_secteur: true, chef_projet: true };
+  var METIERS_GROUPE = ["ingenieur", "dessinateur"];
   function optionsGroupes() {
-    return D.ORDRE_STATUTS.map(function (s) { return { valeur: s, label: D.STATUTS_PLURIEL[s] }; });
+    return D.ORDRE_STATUTS.filter(function (g) { return !GROUPES_ECARTES[g]; })
+      .map(function (g) { return { valeur: g, label: D.STATUTS_PLURIEL[g] }; })
+      .concat(METIERS_GROUPE.map(function (c) { return { valeur: "metier:" + c, label: D.TITRES_METIERS[c] }; }));
+  }
+  function dansGroupe(m, g) {
+    return g.indexOf("metier:") === 0 ? m.metier === g.slice(7) : D.aStatut(m, g);
   }
 
   /** Les affaires des succursales cochées. */
@@ -282,7 +292,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       .filter(function (m) {
         if (!dansSuccursales(m)) return false;
         if (filtres.disciplines.length && filtres.disciplines.indexOf(m.discipline || "_") < 0) return false;
-        if (filtres.groupes.length && !filtres.groupes.some(function (g) { return D.aStatut(m, g); })) return false;
+        if (filtres.groupes.length && !filtres.groupes.some(function (g) { return dansGroupe(m, g); })) return false;
         return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots);
       });
   }
