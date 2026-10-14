@@ -248,12 +248,13 @@
   var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
   if (v) document.getElementById("version").textContent = "Version du " + parseInt(v[3], 10) + " " + MOIS[parseInt(v[2], 10) - 1] + " " + v[1];
 
-  /* Le logo de la marque retenue (posée sur <html> par le script de tête) */
+  /* Le logo de la marque retenue (posée sur <html> par le script de tête) ;
+     celui du bureau sans ses trois lignes de texte (14.10.2026) */
   (function logo() {
     var hote = document.getElementById("logo");
     if (document.documentElement.getAttribute("data-marque") === "ab") {
       var img = document.createElement("img");
-      img.src = "/planif/assets/logo-ab.svg?v=1"; img.alt = "Logo du bureau"; img.width = 150; img.height = 200;
+      img.src = "/planif/assets/logo-ab-marque.svg?v=1"; img.alt = "Logo du bureau"; img.width = 158; img.height = 150;
       hote.appendChild(img);
       document.getElementById("nom-pied").textContent = "Planification";
     } else {
