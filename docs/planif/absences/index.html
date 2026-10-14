@@ -153,9 +153,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      période part alors du lundi, sinon du premier du mois. */
   /* succursales, metiers : codes cochés (14.10.2026), « _ » pour non
      renseignée / à désigner — rien de coché = tout. */
-  var vue = { debut: null, mois: 1, metiers: [], masque: false, succursales: [] };
+  var vue = { debut: null, mois: 1, metiers: [], groupes: [], masque: false, succursales: [] };
   try { Object.assign(vue, JSON.parse(localStorage.getItem(CLE_VUE) || "{}")); } catch (e) {}
   vue.succursales = Array.isArray(vue.succursales) ? vue.succursales.map(String) : [];
+  vue.groupes = Array.isArray(vue.groupes) ? vue.groupes.map(String) : [];
   // Ancien réglage à un seul métier, repris en case cochée
   if (!Array.isArray(vue.metiers)) vue.metiers = [];
   if (vue.metier) vue.metiers = [String(vue.metier)];
@@ -236,6 +237,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (allerA && allerA.membre) {
       var visee = D.membre(allerA.membre);
       if (visee && !dansMetiers(visee)) vue.metiers = [];
+      if (visee && !dansGroupes(visee)) vue.groupes = [];
       if (visee && !dansSuccursales(visee)) vue.succursales = [];
     }
     rendFiltres();
@@ -244,8 +246,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }).catch(UI.echec);
 
   /* --------------------------------------------------------------- filtres
-     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale et Métier
-     en menus à cases, puis la case « Masquer qui n'a rien ». */
+     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale, Métier et
+     Groupe (administrateurs, chefs de secteur…) en menus à cases, puis la
+     case « Masquer qui n'a rien ». */
 
   /** La personne est dans une des succursales cochées (aucune cochée : toutes passent). */
   function dansSuccursales(m) {
@@ -255,6 +258,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /** La personne exerce un des métiers cochés (aucun coché : tous passent). */
   function dansMetiers(m) {
     return !vue.metiers.length || (!!m && vue.metiers.indexOf(metierDe(m)) >= 0);
+  }
+
+  /** La personne est dans un des groupes cochés (aucun coché : tous passent). */
+  function dansGroupes(m) {
+    return !vue.groupes.length || (!!m && vue.groupes.some(function (g) { return D.aStatut(m, g); }));
+  }
+  function optionsGroupes() {
+    return D.ORDRE_STATUTS.map(function (g) { return { valeur: g, label: D.STATUTS_PLURIEL[g] }; });
   }
 
   /* Les succursales du bureau, plus « Non renseignée » (« _ », qu'aucun code
@@ -273,7 +284,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
   function nomMetier(c) { return D.TITRES_METIERS[c === "_" ? "" : c] || c; }
   var nbOptions = "";
-  function compteOptions() { return optionsSuccursales().length + "/" + optionsMetiers().length; }
+  function compteOptions() {
+    return [optionsSuccursales(), optionsMetiers(), optionsGroupes()].map(function (o) {
+      return o.map(function (x) { return x.valeur; }).join(",");
+    }).join("|");
+  }
 
   /** Un menu à cases et son libellé, rangé comme une liste de la ligne de filtres. */
   function champCases(libelle, o) {
@@ -305,11 +320,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
     vue.metiers = met.menu.valeurs();
 
+    var grp = champCases("Groupe", {
+      libelle: "Filtrer : groupes", tous: "Tous les groupes", pluriel: "groupes",
+      options: optionsGroupes(), valeurs: vue.groupes,
+      surChange: function (v) { vue.groupes = v; memorise(); rend(); }
+    });
+    vue.groupes = grp.menu.valeurs();
+
     var masque = el("input", { type: "checkbox" });
     masque.checked = !!vue.masque;
     masque.addEventListener("change", function () { vue.masque = masque.checked; memorise(); rend(); });
 
-    hote.appendChild(succ.champ); hote.appendChild(met.champ);
+    hote.appendChild(succ.champ); hote.appendChild(met.champ); hote.appendChild(grp.champ);
     hote.appendChild(el("div", { class: "champ champ-vue" }, [
       el("label", { class: "case", style: "white-space:nowrap", title: "Ne garder que les personnes absentes sur la période affichée" },
         [masque, "Masquer qui n'a rien"])
@@ -370,11 +392,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Regroupés par métier, par ordre alphabétique dans chacun
     // « Non renseignée », « À désigner » paraissent ou disparaissent avec la dernière personne concernée
     if (nbOptions && compteOptions() !== nbOptions) rendFiltres();
-    var tous = [].concat.apply([], D.parMetier(D.membres().filter(function (m) { return dansSuccursales(m) && dansMetiers(m); }))
+    var tous = [].concat.apply([], D.parMetier(D.membres().filter(function (m) { return dansSuccursales(m) && dansMetiers(m) && dansGroupes(m); }))
       .map(function (g) { return g.membres; }));
 
     // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [vue.succursales.length, vue.metiers.length, vue.masque].filter(Boolean).length;
+    var actifs = [vue.succursales.length, vue.metiers.length, vue.groupes.length, vue.masque].filter(Boolean).length;
     document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
@@ -410,7 +432,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // calendrier, lui, montre toujours les jours passés de la période affichée.
     var auj = C.isoAuj();
     var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier })
-      .filter(function (p) { return dansSuccursales(p.membre) && dansMetiers(p.membre); });
+      .filter(function (p) { return dansSuccursales(p.membre) && dansMetiers(p.membre) && dansGroupes(p.membre); });
     // Une période se retient sur son propre motif : chercher « vacances » ne
     // fait pas remonter la maladie de la même personne.
     if (mots.length) periodes = periodes.filter(function (p) {
@@ -461,6 +483,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     document.getElementById("imp-periode").textContent =
       libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
       (vue.succursales.length ? "  ·  " + vue.succursales.map(nomSuccursale).join(", ") : "") +
+      (vue.groupes.length ? "  ·  " + vue.groupes.map(function (g) { return D.STATUTS_PLURIEL[g] || g; }).join(", ") : "") +
       (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());
