@@ -206,10 +206,6 @@
   .ac-plus{margin-top:16px}
   .ac-vide{padding:26px 0;text-align:center;color:var(--texte-faible);font-size:14.5px}
   .ac-vide b{display:block;font-size:17px;color:var(--texte);margin-bottom:6px}
-  .ac-alerte{border-left:3px solid var(--alerte);padding:14px 18px;background:rgba(var(--alerte-rvb),.04);border-radius:0 8px 8px 0}
-  .ac-alerte h2{margin:0 0 8px;font-size:18px}
-  .ac-alerte p{margin:0;color:var(--texte-doux);max-width:60em}
-  .ac-alerte code{font-size:13px;background:var(--ac-gris);padding:1px 6px;border-radius:4px}
 
   @keyframes ac-pousse{from{transform:scaleY(0)}to{transform:none}}
   @keyframes ac-etire{from{transform:scaleX(0)}to{transform:none}}
@@ -342,7 +338,6 @@
       donnees = prepare(r);
       dessine(silencieux);
     }).catch(function (e) {
-      if (e && e.code === "PGRST202") return manqueBase();
       if (!silencieux) UI.echec(e);
     });
   }
@@ -492,19 +487,6 @@
       el("div", { class: "num-section", text: titre }),
       el("p", { style: "margin-top:12px;color:var(--texte-doux);font-size:15px;max-width:52em", text: texte }),
       el("a", { class: "btn", href: "/planif/console/", style: "margin-top:20px" }, ["Retour à la console"])
-    ]));
-  }
-
-  function manqueBase() {
-    UI.vide(zone).appendChild(el("section", { class: "section" }, [
-      el("div", { class: "ac-alerte" }, [
-        el("h2", { text: "Base à mettre à jour" }),
-        el("p", {}, [
-          "Le journal d'activité n'existe pas encore dans la base. Lance ",
-          el("code", { text: "migration-activite.sql" }),
-          " dans Supabase › SQL Editor, puis recharge cette page. Le journal commencera à se remplir dès les premiers battements des onglets ouverts."
-        ])
-      ])
     ]));
   }
 
