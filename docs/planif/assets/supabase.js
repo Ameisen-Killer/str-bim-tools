@@ -292,20 +292,12 @@
        o.quitter  déconnexion : tous les onglets de l'adresse s'effacent
        o.page     la page de l'outil (/planif/taches/…) : le temps actif s'y
                   range, pour la page Console › Activité */
-  var presenceAvecPage = true;     // repli tant que migration-activite-pages.sql n'est pas passée
   function presence(o) {
     var partir = !o.visible || !!o.quitter;
-    var args = {
+    return rpc("presence", {
       p_onglet: o.onglet, p_horloge: o.horloge,
-      p_visible: !!o.visible, p_quitter: !!o.quitter
-    };
-    if (presenceAvecPage && o.page) args.p_page = o.page;
-    return rpc("presence", args, { garde: partir }).catch(function (e) {
-      if (!args.p_page || !e || e.code !== "PGRST202") throw e;
-      presenceAvecPage = false;
-      delete args.p_page;
-      return rpc("presence", args, { garde: partir });
-    }).then(function (r) {
+      p_visible: !!o.visible, p_quitter: !!o.quitter, p_page: o.page || null
+    }, { garde: partir }).then(function (r) {
       return (r && r.enLigne) || [];
     });
   }
