@@ -563,7 +563,7 @@
 
   var etat = null;
   var precedent = null;        // dernier état réellement enregistré, pour le calcul des écarts
-  var abonnes = [], rechargements = [];
+  var rechargements = [];
   var chargement = null;
 
   /* ---------------------------------------------------------------- profil
@@ -642,8 +642,6 @@
     return vu;
   }
 
-  function previens() { abonnes.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } }); }
-
   /* Les écritures partent une par une, dans l'ordre des actions.
      Deux écritures simultanées calculaient leur écart depuis la même référence :
      deux décalages rapides pouvaient arriver dans le désordre, et une écriture
@@ -669,7 +667,6 @@
     ecriture = ecriture.then(function () {
       precedent = instantane;
       version++;
-      previens();
       return etat;
     }, function (e) {
       if (gen !== generation) throw e;
@@ -1184,7 +1181,6 @@
     /** « 26-801 · Immeuble… », ou le nom seul pour une affaire sans numéro (13.10.2026). */
     libelleAffaire: function (a) { return a ? (a.code ? a.code + " · " : "") + a.nom : "—"; },
     PARTS: PARTS,
-    source: ADAPTATEUR.nom,
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */
     chargeProfil: chargeProfil,
@@ -1218,10 +1214,8 @@
     },
 
     etat: function () { return etat; },
-    reglages: function () { return etat.reglages; },
     canton: function () { return etat.reglages.canton; },
 
-    surChangement: function (f) { abonnes.push(f); return function () { abonnes = abonnes.filter(function (x) { return x !== f; }); }; },
     /** Après un enregistrement refusé, l'état a été relu depuis la base : la page doit se redessiner. */
     surRechargement: function (f) { rechargements.push(f); },
     /** Vrai pendant une écriture de cette page, et dans les ms qui suivent sa fin. */
@@ -1247,7 +1241,6 @@
           etat = normalise(brut);
           precedent = copie(etat);
           version++;
-          previens();
           rechargements.forEach(function (f) { try { f(etat); } catch (e) { console.error(e); } });
           return etat;
         });

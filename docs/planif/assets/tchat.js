@@ -594,7 +594,6 @@
     monte: monte,
     recu: recu,
     nonLus: nonLus,
-    depuisBase: depuisBase,
-    nomDe: function (id) { var m = id && D ? D.membre(id) : null; return m ? m.prenom + " " + m.nom : "un collègue"; }
+    depuisBase: depuisBase
   };
 })(window);

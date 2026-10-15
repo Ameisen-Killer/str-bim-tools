@@ -926,7 +926,6 @@
 
   global.Sb = {
     configure: configure,
-    session: function () { return session; },
     connecte: function () { return !!session; },
     email: function () { return session ? session.email : ""; },
     connexion: connexion,

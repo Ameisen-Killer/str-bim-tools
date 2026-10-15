@@ -645,7 +645,6 @@
   });
 
   global.Palette = {
-    ouvre: ouvre, ferme: ferme, touche: MAC ? "⌘K" : "Ctrl K",
-    lisPhrase: lisPhrase, brouillon: brouillon            // exposés pour les essais
+    ouvre: ouvre, ferme: ferme, touche: MAC ? "⌘K" : "Ctrl K"
   };
 })(window);

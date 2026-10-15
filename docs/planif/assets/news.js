@@ -640,7 +640,6 @@
 
   global.News = {
     monte: monte,
-    nettoie: nettoie,
-    redige: function () { if (peutRediger()) editeur(null); }
+    nettoie: nettoie
   };
 })(window);
