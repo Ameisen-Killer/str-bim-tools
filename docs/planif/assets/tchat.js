@@ -587,11 +587,8 @@
   }
 
   global.Tchat = {
-    ouvre: ouvre,
-    ferme: ferme,
     bascule: function () { if (ouvert) ferme(); else ouvre(); },
     installeFenetre: installeFenetre,
-    monte: monte,
     recu: recu,
     nonLus: nonLus,
     depuisBase: depuisBase

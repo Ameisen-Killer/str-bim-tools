@@ -639,7 +639,6 @@
   }
 
   global.News = {
-    monte: monte,
-    nettoie: nettoie
+    monte: monte
   };
 })(window);

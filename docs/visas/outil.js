@@ -604,7 +604,7 @@
   };
 
   global.Outil = {
-    el: el, toast: toast, ouvre: ouvre, ferme: ferme, confirme: confirme,
+    el: el, toast: toast, ouvre: ouvre, confirme: confirme,
     barre: barre, colleSousBarre: colleSousBarre, pied: pied,
     recherche: recherche, correspond: correspond, imprime: imprime
   };

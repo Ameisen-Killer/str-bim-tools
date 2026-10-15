@@ -933,7 +933,6 @@
     verifieLien: verifieLien,
     choisitMotDePasse: choisitMotDePasse,
     deconnexion: deconnexion,
-    rafraichis: rafraichis,
     utilisateur: utilisateur,
     enregistrePreferences: enregistrePreferences,
     changeMotDePasse: changeMotDePasse,

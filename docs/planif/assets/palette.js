@@ -645,6 +645,6 @@
   });
 
   global.Palette = {
-    ouvre: ouvre, ferme: ferme, touche: MAC ? "⌘K" : "Ctrl K"
+    ouvre: ouvre, touche: MAC ? "⌘K" : "Ctrl K"
   };
 })(window);

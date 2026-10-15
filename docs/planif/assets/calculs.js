@@ -454,13 +454,11 @@
 
   global.Calc = {
     capaciteJour: capaciteJour,
-    joursDe: joursDe,
     poidsJour: poidsJour,
     joursTravaillesEntre: joursTravaillesEntre,
     absenceLe: absenceLe,
     chargeTotale: chargeTotale,
     chargeOuverte: chargeOuverte,
-    partFinie: partFinie,
     affectations: affectations, nonAffectees: nonAffectees,
     debutEffectif: debutEffectif,
     debutAffectation: debutAffectation,

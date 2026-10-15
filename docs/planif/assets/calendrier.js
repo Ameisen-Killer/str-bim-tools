@@ -294,13 +294,13 @@
 
   global.Cal = {
     iso: iso, dt: dt, ajoute: ajoute, diff: diff, lundi: lundi,
-    aujourdhui: aujourdhui, isoAuj: isoAuj, serie: serie,
+    isoAuj: isoAuj, serie: serie,
     semaineISO: semaineISO, estWeekend: estWeekend, rangJour: rangJour,
     premierMois: premierMois, ajouteMois: ajouteMois, mois: mois,
     jourCourt: jourCourt, quantieme: quantieme,
     fmtCourt: fmtCourt, fmtLong: fmtLong, fmtCH: fmtCH, fmtJours: fmtJours,
     fmtMois: fmtMois, fmtMoisCourt: fmtMoisCourt,
-    paques: paques, feries: feries, ferie: ferie, chome: chome,
+    ferie: ferie, chome: chome,
     estOuvre: estOuvre,
     CANTONS: CANTONS, MOIS: MOIS
   };

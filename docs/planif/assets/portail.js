@@ -324,8 +324,7 @@
   }
 
   global.Portail = {
-    el: el, vide: vide, svg: svg, majuscule: majuscule,
-    avecBase: avecBase, session: session, echec: echec, deconnecte: deconnecte,
-    identite: identite, entete: entete, memoriseEntete: memoriseEntete, versionPubliee: versionPubliee, surRetour: surRetour, JOURS: JOURS
+    el: el, vide: vide, svg: svg, session: session, echec: echec,
+    entete: entete, memoriseEntete: memoriseEntete, surRetour: surRetour
   };
 })(window);
