@@ -39,6 +39,14 @@
   .console-menu button:hover{color:var(--texte);border-left-color:var(--or-doux)}
   .console-menu button[aria-current="true"]{color:var(--or);border-left-color:var(--or);padding-left:18px}
   .console-menu .compte{font-size:11px;letter-spacing:.06em;color:var(--texte-faible)}
+  /* Lien vers la page Activité (15.10.2026) : sous les sections, une autre page */
+  .console-menu a.console-page{
+    display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:14px;
+    border-left:1px solid var(--ligne);padding:12px 0 12px 14px;text-decoration:none;
+    font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--texte-faible);transition:color .25s,border-color .25s,padding-left .25s;
+  }
+  .console-menu a.console-page:hover{color:var(--or);border-left-color:var(--or);padding-left:18px}
   .console-menu button[aria-current="true"] .compte{color:var(--or-doux)}
   /* La section ouverte ne porte plus de filet : le menu sépare déjà */
   .console-vue > .section{border-top:0;padding-top:0}
@@ -57,6 +65,8 @@
     .console-menu button:hover{border-left:0;border-bottom-color:var(--or-doux)}
     .console-menu button[aria-current="true"]{border-left:0;border-bottom-color:var(--or);padding-left:16px}
     .console-menu .compte{display:none}
+    .console-menu a.console-page{margin-top:0;border-left:0;padding:12px 16px;min-height:44px;white-space:nowrap}
+    .console-menu a.console-page:hover{padding-left:16px}
   }
 
   /* Liste des utilisateurs : une ligne par personne, réglée sur place. Les
@@ -401,6 +411,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       hotes.menu.appendChild(b);
       s.hoteCompte = compte;
     });
+    // Qui se connecte, quand, combien de temps : une page à part
+    hotes.menu.appendChild(el("a", { class: "console-page", href: "/planif/console/activite/" },
+      [el("span", { text: "Activité" }), el("span", { "aria-hidden": "true", text: "→" })]));
   }
 
   /** Affiche une section. depuisAdresse : l'adresse a déjà la bonne valeur. */

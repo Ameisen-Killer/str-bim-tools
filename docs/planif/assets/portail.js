@@ -323,6 +323,37 @@
     });
   }
 
+  /* ------------------------------------------------------------ présence
+     L'accueil bat comme les autres pages (ui.js), sans afficher le compteur :
+     même identifiant d'onglet, battement toutes les 45 s tant qu'il est
+     visible, « je passe derrière » dès qu'il ne l'est plus. C'est ce qui
+     tient le journal d'activité de la console (15.10.2026) : sans lui, un
+     passage par l'accueil seul n'y laissait aucune trace. */
+  (function () {
+    if (!avecBase || !SB.presence || !SB.connecte()) return;
+    var onglet = null, battement = null;
+    try { onglet = sessionStorage.getItem("planif.onglet"); } catch (e) { onglet = null; }
+    if (!onglet) {
+      onglet = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      try { sessionStorage.setItem("planif.onglet", onglet); } catch (e) { /* l'id vit le temps de la page */ }
+    }
+    function bat(visible) {
+      if (!SB.connecte()) return;
+      SB.presence({ onglet: onglet, horloge: Date.now(), visible: visible }).catch(function () {});
+    }
+    function suit() {
+      if (battement || document.hidden) return;
+      bat(true);
+      battement = setInterval(function () { bat(true); }, 45000);
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) { suit(); return; }
+      if (battement) { clearInterval(battement); battement = null; }
+      bat(false);
+    });
+    suit();
+  })();
+
   global.Portail = {
     el: el, vide: vide, svg: svg, session: session, echec: echec,
     entete: entete, memoriseEntete: memoriseEntete, surRetour: surRetour

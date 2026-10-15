@@ -686,6 +686,36 @@ comment on column public.presences.horloge is
 comment on column public.presences.vu_le is
   'Heure du dernier battement. En ligne = visible et moins de 100 secondes (les onglets visibles battent toutes les 45 s).';
 
+-- ---------------------------------------------------- journal d'activité ---
+-- Une séance : une personne, dans un bureau, sur un appareil. Elle s'ouvre au
+-- premier battement d'un onglet visible et se prolonge tant que des signes de
+-- vie arrivent à moins de 15 minutes d'intervalle ; au-delà, la suivante est
+-- une nouvelle séance. « actif » ne compte que le temps où un onglet de l'outil
+-- était sous les yeux (battements de 45 s, au plus 60 s comptées par message).
+-- Aucune règle RLS, comme presences : seules presence() et console_activite()
+-- y touchent. Gardé 400 jours.
+create table if not exists public.activite (
+  id        bigint generated always as identity primary key,
+  email     text not null
+            constraint activite_email_minuscules check (email = lower(btrim(email))),
+  bureau_id uuid not null
+            constraint activite_bureau_fk references public.bureaux (id) on delete cascade,
+  appareil  text not null default 'ordinateur'
+            constraint activite_appareil_check check (appareil in ('ordinateur', 'mobile', 'tablette')),
+  debut     timestamptz not null default now(),
+  fin       timestamptz not null default now(),
+  actif     integer not null default 0 constraint activite_actif_positif check (actif >= 0)
+);
+create index if not exists activite_personne on public.activite (email, bureau_id, appareil, fin desc);
+create index if not exists activite_fin on public.activite (fin desc);
+
+comment on table public.activite is
+  'Journal des séances de l''outil : qui, dans quel bureau, sur quel appareil, de quand à quand, et combien de secondes sous les yeux. Tenue par public.presence() ; lue par public.console_activite() (super admin). Aucune règle RLS.';
+comment on column public.activite.fin is
+  'Dernier signe de vie de la séance (battement ou onglet passé derrière). Plus de 15 minutes sans signe : la séance est close.';
+comment on column public.activite.actif is
+  'Secondes passées avec un onglet de l''outil visible pendant la séance.';
+
 -- p_visible : l'onglet est sous les yeux (battement) ou vient de passer derrière.
 -- p_quitter : déconnexion — tous les onglets de l'adresse s'effacent.
 create or replace function public.presence(p_onglet text, p_horloge bigint,
@@ -694,12 +724,53 @@ create or replace function public.presence(p_onglet text, p_horloge bigint,
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_email  text := lower(coalesce(auth.jwt() ->> 'email', ''));
-  v_bureau uuid := public.bureau_courant();
-  v_onglet text := left(btrim(coalesce(p_onglet, '')), 64);
+  v_email    text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_bureau   uuid := public.bureau_courant();
+  v_onglet   text := left(btrim(coalesce(p_onglet, '')), 64);
+  v_agent    text;
+  v_appareil text;
+  v_vu       boolean;
+  v_vu_le    timestamptz;
+  v_seance   bigint;
+  v_fin      timestamptz;
 begin
   if v_email = '' or v_bureau is null then
     return jsonb_build_object('enLigne', '[]'::jsonb);
+  end if;
+
+  -- Journal d'activité, AVANT de noter l'onglet : il faut savoir s'il était
+  -- sous les yeux jusqu'ici. Le temps écoulé depuis le dernier signe de vie
+  -- de la séance (ou de l'onglet, s'il est plus récent) compte comme actif,
+  -- 60 s au plus : deux onglets visibles ne comptent pas double, et un
+  -- ordinateur mis en veille ne compte pas sa nuit.
+  if not coalesce(p_quitter, false) and v_onglet <> '' then
+    v_agent := lower(coalesce(nullif(current_setting('request.headers', true), '')::jsonb ->> 'user-agent', ''));
+    v_appareil := case when v_agent ~ '(ipad|tablet)' then 'tablette'
+                       when v_agent ~ '(mobi|iphone)' then 'mobile'
+                       when v_agent ~ 'android' then 'tablette'
+                       else 'ordinateur' end;
+    select p.visible and p.vu_le > now() - interval '100 seconds', p.vu_le
+      into v_vu, v_vu_le
+      from public.presences p
+     where p.email = v_email and p.onglet = v_onglet;
+    select a.id, a.fin into v_seance, v_fin
+      from public.activite a
+     where a.email = v_email and a.bureau_id = v_bureau and a.appareil = v_appareil
+       and a.fin > now() - interval '15 minutes'
+     order by a.fin desc
+     limit 1;
+    if v_seance is not null then
+      update public.activite a
+         set actif = a.actif + case when coalesce(v_vu, false)
+                                    then least(60, greatest(0, floor(extract(epoch from
+                                           now() - greatest(v_fin, v_vu_le)))))::integer
+                                    else 0 end,
+             fin = now()
+       where a.id = v_seance;
+    elsif coalesce(p_visible, true) then
+      insert into public.activite (email, bureau_id, appareil) values (v_email, v_bureau, v_appareil);
+    end if;
+    delete from public.activite a where a.fin < now() - interval '400 days';
   end if;
 
   if p_quitter then
@@ -734,7 +805,7 @@ begin
 end $$;
 
 comment on function public.presence(text, bigint, boolean, boolean) is
-  'Inscrit l''état d''un onglet de la personne connectée et renvoie qui a l''outil sous les yeux dans son bureau : { enLigne: [{ nom, moi }] }.';
+  'Inscrit l''état d''un onglet de la personne connectée, tient le journal d''activité et renvoie qui a l''outil sous les yeux dans son bureau : { enLigne: [{ nom, moi }] }.';
 
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).
@@ -887,7 +958,7 @@ select public.groupes_par_defaut(b.id) from public.bureaux b;
 -- =========================================================== sécurité (RLS) ==
 -- On repart de zéro : les politiques existantes de ces tables sont retirées.
 -- Les tables de planification ne montrent que le bureau courant. Bureaux,
--- accès, succursales, disciplines et présences n'ont aucune politique : seules
+-- accès, succursales, disciplines, présences et activité n'ont aucune politique : seules
 -- les fonctions (security definer) les lisent et les écrivent.
 do $$
 declare
@@ -896,7 +967,7 @@ declare
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                           'succursale_disciplines', 'presences'] loop
+                           'succursale_disciplines', 'presences', 'activite'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -905,7 +976,7 @@ begin
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                        'succursale_disciplines', 'presences')
+                        'succursale_disciplines', 'presences', 'activite')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -1496,6 +1567,48 @@ begin
   );
 end $$;
 
+-- La page Console › Activité : les séances des p_jours derniers jours (1 à
+-- 400), toutes les adresses autorisées (avec leur fiche et leur dernière
+-- connexion), les bureaux, et qui a l'outil sous les yeux en ce moment.
+create or replace function public.console_activite(p_jours integer default 30)
+returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_depuis timestamptz := now() - make_interval(days => greatest(1, least(coalesce(p_jours, 30), 400)));
+begin
+  if not public.est_super_admin() then
+    raise exception 'Console réservée au super admin.';
+  end if;
+  return jsonb_build_object(
+    'maintenant', now(),
+    'bureaux', coalesce((
+      select jsonb_agg(jsonb_build_object('id', b.id, 'nom', b.nom) order by lower(b.nom))
+        from public.bureaux b), '[]'::jsonb),
+    'personnes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'email', a.email, 'bureauId', a.bureau_id, 'actif', a.actif, 'superAdmin', a.super_admin,
+               'prenom', m.prenom, 'nom', m.nom, 'photo', m.photo,
+               'derniereConnexion', u.last_sign_in_at)
+             order by a.email)
+        from public.acces a
+        left join public.membres m on m.id = a.membre_id
+        left join auth.users u on lower(u.email) = a.email), '[]'::jsonb),
+    'seances', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', s.id, 'email', s.email, 'bureauId', s.bureau_id, 'appareil', s.appareil,
+               'debut', s.debut, 'fin', s.fin, 'actif', s.actif)
+             order by s.debut desc)
+        from public.activite s
+       where s.fin >= v_depuis), '[]'::jsonb),
+    'enLigne', coalesce((
+      select jsonb_agg(jsonb_build_object('email', x.email, 'bureauId', x.bureau_id))
+        from (select distinct on (p.email) p.email, p.bureau_id
+                from public.presences p
+               where p.visible and p.vu_le > now() - interval '100 seconds'
+               order by p.email, p.vu_le desc) x), '[]'::jsonb)
+  );
+end $$;
+
 -- Crée ou modifie un bureau : nom, état, réglages, disciplines, succursales.
 -- Les listes reçues remplacent les anciennes ; leur ordre fait foi. Une
 -- succursale ou une discipline retirée est effacée des membres qui la portaient.
@@ -2059,7 +2172,7 @@ begin
     'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
     'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
     'public.peut_saisir_mandat(uuid, text, text, text)',
-    'public.console_etat()', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
+    'public.console_etat()', 'public.console_activite(integer)', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',
     'public.console_enregistre_personne(jsonb)', 'public.console_supprime_membre(uuid)',
     'public.console_supprime_utilisateur(text)', 'public.console_enregistre_droits(jsonb)',
     'public.console_enregistre_groupe(jsonb)', 'public.console_ordonne_groupes(jsonb)',
