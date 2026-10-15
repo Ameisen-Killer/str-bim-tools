@@ -217,6 +217,19 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 .bascule input:focus-visible + .boite{outline:1px solid var(--or);outline-offset:3px}
 .bascule .t{font-size:16px}
 .bascule .t small{display:block;margin-top:4px;color:var(--texte-faible);font-size:13.5px}
+/* Remise à zéro : deux temps, le second se replie seul au bout de 6 s */
+.remise{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px 32px;margin-top:clamp(48px,8vh,80px);padding-top:28px;border-top:1px solid var(--ligne)}
+.remise .t{font-size:16px;max-width:34em}
+.remise .t small{display:block;margin-top:4px;color:var(--texte-faible);font-size:13.5px}
+.remise-actions{display:flex;align-items:center;gap:22px}
+.btn-trait{background:none;border:0;padding:6px 0;cursor:pointer;display:inline-flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--texte-doux);transition:color .3s}
+.btn-trait::before,.btn-trait::after{content:"";width:28px;height:1px;background:currentColor;transition:width .4s}
+.btn-trait:hover{color:var(--or)}
+.btn-trait:hover::before,.btn-trait:hover::after{width:44px}
+.btn-trait.or{color:var(--or)}
+.btn-trait.nu::before,.btn-trait.nu::after{display:none}
+.btn-trait[disabled]{opacity:.4;cursor:default}
+.remise-msg{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--or)}
 
 @media (max-width:860px){
   .pg{grid-template-columns:minmax(0,1fr) repeat(3,minmax(56px,auto));row-gap:14px}
@@ -730,8 +743,50 @@ footer a:hover{color:var(--or)}
       el("label", { class: "bascule rv" }, [cb, el("span", { class: "boite", "aria-hidden": "true" }), el("span", { class: "t" }, [
         "Ne pas compter mes visites sur cet appareil",
         el("small", { text: "Réglage gardé par ce navigateur : à refaire sur ton téléphone et sur chaque ordinateur." })
-      ])])
+      ])]),
+      remise()
     ])]);
+  }
+
+  /* Remise à zéro : efface toutes les pages vues enregistrées. Premier clic :
+     la question ; second clic dans les 6 secondes : l'effacement. */
+  function remise(){
+    var minuteur = null;
+    var actions = el("div", { class: "remise-actions" });
+    function repos(){
+      clearTimeout(minuteur);
+      actions.textContent = "";
+      actions.appendChild(el("button", { type: "button", class: "btn-trait", onclick: demande }, ["Remettre à zéro"]));
+    }
+    function demande(){
+      actions.textContent = "";
+      var ok = el("button", { type: "button", class: "btn-trait or", onclick: efface }, ["Oui, tout effacer"]);
+      actions.appendChild(el("button", { type: "button", class: "btn-trait nu", onclick: repos }, ["Annuler"]));
+      actions.appendChild(ok);
+      ok.focus();
+      minuteur = setTimeout(repos, 6000);
+    }
+    function efface(){
+      clearTimeout(minuteur);
+      [].forEach.call(actions.querySelectorAll("button"), function(b){ b.disabled = true; });
+      SB.rpc("stats_remise_a_zero").then(function(n){
+        actions.textContent = "";
+        actions.appendChild(el("span", { class: "remise-msg", text: (n > 1 ? n + " pages vues effacées" : n === 1 ? "1 page vue effacée" : "Rien à effacer") }));
+        limite = 40;
+        setTimeout(function(){ charge(false); }, 1400);
+      }).catch(function(e){
+        actions.textContent = "";
+        var m = e && e.code === "PGRST202" ? "Lance d'abord migration-stats-remise.sql" : ((e && e.message) || "Effacement impossible");
+        actions.appendChild(el("span", { class: "remise-msg", text: m }));
+        setTimeout(repos, 5000);
+      });
+    }
+    repos();
+    return el("div", { class: "remise rv" }, [
+      el("span", { class: "t" }, ["Remettre les statistiques à zéro",
+        el("small", { text: "Efface toutes les visites enregistrées, sur toutes les périodes. Le comptage reprend aussitôt. Irréversible." })]),
+      actions
+    ]);
   }
 })();
 </script>

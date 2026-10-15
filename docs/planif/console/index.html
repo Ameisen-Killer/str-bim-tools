@@ -47,6 +47,7 @@
     color:var(--texte-faible);transition:color .25s,border-color .25s,padding-left .25s;
   }
   .console-menu a.console-page:hover{color:var(--or);border-left-color:var(--or);padding-left:18px}
+  .console-menu a.console-page.suite{margin-top:0}
   .console-menu button[aria-current="true"] .compte{color:var(--or-doux)}
   /* La section ouverte ne porte plus de filet : le menu sépare déjà */
   .console-vue > .section{border-top:0;padding-top:0}
@@ -414,6 +415,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Qui se connecte, quand, combien de temps : une page à part
     hotes.menu.appendChild(el("a", { class: "console-page", href: "/planif/console/activite/" },
       [el("span", { text: "Activité" }), el("span", { "aria-hidden": "true", text: "→" })]));
+    // Les statistiques du site vitrine : page cachée, accès direct d'ici
+    hotes.menu.appendChild(el("a", { class: "console-page suite", href: "/stats/" },
+      [el("span", { text: "Stats du site" }), el("span", { "aria-hidden": "true", text: "→" })]));
   }
 
   /** Affiche une section. depuisAdresse : l'adresse a déjà la bonne valeur. */
