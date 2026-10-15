@@ -289,13 +289,23 @@
        o.horloge  heure de l'onglet : la base ignore un message plus ancien que
                   le dernier retenu (messages d'une même fenêtre en désordre)
        o.visible  sous les yeux (battement) ou passé derrière
-       o.quitter  déconnexion : tous les onglets de l'adresse s'effacent */
+       o.quitter  déconnexion : tous les onglets de l'adresse s'effacent
+       o.page     la page de l'outil (/planif/taches/…) : le temps actif s'y
+                  range, pour la page Console › Activité */
+  var presenceAvecPage = true;     // repli tant que migration-activite-pages.sql n'est pas passée
   function presence(o) {
     var partir = !o.visible || !!o.quitter;
-    return rpc("presence", {
+    var args = {
       p_onglet: o.onglet, p_horloge: o.horloge,
       p_visible: !!o.visible, p_quitter: !!o.quitter
-    }, { garde: partir }).then(function (r) {
+    };
+    if (presenceAvecPage && o.page) args.p_page = o.page;
+    return rpc("presence", args, { garde: partir }).catch(function (e) {
+      if (!args.p_page || !e || e.code !== "PGRST202") throw e;
+      presenceAvecPage = false;
+      delete args.p_page;
+      return rpc("presence", args, { garde: partir });
+    }).then(function (r) {
       return (r && r.enLigne) || [];
     });
   }

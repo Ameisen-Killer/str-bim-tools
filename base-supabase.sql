@@ -716,11 +716,33 @@ comment on column public.activite.fin is
 comment on column public.activite.actif is
   'Secondes passées avec un onglet de l''outil visible pendant la séance.';
 
+-- Temps actif par page de l'outil (15.10.2026) : une ligne par personne,
+-- bureau, jour (heure suisse) et page (/planif/taches/, /planif/inter-secteurs/?vue=…).
+-- Tenue par presence(), lue par console_activite(). Aucune règle RLS. 400 jours.
+create table if not exists public.activite_pages (
+  email     text not null
+            constraint activite_pages_email_minuscules check (email = lower(btrim(email))),
+  bureau_id uuid not null
+            constraint activite_pages_bureau_fk references public.bureaux (id) on delete cascade,
+  jour      date not null,
+  page      text not null constraint activite_pages_page_forme check (page ~ '^/planif/[a-z0-9/_?=-]{0,90}$'),
+  actif     integer not null default 0 constraint activite_pages_actif_positif check (actif >= 0),
+  primary key (email, bureau_id, jour, page)
+);
+create index if not exists activite_pages_jour on public.activite_pages (jour desc);
+
+-- Ancienne signature, sans p_page (avant le 15.10.2026) : deux versions côte à
+-- côte rendraient l'appel ambigu pour l'API.
+drop function if exists public.presence(text, bigint, boolean, boolean);
+
 -- p_visible : l'onglet est sous les yeux (battement) ou vient de passer derrière.
 -- p_quitter : déconnexion — tous les onglets de l'adresse s'effacent.
+-- p_page    : la page de l'outil ouverte dans l'onglet (/planif/taches/…) :
+--             le temps actif s'y ajoute, jour par jour (activite_pages).
 create or replace function public.presence(p_onglet text, p_horloge bigint,
                                            p_visible boolean default true,
-                                           p_quitter boolean default false)
+                                           p_quitter boolean default false,
+                                           p_page text default null)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -733,6 +755,8 @@ declare
   v_vu_le    timestamptz;
   v_seance   bigint;
   v_fin      timestamptz;
+  v_page     text := lower(left(btrim(coalesce(p_page, '')), 100));
+  v_ajout    integer := 0;
 begin
   if v_email = '' or v_bureau is null then
     return jsonb_build_object('enLigne', '[]'::jsonb);
@@ -760,17 +784,24 @@ begin
      order by a.fin desc
      limit 1;
     if v_seance is not null then
+      if coalesce(v_vu, false) then
+        v_ajout := least(60, greatest(0, floor(extract(epoch from now() - greatest(v_fin, v_vu_le)))))::integer;
+      end if;
       update public.activite a
-         set actif = a.actif + case when coalesce(v_vu, false)
-                                    then least(60, greatest(0, floor(extract(epoch from
-                                           now() - greatest(v_fin, v_vu_le)))))::integer
-                                    else 0 end,
+         set actif = a.actif + v_ajout,
              fin = now()
        where a.id = v_seance;
+      -- Le même temps, rangé sous la page de l'outil qui l'a eu sous les yeux
+      if v_ajout > 0 and v_page ~ '^/planif/[a-z0-9/_?=-]{0,90}$' then
+        insert into public.activite_pages as x (email, bureau_id, jour, page, actif)
+        values (v_email, v_bureau, (now() at time zone 'Europe/Zurich')::date, v_page, v_ajout)
+        on conflict (email, bureau_id, jour, page) do update set actif = x.actif + excluded.actif;
+      end if;
     elsif coalesce(p_visible, true) then
       insert into public.activite (email, bureau_id, appareil) values (v_email, v_bureau, v_appareil);
     end if;
     delete from public.activite a where a.fin < now() - interval '400 days';
+    delete from public.activite_pages x where x.jour < current_date - 400;
   end if;
 
   if p_quitter then
@@ -804,8 +835,8 @@ begin
       ) x), '[]'::jsonb));
 end $$;
 
-comment on function public.presence(text, bigint, boolean, boolean) is
-  'Inscrit l''état d''un onglet de la personne connectée, tient le journal d''activité et renvoie qui a l''outil sous les yeux dans son bureau : { enLigne: [{ nom, moi }] }.';
+comment on function public.presence(text, bigint, boolean, boolean, text) is
+  'Inscrit l''état d''un onglet de la personne connectée, tient le journal d''activité (et le temps par page) et renvoie qui a l''outil sous les yeux dans son bureau : { enLigne: [{ nom, moi }] }.';
 
 -- --------------------------------------------------------------- réglages ---
 -- Une ligne par bureau, créée avec lui (déclencheur plus bas).
@@ -967,7 +998,7 @@ declare
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
                            'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                           'succursale_disciplines', 'presences', 'activite'] loop
+                           'succursale_disciplines', 'presences', 'activite', 'activite_pages'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
 
@@ -976,7 +1007,7 @@ begin
     where schemaname = 'public'
       and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
-                        'succursale_disciplines', 'presences', 'activite')
+                        'succursale_disciplines', 'presences', 'activite', 'activite_pages')
   loop
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
@@ -1600,6 +1631,12 @@ begin
              order by s.debut desc)
         from public.activite s
        where s.fin >= v_depuis), '[]'::jsonb),
+    -- Le temps actif par page de l'outil, jour par jour
+    'pages', coalesce((
+      select jsonb_agg(jsonb_build_object('email', x.email, 'bureauId', x.bureau_id, 'jour', x.jour,
+                                          'page', x.page, 'actif', x.actif))
+        from public.activite_pages x
+       where x.jour >= (v_depuis at time zone 'Europe/Zurich')::date), '[]'::jsonb),
     'enLigne', coalesce((
       select jsonb_agg(jsonb_build_object('email', x.email, 'bureauId', x.bureau_id))
         from (select distinct on (p.email) p.email, p.bureau_id
@@ -2306,7 +2343,7 @@ begin
   foreach f in array array[
     'public.est_super_admin()', 'public.bureau_courant()', 'public.bureau_par_defaut()', 'public.est_autorise()',
     'public.mon_membre()', 'public.mes_droits()', 'public.a_droit(text)',
-    'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean)',
+    'public.mon_profil()', 'public.choisit_bureau(uuid)', 'public.presence(text, bigint, boolean, boolean, text)',
     'public.regle_jours(uuid, jsonb)', 'public.regle_profil(uuid, text, text, text, text)', 'public.peut_valider_conge(uuid)', 'public.decide_conge(uuid, boolean, text)',
     'public.peut_saisir_mandat(uuid, text, text, text)',
     'public.console_etat()', 'public.console_activite(integer)', 'public.console_enregistre_bureau(jsonb)', 'public.console_supprime_bureau(uuid)',

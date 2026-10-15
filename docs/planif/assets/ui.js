@@ -640,7 +640,7 @@
   function bat(o) {
     if (!avecBase || !SB.connecte()) return Promise.resolve();
     return SB.presence({
-      onglet: ONGLET, horloge: Date.now(), visible: o.visible, quitter: o.quitter
+      onglet: ONGLET, horloge: Date.now(), visible: o.visible, quitter: o.quitter, page: pageOuverte()
     }).then(function (liste) {
       if (o.visible && !o.quitter) enLigne = liste;
       dessineEnLigne();
@@ -648,6 +648,14 @@
       /* Réseau ou session : le dernier compte reste affiché, le prochain
          battement corrigera. Ce compteur ne mérite aucun message d'erreur. */
     });
+  }
+
+  /** La page ouverte, pour le temps par page de la console : son dossier, et la
+   *  vue d'Inter-secteurs (?vue=…), qui fait une page à elle seule. */
+  function pageOuverte() {
+    var p = location.pathname.toLowerCase().replace(/index\.html$/, "");
+    var vue = /[?&]vue=([a-z_-]+)/.exec(location.search);
+    return p + (vue ? "?vue=" + vue[1] : "");
   }
 
   /** L'emplacement du compteur, rempli (et vidé) par dessineEnLigne. */

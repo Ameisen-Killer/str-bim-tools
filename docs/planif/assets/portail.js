@@ -339,7 +339,7 @@
     }
     function bat(visible) {
       if (!SB.connecte()) return;
-      SB.presence({ onglet: onglet, horloge: Date.now(), visible: visible }).catch(function () {});
+      SB.presence({ onglet: onglet, horloge: Date.now(), visible: visible, page: "/planif/" }).catch(function () {});
     }
     function suit() {
       if (battement || document.hidden) return;
