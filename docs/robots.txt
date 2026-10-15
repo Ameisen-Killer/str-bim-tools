@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://str-bim-tools.com/sitemap.xml
