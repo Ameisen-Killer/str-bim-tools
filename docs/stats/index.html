@@ -403,7 +403,6 @@ footer a:hover{color:var(--or)}
       if (silencieux) return;
       clearInterval(minuterie);
       var m = (e && e.message) || "";
-      if (e && e.code === "PGRST202") return message("Base à mettre à jour", "La mesure d'audience n'existe pas encore dans la base. Lance migration-stats-site.sql dans Supabase › SQL Editor, puis recharge cette page.");
       if (/réservées/.test(m)) return message("Accès réservé", "Les statistiques du site sont réservées au super admin.");
       if (/session|accès refusé/i.test(m)) return message("Connexion requise", "Ta session a expiré. Reconnecte-toi, tu reviendras ici ensuite.", true);
       message("Lecture impossible", m || "La base n'a pas répondu. Réessaie dans un instant.");
