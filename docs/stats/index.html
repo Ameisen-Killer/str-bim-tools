@@ -776,7 +776,7 @@ footer a:hover{color:var(--or)}
         setTimeout(function(){ charge(false); }, 1400);
       }).catch(function(e){
         actions.textContent = "";
-        var m = e && e.code === "PGRST202" ? "Lance d'abord migration-stats-remise.sql" : ((e && e.message) || "Effacement impossible");
+        var m = (e && e.message) || "Effacement impossible";
         actions.appendChild(el("span", { class: "remise-msg", text: m }));
         setTimeout(repos, 5000);
       });
