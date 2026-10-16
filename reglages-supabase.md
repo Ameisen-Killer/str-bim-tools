@@ -178,7 +178,7 @@ de rapport pourra venir plus tard, une fois quelques semaines d'envois passées 
 
 ## 9. Nom réseau des visites (page /stats/)
 
-Après `migration-reseau-visites.sql` (ou une base installée depuis le 16.10.2026) :
+Base installée ou mise à jour depuis le 16.10.2026 :
 Edge Functions > Deploy a new function > **Via Editor**, nom **`reseau`**, coller le contenu de
 `supabase/functions/reseau/index.ts`, Deploy. Puis, dans la fonction > Details (ou Settings) :
 **Enforce JWT Verification** désactivé, Save. Rien d'autre à régler : l'adresse et la clé de
