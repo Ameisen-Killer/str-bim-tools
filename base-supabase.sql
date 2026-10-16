@@ -2205,7 +2205,11 @@ end $$;
 -- personne, ni suivre quelqu'un d'un jour à l'autre.
 -- « duree » : secondes passées la page visible à l'écran (point d'étape toutes
 -- les 30 s, et au départ). « present_le » : dernier point d'étape d'une page
--- encore visible (qui est sur le site en ce moment). Gardé 25 mois.
+-- encore visible (qui est sur le site en ce moment). « reseau » : nom DNS
+-- inverse de l'adresse IP (souvent le fournisseur d'accès ou le réseau d'une
+-- entreprise), écrit par la fonction Supabase « reseau » (supabase/functions/) ;
+-- '' quand l'adresse n'a pas de nom, l'adresse elle-même n'est pas gardée.
+-- Gardé 25 mois.
 -- Aucune règle RLS : seules les fonctions ci-dessous y touchent.
 create table if not exists public.visites (
   id         uuid primary key default gen_random_uuid(),
@@ -2219,13 +2223,14 @@ create table if not exists public.visites (
   pays       text constraint visites_pays_forme check (pays is null or pays ~ '^[A-Z]{2}$'),
   visiteur   text,
   duree      integer not null default 0 constraint visites_duree_bornes check (duree between 0 and 7200),
-  present_le timestamptz
+  present_le timestamptz,
+  reseau     text constraint visites_reseau_forme check (reseau is null or reseau ~ '^[a-z0-9._-]{0,253}$')
 );
 create index if not exists visites_le on public.visites (le desc);
 alter table public.visites enable row level security;
 
 comment on table public.visites is
-  'Audience du site vitrine : une page vue par ligne, sans donnée personnelle (empreinte du jour hachée, ni IP ni navigateur gardés). Écrite par note_visite / fin_visite, lue par stats_site (super admin). Aucune règle RLS.';
+  'Audience du site vitrine : une page vue par ligne, empreinte du jour hachée, nom DNS inverse de l''adresse IP (reseau), ni IP ni navigateur gardés. Écrite par note_visite / fin_visite et la fonction Supabase reseau, lue par stats_site (super admin). Aucune règle RLS.';
 
 -- Le sel du jour : renouvelé chaque jour, l'ancien effacé.
 create table if not exists public.visites_sel (
@@ -2320,7 +2325,7 @@ begin
       select jsonb_agg(jsonb_build_object(
                'le', v.le, 'page', v.page, 'precedent', v.precedent, 'referent', v.referent,
                'appareil', v.appareil, 'langue', v.langue, 'pays', v.pays,
-               'visiteur', left(v.visiteur, 12), 'duree', v.duree,
+               'visiteur', left(v.visiteur, 12), 'duree', v.duree, 'reseau', v.reseau,
                'present', v.present_le is not null and v.present_le > now() - interval '75 seconds')
              order by v.le desc)
         from public.visites v

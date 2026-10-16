@@ -4,6 +4,8 @@
 //   l'écran (un onglet laissé derrière ne compte pas), toutes les 30 s et au départ.
 // - Ni cookie ni stockage chez le visiteur ; la base ne garde ni l'adresse IP
 //   ni le navigateur (empreinte hachée valable une journée, voir base-supabase.sql).
+// - Nom réseau (16.10.2026) : une fois la page vue notée, la fonction Supabase
+//   « reseau » inscrit le nom DNS inverse de l'adresse IP (supabase/functions/).
 // - Rien n'est compté sur un appareil où « Ne pas compter mes visites » a été
 //   coché dans /stats/ (localStorage « stats.ignore »), ni pour un robot.
 // - L'adresse et la clé publiable sont celles de /planif/assets/config.js : les
@@ -54,7 +56,13 @@
     p_page: page, p_referent: referent, p_precedent: precedent,
     p_langue: (navigator.language || "").slice(0, 2) || null
   }).then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(v){ id = typeof v === "string" ? v : null; })
+    .then(function(v){
+      id = typeof v === "string" ? v : null;
+      if (id) fetch(URL_BASE + "/functions/v1/reseau", {
+        method: "POST", headers: { apikey: CLE, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: id })
+      }).catch(function(){});
+    })
     .catch(function(){});
 
   document.addEventListener("visibilitychange", function(){

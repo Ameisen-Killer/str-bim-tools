@@ -187,10 +187,12 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
 
 /* Dernières visites */
 .journal{margin-top:clamp(40px,6vh,64px)}
-.vis{display:grid;grid-template-columns:120px minmax(0,1.2fr) minmax(0,1.4fr) 110px 90px;gap:16px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(236,232,224,.07)}
+.vis{display:grid;grid-template-columns:120px minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.4fr) 100px 90px;gap:16px;align-items:baseline;padding:13px 0;border-bottom:1px solid rgba(236,232,224,.07)}
 .vis .h{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--texte-faible);font-variant-numeric:tabular-nums}
 .vis .p{font-size:16px}
 .vis .s{color:var(--texte-doux);font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vis .r{font-family:var(--mono);font-size:12px;color:var(--texte-doux);overflow-wrap:anywhere}
+.vis .r.vide{color:var(--texte-faible)}
 .vis .a{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
 .vis .t{text-align:right;font-variant-numeric:tabular-nums}
 .vis.live .t{color:var(--or)}
@@ -238,6 +240,7 @@ h2{margin:18px 0 0;font-weight:200;font-size:clamp(32px,4.6vw,58px);line-height:
   .trois{grid-template-columns:1fr;gap:48px}
   .vis{grid-template-columns:100px minmax(0,1fr) 80px;row-gap:4px}
   .vis .s{grid-column:2;grid-row:2}
+  .vis .r{grid-column:2 / span 2;grid-row:3}
   .vis .a{display:none}
   .vis .t{grid-row:1;grid-column:3}
 }
@@ -409,7 +412,8 @@ footer a:hover{color:var(--or)}
       ecart = Date.now() - Date.parse(r.maintenant); if (isNaN(ecart)) ecart = 0;
       donnees = (r.visites || []).map(function(v){
         return { le: Date.parse(v.le), page: v.page, precedent: v.precedent, referent: v.referent, appareil: v.appareil,
-                 langue: v.langue, pays: v.pays, visiteur: v.visiteur, duree: +v.duree || 0, present: !!v.present };
+                 langue: v.langue, pays: v.pays, visiteur: v.visiteur, duree: +v.duree || 0, present: !!v.present,
+                 reseau: v.reseau == null ? null : String(v.reseau) };
       });
       dessine(silencieux);
     }).catch(function(e){
@@ -719,6 +723,8 @@ footer a:hover{color:var(--or)}
         el("span", { class: "h", text: quand(v.le) }),
         el("span", { class: "p", text: nomPage(v.page) }),
         el("span", { class: "s", text: s ? s : "depuis " + nomPage(v.precedent) }),
+        el("span", { class: "r" + (v.reseau ? "" : " vide"), title: v.reseau ? "Nom réseau (DNS inverse de l'adresse IP)" : null,
+                     text: v.reseau ? v.reseau : v.reseau === "" ? "sans nom réseau" : "—" }),
         el("span", { class: "a", text: nomsApp[v.appareil] || v.appareil }),
         el("span", { class: "t", text: v.present ? "en cours" : v.duree ? duree(v.duree) : "—" })
       ]);
@@ -726,6 +732,7 @@ footer a:hover{color:var(--or)}
     return el("section", {}, [el("div", { class: "wrap", "data-vu": "" }, [
       el("div", { class: "num rv", text: "05 — Dernières visites" }),
       el("h2", { class: "rv", style: "--d:.1s", text: "Page par page, les plus récentes d'abord." }),
+      el("p", { class: "intro rv", style: "--d:.15s", text: "Date et heure, page, provenance, nom réseau de la connexion (le nom DNS de son adresse IP, souvent celui du fournisseur d'accès ou du réseau d'une entreprise, jamais celui de l'ordinateur), appareil et temps passé." }),
       el("div", { class: "journal rv", style: "--d:.2s" }, lignes),
       tri.length > limite ? el("button", { type: "button", class: "plus", onclick: function(){ limite += 60; dessine(true); } }, ["Voir plus"]) : null
     ])]);
@@ -790,6 +797,6 @@ footer a:hover{color:var(--or)}
   }
 })();
 </script>
-<script src="/assets/menu.js?v=22"></script>
+<script src="/assets/menu.js?v=23"></script>
 </body>
 </html>

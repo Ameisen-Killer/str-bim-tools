@@ -175,3 +175,14 @@ s'il a été accepté par le serveur du destinataire (`Delivered`). Ensuite seul
 (messagerie IONOS), DKIM IONOS `s1-ionos` / `s2-ionos`, DKIM Resend `resend._domainkey`,
 sous-domaine d'envoi `send` (MX + SPF Amazon SES), DMARC `p=none`. Un `p=quarantine` avec adresse
 de rapport pourra venir plus tard, une fois quelques semaines d'envois passées sans incident.
+
+## 9. Nom réseau des visites (page /stats/)
+
+Après `migration-reseau-visites.sql` (ou une base installée depuis le 16.10.2026) :
+Edge Functions > Deploy a new function > **Via Editor**, nom **`reseau`**, coller le contenu de
+`supabase/functions/reseau/index.ts`, Deploy. Puis, dans la fonction > Details (ou Settings) :
+**Enforce JWT Verification** désactivé, Save. Rien d'autre à régler : l'adresse et la clé de
+service sont fournies d'office à la fonction.
+
+Une visite faite ensuite affiche son nom réseau dans « 05 — Dernières visites » de /stats/
+(« sans nom réseau » quand l'adresse n'en a pas, « — » pour les visites d'avant).
