@@ -72,7 +72,10 @@ main{position:relative;z-index:2}
 .rail button.on i{background:var(--or);transform:rotate(45deg) scale(1.4)}
 .rail button:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 
-.pied{position:absolute;left:0;right:0;bottom:0;z-index:3;justify-content:center}
+.pied{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;justify-content:center;gap:16px;
+  padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
+.dernier .cartel{padding-bottom:max(140px,calc(env(safe-area-inset-bottom) + 120px))}
 @media (max-width:560px){
   .cartel{padding-right:52px}
 }
