@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen · STR Bim Tools</title>
+<meta name="description" content="Six tableaux animés : particules, portiques à l'infini, tour hyperboloïde, lignes de force, ville et haubans.">
+<!-- Page cachée (18.10.2026) : hors menu, hors sitemap, noindex -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M16 4v24M4 16h24M7.5 7.5l17 17M24.5 7.5l-17 17' stroke='%23D6A85C' stroke-width='1.2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ECE8E0'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<style>
+:root{
+  --noir:#050505;
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(236,232,224,.6);
+  --texte-faible:rgba(236,232,224,.34);
+  --ligne:rgba(236,232,224,.12);
+  --g:clamp(18px,4vw,56px);
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--noir)}
+body{
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.5;
+}
+a{color:inherit}
+
+#toile{position:fixed;left:0;top:0;width:100%;height:100vh;display:block;z-index:0}
+.voile{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 75% 70% at 50% 48%,rgba(5,5,5,0) 55%,rgba(5,5,5,.72) 100%)}
+main{position:relative;z-index:2}
+
+.chap{position:relative;height:240vh;touch-action:pan-y pinch-zoom}
+.chap.premier{height:200vh}
+.cartel{
+  position:sticky;top:0;height:100vh;height:100svh;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:0 var(--g) max(46px,calc(env(safe-area-inset-bottom) + 32px));
+  pointer-events:none;text-shadow:0 0 22px #050505,0 0 6px #050505;
+}
+.num{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.cartel h2{
+  margin:14px 0 0;font-weight:200;font-size:clamp(36px,7.6vw,108px);line-height:.95;
+  letter-spacing:.32em;opacity:0;transition:letter-spacing 2.2s cubic-bezier(.16,.8,.2,1) .15s,opacity 1.6s ease .15s;
+}
+.cartel p{margin:16px 0 0;max-width:28em;font-size:clamp(15px,1.5vw,18px);color:var(--texte-doux)}
+.rv{opacity:0;transform:translateY(18px);transition:opacity 1.3s ease var(--d,0s),transform 1.3s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
+.vu .rv{opacity:1;transform:none}
+.vu .cartel h2{opacity:1;letter-spacing:.01em}
+
+.indice{
+  position:absolute;left:50%;bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px));transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--texte-faible);
+  opacity:0;transition:opacity 1.6s ease 5s;
+}
+.vu .indice{opacity:1}
+.indice i{display:block;width:1px;height:46px;background:linear-gradient(var(--or),rgba(214,168,92,0));transform-origin:top;animation:coule 2.2s cubic-bezier(.6,0,.3,1) infinite}
+@keyframes coule{0%{transform:scaleY(0)}55%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+.premier .num{margin-bottom:0}
+
+.rail{position:fixed;right:max(12px,env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;gap:6px}
+.rail button{width:24px;height:24px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center}
+.rail button i{display:block;width:7px;height:7px;border:1px solid rgba(214,168,92,.55);transform:rotate(45deg);transition:background .5s,transform .5s}
+.rail button.on i{background:var(--or);transform:rotate(45deg) scale(1.4)}
+.rail button:focus-visible{outline:1px solid var(--or);outline-offset:2px}
+
+.pied{position:absolute;left:0;right:0;bottom:0;z-index:3;justify-content:center}
+@media (max-width:560px){
+  .cartel{padding-right:52px}
+}
+</style>
+<link rel="stylesheet" href="/assets/menu.css?v=5">
+</head>
+<body>
+
+<canvas id="toile" aria-hidden="true"></canvas>
+<div class="voile" aria-hidden="true"></div>
+
+<nav class="rail" aria-label="Tableaux">
+  <button type="button" aria-label="Genèse"><i></i></button>
+  <button type="button" aria-label="Hyperstructure"><i></i></button>
+  <button type="button" aria-label="Hyperboloïde"><i></i></button>
+  <button type="button" aria-label="Isostatiques"><i></i></button>
+  <button type="button" aria-label="Métropole"><i></i></button>
+  <button type="button" aria-label="Haubans"><i></i></button>
+</nav>
+
+<main>
+  <section class="chap premier" aria-label="Genèse : des milliers de particules forment le nom STR Bim Tools">
+    <div class="cartel">
+      <div class="num rv" style="--d:.4s">00 — Genèse</div>
+      <div class="indice">Faire défiler<i></i></div>
+    </div>
+  </section>
+
+  <section class="chap" aria-label="Hyperstructure">
+    <div class="cartel">
+      <div class="num rv">01 — Vitesse</div>
+      <h2>Hyperstructure</h2>
+      <p class="rv" style="--d:.5s">Des portiques à l'infini, avalés à pleine vitesse. Plus on descend, plus ça accélère.</p>
+    </div>
+  </section>
+
+  <section class="chap" aria-label="Hyperboloïde">
+    <div class="cartel">
+      <div class="num rv">02 — Torsion</div>
+      <h2>Hyperboloïde</h2>
+      <p class="rv" style="--d:.5s">Des barres toutes droites qui dessinent une courbe. Glisser de côté pour faire tourner la tour.</p>
+    </div>
+  </section>
+
+  <section class="chap" aria-label="Isostatiques">
+    <div class="cartel">
+      <div class="num rv">03 — Contraintes</div>
+      <h2>Isostatiques</h2>
+      <p class="rv" style="--d:.5s">Les lignes de force contournent les vides. Le doigt en est un aussi.</p>
+    </div>
+  </section>
+
+  <section class="chap" aria-label="Métropole">
+    <div class="cartel">
+      <div class="num rv">04 — Densité</div>
+      <h2>Métropole</h2>
+      <p class="rv" style="--d:.5s">Une ville entière qui respire, balayée par un anneau de lumière.</p>
+    </div>
+  </section>
+
+  <section class="chap dernier" aria-label="Haubans">
+    <div class="cartel">
+      <div class="num rv">05 — Résonance</div>
+      <h2>Haubans</h2>
+      <p class="rv" style="--d:.5s">Les câbles vibrent comme des cordes. Les effleurer pour les faire chanter.</p>
+    </div>
+    <footer class="pied">
+      <div class="pied-droite">
+        <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
+        <a href="/mentions-legales/">Mentions légales</a>
+        <span class="pied-maj">Dernière mise à jour : <span data-maj>18.10.2026</span></span>
+      </div>
+    </footer>
+  </section>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById("toile"), ctx = cv.getContext("2d");
+  var W = 0, H = 0, DPR = 1, PW = 1, PH = 1;
+  var TAU = Math.PI * 2;
+  var CR = "236,232,224", OR = "214,168,92", VE = "170,192,214";
+
+  function clamp(x, a, b){ return x < a ? a : x > b ? b : x }
+  function c01(x){ return x < 0 ? 0 : x > 1 ? 1 : x }
+  function ease(p){ p = c01(p); return p < .5 ? 4*p*p*p : 1 - Math.pow(-2*p + 2, 3) / 2 }
+  function smooth(a, b, x){ x = c01((x - a) / (b - a)); return x*x*(3 - 2*x) }
+  function rnd(a, b){ return a + Math.random() * (b - a) }
+  function rgba(c, a){ return "rgba(" + c + "," + c01(a).toFixed(3) + ")" }
+
+  // ---------- Pointeur (souris ou doigt) ----------
+  var ptr = { x: -1e4, y: -1e4, on: false, down: false, up: -1e9, last: 0, acc: 0 };
+  function maintenant(){ return performance.now() }
+  window.addEventListener("pointermove", function(e){
+    if (ptr.down) ptr.acc += e.clientX - ptr.x;
+    ptr.x = e.clientX; ptr.y = e.clientY; ptr.on = true; ptr.last = maintenant();
+  }, { passive: true });
+  window.addEventListener("pointerdown", function(e){
+    ptr.x = e.clientX; ptr.y = e.clientY; ptr.on = true; ptr.down = true; ptr.last = maintenant();
+  }, { passive: true });
+  function lache(e){
+    ptr.down = false;
+    if (e.pointerType !== "mouse"){ ptr.on = false; ptr.up = maintenant(); }
+  }
+  window.addEventListener("pointerup", lache, { passive: true });
+  window.addEventListener("pointercancel", lache, { passive: true });
+  document.documentElement.addEventListener("mouseleave", function(){ ptr.on = false; ptr.up = maintenant(); });
+  // Force du pointeur : 1 tant qu'il est là, puis s'éteint en 1,8 s (utile au doigt : une touche laisse une trace)
+  function ptrForce(){
+    if (ptr.on) return 1;
+    var a = (maintenant() - ptr.up) / 1800;
+    return a < 1 ? 1 - a : 0;
+  }
+
+  // ---------- Caméra perspective ----------
+  var CAM = { ex:0, ey:0, ez:0, fx:0, fy:0, fz:1, rx:1, rz:0, ux:0, uy:1, uz:0, f:1, cx:0, cy:0 };
+  var PX = 0, PY = 0, PZ = 0;
+  function regarde(ex, ey, ez, tx, ty, tz, f, cx, cy){
+    var fx = tx - ex, fy = ty - ey, fz = tz - ez, l = Math.sqrt(fx*fx + fy*fy + fz*fz) || 1;
+    fx /= l; fy /= l; fz /= l;
+    var rx = fz, rz = -fx, lr = Math.sqrt(rx*rx + rz*rz) || 1; rx /= lr; rz /= lr;   // droite = haut × regard
+    CAM.ex = ex; CAM.ey = ey; CAM.ez = ez; CAM.fx = fx; CAM.fy = fy; CAM.fz = fz;
+    CAM.rx = rx; CAM.rz = rz;
+    CAM.ux = fy*rz; CAM.uy = fz*rx - fx*rz; CAM.uz = -fy*rx;                          // haut = regard × droite
+    CAM.f = f; CAM.cx = cx; CAM.cy = cy;
+  }
+  function proj(x, y, z){
+    var dx = x - CAM.ex, dy = y - CAM.ey, dz = z - CAM.ez;
+    var zz = dx*CAM.fx + dy*CAM.fy + dz*CAM.fz;
+    PZ = zz;
+    if (zz < .05) return false;
+    PX = CAM.cx + CAM.f * (dx*CAM.rx + dz*CAM.rz) / zz;
+    PY = CAM.cy - CAM.f * (dx*CAM.ux + dy*CAM.uy + dz*CAM.uz) / zz;
+    return true;
+  }
+
+  // Calque par tableau : chaque scène dessine dans le sien, la toile principale les fond enchaînés
+  function Calque(){ this.c = document.createElement("canvas"); this.x = this.c.getContext("2d"); }
+  Calque.prototype.taille = function(){ this.c.width = PW; this.c.height = PH; };
+
+  // =====================================================================
+  // 00 — Genèse : big bang, galaxie, puis le nom écrit en particules
+  // =====================================================================
+  function echantillon(lignes, ox, oy, cx, cy, maxW, maxH){
+    var w = Math.max(1, Math.ceil(W)), h = Math.max(1, Math.ceil(H));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"), fam = '"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif', i;
+    g.font = "300 100px " + fam;
+    if ("letterSpacing" in g) g.letterSpacing = "10px";
+    var mw = 1;
+    for (i = 0; i < lignes.length; i++) mw = Math.max(mw, g.measureText(lignes[i]).width);
+    var fs = Math.min(100 * maxW / mw, maxH / lignes.length / 1.05);
+    g.font = "300 " + fs.toFixed(1) + "px " + fam;
+    if ("letterSpacing" in g) g.letterSpacing = (fs * .1).toFixed(1) + "px";
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
+    for (i = 0; i < lignes.length; i++) g.fillText(lignes[i], cx + fs * .05, cy + (i - (lignes.length - 1) / 2) * fs * 1.05);
+    var d = g.getImageData(0, 0, w, h).data, pts = [], st = fs > 110 ? 3 : 2, x, y;
+    for (y = 0; y < h; y += st) for (x = 0; x < w; x += st) if (d[(y*w + x)*4 + 3] > 128) pts.push(x, y);
+    var m = pts.length / 2, n = ox.length;
+    for (i = 0; i < n; i++){
+      if (!m){ ox[i] = cx; oy[i] = cy; continue; }
+      var j = Math.floor(Math.random() * m);
+      ox[i] = pts[2*j] + Math.random() * st; oy[i] = pts[2*j + 1] + Math.random() * st;
+    }
+  }
+
+  var genese = { trail: false, n: 0 };
+  genese.init = function(){ this.resize(); };
+  genese.resize = function(){
+    var n = Math.round(clamp(W * H / 230, 1400, 4200)), i;
+    if (n !== this.n){
+      this.n = n;
+      this.x = new Float32Array(n); this.y = new Float32Array(n);
+      this.vx = new Float32Array(n); this.vy = new Float32Array(n);
+      this.tx = new Float32Array(n); this.ty = new Float32Array(n);
+      this.gr = new Float32Array(n); this.ga = new Float32Array(n); this.sd = new Float32Array(n);
+      this.or = new Uint8Array(n);
+      for (i = 0; i < n; i++){
+        this.gr[i] = Math.pow(Math.random(), .7);
+        this.ga[i] = Math.floor(Math.random() * 3) * TAU / 3 + (Math.random() - .5) * .8;
+        this.sd[i] = Math.random();
+        this.or[i] = Math.random() < .17 ? 1 : 0;
+      }
+      this.boum();
+    }
+    var lignes = W < 720 ? ["STR BIM", "TOOLS"] : ["STR BIM TOOLS"];
+    echantillon(lignes, this.tx, this.ty, W / 2, H * .42, W * .86, H * (lignes.length > 1 ? .34 : .22));
+  };
+  genese.boum = function(){
+    for (var i = 0; i < this.n; i++){
+      var a = Math.random() * TAU, s = rnd(200, 1700) * Math.sqrt(Math.random());
+      this.x[i] = W / 2 + rnd(-2, 2); this.y[i] = H * .44 + rnd(-2, 2);
+      this.vx[i] = Math.cos(a) * s; this.vy[i] = Math.sin(a) * s * .7;
+    }
+  };
+  genese.entre = function(){ this.boum(); this.vague = null; this.prochaine = 6.5; };
+  genese.draw = function(g, dt, p, t){
+    var n = this.n, X = this.x, Y = this.y, VX = this.vx, VY = this.vy, i;
+    var cx = W / 2, cy = H * .44, Rx = Math.min(W * .47, H * .95), Ry = Math.min(H * .3, Rx * .5);
+    var sortie = smooth(.1, .65, p);
+    var ps = ptrForce(), pr = Math.max(70, Math.min(W, H) * .14), pr2 = pr * pr;
+
+    // Onde de choc qui traverse le nom de temps en temps
+    if (t > this.prochaine && sortie < .5){
+      this.vague = { x: cx + (Math.random() - .5) * W * .5, y: cy + (Math.random() - .5) * H * .12, t0: t };
+      this.prochaine = t + 5 + Math.random() * 2.5;
+    }
+    var vg = this.vague, vr = -1, vie = 0;
+    if (vg){
+      var age = t - vg.t0; vr = age * Math.max(W, H) * .7; vie = 1 - age / 1.7;
+      if (vie <= 0){ this.vague = vg = null; vr = -1; }
+    }
+
+    var pc = new Path2D(), po = new Path2D(), k = .022, mm = 0;
+    for (i = 0; i < n; i++){
+      var sd = this.sd[i], gri = this.gr[i];
+      var m = smooth(2.1 + sd * 1.3, 3.5 + sd * 1.3, t) * (1 - sortie);
+      var r = .04 + gri, a = this.ga[i] + gri * 4.4 + t * .32 / (.2 + gri), ex = 1 + sortie * .7;
+      var gx = cx + Math.cos(a) * r * Rx * ex, gy = cy + Math.sin(a) * r * Ry * ex;
+      var tx = this.tx[i] + Math.sin(t * 1.7 + sd * 40) * 1.1, ty = this.ty[i] + Math.cos(t * 1.3 + sd * 33) * 1.1;
+      tx = gx + (tx - gx) * m; ty = gy + (ty - gy) * m;
+      var K = 8 + 10 * m, D = 3 + 2.4 * m;
+      var x = X[i], y = Y[i];
+      var vx = VX[i] + (tx - x) * K * dt, vy = VY[i] + (ty - y) * K * dt;
+      var am = Math.exp(-D * dt); vx *= am; vy *= am;
+      var chaud = false;
+      if (ps > 0){
+        var dx = x - ptr.x, dy = y - ptr.y, d2 = dx*dx + dy*dy;
+        if (d2 < pr2 && d2 > 1){
+          var d = Math.sqrt(d2), f = 1 - d / pr; f = f * f * 5200 * ps * dt / d;
+          vx += dx * f; vy += dy * f; chaud = d < pr * .55;
+        }
+      }
+      if (vr > 0){
+        var ddx = x - vg.x, ddy = y - vg.y, dd = Math.sqrt(ddx*ddx + ddy*ddy) + .001, e = Math.abs(dd - vr);
+        if (e < 44){ var fk = (1 - e / 44) * 1500 * vie * dt / dd; vx += ddx * fk; vy += ddy * fk; chaud = true; }
+      }
+      x += vx * dt; y += vy * dt;
+      X[i] = x; Y[i] = y; VX[i] = vx; VY[i] = vy;
+      var lx = vx * k, ly = vy * k;
+      if (lx*lx + ly*ly < 1){ lx = .8; ly = .3; }
+      var P = (this.or[i] || chaud) ? po : pc;
+      P.moveTo(x, y); P.lineTo(x - lx, y - ly);
+      mm += m;
+    }
+    mm /= n;
+
+    g.globalCompositeOperation = "lighter";
+    var hr = Math.max(W, H) * .55, gr = g.createRadialGradient(cx, cy, 0, cx, cy, hr);
+    gr.addColorStop(0, rgba(OR, .11 + .07 * (1 - mm)));
+    gr.addColorStop(.35, rgba(OR, .035));
+    gr.addColorStop(1, rgba(OR, 0));
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.lineCap = "round"; g.lineWidth = 1.3;
+    g.strokeStyle = rgba(CR, .78); g.stroke(pc);
+    g.strokeStyle = rgba(OR, .95); g.stroke(po);
+  };
+
+  // =====================================================================
+  // 01 — Hyperstructure : tunnel de portiques en treillis, à pleine vitesse
+  // =====================================================================
+  var O = { x: 0, y: 0 };
+  function chemin(z){ O.x = Math.sin(z*.045)*2.4 + Math.sin(z*.013)*3.2; O.y = Math.cos(z*.031)*1.3 + Math.sin(z*.019)*.6; }
+
+  var tunnel = { trail: false };
+  tunnel.init = function(){
+    this.Z = 0; this.v = 55;
+    this.N = W < 700 ? 44 : 56;
+    this.P = new Float32Array(this.N * 8); this.ok = new Uint8Array(this.N); this.A = new Float32Array(this.N);
+    this.st = [];
+    var n = W * H > 6e5 ? 240 : 150;
+    for (var i = 0; i < n; i++) this.st.push({ a: Math.random()*TAU, r: rnd(2.4, 9), z: Math.random()*60, o: Math.random() < .22 });
+  };
+  tunnel.entre = function(){ this.v = 55; };
+  tunnel.draw = function(g, dt, p, t){
+    var vc = 8 + p * 24;
+    this.v += (vc - this.v) * Math.min(1, dt * 1.1);
+    this.Z += this.v * dt;
+    var Z = this.Z, ps = ptrForce();
+    var nx = ps * (ptr.x / W - .5), ny = ps * (ptr.y / H - .5);
+    if (!isFinite(nx) || Math.abs(nx) > 1) nx = 0;
+    if (!isFinite(ny) || Math.abs(ny) > 1) ny = 0;
+    chemin(Z); var ex = O.x + nx * 1.4, ey = O.y - ny;
+    chemin(Z + 6);
+    regarde(ex, ey, Z, O.x, O.y, Z + 6, Math.max(W, H) * .55, W / 2, H / 2);
+
+    var dz = 1.15, N = this.N, j0 = Math.ceil((Z + .25) / dz), zmax = N * dz, i, c;
+    var P = this.P, ok = this.ok, A = this.A;
+    var roll0 = Math.sin(t * .33) * .7, hx = 1.55, hy = 1.15;
+    for (i = 0; i < N; i++){
+      var j = j0 + i, zj = j * dz; chemin(zj);
+      var r = j * .07 + roll0, co = Math.cos(r), si = Math.sin(r), bon = 1;
+      for (c = 0; c < 4; c++){
+        var lx = (c === 1 || c === 2) ? hx : -hx, ly = c >= 2 ? hy : -hy;
+        if (!proj(O.x + lx*co - ly*si, O.y + lx*si + ly*co, zj)){ bon = 0; break; }
+        P[i*8 + c*2] = PX; P[i*8 + c*2 + 1] = PY;
+      }
+      ok[i] = bon;
+      var rel = zj - Z;
+      A[i] = Math.pow(c01(1 - rel / zmax), 1.7) * c01((rel - .25) / 1.2);
+    }
+
+    g.globalCompositeOperation = "lighter"; g.lineJoin = "round"; g.lineCap = "round";
+    // lueur au point de fuite
+    chemin(Z + 70);
+    if (proj(O.x, O.y, Z + 70)){
+      var rg = Math.max(W, H) * .35, gr = g.createRadialGradient(PX, PY, 0, PX, PY, rg);
+      gr.addColorStop(0, rgba(OR, .22)); gr.addColorStop(.25, rgba(OR, .05)); gr.addColorStop(1, rgba(OR, 0));
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    }
+    for (i = N - 2; i >= 0; i--){
+      if (!ok[i] || !ok[i + 1]) continue;
+      var a = A[i], jj = j0 + i, b = i * 8, q = b + 8, lw = .6 + 2.2 * a * a * a;
+      if (a <= .004) continue;
+      g.beginPath();
+      for (c = 0; c < 4; c++){ g.moveTo(P[b + c*2], P[b + c*2 + 1]); g.lineTo(P[q + c*2], P[q + c*2 + 1]); }
+      for (c = 0; c < 4; c++){
+        var c2 = (c + 1) % 4;
+        if ((jj + c) % 2){ g.moveTo(P[b + c*2], P[b + c*2 + 1]); g.lineTo(P[q + c2*2], P[q + c2*2 + 1]); }
+        else { g.moveTo(P[b + c2*2], P[b + c2*2 + 1]); g.lineTo(P[q + c*2], P[q + c*2 + 1]); }
+      }
+      g.strokeStyle = rgba(CR, a * .4); g.lineWidth = lw * .7; g.stroke();
+      g.beginPath(); g.moveTo(P[b], P[b + 1]);
+      for (c = 1; c < 4; c++) g.lineTo(P[b + c*2], P[b + c*2 + 1]);
+      g.closePath();
+      if (jj % 9 === 0){
+        g.strokeStyle = rgba(OR, a * .18); g.lineWidth = lw * 7; g.stroke();
+        g.strokeStyle = rgba(OR, a * .95); g.lineWidth = lw * 1.6; g.stroke();
+      } else {
+        g.strokeStyle = rgba(CR, a * .75); g.lineWidth = lw; g.stroke();
+      }
+    }
+    // traînées de lumière
+    var len = Math.min(4, this.v * .05), pc = new Path2D(), po = new Path2D();
+    for (i = 0; i < this.st.length; i++){
+      var s = this.st[i];
+      if (s.z < Z + .6){ s.z = Z + 30 + Math.random() * 35; s.a = Math.random() * TAU; s.r = rnd(2.4, 9); }
+      var ca = Math.cos(s.a) * s.r, sa = Math.sin(s.a) * s.r;
+      chemin(s.z);
+      if (!proj(O.x + ca, O.y + sa, s.z)) continue;
+      var x1 = PX, y1 = PY, z2 = Math.max(Z + .5, s.z - len);
+      chemin(z2);
+      if (!proj(O.x + ca, O.y + sa, z2)) continue;
+      var Pp = s.o ? po : pc; Pp.moveTo(x1, y1); Pp.lineTo(PX, PY);
+    }
+    g.lineWidth = 1;
+    g.strokeStyle = rgba(CR, .5); g.stroke(pc);
+    g.strokeStyle = rgba(OR, .75); g.stroke(po);
+  };
+
+  // =====================================================================
+  // 02 — Hyperboloïde : tour en barres droites, cinq tronçons qui se tordent
+  // =====================================================================
+  var TRONCONS = [[0, 1.5, 1.3, .98], [1.5, 2.75, .98, .74], [2.75, 3.75, .74, .57], [3.75, 4.55, .57, .45], [4.55, 5.15, .45, .37]];
+  var tour = { trail: false };
+  tour.init = function(){
+    this.M = W < 700 ? 24 : 32; this.th = 0; this.acc = ptr.acc; this.tw = new Float32Array(TRONCONS.length);
+    this.sp = [];
+    for (var i = 0; i < 80; i++){ var s = {}; this.relance(s); s.k = Math.floor(Math.random() * TRONCONS.length); this.sp.push(s); }
+  };
+  tour.relance = function(s){ s.k = 0; s.i = Math.floor(Math.random() * this.M); s.fam = Math.random() < .5 ? 1 : -1; s.s = 0; s.v = rnd(.35, .9); };
+  tour.entre = function(){ this.acc = ptr.acc; };
+  // extrémités d'une barre : renvoie dans BA (bas) et BB (haut)
+  var BA = [0, 0, 0], BB = [0, 0, 0];
+  tour.barre = function(k, i, fam){
+    var T = TRONCONS[k], a0 = i * TAU / this.M + k * .21, a1 = a0 + fam * this.tw[k];
+    BA[0] = T[2] * Math.cos(a0); BA[1] = T[0]; BA[2] = T[2] * Math.sin(a0);
+    BB[0] = T[3] * Math.cos(a1); BB[1] = T[1]; BB[2] = T[3] * Math.sin(a1);
+  };
+  tour.draw = function(g, dt, p, t){
+    var M = this.M, k, i, f2, pass;
+    this.th += .2 * dt + (ptr.acc - this.acc) * .006; this.acc = ptr.acc;
+    var R = 8, ey = 1 + Math.sin(t * .17) * .5;
+    var f = Math.min(H * .72 * R / 5.4, W * .8 * R / 2.8);
+    regarde(Math.sin(this.th) * R, ey, -Math.cos(this.th) * R, 0, 2.5, 0, f, W / 2, H * .47);
+    var entree = ease(t / 2.4);
+    for (k = 0; k < TRONCONS.length; k++) this.tw[k] = (.55 + .8 * p) * (.8 + .25 * Math.sin(t * .7 + k * 1.1)) * entree;
+
+    g.globalCompositeOperation = "lighter"; g.lineCap = "round";
+    // halo doré au sol
+    if (proj(0, 0, 0)){
+      var hx = f * 3.2 / PZ;
+      g.save(); g.translate(PX, PY); g.scale(1, .22);
+      var gr = g.createRadialGradient(0, 0, 0, 0, 0, hx);
+      gr.addColorStop(0, rgba(OR, .32)); gr.addColorStop(.4, rgba(OR, .08)); gr.addColorStop(1, rgba(OR, 0));
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, hx, 0, TAU); g.fill(); g.restore();
+    }
+    for (pass = 0; pass < 2; pass++){
+      var sg = pass === 0 ? -1 : 1, mul = pass === 0 ? .16 : 1;   // passe 0 : reflet au sol
+      var paq = [[new Path2D(), new Path2D(), new Path2D()], [new Path2D(), new Path2D(), new Path2D()]];
+      var anneaux = new Path2D();
+      for (k = 0; k < TRONCONS.length; k++){
+        var cr = ease((t - k * .4) / 1.2);
+        if (cr <= 0) continue;
+        var T = TRONCONS[k];
+        for (f2 = 0; f2 < 2; f2++){
+          var fam = f2 ? -1 : 1;
+          for (i = 0; i < M; i++){
+            this.barre(k, i, fam);
+            var bx = BA[0] + (BB[0] - BA[0]) * cr, by = BA[1] + (BB[1] - BA[1]) * cr, bz = BA[2] + (BB[2] - BA[2]) * cr;
+            if (!proj(BA[0], sg * BA[1], BA[2])) continue;
+            var x1 = PX, y1 = PY, z1 = PZ;
+            if (!proj(bx, sg * by, bz)) continue;
+            var zm = (z1 + PZ) / 2, nv = zm < R - .5 ? 0 : zm < R + .5 ? 1 : 2;
+            paq[f2][nv].moveTo(x1, y1); paq[f2][nv].lineTo(PX, PY);
+          }
+        }
+        // anneaux en or
+        var yy = [T[0], T[1]], rr = [T[2], T[3]];
+        for (var e = 0; e < 2; e++){
+          if (e === 1 && cr < 1) continue;
+          for (var s = 0; s <= 48; s++){
+            var an = s / 48 * TAU;
+            if (!proj(rr[e] * Math.cos(an), sg * yy[e], rr[e] * Math.sin(an))) continue;
+            if (s === 0) anneaux.moveTo(PX, PY); else anneaux.lineTo(PX, PY);
+          }
+        }
+      }
+      var nivA = [.85, .55, .28];
+      for (f2 = 0; f2 < 2; f2++) for (i = 0; i < 3; i++){
+        g.strokeStyle = rgba(f2 ? VE : CR, nivA[i] * mul * (f2 ? .9 : .8));
+        g.lineWidth = i === 0 ? 1.1 : .8;
+        g.stroke(paq[f2][i]);
+      }
+      g.lineWidth = 1.3; g.strokeStyle = rgba(OR, .75 * mul); g.stroke(anneaux);
+    }
+    // étincelles qui grimpent le long des barres
+    g.fillStyle = rgba(OR, .95);
+    var halo = new Path2D(), coeur = new Path2D();
+    for (i = 0; i < this.sp.length; i++){
+      var sp = this.sp[i], Tk = TRONCONS[sp.k];
+      sp.s += sp.v * dt / (Tk[1] - Tk[0]);
+      if (sp.s > 1){ sp.s = 0; sp.k++; if (sp.k >= TRONCONS.length) this.relance(sp); continue; }
+      if (ease((t - sp.k * .4) / 1.2) < 1) continue;
+      this.barre(sp.k, sp.i, sp.fam);
+      if (!proj(BA[0] + (BB[0] - BA[0]) * sp.s, BA[1] + (BB[1] - BA[1]) * sp.s, BA[2] + (BB[2] - BA[2]) * sp.s)) continue;
+      var rad = clamp(f * .03 / PZ, .8, 3);
+      coeur.moveTo(PX + rad, PY); coeur.arc(PX, PY, rad, 0, TAU);
+      halo.moveTo(PX + rad * 4, PY); halo.arc(PX, PY, rad * 4, 0, TAU);
+    }
+    g.fillStyle = rgba(OR, .12); g.fill(halo);
+    g.fillStyle = rgba(OR, .95); g.fill(coeur);
+    // fanal au sommet
+    if (proj(0, 5.2, 0)){
+      var pu = .5 + .5 * Math.sin(t * 2.4), rf = 4 + 10 * pu;
+      var gf = g.createRadialGradient(PX, PY, 0, PX, PY, rf * 3);
+      gf.addColorStop(0, rgba(OR, .9)); gf.addColorStop(.3, rgba(OR, .25)); gf.addColorStop(1, rgba(OR, 0));
+      g.fillStyle = gf; g.beginPath(); g.arc(PX, PY, rf * 3, 0, TAU); g.fill();
+    }
+  };
+
+  // =====================================================================
+  // 03 — Isostatiques : lignes de force autour des vides (écoulement potentiel)
+  // =====================================================================
+  var iso = { trail: true, n: 0 };
+  iso.init = function(){ this.resize(); };
+  iso.resize = function(){
+    var n = Math.round(clamp(W * H / 380, 800, 3600)), i;
+    var m = Math.min(W, H);
+    this.trous = [
+      { x: W * .3,  y: H * .4,  r: m * .11 },
+      { x: W * .7,  y: H * .58, r: m * .14 },
+      { x: W * .58, y: H * .2,  r: m * .065 },
+      { x: W * .22, y: H * .78, r: m * .07 }
+    ];
+    this.n = n;
+    this.x = new Float32Array(n); this.y = new Float32Array(n); this.vie = new Float32Array(n);
+    for (i = 0; i < n; i++) this.nait(i);
+  };
+  iso.dedans = function(x, y, pr, ps){
+    for (var k = 0; k < this.trous.length; k++){
+      var h = this.trous[k], dx = x - h.x, dy = y - h.y;
+      if (dx*dx + dy*dy < h.r * h.r * 1.03) return true;
+    }
+    if (ps > 0){ var qx = x - ptr.x, qy = y - ptr.y; if (qx*qx + qy*qy < pr*pr) return true; }
+    return false;
+  };
+  iso.nait = function(i){
+    var x, y, n = 0;
+    do { x = Math.random() * W; y = Math.random() * H; n++; } while (n < 8 && this.dedans(x, y, 0, 0));
+    this.x[i] = x; this.y[i] = y; this.vie[i] = rnd(1.2, 4.5);
+  };
+  iso.draw = function(g, dt, p, t){
+    var al = .5 * Math.sin(t * .07) + p * 1.4, ca = Math.cos(al), sa = Math.sin(al);
+    var ps = ptrForce(), pr = 62 * ps;
+    var tr = this.trous.slice();
+    if (ps > .02) tr.push({ x: ptr.x, y: ptr.y, r: pr });
+    var nt = tr.length, n = this.n, X = this.x, Y = this.y, V = this.vie, i, k;
+    var vit = Math.min(W, H) * .17;
+
+    g.globalCompositeOperation = "destination-out";
+    g.fillStyle = "rgba(0,0,0," + Math.max(.045, 1 - Math.exp(-dt * 2.6)).toFixed(3) + ")";
+    g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = "lighter";
+
+    var pa = new Path2D(), pb = new Path2D();
+    for (i = 0; i < n; i++){
+      V[i] -= dt;
+      if (V[i] < 0){ this.nait(i); continue; }
+      var x = X[i], y = Y[i];
+      // vitesse complexe dW/dz = U·e^(−iα) − Σ U·e^(iα)·R² / (z − zk)²
+      var re = ca, im = -sa;
+      for (k = 0; k < nt; k++){
+        var h = tr[k], dx = x - h.x, dy = y - h.y, a = dx*dx - dy*dy, b = 2*dx*dy, mm = a*a + b*b + 1e-6, r2 = h.r * h.r;
+        re -= r2 * (ca*a + sa*b) / mm;
+        im -= r2 * (sa*a - ca*b) / mm;
+      }
+      var u = re, v = -im;
+      if (i % 3 === 0){ var tmp = u; u = -v; v = tmp; }   // un tiers suit les équipotentielles (perpendiculaires)
+      var sp = Math.sqrt(u*u + v*v);
+      if (sp < 1e-3){ this.nait(i); continue; }
+      var s = vit * Math.min(1.8, .3 + sp) / sp * dt;
+      var nx = x + u * s, ny = y + v * s;
+      if (nx < -5 || ny < -5 || nx > W + 5 || ny > H + 5 || this.dedans(nx, ny, pr, ps)){ this.nait(i); continue; }
+      var P = i % 3 === 0 ? pb : pa;
+      P.moveTo(x, y); P.lineTo(nx, ny);
+      X[i] = nx; Y[i] = ny;
+    }
+    g.lineWidth = 1; g.lineCap = "round";
+    g.strokeStyle = rgba(CR, .32); g.stroke(pa);
+    g.strokeStyle = rgba(OR, .5); g.stroke(pb);
+
+    // les vides : on efface l'intérieur, on trace le bord en or
+    for (k = 0; k < nt; k++){
+      var hh = tr[k];
+      if (hh.r < 2) continue;
+      g.globalCompositeOperation = "destination-out";
+      g.fillStyle = "#000"; g.beginPath(); g.arc(hh.x, hh.y, hh.r - 1, 0, TAU); g.fill();
+      g.globalCompositeOperation = "lighter";
+      g.strokeStyle = rgba(OR, .35); g.lineWidth = 1.2;
+      g.beginPath(); g.arc(hh.x, hh.y, hh.r, 0, TAU); g.stroke();
+      g.strokeStyle = rgba(OR, .05); g.lineWidth = 1;
+      g.beginPath(); g.arc(hh.x, hh.y, hh.r * (1.25 + .08 * Math.sin(t * 1.6 + k)), 0, TAU); g.stroke();
+    }
+  };
+
+  // =====================================================================
+  // 04 — Métropole : ville qui respire, balayée par un anneau de lumière
+  // =====================================================================
+  var ville = { trail: false };
+  ville.init = function(){
+    var G = W < 700 ? 11 : 14, i, j;
+    this.G = G; this.b = []; this.ord = [];
+    for (i = 0; i < G; i++) for (j = 0; j < G; j++){
+      var x = i - (G - 1) / 2, z = j - (G - 1) / 2, d = Math.sqrt(x*x + z*z);
+      this.b.push({ x: x, z: z, d: d, s: .3 + Math.random() * .08,
+        hb: Math.pow(Math.random(), 2.4) * 2.4 + (d < 1.2 ? 2.6 : 0) + Math.max(0, 2 - d * .35) * Math.random(),
+        h: 0, k: 0 });
+      this.ord.push(this.ord.length);
+    }
+    var tri = this.b.map(function(b, n){ return n }).sort(function(a, c){ return this.b[c].hb - this.b[a].hb }.bind(this));
+    this.hauts = tri.slice(0, 3);
+    this.C = new Float32Array(16);
+  };
+  var FACES = [[1, 2, 6, 5], [0, 3, 7, 4], [2, 3, 7, 6], [0, 1, 5, 4], [4, 5, 6, 7]];
+  ville.draw = function(g, dt, p, t){
+    var G = this.G, b = this.b, i, j, n = b.length;
+    var th = t * .09 + .7, ph = .6, R = G;
+    var ex = Math.sin(th) * Math.cos(ph) * R, ey = Math.sin(ph) * R + .5, ez = -Math.cos(th) * Math.cos(ph) * R;
+    var f = Math.min(.7 * W * R / G, .95 * H * R / (G * .9 + 3.5));
+    regarde(ex, ey, ez, 0, .9, 0, f, W / 2, H * .5);
+    var amp = .5 + 1.6 * p, rs = ((t * 2.6) % (G * .75 + 6)) - 2;
+    for (i = 0; i < n; i++){
+      var q = b[i];
+      q.h = (.25 + q.hb + amp * (.5 + .5 * Math.sin(q.x * .8 + t * .8) * Math.cos(q.z * .7 - t * .55))) * ease((t - q.d * .11) / 1.3);
+      var dx = q.x - ex, dy = q.h / 2 - ey, dz = q.z - ez;
+      q.k = dx*dx + dy*dy + dz*dz;
+    }
+    this.ord.sort(function(a, c){ return b[c].k - b[a].k });
+
+    g.globalCompositeOperation = "source-over"; g.lineJoin = "round";
+    // trame au sol
+    var demi = G / 2, sol = new Path2D();
+    for (i = 0; i <= G; i++){
+      var u = i - demi;
+      if (proj(u, 0, -demi)){ sol.moveTo(PX, PY); if (proj(u, 0, demi)) sol.lineTo(PX, PY); }
+      if (proj(-demi, 0, u)){ sol.moveTo(PX, PY); if (proj(demi, 0, u)) sol.lineTo(PX, PY); }
+    }
+    g.strokeStyle = rgba(CR, .08); g.lineWidth = 1; g.stroke(sol);
+    // anneau de lumière au sol
+    if (rs > .2 && proj(0, 0, 0)){
+      var an = new Path2D();
+      for (i = 0; i <= 72; i++){
+        var a = i / 72 * TAU;
+        if (proj(Math.cos(a) * rs, 0, Math.sin(a) * rs)){ if (i === 0) an.moveTo(PX, PY); else an.lineTo(PX, PY); }
+      }
+      g.strokeStyle = rgba(OR, .35 * c01(1 - rs / (G * .75 + 4))); g.lineWidth = 2; g.stroke(an);
+    }
+
+    var C = this.C;
+    for (j = 0; j < n; j++){
+      var B = b[this.ord[j]];
+      if (B.h < .01) continue;
+      var s = B.s, x0 = B.x - s, x1 = B.x + s, z0 = B.z - s, z1 = B.z + s, hh = B.h, okk = true;
+      for (i = 0; i < 8; i++){
+        var cx = (i === 1 || i === 2 || i === 5 || i === 6) ? x1 : x0;
+        var cz = (i === 2 || i === 3 || i === 6 || i === 7) ? z1 : z0;
+        if (!proj(cx, i < 4 ? 0 : hh, cz)){ okk = false; break; }
+        C[i*2] = PX; C[i*2 + 1] = PY;
+      }
+      if (!okk) continue;
+      var vis = [ex > x1, ex < x0, ez > z1, ez < z0, ey > hh];
+      var cote = new Path2D(), dessus = vis[4] ? new Path2D() : null;
+      for (i = 0; i < 5; i++){
+        if (!vis[i]) continue;
+        var F = FACES[i], P = i === 4 ? dessus : cote;
+        P.moveTo(C[F[0]*2], C[F[0]*2 + 1]);
+        for (var e = 1; e < 4; e++) P.lineTo(C[F[e]*2], C[F[e]*2 + 1]);
+        P.closePath();
+      }
+      var gl = Math.exp(-Math.pow(B.d - rs, 2) / 1.1), dist = Math.sqrt(B.k);
+      var brume = .3 + .7 * c01((R * 1.4 - dist) / (G * .9));
+      g.fillStyle = "rgba(5,5,5,.94)"; g.fill(cote); if (dessus) g.fill(dessus);
+      if (gl > .02){
+        g.fillStyle = rgba(OR, gl * .22); g.fill(cote);
+        if (dessus){ g.fillStyle = rgba(OR, gl * .45); g.fill(dessus); }
+      }
+      // étages sur les faces latérales visibles
+      var et = new Path2D(), pas = .3;
+      for (i = 0; i < 4; i++){
+        if (!vis[i]) continue;
+        var F2 = FACES[i];
+        var ax = (F2[0] === 1 || F2[0] === 2) ? x1 : x0, az = (F2[0] === 2 || F2[0] === 3) ? z1 : z0;
+        var bx = (F2[1] === 1 || F2[1] === 2) ? x1 : x0, bz = (F2[1] === 2 || F2[1] === 3) ? z1 : z0;
+        for (var y = pas; y < hh - .05; y += pas){
+          if (!proj(ax, y, az)) continue;
+          var px1 = PX, py1 = PY;
+          if (!proj(bx, y, bz)) continue;
+          et.moveTo(px1, py1); et.lineTo(PX, PY);
+        }
+      }
+      g.lineWidth = .7;
+      g.strokeStyle = gl > .15 ? rgba(OR, (.25 + gl * .5) * brume) : rgba(CR, .12 * brume); g.stroke(et);
+      g.lineWidth = .9;
+      g.strokeStyle = rgba(CR, .7 * brume); g.stroke(cote); if (dessus) g.stroke(dessus);
+    }
+    // feux rouges au sommet des trois plus hautes
+    var cl = .35 + .65 * Math.max(0, Math.sin(t * 3));
+    for (i = 0; i < this.hauts.length; i++){
+      var Hh = b[this.hauts[i]];
+      if (Hh.h > .1 && proj(Hh.x, Hh.h + .04, Hh.z)){
+        var grd = g.createRadialGradient(PX, PY, 0, PX, PY, 9);
+        grd.addColorStop(0, "rgba(255,80,64," + cl.toFixed(3) + ")"); grd.addColorStop(1, "rgba(255,80,64,0)");
+        g.fillStyle = grd; g.beginPath(); g.arc(PX, PY, 9, 0, TAU); g.fill();
+      }
+    }
+  };
+
+  // =====================================================================
+  // 05 — Haubans : pont à haubans dont les câbles vibrent, reflet dans l'eau
+  // =====================================================================
+  var pont = { trail: false };
+  pont.init = function(){
+    var c = [], xp = [-4.2, 4.2], k, a, sd, pl;
+    for (a = 0; a < 2; a++) for (sd = -1; sd <= 1; sd += 2) for (pl = -1; pl <= 1; pl += 2) for (k = 0; k < 9; k++){
+      var x0 = xp[a], yt = 6 - k * .17, zt = pl * (.8 - .55 * yt / 6.3);
+      var inter = sd * x0 < 0, dx = inter ? .9 + k * .38 : .9 + k * .6;
+      c.push({ ax: x0, ay: yt, az: zt, bx: x0 + sd * dx, by: 1.3, bz: pl * .8,
+        A: 0, w: 13 + (8 - k) * 1.4 + Math.random(), ph: Math.random() * TAU, rang: (x0 + sd * dx + 11) / 22 });
+    }
+    this.c = c; this.prochain = 1; this.sw = -10; this.f = 0; this.acc = ptr.acc; this.dth = 0;
+    this.E = new Float32Array(c.length * 4);
+  };
+  pont.entre = function(){ this.prochain = .8; this.acc = ptr.acc; };
+  var CLES = [[-11, 1.3, .8], [-11, 1.3, -.8], [11, 1.3, .8], [11, 1.3, -.8], [-4.2, 6.3, .25], [4.2, 6.3, -.25], [-4.2, 0, .8], [4.2, 0, -.8], [-4.2, 0, -.8], [4.2, 0, .8]];
+  pont.draw = function(g, dt, p, t){
+    var c = this.c, i, s, pass;
+    this.dth += (ptr.acc - this.acc) * .004; this.acc = ptr.acc;
+    var th = (W < H ? .95 : .35) + Math.sin(t * .11) * .35 + this.dth + p * .4, R = 15, ey = 2 + Math.sin(t * .13) * .4;
+    var ex = Math.sin(th) * R, ez = -Math.cos(th) * R;
+    // cadrage : on projette les points clés à f = 1, puis on ajuste
+    regarde(ex, ey, ez, 0, 2.6, 0, 1, 0, 0);
+    var u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+    for (i = 0; i < CLES.length; i++){
+      if (!proj(CLES[i][0], CLES[i][1], CLES[i][2])) continue;
+      if (PX < u0) u0 = PX; if (PX > u1) u1 = PX; if (PY < v0) v0 = PY; if (PY > v1) v1 = PY;
+    }
+    var fc = Math.min(.92 * W / Math.max(1e-3, u1 - u0), .46 * H / Math.max(1e-3, v1 - v0));
+    this.f = this.f ? this.f + (fc - this.f) * Math.min(1, dt * 2) : fc;
+    var f = this.f;
+    regarde(ex, ey, ez, 0, 2.6, 0, f, W / 2 - f * (u0 + u1) / 2, H * .4 - f * (v0 + v1) / 2);
+
+    // balayage automatique, et le pointeur qui pince les câbles
+    if (t > this.prochain){ this.sw = t; this.prochain = t + 6.5; }
+    var ps = ptrForce(), bouge = maintenant() - ptr.last < 140;
+    for (i = 0; i < c.length; i++){
+      var C = c[i], tr = this.sw + C.rang * 1.4;
+      if (tr > t - dt && tr <= t) C.A = Math.max(C.A, .24);
+      if (ps > 0 && bouge){
+        var E = this.E, ax = E[i*4], ay = E[i*4 + 1], bx = E[i*4 + 2], by = E[i*4 + 3];
+        var lx = bx - ax, ly = by - ay, l2 = lx*lx + ly*ly;
+        if (l2 > 1){
+          var q = c01(((ptr.x - ax) * lx + (ptr.y - ay) * ly) / l2), qx = ax + lx * q - ptr.x, qy = ay + ly * q - ptr.y;
+          if (qx*qx + qy*qy < 324) C.A = Math.max(C.A, .2);
+        }
+      }
+      C.A *= Math.exp(-dt * .8);
+    }
+
+    g.globalCompositeOperation = "lighter"; g.lineCap = "round"; g.lineJoin = "round";
+    // ligne d'eau
+    if (proj(0, 0, 0)){
+      var wy = PY, gw = g.createLinearGradient(0, wy - 1, 0, wy + H * .25);
+      gw.addColorStop(0, rgba(OR, .06)); gw.addColorStop(1, rgba(OR, 0));
+      g.fillStyle = gw; g.fillRect(0, wy, W, H * .25);
+    }
+    for (pass = 0; pass < 2; pass++){
+      var sg = pass ? 1 : -1, mul = pass ? 1 : .22;
+      var ond = function(x, y){ return pass ? x : x + Math.sin(y * .07 + t * 2.2) * 3; };
+      // tablier
+      var tab = new Path2D(), x;
+      for (s = -1; s <= 1; s += 2){
+        if (proj(-11, sg * 1.3, s * .8)){ tab.moveTo(ond(PX, PY), PY); if (proj(11, sg * 1.3, s * .8)) tab.lineTo(ond(PX, PY), PY); }
+      }
+      for (x = -11; x <= 11.01; x += .55){
+        if (proj(x, sg * 1.3, -.8)){ var a1 = ond(PX, PY), b1 = PY; if (proj(x, sg * 1.3, .8)){ tab.moveTo(a1, b1); tab.lineTo(ond(PX, PY), PY); } }
+      }
+      g.lineWidth = 1; g.strokeStyle = rgba(CR, .45 * mul); g.stroke(tab);
+      // pylônes
+      var py = new Path2D();
+      for (i = 0; i < 2; i++){
+        var xq = i ? 4.2 : -4.2;
+        for (s = -1; s <= 1; s += 2){
+          if (proj(xq, 0, s * .8)){ py.moveTo(ond(PX, PY), PY); if (proj(xq, sg * 6.3, s * .25)) py.lineTo(ond(PX, PY), PY); }
+        }
+        var ys = [1.05, 6.3];
+        for (var yi = 0; yi < 2; yi++){
+          var zz = .8 - .55 * ys[yi] / 6.3;
+          if (proj(xq, sg * ys[yi], -zz)){ py.moveTo(ond(PX, PY), PY); if (proj(xq, sg * ys[yi], zz)) py.lineTo(ond(PX, PY), PY); }
+        }
+      }
+      g.lineWidth = 1.6; g.strokeStyle = rgba(CR, .85 * mul); g.stroke(py);
+      // câbles
+      var calmes = new Path2D();
+      for (i = 0; i < c.length; i++){
+        var Cc = c[i], dx = Cc.bx - Cc.ax, dy = Cc.by - Cc.ay, ln = Math.sqrt(dx*dx + dy*dy), nx = -dy / ln, ny = dx / ln;
+        var dep = Cc.A * Math.sin(Cc.w * t + Cc.ph), P = Cc.A > .015 ? new Path2D() : calmes, debut = true;
+        for (s = 0; s <= 14; s++){
+          var e = s / 14, o = dep * Math.sin(Math.PI * e);
+          if (!proj(Cc.ax + dx * e + nx * o, sg * (Cc.ay + dy * e + ny * o), Cc.az + (Cc.bz - Cc.az) * e)){ debut = true; continue; }
+          var X1 = ond(PX, PY);
+          if (debut){ P.moveTo(X1, PY); debut = false; } else P.lineTo(X1, PY);
+          if (pass){ if (s === 0){ this.E[i*4] = PX; this.E[i*4 + 1] = PY; } if (s === 14){ this.E[i*4 + 2] = PX; this.E[i*4 + 3] = PY; } }
+        }
+        if (P !== calmes){
+          g.lineWidth = 1 + Cc.A * 6; g.strokeStyle = rgba(OR, (.35 + Cc.A * 2.6) * mul); g.stroke(P);
+        }
+      }
+      g.lineWidth = .9; g.strokeStyle = rgba(CR, .5 * mul); g.stroke(calmes);
+      // lampadaires le long du tablier
+      var lp = new Path2D(), st = new Path2D();
+      for (x = -10.8; x <= 10.81; x += 1.2){
+        for (s = -1; s <= 1; s += 2){
+          if (!proj(x, sg * 1.42, s * .8)) continue;
+          if (pass){ lp.moveTo(PX + 1.6, PY); lp.arc(PX, PY, 1.6, 0, TAU); }
+          else { st.moveTo(ond(PX, PY), PY); st.lineTo(ond(PX, PY + 18), PY + 18); }
+        }
+      }
+      if (pass){
+        g.fillStyle = rgba(OR, .95); g.fill(lp);
+      } else {
+        g.lineWidth = 1.4; g.strokeStyle = rgba(OR, .22); g.stroke(st);
+      }
+    }
+    // fanaux au sommet des pylônes
+    for (i = 0; i < 2; i++){
+      if (!proj(i ? 4.2 : -4.2, 6.45, 0)) continue;
+      var pu = .5 + .5 * Math.sin(t * 2 + i * 1.7), rf = 10 + 14 * pu;
+      var gf = g.createRadialGradient(PX, PY, 0, PX, PY, rf);
+      gf.addColorStop(0, "rgba(255,80,64," + (.5 + .5 * pu).toFixed(3) + ")"); gf.addColorStop(1, "rgba(255,80,64,0)");
+      g.fillStyle = gf; g.beginPath(); g.arc(PX, PY, rf, 0, TAU); g.fill();
+    }
+  };
+
+  // =====================================================================
+  // Défilement : chaque chapitre pilote son tableau, fondu enchaîné entre deux
+  // =====================================================================
+  var scenes = [genese, tunnel, tour, iso, ville, pont];
+  var chaps = [].slice.call(document.querySelectorAll(".chap")), geo = [];
+  var rail = [].slice.call(document.querySelectorAll(".rail button")), courant = -1;
+
+  function mesure(){
+    var y = window.scrollY || window.pageYOffset || 0;
+    geo = chaps.map(function(el){ var r = el.getBoundingClientRect(); return { top: r.top + y, h: r.height }; });
+  }
+  function redim(force){
+    var w = cv.clientWidth || window.innerWidth, h = cv.clientHeight || window.innerHeight;
+    var d = Math.min(window.devicePixelRatio || 1, 2);
+    d = Math.max(1, Math.min(d, Math.sqrt(4.2e6 / Math.max(1, w * h))));
+    mesure();
+    if (!force && w === W && h === H && d === DPR) return;
+    W = w; H = h; DPR = d; PW = Math.max(1, Math.round(W * DPR)); PH = Math.max(1, Math.round(H * DPR));
+    cv.width = PW; cv.height = PH;
+    scenes.forEach(function(s){
+      if (!s.L) return;
+      s.L.taille();
+      if (s.resize) s.resize();
+      s.frais = true;
+    });
+  }
+
+  var dernier = 0;
+  function boucle(now){
+    requestAnimationFrame(boucle);
+    var t = now / 1000, dt = dernier ? Math.min(.05, Math.max(0, t - dernier)) : .016;
+    dernier = t;
+    var Y = window.scrollY || window.pageYOffset || 0, vh = window.innerHeight || H;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, PW, PH);
+    var meilleur = 0, cur = 0;
+    for (var k = 0; k < scenes.length; k++){
+      var gk = geo[k], s = scenes[k];
+      if (!gk) continue;
+      var w = c01(Math.min((Y + vh - gk.top) / vh, (gk.top + gk.h - Y) / vh));
+      var p = c01((Y - gk.top) / Math.max(1, gk.h - vh));
+      if (w > meilleur){ meilleur = w; cur = k; }
+      if (w <= .002){ s.on = false; continue; }
+      if (!s.L){ s.L = new Calque(); s.L.taille(); s.init(); }
+      if (!s.on){ s.on = true; s.t = 0; s.frais = true; if (s.entre) s.entre(); }
+      var L = s.L.x;
+      if (!s.trail || s.frais){
+        L.setTransform(1, 0, 0, 1, 0, 0); L.globalAlpha = 1; L.globalCompositeOperation = "source-over";
+        L.clearRect(0, 0, PW, PH);
+      }
+      s.frais = false;
+      L.setTransform(DPR, 0, 0, DPR, 0, 0);
+      s.t += dt;
+      s.draw(L, dt, p, s.t);
+      ctx.globalAlpha = w; ctx.drawImage(s.L.c, 0, 0);
+    }
+    ctx.globalAlpha = 1;
+    if (cur !== courant){
+      courant = cur;
+      rail.forEach(function(b, i){ b.classList.toggle("on", i === cur); if (i === cur) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); });
+    }
+  }
+
+  rail.forEach(function(b, i){
+    b.addEventListener("click", function(){ mesure(); if (geo[i]) window.scrollTo({ top: geo[i].top + 1, behavior: "smooth" }); });
+  });
+
+  // Cartels : apparaissent à l'arrivée dans le chapitre, se rejouent au retour
+  if ("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){ e.target.classList.toggle("vu", e.isIntersecting && e.intersectionRatio > .12); });
+    }, { threshold: [0, .12, .3] });
+    chaps.forEach(function(c){ io.observe(c); });
+  } else chaps.forEach(function(c){ c.classList.add("vu"); });
+
+  window.addEventListener("resize", function(){ redim(false); });
+  window.addEventListener("load", mesure);
+
+  var parti = false;
+  function demarre(){ if (parti) return; parti = true; redim(true); requestAnimationFrame(boucle); }
+  if (document.fonts && document.fonts.load){
+    document.fonts.load('300 100px "Inter Tight"').then(demarre, demarre);
+    setTimeout(demarre, 1500);
+  } else demarre();
+})();
+</script>
+<script src="/assets/menu.js?v=23"></script>
+<script src="/assets/mesure.js?v=2" defer></script>
+</body>
+</html>
