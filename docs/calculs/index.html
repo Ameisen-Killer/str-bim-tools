@@ -1839,6 +1839,35 @@ footer a{text-decoration:none}
       '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, eV, uV, "Enveloppe des efforts tranchants") +
       '<div class="lg"><span><i></i>enveloppe haute</span><span><i class="t"></i>enveloppe basse</span></div>';
   }
+  // Schéma de la dalle : appuis et épaisseurs par travée (optimisée, forcée), hauteur exagérée
+  function schemaDalle(L, app, hOpt, hForce){
+    var W = 640, H = 170, g = 34, yt = 58, X = L.reduce(function(s, l){ return s + l }, 0), ax = [0];
+    L.forEach(function(l){ ax.push(ax[ax.length - 1] + l) });
+    var hRet = hOpt.map(function(h, i){ return hForce[i] != null ? hForce[i] : h });
+    var hm = Math.max.apply(null, hOpt.concat(hRet)), sc = 34 / Math.max(hm, 0.01), yb = yt + hm * sc;
+    function px(x){ return g + (W - 2*g) * x / X }
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Schéma de la dalle">';
+    L.forEach(function(l, i){
+      var x1 = px(ax[i]), x2 = px(ax[i + 1]), xm = (x1 + x2) / 2, ho = hOpt[i] * sc, hr = hRet[i] * sc;
+      s += '<rect class="tz" x="'+x1.toFixed(1)+'" y="'+yt+'" width="'+(x2 - x1).toFixed(1)+'" height="'+hr.toFixed(1)+'"/>';
+      s += '<path class="tl" d="M'+x1.toFixed(1)+' '+yt+' H'+x2.toFixed(1)+' M'+x1.toFixed(1)+' '+(yt + hr).toFixed(1)+' H'+x2.toFixed(1)+'"/>';
+      if(hForce[i] != null && Math.abs(hForce[i] - hOpt[i]) > 1e-6) s += '<path class="o" stroke-dasharray="5 4" d="M'+x1.toFixed(1)+' '+(yt + ho).toFixed(1)+' H'+x2.toFixed(1)+'"/>';
+      s += '<text class="or" x="'+xm.toFixed(1)+'" y="'+(yt - 22)+'" text-anchor="middle">opt. '+fmt(hOpt[i] * 100, 0)+' cm</text>';
+      if(hForce[i] != null) s += '<text x="'+xm.toFixed(1)+'" y="'+(yt - 8)+'" text-anchor="middle">forcée '+fmt(hForce[i] * 100, 0)+' cm</text>';
+      s += '<text x="'+xm.toFixed(1)+'" y="'+(H - 8)+'" text-anchor="middle">'+fmt(l, 2)+' m</text>';
+      if(i > 0) s += '<line class="f" x1="'+x1.toFixed(1)+'" y1="'+yt+'" x2="'+x1.toFixed(1)+'" y2="'+(yt + Math.max(hr, hRet[i - 1] * sc)).toFixed(1)+'"/>';
+    });
+    ax.forEach(function(x, q){
+      var t = app[q], cx = px(x), y = yb + 2;
+      if(t === "A") s += '<path class="ap" d="M'+cx+' '+y+' l-8 13 h16 z"/>';
+      else if(t === "E"){
+        if(q === 0 || q === ax.length - 1){ var sg = q === 0 ? -1 : 1; s += '<path class="ap" d="M'+cx+' '+(yt - 6)+' V'+(yb + 8)+'"/><path class="f" d="M'+cx+' '+(yt - 2)+' l'+(6*sg)+' 6 M'+cx+' '+(yt + 10)+' l'+(6*sg)+' 6 M'+cx+' '+(yt + 22)+' l'+(6*sg)+' 6"/>' }
+        else s += '<path class="ap" d="M'+(cx - 9)+' '+y+' h18 v12 h-18 z"/><path class="f" d="M'+(cx - 6)+' '+(y + 12)+' l6 -12 M'+cx+' '+(y + 12)+' l6 -12"/>';
+      }
+    });
+    s += '<text x="'+W+'" y="14" text-anchor="end">épaisseurs exagérées · tiretés : optimisée là où elle est forcée</text></svg>';
+    return s + '<div class="lg"><span><i class="t"></i>épaisseur retenue</span><span><i></i>épaisseur optimisée</span><span>△ appui simple · ▭ encastrement</span></div>';
+  }
   function schemaCout(rows, ixOpt, lab){
     var ok = rows.filter(function(r){ return r.ok && isFinite(r.cout) });
     if(ok.length < 2) return "";
@@ -2094,7 +2123,7 @@ footer a{text-decoration:none}
       var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ, T.gTr), eMo = enveloppe(R.M, f2.perm, f2.vari), eVo = enveloppe(R.V, f2.perm, f2.vari);
       h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
-        cle("md travée", fmt(Rr.Mp, 1), "kNm/m") + cle("md appui", fmt(-Rr.Mn, 1), "kNm/m") + cle("vd", fmt(Rr.Vd, 1), "kN/m") + '</div>';
+        cle("md travée", fmt(Rr.Mp, 1), "kNm/m") + cle("md appui", fmt(-Rr.Mn, 1), "kNm/m") + cle("vd", fmt(Rr.Vd, 1), "kN/m") + '</div>%%SCHEMA_DALLE%%';
       h2 += '<h3>Charges</h3>' + schemaCharges(R, T.gTr ? T.gTr.map(function(v){ return v + GAMMA_BA * Rr.h }) : g + GAMMA_BA * Rr.h, q, pts, "kN/m²", "kN/m", "Charges sur la bande") +
         schemasEfforts(R, eMo, eVo, "md [kNm/m]", "vd [kN/m]");
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
@@ -2188,6 +2217,7 @@ footer a{text-decoration:none}
         }
         h2 += blocTravees(Ef, "Avec les épaisseurs forcées (travées " + fixe.map(function(v, i){ return v != null ? i + 1 : null }).filter(function(v){ return v }).join(", ") + ")", Eu);
       }
+      h2 = h2.replace("%%SCHEMA_DALLE%%", '<h3>Appuis et épaisseurs</h3>' + schemaDalle(T.L, T.app, Eo.hs, fixe));
     } else {
       var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN"), Pl;
       try { Pl = plaqueFE(lx, ly, bW, bE, bS, bN, num("da_nu")) } catch(e){ $("#r-dalle").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
