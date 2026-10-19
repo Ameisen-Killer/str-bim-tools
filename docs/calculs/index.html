@@ -1718,6 +1718,38 @@ footer a{text-decoration:none}
     s += '<text x="'+W+'" y="14" text-anchor="end">'+esc(unite)+'</text></svg>';
     return s;
   }
+  // Schéma des charges caractéristiques : g et q répartis sur toute la longueur, charges ponctuelles en flèches
+  function schemaCharges(R, gk, qk, pts, uR, uP, titre){
+    var W = 640, H = 168, g = 34, y0 = 112, X = R.ax[R.ax.length - 1], hmax = 46;
+    function px(x){ return g + (W - 2*g) * x / X }
+    var tot = Math.max(gk + qk, 1e-9), hg = hmax * gk / tot, hq = hmax * qk / tot;
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(titre)+'">';
+    if(hg > 0.5) s += '<rect class="tz" x="'+px(0)+'" y="'+(y0 - 4 - hg).toFixed(1)+'" width="'+(px(X) - px(0)).toFixed(1)+'" height="'+hg.toFixed(1)+'"/>';
+    if(hq > 0.5) s += '<rect class="oz" x="'+px(0)+'" y="'+(y0 - 4 - hg - hq).toFixed(1)+'" width="'+(px(X) - px(0)).toFixed(1)+'" height="'+hq.toFixed(1)+'"/>';
+    s += '<path class="tl" d="M'+px(0)+' '+(y0 - 4)+' V'+(y0 - 4 - hg - hq).toFixed(1)+' H'+px(X)+' V'+(y0 - 4)+'"/>';
+    s += '<text x="'+(px(0) + 6)+'" y="'+(y0 - 10 - hg - hq).toFixed(1)+'">gk = '+fmt(gk, 2)+' · qk = '+fmt(qk, 2)+' '+esc(uR)+'</text>';
+    var pmax = Math.max.apply(null, pts.map(function(p){ return p.G + p.Q }).concat([1e-9]));
+    pts.forEach(function(p, i){
+      var cx = px(p.x), lg = 26 + 40 * (p.G + p.Q) / pmax, y1 = y0 - 4 - lg;
+      s += '<path class="o" d="M'+cx+' '+y1.toFixed(1)+' V'+(y0 - 6)+' M'+(cx - 4)+' '+(y0 - 12)+' L'+cx+' '+(y0 - 5)+' L'+(cx + 4)+' '+(y0 - 12)+'"/>';
+      s += '<text class="or" x="'+cx+'" y="'+(y1 - 5).toFixed(1)+'" text-anchor="middle">P'+(i + 1)+' '+fmt(p.G, 1)+' + '+fmt(p.Q, 1)+'</text>';
+    });
+    s += '<line class="ax" x1="'+px(0)+'" y1="'+y0+'" x2="'+px(X)+'" y2="'+y0+'"/>';
+    R.ax.forEach(function(x, q){
+      var t = R.types[q], cx = px(x);
+      if(t === "A") s += '<path class="ap" d="M'+cx+' '+y0+' l-7 11 h14 z"/>';
+      else if(t === "E") s += '<path class="ap" d="M'+(cx + (q === 0 ? -1 : 1))+' '+(y0-14)+' v28"/><path class="f" d="M'+cx+' '+(y0-14)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0-4)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0+6)+' l'+(q === 0 ? -6 : 6)+' 6"/>';
+      if(q > 0) s += '<text x="'+((px(R.ax[q - 1]) + cx) / 2)+'" y="'+(H - 8)+'" text-anchor="middle">'+fmt(x - R.ax[q - 1], 2)+' m</text>';
+    });
+    s += '<text x="'+W+'" y="14" text-anchor="end">'+esc(uP ? "charges caractéristiques · P en " + uP : "charges caractéristiques")+'</text></svg>';
+    return s + '<div class="lg"><span><i class="t"></i>permanentes gk</span><span><i></i>variables qk</span></div>';
+  }
+  function schemasEfforts(R, eM, eV, uM, uV){
+    return '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eM, uM, "Enveloppe des moments") +
+      '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>' +
+      '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, eV, uV, "Enveloppe des efforts tranchants") +
+      '<div class="lg"><span><i></i>enveloppe haute</span><span><i class="t"></i>enveloppe basse</span></div>';
+  }
   function schemaCout(rows, ixOpt, lab){
     var ok = rows.filter(function(r){ return r.ok && isFinite(r.cout) });
     if(ok.length < 2) return "";
@@ -1910,6 +1942,7 @@ footer a{text-decoration:none}
       cle("Réaction en tête", fmt(Math.abs(num("mu_gT") * R.R[0][0] + num("mu_gW") * R.R[1][0] + M.gQ * R.R[2][0]), 1), "kN/m", "à reprendre par la dalle") + '</div>';
     h2 += schemaPoutre(R, envM, "md [kNm/m] · tête à gauche, pied à droite", "Moments dans le mur");
     h2 += '<div class="lg"><span><i></i>face intérieure tendue</span><span><i class="t"></i>face contre terre tendue</span></div>';
+    h2 += '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, envV, "vd [kN/m] · tête à gauche, pied à droite", "Efforts tranchants dans le mur");
     if(io < 0){ $("#r-mur").innerHTML = h2 + '<div class="alerte">Aucune épaisseur jusqu\'à 60 cm ne passe sans étriers.</div>'; return }
     var Rr = rows[io];
     h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
@@ -1968,12 +2001,12 @@ footer a{text-decoration:none}
       }
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
       if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe. Raccourcis les portées ou ajoute des appuis.</div>'; return }
-      var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ), eMo = enveloppe(R.M, f2.perm, f2.vari);
+      var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ), eMo = enveloppe(R.M, f2.perm, f2.vari), eVo = enveloppe(R.V, f2.perm, f2.vari);
       h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
         cle("md travée", fmt(Rr.Mp, 1), "kNm/m") + cle("md appui", fmt(-Rr.Mn, 1), "kNm/m") + cle("vd", fmt(Rr.Vd, 1), "kN/m") + '</div>';
-      h2 += '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eMo, "md [kNm/m]", "Enveloppe des moments");
-      h2 += '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
+      h2 += '<h3>Charges</h3>' + schemaCharges(R, g + GAMMA_BA * Rr.h, q, pts, "kN/m²", "kN/m", "Charges sur la bande") +
+        schemasEfforts(R, eMo, eVo, "md [kNm/m]", "vd [kN/m]");
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
         verif(null, "Inférieur, sens porteur", txtM(barresM(Rr.Asp))) +
         (Rr.Asn > 0 ? verif(null, "Supérieur sur appuis", txtM(barresM(Rr.Asn))) : "") +
@@ -2050,7 +2083,7 @@ footer a{text-decoration:none}
     function efforts(gt, gG, gQ){
       var f = facteurs(T.L, pts, gt, q, gG, gQ), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
       var a = extr(eM.max), b = extr(eM.min), c = extr(eV.max), d = extr(eV.min);
-      return {eM:eM, Mp:Math.max(a.max, 0), Mn:Math.max(-b.min, 0), Vd:Math.max(c.max, -d.min)};
+      return {eM:eM, eV:eV, gt:gt, Mp:Math.max(a.max, 0), Mn:Math.max(-b.min, 0), Vd:Math.max(c.max, -d.min)};
     }
     // flèche caractéristique max par travée (EI = 1) : permanentes + variables défavorables, et variables seules
     function fleches(gt){
@@ -2124,7 +2157,7 @@ footer a{text-decoration:none}
         verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16)", fmt(Rr.ld * 100, 0) + " % de la limite") +
         verif(null, "Effort tranchant selon SIA 262 (champ de compression) : non codé, EN 1992 §6.2.3 utilisé", "");
       tab = '<h3>Coût selon la hauteur</h3>' + schemaCout(rows, io, "hauteur");
-      var eDessin = Rr.E.eM;
+      var eDessin = Rr.E.eM, ED = Rr.E;
     } else if(matr === "acier"){
       var fam = val("po_fam"), liste = fam === "tous" ? PROFILS.IPE.concat(PROFILS.HEA, PROFILS.HEB) : PROFILS[fam];
       liste = liste.slice().sort(function(a, b){ return a[6] - b[6] });
@@ -2151,7 +2184,7 @@ footer a{text-decoration:none}
         verif(null, "Interaction M–V, voilement local et classe de section : non vérifiés", "");
       tab = '<h3>Profilés essayés</h3><div class="defile"><table><tr><th>Profilé</th><th>kg/m</th><th>md / MRd</th><th>vd / VRd</th><th>Flèche</th></tr>' + essais.slice(-6).map(function(e){
         return '<tr class="'+(e === choix ? "opt" : "ko")+'"><td>'+esc(e.p[0])+'</td><td>'+fmt(e.p[6], 1)+'</td><td>'+fmt(e.Md / e.MRd * 100, 0)+' %</td><td>'+fmt(e.E.Vd / e.VRd * 100, 0)+' %</td><td>'+fmt(e.fl * 100, 0)+' %</td></tr>' }).join("") + '</table></div>';
-      var eDessin = choix.E.eM;
+      var eDessin = choix.E.eM, ED = choix.E;
     } else {
       var B = BOIS[val("po_cl")], bb = Math.max(0.04, num("po_bb")), kmod = num("po_kmod"), kdef = num("po_kdef"), psi2 = num("po_psi2");
       var gMb = String(val("po_gMb")).trim() === "auto" ? (B.lam ? 1.25 : 1.3) : num("po_gMb") || 1.3;
@@ -2179,11 +2212,11 @@ footer a{text-decoration:none}
         verif(null, "Déformation due à l'effort tranchant négligée", "") +
         verif(null, "SIA 265 : valeurs de calcul non recoupées, EN 1995 utilisé", "");
       tab = "";
-      var eDessin = choix.E.eM;
+      var eDessin = choix.E.eM, ED = choix.E;
     }
     h2 += '<h2>Résultat</h2><div class="cles">' + res + '</div>';
-    h2 += '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eDessin, "md [kNm]", "Enveloppe des moments");
-    h2 += '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
+    h2 += '<h3>Charges</h3>' + schemaCharges(R, ED.gt, q, pts, "kN/m (poids propre compris)", "kN", "Charges sur la poutre") +
+      schemasEfforts(R, eDessin, ED.eV, "md [kNm]", "vd [kN]");
     var Ra = reactions(g);
     h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
     h2 += '<h3>Réactions d\'appui de calcul (max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
