@@ -224,6 +224,54 @@ footer{display:flex;justify-content:space-between;gap:12px;padding:14px var(--g)
 footer a{text-decoration:none}
 .pied a:hover,.pied a:focus-visible{color:var(--or)}
 
+/* ---- Version sobre (19.10.2026, demande de Tony) : textes plus petits, moins de gras et d'aplats ---- */
+body{font-size:13px;font-weight:400;line-height:1.45}
+.barre .marque-str{font-size:11.5px}
+.barre .marque-str svg{width:30px;height:30px}
+:root{--haut:50px}
+.theme-btn,.barre .menu-btn{font-size:12px;font-weight:450}
+.theme-btn{padding:5px 10px}
+.cote{padding-top:12px}
+.cote-titre{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.cote a{font-size:13px;font-weight:450;padding:5px 10px}
+.cote a span:first-child{font-size:10.5px}
+.cote a.on{font-weight:550;background:var(--pale)}
+.cote a small,.cote-pied{font-size:11px}
+.num{font-size:11px;font-weight:550;letter-spacing:.04em}
+h1{font-size:clamp(18px,1.6vw,21px);font-weight:600;letter-spacing:-.005em}
+h2{font-size:14px;font-weight:600;margin-bottom:6px}
+h3{font-size:12px;font-weight:550;margin:12px 0 5px}
+.intro{font-size:12.5px;margin-bottom:10px}
+.note{font-size:12px}
+.carte,.vue > .champs{border-radius:6px;box-shadow:0 1px 2px rgba(30,34,38,.04),0 2px 8px rgba(30,34,38,.035);padding:11px 13px 12px;margin-bottom:10px}
+:root[data-theme="sombre"] .carte,:root[data-theme="sombre"] .vue > .champs{box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.champ label{font-size:11px;font-weight:450}
+.champ .boite{border-radius:5px;padding:0 7px;border-color:rgba(var(--encre),.16)}
+.champ input,.champ select{font-size:13px;padding:4px 0}
+.champ .u,.champ .aide{font-size:10.5px}
+.champ output.aff{font-size:13px;font-weight:600;padding:4px 0}
+.ligne-sep{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.ligne-sep.sous{font-size:11px;text-transform:none;letter-spacing:0}
+.cles{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
+.cle{padding:7px 9px 8px;border-radius:5px;background:transparent;border:1px solid var(--ligne)}
+.cle .t{font-size:11px;font-weight:450}
+.cle .v{font-size:16px;font-weight:600}
+.cle .v small{font-size:11px;font-weight:450}
+.cle .s{font-size:11px}
+.cle.or{background:transparent;border-color:rgba(var(--or-rvb),.45)}
+.verifs li{font-size:12.5px;padding:4px 0}
+.verifs li b,.verifs li span:last-child{font-size:11.5px}
+.alerte{font-size:12.5px;padding:7px 11px;border-left-width:2px}
+table{font-size:12px}
+th{font-size:11px;font-weight:550}
+td{padding:3px 8px}
+tr.opt td{background:transparent;font-weight:600}
+.tab-saisie th{font-size:11px;font-weight:450}
+.tab-saisie tr > th:first-child{font-weight:550}
+.schema text{font-size:10px}
+.lg{font-size:11px}
+.etat{font-size:10.5px}
+footer{font-size:11.5px}
 @media (max-width:1180px){
   .vue.calc.on{display:block}
   .vue.calc > .champs{position:static;max-height:none;overflow:visible}
