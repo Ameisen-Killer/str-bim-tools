@@ -630,7 +630,13 @@ footer{font-size:11.5px}
   function flechesTravees(p){
     return [1, 2, 3, 4, 5].map(function(i){
       return {id:p+"ftr"+i, l:"Travée "+i+" · flèche limite L /", v:"250", si:function(){ return +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Flèche limite L /"};
-    });
+    }).concat([1, 2, 3, 4, 5].map(function(i){
+      return {id:p+"wcal"+i, l:"Travée "+i+" · flèche calculée", v:"", t:"aff", si:function(){ return +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Flèche calculée"};
+    }));
+  }
+  // Remplit la colonne « Flèche calculée » : w [m] par travée et part de la limite
+  function afficheFleches(p, fl, ratios){
+    for(var i = 1; i <= 5; i++){ var c = $("#c-" + p + "wcal" + i); if(c) c.textContent = fl && fl[i-1] != null ? fmt(Math.abs(fl[i-1]) * 1000, 1) + " mm · " + fmt(ratios[i-1] * 100, 0) + " %" : "—" }
   }
   function ponctuelles(p, unite){
     var t = [{sep:"Charges ponctuelles"},{id:p+"np", l:"Nombre de charges", v:"0", t:"s", o:opt(["0","1","2","3","4"])}];
@@ -2444,6 +2450,8 @@ footer{font-size:11.5px}
         }
         h2 += blocTravees(Ef, "Avec les épaisseurs forcées (travées " + fixe.map(function(v, i){ return v != null ? i + 1 : null }).filter(function(v){ return v }).join(", ") + ")", Eu);
       }
+      var Eret = Ef || Eo;      // épaisseurs retenues : forcées s'il y en a, sinon optimisées
+      afficheFleches("da_", Eret.D.fl, Eret.tr.map(function(t){ return t.fl }));
       h2 = h2.replace("%%SCHEMA_DALLE%%", '<h3>Appuis et épaisseurs</h3>' + schemaDalle(T.L, T.app, Eo.hs, fixe));
     } else {
       var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN"), Pl;
@@ -2636,6 +2644,7 @@ footer{font-size:11.5px}
     h2 += '<h2>Résultat</h2><div class="cles">' + res + '</div>';
     h2 += '<h3>Charges</h3>' + schemaCharges(R, T.gTr ? T.gTr.map(function(v){ return v + ED.gt }) : ED.gt, q, pts, "kN/m (poids propre compris)", "kN", "Charges sur la poutre") +
       schemasEfforts(R, eDessin, ED.eV, "md [kNm]", "vd [kN]", DD);
+    afficheFleches("po_", DD.fl, ratiosFleche(T, DD.fl, T.lim));
     var Ra = reactions(g);
     h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
     h2 += '<h3>Réactions d\'appui de calcul (max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
