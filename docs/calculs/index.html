@@ -149,6 +149,8 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .tab-saisie .champ{display:block;min-width:104px}
 .tab-saisie .champ.cache{display:none}
 .tab-saisie .champ.liste{min-width:210px}
+.tab-saisie.couche .champ.liste{min-width:158px}
+.tab-saisie.couche th[data-col]{white-space:nowrap}
 .champ output.aff{display:block;width:100%;padding:5px 0;font-size:14px;font-weight:650;color:var(--or);font-variant-numeric:tabular-nums}
 .champ .boite:has(output.aff){background:var(--pale);border-color:transparent}
 .tab-saisie .champ label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
@@ -267,7 +269,7 @@ th{font-size:11px;font-weight:550}
 td{padding:3px 8px}
 tr.opt td{background:transparent;font-weight:600}
 .tab-saisie th{font-size:11px;font-weight:450}
-.tab-saisie tr > th:first-child{font-weight:550}
+.tab-saisie tr > th:first-child{font-weight:550;max-width:none;padding-right:14px}
 .schema text{font-size:10px}
 .lg{font-size:11px}
 .etat{font-size:10.5px}
@@ -573,30 +575,28 @@ footer{font-size:11.5px}
   var APPUIS_EXT = [["A","Appui simple"],["E","Encastrement"],["L","Libre (porte-à-faux)"]];
   // Champs marqués tab / ligne / col : dessinés ensemble en tableau (construit)
   function travees(p, defL, ug, dg, dq){
-    var pm = permTravees(p, ug, dg, dq);
-    var t = [{id:p+"n", l:"Nombre de travées", v:"1", t:"s", o:opt(["1","2","3","4","5"])}].concat(pm.filter(function(c){ return !c.tab }));
+    // Ordre : nombre de travées, tableau des appuis, tableau des travées (portée, gk, qk)
+    var t = [{id:p+"n", l:"Nombre de travées", v:"1", t:"s", o:opt(["1","2","3","4","5"])}];
+    t.push({id:p+"ga", l:"Appui 1 (gauche)", v:"A", t:"s", o:APPUIS_EXT, tab:p+"app", ligne:"Appui 1 (gauche)", col:"Type d'appui"});
+    for(var j = 1; j <= 4; j++) (function(j){
+      t.push({id:p+"ap"+j, l:"Appui "+(j+1), v:"A", t:"s", o:[["A","Appui continu"],["E","Encastrement"]], si:function(){ return +val(p+"n") > j }, tab:p+"app", ligne:"Appui "+(j+1), col:"Type d'appui"});
+    })(j);
+    t.push({id:p+"dr", l:"Dernier appui (droite)", v:"A", t:"s", o:APPUIS_EXT, tab:p+"app", ligne:"Appui de droite", col:"Type d'appui"});
     for(var i = 1; i <= 5; i++) (function(i){
       t.push({id:p+"L"+i, l:"Portée travée "+i, v:defL, u:"m", si:function(){ return +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Portée"});
     })(i);
-    t = t.concat(pm.filter(function(c){ return c.tab }));
-    // Appuis : tableau, un type par appui (les intermédiaires : appui simple continu ou encastrement)
-    t.push({id:p+"ga", l:"Extrémité gauche", v:"A", t:"s", o:APPUIS_EXT, tab:p+"app", ligne:"Appui 1 (extrémité gauche)", col:"Type"});
-    for(var j = 1; j <= 4; j++) (function(j){
-      t.push({id:p+"ap"+j, l:"Appui "+(j+1), v:"A", t:"s", o:[["A","Appui simple (continuité)"],["E","Encastrement"]], si:function(){ return +val(p+"n") > j }, tab:p+"app", ligne:"Appui "+(j+1)+" (entre travées "+j+" et "+(j+1)+")", col:"Type"});
-    })(j);
-    t.push({id:p+"dr", l:"Extrémité droite", v:"A", t:"s", o:APPUIS_EXT, tab:p+"app", ligne:"Dernier appui (extrémité droite)", col:"Type"});
-    return t;
+    return t.concat(permTravees(p, ug, dg, dq));
   }
   // Charges permanentes différentes d'une travée à l'autre (19.10.2026)
-  function parTravee(p){ return val(p+"gm") === "trav" && +val(p+"n") > 1 && (p !== "da_" || val("da_m") === "un") }
-  function parTraveeQ(p){ return val(p+"qm") === "trav" && +val(p+"n") > 1 && (p !== "da_" || val("da_m") === "un") }
+  // gk et qk se saisissent toujours travée par travée (dalle porteuse dans un sens, poutres)
+  function parTravee(p){ return p !== "da_" || val("da_m") === "un" }
+  function parTraveeQ(p){ return parTravee(p) }
   function permTravees(p, unite, defv, defq){
-    var t = [{id:p+"gm", l:"Charges permanentes", v:"meme", t:"s", o:[["meme","Identiques sur toutes les travées"],["trav","Différentes par travée"]], large:true, si:function(){ return +val(p+"n") > 1 }}];
+    var t = [];
     for(var i = 1; i <= 5; i++) (function(i){
-      t.push({id:p+"gtr"+i, l:"Travée "+i+" · permanente gk", v:defv, u:unite, si:function(){ return parTravee(p) && +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Permanente gk"});
+      t.push({id:p+"gtr"+i, l:"Travée "+i+" · permanente gk", v:defv, u:unite, si:function(){ return parTravee(p) && +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Permanente gk (en plus du poids propre)"});
       t.push({id:p+"qtr"+i, l:"Travée "+i+" · charge utile qk", v:defq, u:unite, si:function(){ return parTraveeQ(p) && +val(p+"n") >= i }, tab:p+"trav", ligne:"Travée "+i, col:"Charge utile qk"});
     })(i);
-    t.splice(1, 0, {id:p+"qm", l:"Charges utiles", v:"meme", t:"s", o:[["meme","Identiques sur toutes les travées"],["trav","Différentes par travée"]], large:true, si:function(){ return +val(p+"n") > 1 }});
     return t;
   }
   function ponctuelles(p, unite){
@@ -694,16 +694,14 @@ footer{font-size:11.5px}
       return [
         {id:"da_m", l:"Type de dalle", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true},
         {sep:"Géométrie"}
-      ].concat(tr.filter(function(c){ return c.tab !== "da_app" }), [
-      ], [1, 2, 3, 4, 5].map(function(i){
+      ].concat(tr, [1, 2, 3, 4, 5].map(function(i){
         return un({id:"da_hopt"+i, l:"Travée "+i+" · épaisseur optimisée", v:"", t:"aff", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur optimisée"});
       }), [1, 2, 3, 4, 5].map(function(i){
         return un({id:"da_hf"+i, l:"Travée "+i+" · épaisseur forcée", v:"", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur forcée (vide = optimisée)"});
       }), [
         deux({id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m"}),
         deux({id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m"}),
-        {sep:"Appuis"}
-      ], tr.filter(function(c){ return c.tab === "da_app" }), [
+        {sep:"Bords de la plaque"},
         deux({id:"da_bW", l:"Bord gauche", v:"A", t:"s", o:BORD}),
         deux({id:"da_bE", l:"Bord droit", v:"A", t:"s", o:BORD}),
         deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
@@ -888,6 +886,10 @@ footer{font-size:11.5px}
     function enTableau(cle){
       var mb = CHAMPS[g].filter(function(c){ return c.tab === cle }), lignes = [], cols = [];
       mb.forEach(function(c){ if(lignes.indexOf(c.ligne) < 0) lignes.push(c.ligne); if(cols.indexOf(c.col) < 0) cols.push(c.col) });
+      if(cols.length === 1){   // une seule colonne (appuis) : tableau couché, de gauche à droite
+        return '<div class="tab-saisie couche" data-tab="'+esc(cle)+'"><table><tr><th></th>' + lignes.map(function(l, j){ return '<th data-col="'+j+'">'+esc(l)+'</th>' }).join("") + '</tr><tr><th>'+esc(cols[0])+'</th>' +
+          lignes.map(function(l, j){ var c = mb.filter(function(x){ return x.ligne === l })[0]; return '<td data-col="'+j+'">' + champ(c) + '</td>' }).join("") + '</tr></table></div>';
+      }
       var t = '<div class="tab-saisie" data-tab="'+esc(cle)+'"><table><tr><th></th>' + cols.map(function(k, j){ return '<th data-col="'+j+'">'+esc(k)+'</th>' }).join("") + '</tr>';
       lignes.forEach(function(l){
         t += '<tr><th>'+esc(l)+'</th>' + cols.map(function(k, j){
