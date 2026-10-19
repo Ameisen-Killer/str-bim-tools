@@ -129,6 +129,13 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .champs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px 10px}
 .carte .champs{margin-top:8px}
 .champ{display:flex;flex-direction:column;gap:3px;min-width:0}
+/* Cases alignées d'une colonne à l'autre : intitulé, case et aide sur trois rangées communes */
+@supports (grid-template-rows:subgrid){
+  .champ{display:grid;grid-row:span 3;grid-template-rows:subgrid;row-gap:3px}
+  .champ label{align-self:end}
+}
+.champ.large{grid-column:1/-1}
+.champ.liste{grid-column:span 2}
 .champ.cache{display:none}
 .champ label{font-size:12px;font-weight:500;color:var(--texte-faible);line-height:1.3}
 .champ .boite{display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--surface);border:1px solid var(--ligne-forte);border-radius:6px;transition:border-color .2s,box-shadow .2s}
@@ -252,7 +259,8 @@ footer a{text-decoration:none}
     <a href="#poinconnement" data-vue="poinconnement"><span>08</span><span>Poinçonnement</span><small>EN 1992 · SIA 262</small></a>
     <a href="#fissuration" data-vue="fissuration"><span>09</span><span>Fissuration</span><small>Ouverture wk</small></a>
     <a href="#torsion" data-vue="torsion"><span>10</span><span>Torsion</span><small>Étriers · longitudinales</small></a>
-    <a href="#normes" data-vue="normes"><span>11</span><span>Normes et sources</span><small>SIA · Eurocodes · état</small></a>
+    <a href="#calculette" data-vue="calculette"><span>11</span><span>Calculette HA</span><small>Barres · cadres · poutre ELU</small></a>
+    <a href="#normes" data-vue="normes"><span>12</span><span>Normes et sources</span><small>SIA · Eurocodes · état</small></a>
     <div class="cote-pied">Prédimensionnement. Les résultats ne remplacent ni la note de calcul ni la relecture de l'ingénieur.</div>
   </nav>
   <div class="voile-cote" id="voile-cote"></div>
@@ -373,9 +381,18 @@ footer a{text-decoration:none}
       <div id="r-to"></div>
     </section>
 
+    <!-- Calculette HA -->
+    <section class="vue" id="v-calculette">
+      <div class="num">11 — Calculette HA · EN 1992-1-1 §6.2, §8.2, §9.2</div>
+      <h1>Calculette HA.</h1>
+      <p class="intro">La feuille du classeur, recalculée à l'Eurocode : une section en barres par lits, un Asw/s en cadres avec leur répartition, ou la poutre complète (travée, appuis, effort tranchant, table). Béton et acier : ceux des Hypothèses.</p>
+      <div class="champs" data-groupe="ch"></div>
+      <div id="r-ch"></div>
+    </section>
+
     <!-- 05 — Normes -->
     <section class="vue" id="v-normes">
-      <div class="num">11 — Normes et sources</div>
+      <div class="num">12 — Normes et sources</div>
       <h1>D'où vient chaque valeur.</h1>
       <p class="intro">La SIA sert de référence, l'Eurocode est cité en regard. Chaque valeur est marquée selon ce que j'ai pu recouper.</p>
       <h3>Correspondances</h3>
@@ -690,6 +707,34 @@ footer a{text-decoration:none}
       {id:"fi_w", l:"Ouverture admissible", v:"0.3", t:"s", o:[["0.4","0,4 mm · X0, XC1"],["0.3","0,3 mm · XC2 à XC4, XD, XS"],["man","Saisie"]], aide:"EN 1992 tab. 7.1N"},
       {id:"fi_wm", l:"wmax saisi", v:"0.2", u:"mm", si:function(){ return val("fi_w") === "man" }}
     ],
+    ch:[
+      {id:"ch_mode", l:"Calcul", v:"poutre", t:"s", o:[["barres","Section A → barres"],["cadres","Asw/s → cadres et répartition"],["poutre","Poutre complète à l'ELU"]], large:true},
+      {sep:"Section à placer"},
+      {id:"ch_A", l:"Section A", v:"12", u:"cm²", si:function(){ return val("ch_mode") === "barres" }},
+      {id:"ch_asw", l:"Asw/s au nu de l'appui", v:"5", u:"cm²/m", si:function(){ return val("ch_mode") === "cadres" }},
+      {sep:"Poutre"},
+      {id:"ch_bw", l:"Largeur bw", v:"0.40", u:"m"},
+      {id:"ch_h", l:"Hauteur h", v:"0.65", u:"m", si:function(){ return val("ch_mode") !== "barres" }},
+      {id:"ch_beff", l:"Largeur de table beff", v:"0", u:"m", aide:"0 = section rectangulaire", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_hf", l:"Épaisseur de table hf", v:"0.20", u:"m", si:function(){ return val("ch_mode") === "poutre" && num("ch_beff") > num("ch_bw") }},
+      {id:"ch_ai", l:"Axe des barres inférieures au parement", v:"60", u:"mm", aide:"d = h − cette valeur", si:function(){ return val("ch_mode") !== "barres" }},
+      {id:"ch_as", l:"Axe des barres supérieures au parement", v:"50", u:"mm", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_L", l:"Portée entre nus", v:"7.10", u:"m", aide:"Pour la répartition des cadres ; 0 = sans", si:function(){ return val("ch_mode") !== "barres" }},
+      {sep:"Efforts de calcul", },
+      {id:"ch_Mt", l:"MEd en travée", v:"500", u:"kNm", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_Ma", l:"MEd sur appui intermédiaire", v:"0", u:"kNm", aide:"Valeur absolue ; 0 = pas d'appui intermédiaire", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_V", l:"VEd au nu de l'appui", v:"300", u:"kN", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_cot", l:"Inclinaison des bielles cot θ", v:"auto", t:"s", o:[["auto","Auto (le plus grand admis)"],["1","1,0 (45°)"],["1.5","1,5"],["2","2,0"],["2.5","2,5 (21,8°)"]], aide:"EN 1992 §6.2.3 : 1 ≤ cot θ ≤ 2,5", si:function(){ return val("ch_mode") !== "barres" }},
+      {sep:"Barres"},
+      {id:"ch_n", l:"Barres par lit", v:"4", si:function(){ return val("ch_mode") !== "cadres" }},
+      {id:"ch_lits", l:"Lits au plus", v:"3", si:function(){ return val("ch_mode") !== "cadres" }},
+      {id:"ch_omax", l:"Ø le plus gros admis", v:"26", t:"s", o:[["20","20"],["22","22"],["26","26"],["30","30"],["34","34"],["40","40"]], u:"mm", si:function(){ return val("ch_mode") === "poutre" }},
+      {id:"ch_dw", l:"Ø des cadres", v:"8", t:"s", o:[["6","6"],["8","8"],["10","10"],["12","12"]], u:"mm"},
+      {id:"ch_br", l:"Branches verticales par file", v:"2", t:"s", o:[["2","2 (un cadre)"],["3","3 (cadre + épingle)"],["4","4 (deux cadres)"],["6","6"]], si:function(){ return val("ch_mode") !== "barres" }},
+      {id:"ch_serie", l:"Suite d'espacements", v:"25", t:"s", o:[["25","Pas de 25 mm"],["50","Pas de 50 mm"],["caquot","Suite de Caquot"]], aide:"Caquot : 70, 80, 90, 100, 110, 130, 160, 200, 250, 350, 400 mm", si:function(){ return val("ch_mode") !== "barres" }},
+      {id:"ch_c", l:"Enrobage nominal des cadres", v:"30", u:"mm"},
+      {id:"ch_dg", l:"Plus gros granulat dg", v:"32", u:"mm", si:function(){ return val("ch_mode") !== "cadres" }}
+    ],
     tor:[
       {id:"to_b", l:"Largeur b", v:"0.30", u:"m"},
       {id:"to_h", l:"Hauteur h", v:"0.60", u:"m"},
@@ -740,7 +785,7 @@ footer a{text-decoration:none}
     CHAMPS[g].forEach(function(c){
       if(c.sep){ h += '<div class="ligne-sep">'+esc(c.sep)+'</div>'; return }
       var v = val(c.id), u = typeof c.u === "function" ? c.u() : (c.u || "");
-      h += '<div class="champ'+(c.large ? " large" : "")+'" data-champ="'+c.id+'"><label for="c-'+c.id+'">'+esc(c.l)+'</label><div class="boite">';
+      h += '<div class="champ'+(c.large ? " large" : c.t === "s" ? " liste" : "")+'" data-champ="'+c.id+'"><label for="c-'+c.id+'">'+esc(c.l)+'</label><div class="boite">';
       if(c.t === "s"){
         h += '<select id="c-'+c.id+'">' + c.o.map(function(o){ return '<option value="'+esc(o[0])+'"'+(String(o[0]) === String(v) ? " selected" : "")+'>'+esc(o[1])+'</option>' }).join("") + '</select>';
       } else {
@@ -1376,6 +1421,186 @@ footer a{text-decoration:none}
   // =====================================================================
   //  Torsion (EN 1992-1-1 §6.3), section rectangulaire pleine
   // =====================================================================
+  // =====================================================================
+  //  Calculette HA (d'après la feuille du classeur, recalculée selon EN 1992-1-1)
+  // =====================================================================
+  var DHA = [6,8,10,12,14,16,18,20,22,26,30,34,40];
+  function aHA(o){ return Math.PI * o * o / 4 }
+  // Barres par lits, comme la fonction trouveha du classeur : lit après lit, le plus petit Ø
+  // qui couvre le reste ; un lit n'a pas plus de deux crans de moins que le premier.
+  function litsHA(A, n, lits){
+    var r = [], s = 0, i0 = -1;
+    for(var i = 0; i < lits; i++){
+      var besoin = (A - s) / n / (lits - i), k = 0;
+      while(k < DHA.length - 1 && aHA(DHA[k]) < besoin - 1e-9) k++;
+      if(aHA(DHA[k]) < besoin - 1e-9) return null;
+      if(i === 0) i0 = k; else if(k < i0 - 2) k = i0 - 2;
+      r.push(DHA[k]); s += n * aHA(DHA[k]);
+    }
+    return {o:r, A:s};
+  }
+  function txtLits(L, n){
+    if(!L) return "hors tableau";
+    var t = [], k = 0;
+    while(k < L.o.length){ var j = k; while(j < L.o.length && L.o[j] === L.o[k]) j++; t.push((j - k > 1 ? (j - k) + " × " : "") + n + " Ø" + L.o[k]); k = j }
+    return t.join(" + ") + " (" + fmt(L.A / 100, 2) + " cm²)";
+  }
+  // Moins de lits possible avec un Ø au plus égal à omax
+  function choixLits(A, n, litsMax, omax){
+    for(var l = 1; l <= litsMax; l++){ var L = litsHA(A, n, l); if(L && Math.max.apply(null, L.o) <= omax){ L.n = l; return L } }
+    return null;
+  }
+  // Espacement libre horizontal entre barres d'un lit, EN 1992 §8.2(2), k1 = 1, k2 = 5 mm
+  function espaceLibre(bw, c, dw, n, o, dg){
+    var e = n > 1 ? (bw - 2 * (c + dw) - n * o) / (n - 1) : Infinity;
+    return {e:e, min:Math.max(o, dg + 5, 20)};
+  }
+  // Flexion simple, section rectangulaire ou en T, armature comprimée au-delà de x/d maximal
+  // (bloc rectangulaire fcd sur lam·x comme les autres sections). Md [kNm], longueurs [m] -> mm2
+  function flexionHA(Md, bw, beff, hf, d, d2, M){
+    Md = Math.abs(Md) * 1e6; bw *= 1000; beff = Math.max(beff * 1000, bw); hf *= 1000; d *= 1000; d2 *= 1000;
+    var f = M.fcd, ecu = 0.0035;
+    function compression(y){   // effort et moment par rapport aux armatures tendues
+      var yf = beff > bw ? Math.min(hf, y) : 0;
+      var C = f * (bw * y + (beff - bw) * yf);
+      var Mo = f * (bw * y * (d - y / 2) + (beff - bw) * yf * (d - yf / 2));
+      return {C:C, M:Mo};
+    }
+    if(Md < 1) return {As:0, As2:0, xd:0, y:0, table:false};
+    // y du bloc tel que M(y) = Md, par dichotomie (M croissant en y jusqu'à d)
+    var ylim = M.lam * M.xdmax * d, Mlim = compression(ylim).M;
+    if(Md <= Mlim){
+      var a = 0, b = ylim;
+      for(var it = 0; it < 80; it++){ var m = (a + b) / 2; if(compression(m).M < Md) a = m; else b = m }
+      var y = (a + b) / 2, C = compression(y).C;
+      return {As:C / M.fsd, As2:0, xd:y / M.lam / d, y:y, table:beff > bw && y > hf};
+    }
+    var x = M.xdmax * d, es2 = ecu * (x - d2) / x;
+    if(es2 <= 0) return {As:Infinity, As2:Infinity, xd:M.xdmax, y:ylim, table:false};
+    var s2 = Math.min(M.fsd, M.Es * 1000 * es2), As2 = (Md - Mlim) / ((d - d2) * s2);
+    return {As:(compression(ylim).C + As2 * s2) / M.fsd, As2:As2, xd:M.xdmax, y:ylim, s2:s2, table:beff > bw && ylim > hf};
+  }
+  function suiteEsp(code, smax){
+    var s = code === "caquot" ? [70,80,90,100,110,130,160,200,250,350,400] : [];
+    if(!s.length){ var p = +code; for(var v = 50; v <= 600; v += p) s.push(v) }
+    return s.filter(function(v){ return v <= smax + 1e-9 });
+  }
+  // Répartition des cadres sous charge répartie symétrique : V(x) = V0 (1 − 2x/L).
+  // Asw/s nécessaire en x, plafonné par l'espacement maximal et le pourcentage minimal.
+  function repartition(L, aswNu, aswMin, Asw, smax, code){
+    var S = suiteEsp(code, smax);
+    if(!S.length) return {err:"Aucun espacement de la suite n'est inférieur à " + fmt(smax, 0) + " mm."};
+    var x = 0, pos = [], pas = [], half = L / 2, garde = 0;
+    function sReq(x){ var a = Math.max(aswNu * Math.max(0, 1 - 2 * x / L), aswMin); return Asw / a * 1000 }
+    var s0 = S.filter(function(v){ return v <= sReq(0) + 1e-9 }).pop();
+    if(!s0) return {err:"Même " + S[0] + " mm ne suffit pas au nu : prends un Ø de cadre plus gros ou plus de branches."};
+    x = s0 / 2; pos.push(x);
+    while(x < half && garde++ < 2000){
+      var s = S.filter(function(v){ return v <= sReq(x) + 1e-9 }).pop();
+      if(x + s > half + s / 2) break;
+      x += s; pos.push(x); pas.push(s);
+    }
+    var grp = []; pas.forEach(function(s){ if(grp.length && grp[grp.length - 1].s === s) grp[grp.length - 1].n++; else grp.push({s:s, n:1}) });
+    var reste = L - 2 * pos[pos.length - 1];
+    return {s0:s0, grp:grp, n:2 * pos.length, reste:reste};
+  }
+  function tableCadres(asw, br, d, bw, M){
+    var smax = 0.75 * d, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk;
+    return '<div class="defile"><table><tr><th>Ø</th><th>Asw par file</th><th>s calculé</th><th>s retenu</th><th>Asw/s obtenu</th></tr>' + [6, 8, 10, 12].map(function(o){
+      var A = br * aHA(o), s = A / Math.max(asw, rmin * bw * 1000) * 1000, sr = Math.floor(Math.min(s, smax) / 25) * 25;
+      return '<tr' + (sr < 75 ? ' class="ko"' : "") + '><td>Ø' + o + '</td><td>' + fmt(A, 0) + ' mm²</td><td>' + fmt(s, 0) + ' mm</td><td>' + (sr < 75 ? "trop serré" : sr + " mm") + '</td><td>' + (sr < 75 ? "—" : fmt(A / sr * 10, 2) + " cm²/m") + '</td></tr>';
+    }).join("") + '</table></div>';
+  }
+  function texteRep(R){
+    if(R.err) return '<div class="alerte">' + esc(R.err) + '</div>';
+    return '<p class="note"><b>Du nu vers mi-portée :</b> ' + fmt(R.s0 / 2, 0) + ' mm' + R.grp.map(function(g){ return " + " + g.n + " × " + g.s }).join("") +
+      ' mm, puis la même suite depuis l\'autre appui ; il reste ' + fmt(R.reste, 0) + ' mm au milieu. Environ ' + R.n + ' cadres par travée.</p>';
+  }
+  function rendCalculette(){
+    var M = mat(), mode = val("ch_mode"), bw = num("ch_bw"), c = num("ch_c"), dw = +val("ch_dw"), dg = num("ch_dg"), n = Math.max(1, Math.round(num("ch_n"))), lmax = Math.max(1, Math.round(num("ch_lits")));
+    var h2 = "";
+    if(mode === "barres"){
+      var A = num("ch_A") * 100;
+      h2 += '<h2>Barres pour A = ' + fmt(A / 100, 2) + ' cm²</h2><div class="defile"><table><tr><th>Lits</th><th>Barres</th><th>A obtenu</th><th>Surplus</th><th>Espace libre / minimum</th></tr>';
+      var best = null, rows = [];
+      for(var l = 1; l <= lmax; l++){ var L = litsHA(A, n, l); rows.push({l:l, L:L}); if(L && (!best || L.A < best.L.A - 1)) best = {l:l, L:L} }
+      h2 += rows.map(function(r){
+        if(!r.L) return '<tr class="ko"><td>' + r.l + '</td><td>hors tableau</td><td></td><td></td><td></td></tr>';
+        var E = espaceLibre(bw * 1000, c, dw, n, Math.max.apply(null, r.L.o), dg), ok = E.e >= E.min;
+        return '<tr' + (best && r.l === best.l ? ' class="opt"' : ok ? "" : ' class="ko"') + '><td>' + r.l + '</td><td>' + txtLits(r.L, n) + '</td><td>' + fmt(r.L.A / 100, 2) + ' cm²</td><td>' + fmt((r.L.A / A - 1) * 100, 0) + ' %</td><td>' + (n > 1 ? fmt(E.e, 0) + " / " + fmt(E.min, 0) + " mm" + (ok ? "" : " ✗") : "—") + '</td></tr>';
+      }).join("") + '</table></div><p class="note">Comme dans le classeur : chaque lit prend le plus petit Ø qui couvre le reste, sans descendre de plus de deux crans sous le premier lit. Espace libre selon EN 1992 §8.2(2) : max(Ø ; dg + 5 ; 20 mm), contrôlé sur la largeur bw avec l\'enrobage et le Ø des cadres.</p>';
+      h2 += '<h3>Un seul Ø</h3><div class="defile"><table><tr><th>Ø</th><th>Barres</th><th>A obtenu</th><th>kg/m</th><th>En nappe : e pour A par mètre</th></tr>' + DHA.slice(1).map(function(o){
+        var k = Math.ceil(A / aHA(o) - 1e-9), e = Math.floor(aHA(o) / A * 1000 / 5) * 5;
+        return '<tr><td>Ø' + o + '</td><td>' + k + '</td><td>' + fmt(k * aHA(o) / 100, 2) + ' cm²</td><td>' + fmt(k * aHA(o) * 1e-6 * ACIER_KG, 2) + '</td><td>' + (e >= 50 ? e + " mm" : "—") + '</td></tr>';
+      }).join("") + '</table></div>';
+      $("#r-ch").innerHTML = h2; return;
+    }
+    var h = num("ch_h"), d = h - num("ch_ai") / 1000, br = +val("ch_br"), Lp = num("ch_L");
+    var z = 0.9 * d, nu1 = 0.6 * (1 - M.fck / 250), fcd = M.fcdEC, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk, aswMin = rmin * bw * 1e6, smax = 0.75 * d * 1000;
+    var Afile = br * aHA(dw), stmax = Math.min(0.75 * d * 1000, 600), st = br > 1 ? (bw * 1000 - 2 * c - dw) / (br - 1) : 0;
+    function vmax(ct){ return bw * z * nu1 * fcd * 1000 / (ct + 1 / ct) }
+    if(mode === "cadres"){
+      var asw = num("ch_asw") * 100;
+      h2 += '<h2>Cadres pour Asw/s = ' + fmt(asw / 100, 2) + ' cm²/m</h2><div class="cles">' + cle("d", fmt(d * 1000, 0), "mm", "z = 0,9 d = " + fmt(z * 1000, 0) + " mm") +
+        cle("Espacement maximal", fmt(smax, 0), "mm", "0,75 d, EN 1992 éq. (9.6N)") + cle("Asw/s minimal", fmt(aswMin / 100, 2), "cm²/m", "ρw,min = " + fmt(rmin * 1000, 2) + " ‰, éq. (9.5N)") + '</div>';
+      h2 += '<h3>Par Ø, ' + br + ' branches par file</h3>' + tableCadres(asw, br, d, bw, M);
+      h2 += '<ul class="verifs">' + verif(st <= stmax, "Écart transversal des branches ≤ min(0,75 d ; 600 mm) (§9.2.2(8))", fmt(st, 0) + " ≤ " + fmt(stmax, 0) + " mm") + '</ul>';
+      if(Lp > 0){ h2 += '<h2>Répartition, Ø' + dw + ' à ' + br + ' branches</h2>' + texteRep(repartition(Lp * 1000, asw, aswMin, Afile, smax, val("ch_serie"))) +
+        '<p class="note">Charge répartie symétrique : Asw/s décroît linéairement jusqu\'à mi-portée, sans descendre sous le minimum. Le premier cadre est à s/2 du nu.</p>' }
+      $("#r-ch").innerHTML = h2; return;
+    }
+    // ---- poutre complète
+    var beff = num("ch_beff"), hf = num("ch_hf"), d2 = num("ch_as") / 1000, dsup = h - d2, omax = +val("ch_omax");
+    var Mt = num("ch_Mt"), Ma = num("ch_Ma"), V = num("ch_V");
+    var Ft = flexionHA(Mt, bw, beff, hf, d, d2, M), Fa = Ma > 0 ? flexionHA(Ma, bw, 0, 0, dsup, num("ch_ai") / 1000, M) : null;
+    var Fr = flexionHA(0.15 * Mt, bw, 0, 0, dsup, num("ch_ai") / 1000, M);
+    var amin = asMin(bw, d, M), amax = 0.04 * bw * h * 1e6;
+    var Ati = Math.max(Ft.As, amin), Lt = choixLits(Ati, n, lmax, omax);
+    // cot θ
+    var cot = val("ch_cot") === "auto" ? null : +val("ch_cot");
+    if(cot === null){ for(var ct = 2.5; ct >= 1 - 1e-9; ct -= 0.1){ if(vmax(ct) >= V){ cot = Math.round(ct * 10) / 10; break } } }
+    var Vmax = vmax(cot || 1), aswNu = cot ? V * 1000 / (z * 1000 * M.fsd * cot) * 1000 : Infinity;   // mm2/m
+    var aswMax = 0.5 * nu1 * fcd * bw * 1000 / M.fsd * 1000;                                       // éq. (6.12), cot θ = 1
+    var FE = (cot || 1) * V / 2, AsAp = Math.max(FE * 1000 / M.fsd, 0.25 * Ati);
+    h2 += '<h2>Flexion en travée' + (beff > bw ? ", section en T" : "") + '</h2><div class="cles">' +
+      cle("As inférieur", fmt(Ft.As, 0), "mm²", "x/d = " + fmt(Ft.xd, 2) + (Ft.table ? ", l'axe neutre sort de la table" : ""), true) +
+      (Ft.As2 > 0 ? cle("As' comprimé", fmt(Ft.As2, 0), "mm²", "σs2 = " + fmt(Ft.s2, 0) + " MPa") : "") +
+      cle("As,min", fmt(amin, 0), "mm²", "éq. (9.1N)") + cle("Barres", Lt ? fmt(Lt.A / 100, 1) : "—", "cm²", txtLits(Lt, n)) + '</div><ul class="verifs">' +
+      verif(Ft.As2 === 0, "Sans armature comprimée (x/d ≤ " + fmt(M.xdmax, 2) + ")", Ft.As2 > 0 ? "armature comprimée : agrandis la section ou utilise la table" : "") +
+      verif(Ati <= amax, "As ≤ As,max = 0,04 Ac (§9.2.1.1(3))", fmt(Ati, 0) + " ≤ " + fmt(amax, 0) + " mm²") +
+      (Lt ? (function(){ var E = espaceLibre(bw * 1000, c, dw, n, Lt.o[0], dg); return verif(E.e >= E.min, "Espace libre entre barres (§8.2(2))", fmt(E.e, 0) + " ≥ " + fmt(E.min, 0) + " mm") })() : verif(false, "Barres : aucune combinaison avec " + n + " barres par lit, " + lmax + " lits et Ø ≤ " + omax, "")) + '</ul>';
+    if(Ft.As2 > 0){ var L2 = choixLits(Ft.As2, n, 1, omax); h2 += '<p class="note">Armature comprimée : ' + txtLits(L2, n) + ', tenue par des cadres (§9.2.1.2(3) et §9.5.3).</p>' }
+    h2 += '<h2>Armatures supérieures</h2><div class="cles">' +
+      cle("Appuis de rive", fmt(Math.max(Fr.As, 0), 0), "mm²", "0,15 × MEd travée, §9.2.1.2(1) ; " + txtLits(choixLits(Fr.As, n, 1, omax), n)) +
+      (Fa ? cle("Appui intermédiaire", fmt(Math.max(Fa.As, amin), 0), "mm²", "x/d = " + fmt(Fa.xd, 2) + " ; " + txtLits(choixLits(Math.max(Fa.As, amin), n, lmax, omax), n), true) : "") +
+      (Fa && Fa.As2 > 0 ? cle("As' sur appui", fmt(Fa.As2, 0), "mm²", "en fibre inférieure") : "") + '</div>' +
+      (beff > bw && Fa ? '<p class="note">Sur appui, la table est tendue : le calcul se fait sur la largeur bw. Une partie des barres peut être placée dans la table (§9.2.1.2(2)).</p>' : "");
+    h2 += '<h2>Effort tranchant</h2><div class="cles">' +
+      cle("cot θ", cot ? fmt(cot, 1) : "—", "", cot ? "θ = " + fmt(Math.atan(1 / cot) * 180 / Math.PI, 1) + "°" : "bielle trop sollicitée") +
+      cle("VRd,max", fmt(Vmax, 0), "kN", "éq. (6.9), ν1 = " + fmt(nu1, 2)) +
+      cle("Asw/s au nu", fmt(Math.max(aswNu, aswMin) / 100, 2), "cm²/m", "éq. (6.8), z = 0,9 d", true) +
+      cle("Asw/s minimal", fmt(aswMin / 100, 2), "cm²/m", "éq. (9.5N)") + cle("Asw/s maximal", fmt(aswMax / 100, 2), "cm²/m", "éq. (6.12), cot θ = 1") + '</div><ul class="verifs">' +
+      verif(cot !== null, "VEd ≤ VRd,max", fmt(V, 0) + " ≤ " + fmt(Vmax, 0) + " kN") +
+      verif(aswNu <= aswMax, "Asw/s ≤ maximum utile", fmt(aswNu / 100, 2) + " ≤ " + fmt(aswMax / 100, 2) + " cm²/m") +
+      verif(st <= stmax, "Écart transversal des branches ≤ min(0,75 d ; 600 mm) (§9.2.2(8))", fmt(st, 0) + " ≤ " + fmt(stmax, 0) + " mm") +
+      verif(null, "Ancrage inférieur aux appuis : ≥ max(VEd · cot θ / 2 / fyd ; 0,25 As travée) (§9.2.1.4)", fmt(AsAp, 0) + " mm² · " + txtLits(choixLits(AsAp, n, 1, omax), n)) + '</ul>';
+    if(cot){
+      h2 += '<h3>Cadres au nu, ' + br + ' branches par file</h3>' + tableCadres(aswNu, br, d, bw, M);
+      if(Lp > 0) h2 += '<h3>Répartition, Ø' + dw + ' à ' + br + ' branches</h3>' + texteRep(repartition(Lp * 1000, aswNu, aswMin, Afile, smax, val("ch_serie"))) +
+        '<p class="note">Valable pour une charge répartie symétrique : VEd décroît linéairement du nu à mi-portée.</p>';
+    }
+    if(beff > bw && cot){
+      // Liaison table-âme, EN 1992 §6.2.4 : part de la compression reprise par un débord
+      var dF = V * 1000 / (z * 1000) * ((beff - bw) / 2 / beff), vEd = dF / (hf * 1000), cf = Math.min(cot, 2);
+      var fctd = 0.7 * M.fctm / M.gc, Asf = vEd * hf * 1000 / (M.fsd * cf) * 1000, vlim = nu1 * fcd / (cf + 1 / cf);
+      h2 += '<h2>Liaison table-âme</h2><div class="cles">' + cle("vEd", fmt(vEd, 2), "MPa", "ΔFd/(hf Δx), débord de " + fmt((beff - bw) / 2, 2) + " m") +
+        cle("Asf/sf", vEd <= 0.4 * fctd ? "0" : fmt(Asf / 100, 2), "cm²/m", vEd <= 0.4 * fctd ? "vEd ≤ 0,4 fctd, §6.2.4(6)" : "éq. (6.21), cot θf = " + fmt(cf, 1), true) + '</div><ul class="verifs">' +
+        verif(vEd <= vlim, "Bielles de la table, éq. (6.22)", fmt(vEd, 2) + " ≤ " + fmt(vlim, 2) + " MPa") + '</ul>' +
+        '<p class="note">ΔFd/Δx pris égal à VEd / z × (part du débord dans la largeur beff), table comprimée en travée.</p>';
+    }
+    $("#r-ch").innerHTML = h2;
+  }
+
   function rendTorsion(){
     var M = mat(), b = num("to_b") * 1000, h = num("to_h") * 1000, c = num("to_c"), T = num("to_T") * 1e6, V = num("to_V") * 1000;
     var cot = Math.min(2.5, Math.max(1, num("to_cot"))), th = Math.atan(1 / cot), fcd = M.fcdEC, fyd = M.fsd, nu = 0.6 * (1 - M.fck / 250);
@@ -1990,6 +2215,12 @@ footer a{text-decoration:none}
     ["Torsion tef, Ak, TRd,max, interaction (6.29), (6.31)", "EN 1992-1-1 §6.3", "", ""],
     ["Mur de soutènement : EQU, glissement δ = φ', portance avec inclinaison", "EN 1990 tab. A1.2(A), EN 1997-1 §6.5, annexe D", "", "Facteurs SIA 267 à confirmer"],
     ["Plaque : éléments finis ACM (Kirchhoff), bords appuyés, encastrés ou libres", "Mécanique", "", "Remplace les tables de coefficients du classeur"],
+    ["Calculette HA : barres par lits (règle des deux crans du classeur)", "Usage", "", "Règle d'atelier reprise du classeur, pas une exigence de norme"],
+    ["Espace libre entre barres max(Ø ; dg + 5 ; 20 mm)", "EN 1992-1-1 §8.2(2)", "", "k1 = 1, k2 = 5 mm recommandés"],
+    ["Cadres : sl,max = 0,75 d · st,max = min(0,75 d ; 600) · ρw,min = 0,08 √fck / fyk", "EN 1992-1-1 §9.2.2", "", ""],
+    ["Asw/s = VEd / (z fywd cot θ) · VRd,max · Asw,max (6.12)", "EN 1992-1-1 §6.2.3", "", "Le classeur prenait θ = 45° et des formules BAEL (Roux)"],
+    ["Rive 0,15 MEd · ancrage inférieur VEd cot θ / 2 et 0,25 As", "EN 1992-1-1 §9.2.1.2(1), §9.2.1.4", "", "β1 = 0,15 recommandé ; le classeur prenait VEd / fyd"],
+    ["Liaison table-âme vEd, Asf/sf, 0,4 fctd", "EN 1992-1-1 §6.2.4", "", "Le classeur appliquait la règle BAEL des coutures"],
     ["Enrobages par classe d'exposition", "SIA 262", "av", "À saisir dans chaque section"],
     ["Déversement des poutres", "SIA 263 / EN 1993 §6.3.2", "av", ""],
     ["Limites de flèche", "SIA 260", "av", "Saisies par l'utilisateur"],
@@ -2003,8 +2234,8 @@ footer a{text-decoration:none}
   // =====================================================================
   //  Navigation et calcul
   // =====================================================================
-  var NOMS = {hypotheses:"Hypothèses", materiaux:"Matériaux", fondations:"Fondations", murs:"Murs enterrés", soutenement:"Murs de soutènement", dalles:"Dalles", poutres:"Poutres", poteaux:"Poteaux", poinconnement:"Poinçonnement", fissuration:"Fissuration", torsion:"Torsion", normes:"Normes et sources"};
-  var REND = {hypotheses:rendHypotheses, materiaux:rendMateriaux, fondations:rendFondations, murs:rendMurs, soutenement:rendSoutenement, dalles:rendDalles, poutres:rendPoutres, poteaux:rendPoteaux, poinconnement:rendPoinconnement, fissuration:rendFissures, torsion:rendTorsion, normes:rendNormes};
+  var NOMS = {hypotheses:"Hypothèses", materiaux:"Matériaux", fondations:"Fondations", murs:"Murs enterrés", soutenement:"Murs de soutènement", dalles:"Dalles", poutres:"Poutres", poteaux:"Poteaux", poinconnement:"Poinçonnement", fissuration:"Fissuration", torsion:"Torsion", calculette:"Calculette HA", normes:"Normes et sources"};
+  var REND = {hypotheses:rendHypotheses, materiaux:rendMateriaux, fondations:rendFondations, murs:rendMurs, soutenement:rendSoutenement, dalles:rendDalles, poutres:rendPoutres, poteaux:rendPoteaux, poinconnement:rendPoinconnement, fissuration:rendFissures, torsion:rendTorsion, calculette:rendCalculette, normes:rendNormes};
   var courante = "hypotheses", minuterie = null;
   // Cartes blanches : chaque titre h2 (ou h3 pour la page des normes) ouvre une
   // carte qui garde les éléments suivants jusqu'au titre de même rang.
