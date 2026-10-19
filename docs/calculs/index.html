@@ -209,6 +209,7 @@ td.g{white-space:normal;min-width:16em}
 .schema text{font-family:var(--sans);font-size:11px;fill:rgba(var(--encre),.66);font-variant-numeric:tabular-nums}
 .schema text.or{fill:var(--or)}
 .schema .pt{fill:var(--or)}
+.schema text.nap{font-size:9px;font-weight:600;fill:rgba(var(--encre),.55)}
 .schema .ap{fill:none;stroke:rgba(var(--encre),.6);stroke-width:.9}
 .lg{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px;font-size:12px;color:var(--texte-faible)}
 .lg i{display:inline-block;width:16px;height:0;border-top:1.6px solid var(--or);vertical-align:middle;margin-right:6px}
@@ -1840,6 +1841,7 @@ footer{font-size:11.5px}
     s += '<line class="ax" x1="'+px(0)+'" y1="'+y0+'" x2="'+px(X)+'" y2="'+y0+'"/>';
     R.ax.forEach(function(x, q){
       var t = R.types[q], cx = px(x);
+      s += '<text class="nap" x="'+cx.toFixed(1)+'" y="'+(y0 + 24)+'" text-anchor="middle">'+(q + 1)+'</text>';   // numéro de l'appui
       if(t === "A") s += '<path class="ap" d="M'+cx+' '+y0+' l-7 11 h14 z"/>';
       else if(t === "E") s += '<path class="ap" d="M'+(cx + (q === 0 ? -1 : 1))+' '+(y0-14)+' v28"/><path class="f" d="M'+cx+' '+(y0-14)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0-4)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0+6)+' l'+(q === 0 ? -6 : 6)+' 6"/>';
     });
@@ -1875,6 +1877,7 @@ footer{font-size:11.5px}
     s += '<line class="ax" x1="'+px(0)+'" y1="'+y0+'" x2="'+px(X)+'" y2="'+y0+'"/>';
     R.ax.forEach(function(x, q){
       var t = R.types[q], cx = px(x);
+      s += '<text class="nap" x="'+cx.toFixed(1)+'" y="'+(y0 + 24)+'" text-anchor="middle">'+(q + 1)+'</text>';   // numéro de l'appui
       if(t === "A") s += '<path class="ap" d="M'+cx+' '+y0+' l-7 11 h14 z"/>';
       else if(t === "E") s += '<path class="ap" d="M'+(cx + (q === 0 ? -1 : 1))+' '+(y0-14)+' v28"/><path class="f" d="M'+cx+' '+(y0-14)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0-4)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0+6)+' l'+(q === 0 ? -6 : 6)+' 6"/>';
       if(q > 0) s += '<text x="'+((px(R.ax[q - 1]) + cx) / 2)+'" y="'+(H - 8)+'" text-anchor="middle">'+fmt(x - R.ax[q - 1], 2)+' m</text>';
@@ -1910,6 +1913,7 @@ footer{font-size:11.5px}
     s += '<path class="f" d="M'+px(0)+' '+yc+' H'+px(X)+ax.map(function(x){ return ' M'+px(x).toFixed(1)+' '+(yc - 3)+' v6' }).join("")+'"/>';
     ax.forEach(function(x, q){
       var t = app[q], cx = px(x), y = yb + 1;
+      s += '<text class="nap" x="'+cx.toFixed(1)+'" y="'+(yb + 21)+'" text-anchor="middle">'+(q + 1)+'</text>';   // numéro de l'appui
       if(t === "A") s += '<path class="ap" d="M'+cx.toFixed(1)+' '+y.toFixed(1)+' l-5 8 h10 z"/>';
       else if(t === "E"){
         if(q === 0 || q === ax.length - 1){ var sg = q === 0 ? -1 : 1; s += '<path class="ap" d="M'+cx.toFixed(1)+' '+(yt - 4)+' V'+(yb + 4).toFixed(1)+'"/><path class="f" d="'+[0, 1, 2, 3].map(function(k){ return 'M'+cx.toFixed(1)+' '+(yt - 2 + k * 6)+' l'+(4*sg)+' 4' }).join(" ")+'"/>' }
