@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lumen · STR Bim Tools</title>
-<meta name="description" content="Six tableaux animés : particules, portiques à l'infini, tour hyperboloïde, lignes de force, ville et haubans.">
+<meta name="description" content="Sept tableaux animés : particules, portiques à l'infini, tour hyperboloïde, lignes de force, ville, haubans et lac d'Annecy.">
 <!-- Page cachée (18.10.2026) : hors menu, hors sitemap, noindex -->
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#050505">
@@ -94,6 +94,7 @@ main{position:relative;z-index:2}
   <button type="button" aria-label="Isostatiques"><i></i></button>
   <button type="button" aria-label="Métropole"><i></i></button>
   <button type="button" aria-label="Haubans"><i></i></button>
+  <button type="button" aria-label="Lac d'Annecy"><i></i></button>
 </nav>
 
 <main>
@@ -136,17 +137,25 @@ main{position:relative;z-index:2}
     </div>
   </section>
 
-  <section class="chap dernier" aria-label="Haubans">
+  <section class="chap" aria-label="Haubans">
     <div class="cartel">
       <div class="num rv">05 — Résonance</div>
       <h2>Haubans</h2>
       <p class="rv" style="--d:.5s">Les câbles vibrent comme des cordes. Les effleurer pour les faire chanter.</p>
     </div>
+  </section>
+
+  <section class="chap dernier" aria-label="Lac d'Annecy : un voilier First 211 au coucher du soleil, entre la Tournette et le Semnoz">
+    <div class="cartel">
+      <div class="num rv">06 — Lac d'Annecy</div>
+      <h2>First 211</h2>
+      <p class="rv" style="--d:.5s">Un soir sur le lac, la Tournette à gauche, le Semnoz à droite. Descendre pour faire tomber la nuit, toucher l'eau pour y faire des ronds.</p>
+    </div>
     <footer class="pied">
       <div class="pied-droite">
         <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
         <a href="/mentions-legales/">Mentions légales</a>
-        <span class="pied-maj">Dernière mise à jour : <span data-maj>18.10.2026</span></span>
+        <span class="pied-maj">Dernière mise à jour : <span data-maj>19.10.2026</span></span>
       </div>
     </footer>
   </section>
@@ -168,14 +177,14 @@ main{position:relative;z-index:2}
   function rgba(c, a){ return "rgba(" + c + "," + c01(a).toFixed(3) + ")" }
 
   // ---------- Pointeur (souris ou doigt) ----------
-  var ptr = { x: -1e4, y: -1e4, on: false, down: false, up: -1e9, last: 0, acc: 0 };
+  var ptr = { x: -1e4, y: -1e4, on: false, down: false, up: -1e9, last: 0, acc: 0, downT: 0 };
   function maintenant(){ return performance.now() }
   window.addEventListener("pointermove", function(e){
     if (ptr.down) ptr.acc += e.clientX - ptr.x;
     ptr.x = e.clientX; ptr.y = e.clientY; ptr.on = true; ptr.last = maintenant();
   }, { passive: true });
   window.addEventListener("pointerdown", function(e){
-    ptr.x = e.clientX; ptr.y = e.clientY; ptr.on = true; ptr.down = true; ptr.last = maintenant();
+    ptr.x = e.clientX; ptr.y = e.clientY; ptr.on = true; ptr.down = true; ptr.last = ptr.downT = maintenant();
   }, { passive: true });
   function lache(e){
     ptr.down = false;
@@ -852,9 +861,292 @@ main{position:relative;z-index:2}
   };
 
   // =====================================================================
+  // 06 — Lac d'Annecy : un First 211 au coucher du soleil, Tournette et Semnoz
+  // =====================================================================
+  // Profils vus depuis Annecy vers le sud : x en largeur d'écran, y en « unités de montagne ».
+  // Du fond vers l'avant : Bauges au fond, Tournette (rive est, à gauche), Semnoz (rive ouest, à droite),
+  // Dents de Lanfon au premier plan à gauche.
+  var MONTS = [
+    { p: [[-.05,.10],[.12,.14],[.24,.20],[.33,.17],[.40,.25],[.46,.21],[.52,.29],[.57,.23],[.64,.26],[.71,.18],[.82,.17],[1.05,.12]], fond: "rgb(24,22,20)", ech: 5, or: true },
+    { p: [[-.05,.06],[.05,.13],[.12,.23],[.18,.34],[.22,.41],[.25,.45],[.27,.42],[.29,.46],[.32,.39],[.37,.29],[.42,.19],[.47,.10],[.52,.04],[.57,0]], fond: "rgb(15,14,13)", ech: 8 },
+    { p: [[.50,0],[.58,.05],[.66,.12],[.74,.18],[.82,.22],[.90,.245],[.96,.25],[1.05,.24]], fond: "rgb(12,11,10)", ech: 8 },
+    { p: [[-.05,.19],[0,.23],[.035,.28],[.055,.35],[.07,.30],[.085,.38],[.10,.31],[.115,.36],[.13,.28],[.155,.23],[.19,.15],[.24,.08],[.29,.03],[.33,0]], fond: "rgb(8,8,8)", ech: 7 }
+  ];
+  // lumières des villages au bord de l'eau (Menthon, Talloires, Duingt, Sévrier)
+  var VILLAGES = [.05, .075, .09, .13, .15, .165, .43, .445, .46, .6, .625, .66, .69, .72];
+
+  var lac = { trail: false };
+  lac.init = function(){
+    this.M = new Calque(); this.M.taille();
+    this.etoiles = [];
+    for (var i = 0; i < 150; i++) this.etoiles.push({ x: Math.random(), y: Math.pow(Math.random(), 1.4), ph: Math.random() * TAU, r: Math.random() < .1 ? 1.6 : 1 });
+    this.sillage = []; this.emis = 0; this.ronds = []; this.tap = ptr.downT;
+  };
+  lac.resize = function(){ if (this.M) this.M.taille(); };
+  lac.entre = function(){ this.sillage = []; this.ronds = []; this.tap = ptr.downT; };
+
+  // crête tracée de gauche à droite jusqu'à la fraction r de sa longueur
+  function crete(g, P, r){
+    var tot = 0, i, l = [];
+    for (i = 1; i < P.length; i++){ var d = Math.hypot(P[i][0] - P[i-1][0], P[i][1] - P[i-1][1]); l.push(d); tot += d; }
+    var reste = tot * r;
+    g.beginPath(); g.moveTo(P[0][0], P[0][1]);
+    for (i = 1; i < P.length; i++){
+      if (reste >= l[i-1]){ g.lineTo(P[i][0], P[i][1]); reste -= l[i-1]; }
+      else { var q = reste / l[i-1]; g.lineTo(P[i-1][0] + (P[i][0] - P[i-1][0]) * q, P[i-1][1] + (P[i][1] - P[i-1][1]) * q); break; }
+    }
+    g.stroke();
+  }
+
+  lac.montagnes = function(g, y0, hu, t, nuit){
+    for (var k = 0; k < MONTS.length; k++){
+      var m = MONTS[k], r = ease((t - k * .45) / 2.4);
+      if (r <= 0) continue;
+      var P = m.p.map(function(q){ return [q[0] * W, y0 - q[1] * hu]; }), n = P.length, i, e;
+      g.globalAlpha = smooth(0, .6, r);
+      g.beginPath(); g.moveTo(P[0][0], y0 + 1);
+      for (i = 0; i < n; i++) g.lineTo(P[i][0], P[i][1]);
+      g.lineTo(P[n-1][0], y0 + 1); g.closePath();
+      g.fillStyle = m.fond; g.fill();
+      // échos de la crête : la montagne gravée comme un relevé topographique
+      g.save(); g.clip();
+      g.lineWidth = .8;
+      for (e = 1; e <= m.ech; e++){
+        var dy = e * hu * .024 * (1 + e * .18);
+        g.strokeStyle = rgba(m.or ? OR : CR, (.17 - e * .016) * (1 - nuit * .55));
+        g.beginPath(); g.moveTo(P[0][0], P[0][1] + dy);
+        for (i = 1; i < n; i++) g.lineTo(P[i][0], P[i][1] + dy);
+        g.stroke();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+      g.lineWidth = m.or ? 1.3 : 1.1; g.lineJoin = "round";
+      g.strokeStyle = m.or ? rgba(OR, .85 * (1 - nuit * .6)) : rgba(CR, .6 * (1 - nuit * .4));
+      crete(g, P, r);
+    }
+    // villages qui s'allument à la nuit tombée
+    if (nuit > .05){
+      for (var v = 0; v < VILLAGES.length; v++){
+        var a = nuit * (.55 + .45 * Math.sin(t * 2.3 + v * 7.1)), loin = VILLAGES[v] > .4 && VILLAGES[v] < .5;
+        g.fillStyle = rgba(OR, a);
+        g.beginPath(); g.arc(VILLAGES[v] * W, y0 - (loin ? 1.5 : 3), loin ? .9 : 1.4, 0, TAU); g.fill();
+      }
+    }
+  };
+
+  // First 211 de profil, cap à droite : repère en longueurs de coque, y vers le haut
+  function hauteurPont(x){ return .17 + .06 * (x + .5) * (x + .5); }
+  lac.voilier = function(g, xb, yb, Lb, tangage, gite, t, nuit, reflet){
+    var u = 1 / Lb;
+    g.save(); g.translate(xb, yb); g.rotate(-tangage); g.scale(Lb, reflet ? Lb : -Lb);
+    g.lineJoin = "round"; g.lineCap = "round";
+    // coque
+    g.beginPath(); g.moveTo(-.46, 0); g.lineTo(-.5, .17); g.quadraticCurveTo(0, .17, .5, .23); g.lineTo(.45, 0); g.closePath();
+    g.fillStyle = "rgba(6,6,6,.96)"; g.fill();
+    g.lineWidth = 1.3 * u; g.strokeStyle = rgba(CR, .9); g.stroke();
+    g.beginPath(); g.moveTo(-.48, .075); g.quadraticCurveTo(0, .055, .475, .105);
+    g.lineWidth = 1 * u; g.strokeStyle = rgba(OR, .8); g.stroke();
+    if (!reflet){
+      // œuvres vives, quille relevable et safran, vus « aux rayons X »
+      g.beginPath(); g.moveTo(.45, 0); g.quadraticCurveTo(.3, -.07, 0, -.075); g.quadraticCurveTo(-.3, -.07, -.46, 0);
+      g.moveTo(.04, -.072); g.lineTo(.01, -.36); g.lineTo(-.03, -.36); g.lineTo(-.01, -.074);
+      g.moveTo(-.445, .03); g.lineTo(-.47, -.2); g.lineTo(-.43, -.2); g.lineTo(-.42, .0);
+      g.lineWidth = .8 * u; g.strokeStyle = rgba(VE, .16); g.stroke();
+    }
+    // rouf, hublots, barre franche, filières
+    g.beginPath(); g.moveTo(.2, hauteurPont(.2)); g.lineTo(.13, .285); g.lineTo(-.13, .285); g.lineTo(-.17, hauteurPont(-.17));
+    g.moveTo(.1, .255); g.lineTo(-.09, .255);
+    g.moveTo(-.43, .185); g.lineTo(-.3, .235);
+    var sx = [.42, .26, .06, -.14, -.34, -.47], i;
+    for (i = 0; i < sx.length; i++){ g.moveTo(sx[i], hauteurPont(sx[i])); g.lineTo(sx[i], hauteurPont(sx[i]) + .085); }
+    g.moveTo(sx[0], hauteurPont(sx[0]) + .085);
+    for (i = 1; i < sx.length; i++) g.lineTo(sx[i], hauteurPont(sx[i]) + .085);
+    g.lineWidth = .9 * u; g.strokeStyle = rgba(CR, .6); g.stroke();
+
+    // gréement fractionné, raccourci par la gîte
+    g.save(); g.scale(1, Math.cos(gite));
+    var sf = Math.sin(t * .9) * .012;
+    // grand-voile
+    g.beginPath(); g.moveTo(.065, .41); g.lineTo(.065, 1.39); g.quadraticCurveTo(-.19 + sf, .95, -.4, .39); g.closePath();
+    g.fillStyle = rgba(OR, .1 * (1 - nuit * .6)); g.fill();
+    g.lineWidth = 1 * u; g.strokeStyle = rgba(CR, .8); g.stroke();
+    g.beginPath();
+    for (i = 1; i <= 4; i++){
+      var s = i / 5, a = (1 - s) * (1 - s), b = 2 * (1 - s) * s, c = s * s;
+      var qx = a * .065 + b * (-.19 + sf) + c * -.4, qy = a * 1.39 + b * .95 + c * .39;
+      g.moveTo(qx, qy); g.lineTo(qx + .1 + .04 * s, qy + .005);
+    }
+    g.lineWidth = .8 * u; g.strokeStyle = rgba(OR, .45); g.stroke();
+    // foc
+    g.beginPath(); g.moveTo(.47, .25); g.lineTo(.075, 1.2); g.quadraticCurveTo(-.02 - sf, .72, .02, .3); g.quadraticCurveTo(.25, .23, .47, .25);
+    g.fillStyle = rgba(VE, .08 * (1 - nuit * .5)); g.fill();
+    g.lineWidth = 1 * u; g.strokeStyle = rgba(CR, .75); g.stroke();
+    // mât, bôme, étai, pataras
+    g.beginPath(); g.moveTo(.06, .285); g.lineTo(.06, 1.42);
+    g.moveTo(.06, .4); g.lineTo(-.41, .38);
+    g.lineWidth = 1.6 * u; g.strokeStyle = rgba(CR, .9); g.stroke();
+    g.beginPath(); g.moveTo(.06, 1.22); g.lineTo(.48, .24); g.moveTo(.06, 1.42); g.lineTo(-.49, .18);
+    g.lineWidth = .7 * u; g.strokeStyle = rgba(CR, .4); g.stroke();
+    // feux de navigation : tête de mât, bâbord (rouge), poupe
+    if (nuit > .05 && !reflet){
+      var feux = [[.06, 1.43, "255,250,235"], [.47, .25, "255,80,64"], [-.5, .19, "255,250,235"]];
+      for (i = 0; i < feux.length; i++){
+        var rr = 18 * u, gf = g.createRadialGradient(feux[i][0], feux[i][1], 0, feux[i][0], feux[i][1], rr);
+        gf.addColorStop(0, "rgba(" + feux[i][2] + "," + nuit.toFixed(3) + ")"); gf.addColorStop(1, "rgba(" + feux[i][2] + ",0)");
+        g.fillStyle = gf; g.beginPath(); g.arc(feux[i][0], feux[i][1], rr, 0, TAU); g.fill();
+      }
+    }
+    g.restore();
+    g.restore();
+  };
+
+  lac.draw = function(g, dt, p, t){
+    var portrait = W < H, i, k;
+    var y0 = H * (portrait ? .58 : .62), hu = Math.min(H * .6, W * .75), bas = H - y0;
+    var nuit = smooth(.3, .9, p), couche = smooth(0, .62, p);
+    g.globalCompositeOperation = "source-over";
+
+    // ciel
+    var cg = g.createLinearGradient(0, 0, 0, y0);
+    cg.addColorStop(0, "rgba(5,5,5,0)");
+    cg.addColorStop(.55, rgba(OR, .05 * (1 - nuit)));
+    cg.addColorStop(1, rgba(OR, .34 * (1 - nuit) + .02));
+    g.fillStyle = cg; g.fillRect(0, 0, W, y0);
+    if (nuit > .02){
+      var ng = g.createLinearGradient(0, 0, 0, y0);
+      ng.addColorStop(0, rgba(VE, .0)); ng.addColorStop(1, rgba(VE, .09 * nuit));
+      g.fillStyle = ng; g.fillRect(0, 0, W, y0);
+      for (i = 0; i < this.etoiles.length; i++){
+        var es = this.etoiles[i], ea = nuit * (.25 + .55 * (.5 + .5 * Math.sin(t * 2 + es.ph)));
+        g.fillStyle = rgba(CR, ea); g.fillRect(es.x * W, es.y * y0 * .92, es.r, es.r);
+      }
+    }
+    // soleil qui se couche derrière les Bauges, lune qui se lève
+    var sx = W * .5, sy = y0 - hu * (.36 - .5 * couche), sr = Math.max(6, hu * .055);
+    if (nuit < .98){
+      var gs = g.createRadialGradient(sx, sy, 0, sx, sy, sr * 9);
+      gs.addColorStop(0, rgba(OR, .45 * (1 - nuit))); gs.addColorStop(.25, rgba(OR, .12 * (1 - nuit))); gs.addColorStop(1, rgba(OR, 0));
+      g.fillStyle = gs; g.fillRect(0, 0, W, y0);
+      g.fillStyle = "rgba(240,206,150," + (1 - nuit).toFixed(3) + ")"; g.beginPath(); g.arc(sx, sy, sr, 0, TAU); g.fill();
+    }
+    var lx = W * (portrait ? .78 : .8), ly = y0 - hu * (.55 + .35 * nuit) - (portrait ? H * .08 : 0), lr = Math.max(4, hu * .03);
+    if (nuit > .02){
+      var gl = g.createRadialGradient(lx, ly, 0, lx, ly, lr * 7);
+      gl.addColorStop(0, rgba(VE, .3 * nuit)); gl.addColorStop(1, rgba(VE, 0));
+      g.fillStyle = gl; g.beginPath(); g.arc(lx, ly, lr * 7, 0, TAU); g.fill();
+      g.fillStyle = rgba(CR, .95 * nuit); g.beginPath(); g.arc(lx, ly, lr, 0, TAU); g.fill();
+      g.fillStyle = "rgba(5,5,5," + (.9 * nuit).toFixed(3) + ")"; g.beginPath(); g.arc(lx + lr * .45, ly - lr * .2, lr * .9, 0, TAU); g.fill();
+    }
+
+    // montagnes dans un calque à part, pour pouvoir les refléter
+    var M = this.M.x;
+    M.setTransform(1, 0, 0, 1, 0, 0); M.clearRect(0, 0, PW, PH); M.setTransform(DPR, 0, 0, DPR, 0, 0);
+    this.montagnes(M, y0, hu, t, nuit);
+    g.drawImage(this.M.c, 0, 0, PW, PH, 0, 0, W, H);
+
+    // eau : teinte, reflet ondulé des montagnes (bandes de 2 px décalées), lignes de houle
+    var eg = g.createLinearGradient(0, y0, 0, H);
+    eg.addColorStop(0, rgba(OR, .12 * (1 - nuit) + .02)); eg.addColorStop(1, rgba(OR, 0));
+    g.fillStyle = eg; g.fillRect(0, y0, W, bas);
+    var pas = 2;
+    for (var r = 0; r < bas; r += pas){
+      var sy2 = y0 - r - pas;
+      if (sy2 < 0) break;
+      var ra = .42 * (1 - r / bas);
+      if (ra < .01) continue;
+      var dx = Math.sin(r * .21 + t * 1.7) * (.6 + r * .035) + Math.sin(r * .05 - t * .9) * r * .012;
+      g.globalAlpha = ra;
+      g.drawImage(this.M.c, 0, Math.round(sy2 * DPR), PW, Math.max(1, Math.round(pas * DPR)), dx, y0 + r, W, pas);
+    }
+    g.globalAlpha = 1;
+    g.lineWidth = 1;
+    var houle = new Path2D(), dec = (t * .12) % 1;
+    for (i = 0; i < 22; i++){
+      var uu = (i + dec) / 22, yy = y0 + bas * uu * uu;
+      houle.moveTo(0, yy); houle.lineTo(W, yy);
+    }
+    g.strokeStyle = rgba(CR, .045); g.stroke(houle);
+
+    // scintillements sous le soleil, puis sous la lune
+    g.globalCompositeOperation = "lighter";
+    var sources = [[sx, (1 - nuit) * (1 - smooth(.5, .7, couche) * .7), OR], [lx, nuit * .7, CR]];
+    for (k = 0; k < 2; k++){
+      var force = sources[k][1];
+      if (force < .02) continue;
+      var pc = new Path2D(), pc2 = new Path2D();
+      for (i = 0; i < 90; i++){
+        var h1 = (Math.sin(i * 127.1 + k * 31.7) * 43758.5453) % 1, h2 = (Math.sin(i * 311.7 + k * 17.3) * 24634.6345) % 1;
+        h1 = Math.abs(h1); h2 = Math.abs(h2);
+        var uy = Math.pow(h1, 1.5), yg = y0 + 2 + bas * uy, larg = 6 + bas * uy * .45;
+        var xg = sources[k][0] + (h2 - .5) * 2 * larg, lg = 3 + uy * 24;
+        var fl = Math.sin(t * 3.1 + i * 12.9 + k);
+        if (fl < .2) continue;
+        (fl > .75 ? pc : pc2).moveTo(xg - lg / 2, yg); (fl > .75 ? pc : pc2).lineTo(xg + lg / 2, yg);
+      }
+      g.lineWidth = 1.2;
+      g.strokeStyle = rgba(sources[k][2], .85 * force); g.stroke(pc);
+      g.strokeStyle = rgba(sources[k][2], .35 * force); g.stroke(pc2);
+    }
+    // reflets des villages : longues traînées verticales
+    if (nuit > .05){
+      var tv = new Path2D();
+      for (i = 0; i < VILLAGES.length; i++){
+        var vx = VILLAGES[i] * W + Math.sin(t * 1.3 + i) * 1.2;
+        tv.moveTo(vx, y0 + 3); tv.lineTo(vx + Math.sin(t * 2 + i * 3) * 1.5, y0 + 10 + bas * .12 * (.6 + .4 * Math.sin(i * 5.3)));
+      }
+      g.lineWidth = 1.2; g.strokeStyle = rgba(OR, .28 * nuit); g.stroke(tv);
+    }
+
+    // ronds dans l'eau là où l'on touche
+    if (ptr.downT > this.tap){ this.tap = ptr.downT; if (ptr.y > y0 + 4) this.ronds.push({ x: ptr.x, y: ptr.y, t0: t }); }
+    var rd = new Path2D();
+    for (i = this.ronds.length - 1; i >= 0; i--){
+      var ro = this.ronds[i], ag = t - ro.t0;
+      if (ag > 3.2){ this.ronds.splice(i, 1); continue; }
+      var persp = .12 + .3 * c01((ro.y - y0) / bas);
+      for (k = 0; k < 3; k++){
+        var rx = (ag - k * .25) * 70;
+        if (rx <= 0) continue;
+        rd.moveTo(ro.x + rx, ro.y); rd.ellipse(ro.x, ro.y, rx, rx * persp, 0, 0, TAU);
+      }
+      g.lineWidth = 1; g.strokeStyle = rgba(CR, .5 * (1 - ag / 3.2)); g.stroke(rd); rd = new Path2D();
+    }
+
+    // le voilier, son sillage et son reflet
+    var Lb = portrait ? W * .5 : Math.min(W * .3, H * .36);
+    var xb = W * (portrait ? .5 : .56) + Math.sin(t * .06) * W * .05;
+    var yb = y0 + bas * (portrait ? .42 : .5) + Math.sin(t * 1.2) * 1.5;
+    var tangage = Math.sin(t * 1.2 + .6) * .018, gite = .25 + .1 * Math.sin(t * .37);
+    var vw = Lb * .35, poupe = xb - .5 * Lb, apparition = smooth(1.5, 3.5, t);
+    this.emis += dt;
+    while (this.emis > .1){ this.emis -= .1; this.sillage.push({ a: 0 }); }
+    var sv = new Path2D(), sv2 = new Path2D(), prem = true;
+    for (i = this.sillage.length - 1; i >= 0; i--){
+      var w = this.sillage[i]; w.a += dt;
+      if (w.a > 7){ this.sillage.splice(i, 1); continue; }
+    }
+    for (i = this.sillage.length - 1; i >= 0; i--){
+      var wa = this.sillage[i].a, wx = poupe - wa * vw, ec = wa * vw * .3;
+      if (prem){ sv.moveTo(wx, yb - ec * .16); sv2.moveTo(wx, yb + ec * .32); prem = false; }
+      else { sv.lineTo(wx, yb - ec * .16); sv2.lineTo(wx, yb + ec * .32); }
+    }
+    g.lineWidth = 1; g.strokeStyle = rgba(CR, .28 * apparition); g.stroke(sv); g.stroke(sv2);
+
+    g.globalCompositeOperation = "source-over";
+    g.globalAlpha = apparition;
+    g.save(); g.beginPath(); g.rect(0, yb, W, H - yb); g.clip();
+    g.globalAlpha = apparition * .22;
+    this.voilier(g, xb, yb, Lb, -tangage, gite, t, nuit, true);
+    g.restore();
+    g.globalAlpha = apparition;
+    this.voilier(g, xb, yb, Lb, tangage, gite, t, nuit, false);
+    g.globalAlpha = 1;
+  };
+
+  // =====================================================================
   // Défilement : chaque chapitre pilote son tableau, fondu enchaîné entre deux
   // =====================================================================
-  var scenes = [genese, tunnel, tour, iso, ville, pont];
+  var scenes = [genese, tunnel, tour, iso, ville, pont, lac];
   var chaps = [].slice.call(document.querySelectorAll(".chap")), geo = [];
   var rail = [].slice.call(document.querySelectorAll(".rail button")), courant = -1;
 
