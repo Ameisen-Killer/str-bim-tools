@@ -514,6 +514,15 @@ footer a{text-decoration:none}
     t.push({id:p+"dr", l:"Extrémité droite", v:"A", t:"s", o:APPUIS_EXT});
     return t;
   }
+  // Charges permanentes différentes d'une travée à l'autre (19.10.2026)
+  function parTravee(p){ return val(p+"gm") === "trav" && +val(p+"n") > 1 && (p !== "da_" || val("da_m") === "un") }
+  function permTravees(p, unite, defv){
+    var t = [{id:p+"gm", l:"Charges permanentes", v:"meme", t:"s", o:[["meme","Identiques sur toutes les travées"],["trav","Différentes par travée"]], large:true, si:function(){ return +val(p+"n") > 1 }}];
+    for(var i = 1; i <= 5; i++) (function(i){
+      t.push({id:p+"gtr"+i, l:"Travée "+i+" · permanente gk", v:defv, u:unite, si:function(){ return parTravee(p) && +val(p+"n") >= i }});
+    })(i);
+    return t;
+  }
   function ponctuelles(p, unite){
     var t = [{sep:"Charges ponctuelles"},{id:p+"np", l:"Nombre de charges", v:"0", t:"s", o:opt(["0","1","2","3","4"])}];
     for(var i = 1; i <= 4; i++) (function(i){
@@ -619,8 +628,9 @@ footer a{text-decoration:none}
         deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
         deux({id:"da_bN", l:"Bord haut", v:"A", t:"s", o:BORD}),
         deux({id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true}),
-        {sep:"Charges réparties"},
-        {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons"},
+        {sep:"Charges réparties"}
+      ], permTravees("da_", "kN/m²", "1.50").map(un), [
+        {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons", si:function(){ return !parTravee("da_") }},
         {id:"da_cat", l:"Charge utile SIA 261", v:"A", t:"s", o:Object.keys(CATEGORIES).map(function(k){ return [k, CATEGORIES[k].n] }), large:true},
         {id:"da_q", l:"Charge utile saisie", v:"4.0", u:"kN/m²", si:function(){ return val("da_cat") === "man" }},
         deux({id:"da_tri", l:"Charge triangulaire", v:"non", t:"s", o:[["non","Aucune"],["S","Maximale au bord bas"],["N","Maximale au bord haut"],["W","Maximale au bord gauche"],["E","Maximale au bord droit"]]}),
@@ -759,8 +769,9 @@ footer a{text-decoration:none}
     poutre:[
       {id:"po_mat", l:"Matériau", v:"ba", t:"s", o:[["ba","Béton armé"],["acier","Acier"],["bois","Bois"]], large:true}
     ].concat(travees("po_", "6.00"), [
-      {sep:"Charges réparties (poids propre ajouté)"},
-      {id:"po_g", l:"Permanente gk", v:"15", u:"kN/m"},
+      {sep:"Charges réparties (poids propre ajouté)"}
+    ], permTravees("po_", "kN/m", "15"), [
+      {id:"po_g", l:"Permanente gk", v:"15", u:"kN/m", si:function(){ return !parTravee("po_") }},
       {id:"po_q", l:"Variable qk", v:"8", u:"kN/m"}
     ], ponctuelles("po_", "kN"), [
       {sep:"Section"},
@@ -1015,7 +1026,7 @@ footer a{text-decoration:none}
   function lireTravees(p){
     var n = +val(p+"n"), L = [];
     for(var i = 1; i <= n; i++) L.push(Math.max(0.1, num(p+"L"+i)));
-    return {L:L, ga:val(p+"ga"), dr:val(p+"dr")};
+    return {L:L, ga:val(p+"ga"), dr:val(p+"dr"), gTr:parTravee(p) ? L.map(function(l, i){ return num(p+"gtr"+(i+1)) }) : null};
   }
   function lirePonctuelles(p, L){
     var np = +val(p+"np"), t = [], ax = [0];
@@ -1037,15 +1048,18 @@ footer a{text-decoration:none}
   }
   // Construit les cas : 0 = permanente répartie unitaire, 1 = permanentes ponctuelles,
   // 2.. = variable répartie par travée (valeur unitaire), puis variables ponctuelles une à une
-  function casStandard(L, pts){
+  // gTr : permanentes propres à chaque travée (cas placé après les charges ponctuelles), ou null
+  function casStandard(L, pts, gTr){
     var X = 0, ax = [0]; L.forEach(function(l){ X += l; ax.push(X) });
     var cas = [{d:[[0, X, 1, 1]], p:[]}, {d:[], p:pts.map(function(p){ return [p.x, p.G] })}];
     L.forEach(function(l, i){ cas.push({d:[[ax[i], ax[i+1], 1, 1]], p:[]}) });
     pts.forEach(function(p){ cas.push({d:[], p:[[p.x, p.Q]]}) });
+    if(gTr) cas.push({d:L.map(function(l, i){ return [ax[i], ax[i+1], gTr[i], gTr[i]] }), p:[]});
     return cas;
   }
-  function facteurs(L, pts, g, q, gG, gQ){
+  function facteurs(L, pts, g, q, gG, gQ, gTr){
     var perm = [[0, gG * g], [1, gG]], vari = [];
+    if(gTr) perm.push([2 + L.length + pts.length, gG]);
     L.forEach(function(l, i){ vari.push([2 + i, gQ * q]) });
     pts.forEach(function(p, i){ vari.push([2 + L.length + i, gQ]) });
     return {perm:perm, vari:vari};
@@ -1719,15 +1733,22 @@ footer a{text-decoration:none}
     return s;
   }
   // Schéma des charges caractéristiques : g et q répartis sur toute la longueur, charges ponctuelles en flèches
+  // gk : nombre (toutes les travées) ou tableau (une valeur par travée)
   function schemaCharges(R, gk, qk, pts, uR, uP, titre){
-    var W = 640, H = 168, g = 34, y0 = 112, X = R.ax[R.ax.length - 1], hmax = 46;
+    var W = 640, H = 176, g = 34, y0 = 120, X = R.ax[R.ax.length - 1], hmax = 46, nt = R.ax.length - 1;
     function px(x){ return g + (W - 2*g) * x / X }
-    var tot = Math.max(gk + qk, 1e-9), hg = hmax * gk / tot, hq = hmax * qk / tot;
+    var gs = []; for(var t = 0; t < nt; t++) gs.push(Array.isArray(gk) ? gk[t] : gk);
+    var tot = Math.max(Math.max.apply(null, gs) + qk, 1e-9), d = "";
     var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(titre)+'">';
-    if(hg > 0.5) s += '<rect class="tz" x="'+px(0)+'" y="'+(y0 - 4 - hg).toFixed(1)+'" width="'+(px(X) - px(0)).toFixed(1)+'" height="'+hg.toFixed(1)+'"/>';
-    if(hq > 0.5) s += '<rect class="oz" x="'+px(0)+'" y="'+(y0 - 4 - hg - hq).toFixed(1)+'" width="'+(px(X) - px(0)).toFixed(1)+'" height="'+hq.toFixed(1)+'"/>';
-    s += '<path class="tl" d="M'+px(0)+' '+(y0 - 4)+' V'+(y0 - 4 - hg - hq).toFixed(1)+' H'+px(X)+' V'+(y0 - 4)+'"/>';
-    s += '<text x="'+(px(0) + 6)+'" y="'+(y0 - 10 - hg - hq).toFixed(1)+'">gk = '+fmt(gk, 2)+' · qk = '+fmt(qk, 2)+' '+esc(uR)+'</text>';
+    gs.forEach(function(gt, t){
+      var x1 = px(R.ax[t]), x2 = px(R.ax[t + 1]), hg = hmax * gt / tot, hq = hmax * qk / tot;
+      if(hg > 0.5) s += '<rect class="tz" x="'+x1.toFixed(1)+'" y="'+(y0 - 4 - hg).toFixed(1)+'" width="'+(x2 - x1).toFixed(1)+'" height="'+hg.toFixed(1)+'"/>';
+      if(hq > 0.5) s += '<rect class="oz" x="'+x1.toFixed(1)+'" y="'+(y0 - 4 - hg - hq).toFixed(1)+'" width="'+(x2 - x1).toFixed(1)+'" height="'+hq.toFixed(1)+'"/>';
+      d += (t ? " L" : "M" + x1.toFixed(1) + " " + (y0 - 4) + " L") + x1.toFixed(1) + " " + (y0 - 4 - hg - hq).toFixed(1) + " H" + x2.toFixed(1);
+      if(Array.isArray(gk)) s += '<text x="'+((x1 + x2) / 2).toFixed(1)+'" y="'+(y0 - 9 - hg - hq).toFixed(1)+'" text-anchor="middle">gk = '+fmt(gt, 2)+'</text>';
+    });
+    s += '<path class="tl" d="'+d+' V'+(y0 - 4)+'"/>';
+    s += '<text x="'+(px(0))+'" y="14">'+(Array.isArray(gk) ? "" : "gk = "+fmt(gk, 2)+" · ")+'qk = '+fmt(qk, 2)+' '+esc(uR)+'</text>';
     var pmax = Math.max.apply(null, pts.map(function(p){ return p.G + p.Q }).concat([1e-9]));
     pts.forEach(function(p, i){
       var cx = px(p.x), lg = 26 + 40 * (p.G + p.Q) / pmax, y1 = y0 - 4 - lg;
@@ -1966,15 +1987,15 @@ footer a{text-decoration:none}
   // =====================================================================
   function chargeUtile(cat, id){ return cat === "man" ? num(id) : CATEGORIES[cat].q }
   function rendDalles(){
-    var M = mat(), g = num("da_g"), q = chargeUtile(val("da_cat"), "da_q"), cn = num("da_cn") / 1000, o = num("da_dia") / 1000, rows = [], h2 = "";
+    var M = mat(), g = parTravee("da_") ? 0 : num("da_g"), q = chargeUtile(val("da_cat"), "da_q"), cn = num("da_cn") / 1000, o = num("da_dia") / 1000, rows = [], h2 = "";
     if(val("da_m") === "un"){
-      var T = lireTravees("da_"), pts = lirePonctuelles("da_", T.L), cas = casStandard(T.L, pts), R;
+      var T = lireTravees("da_"), pts = lirePonctuelles("da_", T.L), cas = casStandard(T.L, pts, T.gTr), R;
       try { R = poutreFE(T.L, T.ga, T.dr, cas) } catch(e){ $("#r-dalle").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
       // K d'élancement par travée (EN 1992 tab. 7.4N)
       var n = T.L.length, Ks = elancementK(T);
       for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
         var r = {h:h, ok:true, raisons:[]}, d = h - cn - o / 2, gt = g + GAMMA_BA * h;
-        var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
+        var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ, T.gTr), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
         var a = extr(eM.max), b = extr(eM.min), c = extr(eV.max), c2 = extr(eV.min);
         r.Mp = Math.max(a.max, 0); r.Mn = Math.max(-b.min, 0); r.Vd = Math.max(c.max, -c2.min);
         var fp = flexion(r.Mp, 1, d, M), fn = flexion(r.Mn, 1, d, M), amin = asMin(1, d, M);
@@ -2001,11 +2022,11 @@ footer a{text-decoration:none}
       }
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
       if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe. Raccourcis les portées ou ajoute des appuis.</div>'; return }
-      var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ), eMo = enveloppe(R.M, f2.perm, f2.vari), eVo = enveloppe(R.V, f2.perm, f2.vari);
+      var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ, T.gTr), eMo = enveloppe(R.M, f2.perm, f2.vari), eVo = enveloppe(R.V, f2.perm, f2.vari);
       h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
         cle("md travée", fmt(Rr.Mp, 1), "kNm/m") + cle("md appui", fmt(-Rr.Mn, 1), "kNm/m") + cle("vd", fmt(Rr.Vd, 1), "kN/m") + '</div>';
-      h2 += '<h3>Charges</h3>' + schemaCharges(R, g + GAMMA_BA * Rr.h, q, pts, "kN/m²", "kN/m", "Charges sur la bande") +
+      h2 += '<h3>Charges</h3>' + schemaCharges(R, T.gTr ? T.gTr.map(function(v){ return v + GAMMA_BA * Rr.h }) : g + GAMMA_BA * Rr.h, q, pts, "kN/m²", "kN/m", "Charges sur la bande") +
         schemasEfforts(R, eMo, eVo, "md [kNm/m]", "vd [kN/m]");
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
         verif(null, "Inférieur, sens porteur", txtM(barresM(Rr.Asp))) +
@@ -2077,17 +2098,17 @@ footer a{text-decoration:none}
   //  04 — Poutres
   // =====================================================================
   function rendPoutres(){
-    var M = mat(), T = lireTravees("po_"), pts = lirePonctuelles("po_", T.L), cas = casStandard(T.L, pts), R, matr = val("po_mat");
-    var g = num("po_g"), q = num("po_q"), h2 = "", n = T.L.length;
+    var M = mat(), T = lireTravees("po_"), pts = lirePonctuelles("po_", T.L), cas = casStandard(T.L, pts, T.gTr), R, matr = val("po_mat");
+    var g = parTravee("po_") ? 0 : num("po_g"), q = num("po_q"), h2 = "", n = T.L.length;
     try { R = poutreFE(T.L, T.ga, T.dr, cas) } catch(e){ $("#r-poutre").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
     function efforts(gt, gG, gQ){
-      var f = facteurs(T.L, pts, gt, q, gG, gQ), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
+      var f = facteurs(T.L, pts, gt, q, gG, gQ, T.gTr), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
       var a = extr(eM.max), b = extr(eM.min), c = extr(eV.max), d = extr(eV.min);
       return {eM:eM, eV:eV, gt:gt, Mp:Math.max(a.max, 0), Mn:Math.max(-b.min, 0), Vd:Math.max(c.max, -d.min)};
     }
     // flèche caractéristique max par travée (EI = 1) : permanentes + variables défavorables, et variables seules
     function fleches(gt){
-      var f = facteurs(T.L, pts, gt, q, 1, 1), ax = R.ax, res = [];
+      var f = facteurs(T.L, pts, gt, q, 1, 1, T.gTr), ax = R.ax, res = [];
       T.L.forEach(function(l, i){
         var wG = 0, wQ = 0, wT = 0;
         R.xs.forEach(function(x, k){
@@ -2104,7 +2125,7 @@ footer a{text-decoration:none}
       return res;
     }
     function reactions(gt){
-      var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ);
+      var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ, T.gTr);
       return R.ax.map(function(x, s){
         if(R.types[s] === "L") return null;
         var b = 0, p = 0; f.perm.forEach(function(c){ b += c[1] * R.R[c[0]][s] }); f.vari.forEach(function(c){ var v = c[1] * R.R[c[0]][s]; if(v > 0) p += v });
@@ -2215,7 +2236,7 @@ footer a{text-decoration:none}
       var eDessin = choix.E.eM, ED = choix.E;
     }
     h2 += '<h2>Résultat</h2><div class="cles">' + res + '</div>';
-    h2 += '<h3>Charges</h3>' + schemaCharges(R, ED.gt, q, pts, "kN/m (poids propre compris)", "kN", "Charges sur la poutre") +
+    h2 += '<h3>Charges</h3>' + schemaCharges(R, T.gTr ? T.gTr.map(function(v){ return v + ED.gt }) : ED.gt, q, pts, "kN/m (poids propre compris)", "kN", "Charges sur la poutre") +
       schemasEfforts(R, eDessin, ED.eV, "md [kNm]", "vd [kN]");
     var Ra = reactions(g);
     h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
