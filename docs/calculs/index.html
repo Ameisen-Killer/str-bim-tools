@@ -210,6 +210,10 @@ td.g{white-space:normal;min-width:16em}
 .schema text.or{fill:var(--or)}
 .schema .pt{fill:var(--or)}
 .schema text.nap{font-size:9px;font-weight:600;fill:rgba(var(--encre),.55)}
+.schema[data-sv]{cursor:crosshair}
+.schema .survol line{stroke:rgba(var(--encre),.45);stroke-width:1;stroke-dasharray:2 3}
+.schema .survol circle{fill:var(--surface);stroke:var(--or);stroke-width:1.2}
+.schema .survol text{font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
 .schema .ap{fill:none;stroke:rgba(var(--encre),.6);stroke-width:.9}
 .lg{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px;font-size:12px;color:var(--texte-faible)}
 .lg i{display:inline-block;width:16px;height:0;border-top:1.6px solid var(--or);vertical-align:middle;margin-right:6px}
@@ -1939,7 +1943,9 @@ footer{font-size:11.5px}
     var e1 = extr(env.max), e2 = extr(env.min), amp = Math.max(Math.abs(e1.max), Math.abs(e2.min), 1e-9);
     function px(x){ return g + (W - 2*g) * x / X }
     function py(v){ return y0 + v / amp * 70 }      // positif (fibre inférieure tendue) dessiné vers le bas
-    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(titre)+'">';
+    // valeurs au survol de la souris (19.10.2026)
+    SURVOL.push({px:R.x.map(px), x:R.x, max:Array.from(env.max), min:Array.from(env.min), py:py, u:unite, H:H, W:W, g:g});
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(titre)+'" data-sv="'+(SURVOL.length - 1)+'">';
     var dMax = "M" + px(R.x[0]) + " " + py(0), dMin = dMax;
     for(var i = 0; i < R.x.length; i++){ dMax += " L" + px(R.x[i]).toFixed(1) + " " + py(env.max[i]).toFixed(1); dMin += " L" + px(R.x[i]).toFixed(1) + " " + py(env.min[i]).toFixed(1) }
     dMax += " L" + px(X) + " " + py(0) + " Z"; dMin += " L" + px(X) + " " + py(0) + " Z";
@@ -2695,7 +2701,26 @@ footer{font-size:11.5px}
       carte.appendChild(el);
     });
   }
+  // Survol des schémas : ligne verticale, abscisse et valeurs de l'enveloppe au point le plus proche
+  var SURVOL = [];
+  document.addEventListener("pointermove", function(e){
+    var sv = e.target.closest ? e.target.closest("svg.schema[data-sv]") : null;
+    document.querySelectorAll(".schema .survol").forEach(function(gr){ if(!sv || gr.parentNode !== sv) gr.remove() });
+    if(!sv) return;
+    var D = SURVOL[+sv.getAttribute("data-sv")], m = sv.getScreenCTM();
+    if(!D || !m) return;
+    var p = sv.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; p = p.matrixTransform(m.inverse());
+    var k = 0; for(var i = 1; i < D.px.length; i++) if(Math.abs(D.px[i] - p.x) < Math.abs(D.px[k] - p.x)) k = i;
+    var gr = sv.querySelector(".survol");
+    if(!gr){ gr = document.createElementNS("http://www.w3.org/2000/svg", "g"); gr.setAttribute("class", "survol"); sv.appendChild(gr) }
+    var x = D.px[k], t = "x = " + fmt(D.x[k], 2) + " m · " + (Math.abs(D.max[k] - D.min[k]) < 1e-9 ? fmt(D.max[k], 1) : "max " + fmt(D.max[k], 1) + " · min " + fmt(D.min[k], 1));
+    var anc = x > D.W * 0.62 ? "end" : x < D.W * 0.38 ? "start" : "middle", dx = anc === "end" ? -6 : anc === "start" ? 6 : 0;
+    gr.innerHTML = '<line x1="'+x.toFixed(1)+'" y1="20" x2="'+x.toFixed(1)+'" y2="'+(D.H - 30)+'"/>' +
+      '<circle cx="'+x.toFixed(1)+'" cy="'+D.py(D.max[k]).toFixed(1)+'" r="2.6"/><circle cx="'+x.toFixed(1)+'" cy="'+D.py(D.min[k]).toFixed(1)+'" r="2.6"/>' +
+      '<text x="'+(x + dx).toFixed(1)+'" y="30" text-anchor="'+anc+'">'+esc(t)+'</text>';
+  });
   function calcule(){
+    SURVOL = [];
     try { REND[courante]() }
     catch(e){
       var hote = document.querySelector("#v-" + courante + " [id^='r-']");
