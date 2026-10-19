@@ -197,17 +197,17 @@ tr:hover td{background:rgba(var(--or-rvb),.04)}
 tr.opt td{color:var(--or);font-weight:600;background:var(--pale)}
 tr.ko td{color:var(--texte-faible)}
 td.g{white-space:normal;min-width:16em}
-.schema{display:block;width:100%;height:auto;margin-top:6px;overflow:visible}
-.schema .ax{stroke:rgba(var(--encre),.62);stroke-width:1.2;fill:none}
+.schema{display:block;width:100%;max-width:720px;height:auto;margin-top:6px;overflow:visible}
+.schema .ax{stroke:rgba(var(--encre),.55);stroke-width:1;fill:none}
 .schema .f{stroke:rgba(var(--encre),.14);stroke-width:1;fill:none}
-.schema .o{stroke:rgba(var(--or-rvb),.95);stroke-width:1.6;fill:none}
+.schema .o{stroke:rgba(var(--or-rvb),.95);stroke-width:1.2;fill:none}
 .schema .oz{fill:rgba(var(--or-rvb),.12);stroke:none}
 .schema .tz{fill:rgba(var(--encre),.06);stroke:none}
-.schema .tl{stroke:rgba(var(--encre),.7);stroke-width:1.2;fill:none}
+.schema .tl{stroke:rgba(var(--encre),.65);stroke-width:1;fill:none}
 .schema text{font-family:var(--sans);font-size:11px;fill:rgba(var(--encre),.66);font-variant-numeric:tabular-nums}
 .schema text.or{fill:var(--or)}
 .schema .pt{fill:var(--or)}
-.schema .ap{fill:none;stroke:rgba(var(--encre),.7);stroke-width:1}
+.schema .ap{fill:none;stroke:rgba(var(--encre),.6);stroke-width:.9}
 .lg{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px;font-size:12px;color:var(--texte-faible)}
 .lg i{display:inline-block;width:16px;height:0;border-top:1.6px solid var(--or);vertical-align:middle;margin-right:6px}
 .lg i.t{border-color:rgba(var(--encre),.7)}
@@ -1888,32 +1888,34 @@ footer{font-size:11.5px}
   }
   // Schéma de la dalle : appuis et épaisseurs par travée (optimisée, forcée), hauteur exagérée
   function schemaDalle(L, app, hOpt, hForce){
-    var W = 640, H = 170, g = 34, yt = 58, X = L.reduce(function(s, l){ return s + l }, 0), ax = [0];
+    var W = 640, g = 24, yt = 36, X = L.reduce(function(s, l){ return s + l }, 0), ax = [0];
     L.forEach(function(l){ ax.push(ax[ax.length - 1] + l) });
     var hRet = hOpt.map(function(h, i){ return hForce[i] != null ? hForce[i] : h });
-    var hm = Math.max.apply(null, hOpt.concat(hRet)), sc = 34 / Math.max(hm, 0.01), yb = yt + hm * sc;
+    var hm = Math.max.apply(null, hOpt.concat(hRet)), sc = 22 / Math.max(hm, 0.01), yb = yt + hm * sc, yc = yb + 30, H = yc + 16;
     function px(x){ return g + (W - 2*g) * x / X }
-    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Schéma de la dalle">';
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Appuis et épaisseurs">', prof = "";
     L.forEach(function(l, i){
       var x1 = px(ax[i]), x2 = px(ax[i + 1]), xm = (x1 + x2) / 2, ho = hOpt[i] * sc, hr = hRet[i] * sc;
+      prof += (i ? " V" : "M" + x1.toFixed(1) + " " + yt + " H" + px(X).toFixed(1) + " M" + x1.toFixed(1) + " " + yt + " V") + (yt + hr).toFixed(1) + " H" + x2.toFixed(1);
       s += '<rect class="tz" x="'+x1.toFixed(1)+'" y="'+yt+'" width="'+(x2 - x1).toFixed(1)+'" height="'+hr.toFixed(1)+'"/>';
-      s += '<path class="tl" d="M'+x1.toFixed(1)+' '+yt+' H'+x2.toFixed(1)+' M'+x1.toFixed(1)+' '+(yt + hr).toFixed(1)+' H'+x2.toFixed(1)+'"/>';
-      if(hForce[i] != null && Math.abs(hForce[i] - hOpt[i]) > 1e-6) s += '<path class="o" stroke-dasharray="5 4" d="M'+x1.toFixed(1)+' '+(yt + ho).toFixed(1)+' H'+x2.toFixed(1)+'"/>';
-      s += '<text class="or" x="'+xm.toFixed(1)+'" y="'+(yt - 22)+'" text-anchor="middle">opt. '+fmt(hOpt[i] * 100, 0)+' cm</text>';
-      if(hForce[i] != null) s += '<text x="'+xm.toFixed(1)+'" y="'+(yt - 8)+'" text-anchor="middle">forcée '+fmt(hForce[i] * 100, 0)+' cm</text>';
-      s += '<text x="'+xm.toFixed(1)+'" y="'+(H - 8)+'" text-anchor="middle">'+fmt(l, 2)+' m</text>';
-      if(i > 0) s += '<line class="f" x1="'+x1.toFixed(1)+'" y1="'+yt+'" x2="'+x1.toFixed(1)+'" y2="'+(yt + Math.max(hr, hRet[i - 1] * sc)).toFixed(1)+'"/>';
+      if(hForce[i] != null && Math.abs(hForce[i] - hOpt[i]) > 1e-6) s += '<path class="o" stroke-dasharray="3 3" d="M'+x1.toFixed(1)+' '+(yt + ho).toFixed(1)+' H'+x2.toFixed(1)+'"/>';
+      s += '<text class="or" x="'+xm.toFixed(1)+'" y="'+(yt - (hForce[i] != null ? 17 : 6))+'" text-anchor="middle">'+fmt(hOpt[i] * 100, 0)+' cm</text>';
+      if(hForce[i] != null) s += '<text x="'+xm.toFixed(1)+'" y="'+(yt - 6)+'" text-anchor="middle">forcée '+fmt(hForce[i] * 100, 0)+' cm</text>';
+      // cote
+      s += '<text x="'+xm.toFixed(1)+'" y="'+(yc + 12)+'" text-anchor="middle">'+fmt(l, 2)+'</text>';
     });
+    s += '<path class="tl" d="'+prof+' V'+yt+'"/>';
+    s += '<path class="f" d="M'+px(0)+' '+yc+' H'+px(X)+ax.map(function(x){ return ' M'+px(x).toFixed(1)+' '+(yc - 3)+' v6' }).join("")+'"/>';
     ax.forEach(function(x, q){
-      var t = app[q], cx = px(x), y = yb + 2;
-      if(t === "A") s += '<path class="ap" d="M'+cx+' '+y+' l-8 13 h16 z"/>';
+      var t = app[q], cx = px(x), y = yb + 1;
+      if(t === "A") s += '<path class="ap" d="M'+cx.toFixed(1)+' '+y.toFixed(1)+' l-5 8 h10 z"/>';
       else if(t === "E"){
-        if(q === 0 || q === ax.length - 1){ var sg = q === 0 ? -1 : 1; s += '<path class="ap" d="M'+cx+' '+(yt - 6)+' V'+(yb + 8)+'"/><path class="f" d="M'+cx+' '+(yt - 2)+' l'+(6*sg)+' 6 M'+cx+' '+(yt + 10)+' l'+(6*sg)+' 6 M'+cx+' '+(yt + 22)+' l'+(6*sg)+' 6"/>' }
-        else s += '<path class="ap" d="M'+(cx - 9)+' '+y+' h18 v12 h-18 z"/><path class="f" d="M'+(cx - 6)+' '+(y + 12)+' l6 -12 M'+cx+' '+(y + 12)+' l6 -12"/>';
+        if(q === 0 || q === ax.length - 1){ var sg = q === 0 ? -1 : 1; s += '<path class="ap" d="M'+cx.toFixed(1)+' '+(yt - 4)+' V'+(yb + 4).toFixed(1)+'"/><path class="f" d="'+[0, 1, 2, 3].map(function(k){ return 'M'+cx.toFixed(1)+' '+(yt - 2 + k * 6)+' l'+(4*sg)+' 4' }).join(" ")+'"/>' }
+        else s += '<path class="ap" d="M'+(cx - 6).toFixed(1)+' '+y.toFixed(1)+' h12 v7 h-12 z"/>';
       }
     });
-    s += '<text x="'+W+'" y="14" text-anchor="end">épaisseurs exagérées · tiretés : optimisée là où elle est forcée</text></svg>';
-    return s + '<div class="lg"><span><i class="t"></i>épaisseur retenue</span><span><i></i>épaisseur optimisée</span><span>△ appui simple · ▭ encastrement</span></div>';
+    s += '</svg>';
+    return s + '<div class="lg"><span><i class="t"></i>épaisseur retenue (hauteurs exagérées)</span><span><i></i>optimisée, en tireté là où elle est forcée</span><span>△ appui simple · ▭ encastrement · cotes en m</span></div>';
   }
   function schemaCout(rows, ixOpt, lab){
     var ok = rows.filter(function(r){ return r.ok && isFinite(r.cout) });
