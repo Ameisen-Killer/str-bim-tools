@@ -2395,10 +2395,28 @@ footer{font-size:11.5px}
         return E;
       }
       function tableTravees(E){
-        return '<div class="defile"><table><tr><th>Travée</th><th>L</th><th>h</th><th>md travée</th><th>md appuis</th><th>vd / VRd,c</th><th>Inférieur</th><th>Supérieur sur appuis</th><th>L/d</th><th>Flèche</th><th>Coût</th><th></th></tr>' +
+        return '<div class="defile"><table><tr><th>Travée</th><th>L</th><th>h</th><th>md travée</th><th>md appuis</th><th>vd / VRd,c</th><th>Inférieur</th><th>Répartition</th><th>L/d</th><th>Flèche</th><th>Coût</th><th></th></tr>' +
           E.tr.map(function(t, i){
-            return '<tr' + (t.ok ? "" : ' class="ko"') + '><td>' + (i + 1) + '</td><td>' + fmt(T.L[i], 2) + ' m</td><td><b>' + fmt(t.h * 100, 0) + ' cm</b></td><td>' + fmt(t.Mp, 1) + '</td><td>' + (t.Mn > 0.01 ? "−" + fmt(t.Mn, 1) : "—") + '</td><td>' + fmt(t.Vd, 0) + ' / ' + fmt(t.vr, 0) + '</td><td>' + txtM(barresM(t.Asp)) + '</td><td>' + (t.Asn > 0 ? txtM(barresM(t.Asn)) : "—") + '</td><td>' + fmt(t.ld * 100, 0) + ' %</td><td>' + fmt(Math.abs(t.w) * 1000, 1) + ' mm · ' + fmt(t.fl * 100, 0) + ' %</td><td>' + fmt(t.cout, 0) + '</td><td>' + (t.ok ? "✓" : "✗ " + t.raisons.join(", ")) + '</td></tr>';
-          }).join("") + '</table></div><p class="note">md en kNm/m, vd en kN/m, coût en CHF/m². Flèche à long terme et part de la limite L / saisie. Le supérieur d\'un appui entre deux travées est le plus fort des deux lignes ; il est calculé avec la hauteur utile de chaque travée, donc la plus mince gouverne.</p>';
+            return '<tr' + (t.ok ? "" : ' class="ko"') + '><td>' + (i + 1) + '</td><td>' + fmt(T.L[i], 2) + ' m</td><td><b>' + fmt(t.h * 100, 0) + ' cm</b></td><td>' + fmt(t.Mp, 1) + '</td><td>' + (t.Mn > 0.01 ? "−" + fmt(t.Mn, 1) : "—") + '</td><td>' + fmt(t.Vd, 0) + ' / ' + fmt(t.vr, 0) + '</td><td>' + txtM(barresM(t.Asp)) + '</td><td>' + txtM(barresM(0.2 * t.Asp)) + '</td><td>' + fmt(t.ld * 100, 0) + ' %</td><td>' + fmt(Math.abs(t.w) * 1000, 1) + ' mm · ' + fmt(t.fl * 100, 0) + ' %</td><td>' + fmt(t.cout, 0) + '</td><td>' + (t.ok ? "✓" : "✗ " + t.raisons.join(", ")) + '</td></tr>';
+          }).join("") + '</table></div><p class="note">md en kNm/m, vd en kN/m, coût en CHF/m². Flèche à long terme et part de la limite L / saisie. Répartition : 20 % de l\'inférieur de la travée (EN 1992 §9.3.1.1(2)).</p>' + tableAppuis(E);
+      }
+      // Armatures supérieures appui par appui : md sur l'appui, hauteur utile de la travée voisine la plus mince
+      function tableAppuis(E){
+        var ax = E.R.ax, lignes = "";
+        ax.forEach(function(xa, q){
+          var mn = 0;
+          E.R.x.forEach(function(x, k){ if(Math.abs(x - xa) < 1e-9) mn = Math.min(mn, E.eM.min[k]) });
+          var Mn = -mn, voisins = [q - 1, q].filter(function(i){ return i >= 0 && i < n });
+          if(Mn <= 0.01 || !voisins.length) return;
+          var d = Math.min.apply(null, voisins.map(function(i){ return E.tr[i].d })), f = flexion(Mn, 1, d, M), As = Math.max(f.As, asMin(1, d, M));
+          var lg = function(i){ var porte = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L"); return porte ? T.L[i] : 0.3 * T.L[i] };
+          var typ = E.R.types[q] === "E" ? "encastrement" : q > 0 && q < n ? "appui continu" : "appui simple";
+          lignes += '<tr' + (f.ok ? "" : ' class="ko"') + '><td>' + (q + 1) + '</td><td>' + typ + '</td><td>−' + fmt(Mn, 1) + '</td><td>' + fmt(d * 100, 1) + ' cm</td><td><b>' + txtM(barresM(As)) + '</b></td><td>' +
+            (q > 0 ? fmt(lg(q - 1), 2) : "—") + ' / ' + (q < n ? fmt(lg(q), 2) : "—") + ' m</td><td>' + (f.ok ? "✓" : "✗ x/d") + '</td></tr>';
+        });
+        if(!lignes) return "";
+        return '<h3>Armatures sur appuis</h3><div class="defile"><table><tr><th>Appui</th><th>Type</th><th>md</th><th>d</th><th>Supérieur</th><th>Longueur gauche / droite</th><th></th></tr>' + lignes +
+          '</table></div><p class="note">md en kNm/m, enveloppe sur l\'appui. d de la travée voisine la plus mince. Longueurs de métré : 0,3 L de chaque côté, toute la console pour un porte-à-faux (ancrages en plus). Pas de répartition sous le supérieur sans moment transversal (EN 1992 §9.3.1.1(2)) ; à prévoir sinon.</p>';
       }
       function blocTravees(E, titre, ref){
         var s = '<h2>' + titre + '</h2><div class="cles">' + cle("Épaisseurs", E.hs.map(function(h){ return fmt(h * 100, 0) }).join(" · "), "cm", "travée 1 à " + n, true) +
