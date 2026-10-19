@@ -149,6 +149,7 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .champ .u{font-size:12px;color:var(--texte-faible);white-space:nowrap}
 .champ .aide{font-size:11.5px;line-height:1.35;color:var(--texte-faible)}
 .ligne-sep{grid-column:1/-1;margin-top:4px;padding-top:8px;border-top:1px solid var(--ligne);font-size:12.5px;font-weight:650;color:var(--or)}
+.ligne-sep.sous{margin-top:0;padding-top:2px;border-top:0;font-size:12px;font-weight:600;color:var(--texte-doux)}
 .champs > .ligne-sep:first-child{margin-top:0;padding-top:0;border-top:0}
 
 /* ---- Résultats ---- */
@@ -517,10 +518,11 @@ footer a{text-decoration:none}
     var t = [{sep:"Charges ponctuelles"},{id:p+"np", l:"Nombre de charges", v:"0", t:"s", o:opt(["0","1","2","3","4"])}];
     for(var i = 1; i <= 4; i++) (function(i){
       var si = function(){ return +val(p+"np") >= i };
-      t.push({id:p+"pt"+i, l:"P"+i+" · travée", v:"1", t:"s", o:opt(["1","2","3","4","5"]), si:si});
-      t.push({id:p+"pa"+i, l:"P"+i+" · distance depuis l'appui gauche de la travée", v:"2", u:"m", si:si});
-      t.push({id:p+"pg"+i, l:"P"+i+" · permanente Gk", v:"20", u:unite, si:si});
-      t.push({id:p+"pq"+i, l:"P"+i+" · variable Qk", v:"10", u:unite, si:si});
+      t.push({sep:"Charge P"+i, sous:true});
+      t.push({id:p+"pt"+i, l:"Dans la travée", v:"1", t:"s", o:opt(["1","2","3","4","5"]), si:si});
+      t.push({id:p+"pa"+i, l:"Distance à l'appui gauche", v:"2", u:"m", si:si});
+      t.push({id:p+"pg"+i, l:"Permanente Gk", v:"20", u:unite, si:si});
+      t.push({id:p+"pq"+i, l:"Variable Qk", v:"10", u:unite, si:si});
     })(i);
     return t;
   }
@@ -597,29 +599,40 @@ footer a{text-decoration:none}
       {id:"mu_cn", l:"Enrobage", v:"40", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
       {id:"mu_dia", l:"Ø estimé des barres", v:"14", u:"mm"}
     ],
-    dalle:[
-      {id:"da_m", l:"Fonctionnement", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true}
-    ].concat(travees("da_", "5.00").map(function(c){ var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c }), [
-      {id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m", si:function(){ return val("da_m") === "deux" }},
-      {id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m", si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bW", l:"Bord gauche (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bE", l:"Bord droit (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bS", l:"Bord bas (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bN", l:"Bord haut (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2", si:function(){ return val("da_m") === "deux" }},
-      {id:"da_tri", l:"Charge triangulaire", v:"non", t:"s", o:[["non","Aucune"],["S","Maximale au bord bas"],["N","Maximale au bord haut"],["W","Maximale au bord gauche"],["E","Maximale au bord droit"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_pt", l:"Valeur à la pointe (caractéristique)", v:"20", u:"kN/m²", aide:"Poussée d'eau, de terre, de matériaux stockés", si:function(){ return val("da_m") === "deux" && val("da_tri") !== "non" }},
-      {id:"da_gT", l:"γ de la charge triangulaire", v:"1.35", aide:"À confirmer selon la nature de l'action", si:function(){ return val("da_m") === "deux" && val("da_tri") !== "non" }},
-      {id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true, si:function(){ return val("da_m") === "deux" }},
-      {sep:"Charges"},
-      {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons"},
-      {id:"da_cat", l:"Charge utile SIA 261", v:"A", t:"s", o:Object.keys(CATEGORIES).map(function(k){ return [k, CATEGORIES[k].n] }), large:true},
-      {id:"da_q", l:"Charge utile saisie", v:"4.0", u:"kN/m²", si:function(){ return val("da_cat") === "man" }}
-    ], ponctuelles("da_", "kN/m").map(function(c){ if(c.sep) c.sep = "Charges linéaires (murs portés, kN par m de bande)"; var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c }), [
-      {sep:"Béton armé"},
-      {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
-      {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"}
-    ]),
+    // Saisie des dalles rangée par étapes : type, géométrie, appuis, charges, béton (19.10.2026)
+    dalle:(function(){
+      var un = function(c){ var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c };
+      var deux = function(c){ var s = c.si; c.si = function(){ return val("da_m") === "deux" && (!s || s()) }; return c };
+      var tr = travees("da_", "5.00").map(un), BORD = [["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]];
+      var lin = ponctuelles("da_", "kN/m").map(un);
+      lin[0] = {sep:"Charges linéaires (murs portés, par mètre de bande)"};
+      return [
+        {id:"da_m", l:"Type de dalle", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true},
+        {sep:"Géométrie"}
+      ].concat(tr.slice(0, 6), [
+        deux({id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m"}),
+        deux({id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m"}),
+        {sep:"Appuis"}
+      ], tr.slice(6), [
+        deux({id:"da_bW", l:"Bord gauche", v:"A", t:"s", o:BORD}),
+        deux({id:"da_bE", l:"Bord droit", v:"A", t:"s", o:BORD}),
+        deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
+        deux({id:"da_bN", l:"Bord haut", v:"A", t:"s", o:BORD}),
+        deux({id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true}),
+        {sep:"Charges réparties"},
+        {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons"},
+        {id:"da_cat", l:"Charge utile SIA 261", v:"A", t:"s", o:Object.keys(CATEGORIES).map(function(k){ return [k, CATEGORIES[k].n] }), large:true},
+        {id:"da_q", l:"Charge utile saisie", v:"4.0", u:"kN/m²", si:function(){ return val("da_cat") === "man" }},
+        deux({id:"da_tri", l:"Charge triangulaire", v:"non", t:"s", o:[["non","Aucune"],["S","Maximale au bord bas"],["N","Maximale au bord haut"],["W","Maximale au bord gauche"],["E","Maximale au bord droit"]]}),
+        deux({id:"da_pt", l:"Valeur à la pointe (caractéristique)", v:"20", u:"kN/m²", aide:"Poussée d'eau, de terre, de matériaux stockés", si:function(){ return val("da_tri") !== "non" }}),
+        deux({id:"da_gT", l:"γ de la charge triangulaire", v:"1.35", aide:"À confirmer selon la nature de l'action", si:function(){ return val("da_tri") !== "non" }})
+      ], lin, [
+        {sep:"Béton armé"},
+        {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
+        {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"},
+        deux({id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2"})
+      ]);
+    })(),
     mat:[
       {id:"ma_cl", l:"Classe de béton", v:"C30/37", t:"s", o:opt(CLASSES.map(function(c){ return c[0] }))},
       {id:"ma_cim", l:"Ciment", v:"N", t:"s", o:[["S","Classe S (lent)"],["N","Classe N (normal)"],["R","Classe R (rapide)"]]},
@@ -783,7 +796,7 @@ footer a{text-decoration:none}
     var hote = document.querySelector('[data-groupe="'+g+'"]');
     var h = "";
     CHAMPS[g].forEach(function(c){
-      if(c.sep){ h += '<div class="ligne-sep">'+esc(c.sep)+'</div>'; return }
+      if(c.sep){ h += '<div class="ligne-sep'+(c.sous ? " sous" : "")+'">'+esc(c.sep)+'</div>'; return }
       var v = val(c.id), u = typeof c.u === "function" ? c.u() : (c.u || "");
       h += '<div class="champ'+(c.large ? " large" : c.t === "s" ? " liste" : "")+'" data-champ="'+c.id+'"><label for="c-'+c.id+'">'+esc(c.l)+'</label><div class="boite">';
       if(c.t === "s"){
