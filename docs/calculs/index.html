@@ -9,20 +9,42 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#050505">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 12h24M7 12v14M25 12v14M4 12c6 9 18 9 24 0' fill='none' stroke='%23D6A85C' stroke-width='1.4'/%3E%3C/svg%3E">
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("calculs.theme")||localStorage.getItem("visas.theme")||localStorage.getItem("planif.theme")||"sombre";if(c==="ab")c="clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 :root{
+  color-scheme:dark;
+  --encre:236,232,224;
+  --fond-rvb:5,5,5;
+  --or-rvb:214,168,92;
   --noir:#050505;
-  --ligne:rgba(236,232,224,.12);
+  --noir-2:#0b0b0b;
+  --voile:rgba(0,0,0,.6);
+  --ligne:rgba(var(--encre),.12);
   --or:#D6A85C;
   --texte:#ECE8E0;
-  --texte-doux:rgba(236,232,224,.56);
-  --texte-faible:rgba(236,232,224,.34);
+  --texte-doux:rgba(var(--encre),.62);
+  --texte-faible:rgba(var(--encre),.42);
   --g:clamp(16px,3vw,44px);
   --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --haut:58px;
+}
+/* Thème clair : « dessin sur calque » (mêmes teintes que l'outil Visas) */
+:root[data-theme="clair"]{
+  color-scheme:light;
+  --encre:22,19,15;
+  --fond-rvb:243,240,232;
+  --or-rvb:122,83,18;
+  --noir:#F3F0E8;
+  --noir-2:#FBFAF6;
+  --voile:rgba(22,19,15,.38);
+  --ligne:rgba(var(--encre),.16);
+  --or:#7A5312;
+  --texte:#16130F;
+  --texte-doux:rgba(var(--encre),.74);
+  --texte-faible:rgba(var(--encre),.56);
 }
 *{box-sizing:border-box}
 html{background:var(--noir)}
@@ -39,11 +61,14 @@ p{margin:0}
   display:flex;justify-content:space-between;align-items:baseline;gap:16px;
   padding:max(18px,env(safe-area-inset-top)) var(--g) 18px;
   font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
-  background:rgba(5,5,5,.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  border-bottom:1px solid rgba(236,232,224,.06);
+  background:rgba(var(--fond-rvb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(var(--encre),.06);
 }
 .barre a{text-decoration:none;transition:color .3s}
 .barre a:hover{color:var(--or)}
+.barre a{margin-right:auto}
+.theme-btn{background:none;border:0;padding:0;margin-right:clamp(14px,3vw,30px);font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;transition:color .3s}
+.theme-btn:hover{color:var(--or)}
 
 /* ---- Mise en page : menu de sections à gauche, calcul à droite ---- */
 .app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh;padding-top:var(--haut)}
@@ -56,7 +81,7 @@ p{margin:0}
 .cote a span:last-child{font-size:16px}
 .cote a small{grid-column:2;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
 .cote a:hover{color:var(--texte)}
-.cote a.on{color:var(--texte);border-left-color:var(--or);background:rgba(214,168,92,.05)}
+.cote a.on{color:var(--texte);border-left-color:var(--or);background:rgba(var(--or-rvb),.05)}
 .cote a.on span:first-child{color:var(--or)}
 .cote-pied{margin:26px 26px 0;padding-top:18px;border-top:1px solid var(--ligne);font-family:var(--mono);font-size:10px;
   letter-spacing:.1em;line-height:1.7;color:var(--texte-faible)}
@@ -80,14 +105,14 @@ h3{margin:28px 0 0;font-family:var(--mono);font-weight:400;font-size:11px;letter
 .champ{display:flex;flex-direction:column;gap:6px;min-width:0}
 .champ.cache{display:none}
 .champ label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible);line-height:1.4}
-.champ .boite{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid rgba(236,232,224,.22);transition:border-color .3s}
+.champ .boite{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid rgba(var(--encre),.22);transition:border-color .3s}
 .champ .boite:focus-within{border-color:var(--or)}
 .champ input,.champ select{width:100%;min-width:0;padding:6px 0 7px;border:0;background:transparent;color:var(--texte);
   font:inherit;font-size:16px;font-variant-numeric:tabular-nums;outline:none;border-radius:0}
 .champ select{-webkit-appearance:none;appearance:none;cursor:pointer;
   background-image:linear-gradient(45deg,transparent 50%,var(--or) 50%),linear-gradient(135deg,var(--or) 50%,transparent 50%);
   background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:18px}
-.champ select option{background:#0d0d0d;color:var(--texte)}
+.champ select option{background:var(--noir-2);color:var(--texte)}
 .champ .u{font-family:var(--mono);font-size:11px;color:var(--texte-faible);white-space:nowrap}
 .champ .aide{font-size:12px;line-height:1.4;color:var(--texte-faible)}
 .ligne-sep{grid-column:1/-1;margin-top:6px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--or)}
@@ -107,35 +132,36 @@ h3{margin:28px 0 0;font-family:var(--mono);font-weight:400;font-size:11px;letter
 .verifs li.non{color:var(--or)}
 .verifs li.non span:last-child{color:var(--or)}
 .verifs li.info b{color:var(--texte-faible)}
-.alerte{margin-top:18px;padding:12px 16px;border-left:1px solid var(--or);background:rgba(214,168,92,.06);font-size:14px;color:var(--texte)}
+.alerte{margin-top:18px;padding:12px 16px;border-left:1px solid var(--or);background:rgba(var(--or-rvb),.06);font-size:14px;color:var(--texte)}
 .defile{overflow-x:auto;margin-top:16px;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
-th{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);text-align:left;padding:8px 10px;border-bottom:1px solid rgba(236,232,224,.22);white-space:nowrap}
+th{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);text-align:left;padding:8px 10px;border-bottom:1px solid rgba(var(--encre),.22);white-space:nowrap}
 td{padding:8px 10px;border-bottom:1px solid var(--ligne);white-space:nowrap}
 tr.opt td{color:var(--or)}
 tr.ko td{color:var(--texte-faible)}
 td.g{white-space:normal;min-width:16em}
 .schema{display:block;width:100%;height:auto;margin-top:16px;overflow:visible}
-.schema .ax{stroke:rgba(236,232,224,.62);stroke-width:1.2;fill:none}
-.schema .f{stroke:rgba(236,232,224,.16);stroke-width:1;fill:none}
-.schema .o{stroke:rgba(214,168,92,.9);stroke-width:1.4;fill:none}
-.schema .oz{fill:rgba(214,168,92,.1);stroke:none}
-.schema .tz{fill:rgba(236,232,224,.06);stroke:none}
-.schema .tl{stroke:rgba(236,232,224,.7);stroke-width:1.2;fill:none}
-.schema text{font-family:var(--mono);font-size:11px;fill:rgba(236,232,224,.62)}
+.schema .ax{stroke:rgba(var(--encre),.62);stroke-width:1.2;fill:none}
+.schema .f{stroke:rgba(var(--encre),.16);stroke-width:1;fill:none}
+.schema .o{stroke:rgba(var(--or-rvb),.9);stroke-width:1.4;fill:none}
+.schema .oz{fill:rgba(var(--or-rvb),.1);stroke:none}
+.schema .tz{fill:rgba(var(--encre),.06);stroke:none}
+.schema .tl{stroke:rgba(var(--encre),.7);stroke-width:1.2;fill:none}
+.schema text{font-family:var(--mono);font-size:11px;fill:rgba(var(--encre),.62)}
 .schema text.or{fill:var(--or)}
-.schema .ap{fill:none;stroke:rgba(236,232,224,.7);stroke-width:1}
+.schema .pt{fill:var(--or)}
+.schema .ap{fill:none;stroke:rgba(var(--encre),.7);stroke-width:1}
 .lg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
 .lg i{display:inline-block;width:16px;height:0;border-top:1.4px solid var(--or);vertical-align:middle;margin-right:6px}
-.lg i.t{border-color:rgba(236,232,224,.7)}
+.lg i.t{border-color:rgba(var(--encre),.7)}
 
 .ref{margin:14px 0 0;padding:0;list-style:none}
 .ref li{position:relative;padding:7px 0 7px 22px;font-size:14px;color:var(--texte-doux);border-bottom:1px solid var(--ligne)}
 .ref li::before{content:"";position:absolute;left:3px;top:14px;width:6px;height:6px;border:1px solid var(--or);transform:rotate(45deg)}
 .ref li b{font-weight:400;color:var(--texte)}
 .etat{display:inline-block;margin-left:6px;padding:1px 7px;border:1px solid var(--ligne);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--texte-faible);white-space:nowrap}
-.etat.ok{border-color:rgba(236,232,224,.3);color:var(--texte-doux)}
-.etat.av{border-color:rgba(214,168,92,.5);color:var(--or)}
+.etat.ok{border-color:rgba(var(--encre),.3);color:var(--texte-doux)}
+.etat.av{border-color:rgba(var(--or-rvb),.5);color:var(--or)}
 .bouton{display:inline-flex;align-items:center;gap:12px;margin-top:18px;padding:10px 0;border:0;background:none;cursor:pointer;
   font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--or)}
 .bouton::before,.bouton::after{content:"";width:26px;height:1px;background:var(--or);transition:width .4s}
@@ -148,14 +174,14 @@ footer a:hover{color:var(--or)}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
   .ouvrir{display:flex;position:sticky;top:var(--haut);z-index:12;align-items:center;gap:12px;width:100%;
-    padding:13px var(--g);border:0;border-bottom:1px solid var(--ligne);background:rgba(5,5,5,.94);color:var(--texte);
+    padding:13px var(--g);border:0;border-bottom:1px solid var(--ligne);background:rgba(var(--fond-rvb),.94);color:var(--texte);
     font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;text-align:left}
   .ouvrir i{display:inline-block;width:7px;height:7px;border:1px solid var(--or);transform:rotate(45deg)}
   .ouvrir em{font-style:normal;color:var(--or)}
   .cote{position:fixed;left:0;top:0;bottom:0;z-index:30;width:min(300px,84vw);height:100%;padding-top:calc(var(--haut) + 14px);
-    background:#070707;transform:translateX(-102%);transition:transform .5s cubic-bezier(.76,0,.24,1)}
+    background:var(--noir-2);transform:translateX(-102%);transition:transform .5s cubic-bezier(.76,0,.24,1)}
   .cote.ouvert{transform:none}
-  .voile-cote{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s}
+  .voile-cote{display:block;position:fixed;inset:0;z-index:25;background:var(--voile);opacity:0;pointer-events:none;transition:opacity .4s}
   .voile-cote.ouvert{opacity:1;pointer-events:auto}
   main{padding-top:28px}
 }
@@ -174,6 +200,7 @@ footer a:hover{color:var(--or)}
 
 <header class="barre" data-menu-hote>
   <a href="/">STR Bim Tools</a>
+  <button class="theme-btn" id="theme-btn" type="button" title="Thème d'affichage"><span aria-hidden="true">◐</span> <span id="theme-lib">Sombre</span></button>
   <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
 </header>
 
@@ -181,11 +208,17 @@ footer a:hover{color:var(--or)}
   <nav class="cote" id="cote" aria-label="Sections de calcul">
     <div class="cote-titre">Calculs</div>
     <a href="#hypotheses" data-vue="hypotheses"><span>00</span><span>Hypothèses</span><small>Béton · coefficients · prix</small></a>
-    <a href="#fondations" data-vue="fondations"><span>01</span><span>Fondations</span><small>Semelles filantes et isolées</small></a>
-    <a href="#murs" data-vue="murs"><span>02</span><span>Murs enterrés</span><small>Poussée des terres et de l'eau</small></a>
-    <a href="#dalles" data-vue="dalles"><span>03</span><span>Dalles</span><small>Épaisseur optimale · ferraillage</small></a>
-    <a href="#poutres" data-vue="poutres"><span>04</span><span>Poutres</span><small>Béton armé · acier · bois</small></a>
-    <a href="#normes" data-vue="normes"><span>05</span><span>Normes et sources</span><small>SIA · Eurocodes · état</small></a>
+    <a href="#materiaux" data-vue="materiaux"><span>01</span><span>Matériaux</span><small>Jeune âge · retrait · fluage</small></a>
+    <a href="#fondations" data-vue="fondations"><span>02</span><span>Fondations</span><small>Semelles filantes et isolées</small></a>
+    <a href="#murs" data-vue="murs"><span>03</span><span>Murs enterrés</span><small>Poussée des terres et de l'eau</small></a>
+    <a href="#soutenement" data-vue="soutenement"><span>04</span><span>Murs de soutènement</span><small>Stabilité · rideau · semelle</small></a>
+    <a href="#dalles" data-vue="dalles"><span>05</span><span>Dalles</span><small>Épaisseur optimale · ferraillage</small></a>
+    <a href="#poutres" data-vue="poutres"><span>06</span><span>Poutres</span><small>Béton armé · acier · bois</small></a>
+    <a href="#poteaux" data-vue="poteaux"><span>07</span><span>Poteaux</span><small>Second ordre · interaction N-M</small></a>
+    <a href="#poinconnement" data-vue="poinconnement"><span>08</span><span>Poinçonnement</span><small>EN 1992 · SIA 262</small></a>
+    <a href="#fissuration" data-vue="fissuration"><span>09</span><span>Fissuration</span><small>Ouverture wk</small></a>
+    <a href="#torsion" data-vue="torsion"><span>10</span><span>Torsion</span><small>Étriers · longitudinales</small></a>
+    <a href="#normes" data-vue="normes"><span>11</span><span>Normes et sources</span><small>SIA · Eurocodes · état</small></a>
     <div class="cote-pied">Prédimensionnement. Les résultats ne remplacent ni la note de calcul ni la relecture de l'ingénieur.</div>
   </nav>
   <div class="voile-cote" id="voile-cote"></div>
@@ -218,7 +251,7 @@ footer a:hover{color:var(--or)}
 
     <!-- 01 — Fondations -->
     <section class="vue" id="v-fondations">
-      <div class="num">01 — Fondations · SIA 267 / SIA 262</div>
+      <div class="num">02 — Fondations · SIA 267 / SIA 262</div>
       <h1>Semelles.</h1>
       <p class="intro">Largeur tirée de la résistance du sol, puis épaisseur la moins chère qui tient sans étriers, et ferraillage.</p>
       <div class="champs" data-groupe="fond"></div>
@@ -227,7 +260,7 @@ footer a:hover{color:var(--or)}
 
     <!-- 02 — Murs enterrés -->
     <section class="vue" id="v-murs">
-      <div class="num">02 — Murs enterrés · SIA 267 / SIA 262</div>
+      <div class="num">03 — Murs enterrés · SIA 267 / SIA 262</div>
       <h1>Murs contre terre.</h1>
       <p class="intro">Bande verticale de 1 m chargée par la poussée des terres, la surcharge et l'eau. Épaisseur optimale et armatures des deux faces.</p>
       <div class="champs" data-groupe="mur"></div>
@@ -236,25 +269,79 @@ footer a:hover{color:var(--or)}
 
     <!-- 03 — Dalles -->
     <section class="vue" id="v-dalles">
-      <div class="num">03 — Dalles · SIA 262 / EN 1992-1-1</div>
+      <div class="num">05 — Dalles · SIA 262 / EN 1992-1-1</div>
       <h1>Dalles.</h1>
-      <p class="intro">Porteuse dans un sens (continue sur plusieurs appuis) ou sur quatre côtés. L'épaisseur la moins chère qui passe la flexion, l'effort tranchant sans étriers et l'élancement, puis le ferraillage.</p>
+      <p class="intro">Porteuse dans un sens (continue sur plusieurs appuis) ou rectangulaire avec chaque bord appuyé, encastré ou libre, sous charge uniforme et triangulaire. L'épaisseur la moins chère qui passe la flexion, l'effort tranchant sans étriers et l'élancement, puis le ferraillage.</p>
       <div class="champs" data-groupe="dalle"></div>
       <div id="r-dalle"></div>
     </section>
 
     <!-- 04 — Poutres -->
     <section class="vue" id="v-poutres">
-      <div class="num">04 — Poutres · SIA 262 / 263 / 265</div>
+      <div class="num">06 — Poutres · SIA 262 / 263 / 265</div>
       <h1>Poutres.</h1>
       <p class="intro">Une à cinq travées, appuis d'extrémité au choix, charge répartie et charges ponctuelles. Les charges variables sont placées travée par travée pour obtenir l'enveloppe.</p>
       <div class="champs" data-groupe="poutre"></div>
       <div id="r-poutre"></div>
     </section>
 
+    <!-- Matériaux -->
+    <section class="vue" id="v-materiaux">
+      <div class="num">01 — Matériaux · EN 1992-1-1 §3.1, annexe B</div>
+      <h1>Béton dans le temps.</h1>
+      <p class="intro">Résistance et module au jeune âge, retrait de dessiccation et endogène, coefficient de fluage. Masse des barres.</p>
+      <div class="champs" data-groupe="mat"></div>
+      <div id="r-mat"></div>
+    </section>
+
+    <!-- Mur de soutènement -->
+    <section class="vue" id="v-soutenement">
+      <div class="num">04 — Murs de soutènement · EN 1997-1 / SIA 267</div>
+      <h1>Mur en T renversé.</h1>
+      <p class="intro">Renversement, glissement et portance, puis armatures du rideau, du patin et du talon.</p>
+      <div class="champs" data-groupe="sout"></div>
+      <div id="r-so"></div>
+    </section>
+
+    <!-- Poteaux -->
+    <section class="vue" id="v-poteaux">
+      <div class="num">07 — Poteaux · EN 1992-1-1 §5.8</div>
+      <h1>Poteaux.</h1>
+      <p class="intro">Élancement limite, imperfection, second ordre par la courbure nominale, puis armature symétrique tirée du diagramme d'interaction de la section.</p>
+      <div class="champs" data-groupe="pot"></div>
+      <div id="r-pot"></div>
+    </section>
+
+    <!-- Poinçonnement -->
+    <section class="vue" id="v-poinconnement">
+      <div class="num">08 — Poinçonnement · EN 1992-1-1 §6.4 / SIA 262</div>
+      <h1>Poinçonnement.</h1>
+      <p class="intro">Poteau intérieur, de rive ou d'angle. Contrôle à 2d selon l'Eurocode, et méthode SIA par la rotation de la dalle en regard.</p>
+      <div class="champs" data-groupe="pc"></div>
+      <div id="r-pc"></div>
+    </section>
+
+    <!-- Fissuration -->
+    <section class="vue" id="v-fissuration">
+      <div class="num">09 — Fissuration · EN 1992-1-1 §7.3</div>
+      <h1>Ouverture des fissures.</h1>
+      <p class="intro">Section rectangulaire fléchie sous la combinaison quasi permanente : contrainte de l'armature en section fissurée, espacement des fissures, wk.</p>
+      <div class="champs" data-groupe="fi"></div>
+      <div id="r-fi"></div>
+    </section>
+
+    <!-- Torsion -->
+    <section class="vue" id="v-torsion">
+      <div class="num">10 — Torsion · EN 1992-1-1 §6.3</div>
+      <h1>Torsion.</h1>
+      <p class="intro">Section creuse équivalente, étriers et armature longitudinale de torsion, interaction avec l'effort tranchant.</p>
+      <div class="champs" data-groupe="tor"></div>
+      <div id="r-to"></div>
+    </section>
+
     <!-- 05 — Normes -->
     <section class="vue" id="v-normes">
-      <div class="num">05 — Normes et sources</div>
+      <div class="num">11 — Normes et sources</div>
       <h1>D'où vient chaque valeur.</h1>
       <p class="intro">La SIA sert de référence, l'Eurocode est cité en regard. Chaque valeur est marquée selon ce que j'ai pu recouper.</p>
       <h3>Correspondances</h3>
@@ -421,6 +508,8 @@ footer a:hover{color:var(--or)}
       {id:"fo_r", l:"Rapport L / B de la semelle", v:"1", si:function(){ return val("fo_t") === "iso" }},
       {id:"fo_G", l:"Charge permanente Gk", v:"150", u:function(){ return val("fo_t") === "fil" ? "kN/m" : "kN" }},
       {id:"fo_Q", l:"Charge variable Qk", v:"60", u:function(){ return val("fo_t") === "fil" ? "kN/m" : "kN" }},
+      {id:"fo_MB", l:function(){ return val("fo_t") === "fil" ? "Moment de calcul Md (transversal)" : "Moment de calcul Md selon B" }, v:"0", u:function(){ return val("fo_t") === "fil" ? "kNm/m" : "kNm" }, aide:"Valeur de calcul au niveau de la base"},
+      {id:"fo_ML", l:"Moment de calcul Md selon L", v:"0", u:"kNm", si:function(){ return val("fo_t") === "iso" }},
       {id:"fo_D", l:"Profondeur de la base sous le terrain", v:"0.80", u:"m"},
       {id:"fo_gs", l:"Poids volumique du remblai", v:"19", u:"kN/m³"},
       {sep:"Sol"},
@@ -458,15 +547,18 @@ footer a:hover{color:var(--or)}
       {id:"mu_dia", l:"Ø estimé des barres", v:"14", u:"mm"}
     ],
     dalle:[
-      {id:"da_m", l:"Fonctionnement", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Sur quatre côtés"]], large:true}
+      {id:"da_m", l:"Fonctionnement", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true}
     ].concat(travees("da_", "5.00").map(function(c){ var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c }), [
-      {id:"da_lx", l:"Petite portée lx", v:"5.00", u:"m", si:function(){ return val("da_m") === "deux" }},
-      {id:"da_ly", l:"Grande portée ly", v:"6.50", u:"m", si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bW", l:"Bord gauche (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bE", l:"Bord droit (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bS", l:"Bord bas (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
-      {id:"da_bN", l:"Bord haut (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bW", l:"Bord gauche (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bE", l:"Bord droit (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bS", l:"Bord bas (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bN", l:"Bord haut (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"],["L","Libre"]], si:function(){ return val("da_m") === "deux" }},
       {id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_tri", l:"Charge triangulaire", v:"non", t:"s", o:[["non","Aucune"],["S","Maximale au bord bas"],["N","Maximale au bord haut"],["W","Maximale au bord gauche"],["E","Maximale au bord droit"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_pt", l:"Valeur à la pointe (caractéristique)", v:"20", u:"kN/m²", aide:"Poussée d'eau, de terre, de matériaux stockés", si:function(){ return val("da_m") === "deux" && val("da_tri") !== "non" }},
+      {id:"da_gT", l:"γ de la charge triangulaire", v:"1.35", aide:"À confirmer selon la nature de l'action", si:function(){ return val("da_m") === "deux" && val("da_tri") !== "non" }},
       {id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true, si:function(){ return val("da_m") === "deux" }},
       {sep:"Charges"},
       {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons"},
@@ -477,6 +569,101 @@ footer a:hover{color:var(--or)}
       {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
       {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"}
     ]),
+    mat:[
+      {id:"ma_cl", l:"Classe de béton", v:"C30/37", t:"s", o:opt(CLASSES.map(function(c){ return c[0] }))},
+      {id:"ma_cim", l:"Ciment", v:"N", t:"s", o:[["S","Classe S (lent)"],["N","Classe N (normal)"],["R","Classe R (rapide)"]]},
+      {id:"ma_t", l:"Âge t", v:"7", u:"j"},
+      {sep:"Retrait et fluage"},
+      {id:"ma_RH", l:"Humidité relative", v:"70", u:"%", aide:"Intérieur ≈ 50 %, extérieur ≈ 80 %"},
+      {id:"ma_Ac", l:"Aire de la section Ac", v:"0.25", u:"m²"},
+      {id:"ma_u", l:"Périmètre séchant u", v:"2.0", u:"m", aide:"Dalle de 25 cm séchant sur deux faces : 0,25 m² et 2 m par mètre"},
+      {id:"ma_ts", l:"Fin de la cure ts", v:"3", u:"j"},
+      {id:"ma_t0", l:"Mise en charge t0", v:"28", u:"j"}
+    ],
+    sout:[
+      {sep:"Géométrie"},
+      {id:"so_H", l:"Hauteur du rideau (sur la semelle)", v:"3.00", u:"m"},
+      {id:"so_t", l:"Épaisseur du rideau", v:"0.25", u:"m"},
+      {id:"so_e", l:"Épaisseur de la semelle", v:"0.40", u:"m"},
+      {id:"so_pa", l:"Patin (côté aval)", v:"0.60", u:"m"},
+      {id:"so_ta", l:"Talon (côté terre)", v:"1.60", u:"m"},
+      {id:"so_D", l:"Profondeur de la base sous le terrain aval", v:"0.80", u:"m"},
+      {sep:"Terre retenue"},
+      {id:"so_g", l:"Poids volumique γ", v:"19", u:"kN/m³"},
+      {id:"so_phi", l:"φ'k du remblai", v:"30", u:"°"},
+      {id:"so_q", l:"Surcharge sur le remblai", v:"10", u:"kPa"},
+      {sep:"Sol de fondation"},
+      {id:"so_sol", l:"Résistance du sol", v:"ec7", t:"s", o:[["rap","Valeur de calcul donnée (rapport géotechnique)"],["ec7","Calcul EN 1997-1 annexe D avec inclinaison"]], large:true},
+      {id:"so_qR", l:"Résistance de calcul du sol", v:"250", u:"kPa", si:function(){ return val("so_sol") === "rap" }},
+      {id:"so_phif", l:"φ'k sous la semelle", v:"30", u:"°"},
+      {id:"so_cf", l:"c'k sous la semelle", v:"0", u:"kPa", si:function(){ return val("so_sol") === "ec7" }},
+      {id:"so_g2", l:"γ' sous la base", v:"19", u:"kN/m³", si:function(){ return val("so_sol") === "ec7" }},
+      {sep:"Coefficients"},
+      {id:"so_gGs", l:"EQU γG,dst", v:"1.10", aide:"EN 1990 tab. A1.2(A)"},
+      {id:"so_gGi", l:"EQU γG,stb", v:"0.90", aide:"EN 1990 tab. A1.2(A)"},
+      {id:"so_gphi", l:"γφ' (sur tan φ')", v:"1.0", aide:"EN 1997 AD2 : 1,0. SIA 267 : à confirmer"},
+      {id:"so_gcc", l:"γc'", v:"1.0", si:function(){ return val("so_sol") === "ec7" }},
+      {id:"so_gRh", l:"γR,h glissement", v:"1.1", aide:"EN 1997 AD2 (R2) : 1,1"},
+      {id:"so_gRv", l:"γR,v portance", v:"1.4", aide:"EN 1997 AD2 (R2) : 1,4", si:function(){ return val("so_sol") === "ec7" }},
+      {sep:"Béton armé"},
+      {id:"so_cn", l:"Enrobage", v:"40", u:"mm"},
+      {id:"so_dia", l:"Ø estimé des barres", v:"16", u:"mm"}
+    ],
+    pot:[
+      {id:"pt_f", l:"Section", v:"rect", t:"s", o:[["rect","Rectangulaire"],["circ","Circulaire"]]},
+      {id:"pt_b", l:"Largeur b", v:"0.30", u:"m", si:function(){ return val("pt_f") === "rect" }},
+      {id:"pt_h", l:"Hauteur h (plan de flexion)", v:"0.30", u:"m", si:function(){ return val("pt_f") === "rect" }},
+      {id:"pt_D", l:"Diamètre D", v:"0.40", u:"m", si:function(){ return val("pt_f") === "circ" }},
+      {id:"pt_nb", l:"Nombre de barres", v:"8", si:function(){ return val("pt_f") === "circ" }, aide:"6 au moins (EN 1992 §9.5.2(4))"},
+      {id:"pt_a", l:"Axe des barres au parement", v:"50", u:"mm"},
+      {sep:"Longueurs"},
+      {id:"pt_l", l:"Hauteur libre l", v:"3.00", u:"m"},
+      {id:"pt_l0", l:"Longueur de flambement l0", v:"3.00", u:"m", aide:"l0 = β l, EN 1992 §5.8.3.2"},
+      {id:"pt_cv", l:"Structure contreventée", v:"oui", t:"s", o:[["oui","Oui"],["non","Non"]]},
+      {sep:"Efforts de calcul (1er ordre)"},
+      {id:"pt_N", l:"NEd", v:"1200", u:"kN"},
+      {id:"pt_M02", l:"M02 (plus grand moment d'extrémité)", v:"20", u:"kNm"},
+      {id:"pt_M01", l:"M01 (autre extrémité)", v:"0", u:"kNm", aide:"Signe opposé si double courbure"},
+      {id:"pt_phi", l:"Coefficient de fluage effectif φef", v:"2.0", aide:"φ(∞,t0) · M0Eqp / M0Ed (§5.8.4), voir Matériaux"}
+    ],
+    pc:[
+      {id:"pc_pos", l:"Poteau", v:"int", t:"s", o:[["int","Intérieur"],["bord","De rive"],["angle","D'angle"]]},
+      {id:"pc_f", l:"Section du poteau", v:"rect", t:"s", o:[["rect","Rectangulaire"],["circ","Circulaire (intérieur)"]]},
+      {id:"pc_c1", l:"c1 (perpendiculaire au bord libre)", v:"0.30", u:"m", si:function(){ return val("pc_f") === "rect" || val("pc_pos") !== "int" }},
+      {id:"pc_c2", l:"c2", v:"0.30", u:"m", si:function(){ return val("pc_f") === "rect" || val("pc_pos") !== "int" }},
+      {id:"pc_D", l:"Diamètre", v:"0.40", u:"m", si:function(){ return val("pc_f") === "circ" && val("pc_pos") === "int" }},
+      {id:"pc_d", l:"Hauteur utile moyenne d", v:"220", u:"mm"},
+      {id:"pc_Asx", l:"Armature supérieure, sens x", v:"1131", u:"mm²/m", aide:"Ø12 e = 100 : 1 131 mm²/m"},
+      {id:"pc_Asy", l:"Armature supérieure, sens y", v:"1131", u:"mm²/m"},
+      {id:"pc_V", l:"Effort de poinçonnement VEd", v:"600", u:"kN"},
+      {sep:"EN 1992"},
+      {id:"pc_beta", l:"β", v:"auto", aide:"auto : 1,15 / 1,4 / 1,5 (fig. 6.21N)"},
+      {id:"pc_k", l:"vRd,max = k ν fcd", v:"0.4", t:"s", o:[["0.4","k = 0,4 (amendement A1:2014)"],["0.5","k = 0,5 (EN 1992-1-1:2004)"]], aide:"À confirmer selon l'édition en vigueur"},
+      {sep:"SIA 262 (à confirmer)"},
+      {id:"pc_L", l:"Portée entre poteaux", v:"6.0", u:"m", aide:"rs ≈ 0,22 L"},
+      {id:"pc_Dmax", l:"Diamètre maximal du granulat", v:"32", u:"mm"},
+      {id:"pc_ke", l:"ke", v:"auto", aide:"auto : 0,9 / 0,7 / 0,65"}
+    ],
+    fi:[
+      {id:"fi_b", l:"Largeur b", v:"1.00", u:"m"},
+      {id:"fi_h", l:"Épaisseur h", v:"0.25", u:"m"},
+      {id:"fi_c", l:"Enrobage des barres tendues", v:"30", u:"mm"},
+      {id:"fi_o", l:"Ø des barres", v:"12", u:"mm"},
+      {id:"fi_s", l:"Espacement", v:"150", u:"mm"},
+      {id:"fi_M", l:"Moment quasi permanent Mqp (sur b)", v:"30", u:"kNm"},
+      {id:"fi_kt", l:"Durée de la charge", v:"0.4", t:"s", o:[["0.4","Longue durée (kt = 0,4)"],["0.6","Courte durée (kt = 0,6)"]]},
+      {id:"fi_phi", l:"φ pour le calcul de σs", v:"0", aide:"Ec,eff = Ecm / (1 + φ) ; 0 = court terme"},
+      {id:"fi_w", l:"Ouverture admissible", v:"0.3", t:"s", o:[["0.4","0,4 mm · X0, XC1"],["0.3","0,3 mm · XC2 à XC4, XD, XS"],["man","Saisie"]], aide:"EN 1992 tab. 7.1N"},
+      {id:"fi_wm", l:"wmax saisi", v:"0.2", u:"mm", si:function(){ return val("fi_w") === "man" }}
+    ],
+    tor:[
+      {id:"to_b", l:"Largeur b", v:"0.30", u:"m"},
+      {id:"to_h", l:"Hauteur h", v:"0.60", u:"m"},
+      {id:"to_c", l:"Axe des barres longitudinales au parement", v:"45", u:"mm"},
+      {id:"to_T", l:"TEd", v:"25", u:"kNm"},
+      {id:"to_V", l:"VEd concomitant", v:"150", u:"kN"},
+      {id:"to_cot", l:"cot θ", v:"1.5", aide:"Entre 1 et 2,5 (EN 1992 §6.2.3)"}
+    ],
     poutre:[
       {id:"po_mat", l:"Matériau", v:"ba", t:"s", o:[["ba","Béton armé"],["acier","Acier"],["bois","Bois"]], large:true}
     ].concat(travees("po_", "6.00"), [
@@ -540,6 +727,7 @@ footer a:hover{color:var(--or)}
       var el = document.querySelector('[data-champ="'+c.id+'"]');
       if(c.si) el.classList.toggle("cache", !c.si());
       if(typeof c.u === "function") el.querySelector(".u").textContent = c.u();
+      if(typeof c.l === "function") el.querySelector("label").textContent = c.l();
     });
     // les intertitres sans champ visible disparaissent
     var hote = document.querySelector('[data-groupe="'+g+'"]'), seps = hote.querySelectorAll(".ligne-sep");
@@ -772,58 +960,464 @@ footer a:hover{color:var(--or)}
   }
 
   // =====================================================================
-  //  Plaque rectangulaire (Kirchhoff), différences finies, bords appuyés ou encastrés
-  //  Renvoie les coefficients m / (p lx²)
+  //  Plaque rectangulaire (Kirchhoff) : éléments finis ACM à 12 degrés de liberté
+  //  bords : "A" appuyé, "E" encastré, "L" libre. Trois cas unitaires : uniforme, linéaire en X, linéaire en Y
   // =====================================================================
-  var cachePlaque = {};
-  function plaque(lx, ly, bW, bE, bS, bN, nu){
+  var cacheFE = {};
+  function inverse(A){
+    var n = A.length, M = A.map(function(r, i){ var e = r.slice(); for(var j = 0; j < n; j++) e.push(i === j ? 1 : 0); return e }), i, j, k;
+    for(k = 0; k < n; k++){
+      var p = k; for(i = k + 1; i < n; i++) if(Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
+      var t = M[k]; M[k] = M[p]; M[p] = t;
+      var d = M[k][k]; for(j = 0; j < 2*n; j++) M[k][j] /= d;
+      for(i = 0; i < n; i++) if(i !== k){ var f = M[i][k]; if(f) for(j = 0; j < 2*n; j++) M[i][j] -= f * M[k][j] }
+    }
+    return M.map(function(r){ return r.slice(n) });
+  }
+  function plaqueFE(lx, ly, bW, bE, bS, bN, nu){
     var cle = [lx, ly, bW, bE, bS, bN, nu].join("|");
-    if(cachePlaque[cle]) return cachePlaque[cle];
-    var N = 20, hx = lx / N, hy = ly / N, n1 = N - 1, nu_ = n1 * n1, A = [], b = new Float64Array(nu_), i, j;
-    for(i = 0; i < nu_; i++) A.push(new Float64Array(nu_));
-    var sW = bW === "E" ? 1 : -1, sE = bE === "E" ? 1 : -1, sS = bS === "E" ? 1 : -1, sN = bN === "E" ? 1 : -1;
-    function ajoute(r, ii, jj, c){
-      var s = 1;
-      if(ii === -1){ ii = 1; s *= sW } else if(ii === N + 1){ ii = N - 1; s *= sE }
-      if(jj === -1){ jj = 1; s *= sS } else if(jj === N + 1){ jj = N - 1; s *= sN }
-      if(ii <= 0 || ii >= N || jj <= 0 || jj >= N) return;
-      A[r][(jj - 1) * n1 + (ii - 1)] += s * c;
+    if(cacheFE[cle]) return cacheFE[cle];
+    var nx = 16, ny = Math.max(6, Math.min(32, Math.round(16 * ly / lx)));
+    if(ly < lx){ ny = 16; nx = Math.max(6, Math.min(32, Math.round(16 * lx / ly))) }
+    var a = lx / nx, b = ly / ny, i, j, k, q;
+    function P(x, y){ return [1, x, y, x*x, x*y, y*y, x*x*x, x*x*y, x*y*y, y*y*y, x*x*x*y, x*y*y*y] }
+    function Px(x, y){ return [0, 1, 0, 2*x, y, 0, 3*x*x, 2*x*y, y*y, 0, 3*x*x*y, y*y*y] }
+    function Py(x, y){ return [0, 0, 1, 0, x, 2*y, 0, x*x, 2*x*y, 3*y*y, x*x*x, 3*x*y*y] }
+    function Pxx(x, y){ return [0, 0, 0, 2, 0, 0, 6*x, 2*y, 0, 0, 6*x*y, 0] }
+    function Pyy(x, y){ return [0, 0, 0, 0, 0, 2, 0, 0, 2*x, 6*y, 0, 6*x*y] }
+    function Pxy(x, y){ return [0, 0, 0, 0, 1, 0, 0, 2*x, 2*y, 0, 3*x*x, 3*y*y] }
+    var coins = [[0, 0], [a, 0], [a, b], [0, b]], C = [];
+    coins.forEach(function(c){ C.push(P(c[0], c[1]), Px(c[0], c[1]), Py(c[0], c[1])) });
+    var Ci = inverse(C);
+    function fois(v){ var r = new Array(12).fill(0); for(var m = 0; m < 12; m++){ var s = 0; for(var n = 0; n < 12; n++) s += v[n] * Ci[n][m]; r[m] = s } return r }
+    var gp = [-Math.sqrt(0.6), 0, Math.sqrt(0.6)], gw = [5/9, 8/9, 5/9];
+    var Dm = [[1, nu, 0], [nu, 1, 0], [0, 0, (1 - nu) / 2]];
+    var ke = []; for(i = 0; i < 12; i++) ke.push(new Array(12).fill(0));
+    var fu = new Array(12).fill(0), fx = new Array(12).fill(0), fy = new Array(12).fill(0);
+    for(var gi = 0; gi < 3; gi++) for(var gj = 0; gj < 3; gj++){
+      var x = a * (1 + gp[gi]) / 2, y = b * (1 + gp[gj]) / 2, w = gw[gi] * gw[gj] * a * b / 4;
+      var B = [fois(Pxx(x, y)), fois(Pyy(x, y)), fois(Pxy(x, y)).map(function(v){ return 2 * v })];
+      for(i = 0; i < 12; i++) for(j = 0; j < 12; j++){
+        var s = 0; for(k = 0; k < 3; k++) for(q = 0; q < 3; q++) s += B[k][i] * Dm[k][q] * B[q][j];
+        ke[i][j] += w * s;
+      }
+      var N = fois(P(x, y));
+      for(i = 0; i < 12; i++){ fu[i] += w * N[i]; fx[i] += w * N[i] * x; fy[i] += w * N[i] * y }
     }
-    var ax4 = 1 / Math.pow(hx, 4), ay4 = 1 / Math.pow(hy, 4), axy = 2 / (hx*hx*hy*hy);
-    for(j = 1; j <= n1; j++) for(i = 1; i <= n1; i++){
-      var r = (j - 1) * n1 + (i - 1);
-      ajoute(r, i-2, j, ax4); ajoute(r, i-1, j, -4*ax4); ajoute(r, i, j, 6*ax4); ajoute(r, i+1, j, -4*ax4); ajoute(r, i+2, j, ax4);
-      ajoute(r, i, j-2, ay4); ajoute(r, i, j-1, -4*ay4); ajoute(r, i, j, 6*ay4); ajoute(r, i, j+1, -4*ay4); ajoute(r, i, j+2, ay4);
-      ajoute(r, i-1, j-1, axy); ajoute(r, i+1, j-1, axy); ajoute(r, i-1, j+1, axy); ajoute(r, i+1, j+1, axy);
-      ajoute(r, i, j-1, -2*axy); ajoute(r, i, j+1, -2*axy); ajoute(r, i-1, j, -2*axy); ajoute(r, i+1, j, -2*axy);
-      ajoute(r, i, j, 4*axy);
-      b[r] = 1;
+    var nnx = nx + 1, nny = ny + 1, nn = nnx * nny, nd = 3 * nn, bw = 3 * (nnx + 1) + 2;
+    var K = []; for(i = 0; i < nd; i++) K.push(new Float64Array(2 * bw + 1));   // stockage en bande K[i][j - i + bw]
+    function kadd(r, c, v){ K[r][c - r + bw] += v }
+    var F = [new Float64Array(nd), new Float64Array(nd), new Float64Array(nd)];
+    function dofs(ex, ey){
+      var ns = [ey * nnx + ex, ey * nnx + ex + 1, (ey + 1) * nnx + ex + 1, (ey + 1) * nnx + ex], d = [];
+      ns.forEach(function(n){ d.push(3*n, 3*n + 1, 3*n + 2) });
+      return d;
     }
-    // élimination de Gauss avec pivot partiel
-    for(var p = 0; p < nu_; p++){
-      var mx = p; for(i = p + 1; i < nu_; i++) if(Math.abs(A[i][p]) > Math.abs(A[mx][p])) mx = i;
-      if(mx !== p){ var t = A[p]; A[p] = A[mx]; A[mx] = t; var tb = b[p]; b[p] = b[mx]; b[mx] = tb }
-      for(i = p + 1; i < nu_; i++){
-        var m = A[i][p] / A[p][p]; if(m === 0) continue;
-        for(j = p; j < nu_; j++) A[i][j] -= m * A[p][j];
-        b[i] -= m * b[p];
+    for(var ey = 0; ey < ny; ey++) for(var ex = 0; ex < nx; ex++){
+      var d = dofs(ex, ey), X0 = ex * a, Y0 = ey * b;
+      for(i = 0; i < 12; i++){
+        for(j = 0; j < 12; j++) kadd(d[i], d[j], ke[i][j]);
+        F[0][d[i]] += fu[i];
+        F[1][d[i]] += (X0 * fu[i] + fx[i]) / lx;          // p = X / lx
+        F[2][d[i]] += (Y0 * fu[i] + fy[i]) / ly;          // p = Y / ly
       }
     }
-    var w = new Float64Array(nu_);
-    for(i = nu_ - 1; i >= 0; i--){ var s = b[i]; for(j = i + 1; j < nu_; j++) s -= A[i][j] * w[j]; w[i] = s / A[i][i] }
-    function W(ii, jj){ if(ii <= 0 || ii >= N || jj <= 0 || jj >= N) return 0; return w[(jj - 1) * n1 + (ii - 1)] }
-    var mxp = 0, myp = 0, wmax = 0;
-    for(j = 1; j <= n1; j++) for(i = 1; i <= n1; i++){
-      var wxx = (W(i+1, j) - 2*W(i, j) + W(i-1, j)) / (hx*hx), wyy = (W(i, j+1) - 2*W(i, j) + W(i, j-1)) / (hy*hy);
-      mxp = Math.max(mxp, -(wxx + nu * wyy)); myp = Math.max(myp, -(wyy + nu * wxx)); wmax = Math.max(wmax, W(i, j));
+    var maxd = 0; for(i = 0; i < nd; i++) maxd = Math.max(maxd, K[i][bw]);
+    var pen = maxd * 1e8, bloque = new Uint8Array(nd);
+    function bord(n, type, normale){       // normale : 1 = dérivée en x, 2 = dérivée en y
+      if(type === "L") return;
+      bloque[3*n] = 1;
+      bloque[3*n + (normale === 1 ? 2 : 1)] = 1;      // pente tangentielle nulle le long d'un bord tenu
+      if(type === "E") bloque[3*n + normale] = 1;
     }
-    var mW = 0, mE = 0, mS = 0, mN = 0;
-    for(j = 1; j <= n1; j++){ if(bW === "E") mW = Math.max(mW, 2 * W(1, j) / (hx*hx)); if(bE === "E") mE = Math.max(mE, 2 * W(N-1, j) / (hx*hx)) }
-    for(i = 1; i <= n1; i++){ if(bS === "E") mS = Math.max(mS, 2 * W(i, 1) / (hy*hy)); if(bN === "E") mN = Math.max(mN, 2 * W(i, N-1) / (hy*hy)) }
-    var l2 = lx * lx;
-    var res = {mx:mxp / l2, my:myp / l2, mW:mW / l2, mE:mE / l2, mS:mS / l2, mN:mN / l2, w:wmax / (l2 * l2)};
-    cachePlaque[cle] = res;
-    return res;
+    for(j = 0; j < nny; j++){ bord(j * nnx, bW, 1); bord(j * nnx + nx, bE, 1) }
+    for(i = 0; i < nnx; i++){ bord(i, bS, 2); bord(ny * nnx + i, bN, 2) }
+    var nl = 0; for(i = 0; i < nd; i += 3) if(bloque[i]) nl++;
+    for(i = 0; i < nd; i++) if(bloque[i]) K[i][bw] += pen;
+    // élimination en bande (matrice symétrique définie positive une fois les appuis posés)
+    for(k = 0; k < nd; k++){
+      var piv = K[k][bw];
+      if(!(piv > maxd * 1e-10)) throw new Error("Plaque instable : il faut au moins deux bords tenus, ou un bord encastré.");
+      for(i = k + 1; i <= Math.min(nd - 1, k + bw); i++){
+        var m = K[i][k - i + bw] / piv; if(!m) continue;
+        for(j = k; j <= Math.min(nd - 1, k + bw); j++) K[i][j - i + bw] -= m * K[k][j - k + bw];
+        for(q = 0; q < 3; q++) F[q][i] -= m * F[q][k];
+      }
+    }
+    var U = F.map(function(f){
+      var u = new Float64Array(nd);
+      for(var r = nd - 1; r >= 0; r--){ var s = f[r]; for(var c = r + 1; c <= Math.min(nd - 1, r + bw); c++) s -= K[r][c - r + bw] * u[c]; u[r] = s / K[r][bw] }
+      return u;
+    });
+    // moments aux nœuds (moyenne des éléments voisins) ; réactions aux nœuds tenus
+    var res = U.map(function(u){
+      var mx = new Float64Array(nn), my = new Float64Array(nn), cnt = new Float64Array(nn), R = new Float64Array(nn), wmax = 0;
+      for(var ey = 0; ey < ny; ey++) for(var ex = 0; ex < nx; ex++){
+        var d = dofs(ex, ey), ue = d.map(function(z){ return u[z] }), alpha = new Array(12).fill(0);
+        for(var r = 0; r < 12; r++){ var s = 0; for(var c = 0; c < 12; c++) s += Ci[r][c] * ue[c]; alpha[r] = s }
+        var ns = [ey * nnx + ex, ey * nnx + ex + 1, (ey + 1) * nnx + ex + 1, (ey + 1) * nnx + ex];
+        coins.forEach(function(cc, t){
+          var wxx = 0, wyy = 0, s1 = Pxx(cc[0], cc[1]), s2 = Pyy(cc[0], cc[1]);
+          for(var z = 0; z < 12; z++){ wxx += s1[z] * alpha[z]; wyy += s2[z] * alpha[z] }
+          var n = ns[t]; mx[n] += -(wxx + nu * wyy); my[n] += -(wyy + nu * wxx); cnt[n]++;
+        });
+      }
+      for(var n = 0; n < nn; n++){ mx[n] /= cnt[n]; my[n] /= cnt[n]; if(bloque[3*n]) R[n] = pen * u[3*n]; wmax = Math.max(wmax, u[3*n]) }
+      return {mx:mx, my:my, R:R, w:wmax};
+    });
+    var out = {nx:nx, ny:ny, a:a, b:b, cas:res, bords:{W:bW, E:bE, S:bS, N:bN}};
+    cacheFE[cle] = out;
+    return out;
+  }
+  // Combinaison des cas unitaires et lecture des efforts utiles
+  function lirePlaque(Pl, c){
+    var nnx = Pl.nx + 1, nny = Pl.ny + 1, nn = nnx * nny;
+    function comb(champ, n){ return c[0] * Pl.cas[0][champ][n] + c[1] * Pl.cas[1][champ][n] + c[2] * Pl.cas[2][champ][n] }
+    var r = {mx:0, my:0, W:0, E:0, S:0, N:0, lib:0, v:0}, i, j, n;
+    for(n = 0; n < nn; n++){ r.mx = Math.max(r.mx, comb("mx", n)); r.my = Math.max(r.my, comb("my", n)) }
+    function arete(liste, champ, type, cote){
+      liste.forEach(function(n, t){
+        if(type === "E") r[cote] = Math.max(r[cote], -comb(champ, n));
+        if(type !== "L" && t > 0 && t < liste.length - 1){
+          var trib = champ === "mx" ? Pl.b : Pl.a;
+          r.v = Math.max(r.v, comb("R", n) / trib);
+        }
+      });
+    }
+    var W = [], E = [], S = [], N = [];
+    for(j = 0; j < nny; j++){ W.push(j * nnx); E.push(j * nnx + Pl.nx) }
+    for(i = 0; i < nnx; i++){ S.push(i); N.push(Pl.ny * nnx + i) }
+    arete(W, "mx", Pl.bords.W, "W"); arete(E, "mx", Pl.bords.E, "E"); arete(S, "my", Pl.bords.S, "S"); arete(N, "my", Pl.bords.N, "N");
+    return r;
+  }
+
+  // =====================================================================
+  //  Matériaux : béton au jeune âge, retrait, fluage (EN 1992-1-1 §3.1, annexe B)
+  // =====================================================================
+  var CIMENT = {S:{s:0.38, a1:3, a2:0.13, al:-1}, N:{s:0.25, a1:4, a2:0.12, al:0}, R:{s:0.20, a1:6, a2:0.11, al:1}};
+  function betonAge(fck, cim, t){
+    var fcm = fck + 8, bcc = Math.exp(CIMENT[cim].s * (1 - Math.sqrt(28 / t)));
+    var fctm = 0.30 * Math.pow(fck, 2/3), Ecm = 22 * Math.pow(fcm / 10, 0.3);
+    var fcmt = bcc * fcm;
+    return {bcc:bcc, fcm:fcmt, fck: t >= 28 ? fck : t > 3 ? fcmt - 8 : null, fctm: Math.pow(bcc, t < 28 ? 1 : 2/3) * fctm, Ecm: Math.pow(fcmt / fcm, 0.3) * Ecm};
+  }
+  function interp(tab, x){
+    if(x <= tab[0][0]) return tab[0][1];
+    for(var i = 1; i < tab.length; i++) if(x <= tab[i][0]) return tab[i-1][1] + (tab[i][1] - tab[i-1][1]) * (x - tab[i-1][0]) / (tab[i][0] - tab[i-1][0]);
+    return tab[tab.length - 1][1];
+  }
+  function retraitFluage(fck, cim, RH, h0, ts, t0, t){
+    var fcm = fck + 8, c = CIMENT[cim];
+    var kh = interp([[100, 1.0], [200, 0.85], [300, 0.75], [500, 0.70]], h0);
+    var bRH = 1.55 * (1 - Math.pow(RH / 100, 3));
+    var ecd0 = 0.85 * ((220 + 110 * c.a1) * Math.exp(-c.a2 * fcm / 10)) * 1e-6 * bRH;
+    function bds(tt){ return tt <= ts ? 0 : (tt - ts) / ((tt - ts) + 0.04 * Math.sqrt(Math.pow(h0, 3))) }
+    var eca = 2.5 * (fck - 10) * 1e-6;
+    function bas(tt){ return 1 - Math.exp(-0.2 * Math.sqrt(tt)) }
+    var a1 = Math.pow(35 / fcm, 0.7), a2 = Math.pow(35 / fcm, 0.2), a3 = Math.pow(35 / fcm, 0.5);
+    var base = 1 + (1 - RH / 100) / (0.1 * Math.pow(h0, 1/3));
+    var phiRH = fcm <= 35 ? base : (1 + (1 - RH / 100) / (0.1 * Math.pow(h0, 1/3)) * a1) * a2;
+    var bf = 16.8 / Math.sqrt(fcm);
+    var t0a = Math.max(0.5, t0 * Math.pow(9 / (2 + Math.pow(t0, 1.2)) + 1, c.al));
+    var bt0 = 1 / (0.1 + Math.pow(t0a, 0.20));
+    var phi0 = phiRH * bf * bt0;
+    var bH = fcm <= 35 ? Math.min(1.5 * (1 + Math.pow(0.012 * RH, 18)) * h0 + 250, 1500) : Math.min(1.5 * (1 + Math.pow(0.012 * RH, 18)) * h0 + 250 * a3, 1500 * a3);
+    function bc(tt){ return tt <= t0 ? 0 : Math.pow((tt - t0) / (bH + tt - t0), 0.3) }
+    return {kh:kh, bRH:bRH, ecd0:ecd0, ecdInf:kh * ecd0, ecd:bds(t) * kh * ecd0, ecaInf:eca, eca:bas(t) * eca,
+      phiRH:phiRH, bf:bf, t0a:t0a, bt0:bt0, phi0:phi0, bH:bH, phit: phi0 * bc(t)};
+  }
+  function rendMateriaux(){
+    var fck = fckDe(val("ma_cl")), cim = val("ma_cim"), t = Math.max(0.5, num("ma_t")), RH = Math.min(100, Math.max(20, num("ma_RH")));
+    var h0 = 2000 * num("ma_Ac") / Math.max(num("ma_u"), 1e-6), ts = num("ma_ts"), t0 = Math.max(1, num("ma_t0"));
+    var A = betonAge(fck, cim, t), R = retraitFluage(fck, cim, RH, h0, ts, t0, t);
+    var h = '<h2>Béton à ' + fmt(t, 0) + ' jours</h2><div class="cles">' +
+      cle("fcm(t)", fmt(A.fcm, 1), "MPa", "βcc = " + fmt(A.bcc, 3) + " · éq. (3.1)") +
+      cle("fck(t)", A.fck == null ? "—" : fmt(A.fck, 1), "MPa", t >= 28 ? "t ≥ 28 j : fck" : t > 3 ? "fcm(t) − 8 · §3.1.2(5)" : "t ≤ 3 j : essais nécessaires", true) +
+      cle("fctm(t)", fmt(A.fctm, 2), "MPa", "éq. (3.4)") + cle("Ecm(t)", fmt(A.Ecm, 1), "GPa", "éq. (3.5)") + '</div>';
+    h += '<div class="defile"><table><tr><th>t [j]</th><th>fcm(t)</th><th>fck(t)</th><th>fctm(t)</th><th>Ecm(t)</th></tr>' + [1, 3, 7, 14, 28, 56, 90, 365].map(function(tt){
+      var B = betonAge(fck, cim, tt);
+      return '<tr' + (Math.abs(tt - t) < 1e-9 ? ' class="opt"' : '') + '><td>' + tt + '</td><td>' + fmt(B.fcm, 1) + ' MPa</td><td>' + (B.fck == null ? "—" : fmt(B.fck, 1) + ' MPa') + '</td><td>' + fmt(B.fctm, 2) + ' MPa</td><td>' + fmt(B.Ecm, 1) + ' GPa</td></tr>' }).join("") + '</table></div>';
+    h += '<h2>Retrait</h2><div class="cles">' +
+      cle("h0 = 2 Ac / u", fmt(h0, 0), "mm", "kh = " + fmt(R.kh, 3) + " (tab. 3.3, interpolé)") +
+      cle("Dessiccation à t", fmt(R.ecd * 1e3, 3), "‰", "εcd(t) = βds kh εcd,0") +
+      cle("Endogène à t", fmt(R.eca * 1e3, 3), "‰", "εca(t) = βas εca(∞)") +
+      cle("Total à t", fmt((R.ecd + R.eca) * 1e3, 3), "‰", "", true) +
+      cle("Total final", fmt((R.ecdInf + R.ecaInf) * 1e3, 3), "‰", "εcd,∞ " + fmt(R.ecdInf * 1e3, 3) + " + εca,∞ " + fmt(R.ecaInf * 1e3, 3)) + '</div>';
+    h += '<h2>Fluage</h2><div class="cles">' +
+      cle("φ(∞, t0)", fmt(R.phi0, 2), "", "φRH " + fmt(R.phiRH, 2) + " · β(fcm) " + fmt(R.bf, 2) + " · β(t0) " + fmt(R.bt0, 2), true) +
+      cle("φ(t, t0)", t > t0 ? fmt(R.phit, 2) : "—", "", t > t0 ? "à t = " + fmt(t, 0) + " j" : "t ≤ t0") +
+      cle("t0 corrigé", fmt(R.t0a, 1), "j", "éq. (B.9), ciment " + esc(cim)) + cle("βH", fmt(R.bH, 0), "", "éq. (B.8)") + '</div>';
+    h += '<ul class="verifs">' + verif(null, "Valable si la contrainte de compression à t0 reste ≤ 0,45 fck(t0) (§3.1.4(4)), sinon fluage non linéaire", "") +
+      verif(null, "SIA 262 donne ses propres valeurs de retrait et de fluage : non reprises ici, EN 1992 utilisé", "") + '</ul>';
+    h += '<h2>Barres d\'armature</h2><div class="defile"><table><tr><th>Ø [mm]</th><th>Section</th><th>Masse</th></tr>' + [6, 8, 10, 12, 14, 16, 18, 20, 22, 26, 30, 34, 40].map(function(o){
+      var a = Math.PI * o * o / 4;
+      return '<tr><td>' + o + '</td><td>' + fmt(a, 1) + ' mm²</td><td>' + fmt(a * 1e-6 * ACIER_KG, 3) + ' kg/m</td></tr>' }).join("") + '</table></div><p class="note">Masse = section × 7 850 kg/m³.</p>';
+    $("#r-mat").innerHTML = h;
+  }
+
+  // =====================================================================
+  //  Section en béton armé sous N + M (EN 1992-1-1 §6.1) : parabole-rectangle, acier élasto-plastique
+  // =====================================================================
+  function sectionNM(geo, barres, fcd, fyd, Es){
+    var ec2 = 0.002, ecu = 0.0035, H = geo.h, n = 80, dy = H / n, tr = [];
+    for(var i = 0; i < n; i++){ var y = (i + 0.5) * dy; tr.push({y:y, A: geo.largeur(y) * dy}) }
+    function sc(e){ return e <= 0 ? 0 : e < ec2 ? fcd * (1 - Math.pow(1 - e / ec2, 2)) : fcd }
+    function NM(x){
+      var yc = (1 - ec2 / ecu) * H, N = 0, M = 0;
+      function eps(y){ return x <= H ? ecu * (x - y) / x : ec2 * (x - y) / (x - yc) }
+      tr.forEach(function(t){ var f = sc(eps(t.y)) * t.A; N += f; M += f * (H / 2 - t.y) });
+      barres.forEach(function(b){ var e = eps(b.y), f = (Math.max(-fyd, Math.min(fyd, Es * e)) - sc(e)) * b.A; N += f; M += f * (H / 2 - b.y) });
+      return [N, M];
+    }
+    return {NM:NM, H:H};
+  }
+  // moment résistant pour un effort normal donné (compression positive), N en N, M en N·mm
+  function mRd(S, Ned){
+    var lo = Math.log(S.H * 1e-4), hi = Math.log(S.H * 1e4), a = S.NM(Math.exp(lo)), b = S.NM(Math.exp(hi));
+    if(Ned < a[0] || Ned > b[0]) return -Infinity;
+    for(var k = 0; k < 60; k++){ var m = (lo + hi) / 2, r = S.NM(Math.exp(m)); if(r[0] < Ned) lo = m; else hi = m }
+    return S.NM(Math.exp((lo + hi) / 2))[1];
+  }
+
+  // =====================================================================
+  //  Poteaux (EN 1992-1-1 §5.8, méthode de la courbure nominale §5.8.8)
+  // =====================================================================
+  function rendPoteaux(){
+    var M = mat(), fcd = M.fcdEC, fyd = M.fsd, Es = 200000, circ = val("pt_f") === "circ";
+    var b = num("pt_b") * 1000, h = (circ ? num("pt_D") : num("pt_h")) * 1000, a = num("pt_a"), nb = Math.max(6, Math.round(num("pt_nb")));
+    var l = num("pt_l"), l0 = num("pt_l0"), N = num("pt_N"), M02 = num("pt_M02"), M01 = num("pt_M01"), phi = num("pt_phi"), cv = val("pt_cv") === "oui";
+    if(Math.abs(M01) > Math.abs(M02)){ var tt = M01; M01 = M02; M02 = tt }
+    if(M02 < 0){ M02 = -M02; M01 = -M01 }
+    var Ac = circ ? Math.PI * h * h / 4 : b * h, ii = circ ? h / 4 : h / Math.sqrt(12), lam = l0 * 1000 / ii;
+    var geo = circ ? {h:h, largeur:function(y){ var r = h / 2, z = y - r; return 2 * Math.sqrt(Math.max(r*r - z*z, 0)) }} : {h:h, largeur:function(){ return b }};
+    function barres(As){
+      if(!circ) return [{y:a, A:As / 2}, {y:h - a, A:As / 2}];
+      var rs = h / 2 - a, t = [];
+      for(var k = 0; k < nb; k++){ var th = 2 * Math.PI * k / nb; t.push({y: h / 2 - rs * Math.cos(th), A: As / nb}) }
+      return t;
+    }
+    var deff = circ ? h / 2 + (h / 2 - a) / Math.sqrt(2) : h - a;
+    var ah = Math.min(1, Math.max(2/3, 2 / Math.sqrt(Math.max(l, 0.01)))), ei = (1/200) * ah * l0 / 2;   // §5.2(5), (7)
+    var e0 = Math.max(h / 30, 20) / 1000;                                                                 // §6.1(4)
+    var M02i = M02 + N * ei, M01i = M01 + N * ei;
+    var rm = cv ? (Math.abs(M02) > 1e-9 ? M01 / M02 : 1) : 1, C = 1.7 - rm;
+    var Asmin = Math.max(0.10 * N * 1000 / fyd, 0.002 * Ac), Asmax = 0.04 * Ac;
+    var As = Asmin, r = {};
+    for(var it = 0; it < 25; it++){
+      var n = N * 1000 / (Ac * fcd), w = As * fyd / (Ac * fcd);
+      var lim = 20 * (1 / (1 + 0.2 * phi)) * Math.sqrt(1 + 2 * w) * C / Math.sqrt(Math.max(n, 1e-6));
+      var M2 = 0, Kr = 0, Kp = 0, e2 = 0;
+      if(lam > lim){
+        var r0 = (fyd / Es) / (0.45 * deff / 1000);
+        Kr = Math.max(0, Math.min(1, (1 + w - n) / (1 + w - 0.4)));
+        Kp = Math.max(1, 1 + (0.35 + M.fck / 200 - lam / 150) * phi);
+        e2 = Kr * Kp * r0 * l0 * l0 / 10; M2 = N * e2;
+      }
+      var MEd;
+      if(cv){ var M0e = Math.max(0.6 * M02i + 0.4 * M01i, 0.4 * M02i); MEd = Math.max(M02i, M0e + M2, M01i + 0.5 * M2) }
+      else MEd = M02i + M2;
+      MEd = Math.max(MEd, N * e0);
+      // armature nécessaire
+      function suffit(A){ return mRd(sectionNM(geo, barres(A), fcd, fyd, Es), N * 1000) >= MEd * 1e6 }
+      var nouv;
+      if(suffit(Asmin)) nouv = Asmin;
+      else if(!suffit(3 * Asmax)) nouv = Infinity;
+      else { var lo = Asmin, hi = 3 * Asmax; for(var k = 0; k < 40; k++){ var m = (lo + hi) / 2; if(suffit(m)) hi = m; else lo = m } nouv = hi }
+      r = {n:n, w:w, lim:lim, M2:M2, Kr:Kr, Kp:Kp, e2:e2, MEd:MEd, As:nouv};
+      if(!isFinite(nouv) || Math.abs(nouv - As) < 1){ As = nouv; break }
+      As = nouv;
+    }
+    var hh = '<h2>Élancement et moments</h2><div class="cles">' +
+      cle("λ = l0 / i", fmt(lam, 1), "", "i = " + fmt(ii, 0) + " mm") +
+      cle("λlim", fmt(r.lim, 1), "", "§5.8.3.1 · C = " + fmt(C, 2)) +
+      cle("Second ordre", lam > r.lim ? "oui" : "non", "", lam > r.lim ? "e2 = " + fmt(r.e2 * 1000, 1) + " mm" : "λ ≤ λlim", lam > r.lim) +
+      cle("ei imperfection", fmt(ei * 1000, 1), "mm", "θi l0 / 2, αh = " + fmt(ah, 2)) +
+      cle("M2", fmt(r.M2, 1), "kNm", "Kr " + fmt(r.Kr, 2) + " · Kφ " + fmt(r.Kp, 2)) +
+      cle("MEd", fmt(r.MEd, 1), "kNm", "NEd = " + fmt(N, 0) + " kN", true) + '</div>';
+    if(!isFinite(As)){ $("#r-pot").innerHTML = hh + '<div class="alerte">La section ne suffit pas, même avec 12 % d\'armature : agrandis le poteau.</div>'; return }
+    // barres proposées
+    var prop = null;
+    [12, 14, 16, 18, 20, 22, 26, 30, 34].some(function(o){
+      var A1 = Math.PI * o * o / 4;
+      if(circ){ var nn = Math.max(nb, Math.ceil(As / A1)); if(nn === nb){ prop = {t: nb + " Ø" + o, a: nb * A1, o:o}; return true } return false }
+      var k = Math.max(2, Math.ceil(As / 2 / A1)), place = b - 2 * a + o, maxi = Math.floor((place + Math.max(o, 20)) / (o + Math.max(o, 20)));
+      if(k <= Math.max(2, maxi)){ prop = {t: "2 × " + k + " Ø" + o + " (deux faces opposées)", a: 2 * k * A1, o:o}; return true }
+      return false;
+    });
+    var ratio = As / Ac;
+    hh += '<h2>Armatures</h2><div class="cles">' + cle("As nécessaire", fmt(As, 0), "mm²", fmt(ratio * 100, 2) + " % de Ac", true) +
+      cle("Proposition", prop ? fmt(prop.a, 0) : "—", "mm²", prop ? prop.t : "à répartir") +
+      cle("As,min", fmt(Asmin, 0), "mm²", "§9.5.2(2)") + cle("As,max", fmt(Asmax, 0), "mm²", "0,04 Ac") + '</div>';
+    var oc = prop ? Math.max(6, Math.ceil(prop.o / 4)) : 8, sc = prop ? Math.min(20 * prop.o, Math.min(b, h), 400) : 0;
+    hh += '<ul class="verifs">' + verif(As <= Asmax, "As ≤ 0,04 Ac hors recouvrements (§9.5.2(3))", fmt(ratio * 100, 2) + " %") +
+      verif(null, "Cadres Ø" + oc + " au moins (§9.5.3(1)), espacement ≤ " + fmt(sc, 0) + " mm (§9.5.3(3), réduit de 40 % près des extrémités et des recouvrements)", "") +
+      verif(null, "Flexion dans le plan de " + (circ ? "D" : "h") + " seulement ; flexion déviée (§5.8.9) non vérifiée", "") +
+      verif(null, "fcd = fck / γc (αcc = 1,0), Es = 200 GPa, nbal = 0,4 (§5.8.8.3(3)), c = 10", "") +
+      verif(null, "SIA 262 (poteaux) : non codée, EN 1992 utilisé", "") + '</ul>';
+    // diagramme d'interaction
+    var Sx = sectionNM(geo, barres(prop ? prop.a : As), fcd, fyd, Es), pts = [];
+    for(var k2 = 0; k2 <= 90; k2++){ var x = h * Math.exp(Math.log(1e-3) + (Math.log(1e3) - Math.log(1e-3)) * k2 / 90); var q = Sx.NM(x); pts.push([q[1] / 1e6, q[0] / 1000]) }
+    var Mm = Math.max.apply(null, pts.map(function(p){ return p[0] })) * 1.1, Nmn = Math.min.apply(null, pts.map(function(p){ return p[1] })), Nmx = Math.max.apply(null, pts.map(function(p){ return p[1] })) * 1.05;
+    var W = 640, Hs = 260, g = 46;
+    function px(v){ return g + (W - 2 * g) * v / Math.max(Mm, 1e-9) }
+    function py(v){ return Hs - 26 - (Hs - 50) * (v - Nmn) / Math.max(Nmx - Nmn, 1e-9) }
+    var d = pts.map(function(p, i){ return (i ? "L" : "M") + px(p[0]).toFixed(1) + " " + py(p[1]).toFixed(1) }).join(" ");
+    hh += '<h3>Diagramme d\'interaction avec les barres proposées</h3><svg class="schema" viewBox="0 0 ' + W + ' ' + Hs + '" role="img" aria-label="Diagramme d\'interaction N-M">' +
+      '<line class="f" x1="' + px(0) + '" y1="' + py(Nmn) + '" x2="' + px(0) + '" y2="' + py(Nmx) + '"/><line class="f" x1="' + px(0) + '" y1="' + py(0) + '" x2="' + px(Mm) + '" y2="' + py(0) + '"/>' +
+      '<path class="o" d="' + d + '"/><circle class="pt" cx="' + px(r.MEd) + '" cy="' + py(N) + '" r="4.5"/>' +
+      '<text x="' + (px(r.MEd) + 8) + '" y="' + (py(N) - 6) + '" class="or">MEd, NEd</text><text x="' + (W - g) + '" y="' + (py(0) + 16) + '" text-anchor="end">M [kNm]</text><text x="' + (px(0) + 6) + '" y="' + (py(Nmx) + 12) + '">N [kN], compression vers le haut</text></svg>';
+    $("#r-pot").innerHTML = hh;
+  }
+
+  // =====================================================================
+  //  Poinçonnement : EN 1992-1-1 §6.4 et SIA 262 (à confirmer)
+  // =====================================================================
+  function rendPoinconnement(){
+    var M = mat(), pos = val("pc_pos"), circ = val("pc_f") === "circ" && pos === "int";
+    var c1 = num("pc_c1") * 1000, c2 = num("pc_c2") * 1000, D = num("pc_D") * 1000, d = num("pc_d"), V = num("pc_V") * 1000;
+    var rx = num("pc_Asx") / (1000 * d), ry = num("pc_Asy") / (1000 * d), rho = Math.min(0.02, Math.sqrt(rx * ry));
+    var k = Math.min(2, 1 + Math.sqrt(200 / d)), fcd = M.fcdEC;
+    var vRdc = Math.max(0.18 / M.gc * k * Math.pow(100 * rho * M.fck, 1/3), 0.035 * Math.pow(k, 1.5) * Math.sqrt(M.fck));
+    var beta = String(val("pc_beta")).trim() === "auto" ? {int:1.15, bord:1.4, angle:1.5}[pos] : num("pc_beta") || 1.15;
+    var u1 = circ ? Math.PI * (D + 4 * d) : pos === "int" ? 2 * (c1 + c2) + 4 * Math.PI * d : pos === "bord" ? 2 * c1 + c2 + 2 * Math.PI * d : c1 + c2 + Math.PI * d;
+    var u0 = circ ? Math.PI * D : pos === "int" ? 2 * (c1 + c2) : pos === "bord" ? Math.min(c2 + 3 * d, c2 + 2 * c1) : Math.min(3 * d, c1 + c2);
+    var vEd = beta * V / (u1 * d), vEd0 = beta * V / (u0 * d), nu = 0.6 * (1 - M.fck / 250), vmax = num("pc_k") * nu * fcd;
+    var h = '<h2>EN 1992-1-1 §6.4</h2><div class="cles">' + cle("u1 à 2d", fmt(u1, 0), "mm", "β = " + fmt(beta, 2)) +
+      cle("vEd", fmt(vEd, 3), "MPa", "β VEd / (u1 d)", true) + cle("vRd,c", fmt(vRdc, 3), "MPa", "ρl = " + fmt(rho * 100, 2) + " %, k = " + fmt(k, 2)) +
+      cle("vEd,0 au nu", fmt(vEd0, 2), "MPa", "u0 = " + fmt(u0, 0) + " mm") + cle("vRd,max", fmt(vmax, 2), "MPa", fmt(num("pc_k"), 1) + " ν fcd") + '</div><ul class="verifs">';
+    h += verif(vEd0 <= vmax, "Bielles au nu du poteau vEd,0 ≤ vRd,max (§6.4.5(3))", fmt(vEd0, 2) + " ≤ " + fmt(vmax, 2) + " MPa");
+    if(vEd <= vRdc) h += verif(true, "Sans armature de poinçonnement vEd ≤ vRd,c (§6.4.4)", fmt(vEd, 3) + " ≤ " + fmt(vRdc, 3) + " MPa");
+    else {
+      var fyw = Math.min(250 + 0.25 * d, M.fsd), sr = 0.75 * d, Asw = (vEd - 0.75 * vRdc) * u1 * sr / (1.5 * fyw);
+      var uout = beta * V / (vRdc * d), dist = pos === "int" && !circ ? (uout - 2 * (c1 + c2)) / (2 * Math.PI) : circ ? (uout / Math.PI - D) / 2 : NaN;
+      h += verif(false, "Armature de poinçonnement nécessaire (§6.4.5, éq. 6.52), sr = 0,75 d = " + fmt(sr, 0) + " mm, fywd,ef = " + fmt(fyw, 0) + " MPa", "Asw = " + fmt(Asw, 0) + " mm² par périmètre") +
+        verif(null, "Périmètre uout,ef = β VEd / (vRd,c d) = " + fmt(uout, 0) + " mm" + (isFinite(dist) ? ", soit à " + fmt(dist, 0) + " mm du nu ; dernier cours à ≤ " + fmt(dist - 1.5 * d, 0) + " mm" : ""), "") +
+        verif(null, "Plafond vRd,cs ≤ kmax vRd,c (amendement A1:2014) : à confirmer, non vérifié", "");
+    }
+    h += verif(null, "VEd : réaction du poteau diminuée des charges à l'intérieur du contour si on veut être précis", "") + '</ul>';
+    // SIA 262, niveau d'approximation I et II simplifié (à confirmer)
+    var dS = d, ke = String(val("pc_ke")).trim() === "auto" ? {int:0.9, bord:0.7, angle:0.65}[pos] : num("pc_ke") || 0.9;
+    var u = circ ? Math.PI * (D + dS) : pos === "int" ? 2 * (c1 + c2) + Math.PI * dS : pos === "bord" ? 2 * c1 + c2 + Math.PI * dS / 2 : c1 + c2 + Math.PI * dS / 4;
+    var rs = 0.22 * num("pc_L") * 1000, kg = 48 / (16 + num("pc_Dmax"));
+    var psi1 = 1.5 * rs / dS * M.fsd / M.Es;
+    var As = Math.min(num("pc_Asx"), num("pc_Asy")), mR = As * M.fsd * (dS - As * M.fsd / (2 * M.fcd * 1000)) / 1e6;   // kNm/m
+    var msd = num("pc_V") / 8, psi2 = psi1 * Math.pow(Math.min(1, msd / Math.max(mR, 1e-9)), 1.5);
+    function vr(psi){ var kr = Math.min(2, 1 / (0.45 + 0.18 * psi * dS * kg)); return {kr:kr, V: ke * kr * M.tcd * dS * u / 1000} }
+    var A1 = vr(psi1), A2 = vr(psi2);
+    h += '<h2>SIA 262 · à confirmer</h2><div class="cles">' + cle("u à d/2", fmt(u, 0), "mm", "ke = " + fmt(ke, 2)) +
+      cle("ψ niveau I", fmt(psi1 * 1000, 2), "mrad", "rs = 0,22 L = " + fmt(rs, 0) + " mm") + cle("VRd niveau I", fmt(A1.V, 0), "kN", "kr = " + fmt(A1.kr, 2), true) +
+      cle("ψ niveau II", fmt(psi2 * 1000, 2), "mrad", "msd = Vd/8, mRd = " + fmt(mR, 0) + " kNm/m") + cle("VRd niveau II", fmt(A2.V, 0), "kN", "kr = " + fmt(A2.kr, 2)) + '</div><ul class="verifs">' +
+      verif(num("pc_V") <= A1.V, "VEd ≤ VRd (niveau I, prudent)", fmt(num("pc_V"), 0) + " ≤ " + fmt(A1.V, 0) + " kN") +
+      verif(num("pc_V") <= A2.V, "VEd ≤ VRd (niveau II, msd = Vd/8 pour poteau intérieur)", fmt(num("pc_V"), 0) + " ≤ " + fmt(A2.V, 0) + " kN") +
+      verif(null, "Formules SIA 262 (kr, ψ, kg, ke) écrites sans le texte de la norme sous les yeux : à relire avant usage", "") + '</ul>';
+    $("#r-pc").innerHTML = h;
+  }
+
+  // =====================================================================
+  //  Ouverture des fissures (EN 1992-1-1 §7.3)
+  // =====================================================================
+  function rendFissures(){
+    var M = mat(), Es = 200000, b = num("fi_b") * 1000, h = num("fi_h") * 1000, c = num("fi_c"), o = num("fi_o"), s = num("fi_s"), Mq = num("fi_M") * 1e6;
+    var d = h - c - o / 2, As = Math.PI * o * o / 4 * b / s, fcm = M.fck + 8, Ecm = 22000 * Math.pow(fcm / 10, 0.3), ae = Es / Ecm;
+    var aeff = Es / (Ecm / (1 + num("fi_phi"))), rho = As / (b * d), na = aeff * rho;
+    var x = d * (-na + Math.sqrt(na * na + 2 * na)), ss = Mq / (As * (d - x / 3));
+    var hc = Math.min(2.5 * (h - d), (h - x) / 3, h / 2), rpe = As / (b * hc), kt = num("fi_kt");
+    var srmax = s <= 5 * (c + o / 2) ? 3.4 * c + 0.8 * 0.5 * 0.425 * o / rpe : 1.3 * (h - x);
+    var de = Math.max((ss - kt * M.fctm / rpe * (1 + ae * rpe)) / Es, 0.6 * ss / Es), wk = srmax * de;
+    var wmax = val("fi_w") === "man" ? num("fi_wm") : num("fi_w");
+    var kh = h <= 300 ? 1.0 : h >= 800 ? 0.65 : 1.0 - 0.35 * (h - 300) / 500, Asmin = 0.4 * kh * M.fctm * b * h / 2 / M.fsk;
+    var hh = '<div class="cles">' + cle("wk", fmt(wk, 3), "mm", "limite " + fmt(wmax, 2) + " mm", true) +
+      cle("σs fissuré", fmt(ss, 0), "MPa", "x = " + fmt(x, 0) + " mm, αe = " + fmt(aeff, 1)) +
+      cle("sr,max", fmt(srmax, 0), "mm", s <= 5 * (c + o / 2) ? "éq. (7.11)" : "grand espacement, éq. (7.14)") +
+      cle("εsm − εcm", fmt(de * 1000, 3), "‰", "éq. (7.9)") + cle("ρp,eff", fmt(rpe * 100, 2), "%", "hc,ef = " + fmt(hc, 0) + " mm") +
+      cle("As posée", fmt(As, 0), "mm²", "Ø" + o + " e = " + s + " mm") + '</div><ul class="verifs">' +
+      verif(wk <= wmax, "wk ≤ wmax (EN 1992 tab. 7.1N, combinaison quasi permanente)", fmt(wk, 3) + " ≤ " + fmt(wmax, 2) + " mm") +
+      verif(As >= Asmin, "Armature minimale de fissuration As,min = kc k fct,eff Act / σs (§7.3.2, kc = 0,4 flexion, σs = fyk)", fmt(As, 0) + " ≥ " + fmt(Asmin, 0) + " mm²") +
+      verif(ss <= 0.8 * M.fsk, "σs ≤ 0,8 fyk (§7.2(5))", fmt(ss, 0) + " ≤ " + fmt(0.8 * M.fsk, 0) + " MPa") +
+      verif(null, "Flexion simple, k1 = 0,8 (barres HA), k2 = 0,5, k3 = 3,4, k4 = 0,425 (valeurs recommandées)", "") +
+      verif(null, "SIA 262 maîtrise la fissuration par des contraintes limites de l'armature : non codée, EN 1992 utilisé", "") + '</ul>';
+    $("#r-fi").innerHTML = hh;
+  }
+
+  // =====================================================================
+  //  Torsion (EN 1992-1-1 §6.3), section rectangulaire pleine
+  // =====================================================================
+  function rendTorsion(){
+    var M = mat(), b = num("to_b") * 1000, h = num("to_h") * 1000, c = num("to_c"), T = num("to_T") * 1e6, V = num("to_V") * 1000;
+    var cot = Math.min(2.5, Math.max(1, num("to_cot"))), th = Math.atan(1 / cot), fcd = M.fcdEC, fyd = M.fsd, nu = 0.6 * (1 - M.fck / 250);
+    var A = b * h, u = 2 * (b + h), tef = Math.min(Math.max(A / u, 2 * c), b / 2), Ak = (b - tef) * (h - tef), uk = 2 * ((b - tef) + (h - tef));
+    var TRdmax = 2 * nu * fcd * Ak * tef * Math.sin(th) * Math.cos(th), fctd = 0.7 * M.fctm / M.gc, TRdc = 2 * Ak * tef * fctd;
+    var dd = h - c, z = 0.9 * dd, VRdmax = b * z * nu * fcd / (cot + 1 / cot);
+    var k = Math.min(2, 1 + Math.sqrt(200 / dd)), VRdc = 0.035 * Math.pow(k, 1.5) * Math.sqrt(M.fck) * b * dd;
+    var aT = T / (2 * Ak * fyd * cot) * 1000, aV = V / (z * fyd * cot) * 1000, brin = aT + aV / 2, Asl = T * uk * cot / (2 * Ak * fyd);
+    var inter = T / TRdmax + V / VRdmax, simple = T / TRdc + V / VRdc;
+    var et = null; [8, 10, 12, 14].some(function(o){ for(var s = 300; s >= 75; s -= 25){ var a1 = Math.PI * o * o / 4 * 1000 / s; if(a1 >= brin && s <= uk / 8 && s <= 0.75 * dd){ et = {o:o, s:s, a:a1}; return true } } return false });
+    var h2 = '<div class="cles">' + cle("tef", fmt(tef, 0), "mm", "A/u, au moins 2 × " + fmt(c, 0) + " mm") + cle("Ak", fmt(Ak / 1e6, 4), "m²", "uk = " + fmt(uk, 0) + " mm") +
+      cle("TRd,max", fmt(TRdmax / 1e6, 1), "kNm", "éq. (6.30)") + cle("Étrier par brin", fmt(brin, 0), "mm²/m", "torsion " + fmt(aT, 0) + " + tranchant/2 " + fmt(aV / 2, 0), true) +
+      cle("ΣAsl torsion", fmt(Asl, 0), "mm²", "éq. (6.28), à répartir sur le contour") + '</div><ul class="verifs">' +
+      verif(inter <= 1, "Bielles : TEd / TRd,max + VEd / VRd,max ≤ 1 (éq. 6.29), cot θ = " + fmt(cot, 2), fmt(inter * 100, 0) + " %") +
+      verif(simple <= 1 ? true : null, "Armature minimale seule si TEd / TRd,c + VEd / VRd,c ≤ 1 (éq. 6.31)", fmt(simple * 100, 0) + " %") +
+      verif(null, "Étriers fermés proposés", et ? "Ø" + et.o + " e = " + et.s + " mm (" + fmt(et.a, 0) + " mm²/m)" : "hors tableau") +
+      verif(null, "Espacement des étriers ≤ uk/8 = " + fmt(uk / 8, 0) + " mm (§9.2.3(3)) ; barres longitudinales espacées ≤ 350 mm, une à chaque angle (§9.2.3(4))", "") +
+      verif(null, "VRd,c pris à sa valeur minimale (sans armature longitudinale) : prudent", "") +
+      verif(null, "SIA 262 (torsion) : non codée, EN 1992 utilisé", "") + '</ul>';
+    $("#r-to").innerHTML = h2;
+  }
+
+  // =====================================================================
+  //  Mur de soutènement en T renversé (EN 1997-1 / SIA 267)
+  // =====================================================================
+  function rendSoutenement(){
+    var M = mat(), H = num("so_H"), t = num("so_t"), e = num("so_e"), pa = num("so_pa"), ta = num("so_ta"), g = num("so_g"), phi = num("so_phi") * Math.PI / 180, q = num("so_q");
+    var B = pa + t + ta, Hv = H + e, Ka = Math.pow(Math.tan(Math.PI / 4 - phi / 2), 2), D = num("so_D");
+    var W = [[GAMMA_BA * t * H, pa + t / 2, "Rideau"], [GAMMA_BA * e * B, B / 2, "Semelle"], [g * H * ta, pa + t + ta / 2, "Terre sur le talon"], [num("so_g") * Math.max(D - e, 0) * pa, pa / 2, "Terre sur le patin"]];
+    var Qv = q * ta, xQ = pa + t + ta / 2, Pa = 0.5 * Ka * g * Hv * Hv, Pq = Ka * q * Hv;
+    var SW = 0, SWx = 0; W.forEach(function(w){ SW += w[0]; SWx += w[0] * w[1] });
+    // EQU : renversement autour de l'arête du patin
+    var gs = num("so_gGs"), gi = num("so_gGi"), Mdst = gs * Pa * Hv / 3 + M.gQ * Pq * Hv / 2, Mstb = gi * SWx;
+    // glissement
+    var phif = Math.atan(Math.tan(num("so_phif") * Math.PI / 180) / num("so_gphi")), Hd = M.gG * Pa + M.gQ * Pq, Rh = SW * Math.tan(phif) / num("so_gRh");
+    // portance : deux combinaisons
+    function portance(gW, gQv){
+      var V = gW * SW + gQv * Qv, Ms = gW * SWx + gQv * Qv * xQ, Mo = M.gG * Pa * Hv / 3 + M.gQ * Pq * Hv / 2;
+      var xR = (Ms - Mo) / V, ex = B / 2 - xR, Bp = B - 2 * Math.abs(ex), qRd;
+      if(val("so_sol") === "rap") qRd = num("so_qR");
+      else {
+        var c = num("so_cf") / num("so_gcc"), Nq = Math.exp(Math.PI * Math.tan(phif)) * Math.pow(Math.tan(Math.PI / 4 + phif / 2), 2);
+        var Nc = phif > 1e-6 ? (Nq - 1) / Math.tan(phif) : Math.PI + 2, Ng = 2 * (Nq - 1) * Math.tan(phif), m = 2;
+        var base = 1 - Hd / (V + Bp * c / Math.max(Math.tan(phif), 1e-9));
+        base = Math.max(base, 0);
+        var iq = Math.pow(base, m), ig = Math.pow(base, m + 1), ic = phif > 1e-6 ? iq - (1 - iq) / (Nc * Math.tan(phif)) : 1 - m * Hd / (Bp * c * Nc);
+        qRd = (c * Nc * ic + num("so_g") * D * Nq * iq + 0.5 * num("so_g2") * Bp * Ng * ig) / num("so_gRv");
+      }
+      return {V:V, ex:ex, Bp:Bp, s: Bp > 0 ? V / Bp : Infinity, qRd:qRd, xR:xR};
+    }
+    var C1 = portance(M.gG, M.gQ), C2 = portance(1.0, 0);
+    // rideau
+    var cn = num("so_cn") / 1000, o = num("so_dia") / 1000, dR = t - cn - o / 2;
+    var MR = M.gG * Ka * g * H * H * H / 6 + M.gQ * Ka * q * H * H / 2, VR = M.gG * Ka * g * H * H / 2 + M.gQ * Ka * q * H;
+    var fR = flexion(MR, 1, dR, M), AsR = Math.max(fR.As, asMin(1, dR, M)), vrR = vRdc(1, dR, AsR, M);
+    // patin et talon : réaction uniforme sur B' (Meyerhof), combinaison C1
+    var dS = e - cn - o / 2, sd = C1.s, Mp = (sd - M.gG * GAMMA_BA * e) * pa * pa / 2;
+    var desc = M.gG * (g * H + GAMMA_BA * e) + M.gQ * q, rem = Math.max(0, C1.Bp - pa - t), Mt = desc * ta * ta / 2 - sd * Math.min(rem, ta) * Math.min(rem, ta) / 2;
+    var fP = flexion(Math.max(Mp, 0), 1, dS, M), fT = flexion(Math.max(Mt, 0), 1, dS, M);
+    var h = '<h2>Stabilité (par mètre de mur)</h2><div class="cles">' + cle("Largeur B", fmt(B, 2), "m", "patin " + fmt(pa, 2) + " + rideau " + fmt(t, 2) + " + talon " + fmt(ta, 2)) +
+      cle("Ka", fmt(Ka, 3), "", "Rankine, écran fictif au droit du talon") + cle("Poussée", fmt(Pa, 1) + " + " + fmt(Pq, 1), "kN/m", "terres + surcharge, caractéristiques") +
+      cle("Poids", fmt(SW, 1), "kN/m", "béton et terres") + '</div><ul class="verifs">' +
+      verif(Mstb >= Mdst, "Renversement EQU autour du patin : γG,stb = " + fmt(gi, 2) + ", γG,dst = " + fmt(gs, 2) + " (EN 1990 tab. A1.2(A))", fmt(Mstb, 1) + " ≥ " + fmt(Mdst, 1) + " kNm/m") +
+      verif(Hd <= Rh, "Glissement : Hd ≤ V tan δd / γR,h, δ = φ' (béton coulé en place, EN 1997 §6.5.3(10)), sans butée", fmt(Hd, 1) + " ≤ " + fmt(Rh, 1) + " kN/m") +
+      verif(C1.s <= C1.qRd, "Portance, poids défavorables (γG) : σd = V / B', B' = " + fmt(C1.Bp, 2) + " m", fmt(C1.s, 0) + " ≤ " + fmt(C1.qRd, 0) + " kPa") +
+      verif(C2.s <= C2.qRd, "Portance, poids favorables (1,0) : B' = " + fmt(C2.Bp, 2) + " m", fmt(C2.s, 0) + " ≤ " + fmt(C2.qRd, 0) + " kPa") +
+      verif(Math.abs(C2.ex) <= B / 3 && Math.abs(C1.ex) <= B / 3, "Excentricité ≤ B/3 (au-delà, précautions particulières : EN 1997 §6.5.4)", "e = " + fmt(Math.max(Math.abs(C1.ex), Math.abs(C2.ex)), 2) + " m") + '</ul>';
+    h += '<h2>Béton armé</h2><div class="cles">' + cle("Rideau, md en pied", fmt(MR, 1), "kNm/m", "vd = " + fmt(VR, 1) + " kN/m") + cle("Rideau, face côté terre", fmt(AsR, 0), "mm²/m", txtM(barresM(AsR)), true) +
+      cle("Patin, md", fmt(Math.max(Mp, 0), 1), "kNm/m", txtM(barresM(Math.max(fP.As, asMin(1, dS, M)))) + ", nappe inférieure") +
+      cle("Talon, md", fmt(Math.max(Mt, 0), 1), "kNm/m", txtM(barresM(Math.max(fT.As, asMin(1, dS, M)))) + ", nappe supérieure") + '</div><ul class="verifs">' +
+      verif(fR.ok, "Rideau en flexion, sans armature comprimée", "x/d = " + fmt(fR.xd, 3)) +
+      verif(VR <= vrR, "Rideau, effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(VR, 0) + " ≤ " + fmt(vrR, 0) + " kN/m") +
+      verif(fP.ok && fT.ok, "Semelle en flexion (réaction uniforme sur B', combinaison poids défavorables)", "") +
+      verif(null, "Terrain horizontal, mur sans frottement sur l'écran fictif, sans nappe, butée négligée", "") +
+      verif(null, "Facteurs partiels SIA 267 : à confirmer, valeurs EN 1997 AD2 et EN 1990 proposées par défaut", "") + '</ul>';
+    $("#r-so").innerHTML = h;
   }
 
   // =====================================================================
@@ -868,7 +1462,7 @@ footer a:hover{color:var(--or)}
       var cx = px(r.h);
       if(!(r.ok && isFinite(r.cout))) s += '<line class="f" x1="'+cx+'" y1="'+(H-34)+'" x2="'+cx+'" y2="'+(H-26)+'"/>';
     });
-    if(ixOpt >= 0){ var r = rows[ixOpt]; s += '<circle cx="'+px(r.h)+'" cy="'+py(r.cout)+'" r="4.5" fill="#D6A85C"/><text class="or" x="'+px(r.h)+'" y="'+(py(r.cout) - 10)+'" text-anchor="middle">'+fmt(r.h * 100, 0)+' cm · '+fmt(r.cout, 0)+'</text>' }
+    if(ixOpt >= 0){ var r = rows[ixOpt]; s += '<circle cx="'+px(r.h)+'" cy="'+py(r.cout)+'" r="4.5" class="pt"/><text class="or" x="'+px(r.h)+'" y="'+(py(r.cout) - 10)+'" text-anchor="middle">'+fmt(r.h * 100, 0)+' cm · '+fmt(r.cout, 0)+'</text>' }
     s += '<text x="'+g+'" y="'+(H-10)+'">'+fmt(x0 * 100, 0)+' cm</text><text x="'+(W-g)+'" y="'+(H-10)+'" text-anchor="end">'+fmt(x1 * 100, 0)+' cm</text>';
     s += '<text x="'+(W/2)+'" y="'+(H-10)+'" text-anchor="middle">'+esc(lab)+' · tirets : ne passe pas</text></svg>';
     return s;
@@ -911,44 +1505,47 @@ footer a:hover{color:var(--or)}
     var M = mat(), fil = val("fo_t") === "fil", G = num("fo_G"), Q = num("fo_Q"), D = num("fo_D"), gs = num("fo_gs");
     var cn = num("fo_cn") / 1000, o = num("fo_dia") / 1000, ec7 = val("fo_sol") === "ec7";
     var b0 = num("fo_b0"), c1 = num("fo_c1"), c2 = num("fo_c2"), rL = Math.max(0.2, num("fo_r"));
+    var MB = Math.abs(num("fo_MB")), ML = fil ? 0 : Math.abs(num("fo_ML"));
     var rows = [], hmax = Math.max(0.2, num("fo_hmax"));
+    // charge sur une longueur a de la console, réaction uniforme σn sur la largeur efficace Bp comptée depuis le bord comprimé
+    function console_(sn, a, Bp, x0){ var l = Math.max(Math.min(a, Bp) - x0, 0); return sn * l * (Math.max(a - x0, 0) - l / 2) }
     for(var h = 0.20; h <= hmax + 1e-9; h += 0.05){
       var r = {h:h, ok:true, raisons:[]};
-      // largeur par itération (le poids propre et la portance dépendent de B)
-      var B = fil ? b0 + 0.1 : Math.max(c1, c2) + 0.1, Lw = B, Nd, qRd, it;
-      for(it = 0; it < 40; it++){
+      var B = fil ? b0 : Math.max(c1, c2 / rL, 0.3), Lw, Nd, qRd, eB, eL, Bp, Lp, trouve = false;
+      for(var it = 0; it < 600; it++){
         Lw = fil ? 1 : rL * B;
         var aire = fil ? B : B * Lw, aCol = fil ? b0 : c1 * c2;
         var Wf = GAMMA_BA * aire * h, Ws = gs * Math.max(D - h, 0) * Math.max(aire - aCol, 0);
         Nd = M.gG * (G + Wf + Ws) + M.gQ * Q;
-        qRd = ec7 ? portanceEC7(B, Lw, fil).qRd : num("fo_qR");
-        var Bn = fil ? Nd / qRd : Math.sqrt(Nd / (qRd * rL));
-        Bn = Math.max(Math.ceil(Bn / 0.05 - 1e-9) * 0.05, fil ? b0 : Math.max(c1, c2));
-        if(Math.abs(Bn - B) < 1e-6) break;
-        B = Bn;
+        eB = MB / Nd; eL = ML / Nd; Bp = B - 2 * eB; Lp = fil ? 1 : Lw - 2 * eL;
+        if(Bp > 0.05 && Lp > 0.05){
+          qRd = ec7 ? portanceEC7(Math.min(Bp, Lp), Math.max(Bp, Lp), fil).qRd : num("fo_qR");
+          if(Nd / (Bp * Lp) <= qRd + 1e-9){ trouve = true; break }
+        }
+        B = Math.round((B + 0.05) * 100) / 100;
       }
-      Lw = fil ? 1 : rL * B;
-      r.B = B; r.L = Lw; r.Nd = Nd; r.qRd = qRd; r.sig = Nd / (fil ? B : B * Lw);
-      var sn = (M.gG * G + M.gQ * Q) / (fil ? B : B * Lw);         // réaction nette sous la charge transmise
+      r.B = B; r.L = Lw; r.Nd = Nd; r.qRd = qRd; r.Bp = Bp; r.Lp = Lp; r.eB = eB; r.eL = eL; r.sig = Nd / (Bp * Lp);
+      if(!trouve){ r.ok = false; r.raisons.push("largeur") }
+      var sn = (M.gG * G + M.gQ * Q) / (Bp * Lp);                   // réaction nette sur l'aire efficace (Meyerhof)
       var d1 = h - cn - o / 2, d2 = h - cn - 1.5 * o;
       var a1 = (B - (fil ? b0 : c1)) / 2, a2 = fil ? 0 : (Lw - c2) / 2;
       r.a1 = a1; r.sn = sn; r.d1 = d1;
       if(d1 <= 0.05){ r.ok = false; r.raisons.push("hauteur utile") }
-      var m1 = sn * a1 * a1 / 2, f1 = flexion(m1, 1, d1, M);
+      var m1 = console_(sn, a1, Bp, 0), f1 = flexion(m1, 1, d1, M);
       var As1 = Math.max(f1.As, asMin(1, d1, M));
-      var v1 = sn * Math.max(a1 - d1, 0), vr1 = vRdc(1, d1, As1, M);
+      var v1 = sn * Math.max(Math.min(a1 - d1, Bp), 0), vr1 = vRdc(1, d1, As1, M);
       r.m1 = m1; r.As1 = As1; r.v1 = v1; r.vr1 = vr1; r.xd1 = f1.xd;
       if(!f1.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
       if(v1 > vr1){ r.ok = false; r.raisons.push("effort tranchant") }
       var acier;
       if(fil){
-        r.As2 = Math.max(0.2 * As1, 0);   // répartition 20 % (EN 1992 §9.3.1.1)
+        r.As2 = 0.2 * As1;   // répartition 20 % (EN 1992 §9.3.1.1)
         acier = kgDe(As1, B) + kgDe(r.As2, B);
         r.cout = B * h * M.pb + 2 * h * M.pc + acier * (1 + M.maj) * M.pa;
       } else {
-        var m2 = sn * a2 * a2 / 2, f2 = flexion(m2, 1, d2, M);
+        var m2 = console_(sn, a2, Lp, 0), f2 = flexion(m2, 1, d2, M);
         var As2 = Math.max(f2.As, asMin(1, d2, M));
-        var v2 = sn * Math.max(a2 - d2, 0), vr2 = vRdc(1, d2, As2, M);
+        var v2 = sn * Math.max(Math.min(a2 - d2, Lp), 0), vr2 = vRdc(1, d2, As2, M);
         r.m2 = m2; r.As2 = As2; r.v2 = v2; r.vr2 = vr2; r.xd2 = f2.xd;
         if(!f2.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
         if(v2 > vr2){ r.ok = false; r.raisons.push("effort tranchant") }
@@ -967,7 +1564,7 @@ footer a:hover{color:var(--or)}
       cle("Épaisseur optimale", fmt(R.h * 100, 0), "cm", "coût minimal", true) +
       cle("Coût estimé", fmt(R.cout, 0), "CHF", u) +
       cle("Nd", fmt(R.Nd, 0), fil ? "kN/m" : "kN", "y c. semelle et remblai") +
-      cle("σd / résistance", fmt(R.sig, 0) + " / " + fmt(R.qRd, 0), "kPa") +
+      cle("σd / résistance", fmt(R.sig, 0) + " / " + fmt(R.qRd, 0), "kPa", (R.eB > 0 || R.eL > 0) ? "aire efficace " + fmt(R.Bp, 2) + (fil ? " m" : " × " + fmt(R.Lp, 2) + " m") : "") +
       cle("Armature", fmt(R.acier * (1 + M.maj) / (fil ? 1 : R.B * R.L), 1), "kg/m²", "majoration comprise") + '</div>';
     h2 += '<h3>Ferraillage inférieur</h3><ul class="verifs">' +
       verif(null, fil ? "Transversal (sous le mur)" : "Direction B (nappe extérieure)", txtM(b1)) +
@@ -979,7 +1576,9 @@ footer a:hover{color:var(--or)}
       (fil ? "" : verif(R.xd2 <= M.xdmax, "Flexion au nu du poteau, direction L · md = " + fmt(R.m2, 1) + " kNm/m", "x/d = " + fmt(R.xd2, 3)) +
         verif(R.v2 <= R.vr2, "Effort tranchant direction L", fmt(R.v2, 0) + " ≤ " + fmt(R.vr2, 0) + " kN/m") +
         verif(false, "Poinçonnement (SIA 262 / EN 1992 §6.4) : non vérifié dans cette version", "à faire")) +
-      verif(null, "Excentricité, moments et efforts horizontaux : non pris en compte", "") +
+      (R.eB > 0 || R.eL > 0 ? verif(R.eB <= R.B / 3 && R.eL <= R.L / 3, "Excentricité e = Md / Nd ≤ B/3 (au-delà, précautions particulières : EN 1997 §6.5.4) ; aire efficace B' = B − 2e (EN 1997 annexe D)", "eB = " + fmt(R.eB, 2) + (fil ? "" : ", eL = " + fmt(R.eL, 2)) + " m") +
+        verif(null, "Répartition élastique sans traction selon B (pour mémoire)", (function(){ var L1 = fil ? 1 : R.L, e = R.eB; if(e <= R.B / 6) return "σ = " + fmt(R.Nd / (R.B * L1) * (1 + 6 * e / R.B), 0) + " / " + fmt(R.Nd / (R.B * L1) * (1 - 6 * e / R.B), 0) + " kPa"; var c = 3 * (R.B / 2 - e); return "σmax = " + fmt(2 * R.Nd / (c * L1), 0) + " kPa sur " + fmt(c, 2) + " m comprimés" })()) : "") +
+      verif(null, "Efforts horizontaux (glissement, inclinaison de la charge) : non pris en compte ici", "") +
       (ec7 ? verif(null, "Portance EN 1997-1 annexe D : φ'd = " + fmt(portanceEC7(R.B, R.L, fil).phid, 1) + "°, base horizontale, charge verticale centrée", "") : "") + '</ul>';
     h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
     h2 += '<div class="defile"><table><tr><th>h</th><th>B</th><th>md</th><th>As</th><th>Acier</th><th>Coût</th><th>État</th></tr>' + rows.map(function(r, i){
@@ -1113,46 +1712,55 @@ footer a:hover{color:var(--or)}
         verif(null, "Charges variables placées travée par travée (enveloppe), γG uniforme", "") +
         verif(null, "Effort tranchant selon SIA 262 (kd) : non codé, EN 1992 utilisé", "") + '</ul>';
     } else {
-      var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN");
-      if(ly < lx){ var tt = lx; lx = ly; ly = tt; var t1 = bW, t2 = bE; bW = bS; bE = bN; bS = t1; bN = t2 }
-      var P = plaque(lx, ly, bW, bE, bS, bN, num("da_nu")), Kd = num("da_K");
+      var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN"), Pl;
+      try { Pl = plaqueFE(lx, ly, bW, bE, bS, bN, num("da_nu")) } catch(e){ $("#r-dalle").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
+      var tri = val("da_tri"), pt = num("da_pt") * num("da_gT");
+      function coefs(pu){ var c = [pu, 0, 0]; if(tri === "S"){ c[0] += pt; c[2] -= pt } else if(tri === "N") c[2] += pt; else if(tri === "W"){ c[0] += pt; c[1] -= pt } else if(tri === "E") c[1] += pt; return c }
+      // portée de référence pour l'élancement
+      var cand = [], Kd = num("da_K");
+      if(bW !== "L" && bE !== "L") cand.push(lx);
+      if(bS !== "L" && bN !== "L") cand.push(ly);
+      var lref = cand.length ? Math.min.apply(null, cand) : (bW !== "L" || bE !== "L" ? lx : ly);
+      if(!cand.length) Kd = 0.4;
+      var U = lirePlaque(Pl, [1, 0, 0]);
       for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
-        var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pd = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
-        r.mx = P.mx * pd * lx * lx; r.my = P.my * pd * lx * lx;
-        r.mW = P.mW * pd * lx * lx; r.mE = P.mE * pd * lx * lx; r.mS = P.mS * pd * lx * lx; r.mN = P.mN * pd * lx * lx;
+        var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pu = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
+        var E = lirePlaque(Pl, coefs(pu));
+        r.mx = E.mx; r.my = E.my; r.E = E;
         var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M), amin = asMin(1, dy, M);
         r.Asx = Math.max(fx.As, amin); r.Asy = Math.max(fy.As, amin);
-        var ms = Math.max(r.mW, r.mE, r.mS, r.mN), fs = flexion(ms, 1, dx, M);
-        r.Ass = ms > 0 ? Math.max(fs.As, asMin(1, dx, M)) : 0; r.ms = ms;
+        var ms = Math.max(E.W, E.E, E.S, E.N), fs = flexion(ms, 1, dx, M);
+        r.Ass = ms > 0.01 ? Math.max(fs.As, asMin(1, dx, M)) : 0; r.ms = ms;
         r.xd = Math.max(fx.xd, fy.xd, fs.xd);
         if(!fx.ok || !fy.ok || !fs.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
-        r.Vd = pd * lx / 2; r.vr = vRdc(1, dx, Math.max(r.Ass, r.Asx), M);
+        r.Vd = E.v; r.vr = vRdc(1, dx, Math.max(r.Ass, Math.min(r.Asx, r.Asy)), M);
         if(r.Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
-        r.ld = lx / dx / ldLim(Kd, r.Asx / (dx * 1e6), M.fck);
+        r.ld = lref / dx / ldLim(Kd, Math.max(r.Asx, r.Asy) / (dx * 1e6), M.fck);
         if(r.ld > 1){ r.ok = false; r.raisons.push("élancement") }
         var aire = lx * ly, kg = kgDe(r.Asx, lx) * ly + kgDe(r.Asy, ly) * lx;
-        [["W", ly], ["E", ly], ["S", lx], ["N", lx]].forEach(function(b){ var mm = r["m" + b[0]]; if(mm > 0){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * lx) * b[1] } });
+        [["W", ly, lx], ["E", ly, lx], ["S", lx, ly], ["N", lx, ly]].forEach(function(bd){ var mm = E[bd[0]]; if(mm > 0.01){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * bd[2]) * bd[1] } });
         r.acier = kg / aire;
         r.cout = h * M.pb + M.pc + r.acier * (1 + M.maj) * M.pa;
         rows.push(r);
       }
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
       if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
-      var Rr = rows[io];
+      var Rr = rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"};
       h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
-        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "coef. " + fmt(P.mx, 4) + " · p lx²") + cle("my travée", fmt(Rr.my, 1), "kNm/m", "coef. " + fmt(P.my, 4)) +
-        cle("m sur bord encastré", Rr.ms > 0 ? fmt(-Rr.ms, 1) : "—", "kNm/m") + '</div>';
+        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "charge uniforme : " + fmt(U.mx / (lx * lx), 4) + " · p lx²") + cle("my travée", fmt(Rr.my, 1), "kNm/m", fmt(U.my / (lx * lx), 4) + " · p lx²") +
+        cle("m sur bord encastré", Rr.ms > 0.01 ? fmt(-Rr.ms, 1) : "—", "kNm/m") + cle("vd sur appui", fmt(Rr.Vd, 1), "kN/m", "réaction linéique max hors angles") + '</div>';
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
-        verif(null, "Inférieur, direction lx (nappe extérieure)", txtM(barresM(Rr.Asx))) +
-        verif(null, "Inférieur, direction ly", txtM(barresM(Rr.Asy))) +
-        (Rr.Ass > 0 ? verif(null, "Supérieur sur bords encastrés (sur 0,3 lx)", txtM(barresM(Rr.Ass))) : "") + '</ul>';
+        verif(null, "Inférieur, direction x (nappe extérieure)", txtM(barresM(Rr.Asx))) +
+        verif(null, "Inférieur, direction y", txtM(barresM(Rr.Asy))) +
+        ["W", "E", "S", "N"].map(function(k){ return Rr.E[k] > 0.01 ? verif(null, "Supérieur sur bord " + NB[k] + " encastré (sur 0,3 de la portée)", txtM(barresM(Math.max(flexion(Rr.E[k], 1, Rr.h - cn - o / 2, M).As, asMin(1, Rr.h - cn - o / 2, M))))) : "" }).join("") + '</ul>';
       h2 += '<h3>Vérifications</h3><ul class="verifs">' +
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
-        verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers, estimé par p·lx/2", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
-        verif(Rr.ld <= 1, "Élancement lx/d (EN 1992 éq. 7.16, K = " + fmt(Kd, 1) + ")", fmt(Rr.ld * 100, 0) + " % de la limite") +
-        verif(null, "Moments élastiques d'une plaque de Kirchhoff (différences finies, maillage 20 × 20), charge uniforme", "") +
-        verif(null, "Armature de coin (torsion) et bords libres : non traités dans cette version", "") + '</ul>';
+        verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
+        verif(Rr.ld <= 1, "Élancement l/d (EN 1992 éq. 7.16, K = " + fmt(Kd, 1) + ", l = " + fmt(lref, 2) + " m)", fmt(Rr.ld * 100, 0) + " % de la limite") +
+        verif(null, "Moments élastiques d'une plaque de Kirchhoff (éléments finis ACM, maillage " + Pl.nx + " × " + Pl.ny + "), ν = " + fmt(num("da_nu"), 2), "") +
+        (tri !== "non" ? verif(null, "Charge triangulaire " + fmt(num("da_pt"), 1) + " kN/m² à la pointe, pondérée par " + fmt(num("da_gT"), 2), "") : "") +
+        verif(null, "Armature d'angle (torsion) près des coins appuyés : à disposer, non chiffrée", "") + '</ul>';
     }
     h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
     h2 += '<p class="note">Coût par m² = béton + coffrage de sous-face + armature (majorée de ' + fmt(M.maj * 100, 0) + ' %). Poids propre ' + GAMMA_BA + ' kN/m³ (EN 1991-1-1 tab. A.1). Armature minimale EN 1992 (9.1N).</p>';
@@ -1335,8 +1943,20 @@ footer a:hover{color:var(--or)}
     ["Bois : fm,k, fv,k, E0,mean, ρmean", "EN 338, EN 14080", "", ""],
     ["kmod 0,8 · γM 1,3 / 1,25 · kdef 0,6 · kcr 0,67", "EN 1995-1-1 tab. 3.1, 2.3, 3.2, §6.1.7", "", "SIA 265 non recoupée"],
     ["ψ2 = 0,3 (A, B) · 0,6 (C)", "EN 1990 tab. A1.1", "", ""],
+    ["fcm(t), fck(t), fctm(t), Ecm(t), s = 0,20 / 0,25 / 0,38", "EN 1992-1-1 §3.1.2, éq. (3.1) à (3.5)", "", ""],
+    ["Retrait εcd, εca, kh (tab. 3.3 interpolé)", "EN 1992-1-1 §3.1.4, annexe B.2", "", "Le classeur Excel prenait kh par paliers"],
+    ["Fluage φ(t, t0)", "EN 1992-1-1 annexe B.1", "", ""],
+    ["Élancement limite, imperfection θ0 = 1/200, e0 ≥ h/30 et 20 mm", "EN 1992-1-1 §5.8.3.1, §5.2, §6.1(4)", "", ""],
+    ["Courbure nominale 1/r0 = εyd / (0,45 d), Kr, Kφ, c = 10", "EN 1992-1-1 §5.8.8", "", "Le classeur prenait (h/2 − enrobage) au lieu de 0,45 d"],
+    ["Parabole-rectangle εc2 = 2 ‰, εcu2 = 3,5 ‰", "EN 1992-1-1 §3.1.7, §6.1", "", ""],
+    ["As,min poteaux 0,10 NEd/fyd et 0,002 Ac, As,max 0,04 Ac", "EN 1992-1-1 §9.5.2", "", ""],
+    ["Poinçonnement u1 à 2d, β, vRd,c, vRd,max, armature éq. (6.52)", "EN 1992-1-1 §6.4", "", "k de vRd,max selon l'édition"],
+    ["Poinçonnement kr, ψ, kg, ke", "SIA 262", "", "Écrit de mémoire, à relire"],
+    ["sr,max, εsm − εcm, wk, As,min de fissuration, wmax", "EN 1992-1-1 §7.3, tab. 7.1N", "", "Le classeur modifiait k3 (annexe française) et prenait log10 pour fctm au-delà de C50/60"],
+    ["Torsion tef, Ak, TRd,max, interaction (6.29), (6.31)", "EN 1992-1-1 §6.3", "", ""],
+    ["Mur de soutènement : EQU, glissement δ = φ', portance avec inclinaison", "EN 1990 tab. A1.2(A), EN 1997-1 §6.5, annexe D", "", "Facteurs SIA 267 à confirmer"],
+    ["Plaque : éléments finis ACM (Kirchhoff), bords appuyés, encastrés ou libres", "Mécanique", "", "Remplace les tables de coefficients du classeur"],
     ["Enrobages par classe d'exposition", "SIA 262", "av", "À saisir dans chaque section"],
-    ["Poinçonnement", "SIA 262 / EN 1992 §6.4", "av", ""],
     ["Déversement des poutres", "SIA 263 / EN 1993 §6.3.2", "av", ""],
     ["Limites de flèche", "SIA 260", "av", "Saisies par l'utilisateur"],
     ["Fissuration, étanchéité des murs enterrés", "SIA 262, SIA 272", "av", ""]
@@ -1349,8 +1969,8 @@ footer a:hover{color:var(--or)}
   // =====================================================================
   //  Navigation et calcul
   // =====================================================================
-  var NOMS = {hypotheses:"Hypothèses", fondations:"Fondations", murs:"Murs enterrés", dalles:"Dalles", poutres:"Poutres", normes:"Normes et sources"};
-  var REND = {hypotheses:rendHypotheses, fondations:rendFondations, murs:rendMurs, dalles:rendDalles, poutres:rendPoutres, normes:rendNormes};
+  var NOMS = {hypotheses:"Hypothèses", materiaux:"Matériaux", fondations:"Fondations", murs:"Murs enterrés", soutenement:"Murs de soutènement", dalles:"Dalles", poutres:"Poutres", poteaux:"Poteaux", poinconnement:"Poinçonnement", fissuration:"Fissuration", torsion:"Torsion", normes:"Normes et sources"};
+  var REND = {hypotheses:rendHypotheses, materiaux:rendMateriaux, fondations:rendFondations, murs:rendMurs, soutenement:rendSoutenement, dalles:rendDalles, poutres:rendPoutres, poteaux:rendPoteaux, poinconnement:rendPoinconnement, fissuration:rendFissures, torsion:rendTorsion, normes:rendNormes};
   var courante = "hypotheses", minuterie = null;
   function calcule(){
     try { REND[courante]() }
@@ -1375,6 +1995,24 @@ footer a:hover{color:var(--or)}
   $("#ouvrir").addEventListener("click", function(){ $("#cote").classList.add("ouvert"); $("#voile-cote").classList.add("ouvert") });
   $("#voile-cote").addEventListener("click", ferme);
   window.addEventListener("hashchange", function(){ montre(location.hash.slice(1)) });
+
+  // ---- Thème : sombre → clair → système ----
+  var THEMES = ["sombre", "clair", "systeme"], LIB_THEME = {sombre:"Sombre", clair:"Clair", systeme:"Système"};
+  var mediaClair = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+  function themeChoisi(){ try { var t = localStorage.getItem("calculs.theme") || localStorage.getItem("visas.theme") || localStorage.getItem("planif.theme") || "sombre"; return t === "ab" ? "clair" : THEMES.indexOf(t) < 0 ? "sombre" : t } catch(e){ return "sombre" } }
+  function appliqueTheme(c){
+    var eff = c === "systeme" ? (mediaClair && mediaClair.matches ? "clair" : "sombre") : c;
+    document.documentElement.setAttribute("data-theme", eff);
+    var meta = document.querySelector("meta[name=theme-color]"); if(meta) meta.setAttribute("content", eff === "clair" ? "#F3F0E8" : "#050505");
+    $("#theme-lib").textContent = LIB_THEME[c];
+  }
+  $("#theme-btn").addEventListener("click", function(){
+    var c = THEMES[(THEMES.indexOf(themeChoisi()) + 1) % THEMES.length];
+    try { localStorage.setItem("calculs.theme", c) } catch(e){}
+    appliqueTheme(c);
+  });
+  if(mediaClair && mediaClair.addEventListener) mediaClair.addEventListener("change", function(){ if(themeChoisi() === "systeme") appliqueTheme("systeme") });
+  appliqueTheme(themeChoisi());
 
   Object.keys(CHAMPS).forEach(construit);
   montre(location.hash.slice(1));
