@@ -2401,10 +2401,15 @@ footer{font-size:11.5px}
         return E;
       }
       function tableTravees(E){
-        return '<div class="defile"><table><tr><th>Travée</th><th>L</th><th>h</th><th>md travée</th><th>md appuis</th><th>vd / VRd,c</th><th>Inférieur</th><th>Répartition</th><th>L/d</th><th>Flèche</th><th>Coût</th><th></th></tr>' +
+        return '<div class="defile"><table><tr><th>Travée</th><th>L</th><th>h</th><th>md travée</th><th>md appuis</th><th>vd / VRd,c</th><th>Inférieur</th><th>Répartition</th><th>Supérieur en travée</th><th>L/d</th><th>Flèche</th><th>Coût</th><th></th></tr>' +
           E.tr.map(function(t, i){
-            return '<tr' + (t.ok ? "" : ' class="ko"') + '><td>' + (i + 1) + '</td><td>' + fmt(T.L[i], 2) + ' m</td><td><b>' + fmt(t.h * 100, 0) + ' cm</b></td><td>' + fmt(t.Mp, 1) + '</td><td>' + (t.Mn > 0.01 ? "−" + fmt(t.Mn, 1) : "—") + '</td><td>' + fmt(t.Vd, 0) + ' / ' + fmt(t.vr, 0) + '</td><td>' + txtM(barresM(t.Asp)) + '</td><td>' + txtM(barresM(0.2 * t.Asp)) + '</td><td>' + fmt(t.ld * 100, 0) + ' %</td><td>' + fmt(Math.abs(t.w) * 1000, 1) + ' mm · ' + fmt(t.fl * 100, 0) + ' %</td><td>' + fmt(t.cout, 0) + '</td><td>' + (t.ok ? "✓" : "✗ " + t.raisons.join(", ")) + '</td></tr>';
-          }).join("") + '</table></div><p class="note">md en kNm/m, vd en kN/m, coût en CHF/m². Flèche à long terme et part de la limite L / saisie. Répartition : 20 % de l\'inférieur de la travée (EN 1992 §9.3.1.1(2)).</p>' + tableAppuis(E);
+            // supérieur continu sur toute la travée : moment négatif partout, valeur = le moins négatif de l'enveloppe
+            var mh = -Infinity;
+            E.R.x.forEach(function(x, k){ if(x >= E.R.ax[i] - 1e-9 && x <= E.R.ax[i+1] + 1e-9) mh = Math.max(mh, E.eM.min[k]) });
+            var sup = "—";
+            if(mh < -0.01){ var fs = flexion(-mh, 1, t.d, M); sup = (fs.ok ? "" : "✗ ") + txtM(barresM(Math.max(fs.As, asMin(1, t.d, M)))) + " · md −" + fmt(-mh, 1) }
+            return '<tr' + (t.ok ? "" : ' class="ko"') + '><td>' + (i + 1) + '</td><td>' + fmt(T.L[i], 2) + ' m</td><td><b>' + fmt(t.h * 100, 0) + ' cm</b></td><td>' + fmt(t.Mp, 1) + '</td><td>' + (t.Mn > 0.01 ? "−" + fmt(t.Mn, 1) : "—") + '</td><td>' + fmt(t.Vd, 0) + ' / ' + fmt(t.vr, 0) + '</td><td>' + txtM(barresM(t.Asp)) + '</td><td>' + txtM(barresM(0.2 * t.Asp)) + '</td><td>' + sup + '</td><td>' + fmt(t.ld * 100, 0) + ' %</td><td>' + fmt(Math.abs(t.w) * 1000, 1) + ' mm · ' + fmt(t.fl * 100, 0) + ' %</td><td>' + fmt(t.cout, 0) + '</td><td>' + (t.ok ? "✓" : "✗ " + t.raisons.join(", ")) + '</td></tr>';
+          }).join("") + '</table></div><p class="note">md en kNm/m, vd en kN/m, coût en CHF/m². Flèche à long terme et part de la limite L / saisie. Répartition : 20 % de l\'inférieur de la travée (EN 1992 §9.3.1.1(2)). Supérieur en travée : seulement si l\'enveloppe reste négative sur toute la travée ; sinon le supérieur s\'arrête sur les appuis (voir le tableau suivant).</p>' + tableAppuis(E);
       }
       // Armatures supérieures appui par appui : md sur l'appui, hauteur utile de la travée voisine la plus mince
       function tableAppuis(E){
