@@ -1952,8 +1952,35 @@ footer{font-size:11.5px}
       if(t === "A") s += '<path class="ap" d="M'+cx+' '+y0+' l-7 11 h14 z"/>';
       else if(t === "E") s += '<path class="ap" d="M'+(cx + (q === 0 ? -1 : 1))+' '+(y0-14)+' v28"/><path class="f" d="M'+cx+' '+(y0-14)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0-4)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0+6)+' l'+(q === 0 ? -6 : 6)+' 6"/>';
     });
-    if(e1.max > amp * 0.02) s += '<text class="or" x="'+px(R.x[e1.imax])+'" y="'+(py(e1.max) + 15)+'" text-anchor="middle">'+fmt(e1.max, 1)+'</text>';
-    if(e2.min < -amp * 0.02) s += '<text x="'+px(R.x[e2.imin])+'" y="'+(py(e2.min) - 7)+'" text-anchor="middle">'+fmt(e2.min, 1)+'</text>';
+    // valeurs extrêmes de chaque travée et valeurs sur appuis, sans doublon (19.10.2026)
+    var etq = [];
+    function pose(k, v, haut, anc, dx){
+      if(Math.abs(v) <= amp * 0.02) return;
+      var x = Math.min(Math.max(px(R.x[k]) + (dx || 0), g + 12), W - g - 12), t = fmt(v, 1);
+      if(etq.some(function(e){ return e.t === t && Math.abs(e.x - x) < 18 })) return;
+      etq.push({x:x, t:t});
+      s += '<text'+(haut ? ' class="or"' : '')+' x="'+x.toFixed(1)+'" y="'+(haut ? py(v) + 13 : py(v) - 6).toFixed(1)+'" text-anchor="'+(anc || "middle")+'">'+t+'</text>';
+    }
+    R.ax.forEach(function(xa, q){
+      var ks = []; for(var k = 0; k < R.x.length; k++) if(Math.abs(R.x[k] - xa) < 1e-9) ks.push(k);
+      if(!ks.length) return;
+      var kg = q > 0 ? ks[0] : null, kd = q < R.ax.length - 1 ? ks[ks.length - 1] : null;
+      [["max", true], ["min", false]].forEach(function(c){
+        var a = c[0], vg = kg != null ? env[a][kg] : null, vd = kd != null ? env[a][kd] : null;
+        if(vg != null && vd != null && Math.abs(vg - vd) > amp * 0.01){ pose(kg, vg, c[1], "end", -4); pose(kd, vd, c[1], "start", 4) }
+        else pose(vg != null ? kg : kd, vg != null ? vg : vd, c[1]);
+      });
+    });
+    for(var t = 0; t < R.ax.length - 1; t++){
+      var kx = -1, kn = -1;
+      for(var k = 0; k < R.x.length; k++){
+        if(R.x[k] < R.ax[t] - 1e-9 || R.x[k] > R.ax[t+1] + 1e-9) continue;
+        if(kx < 0 || env.max[k] > env.max[kx]) kx = k;
+        if(kn < 0 || env.min[k] < env.min[kn]) kn = k;
+      }
+      if(kx >= 0) pose(kx, env.max[kx], true);
+      if(kn >= 0) pose(kn, env.min[kn], false);
+    }
     s += '<text x="'+W+'" y="14" text-anchor="end">'+esc(unite)+'</text></svg>';
     return s;
   }
