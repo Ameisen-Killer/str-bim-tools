@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculs · STR Bim Tools</title>
+<meta name="description" content="Prédimensionnement de structure : fondations, murs enterrés, dalles, poutres en béton armé, acier et bois.">
+<!-- Page cachée (19.10.2026) : hors menu, hors sitemap, noindex -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 12h24M7 12v14M25 12v14M4 12c6 9 18 9 24 0' fill='none' stroke='%23D6A85C' stroke-width='1.4'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<style>
+:root{
+  --noir:#050505;
+  --ligne:rgba(236,232,224,.12);
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(236,232,224,.56);
+  --texte-faible:rgba(236,232,224,.34);
+  --g:clamp(16px,3vw,44px);
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --haut:58px;
+}
+*{box-sizing:border-box}
+html{background:var(--noir)}
+body{
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.55;
+}
+a{color:inherit}
+p{margin:0}
+
+.barre{
+  position:fixed;inset:0 0 auto 0;z-index:20;
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding:max(18px,env(safe-area-inset-top)) var(--g) 18px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
+  background:rgba(5,5,5,.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(236,232,224,.06);
+}
+.barre a{text-decoration:none;transition:color .3s}
+.barre a:hover{color:var(--or)}
+
+/* ---- Mise en page : menu de sections à gauche, calcul à droite ---- */
+.app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh;padding-top:var(--haut)}
+.cote{position:sticky;top:var(--haut);align-self:start;height:calc(100vh - var(--haut));overflow-y:auto;
+  border-right:1px solid var(--ligne);padding:34px 0 30px}
+.cote-titre{padding:0 26px 22px;font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.cote a{display:grid;grid-template-columns:30px 1fr;align-items:baseline;padding:11px 26px;text-decoration:none;
+  color:var(--texte-doux);border-left:1px solid transparent;transition:color .3s,border-color .3s,background .3s}
+.cote a span:first-child{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--texte-faible)}
+.cote a span:last-child{font-size:16px}
+.cote a small{grid-column:2;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+.cote a:hover{color:var(--texte)}
+.cote a.on{color:var(--texte);border-left-color:var(--or);background:rgba(214,168,92,.05)}
+.cote a.on span:first-child{color:var(--or)}
+.cote-pied{margin:26px 26px 0;padding-top:18px;border-top:1px solid var(--ligne);font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;line-height:1.7;color:var(--texte-faible)}
+.ouvrir{display:none}
+.voile-cote{display:none}
+
+main{min-width:0;padding:44px var(--g) 90px}
+.vue{display:none;max-width:1080px}
+.vue.on{display:block;animation:entre .6s cubic-bezier(.2,.7,.2,1)}
+@keyframes entre{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.num{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+h1{margin:14px 0 0;font-weight:200;font-size:clamp(34px,5vw,62px);line-height:1.02;letter-spacing:.01em}
+h2{margin:46px 0 0;padding-top:22px;border-top:1px solid var(--ligne);font-weight:300;font-size:clamp(20px,2.2vw,26px);letter-spacing:.01em}
+h3{margin:28px 0 0;font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--texte-doux)}
+.intro{margin:16px 0 0;max-width:46em;font-size:clamp(15px,1.5vw,18px);color:var(--texte-doux)}
+.note{margin:14px 0 0;max-width:52em;font-size:14px;color:var(--texte-doux)}
+.note b{font-weight:400;color:var(--texte)}
+
+/* ---- Formulaires ---- */
+.champs{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px 22px;margin-top:20px}
+.champ{display:flex;flex-direction:column;gap:6px;min-width:0}
+.champ.cache{display:none}
+.champ label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible);line-height:1.4}
+.champ .boite{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid rgba(236,232,224,.22);transition:border-color .3s}
+.champ .boite:focus-within{border-color:var(--or)}
+.champ input,.champ select{width:100%;min-width:0;padding:6px 0 7px;border:0;background:transparent;color:var(--texte);
+  font:inherit;font-size:16px;font-variant-numeric:tabular-nums;outline:none;border-radius:0}
+.champ select{-webkit-appearance:none;appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--or) 50%),linear-gradient(135deg,var(--or) 50%,transparent 50%);
+  background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:18px}
+.champ select option{background:#0d0d0d;color:var(--texte)}
+.champ .u{font-family:var(--mono);font-size:11px;color:var(--texte-faible);white-space:nowrap}
+.champ .aide{font-size:12px;line-height:1.4;color:var(--texte-faible)}
+.ligne-sep{grid-column:1/-1;margin-top:6px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--or)}
+
+/* ---- Résultats ---- */
+.cles{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1px;margin-top:22px;background:var(--ligne);border:1px solid var(--ligne)}
+.cle{background:var(--noir);padding:16px 18px 18px}
+.cle .t{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible)}
+.cle .v{margin-top:8px;font-weight:200;font-size:clamp(24px,3vw,34px);line-height:1.05;font-variant-numeric:tabular-nums}
+.cle .v small{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--texte-faible);margin-left:4px}
+.cle .s{margin-top:6px;font-size:12px;color:var(--texte-doux)}
+.cle.or .v{color:var(--or)}
+.verifs{margin:20px 0 0;padding:0;list-style:none;border-top:1px solid var(--ligne)}
+.verifs li{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--ligne);font-size:14px}
+.verifs li b{font-family:var(--mono);font-weight:400;font-size:13px}
+.verifs li span:last-child{font-family:var(--mono);font-size:12px;color:var(--texte-doux);text-align:right;font-variant-numeric:tabular-nums}
+.verifs li.non{color:var(--or)}
+.verifs li.non span:last-child{color:var(--or)}
+.verifs li.info b{color:var(--texte-faible)}
+.alerte{margin-top:18px;padding:12px 16px;border-left:1px solid var(--or);background:rgba(214,168,92,.06);font-size:14px;color:var(--texte)}
+.defile{overflow-x:auto;margin-top:16px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);text-align:left;padding:8px 10px;border-bottom:1px solid rgba(236,232,224,.22);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--ligne);white-space:nowrap}
+tr.opt td{color:var(--or)}
+tr.ko td{color:var(--texte-faible)}
+td.g{white-space:normal;min-width:16em}
+.schema{display:block;width:100%;height:auto;margin-top:16px;overflow:visible}
+.schema .ax{stroke:rgba(236,232,224,.62);stroke-width:1.2;fill:none}
+.schema .f{stroke:rgba(236,232,224,.16);stroke-width:1;fill:none}
+.schema .o{stroke:rgba(214,168,92,.9);stroke-width:1.4;fill:none}
+.schema .oz{fill:rgba(214,168,92,.1);stroke:none}
+.schema .tz{fill:rgba(236,232,224,.06);stroke:none}
+.schema .tl{stroke:rgba(236,232,224,.7);stroke-width:1.2;fill:none}
+.schema text{font-family:var(--mono);font-size:11px;fill:rgba(236,232,224,.62)}
+.schema text.or{fill:var(--or)}
+.schema .ap{fill:none;stroke:rgba(236,232,224,.7);stroke-width:1}
+.lg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
+.lg i{display:inline-block;width:16px;height:0;border-top:1.4px solid var(--or);vertical-align:middle;margin-right:6px}
+.lg i.t{border-color:rgba(236,232,224,.7)}
+
+.ref{margin:14px 0 0;padding:0;list-style:none}
+.ref li{position:relative;padding:7px 0 7px 22px;font-size:14px;color:var(--texte-doux);border-bottom:1px solid var(--ligne)}
+.ref li::before{content:"";position:absolute;left:3px;top:14px;width:6px;height:6px;border:1px solid var(--or);transform:rotate(45deg)}
+.ref li b{font-weight:400;color:var(--texte)}
+.etat{display:inline-block;margin-left:6px;padding:1px 7px;border:1px solid var(--ligne);font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--texte-faible);white-space:nowrap}
+.etat.ok{border-color:rgba(236,232,224,.3);color:var(--texte-doux)}
+.etat.av{border-color:rgba(214,168,92,.5);color:var(--or)}
+.bouton{display:inline-flex;align-items:center;gap:12px;margin-top:18px;padding:10px 0;border:0;background:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--or)}
+.bouton::before,.bouton::after{content:"";width:26px;height:1px;background:var(--or);transition:width .4s}
+.bouton:hover::before,.bouton:hover::after{width:40px}
+
+footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
+footer a{text-decoration:none}
+footer a:hover{color:var(--or)}
+
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .ouvrir{display:flex;position:sticky;top:var(--haut);z-index:12;align-items:center;gap:12px;width:100%;
+    padding:13px var(--g);border:0;border-bottom:1px solid var(--ligne);background:rgba(5,5,5,.94);color:var(--texte);
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;text-align:left}
+  .ouvrir i{display:inline-block;width:7px;height:7px;border:1px solid var(--or);transform:rotate(45deg)}
+  .ouvrir em{font-style:normal;color:var(--or)}
+  .cote{position:fixed;left:0;top:0;bottom:0;z-index:30;width:min(300px,84vw);height:100%;padding-top:calc(var(--haut) + 14px);
+    background:#070707;transform:translateX(-102%);transition:transform .5s cubic-bezier(.76,0,.24,1)}
+  .cote.ouvert{transform:none}
+  .voile-cote{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .4s}
+  .voile-cote.ouvert{opacity:1;pointer-events:auto}
+  main{padding-top:28px}
+}
+@media (max-width:560px){
+  .champs{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 14px}
+  .champ.large{grid-column:1/-1}
+  .cles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cle{padding:13px 12px 14px}
+  .verifs li{grid-template-columns:22px 1fr;font-size:13px}
+  .verifs li span:last-child{grid-column:2;text-align:left}
+}
+</style>
+<link rel="stylesheet" href="/assets/menu.css?v=5">
+</head>
+<body>
+
+<header class="barre" data-menu-hote>
+  <a href="/">STR Bim Tools</a>
+  <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
+</header>
+
+<div class="app">
+  <nav class="cote" id="cote" aria-label="Sections de calcul">
+    <div class="cote-titre">Calculs</div>
+    <a href="#hypotheses" data-vue="hypotheses"><span>00</span><span>Hypothèses</span><small>Béton · coefficients · prix</small></a>
+    <a href="#fondations" data-vue="fondations"><span>01</span><span>Fondations</span><small>Semelles filantes et isolées</small></a>
+    <a href="#murs" data-vue="murs"><span>02</span><span>Murs enterrés</span><small>Poussée des terres et de l'eau</small></a>
+    <a href="#dalles" data-vue="dalles"><span>03</span><span>Dalles</span><small>Épaisseur optimale · ferraillage</small></a>
+    <a href="#poutres" data-vue="poutres"><span>04</span><span>Poutres</span><small>Béton armé · acier · bois</small></a>
+    <a href="#normes" data-vue="normes"><span>05</span><span>Normes et sources</span><small>SIA · Eurocodes · état</small></a>
+    <div class="cote-pied">Prédimensionnement. Les résultats ne remplacent ni la note de calcul ni la relecture de l'ingénieur.</div>
+  </nav>
+  <div class="voile-cote" id="voile-cote"></div>
+
+  <main>
+    <button class="ouvrir" id="ouvrir" type="button"><i></i>Sections · <em id="ouvrir-nom">Hypothèses</em></button>
+
+    <!-- 00 — Hypothèses -->
+    <section class="vue" id="v-hypotheses">
+      <div class="num">00 — Hypothèses communes</div>
+      <h1>Béton, coefficients, prix.</h1>
+      <p class="intro">Ces valeurs servent à toutes les sections. Elles restent en mémoire dans ce navigateur.</p>
+
+      <h2>Choix du béton</h2>
+      <p class="note">Choisis la situation de l'élément : la page propose la sorte de béton (NPK) et la classe de résistance minimale. Tu peux ensuite forcer la classe.</p>
+      <div class="champs" data-groupe="beton"></div>
+      <div id="preco"></div>
+      <div class="cles" id="beton-cles"></div>
+      <h3>Sortes de béton SN EN 206 (annexe nationale)</h3>
+      <div class="defile"><table id="table-npk"></table></div>
+      <p class="note">Source : Holcim (Suisse), brochure « Betonnorm SN EN 206 ». Classes de résistance et rapports E/C minimaux à respecter ; on commande souvent une classe au-dessus.</p>
+
+      <h2>Coefficients</h2>
+      <div class="champs" data-groupe="coef"></div>
+
+      <h2>Prix unitaires</h2>
+      <p class="note"><b>Valeurs d'exemple, pas des prix de marché :</b> remplace-les par les tiens. Elles servent à chercher l'optimum béton / armature / coffrage.</p>
+      <div class="champs" data-groupe="prix"></div>
+    </section>
+
+    <!-- 01 — Fondations -->
+    <section class="vue" id="v-fondations">
+      <div class="num">01 — Fondations · SIA 267 / SIA 262</div>
+      <h1>Semelles.</h1>
+      <p class="intro">Largeur tirée de la résistance du sol, puis épaisseur la moins chère qui tient sans étriers, et ferraillage.</p>
+      <div class="champs" data-groupe="fond"></div>
+      <div id="r-fond"></div>
+    </section>
+
+    <!-- 02 — Murs enterrés -->
+    <section class="vue" id="v-murs">
+      <div class="num">02 — Murs enterrés · SIA 267 / SIA 262</div>
+      <h1>Murs contre terre.</h1>
+      <p class="intro">Bande verticale de 1 m chargée par la poussée des terres, la surcharge et l'eau. Épaisseur optimale et armatures des deux faces.</p>
+      <div class="champs" data-groupe="mur"></div>
+      <div id="r-mur"></div>
+    </section>
+
+    <!-- 03 — Dalles -->
+    <section class="vue" id="v-dalles">
+      <div class="num">03 — Dalles · SIA 262 / EN 1992-1-1</div>
+      <h1>Dalles.</h1>
+      <p class="intro">Porteuse dans un sens (continue sur plusieurs appuis) ou sur quatre côtés. L'épaisseur la moins chère qui passe la flexion, l'effort tranchant sans étriers et l'élancement, puis le ferraillage.</p>
+      <div class="champs" data-groupe="dalle"></div>
+      <div id="r-dalle"></div>
+    </section>
+
+    <!-- 04 — Poutres -->
+    <section class="vue" id="v-poutres">
+      <div class="num">04 — Poutres · SIA 262 / 263 / 265</div>
+      <h1>Poutres.</h1>
+      <p class="intro">Une à cinq travées, appuis d'extrémité au choix, charge répartie et charges ponctuelles. Les charges variables sont placées travée par travée pour obtenir l'enveloppe.</p>
+      <div class="champs" data-groupe="poutre"></div>
+      <div id="r-poutre"></div>
+    </section>
+
+    <!-- 05 — Normes -->
+    <section class="vue" id="v-normes">
+      <div class="num">05 — Normes et sources</div>
+      <h1>D'où vient chaque valeur.</h1>
+      <p class="intro">La SIA sert de référence, l'Eurocode est cité en regard. Chaque valeur est marquée selon ce que j'ai pu recouper.</p>
+      <h3>Correspondances</h3>
+      <div class="defile"><table>
+        <tr><th>SIA</th><th>Eurocode</th><th>Objet</th></tr>
+        <tr><td>SIA 260</td><td>EN 1990</td><td>Bases (combinaisons, coefficients de charge)</td></tr>
+        <tr><td>SIA 261</td><td>EN 1991</td><td>Actions (charges utiles, poids propres)</td></tr>
+        <tr><td>SIA 262</td><td>EN 1992</td><td>Béton armé</td></tr>
+        <tr><td>SIA 263</td><td>EN 1993</td><td>Acier</td></tr>
+        <tr><td>SIA 265</td><td>EN 1995</td><td>Bois</td></tr>
+        <tr><td>SIA 267</td><td>EN 1997</td><td>Géotechnique</td></tr>
+        <tr><td>SN EN 206</td><td>EN 206</td><td>Béton : spécification, sortes NPK</td></tr>
+      </table></div>
+      <h3>États</h3>
+      <ul class="ref">
+        <li><span class="etat ok">recoupé</span> valeur ou formule retrouvée dans une source publique citée.</li>
+        <li><span class="etat">à confirmer</span> valeur courante que je n'ai pas pu relire dans le texte de la norme : elle est modifiable dans la page.</li>
+        <li><span class="etat av">non codé</span> vérification absente de cette version, signalée dans le calcul.</li>
+      </ul>
+      <h3>Détail</h3>
+      <div class="defile"><table id="table-normes"></table></div>
+    </section>
+  </main>
+</div>
+
+<footer class="pied">
+  <a class="pied-site" href="/">← str-bim-tools.com</a>
+  <div class="pied-droite">
+    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
+    <a href="/mentions-legales/">Mentions légales</a>
+    <span class="pied-maj">Dernière mise à jour : <span data-maj>19.10.2026</span></span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // =====================================================================
+  //  Outils
+  // =====================================================================
+  function $(s, r){ return (r || document).querySelector(s) }
+  function fmt(x, k){
+    if(x == null || !isFinite(x)) return "—";
+    k = k == null ? 2 : k;
+    var s = Math.abs(x).toFixed(k).split("."), e = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return (x < 0 && Math.abs(x) >= Math.pow(10, -k) / 2 ? "−" : "") + e + (s[1] ? "," + s[1] : "");
+  }
+  function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
+  var ACIER_KG = 7850;          // masse volumique de l'acier [kg/m3]
+  var GAMMA_BA = 25;            // poids volumique du béton armé [kN/m3], EN 1991-1-1 tab. A.1
+  var GAMMA_W = 10;             // poids volumique de l'eau [kN/m3]
+
+  // ---- Mémoire des saisies ----
+  var CLE = "calculs.v1", V = {};
+  try { V = JSON.parse(localStorage.getItem(CLE) || "{}") || {} } catch(e){ V = {} }
+  function garde(){ try { localStorage.setItem(CLE, JSON.stringify(V)) } catch(e){} }
+
+  // =====================================================================
+  //  Données normatives
+  // =====================================================================
+  var CLASSES = [["C20/25",20],["C25/30",25],["C30/37",30],["C35/45",35],["C40/50",40],["C45/55",45],["C50/60",50]];
+  function fckDe(c){ for(var i = 0; i < CLASSES.length; i++) if(CLASSES[i][0] === c) return CLASSES[i][1]; return 30 }
+
+  // Sortes NPK, SN EN 206 annexe nationale (source : Holcim Suisse, brochure Betonnorm SN EN 206)
+  var NPK = [
+    {s:"0", x:"X0", c:"C12/15", ec:"—", z:"—", u:"Bâtiment, aucun risque de corrosion"},
+    {s:"A", x:"XC1, XC2", c:"C20/25", ec:"0,65", z:"280", u:"Bâtiment, sec à humide"},
+    {s:"B", x:"XC3", c:"C25/30", ec:"0,60", z:"280", u:"Bâtiment, humidité modérée"},
+    {s:"C", x:"XC4, XF1", c:"C30/37", ec:"0,50", z:"300", u:"Bâtiment, intempéries et gel"},
+    {s:"D (T1)", x:"XC4, XD1, XF2, XF3, XD2a", c:"C25/30", ec:"0,50", z:"300", u:"Génie civil, gel et sels, eau douce"},
+    {s:"E (T2)", x:"XC4, XD1, XF4, XD2a", c:"C25/30", ec:"0,50", z:"300", u:"Génie civil, gel et sels, éclaboussures"},
+    {s:"F (T3)", x:"XC4, XD3, XF2, XD2b", c:"C30/37", ec:"0,45", z:"320", u:"Génie civil, eau salée, gel et sels"},
+    {s:"G (T4)", x:"XC4, XD3, XF4, XD2b", c:"C30/37", ec:"0,45", z:"320", u:"Génie civil, eau salée, gel et sels sévères"}
+  ];
+  // Situations : descriptions des classes d'exposition (EN 206, tableau 1) rattachées à une sorte NPK
+  var SITUATIONS = [
+    ["int", "Intérieur de bâtiment, sec", "XC1", 1],
+    ["enterre", "Fondations, murs enterrés (humide, rarement sec)", "XC2", 1],
+    ["humide", "Intérieur humide ou extérieur abrité de la pluie", "XC3", 2],
+    ["exterieur", "Extérieur exposé à la pluie et au gel, sans sels", "XC4, XF1", 3],
+    ["sels", "Gel et sels de déverglaçage, eau douce (rampe, parking)", "XD1, XF2", 4],
+    ["eclabous", "Gel et sels, éclaboussures sévères", "XD1, XF4", 5],
+    ["sale", "Eau chargée de chlorures, gel et sels", "XD3, XF2", 6],
+    ["salesev", "Eau chargée de chlorures, gel et sels sévères", "XD3, XF4", 7]
+  ];
+
+  // Profilés laminés (source : tableaux de profilés européens, jsoarescorreia.pt/Perfis.pdf)
+  // [nom, h mm, b mm, tw mm, tf mm, A cm2, G kg/m, Iy cm4, Wpl,y cm3, Avz cm2]
+  var PROFILS = {
+    IPE:[["IPE 80",80,46,3.8,5.2,7.64,6.0,80.1,23.22,3.57],["IPE 100",100,55,4.1,5.7,10.32,8.1,171.0,39.41,5.08],["IPE 120",120,64,4.4,6.3,13.21,10.4,317.8,60.73,6.31],["IPE 140",140,73,4.7,6.9,16.43,12.9,541.2,88.34,7.64],["IPE 160",160,82,5.0,7.4,20.09,15.8,869.3,123.9,9.66],["IPE 180",180,91,5.3,8.0,23.95,18.8,1317,166.4,11.25],["IPE 200",200,100,5.6,8.5,28.48,22.4,1943,220.6,14.0],["IPE 220",220,110,5.9,9.2,33.37,26.2,2772,285.4,15.88],["IPE 240",240,120,6.2,9.8,39.12,30.7,3892,366.6,19.14],["IPE 270",270,135,6.6,10.2,45.95,36.1,5790,484.0,22.14],["IPE 300",300,150,7.1,10.7,53.81,42.2,8356,628.4,25.68],["IPE 330",330,160,7.5,11.5,62.61,49.1,11770,804.3,30.81],["IPE 360",360,170,8.0,12.7,72.73,57.1,16270,1019,35.14],["IPE 400",400,180,8.6,13.5,84.46,66.3,23130,1307,42.69],["IPE 450",450,190,9.4,14.6,98.82,77.6,33740,1702,50.85],["IPE 500",500,200,10.2,16.0,115.5,90.7,48200,2194,59.87],["IPE 550",550,210,11.1,17.2,134.4,106,67120,2787,72.34],["IPE 600",600,220,12.0,19.0,156.0,122,92080,3512,83.78]],
+    HEA:[["HEA 100",96,100,5.0,8.0,21.24,16.7,349.2,83.01,7.56],["HEA 120",114,120,5.0,8.0,25.34,19.9,606.2,119.5,8.46],["HEA 140",133,140,5.5,8.5,31.42,24.7,1033,173.5,10.12],["HEA 160",152,160,6.0,9.0,38.77,30.4,1673,245.1,13.21],["HEA 180",171,180,6.0,9.5,45.25,35.5,2510,324.9,14.47],["HEA 200",190,200,6.5,10.0,53.83,42.3,3692,429.5,18.08],["HEA 220",210,220,7.0,11.0,64.34,50.5,5410,568.5,20.67],["HEA 240",230,240,7.5,12.0,76.84,60.3,7763,744.6,25.18],["HEA 260",250,260,7.5,12.5,86.82,68.2,10450,919.8,28.76],["HEA 280",270,280,8.0,13.0,97.26,76.4,13670,1112,31.74],["HEA 300",290,300,8.5,14.0,112.5,88.3,18260,1383,37.28],["HEA 320",310,300,9.0,15.5,124.4,97.6,22930,1628,41.13],["HEA 340",330,300,9.5,16.5,133.5,105,27690,1850,44.95],["HEA 360",350,300,10.0,17.5,142.8,112,33090,2088,48.96],["HEA 400",390,300,11.0,19.0,159.0,125,45070,2562,57.33],["HEA 450",440,300,11.5,21.0,178.0,140,63720,3216,65.78],["HEA 500",490,300,12.0,23.0,197.5,155,86970,3949,74.72],["HEA 550",540,300,12.5,24.0,211.8,166,111900,4622,83.72],["HEA 600",590,300,13.0,25.0,226.5,178,141200,5350,93.21]],
+    HEB:[["HEB 100",100,100,6.0,10.0,26.04,20.4,449.5,104.2,9.04],["HEB 120",120,120,6.5,11.0,34.01,26.7,864.4,165.2,10.96],["HEB 140",140,140,7.0,12.0,42.96,33.7,1509,245.4,13.08],["HEB 160",160,160,8.0,13.0,54.25,42.6,2492,354.0,17.59],["HEB 180",180,180,8.5,14.0,65.25,51.2,3831,481.4,20.24],["HEB 200",200,200,9.0,15.0,78.08,61.3,5696,642.5,24.83],["HEB 220",220,220,9.5,16.0,91.04,71.5,8091,827.0,27.92],["HEB 240",240,240,10.0,17.0,106.0,83.2,11260,1053,33.23],["HEB 260",260,260,10.0,17.5,118.4,93.0,14920,1283,37.59],["HEB 280",280,280,10.5,18.0,131.4,103,19270,1534,41.09],["HEB 300",300,300,11.0,19.0,149.1,117,25170,1869,47.43],["HEB 320",320,300,11.5,20.5,161.3,127,30820,2149,51.77],["HEB 340",340,300,12.0,21.5,170.9,134,36660,2408,56.09],["HEB 360",360,300,12.5,22.5,180.6,142,43190,2683,60.6],["HEB 400",400,300,13.5,24.0,197.8,155,57680,3232,69.98],["HEB 450",450,300,14.0,26.0,218.0,171,79890,3982,79.66],["HEB 500",500,300,14.5,28.0,238.6,187,107200,4815,89.82],["HEB 550",550,300,15.0,29.0,254.1,199,136700,5591,100.1],["HEB 600",600,300,15.5,30.0,270.0,212,171000,6425,110.8]]
+  };
+  // Bois : EN 338 (massif) et EN 14080 (lamellé-collé) — fm,k, fv,k, E0,mean [MPa], rho_mean [kg/m3]
+  var BOIS = {
+    C24:{n:"C24 (massif)", fm:24, fv:4.0, E:11000, rho:420, lam:false},
+    C30:{n:"C30 (massif)", fm:30, fv:4.0, E:12000, rho:460, lam:false},
+    GL24h:{n:"GL24h (lamellé-collé)", fm:24, fv:3.5, E:11500, rho:420, lam:true},
+    GL28h:{n:"GL28h (lamellé-collé)", fm:28, fv:3.5, E:12600, rho:460, lam:true}
+  };
+  // Catégories de charges utiles SIA 261 (vérifiées : A, B, C3) et psi2 EN 1990 tab. A1.1
+  var CATEGORIES = {A:{q:2.0, psi2:0.3, n:"A — habitation (2,0 kN/m²)"}, B:{q:3.0, psi2:0.3, n:"B — bureaux (3,0 kN/m²)"}, C3:{q:5.0, psi2:0.6, n:"C3 — grandes salles (5,0 kN/m²)"}, man:{q:null, psi2:null, n:"Autre (saisie)"}};
+  var DIAMETRES = [8,10,12,14,16,18,20,22,26,30];
+  var ESPACEMENTS = [100,125,150,175,200,225,250];
+
+  // =====================================================================
+  //  Définition des champs
+  // =====================================================================
+  function opt(a){ return a.map(function(x){ return Array.isArray(x) ? x : [x, x] }) }
+  var APPUIS_EXT = [["A","Appui simple"],["E","Encastrement"],["L","Libre (porte-à-faux)"]];
+  function travees(p, defL){
+    var t = [{id:p+"n", l:"Nombre de travées", v:"1", t:"s", o:opt(["1","2","3","4","5"])}];
+    for(var i = 1; i <= 5; i++) (function(i){
+      t.push({id:p+"L"+i, l:"Portée travée "+i, v:defL, u:"m", si:function(){ return +val(p+"n") >= i }});
+    })(i);
+    t.push({id:p+"ga", l:"Extrémité gauche", v:"A", t:"s", o:APPUIS_EXT});
+    t.push({id:p+"dr", l:"Extrémité droite", v:"A", t:"s", o:APPUIS_EXT});
+    return t;
+  }
+  function ponctuelles(p, unite){
+    var t = [{sep:"Charges ponctuelles"},{id:p+"np", l:"Nombre de charges", v:"0", t:"s", o:opt(["0","1","2","3","4"])}];
+    for(var i = 1; i <= 4; i++) (function(i){
+      var si = function(){ return +val(p+"np") >= i };
+      t.push({id:p+"pt"+i, l:"P"+i+" · travée", v:"1", t:"s", o:opt(["1","2","3","4","5"]), si:si});
+      t.push({id:p+"pa"+i, l:"P"+i+" · distance depuis l'appui gauche de la travée", v:"2", u:"m", si:si});
+      t.push({id:p+"pg"+i, l:"P"+i+" · permanente Gk", v:"20", u:unite, si:si});
+      t.push({id:p+"pq"+i, l:"P"+i+" · variable Qk", v:"10", u:unite, si:si});
+    })(i);
+    return t;
+  }
+
+  var CHAMPS = {
+    beton:[
+      {id:"situation", l:"Situation de l'élément", v:"int", t:"s", o:SITUATIONS.map(function(s){ return [s[0], s[1]] }), large:true},
+      {id:"classe", l:"Classe de résistance retenue", v:"C30/37", t:"s", o:opt(CLASSES.map(function(c){ return c[0] }))}
+    ],
+    coef:[
+      {sep:"Charges — SIA 260 / EN 1990"},
+      {id:"gG", l:"γG charges permanentes", v:"1.35", aide:"Valeur courante, à confirmer"},
+      {id:"gQ", l:"γQ charges variables", v:"1.5", aide:"Valeur courante, à confirmer"},
+      {sep:"Béton — SIA 262"},
+      {id:"gc", l:"γc béton", v:"1.5", aide:"SIA 262, recoupé"},
+      {id:"lam", l:"Hauteur du bloc de compression / x", v:"0.85", aide:"Bloc rectangulaire SIA 262, à confirmer (EN 1992 : 0,8)"},
+      {id:"xdmax", l:"x/d maximal", v:"0.35", aide:"Limite de ductilité, à confirmer (EN 1992 §5.5 : 0,45)"},
+      {sep:"Armature B500B — SIA 262"},
+      {id:"fsk", l:"fsk", v:"500", u:"MPa"},
+      {id:"gs", l:"γs", v:"1.15", aide:"fsd = 435 MPa, recoupé"},
+      {id:"Es", l:"Es", v:"205000", u:"MPa", aide:"SIA 262, recoupé"},
+      {id:"maj", l:"Majoration des armatures", v:"15", u:"%", aide:"Recouvrements, ancrages, chutes : hypothèse de métré"}
+    ],
+    prix:[
+      {id:"pb", l:"Béton mis en place", v:"230", u:"CHF/m³"},
+      {id:"pa", l:"Armature posée", v:"2.40", u:"CHF/kg"},
+      {id:"pc", l:"Coffrage", v:"65", u:"CHF/m²"},
+      {id:"ps", l:"Acier de construction posé", v:"5.50", u:"CHF/kg"},
+      {id:"pw", l:"Bois posé", v:"1400", u:"CHF/m³"}
+    ],
+    fond:[
+      {id:"fo_t", l:"Type de semelle", v:"fil", t:"s", o:[["fil","Filante sous mur"],["iso","Isolée sous poteau"]], large:true},
+      {id:"fo_b0", l:"Épaisseur du mur", v:"0.25", u:"m", si:function(){ return val("fo_t") === "fil" }},
+      {id:"fo_c1", l:"Poteau, côté c1", v:"0.30", u:"m", si:function(){ return val("fo_t") === "iso" }},
+      {id:"fo_c2", l:"Poteau, côté c2", v:"0.30", u:"m", si:function(){ return val("fo_t") === "iso" }},
+      {id:"fo_r", l:"Rapport L / B de la semelle", v:"1", si:function(){ return val("fo_t") === "iso" }},
+      {id:"fo_G", l:"Charge permanente Gk", v:"150", u:function(){ return val("fo_t") === "fil" ? "kN/m" : "kN" }},
+      {id:"fo_Q", l:"Charge variable Qk", v:"60", u:function(){ return val("fo_t") === "fil" ? "kN/m" : "kN" }},
+      {id:"fo_D", l:"Profondeur de la base sous le terrain", v:"0.80", u:"m"},
+      {id:"fo_gs", l:"Poids volumique du remblai", v:"19", u:"kN/m³"},
+      {sep:"Sol"},
+      {id:"fo_sol", l:"Résistance du sol", v:"rap", t:"s", o:[["rap","Valeur de calcul donnée (rapport géotechnique)"],["ec7","Calcul EN 1997-1 annexe D (drainé)"]], large:true},
+      {id:"fo_qR", l:"Résistance de calcul du sol", v:"250", u:"kPa", si:function(){ return val("fo_sol") === "rap" }},
+      {id:"fo_phi", l:"φ'k", v:"30", u:"°", si:function(){ return val("fo_sol") === "ec7" }},
+      {id:"fo_c", l:"c'k", v:"0", u:"kPa", si:function(){ return val("fo_sol") === "ec7" }},
+      {id:"fo_g2", l:"γ' du sol sous la base", v:"19", u:"kN/m³", aide:"Déjaugé si nappe", si:function(){ return val("fo_sol") === "ec7" }},
+      {id:"fo_gphi", l:"γφ' (sur tan φ')", v:"1.0", aide:"EN 1997 AD2 : 1,0. SIA 267 : à confirmer", si:function(){ return val("fo_sol") === "ec7" }},
+      {id:"fo_gcc", l:"γc'", v:"1.0", si:function(){ return val("fo_sol") === "ec7" }},
+      {id:"fo_gR", l:"γR,v portance", v:"1.4", aide:"EN 1997 AD2 (R2) : 1,4", si:function(){ return val("fo_sol") === "ec7" }},
+      {sep:"Béton armé"},
+      {id:"fo_cn", l:"Enrobage", v:"50", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
+      {id:"fo_dia", l:"Ø estimé des barres", v:"14", u:"mm"},
+      {id:"fo_hmax", l:"Épaisseur maximale étudiée", v:"1.00", u:"m"}
+    ],
+    mur:[
+      {id:"mu_H", l:"Hauteur entre appuis", v:"3.00", u:"m"},
+      {id:"mu_ap", l:"Appuis", v:"AA", t:"s", o:[["AA","Appuyé en tête et en pied"],["AE","Appuyé en tête, encastré en pied"],["LE","Libre en tête, encastré en pied"]], large:true},
+      {id:"mu_rem", l:"Hauteur de terre au-dessus de la tête", v:"0", u:"m", aide:"Terrain plus haut que l'appui supérieur"},
+      {sep:"Terrain"},
+      {id:"mu_g", l:"Poids volumique γ", v:"20", u:"kN/m³"},
+      {id:"mu_phi", l:"φ'k", v:"30", u:"°"},
+      {id:"mu_K", l:"Coefficient de poussée", v:"K0", t:"s", o:[["K0","Au repos K0 = 1 − sin φ' (mur tenu)"],["Ka","Actif Ka (Rankine, mur qui peut bouger)"],["man","Saisi"]], large:true},
+      {id:"mu_Km", l:"K saisi", v:"0.5", si:function(){ return val("mu_K") === "man" }},
+      {id:"mu_q", l:"Surcharge du terrain", v:"5", u:"kPa"},
+      {id:"mu_eau", l:"Nappe", v:"non", t:"s", o:[["non","Sans eau"],["oui","Avec nappe"]]},
+      {id:"mu_hw", l:"Niveau de la nappe sous la tête", v:"1.50", u:"m", si:function(){ return val("mu_eau") === "oui" }},
+      {id:"mu_gsat", l:"γsat sous la nappe", v:"21", u:"kN/m³", si:function(){ return val("mu_eau") === "oui" }},
+      {sep:"Coefficients"},
+      {id:"mu_gT", l:"γ poussée des terres", v:"1.35", aide:"À confirmer selon SIA 260 / 267"},
+      {id:"mu_gW", l:"γ pression de l'eau", v:"1.35", aide:"À confirmer selon SIA 260 / 267"},
+      {sep:"Béton armé"},
+      {id:"mu_cn", l:"Enrobage", v:"40", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
+      {id:"mu_dia", l:"Ø estimé des barres", v:"14", u:"mm"}
+    ],
+    dalle:[
+      {id:"da_m", l:"Fonctionnement", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Sur quatre côtés"]], large:true}
+    ].concat(travees("da_", "5.00").map(function(c){ var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c }), [
+      {id:"da_lx", l:"Petite portée lx", v:"5.00", u:"m", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_ly", l:"Grande portée ly", v:"6.50", u:"m", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bW", l:"Bord gauche (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bE", l:"Bord droit (le long de ly)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bS", l:"Bord bas (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_bN", l:"Bord haut (le long de lx)", v:"A", t:"s", o:[["A","Appui simple"],["E","Encastré / continu"]], si:function(){ return val("da_m") === "deux" }},
+      {id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2", si:function(){ return val("da_m") === "deux" }},
+      {id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true, si:function(){ return val("da_m") === "deux" }},
+      {sep:"Charges"},
+      {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons"},
+      {id:"da_cat", l:"Charge utile SIA 261", v:"A", t:"s", o:Object.keys(CATEGORIES).map(function(k){ return [k, CATEGORIES[k].n] }), large:true},
+      {id:"da_q", l:"Charge utile saisie", v:"4.0", u:"kN/m²", si:function(){ return val("da_cat") === "man" }}
+    ], ponctuelles("da_", "kN/m").map(function(c){ if(c.sep) c.sep = "Charges linéaires (murs portés, kN par m de bande)"; var s = c.si; c.si = function(){ return val("da_m") === "un" && (!s || s()) }; return c }), [
+      {sep:"Béton armé"},
+      {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
+      {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"}
+    ]),
+    poutre:[
+      {id:"po_mat", l:"Matériau", v:"ba", t:"s", o:[["ba","Béton armé"],["acier","Acier"],["bois","Bois"]], large:true}
+    ].concat(travees("po_", "6.00"), [
+      {sep:"Charges réparties (poids propre ajouté)"},
+      {id:"po_g", l:"Permanente gk", v:"15", u:"kN/m"},
+      {id:"po_q", l:"Variable qk", v:"8", u:"kN/m"}
+    ], ponctuelles("po_", "kN"), [
+      {sep:"Section"},
+      {id:"po_b", l:"Largeur b", v:"0.30", u:"m", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_cn", l:"Enrobage (à l'étrier)", v:"30", u:"mm", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_dl", l:"Ø estimé des barres longitudinales", v:"20", u:"mm", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_de", l:"Ø des étriers", v:"8", u:"mm", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_hmax", l:"Hauteur maximale étudiée", v:"1.20", u:"m", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_fam", l:"Famille de profilés", v:"IPE", t:"s", o:[["IPE","IPE"],["HEA","HEA"],["HEB","HEB"],["tous","Toutes"]], si:function(){ return val("po_mat") === "acier" }},
+      {id:"po_fy", l:"Nuance", v:"355", t:"s", o:[["235","S235 (fy = 235 MPa)"],["275","S275 (fy = 275 MPa)"],["355","S355 (fy = 355 MPa)"]], si:function(){ return val("po_mat") === "acier" }},
+      {id:"po_gM", l:"γM1", v:"1.05", aide:"SIA 263, à confirmer (EN 1993 : γM0 = 1,0)", si:function(){ return val("po_mat") === "acier" }},
+      {id:"po_cl", l:"Classe de bois", v:"GL24h", t:"s", o:Object.keys(BOIS).map(function(k){ return [k, BOIS[k].n] }), si:function(){ return val("po_mat") === "bois" }},
+      {id:"po_bb", l:"Largeur b", v:"0.16", u:"m", si:function(){ return val("po_mat") === "bois" }},
+      {id:"po_kmod", l:"kmod", v:"0.8", aide:"EN 1995 : classe de service 1, moyen terme", si:function(){ return val("po_mat") === "bois" }},
+      {id:"po_gMb", l:"γM", v:"auto", aide:"auto : EN 1995 (1,3 massif, 1,25 lamellé). SIA 265 : à confirmer", si:function(){ return val("po_mat") === "bois" }},
+      {id:"po_kdef", l:"kdef", v:"0.6", aide:"EN 1995 tab. 3.2, classe de service 1", si:function(){ return val("po_mat") === "bois" }},
+      {id:"po_psi2", l:"ψ2 de la charge variable", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux", si:function(){ return val("po_mat") === "bois" }},
+      {sep:"Flèches"},
+      {id:"po_lim", l:"Limite de flèche L /", v:"300", aide:"À fixer selon SIA 260 et le projet", si:function(){ return val("po_mat") !== "ba" }},
+      {id:"po_limf", l:"Flèche finale nette L /", v:"250", si:function(){ return val("po_mat") === "bois" }}
+    ])
+  };
+
+  // =====================================================================
+  //  Formulaires
+  // =====================================================================
+  var DEF = {};
+  Object.keys(CHAMPS).forEach(function(g){ CHAMPS[g].forEach(function(c){ if(c.id) DEF[c.id] = c }) });
+  function val(id){ var x = V[id]; if(x == null || x === "") x = DEF[id] ? DEF[id].v : ""; return x }
+  function num(id){ var x = parseFloat(String(val(id)).replace(",", ".")); return isFinite(x) ? x : parseFloat(DEF[id].v) }
+
+  function construit(g){
+    var hote = document.querySelector('[data-groupe="'+g+'"]');
+    var h = "";
+    CHAMPS[g].forEach(function(c){
+      if(c.sep){ h += '<div class="ligne-sep">'+esc(c.sep)+'</div>'; return }
+      var v = val(c.id), u = typeof c.u === "function" ? c.u() : (c.u || "");
+      h += '<div class="champ'+(c.large ? " large" : "")+'" data-champ="'+c.id+'"><label for="c-'+c.id+'">'+esc(c.l)+'</label><div class="boite">';
+      if(c.t === "s"){
+        h += '<select id="c-'+c.id+'">' + c.o.map(function(o){ return '<option value="'+esc(o[0])+'"'+(String(o[0]) === String(v) ? " selected" : "")+'>'+esc(o[1])+'</option>' }).join("") + '</select>';
+      } else {
+        h += '<input id="c-'+c.id+'" type="text" inputmode="decimal" autocomplete="off" value="'+esc(v)+'">';
+      }
+      h += '<span class="u">'+esc(u)+'</span></div>' + (c.aide ? '<div class="aide">'+esc(c.aide)+'</div>' : "") + '</div>';
+    });
+    hote.innerHTML = h;
+    hote.addEventListener("input", function(e){
+      var id = e.target.id.slice(2); if(!DEF[id]) return;
+      V[id] = e.target.value; garde(); visibilite(g); planifie();
+    });
+    visibilite(g);
+  }
+  function visibilite(g){
+    CHAMPS[g].forEach(function(c){
+      if(!c.id) return;
+      var el = document.querySelector('[data-champ="'+c.id+'"]');
+      if(c.si) el.classList.toggle("cache", !c.si());
+      if(typeof c.u === "function") el.querySelector(".u").textContent = c.u();
+    });
+    // les intertitres sans champ visible disparaissent
+    var hote = document.querySelector('[data-groupe="'+g+'"]'), seps = hote.querySelectorAll(".ligne-sep");
+    seps.forEach(function(s){
+      var n = s.nextElementSibling, vis = false;
+      while(n && !n.classList.contains("ligne-sep")){ if(!n.classList.contains("cache")) vis = true; n = n.nextElementSibling }
+      s.style.display = vis ? "" : "none";
+    });
+  }
+
+  // =====================================================================
+  //  Matériaux
+  // =====================================================================
+  function mat(){
+    var fck = fckDe(val("classe")), gc = num("gc");
+    var etaFc = Math.min(1, Math.pow(30 / fck, 1/3));             // SIA 262 éq. (26)
+    return {
+      fck:fck, gc:gc, etaFc:etaFc,
+      fcd: etaFc * fck / gc,                                       // SIA 262 éq. (2), ηt = 1
+      tcd: 0.3 * Math.sqrt(fck) / gc,                              // SIA 262 éq. (3), ηt = 1
+      fctm: 0.30 * Math.pow(fck, 2/3),                             // EN 1992-1-1 tab. 3.1
+      fcdEC: fck / gc,                                             // EN 1992 avec αcc = 1,0
+      fsk: num("fsk"), fsd: num("fsk") / num("gs"), Es: num("Es"),
+      gG: num("gG"), gQ: num("gQ"), lam: num("lam"), xdmax: num("xdmax"), maj: num("maj") / 100,
+      pb: num("pb"), pa: num("pa"), pc: num("pc"), ps: num("ps"), pw: num("pw")
+    };
+  }
+
+  // Flexion simple, section rectangulaire sans armature comprimée (bloc rectangulaire fcd sur lam·x)
+  // Md [kNm], b [m], d [m] -> As [mm2], x/d
+  function flexion(Md, b, d, M){
+    Md = Math.abs(Md) * 1e6; b *= 1000; d *= 1000;
+    if(Md < 1) return {As:0, xd:0, ok:true};
+    var disc = d*d - 2*Md / (M.fcd * b);
+    if(disc < 0) return {As:Infinity, xd:Infinity, ok:false};
+    var y = d - Math.sqrt(disc), x = y / M.lam;
+    return {As: M.fcd * b * y / M.fsd, xd: x / d, ok: x / d <= M.xdmax + 1e-9};
+  }
+  // Armature minimale EN 1992-1-1 éq. (9.1N) [mm2]
+  function asMin(b, d, M){ return Math.max(0.26 * M.fctm / M.fsk, 0.0013) * b * 1000 * d * 1000 }
+  // Effort tranchant sans armature d'effort tranchant, EN 1992-1-1 §6.2.2 [kN]
+  function vRdc(b, d, As, M){
+    var dm = d * 1000, bm = b * 1000, k = Math.min(2, 1 + Math.sqrt(200 / dm));
+    var rho = Math.min(0.02, As / (bm * dm));
+    var v = 0.18 / M.gc * k * Math.pow(100 * rho * M.fck, 1/3);
+    var vmin = 0.035 * Math.pow(k, 1.5) * Math.sqrt(M.fck);
+    return Math.max(v, vmin) * bm * dm / 1000;
+  }
+  // Élancement limite EN 1992-1-1 éq. (7.16a/b), sans armature comprimée
+  function ldLim(K, rho, fck){
+    var r0 = Math.sqrt(fck) * 1e-3, sf = Math.sqrt(fck);
+    rho = Math.max(rho, 1e-5);
+    if(rho <= r0) return K * (11 + 1.5 * sf * r0 / rho + 3.2 * sf * Math.pow(r0 / rho - 1, 1.5));
+    return K * (11 + 1.5 * sf * r0 / rho);
+  }
+  // Choix de barres
+  function barresM(As){       // nappe, par mètre
+    var best = null;
+    DIAMETRES.forEach(function(o){ ESPACEMENTS.forEach(function(s){
+      var a = Math.PI * o * o / 4 * 1000 / s;
+      if(a >= As - 1e-6 && (!best || a < best.a - 1e-6 || (Math.abs(a - best.a) < 1e-6 && s > best.s))) best = {o:o, s:s, a:a};
+    }) });
+    return best;
+  }
+  function txtM(b){ return b ? "Ø" + b.o + " e = " + b.s + " mm (" + fmt(b.a, 0) + " mm²/m)" : "hors tableau" }
+  function barresP(As, b, cn, de){   // poutre : n barres d'un même Ø, sur un lit si elles tiennent
+    var best = null;
+    [12,14,16,18,20,22,26,30].forEach(function(o){ for(var n = 2; n <= 12; n++){
+      var a = n * Math.PI * o * o / 4;
+      if(a < As) continue;
+      var place = b * 1000 - 2 * (cn + de), besoin = n * o + (n - 1) * Math.max(o, 20);
+      var lits = place >= besoin ? 1 : 2;
+      if(!best || a < best.a - 1 || (Math.abs(a - best.a) <= 1 && lits < best.lits)) best = {n:n, o:o, a:a, lits:lits};
+      break;
+    } });
+    return best;
+  }
+  function txtP(b){ return b ? b.n + " Ø" + b.o + " (" + fmt(b.a, 0) + " mm²)" + (b.lits > 1 ? ", sur deux lits" : "") : "hors tableau" }
+  function kgDe(As_mm2, L){ return As_mm2 * 1e-6 * L * ACIER_KG }
+
+  // =====================================================================
+  //  Poutre continue : éléments finis (Euler-Bernoulli), EI = 1
+  //  cas : [{d:[[x1,x2,w1,w2],...], p:[[x,P],...]}], charges vers le bas positives
+  // =====================================================================
+  function poutreFE(L, ga, dr, cas){
+    var X = 0, ax = [0];
+    L.forEach(function(l){ X += l; ax.push(X) });
+    var pts = [], ND = 40;
+    L.forEach(function(l, i){ for(var k = 0; k <= ND; k++) pts.push(ax[i] + l * k / ND) });
+    cas.forEach(function(c){
+      c.d.forEach(function(s){ pts.push(s[0], s[1]) });
+      c.p.forEach(function(p){ pts.push(p[0]) });
+    });
+    pts = pts.filter(function(x){ return x >= -1e-9 && x <= X + 1e-9 }).sort(function(a, b){ return a - b });
+    var xs = [], tol = X * 1e-7;
+    pts.forEach(function(x){ if(!xs.length || x - xs[xs.length - 1] > tol) xs.push(Math.min(Math.max(x, 0), X)) });
+    xs[xs.length - 1] = X;
+    var nn = xs.length, nd = 2 * nn, bw = 3, K = [], i, j;
+    for(i = 0; i < nd; i++) K.push(new Float64Array(nd));
+    function ke(l){
+      var a = 1 / (l*l*l);
+      return [[12*a, 6*l*a, -12*a, 6*l*a],[6*l*a, 4*l*l*a, -6*l*a, 2*l*l*a],[-12*a, -6*l*a, 12*a, -6*l*a],[6*l*a, 2*l*l*a, -6*l*a, 4*l*l*a]];
+    }
+    var KE = [];
+    for(var e = 0; e < nn - 1; e++){
+      var k = ke(xs[e+1] - xs[e]); KE.push(k);
+      for(i = 0; i < 4; i++) for(j = 0; j < 4; j++) K[2*e + i][2*e + j] += k[i][j];
+    }
+    function noeud(x){ var b = 0, dm = Infinity; for(var q = 0; q < nn; q++){ var dd = Math.abs(xs[q] - x); if(dd < dm){ dm = dd; b = q } } return b }
+    var maxd = 0; for(i = 0; i < nd; i++) maxd = Math.max(maxd, K[i][i]);
+    var pen = maxd * 1e9, types = [], nApp = [], nbLiens = 0;
+    ax.forEach(function(x, q){
+      var t = q === 0 ? ga : q === ax.length - 1 ? dr : "A", n = noeud(x);
+      types.push(t); nApp.push(n);
+      if(t === "A" || t === "E"){ K[2*n][2*n] += pen; nbLiens++ }
+      if(t === "E"){ K[2*n+1][2*n+1] += pen; nbLiens++ }
+    });
+    if(nbLiens < 2) throw new Error("Système instable : il faut au moins deux appuis, ou un encastrement.");
+    // factorisation en bande
+    for(var p = 0; p < nd; p++){
+      if(Math.abs(K[p][p]) < maxd * 1e-9) throw new Error("Système instable : vérifie les appuis (un porte-à-faux doit être tenu par un appui voisin).");
+      for(i = p + 1; i <= Math.min(nd - 1, p + bw); i++){
+        var m = K[i][p] / K[p][p]; if(m === 0) continue; K[i][p] = m;
+        for(j = p + 1; j <= Math.min(nd - 1, p + bw); j++) K[i][j] -= m * K[p][j];
+      }
+    }
+    function wEl(c, xa, xb){       // charge répartie aux deux bouts d'un élément
+      var w1 = 0, w2 = 0;
+      c.d.forEach(function(s){
+        if(xa >= s[0] - tol && xb <= s[1] + tol && s[1] > s[0]){
+          var f1 = (xa - s[0]) / (s[1] - s[0]), f2 = (xb - s[0]) / (s[1] - s[0]);
+          w1 += s[2] + (s[3] - s[2]) * f1; w2 += s[2] + (s[3] - s[2]) * f2;
+        }
+      });
+      return [w1, w2];
+    }
+    var sortie = {x:[], M:[], V:[], w:[], R:[], xs:xs, ax:ax, types:types};
+    cas.forEach(function(c, ic){
+      var F = new Float64Array(nd), ww = [];
+      for(var e = 0; e < nn - 1; e++){
+        var l = xs[e+1] - xs[e], w = wEl(c, xs[e], xs[e+1]); ww.push(w);
+        var w1 = w[0], w2 = w[1];
+        F[2*e] += l * (7*w1 + 3*w2) / 20; F[2*e+1] += l*l * (3*w1 + 2*w2) / 60;
+        F[2*e+2] += l * (3*w1 + 7*w2) / 20; F[2*e+3] -= l*l * (2*w1 + 3*w2) / 60;
+      }
+      var Pn = new Float64Array(nn);
+      c.p.forEach(function(pp){ var k = noeud(pp[0]); F[2 * k] += pp[1]; Pn[k] += pp[1] });
+      var u = Float64Array.from(F);
+      for(i = 0; i < nd; i++) for(j = Math.max(0, i - bw); j < i; j++) u[i] -= K[i][j] * u[j];
+      for(i = nd - 1; i >= 0; i--){ for(j = i + 1; j <= Math.min(nd - 1, i + bw); j++) u[i] -= K[i][j] * u[j]; u[i] /= K[i][i] }
+      var Ms = [], Vs = [], xx = [];
+      for(e = 0; e < nn - 1; e++){
+        var l2 = xs[e+1] - xs[e], k2 = KE[e], ue = [u[2*e], u[2*e+1], u[2*e+2], u[2*e+3]];
+        var a1 = ww[e][0], a2 = ww[e][1];
+        var feq0 = l2 * (7*a1 + 3*a2) / 20, feq1 = l2*l2 * (3*a1 + 2*a2) / 60;
+        var F1 = 0, M1 = 0;
+        for(j = 0; j < 4; j++){ F1 += k2[0][j] * ue[j]; M1 += k2[1][j] * ue[j] }
+        F1 -= feq0; M1 -= feq1;
+        [0, 0.5, 1].forEach(function(t){
+          var x = t * l2, W = a1 * x + (a2 - a1) * x * x / (2 * l2), IW = a1 * x * x / 2 + (a2 - a1) * x * x * x / (6 * l2);
+          xx.push(xs[e] + x); Vs.push(-F1 - W); Ms.push(M1 - F1 * x - IW);
+        });
+      }
+      if(ic === 0) sortie.x = xx;
+      sortie.M.push(Ms); sortie.V.push(Vs);
+      var wv = []; for(i = 0; i < nn; i++) wv.push(u[2*i]);
+      sortie.w.push(wv);
+      // réactions : saut de l'effort tranchant (vers le haut positif)
+      var R = nApp.map(function(n){
+        var gauche = 0, droite = 0;
+        if(n > 0) gauche = Vs[3*(n-1) + 2];
+        if(n < nn - 1) droite = Vs[3*n];
+        return droite - gauche + Pn[n];
+      });
+      sortie.R.push(R);
+    });
+    return sortie;
+  }
+  // Enveloppe : permanentes (facteur fixe) + variables placées où elles sont défavorables
+  function enveloppe(tab, perm, vari){
+    var n = tab[0].length, mx = new Float64Array(n), mn = new Float64Array(n);
+    for(var i = 0; i < n; i++){
+      var b = 0, p = 0, q = 0;
+      perm.forEach(function(c){ b += c[1] * tab[c[0]][i] });
+      vari.forEach(function(c){ var v = c[1] * tab[c[0]][i]; if(v > 0) p += v; else q += v });
+      mx[i] = b + p; mn[i] = b + q;
+    }
+    return {max:mx, min:mn};
+  }
+  function extr(a){ var mx = -Infinity, mn = Infinity, imx = 0, imn = 0; for(var i = 0; i < a.length; i++){ if(a[i] > mx){ mx = a[i]; imx = i } if(a[i] < mn){ mn = a[i]; imn = i } } return {max:mx, min:mn, imax:imx, imin:imn} }
+
+  // Charges d'une poutre / bande à partir des champs (préfixe p)
+  function lireTravees(p){
+    var n = +val(p+"n"), L = [];
+    for(var i = 1; i <= n; i++) L.push(Math.max(0.1, num(p+"L"+i)));
+    return {L:L, ga:val(p+"ga"), dr:val(p+"dr")};
+  }
+  function lirePonctuelles(p, L){
+    var np = +val(p+"np"), t = [], ax = [0];
+    L.forEach(function(l, i){ ax.push(ax[i] + l) });
+    for(var i = 1; i <= np; i++){
+      var tr = Math.min(+val(p+"pt"+i), L.length) - 1, a = Math.min(Math.max(num(p+"pa"+i), 0), L[tr]);
+      t.push({x: ax[tr] + a, G: num(p+"pg"+i), Q: num(p+"pq"+i)});
+    }
+    return t;
+  }
+  // K d'élancement par travée, EN 1992-1-1 tab. 7.4N
+  function elancementK(T){
+    var n = T.L.length;
+    return T.L.map(function(l, i){
+      if((i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L")) return 0.4;
+      var cg = i > 0 || T.ga === "E", cd = i < n - 1 || T.dr === "E";
+      return cg && cd ? 1.5 : cg || cd ? 1.3 : 1.0;
+    });
+  }
+  // Construit les cas : 0 = permanente répartie unitaire, 1 = permanentes ponctuelles,
+  // 2.. = variable répartie par travée (valeur unitaire), puis variables ponctuelles une à une
+  function casStandard(L, pts){
+    var X = 0, ax = [0]; L.forEach(function(l){ X += l; ax.push(X) });
+    var cas = [{d:[[0, X, 1, 1]], p:[]}, {d:[], p:pts.map(function(p){ return [p.x, p.G] })}];
+    L.forEach(function(l, i){ cas.push({d:[[ax[i], ax[i+1], 1, 1]], p:[]}) });
+    pts.forEach(function(p){ cas.push({d:[], p:[[p.x, p.Q]]}) });
+    return cas;
+  }
+  function facteurs(L, pts, g, q, gG, gQ){
+    var perm = [[0, gG * g], [1, gG]], vari = [];
+    L.forEach(function(l, i){ vari.push([2 + i, gQ * q]) });
+    pts.forEach(function(p, i){ vari.push([2 + L.length + i, gQ]) });
+    return {perm:perm, vari:vari};
+  }
+
+  // =====================================================================
+  //  Plaque rectangulaire (Kirchhoff), différences finies, bords appuyés ou encastrés
+  //  Renvoie les coefficients m / (p lx²)
+  // =====================================================================
+  var cachePlaque = {};
+  function plaque(lx, ly, bW, bE, bS, bN, nu){
+    var cle = [lx, ly, bW, bE, bS, bN, nu].join("|");
+    if(cachePlaque[cle]) return cachePlaque[cle];
+    var N = 20, hx = lx / N, hy = ly / N, n1 = N - 1, nu_ = n1 * n1, A = [], b = new Float64Array(nu_), i, j;
+    for(i = 0; i < nu_; i++) A.push(new Float64Array(nu_));
+    var sW = bW === "E" ? 1 : -1, sE = bE === "E" ? 1 : -1, sS = bS === "E" ? 1 : -1, sN = bN === "E" ? 1 : -1;
+    function ajoute(r, ii, jj, c){
+      var s = 1;
+      if(ii === -1){ ii = 1; s *= sW } else if(ii === N + 1){ ii = N - 1; s *= sE }
+      if(jj === -1){ jj = 1; s *= sS } else if(jj === N + 1){ jj = N - 1; s *= sN }
+      if(ii <= 0 || ii >= N || jj <= 0 || jj >= N) return;
+      A[r][(jj - 1) * n1 + (ii - 1)] += s * c;
+    }
+    var ax4 = 1 / Math.pow(hx, 4), ay4 = 1 / Math.pow(hy, 4), axy = 2 / (hx*hx*hy*hy);
+    for(j = 1; j <= n1; j++) for(i = 1; i <= n1; i++){
+      var r = (j - 1) * n1 + (i - 1);
+      ajoute(r, i-2, j, ax4); ajoute(r, i-1, j, -4*ax4); ajoute(r, i, j, 6*ax4); ajoute(r, i+1, j, -4*ax4); ajoute(r, i+2, j, ax4);
+      ajoute(r, i, j-2, ay4); ajoute(r, i, j-1, -4*ay4); ajoute(r, i, j, 6*ay4); ajoute(r, i, j+1, -4*ay4); ajoute(r, i, j+2, ay4);
+      ajoute(r, i-1, j-1, axy); ajoute(r, i+1, j-1, axy); ajoute(r, i-1, j+1, axy); ajoute(r, i+1, j+1, axy);
+      ajoute(r, i, j-1, -2*axy); ajoute(r, i, j+1, -2*axy); ajoute(r, i-1, j, -2*axy); ajoute(r, i+1, j, -2*axy);
+      ajoute(r, i, j, 4*axy);
+      b[r] = 1;
+    }
+    // élimination de Gauss avec pivot partiel
+    for(var p = 0; p < nu_; p++){
+      var mx = p; for(i = p + 1; i < nu_; i++) if(Math.abs(A[i][p]) > Math.abs(A[mx][p])) mx = i;
+      if(mx !== p){ var t = A[p]; A[p] = A[mx]; A[mx] = t; var tb = b[p]; b[p] = b[mx]; b[mx] = tb }
+      for(i = p + 1; i < nu_; i++){
+        var m = A[i][p] / A[p][p]; if(m === 0) continue;
+        for(j = p; j < nu_; j++) A[i][j] -= m * A[p][j];
+        b[i] -= m * b[p];
+      }
+    }
+    var w = new Float64Array(nu_);
+    for(i = nu_ - 1; i >= 0; i--){ var s = b[i]; for(j = i + 1; j < nu_; j++) s -= A[i][j] * w[j]; w[i] = s / A[i][i] }
+    function W(ii, jj){ if(ii <= 0 || ii >= N || jj <= 0 || jj >= N) return 0; return w[(jj - 1) * n1 + (ii - 1)] }
+    var mxp = 0, myp = 0, wmax = 0;
+    for(j = 1; j <= n1; j++) for(i = 1; i <= n1; i++){
+      var wxx = (W(i+1, j) - 2*W(i, j) + W(i-1, j)) / (hx*hx), wyy = (W(i, j+1) - 2*W(i, j) + W(i, j-1)) / (hy*hy);
+      mxp = Math.max(mxp, -(wxx + nu * wyy)); myp = Math.max(myp, -(wyy + nu * wxx)); wmax = Math.max(wmax, W(i, j));
+    }
+    var mW = 0, mE = 0, mS = 0, mN = 0;
+    for(j = 1; j <= n1; j++){ if(bW === "E") mW = Math.max(mW, 2 * W(1, j) / (hx*hx)); if(bE === "E") mE = Math.max(mE, 2 * W(N-1, j) / (hx*hx)) }
+    for(i = 1; i <= n1; i++){ if(bS === "E") mS = Math.max(mS, 2 * W(i, 1) / (hy*hy)); if(bN === "E") mN = Math.max(mN, 2 * W(i, N-1) / (hy*hy)) }
+    var l2 = lx * lx;
+    var res = {mx:mxp / l2, my:myp / l2, mW:mW / l2, mE:mE / l2, mS:mS / l2, mN:mN / l2, w:wmax / (l2 * l2)};
+    cachePlaque[cle] = res;
+    return res;
+  }
+
+  // =====================================================================
+  //  Dessins
+  // =====================================================================
+  function schemaPoutre(R, env, unite, titre){
+    var W = 640, H = 200, g = 34, y0 = 92, X = R.ax[R.ax.length - 1];
+    var e1 = extr(env.max), e2 = extr(env.min), amp = Math.max(Math.abs(e1.max), Math.abs(e2.min), 1e-9);
+    function px(x){ return g + (W - 2*g) * x / X }
+    function py(v){ return y0 + v / amp * 70 }      // positif (fibre inférieure tendue) dessiné vers le bas
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(titre)+'">';
+    var dMax = "M" + px(R.x[0]) + " " + py(0), dMin = dMax;
+    for(var i = 0; i < R.x.length; i++){ dMax += " L" + px(R.x[i]).toFixed(1) + " " + py(env.max[i]).toFixed(1); dMin += " L" + px(R.x[i]).toFixed(1) + " " + py(env.min[i]).toFixed(1) }
+    dMax += " L" + px(X) + " " + py(0) + " Z"; dMin += " L" + px(X) + " " + py(0) + " Z";
+    s += '<path class="oz" d="'+dMax+'"/><path class="tz" d="'+dMin+'"/>';
+    s += '<path class="o" d="'+dMax.replace(" Z", "")+'"/><path class="tl" d="'+dMin.replace(" Z", "")+'"/>';
+    s += '<line class="ax" x1="'+px(0)+'" y1="'+y0+'" x2="'+px(X)+'" y2="'+y0+'"/>';
+    R.ax.forEach(function(x, q){
+      var t = R.types[q], cx = px(x);
+      if(t === "A") s += '<path class="ap" d="M'+cx+' '+y0+' l-7 11 h14 z"/>';
+      else if(t === "E") s += '<path class="ap" d="M'+(cx + (q === 0 ? -1 : 1))+' '+(y0-14)+' v28"/><path class="f" d="M'+cx+' '+(y0-14)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0-4)+' l'+(q === 0 ? -6 : 6)+' 6 M'+cx+' '+(y0+6)+' l'+(q === 0 ? -6 : 6)+' 6"/>';
+    });
+    if(e1.max > amp * 0.02) s += '<text class="or" x="'+px(R.x[e1.imax])+'" y="'+(py(e1.max) + 15)+'" text-anchor="middle">'+fmt(e1.max, 1)+'</text>';
+    if(e2.min < -amp * 0.02) s += '<text x="'+px(R.x[e2.imin])+'" y="'+(py(e2.min) - 7)+'" text-anchor="middle">'+fmt(e2.min, 1)+'</text>';
+    s += '<text x="'+W+'" y="14" text-anchor="end">'+esc(unite)+'</text></svg>';
+    return s;
+  }
+  function schemaCout(rows, ixOpt, lab){
+    var ok = rows.filter(function(r){ return r.ok && isFinite(r.cout) });
+    if(ok.length < 2) return "";
+    var W = 640, H = 170, g = 38, x0 = rows[0].h, x1 = rows[rows.length - 1].h;
+    var c0 = Math.min.apply(null, ok.map(function(r){ return r.cout })), c1 = Math.max.apply(null, ok.map(function(r){ return r.cout }));
+    if(c1 - c0 < 1e-9) c1 = c0 + 1;
+    function px(x){ return g + (W - 2*g) * (x - x0) / Math.max(x1 - x0, 1e-9) }
+    function py(c){ return H - 30 - (H - 52) * (c - c0) / (c1 - c0) }
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Coût selon '+esc(lab)+'">';
+    s += '<line class="f" x1="'+g+'" y1="'+(H-30)+'" x2="'+(W-g)+'" y2="'+(H-30)+'"/>';
+    var d = "";
+    rows.forEach(function(r){ if(r.ok && isFinite(r.cout)) d += (d ? " L" : "M") + px(r.h).toFixed(1) + " " + py(r.cout).toFixed(1); else d += "" });
+    s += '<path class="tl" d="'+d+'"/>';
+    rows.forEach(function(r, i){
+      var cx = px(r.h);
+      if(!(r.ok && isFinite(r.cout))) s += '<line class="f" x1="'+cx+'" y1="'+(H-34)+'" x2="'+cx+'" y2="'+(H-26)+'"/>';
+    });
+    if(ixOpt >= 0){ var r = rows[ixOpt]; s += '<circle cx="'+px(r.h)+'" cy="'+py(r.cout)+'" r="4.5" fill="#D6A85C"/><text class="or" x="'+px(r.h)+'" y="'+(py(r.cout) - 10)+'" text-anchor="middle">'+fmt(r.h * 100, 0)+' cm · '+fmt(r.cout, 0)+'</text>' }
+    s += '<text x="'+g+'" y="'+(H-10)+'">'+fmt(x0 * 100, 0)+' cm</text><text x="'+(W-g)+'" y="'+(H-10)+'" text-anchor="end">'+fmt(x1 * 100, 0)+' cm</text>';
+    s += '<text x="'+(W/2)+'" y="'+(H-10)+'" text-anchor="middle">'+esc(lab)+' · tirets : ne passe pas</text></svg>';
+    return s;
+  }
+  function cle(t, v, u, s, or){ return '<div class="cle'+(or ? " or" : "")+'"><div class="t">'+esc(t)+'</div><div class="v">'+v+(u ? '<small>'+esc(u)+'</small>' : "")+'</div>'+(s ? '<div class="s">'+s+'</div>' : "")+'</div>' }
+  function verif(ok, t, d){ return '<li class="'+(ok === null ? "info" : ok ? "" : "non")+'"><b>'+(ok === null ? "—" : ok ? "✓" : "✗")+'</b><span>'+t+'</span><span>'+(d || "")+'</span></li>' }
+
+  // =====================================================================
+  //  00 — Hypothèses
+  // =====================================================================
+  function rendHypotheses(){
+    var M = mat(), sit = SITUATIONS.filter(function(s){ return s[0] === val("situation") })[0] || SITUATIONS[0];
+    var n = NPK[sit[3]], cmin = fckDe(n.c);
+    $("#preco").innerHTML = '<div class="alerte">Exposition '+esc(sit[2])+' · sorte <b>NPK '+esc(n.s)+'</b> ('+esc(n.x)+') · classe minimale <b>'+esc(n.c)+'</b> · E/C ≤ '+esc(n.ec)+' · ciment ≥ '+esc(n.z)+' kg/m³.'
+      + (M.fck < cmin ? '<br>La classe retenue ('+esc(val("classe"))+') est inférieure à la classe minimale de cette sorte.' : "") + '</div>';
+    $("#beton-cles").innerHTML =
+      cle("fck", fmt(M.fck, 0), "MPa", esc(val("classe"))) +
+      cle("fcd · SIA 262 (2)", fmt(M.fcd, 1), "MPa", "ηfc = " + fmt(M.etaFc, 3), true) +
+      cle("τcd · SIA 262 (3)", fmt(M.tcd, 2), "MPa") +
+      cle("fctm · EN 1992", fmt(M.fctm, 2), "MPa", "0,30 fck^(2/3)") +
+      cle("fsd · B500B", fmt(M.fsd, 0), "MPa", "fsk / γs");
+    $("#table-npk").innerHTML = '<tr><th>Sorte</th><th>Expositions</th><th>Classe min.</th><th>E/C max.</th><th>Ciment min.</th><th>Emploi</th></tr>' +
+      NPK.map(function(r, i){ return '<tr'+(i === sit[3] ? ' class="opt"' : "")+'><td>'+r.s+'</td><td>'+r.x+'</td><td>'+r.c+'</td><td>'+r.ec+'</td><td>'+r.z+'</td><td class="g">'+r.u+'</td></tr>' }).join("");
+  }
+
+  // =====================================================================
+  //  01 — Fondations
+  // =====================================================================
+  function portanceEC7(Bp, Lp, filante){
+    var phi = Math.atan(Math.tan(num("fo_phi") * Math.PI / 180) / num("fo_gphi")), c = num("fo_c") / num("fo_gcc");
+    var q = num("fo_gs") * num("fo_D"), g2 = num("fo_g2"), Nq, Nc, Ng, sq = 1, sg = 1, sc = 1;
+    Nq = Math.exp(Math.PI * Math.tan(phi)) * Math.pow(Math.tan(Math.PI / 4 + phi / 2), 2);
+    Nc = phi > 1e-6 ? (Nq - 1) / Math.tan(phi) : Math.PI + 2;
+    Ng = 2 * (Nq - 1) * Math.tan(phi);
+    if(!filante){ var r = Bp / Lp; sq = 1 + r * Math.sin(phi); sg = 1 - 0.3 * r; sc = (sq * Nq - 1) / Math.max(Nq - 1, 1e-9) }
+    var R = c * Nc * sc + q * Nq * sq + 0.5 * g2 * Bp * Ng * sg;
+    return {qRd: R / num("fo_gR"), Nq:Nq, Nc:Nc, Ng:Ng, phid: phi * 180 / Math.PI};
+  }
+  function rendFondations(){
+    var M = mat(), fil = val("fo_t") === "fil", G = num("fo_G"), Q = num("fo_Q"), D = num("fo_D"), gs = num("fo_gs");
+    var cn = num("fo_cn") / 1000, o = num("fo_dia") / 1000, ec7 = val("fo_sol") === "ec7";
+    var b0 = num("fo_b0"), c1 = num("fo_c1"), c2 = num("fo_c2"), rL = Math.max(0.2, num("fo_r"));
+    var rows = [], hmax = Math.max(0.2, num("fo_hmax"));
+    for(var h = 0.20; h <= hmax + 1e-9; h += 0.05){
+      var r = {h:h, ok:true, raisons:[]};
+      // largeur par itération (le poids propre et la portance dépendent de B)
+      var B = fil ? b0 + 0.1 : Math.max(c1, c2) + 0.1, Lw = B, Nd, qRd, it;
+      for(it = 0; it < 40; it++){
+        Lw = fil ? 1 : rL * B;
+        var aire = fil ? B : B * Lw, aCol = fil ? b0 : c1 * c2;
+        var Wf = GAMMA_BA * aire * h, Ws = gs * Math.max(D - h, 0) * Math.max(aire - aCol, 0);
+        Nd = M.gG * (G + Wf + Ws) + M.gQ * Q;
+        qRd = ec7 ? portanceEC7(B, Lw, fil).qRd : num("fo_qR");
+        var Bn = fil ? Nd / qRd : Math.sqrt(Nd / (qRd * rL));
+        Bn = Math.max(Math.ceil(Bn / 0.05 - 1e-9) * 0.05, fil ? b0 : Math.max(c1, c2));
+        if(Math.abs(Bn - B) < 1e-6) break;
+        B = Bn;
+      }
+      Lw = fil ? 1 : rL * B;
+      r.B = B; r.L = Lw; r.Nd = Nd; r.qRd = qRd; r.sig = Nd / (fil ? B : B * Lw);
+      var sn = (M.gG * G + M.gQ * Q) / (fil ? B : B * Lw);         // réaction nette sous la charge transmise
+      var d1 = h - cn - o / 2, d2 = h - cn - 1.5 * o;
+      var a1 = (B - (fil ? b0 : c1)) / 2, a2 = fil ? 0 : (Lw - c2) / 2;
+      r.a1 = a1; r.sn = sn; r.d1 = d1;
+      if(d1 <= 0.05){ r.ok = false; r.raisons.push("hauteur utile") }
+      var m1 = sn * a1 * a1 / 2, f1 = flexion(m1, 1, d1, M);
+      var As1 = Math.max(f1.As, asMin(1, d1, M));
+      var v1 = sn * Math.max(a1 - d1, 0), vr1 = vRdc(1, d1, As1, M);
+      r.m1 = m1; r.As1 = As1; r.v1 = v1; r.vr1 = vr1; r.xd1 = f1.xd;
+      if(!f1.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+      if(v1 > vr1){ r.ok = false; r.raisons.push("effort tranchant") }
+      var acier;
+      if(fil){
+        r.As2 = Math.max(0.2 * As1, 0);   // répartition 20 % (EN 1992 §9.3.1.1)
+        acier = kgDe(As1, B) + kgDe(r.As2, B);
+        r.cout = B * h * M.pb + 2 * h * M.pc + acier * (1 + M.maj) * M.pa;
+      } else {
+        var m2 = sn * a2 * a2 / 2, f2 = flexion(m2, 1, d2, M);
+        var As2 = Math.max(f2.As, asMin(1, d2, M));
+        var v2 = sn * Math.max(a2 - d2, 0), vr2 = vRdc(1, d2, As2, M);
+        r.m2 = m2; r.As2 = As2; r.v2 = v2; r.vr2 = vr2; r.xd2 = f2.xd;
+        if(!f2.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+        if(v2 > vr2){ r.ok = false; r.raisons.push("effort tranchant") }
+        acier = kgDe(As1, B) * Lw + kgDe(As2, Lw) * B;
+        r.cout = B * Lw * h * M.pb + 2 * (B + Lw) * h * M.pc + acier * (1 + M.maj) * M.pa;
+      }
+      r.acier = acier;
+      rows.push(r);
+    }
+    var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
+    var u = fil ? "par m" : "par semelle", h2 = "";
+    if(io < 0){ $("#r-fond").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à '+fmt(hmax, 2)+' m ne passe sans étriers. Augmente l\'épaisseur maximale ou la classe de béton.</div>'; return }
+    var R = rows[io], b1 = barresM(R.As1), b2 = barresM(R.As2);
+    h2 += '<h2>Résultat</h2><div class="cles">' +
+      cle(fil ? "Largeur B" : "Dimensions B × L", fil ? fmt(R.B, 2) : fmt(R.B, 2) + " × " + fmt(R.L, 2), "m", "", true) +
+      cle("Épaisseur optimale", fmt(R.h * 100, 0), "cm", "coût minimal", true) +
+      cle("Coût estimé", fmt(R.cout, 0), "CHF", u) +
+      cle("Nd", fmt(R.Nd, 0), fil ? "kN/m" : "kN", "y c. semelle et remblai") +
+      cle("σd / résistance", fmt(R.sig, 0) + " / " + fmt(R.qRd, 0), "kPa") +
+      cle("Armature", fmt(R.acier * (1 + M.maj) / (fil ? 1 : R.B * R.L), 1), "kg/m²", "majoration comprise") + '</div>';
+    h2 += '<h3>Ferraillage inférieur</h3><ul class="verifs">' +
+      verif(null, fil ? "Transversal (sous le mur)" : "Direction B (nappe extérieure)", txtM(b1)) +
+      verif(null, fil ? "Longitudinal de répartition (20 %)" : "Direction L (nappe intérieure)", txtM(b2)) + '</ul>';
+    h2 += '<h3>Vérifications</h3><ul class="verifs">' +
+      verif(R.sig <= R.qRd + 1e-9, "Contrainte au sol σd ≤ résistance de calcul", fmt(R.sig, 0) + " ≤ " + fmt(R.qRd, 0) + " kPa") +
+      verif(R.xd1 <= M.xdmax, "Flexion au nu " + (fil ? "du mur" : "du poteau, direction B") + " · md = " + fmt(R.m1, 1) + " kNm/m", "x/d = " + fmt(R.xd1, 3)) +
+      verif(R.v1 <= R.vr1, "Effort tranchant à d du nu, sans étriers (EN 1992 §6.2.2)", fmt(R.v1, 0) + " ≤ " + fmt(R.vr1, 0) + " kN/m") +
+      (fil ? "" : verif(R.xd2 <= M.xdmax, "Flexion au nu du poteau, direction L · md = " + fmt(R.m2, 1) + " kNm/m", "x/d = " + fmt(R.xd2, 3)) +
+        verif(R.v2 <= R.vr2, "Effort tranchant direction L", fmt(R.v2, 0) + " ≤ " + fmt(R.vr2, 0) + " kN/m") +
+        verif(false, "Poinçonnement (SIA 262 / EN 1992 §6.4) : non vérifié dans cette version", "à faire")) +
+      verif(null, "Excentricité, moments et efforts horizontaux : non pris en compte", "") +
+      (ec7 ? verif(null, "Portance EN 1997-1 annexe D : φ'd = " + fmt(portanceEC7(R.B, R.L, fil).phid, 1) + "°, base horizontale, charge verticale centrée", "") : "") + '</ul>';
+    h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
+    h2 += '<div class="defile"><table><tr><th>h</th><th>B</th><th>md</th><th>As</th><th>Acier</th><th>Coût</th><th>État</th></tr>' + rows.map(function(r, i){
+      return '<tr class="'+(i === io ? "opt" : r.ok ? "" : "ko")+'"><td>'+fmt(r.h * 100, 0)+' cm</td><td>'+fmt(r.B, 2)+' m</td><td>'+fmt(r.m1, 1)+'</td><td>'+fmt(r.As1, 0)+' mm²/m</td><td>'+fmt(r.acier, 1)+' kg</td><td>'+fmt(r.cout, 0)+'</td><td>'+(r.ok ? (i === io ? "optimum" : "passe") : esc(r.raisons.join(", ")))+'</td></tr>' }).join("") + '</table></div>';
+    h2 += '<p class="note">Coût = béton + coffrage des rives + armature (longueurs droites, majorées de '+fmt(M.maj * 100, 0)+' %). Armature minimale EN 1992 (9.1N) appliquée.</p>';
+    $("#r-fond").innerHTML = h2;
+  }
+
+  // =====================================================================
+  //  02 — Murs enterrés
+  // =====================================================================
+  function rendMurs(){
+    var M = mat(), H = Math.max(0.5, num("mu_H")), ap = val("mu_ap"), g = num("mu_g"), phi = num("mu_phi") * Math.PI / 180;
+    var K = val("mu_K") === "K0" ? 1 - Math.sin(phi) : val("mu_K") === "Ka" ? Math.pow(Math.tan(Math.PI / 4 - phi / 2), 2) : num("mu_Km");
+    var rem = Math.max(0, num("mu_rem")), q = num("mu_q"), eau = val("mu_eau") === "oui", hw = num("mu_hw"), gsat = num("mu_gsat");
+    // profondeur z depuis la tête ; contraintes à z
+    function sv(z){ var Z = z + rem; if(!eau || Z <= hw + rem) return g * Z; return g * (hw + rem) + (gsat - GAMMA_W) * (Z - hw - rem) }
+    function pw(z){ return eau ? GAMMA_W * Math.max(z - hw, 0) : 0 }
+    var cuts = [0, H]; if(eau && hw > 0 && hw < H) cuts.splice(1, 0, hw);
+    var dT = [], dW = [];
+    for(var i = 0; i < cuts.length - 1; i++){
+      dT.push([cuts[i], cuts[i+1], K * sv(cuts[i]), K * sv(cuts[i+1])]);
+      if(pw(cuts[i+1]) > 0) dW.push([cuts[i], cuts[i+1], pw(cuts[i]), pw(cuts[i+1])]);
+    }
+    var cas = [{d:dT, p:[]}, {d:dW, p:[]}, {d:[[0, H, K * q, K * q]], p:[]}], R;
+    try { R = poutreFE([H], ap === "LE" ? "L" : "A", ap === "AA" ? "A" : "E", cas) }
+    catch(e){ $("#r-mur").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
+    var envM = enveloppe(R.M, [[0, num("mu_gT")], [1, num("mu_gW")]], [[2, M.gQ]]);
+    var envV = enveloppe(R.V, [[0, num("mu_gT")], [1, num("mu_gW")]], [[2, M.gQ]]);
+    var eM = extr(envM.max), em = extr(envM.min), eV = extr(envV.max), ev = extr(envV.min);
+    var Mp = Math.max(eM.max, 0), Mn = Math.max(-em.min, 0), Vd = Math.max(eV.max, -ev.min);
+    var cn = num("mu_cn") / 1000, o = num("mu_dia") / 1000, rows = [];
+    for(var t = 0.18; t <= 0.60 + 1e-9; t += 0.01){
+      var r = {h:t, ok:true, raisons:[]}, d = t - cn - o / 2;
+      var fp = flexion(Mp, 1, d, M), fn = flexion(Mn, 1, d, M), amin = asMin(1, d, M);
+      r.Asi = Math.max(fp.As, Mp > 0 ? amin : 0); r.Ast = Math.max(fn.As, Mn > 0 ? amin : 0);
+      // EN 1992 §9.6.2 : armature verticale totale ≥ 0,002 Ac
+      var tot = 0.002 * t * 1e6;
+      if(r.Asi + r.Ast < tot){ var man = tot - r.Asi - r.Ast; r.Asi += man / 2; r.Ast += man / 2 }
+      r.Ash = Math.max(0.25 * (r.Asi + r.Ast), 0.001 * t * 1e6);   // EN 1992 §9.6.3, total horizontal
+      r.xd = Math.max(fp.xd, fn.xd); r.d = d;
+      if(!fp.ok || !fn.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+      r.vr = vRdc(1, d, Math.min(r.Asi, r.Ast), M);
+      if(Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
+      var acier = kgDe(r.Asi, H) + kgDe(r.Ast, H) + kgDe(r.Ash, H);
+      r.acier = acier / H;
+      r.cout = t * M.pb + 2 * M.pc + r.acier * (1 + M.maj) * M.pa;   // par m² de mur
+      rows.push(r);
+    }
+    var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
+    var h2 = '<h2>Efforts de calcul (bande de 1 m)</h2>';
+    h2 += '<div class="cles">' + cle("K", fmt(K, 3), "", val("mu_K") === "K0" ? "1 − sin φ' (Jaky)" : val("mu_K") === "Ka" ? "tan²(45° − φ'/2)" : "saisi") +
+      cle("md côté local", fmt(Mp, 1), "kNm/m", "face intérieure tendue") +
+      cle("md côté terre", fmt(Mn, 1), "kNm/m", "face contre terre tendue") +
+      cle("vd max", fmt(Vd, 1), "kN/m") +
+      cle("Réaction en tête", fmt(Math.abs(num("mu_gT") * R.R[0][0] + num("mu_gW") * R.R[1][0] + M.gQ * R.R[2][0]), 1), "kN/m", "à reprendre par la dalle") + '</div>';
+    h2 += schemaPoutre(R, envM, "md [kNm/m] · tête à gauche, pied à droite", "Moments dans le mur");
+    h2 += '<div class="lg"><span><i></i>face intérieure tendue</span><span><i class="t"></i>face contre terre tendue</span></div>';
+    if(io < 0){ $("#r-mur").innerHTML = h2 + '<div class="alerte">Aucune épaisseur jusqu\'à 60 cm ne passe sans étriers.</div>'; return }
+    var Rr = rows[io];
+    h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
+      cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") + '</div>';
+    h2 += '<h3>Ferraillage vertical et horizontal</h3><ul class="verifs">' +
+      verif(null, "Vertical, face intérieure", txtM(barresM(Rr.Asi))) +
+      verif(null, "Vertical, face contre terre", txtM(barresM(Rr.Ast))) +
+      verif(null, "Horizontal, chaque face", txtM(barresM(Rr.Ash / 2))) + '</ul>';
+    h2 += '<h3>Vérifications</h3><ul class="verifs">' +
+      verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
+      verif(Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
+      verif(null, "Armatures minimales des voiles EN 1992 §9.6.2 et §9.6.3 appliquées", "") +
+      verif(null, "Effort normal (poids des étages) négligé : du côté de la sécurité pour la flexion", "") +
+      verif(null, "Fissuration et étanchéité (SIA 262, SIA 272) : non vérifiées", "") + '</ul>';
+    h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
+    $("#r-mur").innerHTML = h2;
+  }
+
+  // =====================================================================
+  //  03 — Dalles
+  // =====================================================================
+  function chargeUtile(cat, id){ return cat === "man" ? num(id) : CATEGORIES[cat].q }
+  function rendDalles(){
+    var M = mat(), g = num("da_g"), q = chargeUtile(val("da_cat"), "da_q"), cn = num("da_cn") / 1000, o = num("da_dia") / 1000, rows = [], h2 = "";
+    if(val("da_m") === "un"){
+      var T = lireTravees("da_"), pts = lirePonctuelles("da_", T.L), cas = casStandard(T.L, pts), R;
+      try { R = poutreFE(T.L, T.ga, T.dr, cas) } catch(e){ $("#r-dalle").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
+      // K d'élancement par travée (EN 1992 tab. 7.4N)
+      var n = T.L.length, Ks = elancementK(T);
+      for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
+        var r = {h:h, ok:true, raisons:[]}, d = h - cn - o / 2, gt = g + GAMMA_BA * h;
+        var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
+        var a = extr(eM.max), b = extr(eM.min), c = extr(eV.max), c2 = extr(eV.min);
+        r.Mp = Math.max(a.max, 0); r.Mn = Math.max(-b.min, 0); r.Vd = Math.max(c.max, -c2.min);
+        var fp = flexion(r.Mp, 1, d, M), fn = flexion(r.Mn, 1, d, M), amin = asMin(1, d, M);
+        r.Asp = Math.max(fp.As, amin); r.Asn = r.Mn > 0.01 ? Math.max(fn.As, amin) : 0; r.xd = Math.max(fp.xd, fn.xd); r.d = d;
+        if(!fp.ok || !fn.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+        r.vr = vRdc(1, d, r.Asn > 0 ? Math.min(r.Asp, r.Asn) : r.Asp, M);
+        if(r.Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
+        var rho = r.Asp / (d * 1e6), pire = 0;
+        T.L.forEach(function(l, i){ var lim = ldLim(Ks[i], rho, M.fck), ratio = l / d / lim; pire = Math.max(pire, ratio) });
+        r.ld = pire;
+        if(pire > 1){ r.ok = false; r.raisons.push("élancement") }
+        // métré : inférieure sur toute la longueur, supérieure sur 0,3 L de part et d'autre des appuis continus et encastrés,
+        // répartition 20 % (EN 1992 §9.3.1.1)
+        var Ltot = T.L.reduce(function(s, l){ return s + l }, 0), Lsup = 0;
+        T.L.forEach(function(l, i){
+          if(i > 0 || T.ga === "E") Lsup += 0.3 * l;
+          if(i < n - 1 || T.dr === "E") Lsup += 0.3 * l;
+          if((i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L")) Lsup += 0.7 * l;
+        });
+        var kg = kgDe(r.Asp, Ltot) * 1.2 + kgDe(r.Asn, Lsup) * 1.2;
+        r.acier = kg / Ltot;
+        r.cout = h * M.pb + M.pc + r.acier * (1 + M.maj) * M.pa;
+        rows.push(r);
+      }
+      var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
+      if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe. Raccourcis les portées ou ajoute des appuis.</div>'; return }
+      var Rr = rows[io], f2 = facteurs(T.L, pts, g + GAMMA_BA * Rr.h, q, M.gG, M.gQ), eMo = enveloppe(R.M, f2.perm, f2.vari);
+      h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
+        cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
+        cle("md travée", fmt(Rr.Mp, 1), "kNm/m") + cle("md appui", fmt(-Rr.Mn, 1), "kNm/m") + cle("vd", fmt(Rr.Vd, 1), "kN/m") + '</div>';
+      h2 += '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eMo, "md [kNm/m]", "Enveloppe des moments");
+      h2 += '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
+      h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
+        verif(null, "Inférieur, sens porteur", txtM(barresM(Rr.Asp))) +
+        (Rr.Asn > 0 ? verif(null, "Supérieur sur appuis", txtM(barresM(Rr.Asn))) : "") +
+        verif(null, "Répartition (20 %, EN 1992 §9.3.1.1)", txtM(barresM(0.2 * Rr.Asp))) + '</ul>';
+      h2 += '<h3>Vérifications</h3><ul class="verifs">' +
+        verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
+        verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
+        verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16), travée la plus défavorable", fmt(Rr.ld * 100, 0) + " % de la limite") +
+        verif(null, "Charges variables placées travée par travée (enveloppe), γG uniforme", "") +
+        verif(null, "Effort tranchant selon SIA 262 (kd) : non codé, EN 1992 utilisé", "") + '</ul>';
+    } else {
+      var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN");
+      if(ly < lx){ var tt = lx; lx = ly; ly = tt; var t1 = bW, t2 = bE; bW = bS; bE = bN; bS = t1; bN = t2 }
+      var P = plaque(lx, ly, bW, bE, bS, bN, num("da_nu")), Kd = num("da_K");
+      for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
+        var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pd = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
+        r.mx = P.mx * pd * lx * lx; r.my = P.my * pd * lx * lx;
+        r.mW = P.mW * pd * lx * lx; r.mE = P.mE * pd * lx * lx; r.mS = P.mS * pd * lx * lx; r.mN = P.mN * pd * lx * lx;
+        var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M), amin = asMin(1, dy, M);
+        r.Asx = Math.max(fx.As, amin); r.Asy = Math.max(fy.As, amin);
+        var ms = Math.max(r.mW, r.mE, r.mS, r.mN), fs = flexion(ms, 1, dx, M);
+        r.Ass = ms > 0 ? Math.max(fs.As, asMin(1, dx, M)) : 0; r.ms = ms;
+        r.xd = Math.max(fx.xd, fy.xd, fs.xd);
+        if(!fx.ok || !fy.ok || !fs.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+        r.Vd = pd * lx / 2; r.vr = vRdc(1, dx, Math.max(r.Ass, r.Asx), M);
+        if(r.Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
+        r.ld = lx / dx / ldLim(Kd, r.Asx / (dx * 1e6), M.fck);
+        if(r.ld > 1){ r.ok = false; r.raisons.push("élancement") }
+        var aire = lx * ly, kg = kgDe(r.Asx, lx) * ly + kgDe(r.Asy, ly) * lx;
+        [["W", ly], ["E", ly], ["S", lx], ["N", lx]].forEach(function(b){ var mm = r["m" + b[0]]; if(mm > 0){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * lx) * b[1] } });
+        r.acier = kg / aire;
+        r.cout = h * M.pb + M.pc + r.acier * (1 + M.maj) * M.pa;
+        rows.push(r);
+      }
+      var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
+      if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
+      var Rr = rows[io];
+      h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
+        cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
+        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "coef. " + fmt(P.mx, 4) + " · p lx²") + cle("my travée", fmt(Rr.my, 1), "kNm/m", "coef. " + fmt(P.my, 4)) +
+        cle("m sur bord encastré", Rr.ms > 0 ? fmt(-Rr.ms, 1) : "—", "kNm/m") + '</div>';
+      h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
+        verif(null, "Inférieur, direction lx (nappe extérieure)", txtM(barresM(Rr.Asx))) +
+        verif(null, "Inférieur, direction ly", txtM(barresM(Rr.Asy))) +
+        (Rr.Ass > 0 ? verif(null, "Supérieur sur bords encastrés (sur 0,3 lx)", txtM(barresM(Rr.Ass))) : "") + '</ul>';
+      h2 += '<h3>Vérifications</h3><ul class="verifs">' +
+        verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
+        verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers, estimé par p·lx/2", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
+        verif(Rr.ld <= 1, "Élancement lx/d (EN 1992 éq. 7.16, K = " + fmt(Kd, 1) + ")", fmt(Rr.ld * 100, 0) + " % de la limite") +
+        verif(null, "Moments élastiques d'une plaque de Kirchhoff (différences finies, maillage 20 × 20), charge uniforme", "") +
+        verif(null, "Armature de coin (torsion) et bords libres : non traités dans cette version", "") + '</ul>';
+    }
+    h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
+    h2 += '<p class="note">Coût par m² = béton + coffrage de sous-face + armature (majorée de ' + fmt(M.maj * 100, 0) + ' %). Poids propre ' + GAMMA_BA + ' kN/m³ (EN 1991-1-1 tab. A.1). Armature minimale EN 1992 (9.1N).</p>';
+    $("#r-dalle").innerHTML = h2;
+  }
+
+  // =====================================================================
+  //  04 — Poutres
+  // =====================================================================
+  function rendPoutres(){
+    var M = mat(), T = lireTravees("po_"), pts = lirePonctuelles("po_", T.L), cas = casStandard(T.L, pts), R, matr = val("po_mat");
+    var g = num("po_g"), q = num("po_q"), h2 = "", n = T.L.length;
+    try { R = poutreFE(T.L, T.ga, T.dr, cas) } catch(e){ $("#r-poutre").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
+    function efforts(gt, gG, gQ){
+      var f = facteurs(T.L, pts, gt, q, gG, gQ), eM = enveloppe(R.M, f.perm, f.vari), eV = enveloppe(R.V, f.perm, f.vari);
+      var a = extr(eM.max), b = extr(eM.min), c = extr(eV.max), d = extr(eV.min);
+      return {eM:eM, Mp:Math.max(a.max, 0), Mn:Math.max(-b.min, 0), Vd:Math.max(c.max, -d.min)};
+    }
+    // flèche caractéristique max par travée (EI = 1) : permanentes + variables défavorables, et variables seules
+    function fleches(gt){
+      var f = facteurs(T.L, pts, gt, q, 1, 1), ax = R.ax, res = [];
+      T.L.forEach(function(l, i){
+        var wG = 0, wQ = 0, wT = 0;
+        R.xs.forEach(function(x, k){
+          if(x < ax[i] - 1e-9 || x > ax[i+1] + 1e-9) return;
+          var b = 0, p = 0;
+          f.perm.forEach(function(c){ b += c[1] * R.w[c[0]][k] });
+          f.vari.forEach(function(c){ var v = c[1] * R.w[c[0]][k]; if(v > 0) p += v });
+          // corde entre appuis de la travée : flèche relative (porte-à-faux : depuis l'appui)
+          if(Math.abs(b + p) > Math.abs(wT)){ wT = b + p; wG = b; wQ = p }
+        });
+        var porte = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L");
+        res.push({L: porte ? 2 * l : l, wG:wG, wQ:wQ, wT:wT, porte:porte});
+      });
+      return res;
+    }
+    function reactions(gt){
+      var f = facteurs(T.L, pts, gt, q, M.gG, M.gQ);
+      return R.ax.map(function(x, s){
+        if(R.types[s] === "L") return null;
+        var b = 0, p = 0; f.perm.forEach(function(c){ b += c[1] * R.R[c[0]][s] }); f.vari.forEach(function(c){ var v = c[1] * R.R[c[0]][s]; if(v > 0) p += v });
+        return b + p;
+      });
+    }
+    var verifs = "", res = "", tab = "";
+    if(matr === "ba"){
+      var b = Math.max(0.1, num("po_b")), cn = num("po_cn") / 1000, dl = num("po_dl") / 1000, de = num("po_de"), rows = [];
+      var Ks = elancementK(T);
+      for(var h = 0.25; h <= Math.max(0.3, num("po_hmax")) + 1e-9; h += 0.05){
+        var r = {h:h, ok:true, raisons:[]}, d = h - cn - de / 1000 - dl / 2, E = efforts(g + GAMMA_BA * b * h, M.gG, M.gQ);
+        r.E = E; r.d = d;
+        var fp = flexion(E.Mp, b, d, M), fn = flexion(E.Mn, b, d, M), amin = asMin(b, d, M);
+        r.Asp = Math.max(fp.As, amin); r.Asn = E.Mn > 0.01 ? Math.max(fn.As, amin) : 0; r.xd = Math.max(fp.xd, fn.xd);
+        if(!fp.ok || !fn.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
+        // étriers EN 1992 §6.2.3, cot θ cherché entre 2,5 et 1,0
+        var z = 0.9 * d, nu1 = 0.6 * (1 - M.fck / 250), cot = null;
+        for(var ct = 2.5; ct >= 1 - 1e-9; ct -= 0.1){
+          var vmax = b * 1000 * z * 1000 * nu1 * M.fcdEC / (ct + 1 / ct) / 1000;
+          if(vmax >= E.Vd){ cot = ct; r.vmax = vmax; break }
+        }
+        if(cot === null){ r.ok = false; r.raisons.push("bielle comprimée"); r.asw = Infinity }
+        else {
+          r.cot = cot;
+          var asw = E.Vd * 1000 / (z * 1000 * M.fsd * cot) * 1000;                // mm2/m
+          var aswMin = 0.08 * Math.sqrt(M.fck) / M.fsk * b * 1000 * 1000;       // EN 1992 éq. (9.5N)
+          r.asw = Math.max(asw, aswMin);
+        }
+        var ld = 0; T.L.forEach(function(l, i){ ld = Math.max(ld, l / d / ldLim(Ks[i], r.Asp / (b * d * 1e6), M.fck)) });
+        r.ld = ld; if(ld > 1){ r.ok = false; r.raisons.push("élancement") }
+        var Ltot = T.L.reduce(function(s, l){ return s + l }, 0), Lsup = 0;
+        T.L.forEach(function(l, i){ if(i > 0 || T.ga === "E") Lsup += 0.3 * l; if(i < n - 1 || T.dr === "E") Lsup += 0.3 * l; if((i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L")) Lsup += 0.7 * l });
+        var per = 2 * (b - 2 * cn) + 2 * (h - 2 * cn);
+        var kg = kgDe(r.Asp, Ltot) + kgDe(r.Asn, Lsup) + (r.Asn > 0 ? 0 : kgDe(226, Ltot)) + (isFinite(r.asw) ? r.asw / 2 * 1e-6 * per * Ltot * ACIER_KG : 0);
+        r.acier = kg / Ltot;
+        r.cout = b * h * M.pb + (b + 2 * h) * M.pc + r.acier * (1 + M.maj) * M.pa;
+        rows.push(r);
+      }
+      var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
+      if(io < 0){ $("#r-poutre").innerHTML = '<div class="alerte">Aucune hauteur jusqu\'à ' + fmt(num("po_hmax"), 2) + ' m ne passe avec b = ' + fmt(b, 2) + ' m. Élargis la poutre ou augmente la hauteur maximale.</div>'; return }
+      var Rr = rows[io], bp = barresP(Rr.Asp, b, num("po_cn"), de), bn = Rr.Asn > 0 ? barresP(Rr.Asn, b, num("po_cn"), de) : null;
+      var sEt = null; [8, 10, 12].forEach(function(o){ if(sEt) return; for(var s = 300; s >= 75; s -= 25){ var a = 2 * Math.PI * o * o / 4 * 1000 / s; if(a >= Rr.asw && s <= 0.75 * Rr.d * 1000){ sEt = {o:o, s:s, a:a}; break } } });
+      res = cle("Section b × h", fmt(b * 100, 0) + " × " + fmt(Rr.h * 100, 0), "cm", "hauteur optimale", true) + cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m") +
+        cle("md travée", fmt(Rr.E.Mp, 1), "kNm") + cle("md appui", fmt(-Rr.E.Mn, 1), "kNm") + cle("vd", fmt(Rr.E.Vd, 1), "kN") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m", "majoration comprise");
+      verifs = verif(null, "Inférieures en travée", txtP(bp)) + (bn ? verif(null, "Supérieures sur appuis", txtP(bn)) : "") +
+        verif(null, "Étriers à 2 brins", sEt ? "Ø" + sEt.o + " e = " + sEt.s + " mm (" + fmt(sEt.a, 0) + " mm²/m)" : "hors tableau") +
+        verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
+        verif(true, "Bielles comprimées (EN 1992 éq. 6.9), cot θ = " + fmt(Rr.cot, 1), fmt(Rr.E.Vd, 0) + " ≤ " + fmt(Rr.vmax, 0) + " kN") +
+        verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16)", fmt(Rr.ld * 100, 0) + " % de la limite") +
+        verif(null, "Effort tranchant selon SIA 262 (champ de compression) : non codé, EN 1992 §6.2.3 utilisé", "");
+      tab = '<h3>Coût selon la hauteur</h3>' + schemaCout(rows, io, "hauteur");
+      var eDessin = Rr.E.eM;
+    } else if(matr === "acier"){
+      var fam = val("po_fam"), liste = fam === "tous" ? PROFILS.IPE.concat(PROFILS.HEA, PROFILS.HEB) : PROFILS[fam];
+      liste = liste.slice().sort(function(a, b){ return a[6] - b[6] });
+      var fy = num("po_fy"), gM = num("po_gM"), Ea = 210000, lim = num("po_lim"), choix = null, essais = [];
+      liste.some(function(p){
+        var gt = g + p[6] * 9.81 / 1000, E = efforts(gt, M.gG, M.gQ), Md = Math.max(E.Mp, E.Mn);
+        var MRd = fy * p[8] * 1e3 / gM / 1e6, VRd = fy * p[9] * 100 / (Math.sqrt(3) * gM) / 1000;
+        var EI = Ea * 1e3 * p[7] * 1e-8;    // kN·m²
+        var fl = fleches(gt), pire = 0;
+        fl.forEach(function(w){ pire = Math.max(pire, Math.abs(w.wT) / EI / (w.L / lim)) });
+        var e = {p:p, E:E, Md:Md, MRd:MRd, VRd:VRd, fl:pire, ok: Md <= MRd && E.Vd <= VRd && pire <= 1};
+        essais.push(e);
+        if(e.ok){ choix = e; return true }
+        return false;
+      });
+      if(!choix){ $("#r-poutre").innerHTML = '<div class="alerte">Aucun profilé de la famille choisie ne passe. Essaie « Toutes » ou une nuance plus haute.</div>'; return }
+      var p = choix.p, cout = p[6] * M.ps;
+      res = cle("Profilé", esc(p[0]), "", fy === 355 ? "S355" : fy === 275 ? "S275" : "S235", true) + cle("Masse", fmt(p[6], 1), "kg/m") + cle("Coût estimé", fmt(cout, 0), "CHF/m") +
+        cle("md", fmt(choix.Md, 1), "kNm", "MRd = " + fmt(choix.MRd, 1)) + cle("vd", fmt(choix.E.Vd, 1), "kN", "VRd = " + fmt(choix.VRd, 0)) + cle("Flèche", fmt(choix.fl * 100, 0), "%", "de L/" + fmt(lim, 0));
+      verifs = verif(choix.Md <= choix.MRd, "Flexion plastique MRd = fy · Wpl,y / γM1 (section de classe 1 ou 2 supposée)", fmt(choix.Md, 1) + " ≤ " + fmt(choix.MRd, 1) + " kNm") +
+        verif(choix.E.Vd <= choix.VRd, "Effort tranchant VRd = Avz · fy / (√3 · γM1)", fmt(choix.E.Vd, 0) + " ≤ " + fmt(choix.VRd, 0) + " kN") +
+        verif(choix.fl <= 1, "Flèche sous charges caractéristiques ≤ L/" + fmt(lim, 0) + " (porte-à-faux : 2 L)", fmt(choix.fl * 100, 0) + " %") +
+        verif(false, "Déversement (SIA 263) : non vérifié, poutre supposée tenue latéralement", "à faire") +
+        verif(null, "Interaction M–V, voilement local et classe de section : non vérifiés", "");
+      tab = '<h3>Profilés essayés</h3><div class="defile"><table><tr><th>Profilé</th><th>kg/m</th><th>md / MRd</th><th>vd / VRd</th><th>Flèche</th></tr>' + essais.slice(-6).map(function(e){
+        return '<tr class="'+(e === choix ? "opt" : "ko")+'"><td>'+esc(e.p[0])+'</td><td>'+fmt(e.p[6], 1)+'</td><td>'+fmt(e.Md / e.MRd * 100, 0)+' %</td><td>'+fmt(e.E.Vd / e.VRd * 100, 0)+' %</td><td>'+fmt(e.fl * 100, 0)+' %</td></tr>' }).join("") + '</table></div>';
+      var eDessin = choix.E.eM;
+    } else {
+      var B = BOIS[val("po_cl")], bb = Math.max(0.04, num("po_bb")), kmod = num("po_kmod"), kdef = num("po_kdef"), psi2 = num("po_psi2");
+      var gMb = String(val("po_gMb")).trim() === "auto" ? (B.lam ? 1.25 : 1.3) : num("po_gMb") || 1.3;
+      var fmd = kmod * B.fm / gMb, fvd = kmod * B.fv / gMb, lim = num("po_lim"), limf = num("po_limf"), choix = null, rows = [];
+      for(var h = 0.10; h <= 1.60 + 1e-9; h += 0.02){
+        var gt = g + B.rho * 9.81 / 1000 * bb * h, E = efforts(gt, M.gG, M.gQ), Md = Math.max(E.Mp, E.Mn);
+        var Wm = bb * h * h / 6, sm = Md / Wm / 1000, td = 1.5 * E.Vd / (0.67 * bb * h) / 1000;   // kcr = 0,67
+        var EI = B.E * 1e3 * bb * h * h * h / 12, fl = fleches(gt), pi = 0, pf = 0;
+        fl.forEach(function(w){
+          var wi = Math.abs(w.wQ) / EI, wf = (Math.abs(w.wG) * (1 + kdef) + Math.abs(w.wQ) * (1 + psi2 * kdef)) / EI;
+          pi = Math.max(pi, wi / (w.L / lim)); pf = Math.max(pf, wf / (w.L / limf));
+        });
+        var r = {h:h, E:E, Md:Md, sm:sm, td:td, pi:pi, pf:pf, ok: sm <= fmd && td <= fvd && pi <= 1 && pf <= 1, cout: bb * h * M.pw};
+        rows.push(r);
+        if(r.ok){ choix = r; break }
+      }
+      if(!choix){ $("#r-poutre").innerHTML = '<div class="alerte">Aucune hauteur jusqu\'à 160 cm ne passe avec b = ' + fmt(bb * 100, 0) + ' cm.</div>'; return }
+      res = cle("Section b × h", fmt(bb * 100, 0) + " × " + fmt(choix.h * 100, 0), "cm", esc(B.n), true) + cle("Coût estimé", fmt(choix.cout, 0), "CHF/m") +
+        cle("md", fmt(choix.Md, 1), "kNm") + cle("vd", fmt(choix.E.Vd, 1), "kN") + cle("fm,d", fmt(fmd, 1), "MPa", "kmod · fm,k / γM") + cle("fv,d", fmt(fvd, 2), "MPa");
+      verifs = verif(choix.sm <= fmd, "Flexion σm,d ≤ fm,d (EN 1995 §6.1.6, kh négligé)", fmt(choix.sm, 1) + " ≤ " + fmt(fmd, 1) + " MPa") +
+        verif(choix.td <= fvd, "Cisaillement τd = 1,5 V / (kcr b h) ≤ fv,d, kcr = 0,67 (EN 1995 §6.1.7)", fmt(choix.td, 2) + " ≤ " + fmt(fvd, 2) + " MPa") +
+        verif(choix.pi <= 1, "Flèche instantanée sous la charge variable ≤ L/" + fmt(lim, 0), fmt(choix.pi * 100, 0) + " %") +
+        verif(choix.pf <= 1, "Flèche finale (fluage kdef, ψ2) ≤ L/" + fmt(limf, 0) + " (EN 1995 §2.3.2.2)", fmt(choix.pf * 100, 0) + " %") +
+        verif(false, "Déversement, appuis (compression transversale) et vibrations : non vérifiés", "à faire") +
+        verif(null, "Déformation due à l'effort tranchant négligée", "") +
+        verif(null, "SIA 265 : valeurs de calcul non recoupées, EN 1995 utilisé", "");
+      tab = "";
+      var eDessin = choix.E.eM;
+    }
+    h2 += '<h2>Résultat</h2><div class="cles">' + res + '</div>';
+    h2 += '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eDessin, "md [kNm]", "Enveloppe des moments");
+    h2 += '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
+    var Ra = reactions(g);
+    h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
+    h2 += '<h3>Réactions d\'appui de calcul (max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
+    $("#r-poutre").innerHTML = h2;
+  }
+
+  // =====================================================================
+  //  05 — Normes et sources
+  // =====================================================================
+  var NORMES = [
+    ["fcd = ηfc · fck / γc, ηfc = (30/fck)^(1/3) ≤ 1", "SIA 262 éq. (2) et (26)", "ok", "SOFiSTiK, vérification SIA 262 (dce-sia1)"],
+    ["τcd = 0,3 √fck / γc", "SIA 262 éq. (3)", "ok", "SOFiSTiK, vérification SIA 262"],
+    ["γc = 1,5 · γs = 1,15 · fsd = 435 MPa · Es = 205 GPa", "SIA 262 §2.3, §4.2.2", "ok", "SOFiSTiK, vérification SIA 262"],
+    ["Sortes de béton NPK 0, A à G, P1 à P4", "SN EN 206 annexe nationale", "ok", "Holcim Suisse, brochure Betonnorm SN EN 206"],
+    ["Charges utiles A 2,0 · B 3,0 · C3 5,0 kN/m²", "SIA 261", "ok", "neueholzbau.ch, fiche de prédimensionnement"],
+    ["Profilés IPE, HEA, HEB (h, A, masse, Iy, Wpl,y, Avz)", "Tableaux de profilés européens", "ok", "jsoarescorreia.pt, Perfis.pdf"],
+    ["Classes d'exposition XC, XD, XF (descriptions)", "EN 206 tab. 1", "", ""],
+    ["γG = 1,35 · γQ = 1,5", "SIA 260 / EN 1990 éq. 6.10", "", ""],
+    ["Bloc de compression 0,85 x · x/d ≤ 0,35", "SIA 262", "", "Modifiables dans Hypothèses"],
+    ["fctm = 0,30 fck^(2/3)", "EN 1992-1-1 tab. 3.1", "", ""],
+    ["As,min = max(0,26 fctm/fyk ; 0,0013) b d", "EN 1992-1-1 éq. (9.1N)", "", "SIA 262 non codé"],
+    ["VRd,c, k = 1 + √(200/d) ≤ 2, vmin", "EN 1992-1-1 §6.2.2", "", "SIA 262 non codé"],
+    ["Étriers, cot θ de 1 à 2,5, ν1 = 0,6 (1 − fck/250)", "EN 1992-1-1 §6.2.3", "", "SIA 262 non codé"],
+    ["Élancement L/d, K = 1,0 / 1,3 / 1,5 / 0,4", "EN 1992-1-1 éq. (7.16), tab. 7.4N", "", ""],
+    ["Répartition 20 % · voiles 0,002 Ac et 0,001 Ac", "EN 1992-1-1 §9.3.1.1, §9.6.2, §9.6.3", "", ""],
+    ["Poids volumique du béton armé 25 kN/m³", "EN 1991-1-1 tab. A.1", "", ""],
+    ["Portance drainée Nq, Nc, Nγ, facteurs de forme", "EN 1997-1 annexe D", "", "Facteurs SIA 267 à confirmer"],
+    ["K0 = 1 − sin φ' · Ka = tan²(45° − φ'/2)", "Jaky · Rankine", "", "Mur vertical, terrain horizontal, sans frottement"],
+    ["γM1 = 1,05 · E = 210 GPa · fy 235/275/355", "SIA 263 / EN 1993 / EN 10025", "", ""],
+    ["Bois : fm,k, fv,k, E0,mean, ρmean", "EN 338, EN 14080", "", ""],
+    ["kmod 0,8 · γM 1,3 / 1,25 · kdef 0,6 · kcr 0,67", "EN 1995-1-1 tab. 3.1, 2.3, 3.2, §6.1.7", "", "SIA 265 non recoupée"],
+    ["ψ2 = 0,3 (A, B) · 0,6 (C)", "EN 1990 tab. A1.1", "", ""],
+    ["Enrobages par classe d'exposition", "SIA 262", "av", "À saisir dans chaque section"],
+    ["Poinçonnement", "SIA 262 / EN 1992 §6.4", "av", ""],
+    ["Déversement des poutres", "SIA 263 / EN 1993 §6.3.2", "av", ""],
+    ["Limites de flèche", "SIA 260", "av", "Saisies par l'utilisateur"],
+    ["Fissuration, étanchéité des murs enterrés", "SIA 262, SIA 272", "av", ""]
+  ];
+  function rendNormes(){
+    $("#table-normes").innerHTML = '<tr><th>Valeur ou formule</th><th>Référence</th><th>État</th><th>Source, remarque</th></tr>' + NORMES.map(function(n){
+      return '<tr><td class="g">'+esc(n[0])+'</td><td>'+esc(n[1])+'</td><td><span class="etat '+n[2]+'">'+(n[2] === "ok" ? "recoupé" : n[2] === "av" ? "non codé" : "à confirmer")+'</span></td><td class="g">'+esc(n[3])+'</td></tr>' }).join("");
+  }
+
+  // =====================================================================
+  //  Navigation et calcul
+  // =====================================================================
+  var NOMS = {hypotheses:"Hypothèses", fondations:"Fondations", murs:"Murs enterrés", dalles:"Dalles", poutres:"Poutres", normes:"Normes et sources"};
+  var REND = {hypotheses:rendHypotheses, fondations:rendFondations, murs:rendMurs, dalles:rendDalles, poutres:rendPoutres, normes:rendNormes};
+  var courante = "hypotheses", minuterie = null;
+  function calcule(){
+    try { REND[courante]() }
+    catch(e){
+      var hote = document.querySelector("#v-" + courante + " [id^='r-']");
+      if(hote) hote.innerHTML = '<div class="alerte">Calcul impossible : ' + esc(e.message) + '</div>';
+      if(window.console) console.error(e);
+    }
+  }
+  function planifie(){ clearTimeout(minuterie); minuterie = setTimeout(calcule, 180) }
+  function montre(nom){
+    if(!REND[nom]) nom = "hypotheses";
+    courante = nom;
+    document.querySelectorAll(".vue").forEach(function(v){ v.classList.toggle("on", v.id === "v-" + nom) });
+    document.querySelectorAll(".cote a").forEach(function(a){ a.classList.toggle("on", a.getAttribute("data-vue") === nom) });
+    $("#ouvrir-nom").textContent = NOMS[nom];
+    ferme();
+    calcule();
+    window.scrollTo(0, 0);
+  }
+  function ferme(){ $("#cote").classList.remove("ouvert"); $("#voile-cote").classList.remove("ouvert") }
+  $("#ouvrir").addEventListener("click", function(){ $("#cote").classList.add("ouvert"); $("#voile-cote").classList.add("ouvert") });
+  $("#voile-cote").addEventListener("click", ferme);
+  window.addEventListener("hashchange", function(){ montre(location.hash.slice(1)) });
+
+  Object.keys(CHAMPS).forEach(construit);
+  montre(location.hash.slice(1));
+})();
+</script>
+<script src="/assets/menu.js?v=23"></script>
+<script src="/assets/mesure.js?v=2" defer></script>
+</body>
+</html>
