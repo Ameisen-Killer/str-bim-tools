@@ -1495,14 +1495,15 @@ footer a{text-decoration:none}
     var s0 = S.filter(function(v){ return v <= sReq(0) + 1e-9 }).pop();
     if(!s0) return {err:"Même " + S[0] + " mm ne suffit pas au nu : prends un Ø de cadre plus gros ou plus de branches."};
     x = s0 / 2; pos.push(x);
-    while(x < half && garde++ < 2000){
-      var s = S.filter(function(v){ return v <= sReq(x) + 1e-9 }).pop();
-      if(x + s > half + s / 2) break;
+    var s = s0;
+    while(garde++ < 2000){
+      s = S.filter(function(v){ return v <= sReq(x) + 1e-9 }).pop();
+      if(x + s > half) break;
       x += s; pos.push(x); pas.push(s);
     }
     var grp = []; pas.forEach(function(s){ if(grp.length && grp[grp.length - 1].s === s) grp[grp.length - 1].n++; else grp.push({s:s, n:1}) });
-    var reste = L - 2 * pos[pos.length - 1];
-    return {s0:s0, grp:grp, n:2 * pos.length, reste:reste};
+    var reste = L - 2 * pos[pos.length - 1], milieu = reste > s;   // un cadre de plus au milieu si l'écart dépasse s
+    return {s0:s0, grp:grp, n:2 * pos.length + (milieu ? 1 : 0), reste:reste, milieu:milieu};
   }
   function tableCadres(asw, br, d, bw, M){
     var smax = 0.75 * d, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk;
@@ -1514,7 +1515,7 @@ footer a{text-decoration:none}
   function texteRep(R){
     if(R.err) return '<div class="alerte">' + esc(R.err) + '</div>';
     return '<p class="note"><b>Du nu vers mi-portée :</b> ' + fmt(R.s0 / 2, 0) + ' mm' + R.grp.map(function(g){ return " + " + g.n + " × " + g.s }).join("") +
-      ' mm, puis la même suite depuis l\'autre appui ; il reste ' + fmt(R.reste, 0) + ' mm au milieu. Environ ' + R.n + ' cadres par travée.</p>';
+      ' mm, puis la même suite depuis l\'autre appui ; ' + (R.milieu ? "un cadre au milieu, à " + fmt(R.reste / 2, 0) + " mm de ses voisins." : "il reste " + fmt(R.reste, 0) + " mm au milieu.") + ' Soit ' + R.n + ' cadres par travée.</p>';
   }
   function rendCalculette(){
     var M = mat(), mode = val("ch_mode"), bw = num("ch_bw"), c = num("ch_c"), dw = +val("ch_dw"), dg = num("ch_dg"), n = Math.max(1, Math.round(num("ch_n"))), lmax = Math.max(1, Math.round(num("ch_lits")));
