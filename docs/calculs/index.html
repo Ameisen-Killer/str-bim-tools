@@ -647,7 +647,6 @@ footer a{text-decoration:none}
         {id:"da_m", l:"Type de dalle", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true},
         {sep:"Géométrie"}
       ].concat(tr.filter(function(c){ return c.tab !== "da_app" }), [
-        un({id:"da_ho", l:"Épaisseurs optimisées", v:"meme", t:"s", o:[["meme","Identiques sur toutes les travées"],["trav","Différentes par travée"]], si:function(){ return +val("da_n") > 1 }}),
       ], [1, 2, 3, 4, 5].map(function(i){
         return un({id:"da_hopt"+i, l:"Travée "+i+" · épaisseur optimisée", v:"", t:"aff", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur optimisée"});
       }), [1, 2, 3, 4, 5].map(function(i){
@@ -2198,7 +2197,7 @@ footer a{text-decoration:none}
         if(!E.ok) s += '<div class="alerte">Au moins une travée ne passe pas avec ces épaisseurs (voir la dernière colonne).</div>';
         return s + '<h3>Charges</h3>' + schemaCharges(E.R, E.gT, q, pts, "kN/m² (poids propre compris)", "kN/m", "Charges") + schemasEfforts(E.R, E.eM, E.eV, "md [kNm/m]", "vd [kN/m]");
       }
-      var Eu = evalue(T.L.map(function(){ return Rr.h })), parT = n > 1 && val("da_ho") === "trav";
+      var Eu = evalue(T.L.map(function(){ return Rr.h })), parT = n > 1;   // optimisée travée par travée dès deux travées
       var Eo = parT ? optimiseTravees(Rr.h) : Eu;
       Eo.hs.forEach(function(h, i){ var c = $("#c-da_hopt" + (i + 1)); if(c) c.textContent = fmt(h, 2) });
       if(parT) h2 += blocTravees(Eo, "Épaisseurs optimisées par travée", Eu);
