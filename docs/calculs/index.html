@@ -773,13 +773,13 @@ footer{font-size:11.5px}
         {id:"da_m", l:"Type de dalle", v:"un", t:"s", o:[["un","Porteuse dans un sens (bande de 1 m)"],["deux","Plaque rectangulaire (bords au choix)"]], large:true},
         {sep:"Géométrie"}
       ].concat(tr, [1, 2, 3, 4, 5].map(function(i){
-        return un({id:"da_hopt"+i, l:"Travée "+i+" · épaisseur optimisée", v:"", t:"aff", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur optimisée"});
+        return un({id:"da_hopt"+i, l:"Travée "+i+" · épaisseur optimisée", v:"", t:"aff", u:"cm", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur optimisée"});
       }), [1, 2, 3, 4, 5].map(function(i){
-        return un({id:"da_hf"+i, l:"Travée "+i+" · épaisseur forcée", v:"", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur forcée (vide = optimisée)"});
+        return un({id:"da_hf"+i, l:"Travée "+i+" · épaisseur forcée", v:"", u:"cm", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur forcée (vide = optimisée)"});
       }), flechesCalculees("da_").map(un), [
         deux({id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m"}),
         deux({id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m"}),
-        deux({id:"da_hfp", l:"Épaisseur forcée", v:"", u:"m", aide:"Vide = épaisseur optimisée"}),
+        deux({id:"da_hfp", l:"Épaisseur forcée", v:"", u:"cm", aide:"Vide = épaisseur optimisée"}),
         deux({id:"da_bW", l:"Bord gauche", v:"A", t:"s", o:BORD}),
         deux({id:"da_bE", l:"Bord droit", v:"A", t:"s", o:BORD}),
         deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
@@ -2384,6 +2384,8 @@ footer{font-size:11.5px}
   //  03 — Dalles
   // =====================================================================
   function chargeUtile(cat, id){ return cat === "man" ? num(id) : CATEGORIES[cat].q }
+  // épaisseur saisie en cm (20.10.2026) ; une valeur ≤ 2 est lue en m (saisies d'avant) ; rendue en m, 0 si vide
+  function epCm(id){ var v = parseFloat(String(val(id)).replace(",", ".")); return !(v > 0) ? 0 : v > 2 ? v / 100 : v }
   function rendDalles(){
     $("#v-dalles").classList.toggle("pleine", val("da_m") === "un");   // plaque : saisie à gauche, résultats à droite (20.10.2026)
     var M = mat(), g = parTravee("da_") ? 0 : num("da_g"), q = chargeUtile(val("da_cat"), "da_q"), cn = num("da_cn") / 1000, o = num("da_dia") / 1000, rows = [], h2 = "";
@@ -2496,6 +2498,16 @@ footer{font-size:11.5px}
         for(var k = 0; k < 40 && !E.ok; k++){
           hs = hs.map(function(h, i){ return E.tr[i].ok || fixe[i] != null ? h : Math.min(0.50, Math.round((h + 0.01) * 100) / 100) }); E = evalue(hs);
         }
+        // Une travée forcée dont la flèche dépasse dépend aussi de ses voisines (rotation sur l'appui commun, surtout
+        // pour un porte-à-faux) : on épaissit les travées libres voisines tant que sa flèche diminue (20.10.2026)
+        function pireForcee(E){ var m = 0; E.tr.forEach(function(t, i){ if(fixe[i] != null) m = Math.max(m, t.fl || 0) }); return m }
+        for(var k2 = 0; k2 < 40; k2++){
+          var aide = hs.map(function(h, i){ return fixe[i] == null && h < 0.50 - 1e-9 && [i - 1, i + 1].some(function(j){ return fixe[j] != null && E.tr[j] && E.tr[j].fl > 1 }) });
+          if(!aide.some(Boolean)) break;
+          var hs2 = hs.map(function(h, i){ return aide[i] ? Math.round((h + 0.01) * 100) / 100 : h }), E2 = evalue(hs2);
+          if(pireForcee(E2) >= pireForcee(E) - 1e-3) break;
+          hs = hs2; E = E2;
+        }
         return E;
       }
       function tableTravees(E){
@@ -2597,11 +2609,11 @@ footer{font-size:11.5px}
       }
       var Eu = evalue(T.L.map(function(){ return Rr.h })), parT = n > 1;   // optimisée travée par travée dès deux travées
       var Eo = parT ? optimiseTravees(Rr.h) : Eu;
-      Eo.hs.forEach(function(h, i){ var c = $("#c-da_hopt" + (i + 1)); if(c) c.textContent = fmt(h, 2) });
+      Eo.hs.forEach(function(h, i){ var c = $("#c-da_hopt" + (i + 1)); if(c) c.textContent = fmt(h * 100, 0) });
       if(parT) h2 += blocTravees(Eo, "Épaisseurs optimisées par travée", Eu);
       else h2 += '<h3>Ferraillage par travée, épaisseur identique</h3>' + tableTravees(Eu) + schemaArmatures(Eu);
       // Épaisseurs forcées : une case remplie fixe sa travée, les autres restent optimisées
-      var fixe = T.L.map(function(l, i){ var v = parseFloat(String(val("da_hf" + (i + 1))).replace(",", ".")); return isFinite(v) && v > 0 ? Math.min(1.5, Math.max(0.06, v)) : null });
+      var fixe = T.L.map(function(l, i){ var v = epCm("da_hf" + (i + 1)); return v > 0 ? Math.min(1.5, Math.max(0.06, v)) : null });
       if(fixe.some(function(v){ return v != null })){
         var Ef;
         if(parT) Ef = optimiseTravees(Rr.h, fixe);
@@ -2659,7 +2671,7 @@ footer{font-size:11.5px}
       }
       for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01) rows.push(ligne(h));
       // épaisseur forcée (20.10.2026) : calculée telle quelle, même si elle ne passe pas
-      var hF = parseFloat(String(val("da_hfp")).replace(",", ".")), rF = hF > 0 ? ligne(Math.max(hF, cn + 2 * o + 0.03)) : null;
+      var hF = epCm("da_hfp"), rF = hF > 0 ? ligne(Math.max(hF, cn + 2 * o + 0.03)) : null;
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
       if(io < 0 && !rF){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
       var Rr = rF || rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"}, dxR = Rr.h - cn - o / 2;
