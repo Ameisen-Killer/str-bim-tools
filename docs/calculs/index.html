@@ -645,7 +645,7 @@ footer{font-size:11.5px}
     var n = T.L.length;
     for(var i = 1; i <= 5; i++){
       var cl = $("#c-" + p + "wlim" + i);
-      if(cl) cl.textContent = i <= n ? fmt(((i === 1 && T.ga === "L") || (i === n && T.dr === "L") ? 2 : 1) * T.L[i-1] / T.lim[i-1] * 1000, 1) + " mm" : "—";
+      if(cl) cl.textContent = i <= n ? fmt(T.L[i-1] / T.lim[i-1] * 1000, 1) + " mm" : "—";
       var c = $("#c-" + p + "wcal" + i); if(c) c.textContent = fl && fl[i-1] != null ? fmt(Math.abs(fl[i-1]) * 1000, 1) + " mm · " + fmt(ratios[i-1] * 100, 0) + " %" : "—" }
   }
   function ponctuelles(p, unite){
@@ -1288,10 +1288,9 @@ footer{font-size:11.5px}
     });
     return {max:wMax, min:wMin, fl:fl};
   }
-  // Flèche rapportée à la limite de chaque travée : |w| / (L / lim), porte-à-faux : 2 L
+  // Flèche rapportée à la limite de chaque travée : |w| / (L / lim) ; porte-à-faux : L = longueur de la console (Tony, 20.10.2026)
   function ratiosFleche(T, fl, lim){
-    var n = T.L.length;
-    return fl.map(function(w, i){ var porte = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L"); return Math.abs(w) / ((porte ? 2 : 1) * T.L[i] / (Array.isArray(lim) ? lim[i] : lim)) });
+    return fl.map(function(w, i){ return Math.abs(w) / (T.L[i] / (Array.isArray(lim) ? lim[i] : lim)) });
   }
   // Courbure d'une section rectangulaire en béton armé, EN 1992 §7.4.3 : κ = ζ κII + (1 − ζ) κI (7.18),
   // ζ = 1 − β (Mcr / M)², β = 0,5 (7.19), Ec,eff = Ecm / (1 + φ) (7.20). État I : section brute ; état II : fissuré,
@@ -2354,7 +2353,7 @@ footer{font-size:11.5px}
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
         verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
         verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16), travée la plus défavorable", fmt(Rr.ld * 100, 0) + " % de la limite") +
-        verif(Rr.fl <= 1, "Flèche à long terme ≤ L / limite de chaque travée (EN 1992 §7.4.1(4), §7.4.3, porte-à-faux : 2 L), retrait non compté", fmt(Rr.fl * 100, 0) + " % de la limite") +
+        verif(Rr.fl <= 1, "Flèche à long terme ≤ L / limite de chaque travée (EN 1992 §7.4.1(4), §7.4.3, porte-à-faux : L = longueur de la console), retrait non compté", fmt(Rr.fl * 100, 0) + " % de la limite") +
         verif(null, "Charges variables placées travée par travée (enveloppe), γG uniforme", "") +
         verif(null, "Effort tranchant selon SIA 262 (kd) : non codé, EN 1992 utilisé", "") + '</ul>';
       // ---- Épaisseurs par travée : optimisées travée par travée et / ou forcées (19.10.2026)
@@ -2655,7 +2654,7 @@ footer{font-size:11.5px}
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
         verif(true, "Bielles comprimées (EN 1992 éq. 6.9), cot θ = " + fmt(Rr.cot, 1), fmt(Rr.E.Vd, 0) + " ≤ " + fmt(Rr.vmax, 0) + " kN") +
         verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16)", fmt(Rr.ld * 100, 0) + " % de la limite") +
-        verif(Rr.D.ratio <= 1, "Flèche à long terme ≤ L / limite de chaque travée (EN 1992 §7.4.1(4), §7.4.3, porte-à-faux : 2 L), retrait non compté", fmt(Rr.D.wmax * 1000, 1) + " mm · " + fmt(Rr.D.ratio * 100, 0) + " % de la limite") +
+        verif(Rr.D.ratio <= 1, "Flèche à long terme ≤ L / limite de chaque travée (EN 1992 §7.4.1(4), §7.4.3, porte-à-faux : L = longueur de la console), retrait non compté", fmt(Rr.D.wmax * 1000, 1) + " mm · " + fmt(Rr.D.ratio * 100, 0) + " % de la limite") +
         verif(null, "Effort tranchant selon SIA 262 (champ de compression) : non codé, EN 1992 §6.2.3 utilisé", "");
       tab = '<h3>Coût selon la hauteur</h3>' + schemaCout(rows, io, "hauteur");
       var eDessin = Rr.E.eM, ED = Rr.E, DD = Rr.D;
@@ -2680,7 +2679,7 @@ footer{font-size:11.5px}
         cle("md", fmt(choix.Md, 1), "kNm", "MRd = " + fmt(choix.MRd, 1)) + cle("vd", fmt(choix.E.Vd, 1), "kN", "VRd = " + fmt(choix.VRd, 0)) + cle("Flèche", fmt(choix.D.wmax * 1000, 1), "mm", fmt(choix.fl * 100, 0) + " % de la limite");
       verifs = verif(choix.Md <= choix.MRd, "Flexion plastique MRd = fy · Wpl,y / γM1 (section de classe 1 ou 2 supposée)", fmt(choix.Md, 1) + " ≤ " + fmt(choix.MRd, 1) + " kNm") +
         verif(choix.E.Vd <= choix.VRd, "Effort tranchant VRd = Avz · fy / (√3 · γM1)", fmt(choix.E.Vd, 0) + " ≤ " + fmt(choix.VRd, 0) + " kN") +
-        verif(choix.fl <= 1, "Flèche sous charges caractéristiques ≤ L / limite de chaque travée (porte-à-faux : 2 L)", fmt(choix.fl * 100, 0) + " %") +
+        verif(choix.fl <= 1, "Flèche sous charges caractéristiques ≤ L / limite de chaque travée (porte-à-faux : L = longueur de la console)", fmt(choix.fl * 100, 0) + " %") +
         verif(false, "Déversement (SIA 263) : non vérifié, poutre supposée tenue latéralement", "à faire") +
         verif(null, "Interaction M–V, voilement local et classe de section : non vérifiés", "");
       tab = '<h3>Profilés essayés</h3><div class="defile"><table><tr><th>Profilé</th><th>kg/m</th><th>md / MRd</th><th>vd / VRd</th><th>Flèche</th></tr>' + essais.slice(-6).map(function(e){
