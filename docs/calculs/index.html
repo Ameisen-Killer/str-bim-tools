@@ -2563,8 +2563,8 @@ footer{font-size:11.5px}
         var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pu = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
         var E = lirePlaque(Pl, coefs(pu));
         r.mx = E.mx; r.my = E.my; r.E = E;
-        var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M), amin = asMin(1, dy, M);
-        r.Asx = Math.max(fx.As, amin); r.Asy = Math.max(fy.As, amin);
+        var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M);   // armature minimale avec le d de chaque nappe (20.10.2026)
+        r.Asx = Math.max(fx.As, asMin(1, dx, M)); r.Asy = Math.max(fy.As, asMin(1, dy, M));
         var ms = Math.max(E.W, E.E, E.S, E.N), fs = flexion(ms, 1, dx, M);
         r.Ass = ms > 0.01 ? Math.max(fs.As, asMin(1, dx, M)) : 0; r.ms = ms;
         r.xd = Math.max(fx.xd, fy.xd, fs.xd);
