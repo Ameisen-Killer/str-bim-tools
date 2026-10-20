@@ -1074,12 +1074,13 @@ footer{font-size:11.5px}
     var vmin = 0.035 * Math.pow(k, 1.5) * Math.sqrt(M.fck);
     return Math.max(v, vmin) * bm * dm / 1000;
   }
-  // Élancement limite EN 1992-1-1 éq. (7.16a/b), sans armature comprimée
-  function ldLim(K, rho, fck){
-    var r0 = Math.sqrt(fck) * 1e-3, sf = Math.sqrt(fck);
+  // Élancement limite EN 1992-1-1 éq. (7.16a/b), sans armature comprimée ; l [m] : au-delà de 7 m, × 7 / l
+  // (§7.4.2(2), cloisons fragiles, appliqué par prudence, 20.10.2026)
+  function ldLim(K, rho, fck, l){
+    var r0 = Math.sqrt(fck) * 1e-3, sf = Math.sqrt(fck), f = l > 7 ? 7 / l : 1;
     rho = Math.max(rho, 1e-5);
-    if(rho <= r0) return K * (11 + 1.5 * sf * r0 / rho + 3.2 * sf * Math.pow(r0 / rho - 1, 1.5));
-    return K * (11 + 1.5 * sf * r0 / rho);
+    if(rho <= r0) return f * K * (11 + 1.5 * sf * r0 / rho + 3.2 * sf * Math.pow(r0 / rho - 1, 1.5));
+    return f * K * (11 + 1.5 * sf * r0 / rho);
   }
   // Choix de barres
   function barresM(As){       // nappe, par mètre
@@ -1122,7 +1123,7 @@ footer{font-size:11.5px}
       c.p.forEach(function(p){ pts.push(p[0]) });
     });
     pts = pts.filter(function(x){ return x >= -1e-9 && x <= X + 1e-9 }).sort(function(a, b){ return a - b });
-    var xs = [], tol = X * 1e-7;
+    var xs = [], tol = Math.max(X * 1e-7, 1e-3);   // nœuds fusionnés à 1 mm près
     pts.forEach(function(x){ if(!xs.length || x - xs[xs.length - 1] > tol) xs.push(Math.min(Math.max(x, 0), X)) });
     xs[xs.length - 1] = X;
     var nn = xs.length, nd = 2 * nn, bw = 3, K = [], i, j;
@@ -1306,8 +1307,8 @@ footer{font-size:11.5px}
       // w(x) = −W + C1 (x − a) + C0
       var libreG = R.types[0] === "L", libreD = R.types[n] === "L";
       tr.forEach(function(s, i){ if(!((i === 0 && libreG) || (i === n - 1 && libreD))) C[i] = [0, s.W[s.e] / s.l] });
-      if(libreG){ var s0 = tr[0], sb = n > 1 && C[1] ? C[1][1] : 0, c1 = sb + s0.t[s0.e]; C[0] = [s0.W[s0.e] - c1 * s0.l, c1] }
-      if(libreD){ var sa = n > 1 && C[n-2] ? -tr[n-2].t[tr[n-2].e] + C[n-2][1] : 0; C[n-1] = [0, sa] }
+      if(libreG){ var s0 = tr[0], sb = n > 1 && C[1] && R.types[1] !== "E" ? C[1][1] : 0, c1 = sb + s0.t[s0.e]; C[0] = [s0.W[s0.e] - c1 * s0.l, c1] }
+      if(libreD){ var sa = n > 1 && C[n-2] && R.types[n-1] !== "E" ? -tr[n-2].t[tr[n-2].e] + C[n-2][1] : 0; C[n-1] = [0, sa] }
       var fc = tr.map(function(s, i){
         var best = 0;
         s.ks.forEach(function(k, j){ var v = -s.W[j] + C[i][1] * (R.x[k] - ax[i]) + C[i][0]; w[k] = v; if(Math.abs(v) > Math.abs(best)) best = v });
@@ -1458,7 +1459,7 @@ footer{font-size:11.5px}
     // Moments de dimensionnement de Wood-Armer (20.10.2026) : inférieur mx* = mx + |mxy|, my* = my + |mxy| ;
     // supérieur mx* = mx − |mxy|, my* = my − |mxy| ; si l'un change de signe, il est annulé et l'autre vaut m + mxy² / |m|.
     // mx, my : inférieurs (positifs) ; tx, ty : supérieurs (valeurs positives) ; mx0, my0 : moments sans torsion ; w : flèche max.
-    var r = {mx:0, my:0, tx:0, ty:0, mx0:0, my0:0, w:0, W:0, E:0, S:0, N:0, lib:0, v:0}, i, j, n;
+    var r = {mx:0, my:0, tx:0, ty:0, mx0:0, my0:0, mx0n:0, my0n:0, w:0, W:0, E:0, S:0, N:0, lib:0, v:0}, i, j, n;
     for(n = 0; n < nn; n++){
       var a = comb("mx", n), b = comb("my", n), t = Math.abs(comb("mxy", n)), ix = a + t, iy = b + t, sx = a - t, sy = b - t;
       if(ix < 0 && iy < 0){ ix = 0; iy = 0 }
@@ -1468,7 +1469,7 @@ footer{font-size:11.5px}
       else if(sx > 0){ sx = 0; sy = b - t * t / Math.max(Math.abs(a), 1e-9) }
       else if(sy > 0){ sy = 0; sx = a - t * t / Math.max(Math.abs(b), 1e-9) }
       r.mx = Math.max(r.mx, ix); r.my = Math.max(r.my, iy); r.tx = Math.max(r.tx, -sx); r.ty = Math.max(r.ty, -sy);
-      r.mx0 = Math.max(r.mx0, a); r.my0 = Math.max(r.my0, b); r.w = Math.max(r.w, comb("wn", n));
+      r.mx0 = Math.max(r.mx0, a); r.my0 = Math.max(r.my0, b); r.mx0n = Math.min(r.mx0n, a); r.my0n = Math.min(r.my0n, b); r.w = Math.max(r.w, comb("wn", n));
     }
     function arete(liste, champ, type, cote){
       liste.forEach(function(n, t){
@@ -1522,7 +1523,7 @@ footer{font-size:11.5px}
       phiRH:phiRH, bf:bf, t0a:t0a, bt0:bt0, phi0:phi0, bH:bH, phit: phi0 * bc(t)};
   }
   function rendMateriaux(){
-    var fck = fckDe(val("ma_cl")), cim = val("ma_cim"), t = Math.max(0.5, num("ma_t")), RH = Math.min(100, Math.max(20, num("ma_RH")));
+    var fck = fckDe(val("ma_cl")), cim = val("ma_cim"), t = Math.max(0.5, num("ma_t")), RH = Math.min(100, Math.max(40, num("ma_RH")));   // annexe B : 40 à 100 %
     var h0 = 2000 * num("ma_Ac") / Math.max(num("ma_u"), 1e-6), ts = num("ma_ts"), t0 = Math.max(1, num("ma_t0"));
     var A = betonAge(fck, cim, t), R = retraitFluage(fck, cim, RH, h0, ts, t0, t);
     var h = '<h2>Béton à ' + fmt(t, 0) + ' jours</h2><div class="cles">' +
@@ -1643,7 +1644,7 @@ footer{font-size:11.5px}
     hh += '<h2>Armatures</h2><div class="cles">' + cle("As nécessaire", fmt(As, 0), "mm²", fmt(ratio * 100, 2) + " % de Ac", true) +
       cle("Proposition", prop ? fmt(prop.a, 0) : "—", "mm²", prop ? prop.t : "à répartir") +
       cle("As,min", fmt(Asmin, 0), "mm²", "§9.5.2(2)") + cle("As,max", fmt(Asmax, 0), "mm²", "0,04 Ac") + '</div>';
-    var oc = prop ? Math.max(6, Math.ceil(prop.o / 4)) : 8, sc = prop ? Math.min(20 * prop.o, Math.min(b, h), 400) : 0;
+    var oc = prop ? Math.max(6, Math.ceil(prop.o / 4)) : 8, sc = prop ? Math.min(20 * prop.o, circ ? h : Math.min(b, h), 400) : 0;
     hh += '<ul class="verifs">' + verif(As <= Asmax, "As ≤ 0,04 Ac hors recouvrements (§9.5.2(3))", fmt(ratio * 100, 2) + " %") +
       verif(null, "Cadres Ø" + oc + " au moins (§9.5.3(1)), espacement ≤ " + fmt(sc, 0) + " mm (§9.5.3(3), réduit de 40 % près des extrémités et des recouvrements)", "") +
       verif(null, "Flexion dans le plan de " + (circ ? "D" : "h") + " seulement ; flexion déviée (§5.8.9) non vérifiée", "") +
@@ -1673,7 +1674,7 @@ footer{font-size:11.5px}
     var rx = num("pc_Asx") / (1000 * d), ry = num("pc_Asy") / (1000 * d), rho = Math.min(0.02, Math.sqrt(rx * ry));
     var k = Math.min(2, 1 + Math.sqrt(200 / d)), fcd = M.fcdEC;
     var vRdc = Math.max(0.18 / M.gc * k * Math.pow(100 * rho * M.fck, 1/3), 0.035 * Math.pow(k, 1.5) * Math.sqrt(M.fck));
-    var beta = String(val("pc_beta")).trim() === "auto" ? {int:1.15, bord:1.4, angle:1.5}[pos] : num("pc_beta") || 1.15;
+    var beta = String(val("pc_beta")).trim() === "auto" ? {int:1.15, bord:1.4, angle:1.5}[pos] : num("pc_beta") || {int:1.15, bord:1.4, angle:1.5}[pos];
     var u1 = circ ? Math.PI * (D + 4 * d) : pos === "int" ? 2 * (c1 + c2) + 4 * Math.PI * d : pos === "bord" ? 2 * c1 + c2 + 2 * Math.PI * d : c1 + c2 + Math.PI * d;
     var u0 = circ ? Math.PI * D : pos === "int" ? 2 * (c1 + c2) : pos === "bord" ? Math.min(c2 + 3 * d, c2 + 2 * c1) : Math.min(3 * d, c1 + c2);
     var vEd = beta * V / (u1 * d), vEd0 = beta * V / (u0 * d), nu = 0.6 * (1 - M.fck / 250), vmax = num("pc_k") * nu * fcd;
@@ -1728,7 +1729,7 @@ footer{font-size:11.5px}
       cle("As posée", fmt(As, 0), "mm²", "Ø" + o + " e = " + cmE(s) + " cm") + '</div><ul class="verifs">' +
       verif(wk <= wmax, "wk ≤ wmax (EN 1992 tab. 7.1N, combinaison quasi permanente)", fmt(wk, 3) + " ≤ " + fmt(wmax, 2) + " mm") +
       verif(As >= Asmin, "Armature minimale de fissuration As,min = kc k fct,eff Act / σs (§7.3.2, kc = 0,4 flexion, σs = fyk)", fmt(As, 0) + " ≥ " + fmt(Asmin, 0) + " mm²") +
-      verif(ss <= 0.8 * M.fsk, "σs ≤ 0,8 fyk (§7.2(5))", fmt(ss, 0) + " ≤ " + fmt(0.8 * M.fsk, 0) + " MPa") +
+      verif(ss <= 0.8 * M.fsk, "σs ≤ 0,8 fyk (§7.2(5), à faire sous combinaison caractéristique : ici sous le moment saisi, indicatif)", fmt(ss, 0) + " ≤ " + fmt(0.8 * M.fsk, 0) + " MPa") +
       verif(null, "Flexion simple, k1 = 0,8 (barres HA), k2 = 0,5, k3 = 3,4, k4 = 0,425 (valeurs recommandées)", "") +
       verif(null, "SIA 262 maîtrise la fissuration par des contraintes limites de l'armature : non codée, EN 1992 utilisé", "") + '</ul>';
     $("#r-fi").innerHTML = hh;
@@ -1822,9 +1823,9 @@ footer{font-size:11.5px}
     return {s0:s0, grp:grp, n:2 * pos.length + (milieu ? 1 : 0), reste:reste, milieu:milieu};
   }
   function tableCadres(asw, br, d, bw, M){
-    var smax = 0.75 * d, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk;
+    var smax = 0.75 * d * 1000, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk;   // d en m, s en mm
     return '<div class="defile"><table><tr><th>Ø</th><th>Asw par file</th><th>s calculé</th><th>s retenu</th><th>Asw/s obtenu</th></tr>' + [6, 8, 10, 12].map(function(o){
-      var A = br * aHA(o), s = A / Math.max(asw, rmin * bw * 1000) * 1000, sr = Math.floor(Math.min(s, smax) / 25) * 25;
+      var A = br * aHA(o), s = A / Math.max(asw, rmin * bw * 1e6) * 1000, sr = Math.floor(Math.min(s, smax) / 25) * 25;
       return '<tr' + (sr < 75 ? ' class="ko"' : "") + '><td>Ø' + o + '</td><td>' + fmt(A, 0) + ' mm²</td><td>' + fmt(s / 10, 1) + ' cm</td><td>' + (sr < 75 ? "trop serré" : cmE(sr) + " cm") + '</td><td>' + (sr < 75 ? "—" : fmt(A / sr * 10, 2) + " cm²/m") + '</td></tr>';
     }).join("") + '</table></div>';
   }
@@ -1945,7 +1946,7 @@ footer{font-size:11.5px}
   // =====================================================================
   function rendSoutenement(){
     var M = mat(), H = num("so_H"), t = num("so_t"), e = num("so_e"), pa = num("so_pa"), ta = num("so_ta"), g = num("so_g"), phi = num("so_phi") * Math.PI / 180, q = num("so_q");
-    var B = pa + t + ta, Hv = H + e, Ka = Math.pow(Math.tan(Math.PI / 4 - phi / 2), 2), D = num("so_D");
+    var B = pa + t + ta, Hv = H + e, phiK = Math.atan(Math.tan(phi) / num("so_gphi")), Ka = Math.pow(Math.tan(Math.PI / 4 - phiK / 2), 2), D = num("so_D");   // γφ aussi sur le remblai
     var W = [[GAMMA_BA * t * H, pa + t / 2, "Rideau"], [GAMMA_BA * e * B, B / 2, "Semelle"], [g * H * ta, pa + t + ta / 2, "Terre sur le talon"], [num("so_g") * Math.max(D - e, 0) * pa, pa / 2, "Terre sur le patin"]];
     var Qv = q * ta, xQ = pa + t + ta / 2, Pa = 0.5 * Ka * g * Hv * Hv, Pq = Ka * q * Hv;
     var SW = 0, SWx = 0; W.forEach(function(w){ SW += w[0]; SWx += w[0] * w[1] });
@@ -1963,7 +1964,7 @@ footer{font-size:11.5px}
         var Nc = phif > 1e-6 ? (Nq - 1) / Math.tan(phif) : Math.PI + 2, Ng = 2 * (Nq - 1) * Math.tan(phif), m = 2;
         var base = 1 - Hd / (V + Bp * c / Math.max(Math.tan(phif), 1e-9));
         base = Math.max(base, 0);
-        var iq = Math.pow(base, m), ig = Math.pow(base, m + 1), ic = phif > 1e-6 ? iq - (1 - iq) / (Nc * Math.tan(phif)) : 1 - m * Hd / (Bp * c * Nc);
+        var iq = Math.pow(base, m), ig = Math.pow(base, m + 1), ic = phif > 1e-6 ? iq - (1 - iq) / (Nc * Math.tan(phif)) : c > 0 && Bp > 0 ? 0.5 * (1 + Math.sqrt(Math.max(0, 1 - Hd / (Bp * c)))) : 0;   // non drainé : EN 1997 D.3
         qRd = (c * Nc * ic + num("so_g") * D * Nq * iq + 0.5 * num("so_g2") * Bp * Ng * ig) / num("so_gRv");
       }
       return {V:V, ex:ex, Bp:Bp, s: Bp > 0 ? V / Bp : Infinity, qRd:qRd, xR:xR};
@@ -1974,8 +1975,11 @@ footer{font-size:11.5px}
     var MR = M.gG * Ka * g * H * H * H / 6 + M.gQ * Ka * q * H * H / 2, VR = M.gG * Ka * g * H * H / 2 + M.gQ * Ka * q * H;
     var fR = flexion(MR, 1, dR, M), AsR = Math.max(fR.As, asMin(1, dR, M)), vrR = vRdc(1, dR, AsR, M);
     // patin et talon : réaction uniforme sur B' (Meyerhof), combinaison C1
-    var dS = e - cn - o / 2, sd = C1.s, Mp = (sd - M.gG * GAMMA_BA * e) * pa * pa / 2;
-    var desc = M.gG * (g * H + GAMMA_BA * e) + M.gQ * q, rem = Math.max(0, C1.Bp - pa - t), Mt = desc * ta * ta / 2 - sd * Math.min(rem, ta) * Math.min(rem, ta) / 2;
+    // zone comprimée B' placée du côté de la résultante (ex > 0 : côté patin), 20.10.2026
+    var dS = e - cn - o / 2, sd = C1.s, x0 = C1.ex >= 0 ? 0 : B - C1.Bp;
+    function reaction(u1, u2, rac){ var s1 = Math.max(u1, x0), s2 = Math.min(u2, x0 + C1.Bp); return s2 > s1 ? sd * (s2 - s1) * Math.abs((s1 + s2) / 2 - rac) : 0 }
+    var Mp = reaction(0, pa, pa) - M.gG * GAMMA_BA * e * pa * pa / 2;
+    var desc = M.gG * (g * H + GAMMA_BA * e) + M.gQ * q, Mt = desc * ta * ta / 2 - reaction(pa + t, B, pa + t);
     var fP = flexion(Math.max(Mp, 0), 1, dS, M), fT = flexion(Math.max(Mt, 0), 1, dS, M);
     var h = '<h2>Stabilité (par mètre de mur)</h2><div class="cles">' + cle("Largeur B", fmt(B, 2), "m", "patin " + fmt(pa, 2) + " + rideau " + fmt(t, 2) + " + talon " + fmt(ta, 2)) +
       cle("Ka", fmt(Ka, 3), "", "Rankine, écran fictif au droit du talon") + cle("Poussée", fmt(Pa, 1) + " + " + fmt(Pq, 1), "kN/m", "terres + surcharge, caractéristiques") +
@@ -2221,7 +2225,7 @@ footer{font-size:11.5px}
     Nq = Math.exp(Math.PI * Math.tan(phi)) * Math.pow(Math.tan(Math.PI / 4 + phi / 2), 2);
     Nc = phi > 1e-6 ? (Nq - 1) / Math.tan(phi) : Math.PI + 2;
     Ng = 2 * (Nq - 1) * Math.tan(phi);
-    if(!filante){ var r = Bp / Lp; sq = 1 + r * Math.sin(phi); sg = 1 - 0.3 * r; sc = (sq * Nq - 1) / Math.max(Nq - 1, 1e-9) }
+    if(!filante){ var r = Bp / Lp; sq = 1 + r * Math.sin(phi); sg = 1 - 0.3 * r; sc = Nq - 1 > 1e-6 ? (sq * Nq - 1) / (Nq - 1) : 1 + 0.2 * r }   // φ = 0 : EN 1997 D.3
     var R = c * Nc * sc + q * Nq * sq + 0.5 * g2 * Bp * Ng * sg;
     return {qRd: R / num("fo_gR"), Nq:Nq, Nc:Nc, Ng:Ng, phid: phi * 180 / Math.PI};
   }
@@ -2412,7 +2416,7 @@ footer{font-size:11.5px}
         r.D.txt = txtD; r.fl = Math.max.apply(null, ratiosFleche(T, r.D.fl, T.lim));
         if(r.fl > 1){ r.ok = false; r.raisons.push("flèche") }
         var rho = r.Asp / (d * 1e6), pire = 0;
-        T.L.forEach(function(l, i){ var lim = ldLim(Ks[i], rho, M.fck), ratio = l / d / lim; pire = Math.max(pire, ratio) });
+        T.L.forEach(function(l, i){ var con = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L"), lim = ldLim(Ks[i], con ? r.Asn / (d * 1e6) : rho, M.fck, l), ratio = l / d / lim; pire = Math.max(pire, ratio) });
         r.ld = pire;
         if(pire > 1){ r.ok = false; r.raisons.push("élancement") }
         // métré : inférieure sur toute la longueur, supérieure sur 0,3 L de part et d'autre des appuis continus et encastrés,
@@ -2457,7 +2461,8 @@ footer{font-size:11.5px}
         if(!fp.ok || !fn.ok){ r.ok = false; r.raisons.push("flexion") }
         r.vr = vRdc(1, d, r.Asn > 0 ? Math.min(r.Asp, r.Asn) : r.Asp, M);
         if(Vd > r.vr){ r.ok = false; r.raisons.push("tranchant") }
-        r.ld = l / d / ldLim(Ks[i], r.Asp / (d * 1e6), M.fck);
+        var con = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L");   // console : armature tendue en haut
+        r.ld = l / d / ldLim(Ks[i], (con ? r.Asn : r.Asp) / (d * 1e6), M.fck, l);
         if(r.ld > 1){ r.ok = false; r.raisons.push("élancement") }
         var Ls = (i > 0 || T.ga === "E" ? 0.3 * l : 0) + (i < n - 1 || T.dr === "E" ? 0.3 * l : 0) + ((i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L") ? 0.7 * l : 0);
         r.acier = (kgDe(r.Asp, l) * 1.2 + kgDe(r.Asn, Ls) * 1.2) / l;
@@ -2470,7 +2475,14 @@ footer{font-size:11.5px}
         var f = facteurs(T.L, pts, 0, q, M.gG, M.gQ, gT), eM = enveloppe(Rx.M, f.perm, f.vari), eV = enveloppe(Rx.V, f.perm, f.vari);
         var tr = T.L.map(function(l, i){
           var a = Rx.ax[i], b = Rx.ax[i + 1], Mp = 0, Mn = 0, Vd = 0;
-          Rx.x.forEach(function(x, k){ if(x < a - 1e-9 || x > b + 1e-9) return; Mp = Math.max(Mp, eM.max[k]); Mn = Math.max(Mn, -eM.min[k]); Vd = Math.max(Vd, eV.max[k], -eV.min[k]) });
+          Rx.x.forEach(function(x, k){
+            if(x < a - 1e-9 || x > b + 1e-9) return;
+            Mp = Math.max(Mp, eM.max[k]); Mn = Math.max(Mn, -eM.min[k]);
+            // sur un appui, deux points : fin de l'élément de gauche, début de celui de droite ; V pris du côté de la travée
+            if(Math.abs(x - a) < 1e-9 && k > 0 && Math.abs(Rx.x[k - 1] - a) > 1e-9 && i > 0) return;
+            if(Math.abs(x - b) < 1e-9 && k < Rx.x.length - 1 && Math.abs(Rx.x[k + 1] - b) > 1e-9) return;
+            Vd = Math.max(Vd, eV.max[k], -eV.min[k]);
+          });
           return verifTravee(i, hs[i], Mp, Mn, Vd);
         });
         var kT = tr.map(function(t){ return courbureBA(1, t.h, t.d, t.Asp, t.d, t.Asn > 0 ? t.Asn : asMin(1, t.d, M), M.fck, phi, M.Es) });
@@ -2615,11 +2627,12 @@ footer{font-size:11.5px}
       }
       var Eu = evalue(T.L.map(function(){ return Rr.h })), parT = n > 1;   // optimisée travée par travée dès deux travées
       var Eo = parT ? optimiseTravees(Rr.h) : Eu;
+      if(parT && Eu.ok && (!Eo.ok || Eu.cout <= Eo.cout)) Eo = Eu;   // l'épaisseur identique peut être la meilleure
       Eo.hs.forEach(function(h, i){ var c = $("#c-da_hopt" + (i + 1)); if(c) c.textContent = fmt(h * 100, 0) });
       if(parT) h2 += blocTravees(Eo, "Épaisseurs optimisées par travée", Eu);
       else h2 += '<h3>Ferraillage par travée, épaisseur identique</h3>' + tableTravees(Eu) + schemaArmatures(Eu);
       // Épaisseurs forcées : une case remplie fixe sa travée, les autres restent optimisées
-      var fixe = T.L.map(function(l, i){ var v = epCm("da_hf" + (i + 1)); return v > 0 ? Math.min(1.5, Math.max(0.06, v)) : null });
+      var fixe = T.L.map(function(l, i){ var v = epCm("da_hf" + (i + 1)); return v > 0 ? Math.min(1.5, Math.max(cn + 2 * o + 0.03, v)) : null });
       if(fixe.some(function(v){ return v != null })){
         var Ef;
         if(parT) Ef = optimiseTravees(Rr.h, fixe);
@@ -2654,23 +2667,28 @@ footer{font-size:11.5px}
         r.mx = E.mx; r.my = E.my; r.E = E;
         var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M);   // armature minimale avec le d de chaque nappe (20.10.2026)
         r.Asx = Math.max(fx.As, asMin(1, dx, M)); r.Asy = Math.max(fy.As, asMin(1, dy, M));
-        var ms = Math.max(E.W, E.E, E.S, E.N), fs = flexion(ms, 1, dx, M);
-        r.Ass = ms > 0.01 ? Math.max(fs.As, asMin(1, dx, M)) : 0; r.ms = ms;
+        var ms = Math.max(E.W, E.E, E.S, E.N), msx = Math.max(E.W, E.E), msy = Math.max(E.S, E.N);   // bords bas / haut : nappe y, dy
+        var fsx = flexion(msx, 1, dx, M), fsy = flexion(msy, 1, dy, M), fs = {ok: fsx.ok && fsy.ok, xd: Math.max(fsx.xd, fsy.xd)};
+        r.Ass = ms > 0.01 ? Math.max(msx > 0.01 ? Math.max(fsx.As, asMin(1, dx, M)) : 0, msy > 0.01 ? Math.max(fsy.As, asMin(1, dy, M)) : 0) : 0; r.ms = ms;
         r.xd = Math.max(fx.xd, fy.xd, fs.xd);
         if(!fx.ok || !fy.ok || !fs.ok){ r.ok = false; r.raisons.push("flexion (x/d)") }
         r.Vd = E.v; r.vr = vRdc(1, dx, Math.max(r.Ass, Math.min(r.Asx, r.Asy)), M);
         if(r.Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
-        r.ld = lref / dx / ldLim(Kd, Math.max(r.Asx, r.Asy) / (dx * 1e6), M.fck);
+        r.ld = lref / dx / ldLim(Kd, Math.max(r.Asx, r.Asy) / (dx * 1e6), M.fck, lref);
         if(r.ld > 1){ r.ok = false; r.raisons.push("élancement") }
         // flèche à long terme, quasi permanente (20.10.2026) : flèche élastique de la plaque × (1 − ν²) κ(m) / m,
         // κ fissurée EN 1992 §7.4.3 dans la direction la plus sollicitée (la plus souple des deux)
         var Eq = lirePlaque(Pl, coefs(g + GAMMA_BA * h + psi2 * q, num("da_pt")));
-        var kx = courbureBA(1, h, dx, r.Asx, dx, asMin(1, dx, M), M.fck, phi, M.Es), ky = courbureBA(1, h, dy, r.Asy, dy, asMin(1, dy, M), M.fck, phi, M.Es);
-        var mqx = Math.max(Eq.mx0, 0.01), mqy = Math.max(Eq.my0, 0.01);
-        r.w = Eq.w * (1 - nu * nu) * Math.max(kx(mqx) / mqx, ky(mqy) / mqy); r.wl = lref / plim; r.fl = r.w / r.wl;
+        // armature supérieure pour la courbure sous moment négatif (bords encastrés, consoles) : Wood-Armer supérieur
+        var Atx = Math.max(E.tx > 0.01 ? flexion(E.tx, 1, dx, M).As : 0, asMin(1, dx, M)), Aty = Math.max(E.ty > 0.01 ? flexion(E.ty, 1, dy, M).As : 0, asMin(1, dy, M));
+        var kx = courbureBA(1, h, dx, r.Asx, dx, Atx, M.fck, phi, M.Es), ky = courbureBA(1, h, dy, r.Asy, dy, Aty, M.fck, phi, M.Es);
+        var mqx = Math.max(Eq.mx0, 0.01), mqy = Math.max(Eq.my0, 0.01), rk = Math.max(kx(mqx) / mqx, ky(mqy) / mqy);
+        if(Eq.mx0n < -0.01) rk = Math.max(rk, kx(Eq.mx0n) / Eq.mx0n);
+        if(Eq.my0n < -0.01) rk = Math.max(rk, ky(Eq.my0n) / Eq.my0n);
+        r.w = Eq.w * (1 - nu * nu) * rk; r.wl = lref / plim; r.fl = r.w / r.wl;
         if(r.fl > 1){ r.ok = false; r.raisons.push("flèche") }
         var aire = lx * ly, kg = kgDe(r.Asx, lx) * ly + kgDe(r.Asy, ly) * lx;
-        [["W", ly, lx], ["E", ly, lx], ["S", lx, ly], ["N", lx, ly]].forEach(function(bd){ var mm = E[bd[0]]; if(mm > 0.01){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * bd[2]) * bd[1] } });
+        [["W", ly, lx], ["E", ly, lx], ["S", lx, ly], ["N", lx, ly]].forEach(function(bd){ var mm = E[bd[0]], db = bd[0] === "S" || bd[0] === "N" ? dy : dx; if(mm > 0.01){ var f = flexion(mm, 1, db, M); kg += kgDe(Math.max(f.As, asMin(1, db, M)), 0.3 * bd[2]) * bd[1] } });
         r.acier = kg / aire;
         r.cout = h * M.pb + M.pc + r.acier * (1 + M.maj) * M.pa;
         return r;
@@ -2692,7 +2710,7 @@ footer{font-size:11.5px}
         verif(null, "Inférieur, direction y", txtM(barresM(Rr.Asy))) +
         (Rr.E.tx > 0.01 ? verif(null, "Supérieur, direction x : maximum Wood-Armer (angles, bords)", txtM(barresM(Math.max(flexion(Rr.E.tx, 1, dxR, M).As, asMin(1, dxR, M))))) : "") +
         (Rr.E.ty > 0.01 ? verif(null, "Supérieur, direction y : maximum Wood-Armer (angles, bords)", txtM(barresM(Math.max(flexion(Rr.E.ty, 1, dxR - o, M).As, asMin(1, dxR - o, M))))) : "") +
-        ["W", "E", "S", "N"].map(function(k){ return Rr.E[k] > 0.01 ? verif(null, "Supérieur sur bord " + NB[k] + " encastré (sur 0,3 de la portée)", txtM(barresM(Math.max(flexion(Rr.E[k], 1, Rr.h - cn - o / 2, M).As, asMin(1, Rr.h - cn - o / 2, M))))) : "" }).join("") + '</ul>';
+        ["W", "E", "S", "N"].map(function(k){ return Rr.E[k] > 0.01 ? verif(null, "Supérieur sur bord " + NB[k] + " encastré (sur 0,3 de la portée)", txtM(barresM(Math.max(flexion(Rr.E[k], 1, dxR - (k === "S" || k === "N" ? o : 0), M).As, asMin(1, dxR - (k === "S" || k === "N" ? o : 0), M))))) : "" }).join("") + '</ul>';
       h2 += '<h3>Vérifications</h3><ul class="verifs">' +
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
         verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
@@ -2760,7 +2778,7 @@ footer{font-size:11.5px}
         r.D = fleche(E.gt, 1, psi2, function(i, m){ return kB(m) }, T.lim);
         r.D.txt = "long terme, quasi permanente (ψ2 = " + fmt(psi2, 2) + ", φ = " + fmt(phi, 1) + "), fissuration EN 1992 §7.4.3";
         if(r.D.ratio > 1){ r.ok = false; r.raisons.push("flèche") }
-        var ld = 0; T.L.forEach(function(l, i){ ld = Math.max(ld, l / d / ldLim(Ks[i], r.Asp / (b * d * 1e6), M.fck)) });
+        var ld = 0; T.L.forEach(function(l, i){ var con = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L"); ld = Math.max(ld, l / d / ldLim(Ks[i], (con ? r.Asn : r.Asp) / (b * d * 1e6), M.fck, l)) });
         r.ld = ld; if(ld > 1){ r.ok = false; r.raisons.push("élancement") }
         var Ltot = T.L.reduce(function(s, l){ return s + l }, 0), Lsup = 0;
         T.L.forEach(function(l, i){ if(i > 0 || T.ga === "E") Lsup += 0.3 * l; if(i < n - 1 || T.dr === "E") Lsup += 0.3 * l; if((i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L")) Lsup += 0.7 * l });
