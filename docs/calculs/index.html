@@ -1057,7 +1057,8 @@ footer{font-size:11.5px}
     }) });
     return best;
   }
-  function txtM(b){ return b ? "Ø" + b.o + " e = " + b.s + " mm (" + fmt(b.a, 0) + " mm²/m)" : "hors tableau" }
+  function cmE(s){ return fmt(s / 10, s % 10 ? 1 : 0) }      // espacement mm -> cm (Tony, 20.10.2026)
+  function txtM(b){ return b ? "Ø" + b.o + " e = " + cmE(b.s) + " cm (" + fmt(b.a, 0) + " mm²/m)" : "hors tableau" }
   function barresP(As, b, cn, de){   // poutre : n barres d'un même Ø, sur un lit si elles tiennent
     var best = null;
     [12,14,16,18,20,22,26,30].forEach(function(o){ for(var n = 2; n <= 12; n++){
@@ -1678,7 +1679,7 @@ footer{font-size:11.5px}
       cle("σs fissuré", fmt(ss, 0), "MPa", "x = " + fmt(x, 0) + " mm, αe = " + fmt(aeff, 1)) +
       cle("sr,max", fmt(srmax, 0), "mm", s <= 5 * (c + o / 2) ? "éq. (7.11)" : "grand espacement, éq. (7.14)") +
       cle("εsm − εcm", fmt(de * 1000, 3), "‰", "éq. (7.9)") + cle("ρp,eff", fmt(rpe * 100, 2), "%", "hc,ef = " + fmt(hc, 0) + " mm") +
-      cle("As posée", fmt(As, 0), "mm²", "Ø" + o + " e = " + s + " mm") + '</div><ul class="verifs">' +
+      cle("As posée", fmt(As, 0), "mm²", "Ø" + o + " e = " + cmE(s) + " cm") + '</div><ul class="verifs">' +
       verif(wk <= wmax, "wk ≤ wmax (EN 1992 tab. 7.1N, combinaison quasi permanente)", fmt(wk, 3) + " ≤ " + fmt(wmax, 2) + " mm") +
       verif(As >= Asmin, "Armature minimale de fissuration As,min = kc k fct,eff Act / σs (§7.3.2, kc = 0,4 flexion, σs = fyk)", fmt(As, 0) + " ≥ " + fmt(Asmin, 0) + " mm²") +
       verif(ss <= 0.8 * M.fsk, "σs ≤ 0,8 fyk (§7.2(5))", fmt(ss, 0) + " ≤ " + fmt(0.8 * M.fsk, 0) + " MPa") +
@@ -1886,7 +1887,7 @@ footer{font-size:11.5px}
       cle("ΣAsl torsion", fmt(Asl, 0), "mm²", "éq. (6.28), à répartir sur le contour") + '</div><ul class="verifs">' +
       verif(inter <= 1, "Bielles : TEd / TRd,max + VEd / VRd,max ≤ 1 (éq. 6.29), cot θ = " + fmt(cot, 2), fmt(inter * 100, 0) + " %") +
       verif(simple <= 1 ? true : null, "Armature minimale seule si TEd / TRd,c + VEd / VRd,c ≤ 1 (éq. 6.31)", fmt(simple * 100, 0) + " %") +
-      verif(null, "Étriers fermés proposés", et ? "Ø" + et.o + " e = " + et.s + " mm (" + fmt(et.a, 0) + " mm²/m)" : "hors tableau") +
+      verif(null, "Étriers fermés proposés", et ? "Ø" + et.o + " e = " + cmE(et.s) + " cm (" + fmt(et.a, 0) + " mm²/m)" : "hors tableau") +
       verif(null, "Espacement des étriers ≤ uk/8 = " + fmt(uk / 8, 0) + " mm (§9.2.3(3)) ; barres longitudinales espacées ≤ 350 mm, une à chaque angle (§9.2.3(4))", "") +
       verif(null, "VRd,c pris à sa valeur minimale (sans armature longitudinale) : prudent", "") +
       verif(null, "SIA 262 (torsion) : non codée, EN 1992 utilisé", "") + '</ul>';
@@ -2462,7 +2463,7 @@ footer{font-size:11.5px}
         var hm = Math.max.apply(null, E.hs), sc = 34 / Math.max(hm, 0.01), yb = yt + hm * sc, H = yb + 64;
         function px(x){ return g + (W - 2*g) * x / X }
         var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Ferraillage">', prof = "", ent = 3;
-        function lab(b){ return b ? "Ø" + b.o + " e " + b.s : "hors tableau" }
+        function lab(b){ return b ? "Ø" + b.o + " e " + cmE(b.s) : "hors tableau" }
         E.tr.forEach(function(t, i){
           var x1 = px(ax[i]), x2 = px(ax[i + 1]), hb = yt + t.h * sc;
           s += '<rect class="tz" x="'+x1.toFixed(1)+'" y="'+yt+'" width="'+(x2 - x1).toFixed(1)+'" height="'+(t.h * sc).toFixed(1)+'"/>';
@@ -2496,7 +2497,7 @@ footer{font-size:11.5px}
           if(t === "A") s += '<path class="ap" d="M'+cx.toFixed(1)+' '+y.toFixed(1)+' l-5 8 h10 z"/>';
           else if(t === "E") s += '<path class="ap" d="M'+(cx - 6).toFixed(1)+' '+y.toFixed(1)+' h12 v7 h-12 z"/>';
         });
-        s += '<text x="'+(W - g)+'" y="'+(H - 4)+'" text-anchor="end">e en mm · épaisseurs exagérées</text></svg>';
+        s += '<text x="'+(W - g)+'" y="'+(H - 4)+'" text-anchor="end">e en cm · épaisseurs exagérées</text></svg>';
         return '<h3>Ferraillage</h3>' + s + '<div class="lg"><span><i></i>inférieur, points : répartition</span><span><i class="t"></i>supérieur (sur appuis : 0,3 L de chaque côté, console entière), points : répartition</span></div>';
       }
       function blocTravees(E, titre, ref){
@@ -2654,7 +2655,7 @@ footer{font-size:11.5px}
       res = cle("Section b × h", fmt(b * 100, 0) + " × " + fmt(Rr.h * 100, 0), "cm", "hauteur optimale", true) + cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m") +
         cle("md travée", fmt(Rr.E.Mp, 1), "kNm") + cle("md appui", fmt(-Rr.E.Mn, 1), "kNm") + cle("vd", fmt(Rr.E.Vd, 1), "kN") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m", "majoration comprise");
       verifs = verif(null, "Inférieures en travée", txtP(bp)) + (bn ? verif(null, "Supérieures sur appuis", txtP(bn)) : "") +
-        verif(null, "Étriers à 2 brins", sEt ? "Ø" + sEt.o + " e = " + sEt.s + " mm (" + fmt(sEt.a, 0) + " mm²/m)" : "hors tableau") +
+        verif(null, "Étriers à 2 brins", sEt ? "Ø" + sEt.o + " e = " + cmE(sEt.s) + " cm (" + fmt(sEt.a, 0) + " mm²/m)" : "hors tableau") +
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
         verif(true, "Bielles comprimées (EN 1992 éq. 6.9), cot θ = " + fmt(Rr.cot, 1), fmt(Rr.E.Vd, 0) + " ≤ " + fmt(Rr.vmax, 0) + " kN") +
         verif(Rr.ld <= 1, "Élancement L/d (EN 1992 éq. 7.16)", fmt(Rr.ld * 100, 0) + " % de la limite") +
