@@ -171,6 +171,11 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .champ .u{font-size:12px;color:var(--texte-faible);white-space:nowrap}
 .champ .aide{font-size:11.5px;line-height:1.35;color:var(--texte-faible)}
 .ligne-sep{grid-column:1/-1;margin-top:4px;padding-top:8px;border-top:1px solid var(--ligne);font-size:12.5px;font-weight:650;color:var(--or)}
+.champ.dessin{grid-column:span 2;grid-row:span 3}
+.champ.dessin .schema{margin-top:2px;max-width:340px}
+.schema .bd{stroke:rgba(var(--encre),.8);stroke-width:2.2;fill:none}
+.schema .bl{stroke:rgba(var(--encre),.5);stroke-width:1.2;stroke-dasharray:5 4;fill:none}
+.schema .ha{stroke:rgba(var(--encre),.55);stroke-width:1}
 .ligne-sep.sous{margin-top:0;padding-top:2px;border-top:0;font-size:12px;font-weight:600;color:var(--texte-doux)}
 .champs > .ligne-sep:first-child{margin-top:0;padding-top:0;border-top:0}
 
@@ -758,9 +763,10 @@ footer{font-size:11.5px}
       }), [1, 2, 3, 4, 5].map(function(i){
         return un({id:"da_hf"+i, l:"Travée "+i+" · épaisseur forcée", v:"", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur forcée (vide = optimisée)"});
       }), flechesCalculees("da_").map(un), [
+        deux({id:"da_croquis", l:"Plan de la plaque et appuis", t:"dessin", v:"", dessin:croquisPlaque}),
         deux({id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m"}),
         deux({id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m"}),
-        {sep:"Bords de la plaque"},
+        deux({id:"da_hfp", l:"Épaisseur forcée", v:"", u:"m", aide:"Vide = épaisseur optimisée"}),
         deux({id:"da_bW", l:"Bord gauche", v:"A", t:"s", o:BORD}),
         deux({id:"da_bE", l:"Bord droit", v:"A", t:"s", o:BORD}),
         deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
@@ -968,6 +974,7 @@ footer{font-size:11.5px}
     });
     function champ(c){
       var h = "", v = val(c.id), u = typeof c.u === "function" ? c.u() : (c.u || "");
+      if(c.t === "dessin") return '<div class="champ dessin" data-champ="'+c.id+'"><label>'+esc(c.l)+'</label><div class="croquis"></div></div>';
       h += '<div class="champ'+(c.large ? " large" : c.t === "s" ? " liste" : "")+'" data-champ="'+c.id+'"><label for="c-'+c.id+'">'+esc(c.l)+'</label><div class="boite">';
       if(c.t === "aff"){
         h += '<output id="c-'+c.id+'" class="aff">—</output>';
@@ -993,6 +1000,7 @@ footer{font-size:11.5px}
       if(c.si) el.classList.toggle("cache", !c.si());
       if(typeof c.u === "function") el.querySelector(".u").textContent = c.u();
       if(typeof c.l === "function") el.querySelector("label").textContent = c.l();
+      if(c.dessin && !el.classList.contains("cache")) el.querySelector(".croquis").innerHTML = c.dessin();
     });
     // tableaux : lignes, colonnes, puis le tableau entier sans case visible
     var hote = document.querySelector('[data-groupe="'+g+'"]');
@@ -2074,6 +2082,39 @@ footer{font-size:11.5px}
       '<div class="lg"><span><i></i>flèche vers le bas</span><span><i class="t"></i>remontée</span><span>' + esc(D.txt) + '</span></div>';
     return s;
   }
+  // Plan de la plaque rectangulaire dans la saisie (20.10.2026) : appui simple = triangles, encastré = hachures, libre = tirets
+  function croquisPlaque(){
+    var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), W = 280, H = 214;
+    var k = Math.min(180 / lx, 132 / ly), w = lx * k, h = ly * k, x0 = (W - w) / 2 - 6, y0 = 26 + (132 - h) / 2;
+    var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Plan de la plaque">';
+    s += '<rect class="oz" x="'+x0.toFixed(1)+'" y="'+y0.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'"/>';
+    // bord de (xa, ya) à (xb, yb), normale extérieure (nx, ny)
+    function bord(type, xa, ya, xb, yb, nx, ny){
+      var L = Math.hypot(xb - xa, yb - ya), tx = (xb - xa) / L, ty = (yb - ya) / L, r = "";
+      if(type === "L") return '<line class="bl" x1="'+xa.toFixed(1)+'" y1="'+ya.toFixed(1)+'" x2="'+xb.toFixed(1)+'" y2="'+yb.toFixed(1)+'"/>';
+      r += '<line class="bd" x1="'+xa.toFixed(1)+'" y1="'+ya.toFixed(1)+'" x2="'+xb.toFixed(1)+'" y2="'+yb.toFixed(1)+'"/>';
+      if(type === "A"){
+        var n = Math.max(2, Math.round(L / 26));
+        for(var i = 0; i < n; i++){
+          var u = (i + 0.5) * L / n, px = xa + tx * u + nx * 1.5, py = ya + ty * u + ny * 1.5;
+          r += '<path class="ap" d="M'+px.toFixed(1)+' '+py.toFixed(1)+' L'+(px + nx * 8 + tx * 5).toFixed(1)+' '+(py + ny * 8 + ty * 5).toFixed(1)+' L'+(px + nx * 8 - tx * 5).toFixed(1)+' '+(py + ny * 8 - ty * 5).toFixed(1)+' Z"/>';
+        }
+      } else {
+        for(var u = 4; u < L - 1; u += 6){
+          var qx = xa + tx * u, qy = ya + ty * u;
+          r += '<line class="ha" x1="'+qx.toFixed(1)+'" y1="'+qy.toFixed(1)+'" x2="'+(qx + nx * 7 - tx * 4).toFixed(1)+'" y2="'+(qy + ny * 7 - ty * 4).toFixed(1)+'"/>';
+        }
+      }
+      return r;
+    }
+    s += bord(val("da_bN"), x0, y0, x0 + w, y0, 0, -1) + bord(val("da_bS"), x0, y0 + h, x0 + w, y0 + h, 0, 1);
+    s += bord(val("da_bW"), x0, y0, x0, y0 + h, -1, 0) + bord(val("da_bE"), x0 + w, y0, x0 + w, y0 + h, 1, 0);
+    var cx = x0 + w / 2, cy = y0 + h / 2;
+    s += '<text x="'+cx.toFixed(1)+'" y="'+(y0 + h + 26).toFixed(1)+'" text-anchor="middle">lx = '+fmt(lx, 2)+' m</text>';
+    s += '<text x="'+(x0 + w + 24).toFixed(1)+'" y="'+cy.toFixed(1)+'" text-anchor="middle" transform="rotate(-90 '+(x0 + w + 24).toFixed(1)+' '+cy.toFixed(1)+')">ly = '+fmt(ly, 2)+' m</text>';
+    s += '<text x="'+(W / 2).toFixed(1)+'" y="'+(H - 4)+'" text-anchor="middle">▲ appui simple · ⫽ encastré · - - libre</text>';
+    return s + '</svg>';
+  }
   // Schéma de la dalle : appuis et épaisseurs par travée (optimisée, forcée), hauteur exagérée
   function schemaDalle(L, app, hOpt, hForce){
     var W = 640, g = 24, yt = 36, X = L.reduce(function(s, l){ return s + l }, 0), ax = [0];
@@ -2574,7 +2615,7 @@ footer{font-size:11.5px}
       var lref = cand.length ? Math.min.apply(null, cand) : (bW !== "L" || bE !== "L" ? lx : ly);
       if(!cand.length) Kd = 0.4;
       var U = lirePlaque(Pl, [1, 0, 0]);
-      for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
+      function ligne(h){
         var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pu = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
         var E = lirePlaque(Pl, coefs(pu, pt));
         r.mx = E.mx; r.my = E.my; r.E = E;
@@ -2599,14 +2640,18 @@ footer{font-size:11.5px}
         [["W", ly, lx], ["E", ly, lx], ["S", lx, ly], ["N", lx, ly]].forEach(function(bd){ var mm = E[bd[0]]; if(mm > 0.01){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * bd[2]) * bd[1] } });
         r.acier = kg / aire;
         r.cout = h * M.pb + M.pc + r.acier * (1 + M.maj) * M.pa;
-        rows.push(r);
+        return r;
       }
+      for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01) rows.push(ligne(h));
+      // épaisseur forcée (20.10.2026) : calculée telle quelle, même si elle ne passe pas
+      var hF = parseFloat(String(val("da_hfp")).replace(",", ".")), rF = hF > 0 ? ligne(Math.max(hF, cn + 2 * o + 0.03)) : null;
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
-      if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
-      var Rr = rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"}, dxR = Rr.h - cn - o / 2;
-      h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
+      if(io < 0 && !rF){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
+      var Rr = rF || rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"}, dxR = Rr.h - cn - o / 2;
+      if(rF && !rF.ok) h2 += '<div class="alerte ko">⚠ Épaisseur forcée insuffisante : ' + esc(rF.raisons.join(", ")) + '</div>';
+      h2 += '<h2>Résultat</h2><div class="cles">' + (rF ? cle("Épaisseur forcée", fmt(Rr.h * 100, 1), "cm", (rF.ok ? "conforme" : "non conforme") + (io >= 0 ? " · optimum " + fmt(rows[io].h * 100, 0) + " cm" : ""), true) : cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true)) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
-        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "charge uniforme : " + "Wood-Armer · sans torsion " + fmt(Rr.E.mx0, 1)) + cle("my travée", fmt(Rr.my, 1), "kNm/m", "Wood-Armer · sans torsion " + fmt(Rr.E.my0, 1)) +
+        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "Wood-Armer · sans torsion " + fmt(Rr.E.mx0, 1)) + cle("my travée", fmt(Rr.my, 1), "kNm/m", "Wood-Armer · sans torsion " + fmt(Rr.E.my0, 1)) +
         cle("Flèche", fmt(Rr.w * 1000, 1), "mm", "limite " + fmt(Rr.wl * 1000, 1) + " mm (L/" + fmt(plim, 0) + ")") +
         cle("m sur bord encastré", Rr.ms > 0.01 ? fmt(-Rr.ms, 1) : "—", "kNm/m") + cle("vd sur appui", fmt(Rr.Vd, 1), "kN/m", "réaction linéique max hors angles") + '</div>';
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
@@ -2624,7 +2669,7 @@ footer{font-size:11.5px}
         (tri !== "non" ? verif(null, "Charge triangulaire " + fmt(num("da_pt"), 1) + " kN/m² à la pointe, pondérée par " + fmt(num("da_gT"), 2), "") : "") +
         verif(null, "Torsion mxy prise en compte par Wood-Armer (inférieur mx + |mxy|, my + |mxy| ; supérieur mx − |mxy|, my − |mxy|) ; armature supérieure d'angle à disposer là où le moment supérieur apparaît, non comptée dans le coût", "") + '</ul>';
     }
-    h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
+    if(io >= 0) h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
     h2 += '<p class="note">Coût par m² = béton + coffrage de sous-face + armature (majorée de ' + fmt(M.maj * 100, 0) + ' %). Poids propre ' + GAMMA_BA + ' kN/m³ (EN 1991-1-1 tab. A.1). Armature minimale EN 1992 (9.1N).</p>';
     $("#r-dalle").innerHTML = h2;
   }
@@ -2916,7 +2961,7 @@ footer{font-size:11.5px}
     CHAMPS[g].forEach(function(c){
       if(c.sep){ h += '<div class="sep">' + esc(c.sep) + '</div>'; return }
       var el = document.querySelector('[data-champ="' + c.id + '"]');
-      if(c.t === "aff" || !el || el.classList.contains("cache")) return;
+      if(c.t === "aff" || c.t === "dessin" || !el || el.classList.contains("cache")) return;
       var v = val(c.id), u = typeof c.u === "function" ? c.u() : (c.u || ""), l = typeof c.l === "function" ? c.l() : c.l;
       if(c.t === "s"){ var o = c.o.filter(function(x){ return String(x[0]) === String(v) })[0]; v = o ? o[1] : v; u = "" }
       h += '<div><span>' + esc(l) + '</span><span>' + (v === "" ? "—" : esc(v) + (u ? " " + esc(u) : "")) + '</span></div>';
