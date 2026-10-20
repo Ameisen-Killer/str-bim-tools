@@ -765,6 +765,7 @@ footer{font-size:11.5px}
         deux({id:"da_bE", l:"Bord droit", v:"A", t:"s", o:BORD}),
         deux({id:"da_bS", l:"Bord bas", v:"A", t:"s", o:BORD}),
         deux({id:"da_bN", l:"Bord haut", v:"A", t:"s", o:BORD}),
+        deux({id:"da_plim", l:"Flèche limite L /", v:"250", aide:"L = plus petite portée entre deux bords tenus opposés (EN 1992 §7.4.1(4))"}),
         deux({id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true}),
         {sep:"Charges réparties"},
         {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons", si:function(){ return !parTravee("da_") }},
@@ -778,8 +779,8 @@ footer{font-size:11.5px}
         {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
         {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"},
         deux({id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2"}),
-        un({id:"da_psi2", l:"ψ2 de la charge utile (flèche, ELS)", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux ; 0,6 grandes salles"}),
-        un({id:"da_phi", l:"Coefficient de fluage φ (flèche, ELS)", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1, ou section Matériaux)"})
+        {id:"da_psi2", l:"ψ2 de la charge utile (flèche, ELS)", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux ; 0,6 grandes salles"},
+        {id:"da_phi", l:"Coefficient de fluage φ (flèche, ELS)", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1, ou section Matériaux)"}
       ]);
     })(),
     mat:[
@@ -1410,19 +1411,19 @@ footer{font-size:11.5px}
     });
     // moments aux nœuds (moyenne des éléments voisins) ; réactions aux nœuds tenus
     var res = U.map(function(u){
-      var mx = new Float64Array(nn), my = new Float64Array(nn), cnt = new Float64Array(nn), R = new Float64Array(nn), wmax = 0;
+      var mx = new Float64Array(nn), my = new Float64Array(nn), mxy = new Float64Array(nn), wn = new Float64Array(nn), cnt = new Float64Array(nn), R = new Float64Array(nn), wmax = 0;
       for(var ey = 0; ey < ny; ey++) for(var ex = 0; ex < nx; ex++){
         var d = dofs(ex, ey), ue = d.map(function(z){ return u[z] }), alpha = new Array(12).fill(0);
         for(var r = 0; r < 12; r++){ var s = 0; for(var c = 0; c < 12; c++) s += Ci[r][c] * ue[c]; alpha[r] = s }
         var ns = [ey * nnx + ex, ey * nnx + ex + 1, (ey + 1) * nnx + ex + 1, (ey + 1) * nnx + ex];
         coins.forEach(function(cc, t){
-          var wxx = 0, wyy = 0, s1 = Pxx(cc[0], cc[1]), s2 = Pyy(cc[0], cc[1]);
-          for(var z = 0; z < 12; z++){ wxx += s1[z] * alpha[z]; wyy += s2[z] * alpha[z] }
-          var n = ns[t]; mx[n] += -(wxx + nu * wyy); my[n] += -(wyy + nu * wxx); cnt[n]++;
+          var wxx = 0, wyy = 0, wxy = 0, s1 = Pxx(cc[0], cc[1]), s2 = Pyy(cc[0], cc[1]), s3 = Pxy(cc[0], cc[1]);
+          for(var z = 0; z < 12; z++){ wxx += s1[z] * alpha[z]; wyy += s2[z] * alpha[z]; wxy += s3[z] * alpha[z] }
+          var n = ns[t]; mx[n] += -(wxx + nu * wyy); my[n] += -(wyy + nu * wxx); mxy[n] += -(1 - nu) * wxy; cnt[n]++;
         });
       }
-      for(var n = 0; n < nn; n++){ mx[n] /= cnt[n]; my[n] /= cnt[n]; if(bloque[3*n]) R[n] = pen * u[3*n]; wmax = Math.max(wmax, u[3*n]) }
-      return {mx:mx, my:my, R:R, w:wmax};
+      for(var n = 0; n < nn; n++){ mx[n] /= cnt[n]; my[n] /= cnt[n]; mxy[n] /= cnt[n]; wn[n] = bloque[3*n] ? 0 : u[3*n]; if(bloque[3*n]) R[n] = pen * u[3*n]; wmax = Math.max(wmax, u[3*n]) }
+      return {mx:mx, my:my, mxy:mxy, wn:wn, R:R, w:wmax};
     });
     var out = {nx:nx, ny:ny, a:a, b:b, cas:res, bords:{W:bW, E:bE, S:bS, N:bN}};
     cacheFE[cle] = out;
@@ -1432,8 +1433,21 @@ footer{font-size:11.5px}
   function lirePlaque(Pl, c){
     var nnx = Pl.nx + 1, nny = Pl.ny + 1, nn = nnx * nny;
     function comb(champ, n){ return c[0] * Pl.cas[0][champ][n] + c[1] * Pl.cas[1][champ][n] + c[2] * Pl.cas[2][champ][n] }
-    var r = {mx:0, my:0, W:0, E:0, S:0, N:0, lib:0, v:0}, i, j, n;
-    for(n = 0; n < nn; n++){ r.mx = Math.max(r.mx, comb("mx", n)); r.my = Math.max(r.my, comb("my", n)) }
+    // Moments de dimensionnement de Wood-Armer (20.10.2026) : inférieur mx* = mx + |mxy|, my* = my + |mxy| ;
+    // supérieur mx* = mx − |mxy|, my* = my − |mxy| ; si l'un change de signe, il est annulé et l'autre vaut m + mxy² / |m|.
+    // mx, my : inférieurs (positifs) ; tx, ty : supérieurs (valeurs positives) ; mx0, my0 : moments sans torsion ; w : flèche max.
+    var r = {mx:0, my:0, tx:0, ty:0, mx0:0, my0:0, w:0, W:0, E:0, S:0, N:0, lib:0, v:0}, i, j, n;
+    for(n = 0; n < nn; n++){
+      var a = comb("mx", n), b = comb("my", n), t = Math.abs(comb("mxy", n)), ix = a + t, iy = b + t, sx = a - t, sy = b - t;
+      if(ix < 0 && iy < 0){ ix = 0; iy = 0 }
+      else if(ix < 0){ ix = 0; iy = b + t * t / Math.max(Math.abs(a), 1e-9) }
+      else if(iy < 0){ iy = 0; ix = a + t * t / Math.max(Math.abs(b), 1e-9) }
+      if(sx > 0 && sy > 0){ sx = 0; sy = 0 }
+      else if(sx > 0){ sx = 0; sy = b - t * t / Math.max(Math.abs(a), 1e-9) }
+      else if(sy > 0){ sy = 0; sx = a - t * t / Math.max(Math.abs(b), 1e-9) }
+      r.mx = Math.max(r.mx, ix); r.my = Math.max(r.my, iy); r.tx = Math.max(r.tx, -sx); r.ty = Math.max(r.ty, -sy);
+      r.mx0 = Math.max(r.mx0, a); r.my0 = Math.max(r.my0, b); r.w = Math.max(r.w, comb("wn", n));
+    }
     function arete(liste, champ, type, cote){
       liste.forEach(function(n, t){
         if(type === "E") r[cote] = Math.max(r[cote], -comb(champ, n));
@@ -2551,7 +2565,8 @@ footer{font-size:11.5px}
       var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN"), Pl;
       try { Pl = plaqueFE(lx, ly, bW, bE, bS, bN, num("da_nu")) } catch(e){ $("#r-dalle").innerHTML = '<div class="alerte">'+esc(e.message)+'</div>'; return }
       var tri = val("da_tri"), pt = num("da_pt") * num("da_gT");
-      function coefs(pu){ var c = [pu, 0, 0]; if(tri === "S"){ c[0] += pt; c[2] -= pt } else if(tri === "N") c[2] += pt; else if(tri === "W"){ c[0] += pt; c[1] -= pt } else if(tri === "E") c[1] += pt; return c }
+      function coefs(pu, pt){ var c = [pu, 0, 0]; if(tri === "S"){ c[0] += pt; c[2] -= pt } else if(tri === "N") c[2] += pt; else if(tri === "W"){ c[0] += pt; c[1] -= pt } else if(tri === "E") c[1] += pt; return c }
+      var nu = num("da_nu"), psi2 = num("da_psi2"), phi = num("da_phi"), plim = Math.max(1, num("da_plim"));
       // portée de référence pour l'élancement
       var cand = [], Kd = num("da_K");
       if(bW !== "L" && bE !== "L") cand.push(lx);
@@ -2561,7 +2576,7 @@ footer{font-size:11.5px}
       var U = lirePlaque(Pl, [1, 0, 0]);
       for(var h = 0.12; h <= 0.50 + 1e-9; h += 0.01){
         var r = {h:h, ok:true, raisons:[]}, dx = h - cn - o / 2, dy = dx - o, pu = M.gG * (g + GAMMA_BA * h) + M.gQ * q;
-        var E = lirePlaque(Pl, coefs(pu));
+        var E = lirePlaque(Pl, coefs(pu, pt));
         r.mx = E.mx; r.my = E.my; r.E = E;
         var fx = flexion(r.mx, 1, dx, M), fy = flexion(r.my, 1, dy, M);   // armature minimale avec le d de chaque nappe (20.10.2026)
         r.Asx = Math.max(fx.As, asMin(1, dx, M)); r.Asy = Math.max(fy.As, asMin(1, dy, M));
@@ -2573,6 +2588,13 @@ footer{font-size:11.5px}
         if(r.Vd > r.vr){ r.ok = false; r.raisons.push("effort tranchant") }
         r.ld = lref / dx / ldLim(Kd, Math.max(r.Asx, r.Asy) / (dx * 1e6), M.fck);
         if(r.ld > 1){ r.ok = false; r.raisons.push("élancement") }
+        // flèche à long terme, quasi permanente (20.10.2026) : flèche élastique de la plaque × (1 − ν²) κ(m) / m,
+        // κ fissurée EN 1992 §7.4.3 dans la direction la plus sollicitée (la plus souple des deux)
+        var Eq = lirePlaque(Pl, coefs(g + GAMMA_BA * h + psi2 * q, num("da_pt")));
+        var kx = courbureBA(1, h, dx, r.Asx, dx, asMin(1, dx, M), M.fck, phi, M.Es), ky = courbureBA(1, h, dy, r.Asy, dy, asMin(1, dy, M), M.fck, phi, M.Es);
+        var mqx = Math.max(Eq.mx0, 0.01), mqy = Math.max(Eq.my0, 0.01);
+        r.w = Eq.w * (1 - nu * nu) * Math.max(kx(mqx) / mqx, ky(mqy) / mqy); r.wl = lref / plim; r.fl = r.w / r.wl;
+        if(r.fl > 1){ r.ok = false; r.raisons.push("flèche") }
         var aire = lx * ly, kg = kgDe(r.Asx, lx) * ly + kgDe(r.Asy, ly) * lx;
         [["W", ly, lx], ["E", ly, lx], ["S", lx, ly], ["N", lx, ly]].forEach(function(bd){ var mm = E[bd[0]]; if(mm > 0.01){ var f = flexion(mm, 1, dx, M); kg += kgDe(Math.max(f.As, asMin(1, dx, M)), 0.3 * bd[2]) * bd[1] } });
         r.acier = kg / aire;
@@ -2581,22 +2603,26 @@ footer{font-size:11.5px}
       }
       var io = -1; rows.forEach(function(r, i){ if(r.ok && (io < 0 || r.cout < rows[io].cout - 1e-9)) io = i });
       if(io < 0){ $("#r-dalle").innerHTML = '<div class="alerte">Aucune épaisseur jusqu\'à 50 cm ne passe.</div>'; return }
-      var Rr = rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"};
+      var Rr = rows[io], NB = {W:"gauche", E:"droit", S:"bas", N:"haut"}, dxR = Rr.h - cn - o / 2;
       h2 += '<h2>Résultat</h2><div class="cles">' + cle("Épaisseur optimale", fmt(Rr.h * 100, 0), "cm", "coût minimal", true) +
         cle("Coût estimé", fmt(Rr.cout, 0), "CHF/m²") + cle("Armature", fmt(Rr.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") +
-        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "charge uniforme : " + fmt(U.mx / (lx * lx), 4) + " · p lx²") + cle("my travée", fmt(Rr.my, 1), "kNm/m", fmt(U.my / (lx * lx), 4) + " · p lx²") +
+        cle("mx travée", fmt(Rr.mx, 1), "kNm/m", "charge uniforme : " + "Wood-Armer · sans torsion " + fmt(Rr.E.mx0, 1)) + cle("my travée", fmt(Rr.my, 1), "kNm/m", "Wood-Armer · sans torsion " + fmt(Rr.E.my0, 1)) +
+        cle("Flèche", fmt(Rr.w * 1000, 1), "mm", "limite " + fmt(Rr.wl * 1000, 1) + " mm (L/" + fmt(plim, 0) + ")") +
         cle("m sur bord encastré", Rr.ms > 0.01 ? fmt(-Rr.ms, 1) : "—", "kNm/m") + cle("vd sur appui", fmt(Rr.Vd, 1), "kN/m", "réaction linéique max hors angles") + '</div>';
       h2 += '<h3>Ferraillage</h3><ul class="verifs">' +
         verif(null, "Inférieur, direction x (nappe extérieure)", txtM(barresM(Rr.Asx))) +
         verif(null, "Inférieur, direction y", txtM(barresM(Rr.Asy))) +
+        (Rr.E.tx > 0.01 ? verif(null, "Supérieur, direction x : maximum Wood-Armer (angles, bords)", txtM(barresM(Math.max(flexion(Rr.E.tx, 1, dxR, M).As, asMin(1, dxR, M))))) : "") +
+        (Rr.E.ty > 0.01 ? verif(null, "Supérieur, direction y : maximum Wood-Armer (angles, bords)", txtM(barresM(Math.max(flexion(Rr.E.ty, 1, dxR - o, M).As, asMin(1, dxR - o, M))))) : "") +
         ["W", "E", "S", "N"].map(function(k){ return Rr.E[k] > 0.01 ? verif(null, "Supérieur sur bord " + NB[k] + " encastré (sur 0,3 de la portée)", txtM(barresM(Math.max(flexion(Rr.E[k], 1, Rr.h - cn - o / 2, M).As, asMin(1, Rr.h - cn - o / 2, M))))) : "" }).join("") + '</ul>';
       h2 += '<h3>Vérifications</h3><ul class="verifs">' +
         verif(Rr.xd <= M.xdmax, "Flexion, sans armature comprimée", "x/d = " + fmt(Rr.xd, 3)) +
         verif(Rr.Vd <= Rr.vr, "Effort tranchant sans étriers (EN 1992 §6.2.2)", fmt(Rr.Vd, 0) + " ≤ " + fmt(Rr.vr, 0) + " kN/m") +
         verif(Rr.ld <= 1, "Élancement l/d (EN 1992 éq. 7.16, K = " + fmt(Kd, 1) + ", l = " + fmt(lref, 2) + " m)", fmt(Rr.ld * 100, 0) + " % de la limite") +
+        verif(Rr.fl <= 1, "Flèche à long terme ≤ L/" + fmt(plim, 0) + " (L = " + fmt(lref, 2) + " m), quasi permanente (ψ2 = " + fmt(psi2, 2) + ", φ = " + fmt(phi, 1) + "), plaque élastique × rapport des courbures fissurée / non fissurée (EN 1992 §7.4.3), retrait non compté", fmt(Rr.w * 1000, 1) + " mm · " + fmt(Rr.fl * 100, 0) + " % de la limite") +
         verif(null, "Moments élastiques d'une plaque de Kirchhoff (éléments finis ACM, maillage " + Pl.nx + " × " + Pl.ny + "), ν = " + fmt(num("da_nu"), 2), "") +
         (tri !== "non" ? verif(null, "Charge triangulaire " + fmt(num("da_pt"), 1) + " kN/m² à la pointe, pondérée par " + fmt(num("da_gT"), 2), "") : "") +
-        verif(null, "Armature d'angle (torsion) près des coins appuyés : à disposer, non chiffrée", "") + '</ul>';
+        verif(null, "Torsion mxy prise en compte par Wood-Armer (inférieur mx + |mxy|, my + |mxy| ; supérieur mx − |mxy|, my − |mxy|) ; armature supérieure d'angle à disposer là où le moment supérieur apparaît, non comptée dans le coût", "") + '</ul>';
     }
     h2 += '<h3>Coût selon l\'épaisseur</h3>' + schemaCout(rows, io, "épaisseur");
     h2 += '<p class="note">Coût par m² = béton + coffrage de sous-face + armature (majorée de ' + fmt(M.maj * 100, 0) + ' %). Poids propre ' + GAMMA_BA + ' kN/m³ (EN 1991-1-1 tab. A.1). Armature minimale EN 1992 (9.1N).</p>';
