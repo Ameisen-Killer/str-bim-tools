@@ -7,57 +7,57 @@
 <meta name="description" content="Prédimensionnement de structure : fondations, murs enterrés, dalles, poutres en béton armé, acier et bois.">
 <!-- Page cachée (19.10.2026) : hors menu, hors sitemap, noindex -->
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#F6F2EA">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%236B5233'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23E9D6B0' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#EDF2F9">
+<link rel="icon" type="image/png" href="/calculs/logo-96.png">
 <!-- Charte du planificateur V2 (19.10.2026) : thème Sable clair par défaut, sombre au choix -->
-<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("calculs.theme")||"clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: dark)").matches?"sombre":"clair";if(c!=="sombre")c="clair";r.setAttribute("data-theme",c);if(c==="sombre")document.querySelector("meta[name=theme-color]").setAttribute("content","#121315");}catch(e){r.setAttribute("data-theme","clair");}})();</script>
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("calculs.theme")||"clair";if(c==="systeme")c=matchMedia("(prefers-color-scheme: dark)").matches?"sombre":"clair";if(c!=="sombre")c="clair";r.setAttribute("data-theme",c);if(c==="sombre")document.querySelector("meta[name=theme-color]").setAttribute("content","#060D1B");}catch(e){r.setAttribute("data-theme","clair");}})();</script>
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <style>
-/* Charte du planificateur (version 2) : fond sable, cartes blanches arrondies,
-   couleurs de la marque STR (marque.css), une seule police en casse normale.
+/* Charte du planificateur (version 2) : cartes blanches arrondies, une seule police en casse normale.
+   Couleurs tirées du logo STR BIM TOOLS (20.10.2026) : bleu nuit et bleu électrique.
    Version compacte : saisie à gauche, résultats à droite. */
 :root{
   color-scheme:light;
-  --encre:30,34,38;
-  --page:var(--m-fond);
+  --encre:14,24,44;
+  --page:#EDF2F9;
   --surface:#fff;
-  --surface-2:#F7F5F0;
-  --or-rvb:var(--m-fort-rvb);
-  --or:var(--m-fort);
-  --pale:var(--m-pale);
-  --actif:var(--m-clair);
+  --surface-2:#F3F6FB;
+  --or-rvb:11,94,215;
+  --or:#0B5ED7;
+  --pale:#E7F0FD;
+  --actif:#D3E4FB;
   --alerte:#C62B22;
-  --texte:#1E2226;
+  --texte:#0E182C;
   --texte-doux:rgba(var(--encre),.82);
   --texte-faible:rgba(var(--encre),.64);
   --ligne:rgba(var(--encre),.10);
   --ligne-forte:rgba(var(--encre),.20);
-  --voile:rgba(30,34,38,.34);
-  --ombre:0 1px 2px rgba(30,34,38,.05),0 4px 14px rgba(30,34,38,.05);
+  --voile:rgba(14,24,44,.34);
+  --ombre:0 1px 2px rgba(14,24,44,.05),0 4px 14px rgba(14,24,44,.06);
   --sans:"Inter","Inter repli","Inter repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
   --g:clamp(12px,2vw,24px);
   --haut:56px;
 }
 :root[data-theme="sombre"]{
   color-scheme:dark;
-  --encre:232,228,220;
-  --page:#121315;
-  --surface:#1B1D20;
-  --surface-2:#24262A;
-  --or-rvb:214,176,116;
-  --or:#D6B074;
-  --pale:rgba(214,176,116,.12);
-  --actif:rgba(214,176,116,.22);
+  --encre:224,233,246;
+  --page:#060D1B;
+  --surface:#0C172C;
+  --surface-2:#13213B;
+  --or-rvb:64,156,255;
+  --or:#409CFF;
+  --pale:rgba(64,156,255,.12);
+  --actif:rgba(64,156,255,.24);
   --alerte:#F07167;
-  --texte:#ECE8E0;
+  --texte:#E6EDF8;
   --texte-doux:rgba(var(--encre),.80);
   --texte-faible:rgba(var(--encre),.58);
   --ligne:rgba(var(--encre),.09);
   --ligne-forte:rgba(var(--encre),.20);
   --voile:rgba(0,0,0,.55);
-  --ombre:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25);
+  --ombre:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25),0 0 0 1px rgba(64,156,255,.06);
 }
 *{box-sizing:border-box}
 html{background:var(--page)}
@@ -76,7 +76,7 @@ p{margin:0}
   background:var(--surface);box-shadow:0 1px 0 rgba(var(--encre),.06),0 6px 18px rgba(30,34,38,.05);
 }
 .barre .marque-str{font-size:12.5px;margin-right:auto}
-.barre .marque-str svg{width:34px;height:34px}
+.barre .marque-str img{width:38px;height:38px;border-radius:50%;display:block;flex:none;box-shadow:0 0 0 1px rgba(var(--or-rvb),.35),0 0 10px rgba(var(--or-rvb),.25)}
 :root[data-theme="sombre"] .marque-str{color:var(--texte)}
 :root[data-theme="sombre"] .marque-str span span{color:var(--texte-faible)}
 .theme-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--ligne-forte);border-radius:6px;
@@ -171,8 +171,8 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .champ .u{font-size:12px;color:var(--texte-faible);white-space:nowrap}
 .champ .aide{font-size:11.5px;line-height:1.35;color:var(--texte-faible)}
 .ligne-sep{grid-column:1/-1;margin-top:4px;padding-top:8px;border-top:1px solid var(--ligne);font-size:12.5px;font-weight:650;color:var(--or)}
-.champ.dessin{grid-column:span 2;grid-row:span 3}
-.champ.dessin .schema{margin-top:2px;max-width:340px}
+.champ.dessin{grid-column:1/-1}
+.champ.dessin .schema{margin-top:2px;max-width:300px}
 .schema .bd{stroke:rgba(var(--encre),.8);stroke-width:2.2;fill:none}
 .schema .bl{stroke:rgba(var(--encre),.5);stroke-width:1.2;stroke-dasharray:5 4;fill:none}
 .schema .ha{stroke:rgba(var(--encre),.55);stroke-width:1}
@@ -243,7 +243,7 @@ footer a{text-decoration:none}
 /* ---- Version sobre (19.10.2026, demande de Tony) : textes plus petits, moins de gras et d'aplats ---- */
 body{font-size:13px;font-weight:400;line-height:1.45}
 .barre .marque-str{font-size:11.5px}
-.barre .marque-str svg{width:30px;height:30px}
+.barre .marque-str img{width:32px;height:32px}
 :root{--haut:50px}
 .theme-btn,.barre .menu-btn{font-size:12px;font-weight:450}
 .theme-btn{padding:5px 10px}
@@ -324,8 +324,9 @@ footer{font-size:11.5px}
   body{background:#fff;color:#1d1b18;font-size:10.5px}
   body > *:not(#note){display:none!important}
   #note{display:block}
-  #note .tete{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #6B5233;padding-bottom:6px;margin-bottom:10px}
-  #note .tete b{font-size:15px;color:#6B5233}
+  #note .tete{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #0B5ED7;padding-bottom:6px;margin-bottom:10px}
+  #note .tete b{font-size:15px;color:#0B5ED7}
+  #note .tete img{width:15mm;height:15mm;border-radius:50%;margin-right:8px;vertical-align:middle}
   #note h2{font-size:13px;margin:14px 0 6px;break-after:avoid}
   #note h3{font-size:11.5px;margin:10px 0 4px;break-after:avoid}
   #note .carte{border:0;box-shadow:none;padding:0;margin:0;background:none}
@@ -333,7 +334,7 @@ footer{font-size:11.5px}
   #note th,#note td{border-bottom:1px solid #e3ddd2;padding:2px 5px;text-align:left;vertical-align:top}
   #note .hyp{columns:2;column-gap:18px}
   #note .hyp div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #eee7dc;padding:1px 0;break-inside:avoid}
-  #note .hyp .sep{display:block;font-weight:600;border:0;padding-top:6px;color:#6B5233}
+  #note .hyp .sep{display:block;font-weight:600;border:0;padding-top:6px;color:#0B5ED7}
   #note svg,#note .cles,#note .verifs li,#note tr{break-inside:avoid}
   #note .schema{max-width:100%}
   #note .defile{overflow:visible}
@@ -345,7 +346,7 @@ footer{font-size:11.5px}
 <body>
 
 <header class="barre" data-menu-hote>
-  <a class="marque-str" href="/" aria-label="STR Bim Tools, accueil"><svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="16" fill="#6B5233"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#E9D6B0" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="marque-mots"><b>STR Bim Tools</b><span>Calculs</span></span></a>
+  <a class="marque-str" href="/" aria-label="STR Bim Tools, accueil"><img src="/calculs/logo-96.png" srcset="/calculs/logo-96.png 1x, /calculs/logo-256.webp 2.5x" width="38" height="38" alt=""><span class="marque-mots"><b>STR Bim Tools</b><span>Calculs</span></span></a>
   <button class="theme-btn" id="pdf-btn" type="button" title="Note de calcul en PDF (imprimer, puis Enregistrer au format PDF)"><span aria-hidden="true">⎙</span><span>PDF</span></button>
   <button class="theme-btn" id="theme-btn" type="button" title="Thème d'affichage"><span aria-hidden="true">◐</span><span id="theme-lib">Clair</span></button>
   <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
@@ -763,7 +764,6 @@ footer{font-size:11.5px}
       }), [1, 2, 3, 4, 5].map(function(i){
         return un({id:"da_hf"+i, l:"Travée "+i+" · épaisseur forcée", v:"", u:"m", si:function(){ return +val("da_n") >= i }, tab:"da_trav", ligne:"Travée "+i, col:"Épaisseur forcée (vide = optimisée)"});
       }), flechesCalculees("da_").map(un), [
-        deux({id:"da_croquis", l:"Plan de la plaque et appuis", t:"dessin", v:"", dessin:croquisPlaque}),
         deux({id:"da_lx", l:"Portée lx (gauche → droite)", v:"5.00", u:"m"}),
         deux({id:"da_ly", l:"Portée ly (bas → haut)", v:"6.50", u:"m"}),
         deux({id:"da_hfp", l:"Épaisseur forcée", v:"", u:"m", aide:"Vide = épaisseur optimisée"}),
@@ -773,6 +773,7 @@ footer{font-size:11.5px}
         deux({id:"da_bN", l:"Bord haut", v:"A", t:"s", o:BORD}),
         deux({id:"da_plim", l:"Flèche limite L /", v:"250", aide:"L = plus petite portée entre deux bords tenus opposés (EN 1992 §7.4.1(4))"}),
         deux({id:"da_K", l:"Système pour l'élancement (EN 1992 tab. 7.4N)", v:"1.0", t:"s", o:[["1.0","K = 1,0 · appuis simples"],["1.3","K = 1,3 · continu sur un grand côté"],["1.5","K = 1,5 · continu sur les quatre côtés"]], large:true}),
+        deux({id:"da_croquis", l:"Plan de la plaque et appuis", t:"dessin", v:"", dessin:croquisPlaque}),
         {sep:"Charges réparties"},
         {id:"da_g", l:"Permanentes en plus du poids propre", v:"1.50", u:"kN/m²", aide:"Chape, revêtement, cloisons", si:function(){ return !parTravee("da_") }},
         {id:"da_cat", l:"Charge utile SIA 261", v:"A", t:"s", o:Object.keys(CATEGORIES).map(function(k){ return [k, CATEGORIES[k].n] }), large:true, si:function(){ return !parTraveeQ("da_") }},
@@ -2944,7 +2945,7 @@ footer{font-size:11.5px}
   function appliqueTheme(c){
     var eff = c === "systeme" ? (mediaSombre && mediaSombre.matches ? "sombre" : "clair") : c;
     document.documentElement.setAttribute("data-theme", eff);
-    var meta = document.querySelector("meta[name=theme-color]"); if(meta) meta.setAttribute("content", eff === "sombre" ? "#121315" : "#F6F2EA");
+    var meta = document.querySelector("meta[name=theme-color]"); if(meta) meta.setAttribute("content", eff === "sombre" ? "#060D1B" : "#EDF2F9");
     $("#theme-lib").textContent = LIB_THEME[c];
   }
   $("#theme-btn").addEventListener("click", function(){
@@ -2973,7 +2974,7 @@ footer{font-size:11.5px}
     calcule();
     var vue = $("#v-" + courante), groupes = [].map.call(vue.querySelectorAll("[data-groupe]"), function(e){ return e.getAttribute("data-groupe") });
     var res = vue.querySelector("[id^='r-']"), d = new Date();
-    var h = '<div class="tete"><b>Note de calcul · ' + esc(NOMS[courante]) + '</b><span>STR Bim Tools · ' + d.toLocaleDateString("fr-CH") + '</span></div>';
+    var h = '<div class="tete"><b><img src="/calculs/logo-256.webp" alt="">Note de calcul · ' + esc(NOMS[courante]) + '</b><span>STR Bim Tools · ' + d.toLocaleDateString("fr-CH") + '</span></div>';
     if(courante !== "hypotheses") h += '<h2>Hypothèses communes</h2><div class="hyp">' + hypotheses("beton") + hypotheses("coef") + '</div>';
     groupes.forEach(function(g){ h += '<h2>' + (courante === "hypotheses" ? "Saisie" : "Données de la section") + '</h2><div class="hyp">' + hypotheses(g) + '</div>' });
     if(res) h += res.innerHTML;
