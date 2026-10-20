@@ -153,6 +153,9 @@ h3{margin:14px 0 6px;font-weight:600;font-size:13px;color:var(--texte-doux)}
 .tab-saisie.couche th[data-col]{white-space:nowrap}
 .champ output.aff{display:block;width:100%;padding:5px 0;font-size:14px;font-weight:650;color:var(--or);font-variant-numeric:tabular-nums}
 .champ .boite:has(output.aff){background:var(--pale);border-color:transparent}
+.champ output.aff.ko{color:var(--alerte)}
+.champ .boite:has(output.aff.ko){background:rgba(198,43,34,.10);border-color:var(--alerte)}
+.alerte.ko{border-left-color:var(--alerte);color:var(--alerte)}
 .tab-saisie .champ label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .tab-saisie .champ .aide{display:none}
 .champ.liste{grid-column:span 2}
@@ -642,11 +645,16 @@ footer{font-size:11.5px}
   }
   // Remplit la colonne « Flèche calculée » : w [m] par travée et part de la limite
   function afficheFleches(p, T, fl, ratios){
-    var n = T.L.length;
+    var n = T.L.length, depasse = [];
     for(var i = 1; i <= 5; i++){
       var cl = $("#c-" + p + "wlim" + i);
       if(cl) cl.textContent = i <= n ? fmt(T.L[i-1] / T.lim[i-1] * 1000, 1) + " mm" : "—";
-      var c = $("#c-" + p + "wcal" + i); if(c) c.textContent = fl && fl[i-1] != null ? fmt(Math.abs(fl[i-1]) * 1000, 1) + " mm · " + fmt(ratios[i-1] * 100, 0) + " %" : "—" }
+      var c = $("#c-" + p + "wcal" + i), ko = !!(fl && fl[i-1] != null && i <= n && ratios[i-1] > 1);
+      if(c){ c.textContent = fl && fl[i-1] != null && i <= n ? (ko ? "⚠ " : "") + fmt(Math.abs(fl[i-1]) * 1000, 1) + " mm · " + fmt(ratios[i-1] * 100, 0) + " %" : "—"; c.classList.toggle("ko", ko) }
+      if(ko) depasse.push("travée " + i + " : " + fmt(Math.abs(fl[i-1]) * 1000, 1) + " mm > " + fmt(T.L[i-1] / T.lim[i-1] * 1000, 1) + " mm (L/" + fmt(T.lim[i-1], 0) + ")");
+    }
+    // alerte à placer en tête des résultats, vide si tout passe
+    return depasse.length ? '<div class="alerte ko">⚠ Flèche limite dépassée · ' + depasse.join(" · ") + '</div>' : "";
   }
   function ponctuelles(p, unite){
     var t = [{sep:"Charges ponctuelles"},{id:p+"np", l:"Nombre de charges", v:"0", t:"s", o:opt(["0","1","2","3","4"])}];
@@ -2527,7 +2535,7 @@ footer{font-size:11.5px}
         h2 += blocTravees(Ef, "Avec les épaisseurs forcées (travées " + fixe.map(function(v, i){ return v != null ? i + 1 : null }).filter(function(v){ return v }).join(", ") + ")", Eu);
       }
       var Eret = Ef || Eo;      // épaisseurs retenues : forcées s'il y en a, sinon optimisées
-      afficheFleches("da_", T, Eret.D.fl, Eret.tr.map(function(t){ return t.fl }));
+      h2 = afficheFleches("da_", T, Eret.D.fl, Eret.tr.map(function(t){ return t.fl })) + h2;
       h2 = h2.replace("%%SCHEMA_DALLE%%", '<h3>Appuis et épaisseurs</h3>' + schemaDalle(T.L, T.app, Eo.hs, fixe));
     } else {
       var lx = Math.max(0.5, num("da_lx")), ly = Math.max(0.5, num("da_ly")), bW = val("da_bW"), bE = val("da_bE"), bS = val("da_bS"), bN = val("da_bN"), Pl;
@@ -2720,7 +2728,7 @@ footer{font-size:11.5px}
     h2 += '<h2>Résultat</h2><div class="cles">' + res + '</div>';
     h2 += '<h3>Charges</h3>' + schemaCharges(R, T.gTr ? T.gTr.map(function(v){ return v + ED.gt }) : ED.gt, q, pts, "kN/m (poids propre compris)", "kN", "Charges sur la poutre") +
       schemasEfforts(R, eDessin, ED.eV, "md [kNm]", "vd [kN]", DD);
-    afficheFleches("po_", T, DD.fl, ratiosFleche(T, DD.fl, T.lim));
+    h2 = afficheFleches("po_", T, DD.fl, ratiosFleche(T, DD.fl, T.lim)) + h2;
     var Ra = reactions(g);
     h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
     h2 += '<h3>Réactions d\'appui de calcul (max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
