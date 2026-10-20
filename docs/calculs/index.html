@@ -288,7 +288,18 @@ tr.opt td{background:transparent;font-weight:600}
 .lg{font-size:11px}
 .etat{font-size:10.5px}
 footer{font-size:11.5px}
-@media (max-width:1180px){
+/* Menu des sections masqué automatiquement (20.10.2026) : rail des numéros, déplié au survol */
+@media (min-width:861px){
+  .app{grid-template-columns:52px minmax(0,1fr)}
+  .cote{position:fixed;left:0;top:var(--haut);bottom:0;z-index:15;width:52px;height:auto;padding:14px 6px 20px;overflow:hidden;
+    background:var(--surface);border-right:1px solid var(--ligne);transition:width .22s ease,box-shadow .22s ease}
+  .cote:hover,.cote:focus-within{width:240px;overflow-y:auto;box-shadow:var(--ombre)}
+  .cote a{white-space:nowrap;padding:6px 8px}
+  .cote:not(:hover):not(:focus-within) .cote-titre,.cote:not(:hover):not(:focus-within) .cote-pied,
+  .cote:not(:hover):not(:focus-within) a span:nth-child(2),.cote:not(:hover):not(:focus-within) a small{visibility:hidden}
+  main{padding-left:14px}
+}
+@media (max-width:1000px){
   .vue.calc.on{display:block}
   .vue.calc > .champs{position:static;max-height:none;overflow:visible}
 }
@@ -2372,6 +2383,7 @@ footer{font-size:11.5px}
   // =====================================================================
   function chargeUtile(cat, id){ return cat === "man" ? num(id) : CATEGORIES[cat].q }
   function rendDalles(){
+    $("#v-dalles").classList.toggle("pleine", val("da_m") === "un");   // plaque : saisie à gauche, résultats à droite (20.10.2026)
     var M = mat(), g = parTravee("da_") ? 0 : num("da_g"), q = chargeUtile(val("da_cat"), "da_q"), cn = num("da_cn") / 1000, o = num("da_dia") / 1000, rows = [], h2 = "";
     if(val("da_m") === "un"){
       var T = lireTravees("da_"), pts = lirePonctuelles("da_", T.L), cas = casStandard(T.L, pts, T.gTr), R;
