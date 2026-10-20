@@ -220,6 +220,9 @@ td.g{white-space:normal;min-width:16em}
 .lg{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px;font-size:12px;color:var(--texte-faible)}
 .lg i{display:inline-block;width:16px;height:0;border-top:1.6px solid var(--or);vertical-align:middle;margin-right:6px}
 .lg i.t{border-color:rgba(var(--encre),.7)}
+.lg i.lim{border-top:1.6px dashed var(--alerte)}
+.schema .lim{stroke:var(--alerte);stroke-width:1.2;stroke-dasharray:5 4;fill:none}
+.schema text.lim{fill:var(--alerte)}
 
 .ref{margin:6px 0 0;padding:0;list-style:none}
 .ref li{padding:5px 0;font-size:13.5px;color:var(--texte-doux);border-bottom:1px solid var(--ligne)}
@@ -1961,9 +1964,10 @@ footer{font-size:11.5px}
   // =====================================================================
   //  Dessins
   // =====================================================================
-  function schemaPoutre(R, env, unite, titre){
+  // lims : flèche limite par travée [même unité que env], tracée en pointillé rouge (20.10.2026)
+  function schemaPoutre(R, env, unite, titre, lims){
     var W = 640, H = 200, g = 34, y0 = 92, X = R.ax[R.ax.length - 1];
-    var e1 = extr(env.max), e2 = extr(env.min), amp = Math.max(Math.abs(e1.max), Math.abs(e2.min), 1e-9);
+    var e1 = extr(env.max), e2 = extr(env.min), amp = Math.max(Math.abs(e1.max), Math.abs(e2.min), lims ? Math.max.apply(null, lims) : 0, 1e-9);
     function px(x){ return g + (W - 2*g) * x / X }
     function py(v){ return y0 + v / amp * 70 }      // positif (fibre inférieure tendue) dessiné vers le bas
     // valeurs au survol de la souris (19.10.2026)
@@ -1975,6 +1979,11 @@ footer{font-size:11.5px}
     s += '<path class="oz" d="'+dMax+'"/><path class="tz" d="'+dMin+'"/>';
     s += '<path class="o" d="'+dMax.replace(" Z", "")+'"/><path class="tl" d="'+dMin.replace(" Z", "")+'"/>';
     s += '<line class="ax" x1="'+px(0)+'" y1="'+y0+'" x2="'+px(X)+'" y2="'+y0+'"/>';
+    if(lims) lims.forEach(function(wl, t){
+      var x1 = px(R.ax[t]), x2 = px(R.ax[t + 1]), yl = py(wl), lib = R.types[t] === "L";   // console libre à gauche : libellé côté appui
+      s += '<line class="lim" x1="'+x1.toFixed(1)+'" y1="'+yl.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+yl.toFixed(1)+'"/>';
+      s += '<text class="lim" x="'+(lib ? x2 - 4 : x1 + 4).toFixed(1)+'" y="'+(yl - 4).toFixed(1)+'" text-anchor="'+(lib ? "end" : "start")+'">lim. '+fmt(wl, 1)+'</text>';
+    });
     R.ax.forEach(function(x, q){
       var t = R.types[q], cx = px(x);
       s += '<text class="nap" x="'+cx.toFixed(1)+'" y="'+(y0 + 24)+'" text-anchor="middle">'+(q + 1)+'</text>';   // numéro de l'appui
@@ -2048,14 +2057,17 @@ footer{font-size:11.5px}
     s += '<text x="'+W+'" y="14" text-anchor="end">'+esc(uP ? "charges caractéristiques · P en " + uP : "charges caractéristiques")+'</text></svg>';
     return s + '<div class="lg"><span><i class="t"></i>permanentes gk</span><span><i></i>variables qk</span></div>';
   }
-  // D : déformée facultative {max, min [m], txt}
+  // D : déformée facultative {max, min [m], txt, lim (L / lim par travée, nombre ou tableau)}
   function schemasEfforts(R, eM, eV, uM, uV, D){
     var s = '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, eV, uV, "Enveloppe des efforts tranchants") +
       '<div class="lg"><span><i></i>enveloppe haute</span><span><i class="t"></i>enveloppe basse</span></div>' +
       '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eM, uM, "Enveloppe des moments") +
       '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
-    if(D) s += '<h3>Déformée, enveloppe</h3>' + schemaPoutre(R, {max:Array.from(D.max, function(v){ return v * 1000 }), min:Array.from(D.min, function(v){ return v * 1000 })}, "w [mm]", "Déformée") +
-      '<div class="lg"><span><i></i>flèche vers le bas</span><span><i class="t"></i>remontée</span><span>' + esc(D.txt) + '</span></div>';
+    if(D){
+      var lims = D.lim ? R.ax.slice(1).map(function(x, t){ return (x - R.ax[t]) * 1000 / (Array.isArray(D.lim) ? D.lim[t] : D.lim) }) : null;
+      s += '<h3>Déformée, enveloppe</h3>' + schemaPoutre(R, {max:Array.from(D.max, function(v){ return v * 1000 }), min:Array.from(D.min, function(v){ return v * 1000 })}, "w [mm]", "Déformée", lims) +
+        '<div class="lg"><span><i></i>flèche vers le bas</span><span><i class="t"></i>remontée</span>' + (lims ? '<span><i class="lim"></i>flèche limite L / lim</span>' : '') + '<span>' + esc(D.txt) + '</span></div>';
+    }
     return s;
   }
   // Schéma de la dalle : appuis et épaisseurs par travée (optimisée, forcée), hauteur exagérée
@@ -2327,7 +2339,7 @@ footer{font-size:11.5px}
         // flèche à long terme, charges quasi permanentes (EN 1992 §7.4.1(4), §7.4.3)
         var kU = courbureBA(1, h, d, r.Asp, d, r.Asn > 0 ? r.Asn : amin, M.fck, phi, M.Es);
         r.D = deformee(R, combFleche(R, facteurs(T.L, pts, gt, q, 1, 1, T.gTr), 1, psi2), function(i, m){ return kU(m) });
-        r.D.txt = txtD; r.fl = Math.max.apply(null, ratiosFleche(T, r.D.fl, T.lim));
+        r.D.txt = txtD; r.D.lim = T.lim; r.fl = Math.max.apply(null, ratiosFleche(T, r.D.fl, T.lim));
         if(r.fl > 1){ r.ok = false; r.raisons.push("flèche") }
         var rho = r.Asp / (d * 1e6), pire = 0;
         T.L.forEach(function(l, i){ var lim = ldLim(Ks[i], rho, M.fck), ratio = l / d / lim; pire = Math.max(pire, ratio) });
@@ -2393,7 +2405,7 @@ footer{font-size:11.5px}
         });
         var kT = tr.map(function(t){ return courbureBA(1, t.h, t.d, t.Asp, t.d, t.Asn > 0 ? t.Asn : asMin(1, t.d, M), M.fck, phi, M.Es) });
         var D = deformee(Rx, combFleche(Rx, facteurs(T.L, pts, 0, q, 1, 1, gT), 1, psi2), function(i, m){ return kT[i](m) });
-        D.txt = txtD;
+        D.txt = txtD; D.lim = T.lim;
         ratiosFleche(T, D.fl, T.lim).forEach(function(rf, i){ tr[i].fl = rf; tr[i].w = D.fl[i]; if(rf > 1){ tr[i].ok = false; tr[i].raisons.push("flèche") } });
         var cout = 0, acier = 0; tr.forEach(function(t, i){ cout += t.cout * T.L[i]; acier += t.acier * T.L[i] });
         return {hs:hs, R:Rx, gT:gT, eM:eM, eV:eV, D:D, tr:tr, cout:cout / Ltot, acier:acier / Ltot, ok:tr.every(function(t){ return t.ok })};
@@ -2608,7 +2620,7 @@ footer{font-size:11.5px}
     // déformée : permanentes × fp, variables défavorables × fq, courbure kap(i, M)
     function fleche(gt, fp, fq, kap, lim){
       var D = deformee(R, combFleche(R, facteurs(T.L, pts, gt, q, 1, 1, T.gTr), fp, fq), kap);
-      D.ratio = Math.max.apply(null, ratiosFleche(T, D.fl, lim)); D.wmax = Math.max.apply(null, D.fl.map(Math.abs));
+      D.lim = lim; D.ratio = Math.max.apply(null, ratiosFleche(T, D.fl, lim)); D.wmax = Math.max.apply(null, D.fl.map(Math.abs));
       return D;
     }
     function reactions(gt){
