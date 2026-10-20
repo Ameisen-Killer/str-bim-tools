@@ -228,6 +228,8 @@ td.g{white-space:normal;min-width:16em}
 .etat{display:inline-block;margin-right:6px;padding:1px 8px;border-radius:20px;background:var(--surface-2);font-size:11.5px;font-weight:500;color:var(--texte-faible);white-space:nowrap}
 .etat.ok{color:var(--texte-doux)}
 .etat.av{background:var(--pale);color:var(--or)}
+.verifs li em.el{display:inline-block;margin-right:6px;padding:0 6px;border-radius:20px;background:var(--surface-2);font-style:normal;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap}
+.verifs li em.el.els{background:var(--pale);color:var(--or)}
 
 footer{display:flex;justify-content:space-between;gap:12px;padding:14px var(--g) max(14px,env(safe-area-inset-bottom));font-size:12.5px;color:var(--texte-faible)}
 footer a{text-decoration:none}
@@ -676,8 +678,8 @@ footer{font-size:11.5px}
     ],
     coef:[
       {sep:"Charges — SIA 260 / EN 1990"},
-      {id:"gG", l:"γG charges permanentes", v:"1.35", aide:"Valeur courante, à confirmer"},
-      {id:"gQ", l:"γQ charges variables", v:"1.5", aide:"Valeur courante, à confirmer"},
+      {id:"gG", l:"γG charges permanentes (ELU)", v:"1.35", aide:"Valeur courante, à confirmer"},
+      {id:"gQ", l:"γQ charges variables (ELU)", v:"1.5", aide:"Valeur courante, à confirmer"},
       {sep:"Béton — SIA 262"},
       {id:"gc", l:"γc béton", v:"1.5", aide:"SIA 262, recoupé"},
       {id:"lam", l:"Hauteur du bloc de compression / x", v:"0.85", aide:"Bloc rectangulaire SIA 262, à confirmer (EN 1992 : 0,8)"},
@@ -776,8 +778,8 @@ footer{font-size:11.5px}
         {id:"da_cn", l:"Enrobage", v:"30", u:"mm", aide:"À fixer selon exposition (SIA 262)"},
         {id:"da_dia", l:"Ø estimé des barres", v:"12", u:"mm"},
         deux({id:"da_nu", l:"Coefficient de Poisson ν", v:"0.2"}),
-        un({id:"da_psi2", l:"ψ2 de la charge utile (flèche)", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux ; 0,6 grandes salles"}),
-        un({id:"da_phi", l:"Coefficient de fluage φ (flèche)", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1, ou section Matériaux)"})
+        un({id:"da_psi2", l:"ψ2 de la charge utile (flèche, ELS)", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux ; 0,6 grandes salles"}),
+        un({id:"da_phi", l:"Coefficient de fluage φ (flèche, ELS)", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1, ou section Matériaux)"})
       ]);
     })(),
     mat:[
@@ -924,10 +926,10 @@ footer{font-size:11.5px}
       {id:"po_kmod", l:"kmod", v:"0.8", aide:"EN 1995 : classe de service 1, moyen terme", si:function(){ return val("po_mat") === "bois" }},
       {id:"po_gMb", l:"γM", v:"auto", aide:"auto : EN 1995 (1,3 massif, 1,25 lamellé). SIA 265 : à confirmer", si:function(){ return val("po_mat") === "bois" }},
       {id:"po_kdef", l:"kdef", v:"0.6", aide:"EN 1995 tab. 3.2, classe de service 1", si:function(){ return val("po_mat") === "bois" }},
-      {id:"po_psi2", l:"ψ2 de la charge variable", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux", si:function(){ return val("po_mat") !== "acier" }},
+      {id:"po_psi2", l:"ψ2 de la charge variable (flèche, ELS)", v:"0.3", aide:"EN 1990 tab. A1.1 : 0,3 habitation, bureaux", si:function(){ return val("po_mat") !== "acier" }},
       {sep:"Flèches"},
-      {id:"po_phi", l:"Coefficient de fluage φ", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1)", si:function(){ return val("po_mat") === "ba" }},
-      {id:"po_lim", l:"Flèche instantanée sous la charge variable L /", v:"300", aide:"La flèche finale se règle par travée, en haut", si:function(){ return val("po_mat") === "bois" }}
+      {id:"po_phi", l:"Coefficient de fluage φ (flèche, ELS)", v:"2.5", aide:"À lire selon h0, humidité et âge au chargement (EN 1992 fig. 3.1)", si:function(){ return val("po_mat") === "ba" }},
+      {id:"po_lim", l:"Flèche instantanée (ELS) L /", v:"300", aide:"La flèche finale se règle par travée, en haut", si:function(){ return val("po_mat") === "bois" }}
     ])
   };
 
@@ -2050,11 +2052,11 @@ footer{font-size:11.5px}
   }
   // D : déformée facultative {max, min [m], txt}
   function schemasEfforts(R, eM, eV, uM, uV, D){
-    var s = '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, eV, uV, "Enveloppe des efforts tranchants") +
+    var s = '<h3>Efforts tranchants de calcul (ELU), enveloppe</h3>' + schemaPoutre(R, eV, uV, "Enveloppe des efforts tranchants") +
       '<div class="lg"><span><i></i>enveloppe haute</span><span><i class="t"></i>enveloppe basse</span></div>' +
-      '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, eM, uM, "Enveloppe des moments") +
+      '<h3>Moments de calcul (ELU), enveloppe</h3>' + schemaPoutre(R, eM, uM, "Enveloppe des moments") +
       '<div class="lg"><span><i></i>fibre inférieure tendue</span><span><i class="t"></i>fibre supérieure tendue</span></div>';
-    if(D) s += '<h3>Déformée, enveloppe</h3>' + schemaPoutre(R, {max:Array.from(D.max, function(v){ return v * 1000 }), min:Array.from(D.min, function(v){ return v * 1000 })}, "w [mm]", "Déformée") +
+    if(D) s += '<h3>Déformée (ELS), enveloppe</h3>' + schemaPoutre(R, {max:Array.from(D.max, function(v){ return v * 1000 }), min:Array.from(D.min, function(v){ return v * 1000 })}, "w [mm]", "Déformée") +
       '<div class="lg"><span><i></i>flèche vers le bas</span><span><i class="t"></i>remontée</span><span>' + esc(D.txt) + '</span></div>';
     return s;
   }
@@ -2113,7 +2115,15 @@ footer{font-size:11.5px}
     return s;
   }
   function cle(t, v, u, s, or){ return '<div class="cle'+(or ? " or" : "")+'"><div class="t">'+esc(t)+'</div><div class="v">'+v+(u ? '<small>'+esc(u)+'</small>' : "")+'</div>'+(s ? '<div class="s">'+s+'</div>' : "")+'</div>' }
-  function verif(ok, t, d){ return '<li class="'+(ok === null ? "info" : ok ? "" : "non")+'"><b>'+(ok === null ? "—" : ok ? "✓" : "✗")+'</b><span>'+t+'</span><span>'+(d || "")+'</span></li>' }
+  // état limite de la vérification, déduit de son libellé (20.10.2026) : ELS, ELU (STR), ELU · GEO, ELU · EQU ; rien pour les dispositions constructives
+  function etatLimite(t){
+    if(/^(Flèche|wk ≤|σs ≤ 0,8|Élancement [Ll]\/d|Armature minimale de fissuration)/.test(t)) return ["ELS", "els"];
+    if(/^Renversement EQU/.test(t)) return ["ELU · EQU", ""];
+    if(/^(Portance|Glissement|Contrainte au sol|Excentricité)/.test(t)) return ["ELU · GEO", ""];
+    if(/^(Flexion|Effort tranchant|VEd|Bielles|Cisaillement|Sans armature|Rideau|Semelle|Périmètre|Armature de poinçonnement|Ancrage|Asw\/s ≤|Inférieur|Supérieur|Horizontal|Vertical|Armature minimale seule)/.test(t)) return ["ELU", ""];
+    return null;
+  }
+  function verif(ok, t, d){ var e = ok === null ? null : etatLimite(t); return '<li class="'+(ok === null ? "info" : ok ? "" : "non")+'"><b>'+(ok === null ? "—" : ok ? "✓" : "✗")+'</b><span>'+(e ? '<em class="el '+e[1]+'">'+e[0]+'</em>' : '')+t+'</span><span>'+(d || "")+'</span></li>' }
 
   // =====================================================================
   //  00 — Hypothèses
@@ -2280,8 +2290,8 @@ footer{font-size:11.5px}
       cle("md côté terre", fmt(Mn, 1), "kNm/m", "face contre terre tendue") +
       cle("vd max", fmt(Vd, 1), "kN/m") +
       cle("Réaction en tête", fmt(Math.abs(num("mu_gT") * R.R[0][0] + num("mu_gW") * R.R[1][0] + M.gQ * R.R[2][0]), 1), "kN/m", "à reprendre par la dalle") + '</div>';
-    h2 += '<h3>Efforts tranchants de calcul, enveloppe</h3>' + schemaPoutre(R, envV, "vd [kN/m] · tête à gauche, pied à droite", "Efforts tranchants dans le mur");
-    h2 += '<h3>Moments de calcul, enveloppe</h3>' + schemaPoutre(R, envM, "md [kNm/m] · tête à gauche, pied à droite", "Moments dans le mur");
+    h2 += '<h3>Efforts tranchants de calcul (ELU), enveloppe</h3>' + schemaPoutre(R, envV, "vd [kN/m] · tête à gauche, pied à droite", "Efforts tranchants dans le mur");
+    h2 += '<h3>Moments de calcul (ELU), enveloppe</h3>' + schemaPoutre(R, envM, "md [kNm/m] · tête à gauche, pied à droite", "Moments dans le mur");
     h2 += '<div class="lg"><span><i></i>face intérieure tendue</span><span><i class="t"></i>face contre terre tendue</span></div>';
     if(io < 0){ $("#r-mur").innerHTML = h2 + '<div class="alerte">Aucune épaisseur jusqu\'à 60 cm ne passe sans étriers.</div>'; return }
     var Rr = rows[io];
@@ -2731,7 +2741,7 @@ footer{font-size:11.5px}
     h2 = afficheFleches("po_", T, DD.fl, ratiosFleche(T, DD.fl, T.lim)) + h2;
     var Ra = reactions(g);
     h2 += '<h3>Vérifications et armatures</h3><ul class="verifs">' + verifs + '</ul>' + tab;
-    h2 += '<h3>Réactions d\'appui de calcul (max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
+    h2 += '<h3>Réactions d\'appui de calcul (ELU, max, sans le poids propre de la poutre)</h3><ul class="verifs">' + Ra.map(function(v, s){ return v == null ? "" : verif(null, "Appui " + (s + 1), fmt(v, 1) + " kN") }).join("") + '</ul>';
     $("#r-poutre").innerHTML = h2;
   }
 
