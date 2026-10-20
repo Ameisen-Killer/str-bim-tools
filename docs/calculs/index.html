@@ -2423,35 +2423,91 @@ footer{font-size:11.5px}
           }).join("") + '</table></div><p class="note">md en kNm/m, vd en kN/m, coût en CHF/m². Flèche à long terme et part de la limite L / saisie. Répartition : 20 % de l\'inférieur de la travée (EN 1992 §9.3.1.1(2)). Supérieur en travée : seulement si l\'enveloppe reste négative sur toute la travée ; sinon le supérieur s\'arrête sur les appuis (voir le tableau suivant).</p>' + tableAppuis(E);
       }
       // Armatures supérieures appui par appui : md sur l'appui, hauteur utile de la travée voisine la plus mince
-      function tableAppuis(E){
-        var ax = E.R.ax, lignes = "";
-        ax.forEach(function(xa, q){
+      function appuisArm(E){
+        var res = [];
+        E.R.ax.forEach(function(xa, q){
           var mn = 0;
           E.R.x.forEach(function(x, k){ if(Math.abs(x - xa) < 1e-9) mn = Math.min(mn, E.eM.min[k]) });
           var Mn = -mn, voisins = [q - 1, q].filter(function(i){ return i >= 0 && i < n });
           if(Mn <= 0.01 || !voisins.length) return;
-          var d = Math.min.apply(null, voisins.map(function(i){ return E.tr[i].d })), f = flexion(Mn, 1, d, M), As = Math.max(f.As, asMin(1, d, M));
+          var d = Math.min.apply(null, voisins.map(function(i){ return E.tr[i].d })), f = flexion(Mn, 1, d, M);
           var lg = function(i){ var porte = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L"); return porte ? T.L[i] : 0.3 * T.L[i] };
-          var typ = E.R.types[q] === "E" ? "encastrement" : q > 0 && q < n ? "appui continu" : "appui simple";
-          lignes += '<tr' + (f.ok ? "" : ' class="ko"') + '><td>' + (q + 1) + '</td><td>' + typ + '</td><td>−' + fmt(Mn, 1) + '</td><td>' + fmt(d * 100, 1) + ' cm</td><td><b>' + txtM(barresM(As)) + '</b></td><td>' +
-            (q > 0 ? fmt(lg(q - 1), 2) : "—") + ' / ' + (q < n ? fmt(lg(q), 2) : "—") + ' m</td><td>' + (f.ok ? "✓" : "✗ x/d") + '</td></tr>';
+          res.push({q:q, Mn:Mn, d:d, ok:f.ok, b:barresM(Math.max(f.As, asMin(1, d, M))), lgG:q > 0 ? lg(q - 1) : 0, lgD:q < n ? lg(q) : 0,
+            typ:E.R.types[q] === "E" ? "encastrement" : q > 0 && q < n ? "appui continu" : "appui simple"});
         });
+        return res;
+      }
+      // Supérieur continu sur toute la travée i (enveloppe négative partout), ou null
+      function supTravee(E, i){
+        var mh = -Infinity;
+        E.R.x.forEach(function(x, k){ if(x >= E.R.ax[i] - 1e-9 && x <= E.R.ax[i+1] + 1e-9) mh = Math.max(mh, E.eM.min[k]) });
+        if(mh >= -0.01) return null;
+        var t = E.tr[i], fs = flexion(-mh, 1, t.d, M);
+        return {Mn:-mh, ok:fs.ok, b:barresM(Math.max(fs.As, asMin(1, t.d, M)))};
+      }
+      function tableAppuis(E){
+        var lignes = appuisArm(E).map(function(a){
+          return '<tr' + (a.ok ? "" : ' class="ko"') + '><td>' + (a.q + 1) + '</td><td>' + a.typ + '</td><td>−' + fmt(a.Mn, 1) + '</td><td>' + fmt(a.d * 100, 1) + ' cm</td><td><b>' + txtM(a.b) + '</b></td><td>' +
+            (a.q > 0 ? fmt(a.lgG, 2) : "—") + ' / ' + (a.q < n ? fmt(a.lgD, 2) : "—") + ' m</td><td>' + (a.ok ? "✓" : "✗ x/d") + '</td></tr>';
+        }).join("");
         if(!lignes) return "";
         return '<h3>Armatures sur appuis</h3><div class="defile"><table><tr><th>Appui</th><th>Type</th><th>md</th><th>d</th><th>Supérieur</th><th>Longueur gauche / droite</th><th></th></tr>' + lignes +
           '</table></div><p class="note">md en kNm/m, enveloppe sur l\'appui. d de la travée voisine la plus mince. Longueurs de métré : 0,3 L de chaque côté, toute la console pour un porte-à-faux (ancrages en plus). Pas de répartition sous le supérieur sans moment transversal (EN 1992 §9.3.1.1(2)) ; à prévoir sinon.</p>';
+      }
+      // Schéma du ferraillage en élévation (19.10.2026) : épaisseurs exagérées, inférieur par travée,
+      // supérieur sur appuis avec ses longueurs, supérieur continu en travée, répartition en points
+      function schemaArmatures(E){
+        var W = 640, g = 24, yt = 46, X = T.L.reduce(function(a, l){ return a + l }, 0), ax = E.R.ax;
+        var hm = Math.max.apply(null, E.hs), sc = 34 / Math.max(hm, 0.01), yb = yt + hm * sc, H = yb + 64;
+        function px(x){ return g + (W - 2*g) * x / X }
+        var s = '<svg class="schema" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Ferraillage">', prof = "", ent = 3;
+        function lab(b){ return b ? "Ø" + b.o + " e " + b.s : "hors tableau" }
+        E.tr.forEach(function(t, i){
+          var x1 = px(ax[i]), x2 = px(ax[i + 1]), hb = yt + t.h * sc;
+          s += '<rect class="tz" x="'+x1.toFixed(1)+'" y="'+yt+'" width="'+(x2 - x1).toFixed(1)+'" height="'+(t.h * sc).toFixed(1)+'"/>';
+          prof += (i ? " V" : "M" + x1.toFixed(1) + " " + yt + " H" + px(X).toFixed(1) + " M" + x1.toFixed(1) + " " + yt + " V") + hb.toFixed(1) + " H" + x2.toFixed(1);
+          // inférieur : barre sur la travée, crochets relevés aux bouts
+          var yi = hb - ent, b = barresM(t.Asp), r = barresM(0.2 * t.Asp);
+          s += '<path class="o" d="M'+(x1 + 3).toFixed(1)+' '+(yi - 5).toFixed(1)+' V'+yi.toFixed(1)+' H'+(x2 - 3).toFixed(1)+' V'+(yi - 5).toFixed(1)+'"/>';
+          for(var xx = x1 + 8; xx < x2 - 6; xx += 12) s += '<circle class="pt" cx="'+xx.toFixed(1)+'" cy="'+(yi - 2.2).toFixed(1)+'" r="1.1"/>';
+          s += '<text class="or" x="'+((x1 + x2) / 2).toFixed(1)+'" y="'+(yb + 30)+'" text-anchor="middle">'+lab(b)+'</text>';
+          s += '<text x="'+((x1 + x2) / 2).toFixed(1)+'" y="'+(yb + 42)+'" text-anchor="middle">rép. '+lab(r)+'</text>';
+          // supérieur continu en travée
+          var st = supTravee(E, i), porte = (i === 0 && T.ga === "L") || (i === n - 1 && T.dr === "L");
+          if(st && !porte){
+            s += '<path class="tl" d="M'+(x1 + 3).toFixed(1)+' '+(yt + ent)+' H'+(x2 - 3).toFixed(1)+'"/>';
+            s += '<text x="'+((x1 + x2) / 2).toFixed(1)+'" y="'+(yt - 22)+'" text-anchor="middle">sup. '+lab(st.b)+'</text>';
+          }
+        });
+        s += '<path class="f" d="'+prof+' V'+yt+'"/>';
+        // supérieur sur appuis
+        appuisArm(E).forEach(function(a){
+          var cx = px(ax[a.q]), xg = px(ax[a.q] - a.lgG), xd = px(ax[a.q] + a.lgD), y = yt + ent;
+          s += '<path class="tl" stroke-width="1.6" d="M'+xg.toFixed(1)+' '+(y + 5)+' V'+y+' H'+xd.toFixed(1)+' V'+(y + 5)+'"/>';
+          s += '<text x="'+cx.toFixed(1)+'" y="'+(yt - 8)+'" text-anchor="middle">'+lab(a.b)+'</text>';
+        });
+        // appuis et numéros
+        ax.forEach(function(x, q){
+          var t = E.R.types[q], cx = px(x), y = yb + 1;
+          s += '<text class="nap" x="'+cx.toFixed(1)+'" y="'+(yb + 19)+'" text-anchor="middle">'+(q + 1)+'</text>';
+          if(t === "A") s += '<path class="ap" d="M'+cx.toFixed(1)+' '+y.toFixed(1)+' l-5 8 h10 z"/>';
+          else if(t === "E") s += '<path class="ap" d="M'+(cx - 6).toFixed(1)+' '+y.toFixed(1)+' h12 v7 h-12 z"/>';
+        });
+        s += '<text x="'+(W - g)+'" y="'+(H - 4)+'" text-anchor="end">e en mm · épaisseurs exagérées</text></svg>';
+        return '<h3>Ferraillage</h3>' + s + '<div class="lg"><span><i></i>inférieur, points : répartition</span><span><i class="t"></i>supérieur (sur appuis : 0,3 L de chaque côté, console entière)</span></div>';
       }
       function blocTravees(E, titre, ref){
         var s = '<h2>' + titre + '</h2><div class="cles">' + cle("Épaisseurs", E.hs.map(function(h){ return fmt(h * 100, 0) }).join(" · "), "cm", "travée 1 à " + n, true) +
           cle("Coût estimé", fmt(E.cout, 0), "CHF/m²", ref ? (E.cout >= ref.cout ? "+" : "−") + fmt(Math.abs(E.cout / ref.cout - 1) * 100, 1) + " % par rapport à l'optimum identique" : "") +
           cle("Armature", fmt(E.acier * (1 + M.maj), 1), "kg/m²", "majoration comprise") + '</div>' + tableTravees(E);
         if(!E.ok) s += '<div class="alerte">Au moins une travée ne passe pas avec ces épaisseurs (voir la dernière colonne).</div>';
-        return s + '<h3>Charges</h3>' + schemaCharges(E.R, E.gT, q, pts, "kN/m² (poids propre compris)", "kN/m", "Charges") + schemasEfforts(E.R, E.eM, E.eV, "md [kNm/m]", "vd [kN/m]", E.D);
+        return s + '<h3>Charges</h3>' + schemaCharges(E.R, E.gT, q, pts, "kN/m² (poids propre compris)", "kN/m", "Charges") + schemasEfforts(E.R, E.eM, E.eV, "md [kNm/m]", "vd [kN/m]", E.D) + schemaArmatures(E);
       }
       var Eu = evalue(T.L.map(function(){ return Rr.h })), parT = n > 1;   // optimisée travée par travée dès deux travées
       var Eo = parT ? optimiseTravees(Rr.h) : Eu;
       Eo.hs.forEach(function(h, i){ var c = $("#c-da_hopt" + (i + 1)); if(c) c.textContent = fmt(h, 2) });
       if(parT) h2 += blocTravees(Eo, "Épaisseurs optimisées par travée", Eu);
-      else h2 += '<h3>Ferraillage par travée, épaisseur identique</h3>' + tableTravees(Eu);
+      else h2 += '<h3>Ferraillage par travée, épaisseur identique</h3>' + tableTravees(Eu) + schemaArmatures(Eu);
       // Épaisseurs forcées : une case remplie fixe sa travée, les autres restent optimisées
       var fixe = T.L.map(function(l, i){ var v = parseFloat(String(val("da_hf" + (i + 1))).replace(",", ".")); return isFinite(v) && v > 0 ? Math.min(1.5, Math.max(0.06, v)) : null });
       if(fixe.some(function(v){ return v != null })){
