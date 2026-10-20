@@ -1779,13 +1779,13 @@ footer{font-size:11.5px}
     var smax = 0.75 * d, rmin = 0.08 * Math.sqrt(M.fck) / M.fsk;
     return '<div class="defile"><table><tr><th>Ø</th><th>Asw par file</th><th>s calculé</th><th>s retenu</th><th>Asw/s obtenu</th></tr>' + [6, 8, 10, 12].map(function(o){
       var A = br * aHA(o), s = A / Math.max(asw, rmin * bw * 1000) * 1000, sr = Math.floor(Math.min(s, smax) / 25) * 25;
-      return '<tr' + (sr < 75 ? ' class="ko"' : "") + '><td>Ø' + o + '</td><td>' + fmt(A, 0) + ' mm²</td><td>' + fmt(s, 0) + ' mm</td><td>' + (sr < 75 ? "trop serré" : sr + " mm") + '</td><td>' + (sr < 75 ? "—" : fmt(A / sr * 10, 2) + " cm²/m") + '</td></tr>';
+      return '<tr' + (sr < 75 ? ' class="ko"' : "") + '><td>Ø' + o + '</td><td>' + fmt(A, 0) + ' mm²</td><td>' + fmt(s / 10, 1) + ' cm</td><td>' + (sr < 75 ? "trop serré" : cmE(sr) + " cm") + '</td><td>' + (sr < 75 ? "—" : fmt(A / sr * 10, 2) + " cm²/m") + '</td></tr>';
     }).join("") + '</table></div>';
   }
   function texteRep(R){
     if(R.err) return '<div class="alerte">' + esc(R.err) + '</div>';
-    return '<p class="note"><b>Du nu vers mi-portée :</b> ' + fmt(R.s0 / 2, 0) + ' mm' + R.grp.map(function(g){ return " + " + g.n + " × " + g.s }).join("") +
-      ' mm, puis la même suite depuis l\'autre appui ; ' + (R.milieu ? "un cadre au milieu, à " + fmt(R.reste / 2, 0) + " mm de ses voisins." : "il reste " + fmt(R.reste, 0) + " mm au milieu.") + ' Soit ' + R.n + ' cadres par travée.</p>';
+    return '<p class="note"><b>Du nu vers mi-portée :</b> ' + fmt(R.s0 / 20, 1) + ' cm' + R.grp.map(function(g){ return " + " + g.n + " × " + cmE(g.s) }).join("") +
+      ' cm, puis la même suite depuis l\'autre appui ; ' + (R.milieu ? "un cadre au milieu, à " + fmt(R.reste / 20, 1) + " cm de ses voisins." : "il reste " + fmt(R.reste / 10, 1) + " cm au milieu.") + ' Soit ' + R.n + ' cadres par travée.</p>';
   }
   function rendCalculette(){
     var M = mat(), mode = val("ch_mode"), bw = num("ch_bw"), c = num("ch_c"), dw = +val("ch_dw"), dg = num("ch_dg"), n = Math.max(1, Math.round(num("ch_n"))), lmax = Math.max(1, Math.round(num("ch_lits")));
