@@ -145,7 +145,13 @@ button,input,select{font:inherit;color:inherit}
 
 /* ---------- Éditeur ---------- */
 /* l'éditeur prend tout l'écran : le bandeau du site disparaît (thème et moteur sont dans Affichage) */
-body.edition .barre{display:none}
+body.edition .barre,body.edition footer{display:none}
+body.edition{overflow:hidden}
+/* ascenseurs des panneaux : fins et discrets */
+.liste,.props,.ctx{scrollbar-width:thin;scrollbar-color:rgba(var(--encre),.22) transparent}
+.liste::-webkit-scrollbar,.props::-webkit-scrollbar,.ctx::-webkit-scrollbar{width:8px}
+.liste::-webkit-scrollbar-thumb,.props::-webkit-scrollbar-thumb,.ctx::-webkit-scrollbar-thumb{background:rgba(var(--encre),.22);border-radius:4px}
+.liste::-webkit-scrollbar-track,.props::-webkit-scrollbar-track,.ctx::-webkit-scrollbar-track{background:transparent}
 .editeur{height:100svh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
 .outils{
   display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;
