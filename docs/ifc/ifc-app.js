@@ -447,6 +447,7 @@
       h.push(bouton("developper-tout", "Développer tout"), bouton("reduire-tout", "Réduire tout"));
     }
     if (noeud && l.i.supprimable) h.push("<hr>", bouton("selectionner", l.enfants ? "Sélectionner avec son contenu" : "Sélectionner"));
+    if (choix.size) h.push(noeud && l.i.supprimable ? "" : "<hr>", bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")));
     c.cles = elementsDe([l].concat(sousLignes(c.k)).filter(function(x){ return x.i && x.f.visible; }).map(function(x){ return x.cle; }));
     if (c.cles.length) h.push("<hr>", '<div class="mb-sous">Vue 3D</div>', boutonsVue(c.cles, !noeud));
     h.push("<hr>", '<div class="mb-sous">Couleur de la maquette</div><div class="teintes">' +
@@ -469,9 +470,12 @@
       activer(cl, true);
       var d = lireCle(cl), i = IFC.infos(d.f.m, d.id);
       h.push('<div class="ctx-titre">' + esc(c.length > 1 ? "Sélection : " + pluriel(c.length, "élément") : nomAff(i)) + "</div>");
-      if (i.supprimable) h.push(bouton("basculer", choix.has(cl) ? "Retirer de la sélection" : "Ajouter à la sélection"), "<hr>");
+      if (i.supprimable) h.push(bouton("basculer", choix.has(cl) ? "Retirer de la sélection" : "Ajouter à la sélection"));
+      if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")));
+      if (i.supprimable || choix.size) h.push("<hr>");
       h.push(boutonsVue(c), "<hr>");
     }
+    else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
     if (vue.aCoupe()) h.push(bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
@@ -776,7 +780,7 @@
     },
     annuler: annuler, retablir: retablir, supprimer: supprimer,
     tout: function(){ $("#sel-tout").click(); },
-    rien: function(){ choix.clear(); majLignes(); maj(); },
+    rien: function(){ var n = choix.size; choix.clear(); majLignes(); maj(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
     inverser: function(){ $("#sel-inv").click(); },
     "meme-type": function(){ comme(function(i, r){ return i.type === r.type; }, "le même type"); },
     "meme-materiau": function(){ comme(function(i, r){ return !!r.materiau && i.materiau === r.materiau; }, "le même matériau"); },
