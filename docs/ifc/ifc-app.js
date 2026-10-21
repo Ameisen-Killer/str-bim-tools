@@ -561,10 +561,18 @@
 
   // ================= Propriétés =================
   function ligne(dt, dd, mono){ return dd ? "<dt>" + esc(dt) + "</dt><dd" + (mono ? ' class="mono"' : "") + ">" + esc(dd) + "</dd>" : ""; }
+  // ce que montre le panneau : rien, « plusieurs éléments », ou l'élément actif (et sa version)
+  var dernierProps = null;
+  function cleProps(){ return choix.size > 1 ? "n" + choix.size : actif && existe(actif) ? actif + "@" + lireCle(actif).f.m.version : ""; }
   function afficherProps(){
+    dernierProps = cleProps();
     var z = $("#props");
     if (!actif || !existe(actif)){
       z.innerHTML = '<p class="props-vide">Clique un élément dans la liste ou dans la vue 3D.</p>';
+      return;
+    }
+    if (choix.size > 1){
+      z.innerHTML = '<p class="props-vide">' + esc(pluriel(choix.size, "élément sélectionné", "éléments sélectionnés")) + " : les propriétés s'affichent pour un seul élément à la fois.</p>";
       return;
     }
     var d = lireCle(actif), m = d.f.m, id = d.id, i = IFC.infos(m, id), I = IFC.index(m);
@@ -636,6 +644,7 @@
     $("#f-bilan").innerHTML = "Avant <b>" + fmtN(avant) + "</b> entités · " + fmtTaille(oAvant) +
       " → maintenant <b>" + fmtN(apres) + "</b> entités · " + fmtTaille(oApres);
     vue.selection(choix, actif);
+    if (cleProps() !== dernierProps) afficherProps();
   }
 
   function infoVue(b){
