@@ -1277,7 +1277,64 @@
     function rendre(){
       attente = false;
       if (!W || !H) return;
-      M.dessiner(camera());
+      var c = camera();
+      M.dessiner(c);
+      placerPoignees(c);
+    }
+
+    // ---------- Poignées de la boîte de coupe : une par face, à tirer pour l'étirer ou la réduire ----------
+    function ecran(c, p){
+      var qx = p[0] - c.centre[0], qy = p[1] - c.centre[1], qz = p[2] - c.centre[2];
+      var xv = c.ca*qx + c.sa*qy, yv = -c.sa*qx + c.ca*qy;
+      return [W/2 + c.px + xv*c.s, H/2 + c.py - (qz*c.cb + yv*c.sb)*c.s];
+    }
+    function centreFace(f){        // f = 2·axe + côté (0 : min, 1 : max)
+      var ax = f >> 1, p = [0, 1, 2].map(function(i){ return (coupe.min[i] + coupe.max[i])/2; });
+      p[ax] = f & 1 ? coupe.max[ax] : coupe.min[ax];
+      return p;
+    }
+    var NOMS_FACES = ["ouest", "est", "sud", "nord", "bas", "haut"], poignees = [], tire = null;
+    NOMS_FACES.forEach(function(nom, f){
+      var b = document.createElement("div");
+      b.className = "poignee"; b.hidden = true;
+      b.title = "Tirer pour déplacer la face " + nom + " de la boîte de coupe";
+      b.addEventListener("pointerdown", function(e){
+        if (!coupe) return;
+        e.preventDefault(); e.stopPropagation();
+        try { b.setPointerCapture(e.pointerId); } catch (x){}
+        var c = camera(), ax = f >> 1, p = centreFace(f), q = p.slice();
+        q[ax] += 1;
+        var a = ecran(c, p), z = ecran(c, q), d = [z[0] - a[0], z[1] - a[1]], l2 = d[0]*d[0] + d[1]*d[1];
+        tire = { f: f, ax: ax, x: e.clientX, y: e.clientY, d: d, l2: l2, v0: f & 1 ? coupe.max[ax] : coupe.min[ax] };
+        b.classList.add("tiree");
+      });
+      b.addEventListener("pointermove", function(e){
+        if (!tire || tire.f !== f || tire.l2 < 1e-12) return;
+        // déplacement de la souris projeté sur l'axe de la face, ramené en unités du modèle
+        var k = ((e.clientX - tire.x)*tire.d[0] + (e.clientY - tire.y)*tire.d[1])/tire.l2, v = tire.v0 + k, ax = tire.ax;
+        var mini = Math.max(rayon*1e-3, 1e-6);
+        if (f & 1) coupe.max[ax] = Math.max(v, coupe.min[ax] + mini);
+        else coupe.min[ax] = Math.min(v, coupe.max[ax] - mini);
+        M.coupe(coupe);
+        vite = true; demander();
+      });
+      function lache(){
+        if (!tire || tire.f !== f) return;
+        tire = null; b.classList.remove("tiree");
+        vite = false; demander();
+      }
+      b.addEventListener("pointerup", lache);
+      b.addEventListener("pointercancel", lache);
+      cv.parentNode.appendChild(b);
+      poignees.push(b);
+    });
+    function placerPoignees(c){
+      (poignees || []).forEach(function(b, f){
+        if (!coupe){ b.hidden = true; return; }
+        var p = ecran(c, centreFace(f));
+        b.hidden = !(p[0] > -20 && p[0] < W + 20 && p[1] > -20 && p[1] < H + 20);
+        b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
+      });
     }
 
     function boite(){
