@@ -1,9 +1,12 @@
-// Aperçu 3D de /ifc/ : rendu canvas 2D maison, sans WebGL ni bibliothèque.
+// Aperçu 3D de /ifc/ : rendu maison, sans bibliothèque. WebGL écrit à la main (tampon de profondeur,
+// exact), avec en secours le moteur canvas 2D du peintre (ou forcé par ?moteur=canvas dans l'adresse).
 // - Géométrie lue : IFCFACETEDBREP (faces, boucles, points), IFCMAPPEDITEM (IFCREPRESENTATIONMAP +
 //   IFCCARTESIANTRANSFORMATIONOPERATOR3D), IFCEXTRUDEDAREASOLID (profils paramétrés ou polylignes),
 //   surfaces à facettes, faces triangulées/polygonales IFC4, quelques primitives ; chaîne
 //   IFCLOCALPLACEMENT récursive. Le reste est compté dans « non lus » et affiché dans la vue.
-// - Projection orthographique, faces triées en profondeur (peintre), ombrage lambert, arêtes fines.
+// - Projection orthographique, ombrage lambert, seules les arêtes vives sont tracées (pas les coutures
+//   entre facettes d'un rond). Sélection au clic : image d'identifiants hors écran en WebGL, test de
+//   point dans les polygones projetés en canvas 2D.
 // - Géométrie mise en cache par élément (elle ne change pas quand on supprime d'autres éléments).
 (function(global){
   "use strict";
@@ -544,37 +547,487 @@
     return res;
   }
 
-  // ================= Rendu et interaction =================
+  // ================= Maillage : arêtes vives et triangles =================
+  // Arêtes vives : bord libre, ou angle marqué entre les deux faces qui la partagent. Les facettes
+  // d'un rond ou d'une face triangulée ne montrent donc plus leurs coutures.
+  var COS_VIF = Math.cos(28*Math.PI/180);
+  function aretesVives(geo){
+    if (geo.A) return geo.A;
+    var faces = geo.faces, q = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
+    var tab = new Map();
+    function cle(b, i){ return Math.round(b[i]/q) + "," + Math.round(b[i+1]/q) + "," + Math.round(b[i+2]/q); }
+    faces.forEach(function(f, fi){
+      f.ar = [];
+      f.b.forEach(function(b, bi){
+        var n = b.length/3;
+        for (var i = 0; i < n; i++){
+          var j = (i + 1) % n, a = cle(b, 3*i), c = cle(b, 3*j);
+          if (a === c) continue;
+          var k = a < c ? a + "|" + c : c + "|" + a, l = tab.get(k);
+          if (!l) tab.set(k, l = []);
+          l.push(fi, bi, i);
+        }
+      });
+    });
+    var seg = [];
+    tab.forEach(function(l){
+      var vive = l.length !== 6;
+      if (!vive) vive = Math.abs(dot(faces[l[0]].n, faces[l[3]].n)) < COS_VIF;
+      if (!vive) return;
+      for (var r = 0; r < l.length; r += 3) faces[l[r]].ar.push(l[r+1], l[r+2]);
+      var b = faces[l[0]].b[l[1]], i = l[2], j = (i + 1) % (b.length/3);
+      seg.push(b[3*i], b[3*i+1], b[3*i+2], b[3*j], b[3*j+1], b[3*j+2]);
+    });
+    geo.A = new Float64Array(seg);
+    return geo.A;
+  }
+
+  // Triangulation d'une face plane avec trous (ponts vers les trous, puis découpe en oreilles)
+  function aire(ix, X, Y){
+    var s = 0;
+    for (var i = 0, j = ix.length - 1; i < ix.length; j = i++) s += (X[ix[j]] - X[ix[i]])*(Y[ix[j]] + Y[ix[i]]);
+    return s/2;
+  }
+  function orient(ax, ay, bx, by, cx, cy){ return (bx - ax)*(cy - ay) - (by - ay)*(cx - ax); }
+  function croise(X, Y, a, b, c, d){
+    var d1 = orient(X[a], Y[a], X[b], Y[b], X[c], Y[c]), d2 = orient(X[a], Y[a], X[b], Y[b], X[d], Y[d]);
+    var d3 = orient(X[c], Y[c], X[d], Y[d], X[a], Y[a]), d4 = orient(X[c], Y[c], X[d], Y[d], X[b], Y[b]);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  }
+  function memePoint(X, Y, a, b){ return X[a] === X[b] && Y[a] === Y[b]; }
+  function ponts(ext, trous, X, Y){
+    trous.sort(function(h, k){
+      var mh = -Infinity, mk = -Infinity;
+      h.forEach(function(i){ if (X[i] > mh) mh = X[i]; });
+      k.forEach(function(i){ if (X[i] > mk) mk = X[i]; });
+      return mk - mh;
+    });
+    trous.forEach(function(h, ti){
+      var im = 0;
+      for (var i = 1; i < h.length; i++) if (X[h[i]] > X[h[im]]) im = i;
+      var M = h[im], best = -1, bestD = Infinity, secours = -1, secoursD = Infinity;
+      for (var p = 0; p < ext.length; p++){
+        var P = ext[p], d = (X[P] - X[M])*(X[P] - X[M]) + (Y[P] - Y[M])*(Y[P] - Y[M]);
+        if (d < secoursD){ secoursD = d; secours = p; }
+        if (d >= bestD) continue;
+        var libre = true, e, u, v;
+        for (e = 0; e < ext.length && libre; e++){
+          u = ext[e]; v = ext[(e + 1) % ext.length];
+          if (u === P || v === P || memePoint(X, Y, u, P) || memePoint(X, Y, v, P)) continue;
+          if (croise(X, Y, M, P, u, v)) libre = false;
+        }
+        for (var t = ti; t < trous.length && libre; t++){
+          var hh = trous[t];
+          for (e = 0; e < hh.length && libre; e++){
+            u = hh[e]; v = hh[(e + 1) % hh.length];
+            if (u === M || v === M) continue;
+            if (croise(X, Y, M, P, u, v)) libre = false;
+          }
+        }
+        if (libre){ best = p; bestD = d; }
+      }
+      if (best < 0) best = secours;
+      var tour = h.slice(im).concat(h.slice(0, im + 1));
+      ext = ext.slice(0, best + 1).concat(tour, [ext[best]], ext.slice(best + 1));
+    });
+    return ext;
+  }
+  function dansTri(X, Y, a, b, c, p){
+    return orient(X[a], Y[a], X[b], Y[b], X[p], Y[p]) >= 0 && orient(X[b], Y[b], X[c], Y[c], X[p], Y[p]) >= 0 && orient(X[c], Y[c], X[a], Y[a], X[p], Y[p]) >= 0;
+  }
+  function oreilles(poly, X, Y, out){
+    var n = poly.length, prev = new Int32Array(n), next = new Int32Array(n);
+    for (var k = 0; k < n; k++){ prev[k] = (k + n - 1) % n; next[k] = (k + 1) % n; }
+    var reste = n, i = 0, essais = 0;
+    function coupe(i){
+      out.push(poly[prev[i]], poly[i], poly[next[i]]);
+      next[prev[i]] = next[i]; prev[next[i]] = prev[i]; reste--; essais = 0;
+      return next[i];
+    }
+    while (reste > 3){
+      var a = prev[i], c = next[i], A = poly[a], B = poly[i], Cc = poly[c], ok = false;
+      if (orient(X[A], Y[A], X[B], Y[B], X[Cc], Y[Cc]) > 0){
+        ok = true;
+        for (var p = next[c]; p !== a && ok; p = next[p]){
+          var P = poly[p];
+          if (memePoint(X, Y, P, A) || memePoint(X, Y, P, B) || memePoint(X, Y, P, Cc)) continue;
+          if (dansTri(X, Y, A, B, Cc, P)) ok = false;
+        }
+      }
+      if (ok){ i = coupe(i); continue; }
+      i = c;
+      if (++essais > reste) i = coupe(i);      // polygone dégénéré : on coupe quand même
+    }
+    out.push(poly[prev[i]], poly[i], poly[next[i]]);
+  }
+  // Triangles d'une face : tableau d'indices dans la liste des sommets de ses boucles mises bout à bout
+  function trianguler(f){
+    var b = f.b;
+    if (b.length === 1){
+      var n0 = b[0].length/3;
+      if (n0 === 3) return [0, 1, 2];
+    }
+    var nn = f.n, ax = Math.abs(nn[0]), ay = Math.abs(nn[1]), az = Math.abs(nn[2]), iu, iv;
+    if (az >= ax && az >= ay){ iu = 0; iv = 1; } else if (ax >= ay){ iu = 1; iv = 2; } else { iu = 2; iv = 0; }
+    var X = [], Y = [], boucles = [], base = 0;
+    b.forEach(function(l){
+      var ix = [];
+      for (var i = 0; i < l.length; i += 3){ X.push(l[i + iu]); Y.push(l[i + iv]); ix.push(base + i/3); }
+      base += l.length/3;
+      boucles.push(ix);
+    });
+    var ext = boucles[0], sens = aire(ext, X, Y) < 0 ? -1 : 1;
+    if (sens < 0) for (var k = 0; k < X.length; k++) X[k] = -X[k];      // contour extérieur dans le sens direct
+    if (b.length === 1 && n0 === 4){
+      // quadrilatère : coupé par la diagonale qui reste à l'intérieur
+      if (orient(X[0], Y[0], X[1], Y[1], X[2], Y[2]) > 0 && orient(X[0], Y[0], X[2], Y[2], X[3], Y[3]) > 0) return [0, 1, 2, 0, 2, 3];
+      return [1, 2, 3, 1, 3, 0];
+    }
+    var trous = boucles.slice(1).filter(function(h){ return h.length >= 3; }).map(function(h){ return aire(h, X, Y) > 0 ? h.slice().reverse() : h; });
+    var poly = trous.length ? ponts(ext, trous, X, Y) : ext, out = [];
+    if (poly.length >= 3) oreilles(poly, X, Y, out);
+    return out;
+  }
+  // Triangles de tout l'élément, en coordonnées monde, et indice de face de chaque triangle
+  function triangles(geo){
+    if (geo.T) return geo.T;
+    var pos = [], fac = [];
+    geo.faces.forEach(function(f, fi){
+      var ix = trianguler(f), P = [];
+      f.b.forEach(function(l){ for (var i = 0; i < l.length; i++) P.push(l[i]); });
+      for (var k = 0; k + 2 < ix.length; k += 3){
+        for (var m = 0; m < 3; m++){ var v = 3*ix[k + m]; pos.push(P[v], P[v+1], P[v+2]); }
+        fac.push(fi);
+      }
+    });
+    geo.T = new Float64Array(pos);
+    geo.TF = fac;
+    return geo.T;
+  }
+
+  // ================= Moteur WebGL =================
+  var SOURCES = {
+    vFaces: "attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;uniform mat4 uM;uniform vec3 uL;varying vec3 vC;" +
+      "void main(){gl_Position=uM*vec4(aP,1.0);float l=abs(dot(aN,uL));vC=aC*(0.34+0.66*l);}",
+    fFaces: "precision mediump float;varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}",
+    vLignes: "attribute vec3 aP;attribute vec4 aC;uniform mat4 uM;varying vec4 vC;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;}",
+    fLignes: "precision mediump float;varying vec4 vC;void main(){gl_FragColor=vC;}",
+    vId: "attribute vec3 aP;attribute vec3 aC;uniform mat4 uM;varying vec3 vC;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;}",
+    fId: "precision mediump float;varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}"
+  };
+
+  function moteurGL(cv){
+    var gl = null;
+    try {
+      var opts = { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false };
+      gl = cv.getContext("webgl", opts) || cv.getContext("experimental-webgl", opts);
+    } catch (e){ gl = null; }
+    if (!gl) return null;
+
+    function programme(vs, fs, attrs){
+      function sh(t, src){
+        var s = gl.createShader(t);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        return s;
+      }
+      var p = gl.createProgram();
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, vs));
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      attrs.forEach(function(a, i){ if (a) gl.bindAttribLocation(p, i, a); });
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL") };
+    }
+    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null;
+    function init(){
+      P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
+      P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
+      P.id = programme(SOURCES.vId, SOURCES.fId, ["aP", null, "aC"]);
+      ["pos", "nor", "col", "ids", "lpos", "lcol"].forEach(function(k){ B[k] = gl.createBuffer(); });
+      fbo = null;
+    }
+    try { init(); } catch (e){ if (window.console) console.warn("WebGL indisponible :", e); return { echec: true }; }
+
+    var dernier = null;    // dernière liste chargée, pour reconstruire après une perte de contexte
+    function remplir(buf, data, usage){ gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, data, usage || gl.STATIC_DRAW); }
+
+    function charger(liste, orig){
+      dernier = { liste: liste, orig: orig };
+      origine = orig;
+      var nv = 0, nl = 0;
+      liste.forEach(function(it){ nv += triangles(it.geo).length/3; nl += aretesVives(it.geo).length/3; });
+      var pos = new Float32Array(3*nv), nor = new Float32Array(3*nv), ids = new Uint8Array(3*nv), lpos = new Float32Array(3*nl);
+      var v = 0, w = 0;
+      plages = [];
+      liste.forEach(function(it, e){
+        var T = it.geo.T, TF = it.geo.TF, A = it.geo.A, faces = it.geo.faces, v0 = v, w0 = w;
+        var id = e + 1, r = id & 255, g = (id >> 8) & 255, bl = (id >> 16) & 255;
+        for (var k = 0; k < T.length; k += 3, v++){
+          pos[3*v] = T[k] - orig[0]; pos[3*v+1] = T[k+1] - orig[1]; pos[3*v+2] = T[k+2] - orig[2];
+          var n = faces[TF[(k/9) | 0]].n;
+          nor[3*v] = n[0]; nor[3*v+1] = n[1]; nor[3*v+2] = n[2];
+          ids[3*v] = r; ids[3*v+1] = g; ids[3*v+2] = bl;
+        }
+        for (k = 0; k < A.length; k += 3, w++){
+          lpos[3*w] = A[k] - orig[0]; lpos[3*w+1] = A[k+1] - orig[1]; lpos[3*w+2] = A[k+2] - orig[2];
+        }
+        plages.push([v0, v, w0, w]);
+      });
+      nTri = nv; nLig = nl;
+      remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
+      remplir(B.col, new Uint8Array(3*nv), gl.DYNAMIC_DRAW);
+      remplir(B.lcol, new Uint8Array(4*nl), gl.DYNAMIC_DRAW);
+    }
+
+    function teinter(liste, sel, actif, coul){
+      var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
+      var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA;
+      liste.forEach(function(it, e){
+        var pl = plages[e];
+        if (!pl) return;
+        var c = sel.has(it.id) ? OR : P1, l = it.id === actif ? act : sel.has(it.id) ? aro : ar;
+        for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
+        for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
+      });
+      remplir(B.col, col, gl.DYNAMIC_DRAW);
+      remplir(B.lcol, lcol, gl.DYNAMIC_DRAW);
+    }
+
+    // Matrice de vue (colonnes) : même projection orthographique que le moteur canvas
+    function matrice(c){
+      var dx = origine[0] - c.centre[0], dy = origine[1] - c.centre[1], dz = origine[2] - c.centre[2];
+      var kx = 2*c.s/c.W, ky = 2*c.s/c.H, kz = 1/c.prof;
+      var r0 = [kx*c.ca, kx*c.sa, 0];
+      var r1 = [-ky*c.sb*c.sa, ky*c.sb*c.ca, ky*c.cb];
+      var r2 = [-kz*c.cb*c.sa, kz*c.cb*c.ca, -kz*c.sb];
+      function t(r){ return r[0]*dx + r[1]*dy + r[2]*dz; }
+      return new Float32Array([
+        r0[0], r1[0], r2[0], 0,
+        r0[1], r1[1], r2[1], 0,
+        r0[2], r1[2], r2[2], 0,
+        t(r0) + 2*c.px/c.W, t(r1) - 2*c.py/c.H, t(r2), 1
+      ]);
+    }
+    function attrib(i, buf, n, type, normalise){
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.enableVertexAttribArray(i);
+      gl.vertexAttribPointer(i, n, type, !!normalise, 0, 0);
+    }
+    function faces(c, prog, couleurBuf){
+      var M = matrice(c);
+      gl.useProgram(prog.p);
+      gl.uniformMatrix4fv(prog.uM, false, M);
+      if (prog.uL) gl.uniform3fv(prog.uL, c.lumiere);
+      attrib(0, B.pos, 3, gl.FLOAT);
+      if (prog === P.faces) attrib(1, B.nor, 3, gl.FLOAT); else gl.disableVertexAttribArray(1);
+      attrib(2, couleurBuf, 3, gl.UNSIGNED_BYTE, true);
+      gl.enable(gl.POLYGON_OFFSET_FILL);
+      gl.polygonOffset(1, 1);
+      if (nTri) gl.drawArrays(gl.TRIANGLES, 0, nTri);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+      return M;
+    }
+    function dessiner(c){
+      if (gl.isContextLost()) return;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      var M = faces(c, P.faces, B.col);
+      if (nLig){
+        gl.useProgram(P.lignes.p);
+        gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        attrib(0, B.lpos, 3, gl.FLOAT);
+        gl.disableVertexAttribArray(1);
+        attrib(2, B.lcol, 4, gl.UNSIGNED_BYTE, true);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+        gl.drawArrays(gl.LINES, 0, nLig);
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
+      }
+    }
+    // Sélection : rendu des identifiants dans une image hors écran, lecture du pixel visé
+    function viser(c, x, y){
+      if (gl.isContextLost() || !nTri) return 0;
+      var w = cv.width, h = cv.height;
+      if (!fbo || fbo.w !== w || fbo.h !== h){
+        if (fbo){ gl.deleteFramebuffer(fbo.f); gl.deleteTexture(fbo.t); gl.deleteRenderbuffer(fbo.r); }
+        fbo = { w: w, h: h, f: gl.createFramebuffer(), t: gl.createTexture(), r: gl.createRenderbuffer() };
+        gl.bindTexture(gl.TEXTURE_2D, fbo.t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, fbo.r);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.f);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fbo.t, 0);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, fbo.r);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.f);
+      gl.viewport(0, 0, w, h);
+      gl.disable(gl.BLEND);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      faces(c, P.id, B.ids);
+      var px = new Uint8Array(4), X = Math.round(x*c.dpr), Y = Math.round(h - y*c.dpr - 1);
+      if (X >= 0 && Y >= 0 && X < w && Y < h) gl.readPixels(X, Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return px[0] + (px[1] << 8) + (px[2] << 16);     // 0 = rien, sinon rang dans la liste + 1
+    }
+
+    return {
+      nom: "WebGL", charger: charger, teinter: teinter, dessiner: dessiner, viser: viser,
+      perdu: function(){ return gl.isContextLost(); },
+      restaurer: function(){ init(); if (dernier) charger(dernier.liste, dernier.orig); }
+    };
+  }
+
+  // ================= Moteur canvas 2D (secours) =================
+  function moteurCanvas(cv){
+    var ctx = cv.getContext("2d"), liste = [], dessin = [], sel = new Set(), actif = 0, coul = null, teintes = {};
+    function teinte(base, k){
+      var cle = (base === OR ? "o" : "p") + k, t = teintes[cle];
+      if (!t){
+        var f = .34 + .66*k/24;
+        t = teintes[cle] = "rgb(" + Math.round(base[0]*f) + "," + Math.round(base[1]*f) + "," + Math.round(base[2]*f) + ")";
+      }
+      return t;
+    }
+    function dessiner(c){
+      ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
+      ctx.clearRect(0, 0, c.W, c.H);
+      dessin.length = 0;
+      var ca = c.ca, sa = c.sa, cb = c.cb, sb = c.sb, s = c.s, cx = c.W/2 + c.px, cy = c.H/2 + c.py;
+      var c0 = c.centre[0], c1 = c.centre[1], c2 = c.centre[2], W = c.W, H = c.H;
+      for (var e = 0; e < liste.length; e++){
+        var faces = liste[e].geo.faces;
+        for (var fi = 0; fi < faces.length; fi++){
+          var f = faces[fi], zs = 0, nz = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+          if (!f.p) f.p = f.b.map(function(b){ return new Float32Array(b.length/3*2); });
+          for (var bi = 0; bi < f.b.length; bi++){
+            var b = f.b[bi], p = f.p[bi];
+            for (var k = 0, j = 0; k < b.length; k += 3, j += 2){
+              var qx = b[k] - c0, qy = b[k+1] - c1, qz = b[k+2] - c2;
+              var xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
+              var sx = cx + xv*s, sy = cy - (qz*cb + yv*sb)*s;
+              p[j] = sx; p[j+1] = sy;
+              if (bi === 0){
+                zs += yv*cb - qz*sb; nz++;
+                if (sx < x0) x0 = sx; if (sx > x1) x1 = sx; if (sy < y0) y0 = sy; if (sy > y1) y1 = sy;
+              }
+            }
+          }
+          f.z = zs/nz; f.el = e; f.x0 = x0; f.x1 = x1; f.y0 = y0; f.y1 = y1;
+          if (x1 < 0 || x0 > W || y1 < 0 || y0 > H) continue;     // hors écran
+          dessin.push(f);
+        }
+      }
+      dessin.sort(function(a, b){ return b.z - a.z; });
+      var detail = !(c.vite && dessin.length > 12000), L = c.lumiereVue;
+      ctx.lineJoin = "round";
+      for (var i = 0; i < dessin.length; i++){
+        var F = dessin[i], it = liste[F.el], n = F.n;
+        var nx1 = ca*n[0] + sa*n[1], ny1 = -sa*n[0] + ca*n[1];
+        var nup = n[2]*cb + ny1*sb, ndp = ny1*cb - n[2]*sb;
+        var lum = Math.abs(nx1*L[0] + nup*L[1] - ndp*L[2]);
+        var choisi = sel.has(it.id), estActif = it.id === actif, fond = teinte(choisi ? OR : coul.piece, Math.round(lum*24));
+        ctx.beginPath();
+        for (var bj = 0; bj < F.p.length; bj++){
+          var P = F.p[bj];
+          ctx.moveTo(P[0], P[1]);
+          for (var q = 2; q < P.length; q += 2) ctx.lineTo(P[q], P[q+1]);
+          ctx.closePath();
+        }
+        ctx.fillStyle = fond;
+        ctx.fill("evenodd");
+        if (detail){ ctx.strokeStyle = fond; ctx.lineWidth = .8; ctx.stroke(); }     // bouche les joints entre facettes
+        if ((detail || estActif) && F.ar && F.ar.length){
+          ctx.beginPath();
+          for (var r = 0; r < F.ar.length; r += 2){
+            var Q = F.p[F.ar[r]], a = F.ar[r+1], m = Q.length/2, z = (a + 1) % m;
+            ctx.moveTo(Q[2*a], Q[2*a+1]); ctx.lineTo(Q[2*z], Q[2*z+1]);
+          }
+          ctx.strokeStyle = estActif ? coul.actif : choisi ? coul.areteOr : coul.arete;
+          ctx.lineWidth = estActif ? 1.1 : .6;
+          ctx.stroke();
+        }
+      }
+      if (!liste.length){
+        ctx.fillStyle = coul.texte; ctx.font = "11px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center";
+        ctx.fillText("Aucune géométrie à afficher", W/2, H/2);
+      }
+    }
+    function dedans(F, x, y){
+      var c = false;
+      for (var bi = 0; bi < F.p.length; bi++){
+        var p = F.p[bi], n = p.length/2;
+        for (var i = 0, j = n - 1; i < n; j = i++){
+          var xi = p[2*i], yi = p[2*i+1], xj = p[2*j], yj = p[2*j+1];
+          if ((yi > y) !== (yj > y) && x < (xj - xi)*(y - yi)/(yj - yi) + xi) c = !c;
+        }
+      }
+      return c;
+    }
+    function viser(c, x, y){
+      for (var i = dessin.length - 1; i >= 0; i--){       // du devant vers l'arrière
+        var F = dessin[i];
+        if (x < F.x0 || x > F.x1 || y < F.y0 || y > F.y1) continue;
+        if (dedans(F, x, y)) return F.el + 1;
+      }
+      return 0;
+    }
+    return {
+      nom: "canvas 2D",
+      charger: function(l){ liste = l; l.forEach(function(it){ aretesVives(it.geo); }); },
+      teinter: function(l, s, a, k){ sel = s; actif = a; if (coul !== k){ coul = k; teintes = {}; } },
+      dessiner: dessiner, viser: viser,
+      perdu: function(){ return false; }, restaurer: function(){}
+    };
+  }
+
+  // ================= Vue : caméra, interaction, choix du moteur =================
+  var OR = [214,168,92];
+
   function creer(cv, rappels){
     rappels = rappels || {};
-    var ctx = cv.getContext("2d");
-    var G = null, liste = [], sel = new Set(), actif = 0;
-    var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1;
-    var W = 0, H = 0, dpr = 1, dessin = [], attente = false, vite = false, nbFaces = 0;
-    var coul = {};
+    // WebGL d'abord ; le moteur canvas 2D prend le relais s'il manque (ou avec ?moteur=canvas dans l'adresse)
+    var M = null;
+    if (!/[?&]moteur=canvas\b/.test(location.search)) M = moteurGL(cv);
+    if (M && M.echec){
+      var neuf = cv.cloneNode(false);           // un canvas qui a servi à WebGL ne peut plus donner de contexte 2D
+      cv.parentNode.replaceChild(neuf, cv);
+      cv = neuf; M = null;
+    }
+    if (!M) M = moteurCanvas(cv);
+
+    var G = null, liste = [], sel = new Set(), actif = 0, nbFaces = 0;
+    var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
+    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {};
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
-    var OR = [214,168,92];
 
     function rvb(nom, defaut){
       var v = getComputedStyle(document.documentElement).getPropertyValue(nom).trim().split(",").map(Number);
       return v.length === 3 && v.every(isFinite) ? v : defaut;
     }
     function couleurs(){
-      coul.piece = rvb("--vue-piece", [236,232,224]);
-      var a = rvb("--vue-arete", [236,232,224]);
-      coul.arete = "rgba(" + a.join(",") + ",.2)";
-      coul.areteOr = "rgba(120,86,30,.55)";
-      coul.actif = "rgba(" + OR.join(",") + ",.95)";
-      coul.texte = "rgba(" + a.join(",") + ",.45)";
-      coul.teintes = {};
-    }
-    function teinte(base, k){
-      var cle = (base === OR ? "o" : "p") + k, t = coul.teintes[cle];
-      if (!t){
-        var f = .34 + .66*k/24;
-        t = coul.teintes[cle] = "rgb(" + Math.round(base[0]*f) + "," + Math.round(base[1]*f) + "," + Math.round(base[2]*f) + ")";
-      }
-      return t;
+      var a = rvb("--vue-arete", [236,232,224]), clair = document.documentElement.getAttribute("data-theme") === "clair";
+      coul = {
+        piece: rvb("--vue-piece", [236,232,224]),
+        arete: "rgba(" + a.join(",") + ",.24)", areteRGBA: [a[0], a[1], a[2], Math.round(255*(clair ? .32 : .2))],
+        areteOr: "rgba(120,86,30,.55)", areteOrRGBA: [120, 86, 30, 140],
+        actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
+        texte: "rgba(" + a.join(",") + ",.45)"
+      };
+      M.teinter(liste, sel, actif, coul);
     }
     couleurs();
     new MutationObserver(function(){ couleurs(); demander(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -590,90 +1043,26 @@
     if ("ResizeObserver" in window) new ResizeObserver(taille).observe(cv);
     window.addEventListener("resize", taille);
 
-    function echelle(){ return Math.min(W, H)*.44/rayon*zoom; }
+    function camera(){
+      var ca = Math.cos(yaw), sa = Math.sin(yaw), cb = Math.cos(pitch), sb = Math.sin(pitch);
+      // lumière : fixée par rapport à l'écran, ramenée dans le repère du modèle pour WebGL
+      var lx = LUM[0], lu = LUM[1], lv = LUM[2];
+      var lumiere = [
+        lx*ca + lu*(-sb*sa) + lv*(cb*sa),
+        lx*sa + lu*(sb*ca) + lv*(-cb*ca),
+        lu*cb + lv*sb
+      ];
+      return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: dpr,
+        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM };
+    }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
-
     function rendre(){
       attente = false;
       if (!W || !H) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      dessin.length = 0;
-      if (!liste.length){
-        ctx.fillStyle = coul.texte; ctx.font = "11px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center";
-        ctx.fillText(G ? "Aucune géométrie à afficher" : "", W/2, H/2);
-        return;
-      }
-      var ca = Math.cos(yaw), sa = Math.sin(yaw), cb = Math.cos(pitch), sb = Math.sin(pitch), s = echelle();
-      var cx = W/2 + px, cy = H/2 + py, c0 = centre[0], c1 = centre[1], c2 = centre[2];
-      for (var e = 0; e < liste.length; e++){
-        var faces = liste[e].geo.faces;
-        for (var fi = 0; fi < faces.length; fi++){
-          var f = faces[fi], zs = 0, nz = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-          if (!f.p) f.p = f.b.map(function(b){ return new Float32Array(b.length/3*2); });
-          for (var bi = 0; bi < f.b.length; bi++){
-            var b = f.b[bi], p = f.p[bi];
-            for (var k = 0, j = 0; k < b.length; k += 3, j += 2){
-              var qx = b[k] - c0, qy = b[k+1] - c1, qz = b[k+2] - c2;
-              var xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
-              var up = qz*cb + yv*sb, sx = cx + xv*s, sy = cy - up*s;
-              p[j] = sx; p[j+1] = sy;
-              if (bi === 0){
-                zs += yv*cb - qz*sb; nz++;
-                if (sx < x0) x0 = sx; if (sx > x1) x1 = sx; if (sy < y0) y0 = sy; if (sy > y1) y1 = sy;
-              }
-            }
-          }
-          f.z = zs/nz; f.el = e; f.x0 = x0; f.x1 = x1; f.y0 = y0; f.y1 = y1;
-          if (x1 < 0 || x0 > W || y1 < 0 || y0 > H) continue;     // hors écran
-          dessin.push(f);
-        }
-      }
-      dessin.sort(function(a, b){ return b.z - a.z; });
-      var aretes = !(vite && dessin.length > 12000);
-      ctx.lineJoin = "round";
-      ctx.lineWidth = .6;
-      for (var i = 0; i < dessin.length; i++){
-        var F = dessin[i], it = liste[F.el], n = F.n;
-        var nx1 = ca*n[0] + sa*n[1], ny1 = -sa*n[0] + ca*n[1];
-        var nup = n[2]*cb + ny1*sb, ndp = ny1*cb - n[2]*sb;
-        var lum = Math.abs(nx1*LUM[0] + nup*LUM[1] - ndp*LUM[2]);
-        var choisi = sel.has(it.id);
-        ctx.beginPath();
-        for (var bj = 0; bj < F.p.length; bj++){
-          var P = F.p[bj];
-          ctx.moveTo(P[0], P[1]);
-          for (var q = 2; q < P.length; q += 2) ctx.lineTo(P[q], P[q+1]);
-          ctx.closePath();
-        }
-        ctx.fillStyle = teinte(choisi ? OR : coul.piece, Math.round(lum*24));
-        ctx.fill("evenodd");
-        if (it.id === actif){ ctx.strokeStyle = coul.actif; ctx.lineWidth = 1.1; ctx.stroke(); ctx.lineWidth = .6; }
-        else if (aretes){ ctx.strokeStyle = choisi ? coul.areteOr : coul.arete; ctx.stroke(); }
-      }
+      M.dessiner(camera());
     }
 
-    function dedans(F, x, y){
-      var c = false;
-      for (var bi = 0; bi < F.p.length; bi++){
-        var p = F.p[bi], n = p.length/2;
-        for (var i = 0, j = n - 1; i < n; j = i++){
-          var xi = p[2*i], yi = p[2*i+1], xj = p[2*j], yj = p[2*j+1];
-          if ((yi > y) !== (yj > y) && x < (xj - xi)*(y - yi)/(yj - yi) + xi) c = !c;
-        }
-      }
-      return c;
-    }
-    function viser(x, y){
-      for (var i = dessin.length - 1; i >= 0; i--){       // du devant vers l'arrière
-        var F = dessin[i];
-        if (x < F.x0 || x > F.x1 || y < F.y0 || y > F.y1) continue;
-        if (dedans(F, x, y)) return liste[F.el].id;
-      }
-      return 0;
-    }
-
-    function recadrer(){
+    function boite(){
       var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
       liste.forEach(function(it){
         for (var k = 0; k < 3; k++){
@@ -681,11 +1070,12 @@
           if (it.geo.max[k] > mx[k]) mx[k] = it.geo.max[k];
         }
       });
-      if (!isFinite(mn[0])){ centre = [0,0,0]; rayon = 1; }
-      else {
-        centre = [(mn[0] + mx[0])/2, (mn[1] + mx[1])/2, (mn[2] + mx[2])/2];
-        rayon = Math.max(1e-9, Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])/2);
-      }
+      if (!isFinite(mn[0])) return null;
+      return { c: [(mn[0] + mx[0])/2, (mn[1] + mx[1])/2, (mn[2] + mx[2])/2], r: Math.max(1e-9, Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])/2) };
+    }
+    function recadrer(){
+      var b = boite();
+      if (b){ centre = b.c; rayon = b.r; } else { centre = [0,0,0]; rayon = 1; }
       zoom = 1; px = 0; py = 0;
       demander();
     }
@@ -738,8 +1128,9 @@
       cv.classList.remove("tire");
       if (vite){ vite = false; demander(); }
       if (e.type === "pointerup" && !bouge && !multi && (e.button === 0 || e.pointerType !== "mouse")){
-        var p = local(e);
-        if (rappels.surClic) rappels.surClic(viser(p.x, p.y), e);
+        var p = local(e), k = W && H ? M.viser(camera(), p.x, p.y) : 0;
+        if (M.nom === "WebGL") demander();
+        if (rappels.surClic) rappels.surClic(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e);
       }
     }
     cv.addEventListener("pointerup", fin);
@@ -755,10 +1146,12 @@
       clearTimeout(minuterie);
       minuterie = setTimeout(function(){ vite = false; demander(); }, 160);
     }, { passive: false });
+    cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); });
+    cv.addEventListener("webglcontextrestored", function(){ M.restaurer(); M.teinter(liste, sel, actif, coul); demander(); });
 
     return {
       // Nouveau modèle : la géométrie en cache repart de zéro
-      modele: function(m){ G = Contexte(m); liste = []; },
+      modele: function(m){ G = Contexte(m); liste = []; origine = null; },
       // Éléments à dessiner (ids) ; renvoie le bilan de lecture
       afficher: function(ids){
         liste = [];
@@ -767,10 +1160,18 @@
           var g = geometrie(G, id);
           if (g){ liste.push({ id: id, geo: g }); nbFaces += g.faces.length; }
         });
+        // origine et profondeur fixées au premier affichage du modèle (précision des coordonnées en float32)
+        if (!origine){
+          var b = boite();
+          origine = b ? b.c : [0,0,0];
+          prof = (b ? b.r : 1)*3;
+        }
+        M.charger(liste, origine);
+        M.teinter(liste, sel, actif, coul);
         demander();
-        return { elements: liste.length, faces: nbFaces, nonLus: G.nonLus, erreurs: G.erreurs };
+        return { elements: liste.length, faces: nbFaces, nonLus: G.nonLus, erreurs: G.erreurs, moteur: M.nom };
       },
-      selection: function(s, a){ sel = s; actif = a || 0; demander(); },
+      selection: function(s, a){ sel = s; actif = a || 0; M.teinter(liste, sel, actif, coul); demander(); },
       recadrer: recadrer,
       redessiner: function(){ taille(); }
     };

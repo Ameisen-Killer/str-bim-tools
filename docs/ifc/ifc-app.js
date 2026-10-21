@@ -251,7 +251,8 @@
     var nl = Object.keys(b.nonLus);
     $("#vue-info").textContent = pluriel(b.elements, "élément dessiné", "éléments dessinés") + " · " + pluriel(b.faces, "face") +
       (nl.length ? " · géométrie non lue : " + nl.slice(0, 4).map(IFC.nomType).join(", ") + (nl.length > 4 ? "…" : "") : "") +
-      (b.erreurs ? " · " + pluriel(b.erreurs, "élément illisible", "éléments illisibles") : "");
+      (b.erreurs ? " · " + pluriel(b.erreurs, "élément illisible", "éléments illisibles") : "") +
+      " · moteur " + b.moteur;
   }
 
   function confirmer(texte, ok){
