@@ -1161,7 +1161,7 @@
         if (bouge){
           var dx = n.x - p.x, dy = n.y - p.y;
           if (e.shiftKey || (e.buttons & 6)){ px += dx; py += dy; }
-          else { yaw += dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); }
+          else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); }
           vite = true; demander();
         }
         p.x = n.x; p.y = n.y;
