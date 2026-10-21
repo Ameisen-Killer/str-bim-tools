@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IFC · STR Bim Tools</title>
+<meta name="description" content="Ouvre un fichier IFC dans le navigateur, sélectionne des éléments, supprime-les proprement et réécris l'IFC. Le fichier ne quitte jamais ton poste.">
+<!-- Tant que la page n'est pas validée : garder noindex et ne l'ajouter ni au menu, ni au sitemap -->
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#050505">
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("ifc.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M13 4v18M19 4v18M7 22h18l-3 5H10z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M13 10h6M13 16h6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<style>
+:root{
+  --encre:236,232,224;
+  --fond-rvb:5,5,5;
+  --or-rvb:214,168,92;
+  --noir:#050505;
+  --noir-2:#0B0B0A;
+  --noir-3:#11110F;
+  --ligne:rgba(var(--encre),.12);
+  --or:#D6A85C;
+  --texte:#ECE8E0;
+  --texte-doux:rgba(var(--encre),.56);
+  --texte-faible:rgba(var(--encre),.34);
+  --rouge:#E0806A;
+  --g:clamp(18px,4vw,56px);
+  --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
+  --sans:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --courbe:cubic-bezier(.2,.7,.2,1);
+  --haut-barre:52px;
+  /* couleurs lues par l'aperçu 3D (ifc-vue.js) */
+  --vue-fond:#070707;
+  --vue-piece:236,232,224;
+  --vue-arete:236,232,224;
+}
+:root[data-theme="clair"]{
+  color-scheme:light;
+  --encre:22,19,15;
+  --fond-rvb:243,240,232;
+  --or-rvb:122,83,18;
+  --noir:#F3F0E8;
+  --noir-2:#FBFAF6;
+  --noir-3:#ECE8DD;
+  --or:#7A5312;
+  --texte:#16130F;
+  --ligne:rgba(var(--encre),.18);
+  --texte-doux:rgba(var(--encre),.78);
+  --texte-faible:rgba(var(--encre),.56);
+  --rouge:#A23B22;
+  --vue-fond:#E9E5DA;
+  --vue-piece:250,248,242;
+  --vue-arete:40,34,26;
+}
+:root[data-theme="sombre"]{color-scheme:dark}
+*{box-sizing:border-box}
+html{overflow-x:hidden}
+body{
+  margin:0;background:var(--noir);color:var(--texte);
+  font-family:var(--sans);font-weight:300;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.5;
+}
+a{color:inherit}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+::selection{background:rgba(var(--or-rvb),.3)}
+.mono{font-family:var(--mono)}
+
+/* ---------- Barre ---------- */
+.barre{
+  position:fixed;inset:0 0 auto 0;z-index:30;
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding:max(18px,env(safe-area-inset-top)) var(--g) 18px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
+  background:rgba(var(--fond-rvb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(var(--encre),.06);
+}
+.barre a{text-decoration:none;transition:color .3s}
+.barre a:hover{color:var(--or)}
+.barre .ici{color:var(--or)}
+.barre-droite{display:flex;align-items:baseline;gap:22px}
+
+/* ---------- Thème ---------- */
+.theme{position:relative}
+.theme-btn{background:none;border:0;padding:0;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--texte-doux);display:inline-flex;gap:8px;align-items:baseline;transition:color .3s}
+.theme-btn:hover,.theme-btn:focus-visible{color:var(--or);outline:none}
+.menu-theme{position:absolute;right:0;top:calc(100% + 12px);min-width:150px;padding:6px 0;background:var(--noir-2);border:1px solid var(--ligne);display:flex;flex-direction:column;z-index:40}
+.menu-theme button{background:none;border:0;text-align:left;padding:10px 16px;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--texte-doux)}
+.menu-theme button:hover,.menu-theme button:focus-visible{color:var(--or);outline:none}
+.menu-theme button[aria-checked="true"]{color:var(--or)}
+.menu-theme button[aria-checked="true"]::before{content:"● ";font-size:8px;vertical-align:middle}
+@media (max-width:560px){.barre .ici,.theme-btn span+span{display:none}}
+
+/* ---------- Révélations et tracés ---------- */
+.rv{opacity:0;transform:translateY(18px);transition:opacity 1.2s ease var(--d,0s),transform 1.2s var(--courbe) var(--d,0s)}
+.vu .rv{opacity:1;transform:none}
+.l{fill:none;stroke:rgba(var(--encre),.62);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.l.f{stroke:rgba(var(--encre),.2)}
+.l.o{stroke:rgba(var(--or-rvb),.9)}
+.draw{stroke-dasharray:1 1;stroke-dashoffset:1;transition:stroke-dashoffset var(--t,1.4s) cubic-bezier(.55,.05,.25,1) var(--d,0s)}
+.vu .draw{stroke-dashoffset:0}
+
+/* ---------- Accueil : chargement du fichier ---------- */
+.accueil{min-height:100svh;display:grid;grid-template-rows:minmax(220px,1fr) auto;padding:calc(var(--haut-barre) + 12px) var(--g) clamp(28px,6vh,64px);max-width:1360px;margin-inline:auto}
+.accueil-scene{display:flex;align-items:center;justify-content:center;min-height:0}
+.accueil-scene svg{width:100%;height:100%;max-height:420px;display:block}
+.surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.accueil h1{margin:14px 0 0;font-weight:200;font-size:clamp(64px,13vw,168px);line-height:.88;letter-spacing:.04em}
+.chapeau{margin:22px 0 0;max-width:32em;font-size:clamp(16px,1.9vw,20px);color:var(--texte-doux)}
+.depot{
+  margin-top:32px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;
+  padding:26px clamp(18px,3vw,32px);border:1px dashed rgba(var(--encre),.3);background:rgba(var(--encre),.02);
+  transition:border-color .3s,background .3s;max-width:640px;
+}
+.depot.survol{border-color:var(--or);background:rgba(var(--or-rvb),.07)}
+.depot-titre{font-size:clamp(17px,2vw,21px);font-weight:300}
+.depot-note{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--texte-faible)}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:8px 16px;cursor:pointer;
+  background:none;border:1px solid rgba(var(--encre),.28);color:var(--texte);
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;
+  transition:border-color .25s,color .25s,background .25s;
+}
+.btn:hover:not(:disabled),.btn:focus-visible{border-color:var(--or);color:var(--or);outline:none}
+.btn:disabled{opacity:.38;cursor:default}
+.btn.plein{background:var(--or);border-color:var(--or);color:var(--noir)}
+.btn.plein:hover:not(:disabled),.btn.plein:focus-visible{background:transparent;color:var(--or)}
+.btn.danger{border-color:rgba(224,128,106,.55)}
+:root[data-theme="clair"] .btn.danger{border-color:rgba(162,59,34,.5)}
+.btn.danger:hover:not(:disabled),.btn.danger:focus-visible{border-color:var(--rouge);color:var(--rouge)}
+.btn.petit{min-height:30px;padding:4px 10px;font-size:10px;letter-spacing:.1em}
+.erreur{margin-top:18px;max-width:640px;padding:14px 16px;border-left:2px solid var(--rouge);background:rgba(224,128,106,.08);color:var(--texte)}
+.erreur b{display:block;font-weight:500;margin-bottom:4px;color:var(--rouge)}
+.chargement{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
+@media (min-width:1000px){
+  .accueil{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr;column-gap:32px}
+  .accueil-scene{grid-column:2;grid-row:1}
+  .accueil-texte{grid-column:1;grid-row:1;align-self:end}
+}
+
+/* ---------- Éditeur ---------- */
+.editeur{height:100svh;display:flex;flex-direction:column;padding-top:calc(max(18px, env(safe-area-inset-top)) + 35px)}
+.outils{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  padding:10px var(--g);border-bottom:1px solid var(--ligne);background:var(--noir-2);
+}
+.fichier{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.fichier-nom{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fichier-bilan{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fichier-bilan b{font-weight:400;color:var(--texte-doux)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.etat{flex:1 1 100%;min-height:1.4em;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--texte-doux)}
+.etat::before{content:"— ";color:var(--or)}
+.etat:empty::before{content:""}
+
+.onglets{display:none}
+.panneaux{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr) minmax(260px,340px)}
+.panneau{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--noir)}
+.p-liste{border-right:1px solid var(--ligne)}
+.p-props{border-left:1px solid var(--ligne)}
+.p-titre{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--or);padding:14px 16px 8px}
+
+/* liste des éléments */
+.filtres{display:flex;flex-direction:column;gap:8px;padding:0 16px 10px;border-bottom:1px solid var(--ligne)}
+.champ{width:100%;min-height:36px;padding:7px 10px;background:var(--noir-2);border:1px solid var(--ligne);color:var(--texte);border-radius:0;font-size:14px}
+.champ:focus{outline:none;border-color:var(--or)}
+select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--texte-doux) 50%),linear-gradient(135deg,var(--texte-doux) 50%,transparent 50%);background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
+.ligne-btn{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.compte{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--texte-faible)}
+.liste{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 0 24px}
+.el{
+  display:grid;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:8px;
+  padding:6px 12px 6px calc(12px + var(--niv,0)*14px);border-left:2px solid transparent;cursor:pointer;
+}
+.el:hover{background:rgba(var(--encre),.04)}
+.el.actif{border-left-color:var(--or);background:rgba(var(--or-rvb),.08)}
+.el.choisi .el-nom{color:var(--or)}
+.el input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--or);cursor:pointer}
+.el .vide{width:16px}
+.el-nom{font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el-info{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el.spatial .el-nom{color:var(--texte-doux);font-weight:400}
+.el.ouverture{opacity:.62}
+.liste-vide{padding:18px 16px;color:var(--texte-faible);font-size:13px}
+
+/* aperçu 3D */
+.p-vue{position:relative;background:var(--vue-fond)}
+.p-vue canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.p-vue canvas.tire{cursor:grabbing}
+.vue-outils{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+.vue-outils .btn{background:rgba(var(--fond-rvb),.7)}
+.vue-aide{position:absolute;left:12px;bottom:10px;right:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
+.vue-info{position:absolute;left:12px;top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
+
+/* propriétés */
+.props{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 16px 28px}
+.props-vide{color:var(--texte-faible);font-size:13px;padding-top:6px}
+.props h3{margin:2px 0 4px;font-weight:300;font-size:20px;line-height:1.2;word-break:break-word}
+.props .type{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--or)}
+.props dl{margin:12px 0 0;display:grid;grid-template-columns:minmax(90px,auto) minmax(0,1fr);gap:4px 12px;font-size:13px}
+.props dt{color:var(--texte-faible)}
+.props dd{margin:0;word-break:break-word}
+.props dd.mono{font-size:11.5px}
+.pset{margin-top:16px;border-top:1px solid var(--ligne);padding-top:10px}
+.pset-nom{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-doux)}
+.pset dl{margin-top:8px}
+
+/* fenêtre de confirmation */
+dialog{max-width:min(460px,calc(100vw - 32px));padding:24px;background:var(--noir-2);color:var(--texte);border:1px solid var(--ligne)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h2{margin:0 0 10px;font-weight:300;font-size:22px}
+dialog p{color:var(--texte-doux);font-size:14.5px}
+dialog p+p{margin-top:8px}
+dialog .actions{margin-top:20px;justify-content:flex-end}
+
+/* ---------- Smartphone : trois onglets ---------- */
+@media (max-width:899px){
+  .outils{padding:8px 12px;gap:8px}
+  .actions .btn{padding:6px 10px;font-size:10px;letter-spacing:.08em}
+  .onglets{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--ligne);background:var(--noir-2)}
+  .onglets button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 4px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-doux)}
+  .onglets button[aria-selected="true"]{color:var(--or);border-bottom-color:var(--or)}
+  .panneaux{display:block;position:relative}
+  .panneau{position:absolute;inset:0;border:0}
+  .panneau:not(.montre){visibility:hidden;pointer-events:none}
+  .el{padding-top:9px;padding-bottom:9px}
+  .el input{width:20px;height:20px;margin-top:0}
+  .el{grid-template-columns:26px minmax(0,1fr)}
+}
+
+/* Pied commun : la mise en page fine est dans menu.css */
+footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
+footer a{text-decoration:none}
+footer a:hover{color:var(--or)}
+</style>
+<link rel="stylesheet" href="/assets/menu.css?v=5">
+</head>
+<body>
+
+<header class="barre" data-menu-hote>
+  <a href="/">STR Bim Tools</a>
+  <span class="barre-droite">
+    <span class="ici">IFC</span>
+    <span class="theme">
+      <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="menu" aria-expanded="false" title="Thème d'affichage"><span aria-hidden="true">◐</span><span>Thème</span></button>
+      <div class="menu-theme" id="menu-theme" role="menu" hidden>
+        <button type="button" role="menuitemradio" data-choix-theme="sombre">Sombre</button>
+        <button type="button" role="menuitemradio" data-choix-theme="clair">Clair</button>
+        <button type="button" role="menuitemradio" data-choix-theme="systeme">Système</button>
+      </div>
+    </span>
+    <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
+  </span>
+</header>
+
+<main>
+  <!-- ===== Avant chargement : dépôt du fichier ===== -->
+  <section class="accueil" id="accueil">
+    <div class="accueil-scene">
+      <svg viewBox="0 0 400 320" role="img" aria-label="Pied de poteau métallique dessiné en fil de fer : platine, raidisseurs et boulons">
+        <!-- platine en perspective -->
+        <path class="l draw" pathLength="1" style="--d:.2s;--t:1.6s" d="M80 236 L200 196 L320 236 L200 276 Z"/>
+        <path class="l f draw" pathLength="1" style="--d:.5s;--t:1.4s" d="M80 236 L80 244 L200 284 L320 244 L320 236 M200 276 L200 284"/>
+        <!-- poteau en H -->
+        <path class="l draw" pathLength="1" style="--d:.9s;--t:1.8s" d="M160 222 L160 40 M240 222 L240 40 M176 227 L176 46 M224 227 L224 46"/>
+        <path class="l f draw" pathLength="1" style="--d:1.1s;--t:1.4s" d="M160 40 L176 46 L224 46 L240 40 M200 52 L200 236"/>
+        <!-- raidisseurs -->
+        <path class="l o draw" pathLength="1" style="--d:1.7s;--t:1.2s" d="M240 160 L300 230 L240 230 Z M160 160 L100 230 L160 230 Z"/>
+        <!-- boulons -->
+        <path class="l o draw" pathLength="1" style="--d:2.2s;--t:1s" d="M120 236 l0 -14 M280 236 l0 -14 M200 210 l0 -14 M200 262 l0 -14"/>
+        <path class="l f draw" pathLength="1" style="--d:2.5s;--t:1.2s" d="M120 244 l0 46 M280 244 l0 46 M200 284 l0 30"/>
+      </svg>
+    </div>
+    <div class="accueil-texte">
+      <div class="surtitre rv" style="--d:.6s">STR Bim Tools · Éditeur</div>
+      <h1 class="rv" style="--d:.8s">IFC</h1>
+      <p class="chapeau rv" style="--d:1s">Ouvre une maquette IFC, coche les éléments en trop, supprime-les proprement et récupère le fichier réécrit.</p>
+      <div class="depot rv" style="--d:1.2s" id="depot">
+        <div class="depot-titre">Dépose ton fichier .ifc ici</div>
+        <div class="actions">
+          <button type="button" class="btn plein" id="choisir">Choisir un fichier</button>
+        </div>
+        <div class="depot-note">IFC2X3 ou IFC4 · le fichier reste dans ton navigateur, rien n'est envoyé</div>
+        <div class="chargement" id="chargement" hidden>Lecture du fichier…</div>
+      </div>
+      <div class="erreur" id="erreur" role="alert" hidden></div>
+    </div>
+    <input type="file" id="fichier" accept=".ifc,.IFC" hidden>
+  </section>
+
+  <!-- ===== Après chargement : éditeur ===== -->
+  <div class="editeur" id="editeur" hidden>
+    <div class="outils">
+      <div class="fichier">
+        <span class="fichier-nom" id="f-nom">—</span>
+        <span class="fichier-bilan" id="f-bilan"></span>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn danger" id="b-suppr" disabled>Supprimer <span id="b-suppr-n"></span></button>
+        <button type="button" class="btn" id="b-annuler" disabled title="Annuler (Ctrl+Z)">Annuler</button>
+        <button type="button" class="btn" id="b-retablir" disabled title="Rétablir (Ctrl+Y)">Rétablir</button>
+        <button type="button" class="btn plein" id="b-export">Exporter l'IFC</button>
+        <button type="button" class="btn" id="b-autre" title="Ouvrir un autre fichier">Autre fichier</button>
+      </div>
+      <div class="etat" id="etat" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="onglets" role="tablist" aria-label="Panneaux">
+      <button type="button" role="tab" data-onglet="p-liste" aria-selected="false">Éléments</button>
+      <button type="button" role="tab" data-onglet="p-vue" aria-selected="true">3D</button>
+      <button type="button" role="tab" data-onglet="p-props" aria-selected="false">Propriétés</button>
+    </div>
+
+    <div class="panneaux">
+      <aside class="panneau p-liste" id="p-liste" aria-label="Liste des éléments">
+        <div class="p-titre">Éléments</div>
+        <div class="filtres">
+          <input type="search" class="champ" id="recherche" placeholder="Rechercher un nom, un type, un matériau" autocomplete="off">
+          <select class="champ" id="filtre-type" aria-label="Filtrer par type"><option value="">Tous les types</option></select>
+          <div class="ligne-btn">
+            <button type="button" class="btn petit" id="sel-tout">Tout</button>
+            <button type="button" class="btn petit" id="sel-rien">Rien</button>
+            <button type="button" class="btn petit" id="sel-inv">Inverser</button>
+            <span class="compte" id="compte"></span>
+          </div>
+        </div>
+        <div class="liste" id="liste" role="list"></div>
+      </aside>
+
+      <div class="panneau p-vue montre" id="p-vue">
+        <canvas id="vue" aria-label="Aperçu 3D de la maquette : glisser pour tourner, molette ou pincement pour zoomer"></canvas>
+        <div class="vue-info" id="vue-info"></div>
+        <div class="vue-outils">
+          <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
+        </div>
+        <div class="vue-aide" id="vue-aide">Glisser : tourner · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner</div>
+      </div>
+
+      <aside class="panneau p-props" id="p-props" aria-label="Propriétés de l'élément actif">
+        <div class="p-titre">Propriétés</div>
+        <div class="props" id="props"><p class="props-vide">Clique un élément dans la liste ou dans la vue 3D.</p></div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<dialog id="confirmer">
+  <form method="dialog">
+    <h2>Supprimer la sélection ?</h2>
+    <p id="confirmer-texte"></p>
+    <p>Tu pourras annuler tant que la page reste ouverte.</p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Garder</button>
+      <button type="submit" class="btn danger" value="oui" id="confirmer-oui">Supprimer</button>
+    </div>
+  </form>
+</dialog>
+
+<footer class="pied">
+  <a class="pied-site" href="/">← str-bim-tools.com</a>
+  <div class="pied-droite">
+    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
+    <a href="/mentions-legales/">Mentions légales</a>
+    <span class="pied-maj">Dernière mise à jour : <span data-maj>jj.mm.aaaa</span></span>
+  </div>
+</footer>
+
+<script src="/ifc/ifc-core.js?v=1"></script>
+<script src="/ifc/ifc-vue.js?v=1"></script>
+<script src="/ifc/ifc-app.js?v=1"></script>
+<script src="/assets/menu.js?v=23"></script>
+</body>
+</html>
