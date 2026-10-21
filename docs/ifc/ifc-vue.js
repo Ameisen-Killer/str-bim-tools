@@ -276,7 +276,6 @@
   }
 
   // ---------- Profils (boucles 2D à plat [x0,y0,x1,y1,…], la première est l'extérieur) ----------
-  function poly(pts){ return pts; }
   function rect(X, Y){ return [-X,-Y, X,-Y, X,Y, -X,Y]; }
   function cercle(rx, ry, n){
     n = n || 32; var o = [];
@@ -297,17 +296,51 @@
     c.forEach(function(p){ o.push(p[0], p[1]); });
     return o;
   }
+  // Arrondit les sommets d'un contour à plat (rayon par sommet, 0 ou NaN = angle vif) : congés
+  // âme-aile, arrondis de bout d'aile, coins des tubes. Arcs découpés tous les 15° au plus.
+  function arrondir(pts, rr){
+    var n = pts.length/2, out = [];
+    for (var i = 0; i < n; i++){
+      var r = rr[i], vx = pts[2*i], vy = pts[2*i+1];
+      if (!(r > 0)){ out.push(vx, vy); continue; }
+      var p = (i + n - 1) % n, s = (i + 1) % n;
+      var ax = pts[2*p] - vx, ay = pts[2*p+1] - vy, bx = pts[2*s] - vx, by = pts[2*s+1] - vy;
+      var la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+      if (!(la > 0 && lb > 0)){ out.push(vx, vy); continue; }
+      ax /= la; ay /= la; bx /= lb; by /= lb;
+      var th = Math.acos(Math.max(-1, Math.min(1, ax*bx + ay*by)));
+      if (th < 1e-3 || th > Math.PI - 1e-3){ out.push(vx, vy); continue; }
+      var tg = r/Math.tan(th/2), lim = .49*Math.min(la, lb);
+      if (tg > lim){ r *= lim/tg; tg = lim; }
+      var ux = ax + bx, uy = ay + by, lu = Math.hypot(ux, uy);
+      ux /= lu; uy /= lu;
+      var d = r/Math.sin(th/2), cx = vx + ux*d, cy = vy + uy*d;
+      var a1 = Math.atan2(vy + ay*tg - cy, vx + ax*tg - cx), a2 = Math.atan2(vy + by*tg - cy, vx + bx*tg - cx), da = a2 - a1;
+      while (da > Math.PI) da -= 2*Math.PI;
+      while (da < -Math.PI) da += 2*Math.PI;
+      var m = Math.max(2, Math.ceil(Math.abs(da)/(Math.PI/12)));
+      for (var k = 0; k <= m; k++){ var t = a1 + da*k/m; out.push(cx + r*Math.cos(t), cy + r*Math.sin(t)); }
+    }
+    return out;
+  }
+
   function profil(G, id, prof){
     var e = G.m.ent.get(id);
     if (!e || (prof || 0) > 8) return null;
     var a = C(e), t = e.type, B = null, pos = a[2];
-    var X, Y, w, h, b, tw, tf;
+    var X, Y, w, h, b, bt, tw, tf, tt, rf, rt, re, ri, g, pente, xw;
+    // épaisseur d'une aile à pente (IPN, UPN) : tf est mesurée au milieu du débord, de xw (âme) à xt (bout)
+    function ep(x, xa, xb){ return tf + ((xa + xb)/2 - x)*pente; }
+    function angle(v){ var x = N(v)*G.angle; return isFinite(x) ? Math.tan(x) : 0; }
     switch (t){
-      case "IFCRECTANGLEPROFILEDEF": case "IFCROUNDEDRECTANGLEPROFILEDEF":
+      case "IFCRECTANGLEPROFILEDEF":
         B = [rect(N(a[3])/2, N(a[4])/2)]; break;
+      case "IFCROUNDEDRECTANGLEPROFILEDEF":
+        ri = N(a[5]);
+        B = [arrondir(rect(N(a[3])/2, N(a[4])/2), [ri, ri, ri, ri])]; break;
       case "IFCRECTANGLEHOLLOWPROFILEDEF":
-        X = N(a[3])/2; Y = N(a[4])/2; w = N(a[5]);
-        B = [rect(X, Y), rect(X - w, Y - w)]; break;
+        X = N(a[3])/2; Y = N(a[4])/2; w = N(a[5]); ri = N(a[6]); re = N(a[7]);
+        B = [arrondir(rect(X, Y), [re, re, re, re]), arrondir(rect(X - w, Y - w), [ri, ri, ri, ri])]; break;
       case "IFCCIRCLEPROFILEDEF":
         B = [cercle(N(a[3]))]; break;
       case "IFCCIRCLEHOLLOWPROFILEDEF":
@@ -315,20 +348,42 @@
       case "IFCELLIPSEPROFILEDEF":
         B = [cercle(N(a[3]), N(a[4]))]; break;
       case "IFCISHAPEPROFILEDEF":
-        b = N(a[3])/2; h = N(a[4])/2; tw = N(a[5])/2; tf = N(a[6]);
-        B = [poly([-b,-h, b,-h, b,-h+tf, tw,-h+tf, tw,h-tf, b,h-tf, b,h, -b,h, -b,h-tf, -tw,h-tf, -tw,-h+tf, -b,-h+tf])]; break;
+        // (…, OverallWidth, OverallDepth, WebThickness, FlangeThickness, FilletRadius[, FlangeEdgeRadius, FlangeSlope])
+        b = N(a[3])/2; h = N(a[4])/2; tw = N(a[5])/2; tf = N(a[6]); rf = N(a[7]); re = N(a[8]); pente = angle(a[9]);
+        B = [arrondir([-b,-h, b,-h, b,-h+ep(b,tw,b), tw,-h+ep(tw,tw,b), tw,h-ep(tw,tw,b), b,h-ep(b,tw,b), b,h,
+          -b,h, -b,h-ep(b,tw,b), -tw,h-ep(tw,tw,b), -tw,-h+ep(tw,tw,b), -b,-h+ep(b,tw,b)],
+          [0,0,re,rf,rf,re,0,0,re,rf,rf,re])]; break;
+      case "IFCASYMMETRICISHAPEPROFILEDEF":
+        // (…, largeur bas, hauteur, âme, aile bas, congé bas, largeur haut, aile haut, congé haut, …)
+        b = N(a[3])/2; h = N(a[4])/2; tw = N(a[5])/2; tf = N(a[6]); rf = N(a[7]);
+        bt = N(a[8])/2 || b; tt = N(a[9]) || tf; rt = N(a[10]); if (!(rt >= 0)) rt = rf;
+        B = [arrondir([-b,-h, b,-h, b,-h+tf, tw,-h+tf, tw,h-tt, bt,h-tt, bt,h, -bt,h, -bt,h-tt, -tw,h-tt, -tw,-h+tf, -b,-h+tf],
+          [0,0,0,rf,rt,0,0,0,0,rt,rf,0])]; break;
       case "IFCTSHAPEPROFILEDEF":
-        h = N(a[3])/2; b = N(a[4])/2; tw = N(a[5])/2; tf = N(a[6]);
-        B = [poly([-b,h, b,h, b,h-tf, tw,h-tf, tw,-h, -tw,-h, -tw,h-tf, -b,h-tf])]; break;
-      case "IFCUSHAPEPROFILEDEF": case "IFCCSHAPEPROFILEDEF":
-        h = N(a[3])/2; b = N(a[4])/2; tw = N(a[5]); tf = t === "IFCCSHAPEPROFILEDEF" ? tw : N(a[6]);
-        B = [poly([-b,-h, b,-h, b,-h+tf, -b+tw,-h+tf, -b+tw,h-tf, b,h-tf, b,h, -b,h])]; break;
+        // (…, Depth, FlangeWidth, WebThickness, FlangeThickness, FilletRadius, FlangeEdgeRadius, WebEdgeRadius, …)
+        h = N(a[3])/2; b = N(a[4])/2; tw = N(a[5])/2; tf = N(a[6]); rf = N(a[7]); re = N(a[8]); rt = N(a[9]);
+        B = [arrondir([-b,h, b,h, b,h-tf, tw,h-tf, tw,-h, -tw,-h, -tw,h-tf, -b,h-tf], [0,0,re,rf,rt,rt,rf,re])]; break;
+      case "IFCUSHAPEPROFILEDEF":
+        // (…, Depth, FlangeWidth, WebThickness, FlangeThickness, FilletRadius, EdgeRadius, FlangeSlope)
+        h = N(a[3])/2; b = N(a[4])/2; tw = N(a[5]); tf = N(a[6]); rf = N(a[7]); re = N(a[8]); pente = angle(a[9]);
+        xw = -b + tw;
+        B = [arrondir([-b,-h, b,-h, b,-h+ep(b,xw,b), xw,-h+ep(xw,xw,b), xw,h-ep(xw,xw,b), b,h-ep(b,xw,b), b,h, -b,h],
+          [0,0,re,rf,rf,re,0,0])]; break;
+      case "IFCCSHAPEPROFILEDEF":
+        // profil formé à froid : (…, Depth, Width, WallThickness, Girth, InternalFilletRadius)
+        h = N(a[3])/2; b = N(a[4])/2; tw = N(a[5]); g = N(a[6]); ri = N(a[7]) || 0; re = ri + tw;
+        B = [g > tw
+          ? arrondir([-b,-h, b,-h, b,-h+g, b-tw,-h+g, b-tw,-h+tw, -b+tw,-h+tw, -b+tw,h-tw, b-tw,h-tw, b-tw,h-g, b,h-g, b,h, -b,h],
+              [re,re,0,0,ri,ri,ri,ri,0,0,re,re])
+          : arrondir([-b,-h, b,-h, b,-h+tw, -b+tw,-h+tw, -b+tw,h-tw, b,h-tw, b,h, -b,h], [re,0,0,ri,ri,0,0,re])]; break;
       case "IFCLSHAPEPROFILEDEF":
-        h = N(a[3])/2; b = (N(a[4]) || N(a[3]))/2; tw = N(a[5]);
-        B = [poly([-b,-h, b,-h, b,-h+tw, -b+tw,-h+tw, -b+tw,h, -b,h])]; break;
+        // (…, Depth, Width, Thickness, FilletRadius, EdgeRadius, LegSlope)
+        h = N(a[3])/2; b = (N(a[4]) || N(a[3]))/2; tw = N(a[5]); rf = N(a[6]); re = N(a[7]);
+        B = [arrondir([-b,-h, b,-h, b,-h+tw, -b+tw,-h+tw, -b+tw,h, -b,h], [0,0,re,rf,re,0])]; break;
       case "IFCZSHAPEPROFILEDEF":
-        h = N(a[3])/2; b = N(a[4]); tw = N(a[5])/2; tf = N(a[6]);
-        B = [poly([-tw,-h, b-tw,-h, b-tw,-h+tf, tw,-h+tf, tw,h, -b+tw,h, -b+tw,h-tf, -tw,h-tf])]; break;
+        // (…, Depth, FlangeWidth, WebThickness, FlangeThickness, FilletRadius, EdgeRadius)
+        h = N(a[3])/2; b = N(a[4]); tw = N(a[5])/2; tf = N(a[6]); rf = N(a[7]); re = N(a[8]);
+        B = [arrondir([-tw,-h, b-tw,-h, b-tw,-h+tf, tw,-h+tf, tw,h, -b+tw,h, -b+tw,h-tf, -tw,h-tf], [0,0,re,rf,0,0,re,rf])]; break;
       case "IFCARBITRARYCLOSEDPROFILEDEF":
         B = [plat(courbe(G, R(a[2])))]; pos = null; break;
       case "IFCARBITRARYPROFILEDEFWITHVOIDS":
