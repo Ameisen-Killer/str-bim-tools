@@ -1338,6 +1338,27 @@
       return p;
     }
     var NOMS_FACES = ["ouest", "est", "sud", "nord", "bas", "haut"], poignees = [], tire = null, fige = false;
+    // à la souris, les poignées n'apparaissent qu'au survol de la boîte ; au doigt, elles restent visibles
+    var souris = !!(window.matchMedia && matchMedia("(hover: hover)").matches), survol = false, surPoignee = false;
+    function pres(x, y){        // le point écran est-il dans l'enveloppe de la boîte projetée (marge 28 px) ?
+      if (!coupe || !W) return false;
+      var c = camera(), P = [];
+      for (var k = 0; k < 8; k++) P.push(ecran(c, [k & 1 ? coupe.max[0] : coupe.min[0], k & 2 ? coupe.max[1] : coupe.min[1], k & 4 ? coupe.max[2] : coupe.min[2]]));
+      P.sort(function(a, b){ return a[0] - b[0] || a[1] - b[1]; });
+      function cr(o, a, b){ return (a[0] - o[0])*(b[1] - o[1]) - (a[1] - o[1])*(b[0] - o[0]); }
+      var bas = [], haut = [];
+      P.forEach(function(p){ while (bas.length > 1 && cr(bas[bas.length - 2], bas[bas.length - 1], p) <= 0) bas.pop(); bas.push(p); });
+      P.slice().reverse().forEach(function(p){ while (haut.length > 1 && cr(haut[haut.length - 2], haut[haut.length - 1], p) <= 0) haut.pop(); haut.push(p); });
+      var E = bas.slice(0, -1).concat(haut.slice(0, -1)), dedans = E.length > 2, n = E.length;
+      for (var i = 0; i < n; i++){
+        var a = E[i], b = E[(i + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx*dx + dy*dy;
+        if (cr(a, b, [x, y]) < 0) dedans = false;
+        var t = l2 ? Math.max(0, Math.min(1, ((x - a[0])*dx + (y - a[1])*dy)/l2)) : 0;
+        if (Math.hypot(a[0] + t*dx - x, a[1] + t*dy - y) < 28) return true;
+      }
+      return dedans;
+    }
+    function survoler(oui){ if (oui !== survol){ survol = oui; placerPoignees(camera()); } }
     NOMS_FACES.forEach(function(nom, f){
       var b = document.createElement("div");
       b.className = "poignee"; b.hidden = true;
@@ -1369,6 +1390,8 @@
       }
       b.addEventListener("pointerup", lache);
       b.addEventListener("pointercancel", lache);
+      b.addEventListener("pointerenter", function(){ surPoignee = true; });
+      b.addEventListener("pointerleave", function(){ surPoignee = false; if (!tire) placerPoignees(camera()); });
       cv.parentNode.appendChild(b);
       poignees.push(b);
     });
@@ -1378,6 +1401,7 @@
         var p = ecran(c, centreFace(f));
         b.hidden = !(p[0] > -20 && p[0] < W + 20 && p[1] > -20 && p[1] < H + 20);
         b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
+        b.classList.toggle("loin", souris && !survol && !surPoignee && !tire);
       });
     }
 
@@ -1471,6 +1495,7 @@
         cv.classList.add("tire");
       });
       cv.addEventListener("pointermove", function(e){
+        if (coupe && souris && e.pointerType === "mouse") survoler(pres(local(e).x, local(e).y));
         var p = ptrs.get(e.pointerId);
         if (!p) return;
         var n = local(e);
@@ -1518,6 +1543,10 @@
         rappels.surMenu(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e.clientX, e.clientY);
       }
       cv.addEventListener("pointerup", fin);
+      cv.addEventListener("pointerleave", function(e){
+        var r = e.relatedTarget;
+        if (!(r && r.classList && r.classList.contains("poignee"))) survoler(false);     // passer sur une poignée n'est pas sortir
+      });
       cv.addEventListener("pointercancel", fin);
       cv.addEventListener("contextmenu", function(e){
         e.preventDefault();

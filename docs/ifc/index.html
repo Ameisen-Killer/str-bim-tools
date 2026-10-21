@@ -254,6 +254,8 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .vue-outils{position:absolute;top:10px;right:10px;display:flex;gap:6px}
 /* poignées de la boîte de coupe (placées par ifc-vue.js) */
 .poignee{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:rgb(var(--or-rvb));border:2px solid var(--vue-fond);box-shadow:0 0 0 1px rgba(var(--or-rvb),.7),0 2px 8px rgba(0,0,0,.35);cursor:grab;touch-action:none;z-index:2}
+.poignee{transition:opacity .18s ease,box-shadow .18s ease}
+.poignee.loin{opacity:0;pointer-events:none}
 .poignee::after{content:"";position:absolute;inset:-10px;border-radius:50%}
 .poignee:hover{box-shadow:0 0 0 4px rgba(var(--or-rvb),.35),0 2px 8px rgba(0,0,0,.35)}
 .poignee.tiree{cursor:grabbing;box-shadow:0 0 0 6px rgba(var(--or-rvb),.3),0 2px 8px rgba(0,0,0,.35)}
@@ -512,7 +514,7 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=2"></script>
 <script src="/ifc/ifc-core.js?v=2"></script>
-<script src="/ifc/ifc-vue.js?v=11"></script>
+<script src="/ifc/ifc-vue.js?v=12"></script>
 <script src="/ifc/ifc-app.js?v=10"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
