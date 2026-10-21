@@ -540,6 +540,9 @@
     else if (e.key === "Escape" || e.key === "Tab"){ e.preventDefault(); fermerCtx(); }
   });
   document.addEventListener("pointerdown", function(e){ if (!ctx.hidden && !ctx.contains(e.target)) fermerCtx(); });
+  // Windows envoie « contextmenu » au relâchement du clic droit, quand notre menu est déjà sous le curseur :
+  // le menu du navigateur ne doit pas s'ouvrir par-dessus
+  ctx.addEventListener("contextmenu", function(e){ e.preventDefault(); });
   window.addEventListener("resize", fermerCtx);
   $("#liste").addEventListener("scroll", fermerCtx);
   function surTeinteLibre(){ if (cibleTeinte && fichiers.indexOf(cibleTeinte) >= 0) teinter(cibleTeinte, teinteDe(teinteLibre.value)); }
