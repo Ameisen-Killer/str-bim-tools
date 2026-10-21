@@ -3,13 +3,14 @@
 // - À chaque publication : mettre MISE_A_JOUR à la date du jour (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-10-16";
+  var MISE_A_JOUR = "2026-10-21";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
     {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
     {href:"/a-propos/", nom:"À propos", desc:"de Tony Varin"},
     {href:"/bench/", nom:"Bench", desc:"Comparateur de postes de travail"},
+    {href:"/ifc/", nom:"IFC", desc:"Éditeur de maquettes IFC"},
     {href:"/mentions-legales/", nom:"Mentions légales", desc:"Éditeur, hébergeur, données"}
   ];
 
