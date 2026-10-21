@@ -853,7 +853,8 @@
         var pl = plages[e];
         if (!pl) return;
         var t = it.h != null ? coul.pastel(it.h) : null;
-        var c = sel.has(it.id) ? OR : t ? t.piece : P1, l = it.id === actif ? act : sel.has(it.id) ? aro : t ? t.areteRGBA : ar;
+        // contour doré seulement pour la sélection ; l'élément actif non sélectionné garde un contour neutre renforcé
+        var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : P1, l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
         for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
       });
@@ -1185,7 +1186,7 @@
             var Q = F.p[F.ar[r]], a = F.ar[r+1], m = Q.length/2, z = (a + 1) % m;
             ctx.moveTo(Q[2*a], Q[2*a+1]); ctx.lineTo(Q[2*z], Q[2*z+1]);
           }
-          ctx.strokeStyle = estActif ? coul.actif : choisi ? coul.areteOr : pa ? pa.arete : coul.arete;
+          ctx.strokeStyle = choisi ? (estActif ? coul.actif : coul.areteOr) : estActif ? coul.areteActive : pa ? pa.arete : coul.arete;
           ctx.lineWidth = estActif ? 1.1 : .6;
           ctx.stroke();
         }
@@ -1275,6 +1276,7 @@
         areteOr: "rgba(120,86,30,.55)", areteOrRGBA: [120, 86, 30, 140],
         actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
         texte: "rgba(" + a.join(",") + ",.45)",
+        areteActive: "rgba(" + a.join(",") + ",.85)", areteActiveRGBA: [a[0], a[1], a[2], 215],
         cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190],
         coupeRGB: clair ? [204, 44, 38] : [196, 48, 42]
       };
