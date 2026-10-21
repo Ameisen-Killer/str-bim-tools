@@ -476,7 +476,7 @@
       h.push(boutonsVue(c), "<hr>");
     }
     else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
-    if (vue.aCoupe()) h.push(bouton("sans-coupe", "Retirer la boîte de coupe"));
+    if (vue.aCoupe()) h.push(bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     montrerCtx(x, y, h, { vue: true, cle: cl, cles: c });
@@ -608,6 +608,8 @@
     activerCmd("zoomer", n > 0 || a);
     activerCmd("coupe", n > 0 || a);
     activerCmd("sans-coupe", vue.aCoupe());
+    activerCmd("figer-coupe", vue.aCoupe());
+    $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
     var mo = vue.moteur() === "WebGL" ? "webgl" : "canvas";
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
@@ -795,6 +797,11 @@
     zoomer: function(){ zoomerCles(cibles()); },
     coupe: function(){ couperCles(cibles()); },
     "sans-coupe": sansCoupe,
+    "figer-coupe": function(){
+      var f = vue.figer(!vue.fige());
+      etat(f ? "Boîte de coupe figée : poignées masquées." : "Boîte de coupe libérée : tire les poignées pour la retoucher.");
+      maj();
+    },
     "tout-reduire": function(){ fichiers.forEach(function(f){ f.plie = true; }); rendreListe(); },
     "tout-developper": function(){ fichiers.forEach(function(f){ f.plie = false; }); plies.clear(); rendreListe(); },
     theme: function(b){ if (choisirTheme) choisirTheme(b.getAttribute("data-choix-theme")); },

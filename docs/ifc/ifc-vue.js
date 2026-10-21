@@ -1337,7 +1337,7 @@
       p[ax] = f & 1 ? coupe.max[ax] : coupe.min[ax];
       return p;
     }
-    var NOMS_FACES = ["ouest", "est", "sud", "nord", "bas", "haut"], poignees = [], tire = null;
+    var NOMS_FACES = ["ouest", "est", "sud", "nord", "bas", "haut"], poignees = [], tire = null, fige = false;
     NOMS_FACES.forEach(function(nom, f){
       var b = document.createElement("div");
       b.className = "poignee"; b.hidden = true;
@@ -1374,7 +1374,7 @@
     });
     function placerPoignees(c){
       (poignees || []).forEach(function(b, f){
-        if (!coupe){ b.hidden = true; return; }
+        if (!coupe || fige){ b.hidden = true; return; }
         var p = ecran(c, centreFace(f));
         b.hidden = !(p[0] > -20 && p[0] < W + 20 && p[1] > -20 && p[1] < H + 20);
         b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
@@ -1585,11 +1585,14 @@
           var m = Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
           b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }) };
         }
-        coupe = b;
+        coupe = b; fige = false;
         M.coupe(b);
         if (b) cadrerSur(b); else demander();
         return !!b;
       },
+      // Boîte figée : plus de poignées, plus de retouche à la souris
+      figer: function(oui){ fige = !!oui && !!coupe; demander(); return fige; },
+      fige: function(){ return fige; },
       aCoupe: function(){ return !!coupe; },
       // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
       moteur: function(nom){
