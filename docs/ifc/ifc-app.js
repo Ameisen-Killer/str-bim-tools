@@ -310,7 +310,13 @@
     else if (i.supprimable){ choix.add(c); etat("« " + nomAff(i) + " » ajouté à la sélection."); }
     // déplie le fichier et les parents si besoin, pour retrouver l'élément dans la liste
     if (deplierVers(c)) rendreListe();
-    activer(c, true);
+    if (choix.has(c)) activer(c, true);
+    else oublierActif();
+  }
+  // Un élément désélectionné ne reste pas affiché dans Propriétés
+  function oublierActif(){
+    if (actif && !choix.has(actif)) actif = "";
+    majLignes(); afficherProps(); maj();
   }
 
   $("#liste").addEventListener("click", function(e){
@@ -328,7 +334,7 @@
     if (!r) return;
     var c = r.getAttribute("data-cle");
     if (e.target.closest("[data-pli]")){ if (plies.has(c)) plies.delete(c); else plies.add(c); rendreListe(); return; }
-    if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); activer(c, false); return; }
+    if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); if (e.target.checked) activer(c, false); else oublierActif(); return; }
     activer(c, false);
   });
   $("#recherche").addEventListener("input", function(){ rendreListe(); maj(); });
@@ -339,11 +345,11 @@
   });
   $("#sel-rien").addEventListener("click", function(){
     visibles.forEach(function(c){ choix.delete(c); });
-    majLignes(); maj();
+    oublierActif();
   });
   $("#sel-inv").addEventListener("click", function(){
     visibles.forEach(function(c){ if (choix.has(c)) choix.delete(c); else choix.add(c); });
-    majLignes(); maj();
+    oublierActif();
   });
 
   // ================= Arborescence : réduire, développer, couleur des maquettes =================
@@ -782,7 +788,7 @@
     },
     annuler: annuler, retablir: retablir, supprimer: supprimer,
     tout: function(){ $("#sel-tout").click(); },
-    rien: function(){ var n = choix.size; choix.clear(); majLignes(); maj(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
+    rien: function(){ var n = choix.size; choix.clear(); oublierActif(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
     inverser: function(){ $("#sel-inv").click(); },
     "meme-type": function(){ comme(function(i, r){ return i.type === r.type; }, "le même type"); },
     "meme-materiau": function(){ comme(function(i, r){ return !!r.materiau && i.materiau === r.materiau; }, "le même matériau"); },
