@@ -144,9 +144,25 @@ button,input,select{font:inherit;color:inherit}
 /* ---------- Éditeur ---------- */
 .editeur{height:100svh;display:flex;flex-direction:column;padding-top:calc(max(18px, env(safe-area-inset-top)) + 35px)}
 .outils{
-  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
-  padding:10px var(--g);border-bottom:1px solid var(--ligne);background:var(--noir-2);
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;
+  padding:6px var(--g) 8px;border-bottom:1px solid var(--ligne);background:var(--noir-2);
 }
+/* barre de menus façon logiciel */
+.mb{display:flex;align-items:stretch;margin-left:-10px}
+.mb-gr{position:relative}
+.mb-titre{background:none;border:0;padding:9px 10px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-doux);transition:color .2s,background .2s}
+.mb-titre:hover,.mb-titre:focus-visible,.mb-titre[aria-expanded="true"]{color:var(--or);background:rgba(var(--encre),.05);outline:none}
+.mb-liste{position:absolute;left:0;top:100%;z-index:50;min-width:260px;max-width:calc(100vw - 16px);padding:6px 0;background:var(--noir-2);border:1px solid var(--ligne);box-shadow:0 14px 36px rgba(0,0,0,.32);display:flex;flex-direction:column}
+.mb-liste button{display:flex;justify-content:space-between;align-items:baseline;gap:28px;background:none;border:0;text-align:left;padding:8px 14px;cursor:pointer;font-size:13.5px;color:var(--texte);white-space:nowrap}
+.mb-liste button span{overflow:hidden;text-overflow:ellipsis}
+.mb-liste button:hover:not(:disabled),.mb-liste button:focus-visible{background:rgba(var(--or-rvb),.13);color:var(--or);outline:none}
+.mb-liste button.danger:hover:not(:disabled),.mb-liste button.danger:focus-visible{background:rgba(224,128,106,.12);color:var(--rouge)}
+.mb-liste button:disabled{opacity:.36;cursor:default}
+.mb-liste kbd{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible)}
+.mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:5px 0}
+.mb-sous{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);padding:7px 14px 3px}
+.fichier{padding-left:16px;border-left:1px solid var(--ligne)}
+@media (max-width:899px){.fichier{padding-left:0;border-left:0;flex-basis:100%}.mb{margin-left:-8px}.mb-titre{padding:9px 8px;letter-spacing:.06em}}
 .fichier{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
 .fichier-nom{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fichier-bilan{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -184,6 +200,8 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .el-info{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el.spatial .el-nom{color:var(--texte-doux);font-weight:400}
 .el.ouverture{opacity:.62}
+.el.cache .el-nom,.el.cache .el-info{opacity:.42}
+.el.cache .el-nom::after{content:" · masqué";font-family:var(--mono);font-size:10px;color:var(--texte-faible)}
 /* en-tête de fichier dans la liste (plusieurs IFC ouverts) */
 .fic{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px 9px 12px;margin-top:6px;border-top:1px solid var(--ligne);border-bottom:1px solid var(--ligne);background:var(--noir-2);cursor:pointer}
 .fic:first-child{margin-top:0;border-top:0}
@@ -229,11 +247,13 @@ dialog h2{margin:0 0 10px;font-weight:300;font-size:22px}
 dialog p{color:var(--texte-doux);font-size:14.5px}
 dialog p+p{margin-top:8px}
 dialog .actions{margin-top:20px;justify-content:flex-end}
+.aide-table{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:6px;font-size:14px}
+.aide-table kbd{font-family:var(--mono);font-size:11.5px;color:var(--or);white-space:nowrap}
+.aide-table span{color:var(--texte-doux)}
 
 /* ---------- Smartphone : trois onglets ---------- */
 @media (max-width:899px){
-  .outils{padding:8px 12px;gap:8px}
-  .actions .btn{padding:6px 10px;font-size:10px;letter-spacing:.08em}
+  .outils{padding:4px 12px 8px;gap:4px 8px}
   .onglets{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--ligne);background:var(--noir-2)}
   .onglets button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 4px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-doux)}
   .onglets button[aria-selected="true"]{color:var(--or);border-bottom-color:var(--or)}
@@ -296,16 +316,69 @@ footer a:hover{color:var(--or)}
   <!-- ===== Après chargement : éditeur ===== -->
   <div class="editeur" id="editeur" hidden>
     <div class="outils">
+      <!-- Barre de menus façon logiciel ; les commandes portent data-cmd (ifc-app.js) -->
+      <nav class="mb" id="mb" role="menubar" aria-label="Menus de l'éditeur">
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Fichier</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="ouvrir"><span>Ouvrir…</span><kbd>Ctrl+O</kbd></button>
+            <button type="button" role="menuitem" data-cmd="ajouter"><span>Ajouter un IFC…</span><kbd>Ctrl+Maj+O</kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
+            <div data-dyn="exports"></div>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="fermer-tout"><span>Tout fermer</span><kbd></kbd></button>
+          </div>
+        </div>
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Édition</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="annuler"><span id="cmd-annuler">Annuler</span><kbd>Ctrl+Z</kbd></button>
+            <button type="button" role="menuitem" data-cmd="retablir"><span id="cmd-retablir">Rétablir</span><kbd>Ctrl+Y</kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="supprimer" class="danger"><span id="cmd-supprimer">Supprimer la sélection</span><kbd>Suppr</kbd></button>
+          </div>
+        </div>
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Sélection</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="tout"><span>Tout sélectionner</span><kbd>Ctrl+A</kbd></button>
+            <button type="button" role="menuitem" data-cmd="rien"><span>Ne rien sélectionner</span><kbd>Échap</kbd></button>
+            <button type="button" role="menuitem" data-cmd="inverser"><span>Inverser la sélection</span><kbd></kbd></button>
+            <hr>
+            <div class="mb-sous">Comme l'élément actif</div>
+            <button type="button" role="menuitem" data-cmd="meme-type"><span>Même type</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="meme-materiau"><span>Même matériau</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="meme-nom"><span>Même nom</span><kbd></kbd></button>
+          </div>
+        </div>
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Affichage</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="recadrer"><span>Recadrer</span><kbd>F</kbd></button>
+            <hr>
+            <div class="mb-sous">Vues</div>
+            <button type="button" role="menuitem" data-cmd="vue-iso"><span>Perspective isométrique</span><kbd>1</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-dessus"><span>Dessus</span><kbd>2</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-face"><span>Face</span><kbd>3</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-cote"><span>Côté</span><kbd>4</kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="masquer"><span>Masquer la sélection</span><kbd>H</kbd></button>
+            <button type="button" role="menuitem" data-cmd="isoler"><span>Isoler la sélection</span><kbd>I</kbd></button>
+            <button type="button" role="menuitem" data-cmd="tout-afficher"><span>Tout afficher</span><kbd>Maj+H</kbd></button>
+          </div>
+        </div>
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Aide</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="raccourcis"><span>Raccourcis clavier</span><kbd>?</kbd></button>
+            <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos de l'éditeur</span><kbd></kbd></button>
+          </div>
+        </div>
+      </nav>
       <div class="fichier">
         <span class="fichier-nom" id="f-nom">—</span>
         <span class="fichier-bilan" id="f-bilan"></span>
-      </div>
-      <div class="actions">
-        <button type="button" class="btn danger" id="b-suppr" disabled>Supprimer <span id="b-suppr-n"></span></button>
-        <button type="button" class="btn" id="b-annuler" disabled title="Annuler (Ctrl+Z)">Annuler</button>
-        <button type="button" class="btn" id="b-retablir" disabled title="Rétablir (Ctrl+Y)">Rétablir</button>
-        <button type="button" class="btn plein" id="b-export">Exporter l'IFC</button>
-        <button type="button" class="btn" id="b-autre" title="Ajouter un ou plusieurs fichiers IFC à la vue">Ajouter un IFC</button>
       </div>
       <div class="etat" id="etat" role="status" aria-live="polite"></div>
     </div>
@@ -361,6 +434,16 @@ footer a:hover{color:var(--or)}
   </form>
 </dialog>
 
+<dialog id="aide">
+  <form method="dialog">
+    <h2 id="aide-titre">Raccourcis clavier</h2>
+    <div id="aide-corps"></div>
+    <div class="actions">
+      <button type="submit" class="btn" value="ok">Fermer</button>
+    </div>
+  </form>
+</dialog>
+
 <footer class="pied">
   <a class="pied-site" href="/">← str-bim-tools.com</a>
   <div class="pied-droite">
@@ -372,8 +455,8 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=1"></script>
 <script src="/ifc/ifc-core.js?v=1"></script>
-<script src="/ifc/ifc-vue.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=3"></script>
+<script src="/ifc/ifc-vue.js?v=5"></script>
+<script src="/ifc/ifc-app.js?v=4"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>

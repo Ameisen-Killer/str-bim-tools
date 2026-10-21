@@ -1236,6 +1236,8 @@
       },
       selection: function(s, a){ sel = s; actif = a || 0; M.teinter(liste, sel, actif, coul); demander(); },
       recadrer: recadrer,
+      // vue type : lacet (autour de Z) et plongée en radians, puis recadrage
+      orienter: function(l, p){ yaw = l; pitch = Math.max(-1.55, Math.min(1.55, p)); recadrer(); },
       redessiner: function(){ taille(); }
     };
   }

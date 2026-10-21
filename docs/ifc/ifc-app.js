@@ -19,7 +19,7 @@
 
   // fichier ouvert : { uid, m (modèle IFC), propre (version exportée), visible, plie, taille: {v, t} }
   var fichiers = [], parUid = new Map(), uidSuivant = 1;
-  var lignes = [], choix = new Set(), actif = "", histo = [], aRefaire = [];
+  var lignes = [], choix = new Set(), caches = new Set(), actif = "", histo = [], aRefaire = [];
 
   var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue });
 
@@ -80,6 +80,8 @@
     });
     suite.then(function(){
       $("#chargement").hidden = true;
+      if (ajoutes.length && remplacer) vider();
+      remplacer = false;
       if (ajoutes.length) ouvrir(ajoutes, performance.now() - t0, refus);
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
       else erreur(refus.join(" "));
@@ -122,7 +124,7 @@
     });
     vue.modeles(fichiers.map(function(x){ return x.m; }));
     if (!fichiers.length){
-      choix = new Set(); actif = ""; lignes = [];
+      choix = new Set(); caches = new Set(); actif = ""; lignes = [];
       $("#editeur").hidden = true;
       $("#accueil").hidden = false;
       etat("");
@@ -146,11 +148,12 @@
       });
     });
     choix.forEach(function(c){ if (!existe(c)) choix.delete(c); });
+    caches.forEach(function(c){ if (!existe(c)) caches.delete(c); });
     if (actif && !existe(actif)) actif = "";
     remplirTypes();
     rendreListe();
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element") items.push({ cle: l.cle, m: l.f.m, id: l.id }); });
+    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id }); });
     infoVue(vue.afficher(items));
     afficherProps();
     maj();
@@ -197,7 +200,7 @@
       var c = choix.has(l.cle);
       if (i.supprimable) visibles.push(l.cle);
       var info = [i.typeLib, i.materiau, "#" + i.id].filter(Boolean).join(" · ");
-      html.push('<div class="el ' + i.genre + (c ? " choisi" : "") + (l.cle === actif ? " actif" : "") + '" role="listitem" data-cle="' + l.cle +
+      html.push('<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + '" role="listitem" data-cle="' + l.cle +
         '" style="--niv:' + (filtre ? 0 : Math.min(l.niv, 8)) + '">' +
         (i.supprimable ? '<input type="checkbox" aria-label="Sélectionner ' + esc(nomAff(i)) + '"' + (c ? " checked" : "") + ">" : '<span class="vide"></span>') +
         '<div><div class="el-nom">' + esc(nomAff(i)) + '</div><div class="el-info">' + esc(info) + "</div></div></div>");
@@ -213,6 +216,7 @@
       var oui = choix.has(c);
       r.classList.toggle("choisi", oui);
       r.classList.toggle("actif", c === actif);
+      r.classList.toggle("cache", caches.has(c));
       var cb = r.querySelector("input");
       if (cb) cb.checked = oui;
     });
@@ -322,13 +326,24 @@
   function maj(){
     if (!fichiers.length) return;
     var n = choix.size;
-    $("#b-suppr-n").textContent = n ? "(" + fmtN(n) + ")" : "";
-    $("#b-suppr").disabled = !n;
-    $("#b-annuler").disabled = !histo.length;
-    $("#b-retablir").disabled = !aRefaire.length;
-    $("#b-annuler").title = histo.length ? "Annuler : " + histo[histo.length - 1].txt + " (Ctrl+Z)" : "Annuler (Ctrl+Z)";
-    $("#b-retablir").title = aRefaire.length ? "Rétablir : " + aRefaire[aRefaire.length - 1].txt + " (Ctrl+Y)" : "Rétablir (Ctrl+Y)";
-    $("#b-export").textContent = fichiers.length > 1 ? "Exporter les modifiés" : "Exporter l'IFC";
+    // état des commandes des menus
+    var a = !!(actif && existe(actif));
+    activerCmd("supprimer", n > 0);
+    $("#cmd-supprimer").textContent = "Supprimer la sélection" + (n ? " (" + fmtN(n) + ")" : "");
+    activerCmd("annuler", histo.length > 0);
+    $("#cmd-annuler").textContent = histo.length ? "Annuler la " + histo[histo.length - 1].txt : "Annuler";
+    activerCmd("retablir", aRefaire.length > 0);
+    $("#cmd-retablir").textContent = aRefaire.length ? "Rétablir la " + aRefaire[aRefaire.length - 1].txt : "Rétablir";
+    $("#cmd-exporter").textContent = fichiers.length > 1 ? "Exporter les fichiers modifiés" : "Exporter l'IFC";
+    ["meme-type", "meme-materiau", "meme-nom"].forEach(function(c){ activerCmd(c, a); });
+    activerCmd("masquer", n > 0 || a);
+    activerCmd("isoler", n > 0 || a);
+    activerCmd("tout-afficher", caches.size > 0);
+    activerCmd("rien", n > 0);
+    var dyn = $('[data-dyn="exports"]');
+    dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
+      return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
+    }).join("") : "";
     $("#compte").textContent = fmtN(visibles.length) + " affichés" + (n ? " · " + fmtN(n) + " cochés" : "");
     var avant = 0, apres = 0, oAvant = 0, oApres = 0;
     fichiers.forEach(function(f){ avant += f.m.nbOrigine; apres += f.m.ent.size; oAvant += f.m.taille; oApres += tailleDe(f); });
@@ -349,6 +364,7 @@
     $("#vue-info").textContent = pluriel(b.elements, "élément dessiné", "éléments dessinés") + " · " + pluriel(b.faces, "face") +
       (nl.length ? " · géométrie non lue : " + nl.slice(0, 4).map(IFC.nomType).join(", ") + (nl.length > 4 ? "…" : "") : "") +
       (b.erreurs ? " · " + pluriel(b.erreurs, "élément illisible", "éléments illisibles") : "") +
+      (caches.size ? " · " + fmtN(caches.size) + " masqués" : "") +
       " · moteur " + b.moteur;
   }
 
@@ -442,20 +458,170 @@
     });
   }
 
-  $("#b-suppr").addEventListener("click", supprimer);
-  $("#b-annuler").addEventListener("click", annuler);
-  $("#b-retablir").addEventListener("click", retablir);
-  $("#b-export").addEventListener("click", function(){ exporter(null); });
   $("#b-recadrer").addEventListener("click", function(){ vue.recadrer(); });
 
+  // ================= Masquer / isoler dans la vue 3D =================
+  function elementsDe(liste){
+    return liste.filter(function(c){ var d = lireCle(c), i = d.f && IFC.infos(d.f.m, d.id); return i && i.genre === "element"; });
+  }
+  function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
+  function majVue(){
+    var items = [];
+    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id }); });
+    infoVue(vue.afficher(items));
+    majLignes(); maj();
+  }
+
+  // ================= Commandes (menus et raccourcis) =================
+  var remplacer = false;
+  function vider(){
+    fichiers = []; parUid.clear(); histo = []; aRefaire = []; choix = new Set(); caches = new Set(); actif = ""; lignes = [];
+    vue.modeles([]);
+  }
+  function comme(test, quoi){
+    var d = lireCle(actif), r = IFC.infos(d.f.m, d.id), n = 0;
+    lignes.forEach(function(l){ if (l.i && l.i.supprimable && test(l.i, r) && !choix.has(l.cle)){ choix.add(l.cle); n++; } });
+    majLignes(); maj();
+    etat(n ? pluriel(n, "élément ajouté", "éléments ajoutés") + " à la sélection (" + quoi + " que « " + nomAff(r) + " »)." : "Aucun autre élément avec " + quoi + ".");
+  }
+  function aide(titre, html){
+    $("#aide-titre").textContent = titre;
+    $("#aide-corps").innerHTML = html;
+    var d = $("#aide");
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+  }
+  var COMMANDES = {
+    ouvrir: function(){
+      if (fichiers.some(modifie) && !confirm("Les modifications non exportées seront perdues. Ouvrir d'autres fichiers à la place ?")) return;
+      remplacer = true; choisir();
+    },
+    ajouter: function(){ remplacer = false; choisir(); },
+    exporter: function(){ exporter(null); },
+    "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
+    "fermer-tout": function(){
+      if (fichiers.some(modifie) && !confirm("Les modifications non exportées seront perdues. Tout fermer ?")) return;
+      vider();
+      $("#editeur").hidden = true; $("#accueil").hidden = false;
+      etat(""); window.scrollTo(0, 0);
+    },
+    annuler: annuler, retablir: retablir, supprimer: supprimer,
+    tout: function(){ $("#sel-tout").click(); },
+    rien: function(){ choix.clear(); majLignes(); maj(); },
+    inverser: function(){ $("#sel-inv").click(); },
+    "meme-type": function(){ comme(function(i, r){ return i.type === r.type; }, "le même type"); },
+    "meme-materiau": function(){ comme(function(i, r){ return !!r.materiau && i.materiau === r.materiau; }, "le même matériau"); },
+    "meme-nom": function(){ comme(function(i, r){ return !!r.nom && i.nom === r.nom; }, "le même nom"); },
+    recadrer: function(){ vue.recadrer(); },
+    "vue-iso": function(){ vue.orienter(-Math.PI/4, Math.atan(Math.SQRT1_2)); },
+    "vue-dessus": function(){ vue.orienter(0, 1.55); },
+    "vue-face": function(){ vue.orienter(0, 0); },
+    "vue-cote": function(){ vue.orienter(Math.PI/2, 0); },
+    masquer: function(){
+      var c = cibles();
+      c.forEach(function(x){ caches.add(x); });
+      majVue();
+      etat(pluriel(c.length, "élément masqué", "éléments masqués") + " dans la vue 3D (Maj+H pour tout afficher).");
+    },
+    isoler: function(){
+      var c = new Set(cibles()), n = 0;
+      caches = new Set();
+      lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && !c.has(l.cle)){ caches.add(l.cle); n++; } });
+      majVue();
+      etat(pluriel(c.size, "élément isolé", "éléments isolés") + ", " + fmtN(n) + " masqués.");
+    },
+    "tout-afficher": function(){ var n = caches.size; caches = new Set(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
+    raccourcis: function(){
+      aide("Raccourcis clavier", '<div class="aide-table">' + [
+        ["Ctrl+O", "Ouvrir des fichiers (remplace ceux ouverts)"], ["Ctrl+Maj+O", "Ajouter des fichiers"], ["Ctrl+S", "Exporter"],
+        ["Ctrl+Z / Ctrl+Y", "Annuler / Rétablir"], ["Suppr", "Supprimer la sélection"], ["Ctrl+A", "Tout sélectionner"], ["Échap", "Ne rien sélectionner"],
+        ["F", "Recadrer"], ["1 · 2 · 3 · 4", "Vue isométrique, dessus, face, côté"], ["H · I · Maj+H", "Masquer, isoler, tout afficher"],
+        ["Glisser", "Tourner (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"]
+      ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
+    },
+    "a-propos": function(){
+      aide("Éditeur IFC", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
+        "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne fait aucun appel réseau.</p>");
+    }
+  };
+  function activerCmd(c, ok){ [].forEach.call(document.querySelectorAll('[data-cmd="' + c + '"]'), function(b){ b.disabled = !ok; }); }
+
+  // ================= Barre de menus =================
+  var mb = $("#mb"), groupes = [].slice.call(mb.querySelectorAll(".mb-gr")), ouvert = null;
+  function itemsDe(liste){ return [].filter.call(liste.querySelectorAll("button"), function(b){ return !b.disabled; }); }
+  function fermerMenu(){
+    if (!ouvert) return;
+    ouvert.liste.hidden = true;
+    ouvert.titre.setAttribute("aria-expanded", "false");
+    ouvert = null;
+  }
+  function ouvrirMenu(gr, focus){
+    fermerMenu();
+    var titre = gr.querySelector(".mb-titre"), liste = gr.querySelector(".mb-liste");
+    maj();
+    liste.hidden = false;
+    titre.setAttribute("aria-expanded", "true");
+    ouvert = { gr: gr, titre: titre, liste: liste };
+    liste.style.left = "";
+    var r = liste.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) liste.style.left = (window.innerWidth - 8 - r.right) + "px";
+    if (focus){ var b = itemsDe(liste)[0]; if (b) b.focus(); }
+  }
+  groupes.forEach(function(gr){
+    var titre = gr.querySelector(".mb-titre");
+    titre.addEventListener("click", function(e){
+      e.stopPropagation();
+      if (ouvert && ouvert.gr === gr) fermerMenu(); else ouvrirMenu(gr, e.detail === 0);
+    });
+    titre.addEventListener("mouseenter", function(){ if (ouvert && ouvert.gr !== gr) ouvrirMenu(gr, false); });
+  });
+  mb.addEventListener("click", function(e){
+    var b = e.target.closest("[data-cmd]");
+    if (!b || b.disabled) return;
+    fermerMenu();
+    var f = COMMANDES[b.getAttribute("data-cmd")];
+    if (f) f(b);
+  });
+  document.addEventListener("click", function(e){ if (ouvert && !mb.contains(e.target)) fermerMenu(); });
+  mb.addEventListener("keydown", function(e){
+    if (!ouvert) return;
+    var its = itemsDe(ouvert.liste), i = its.indexOf(document.activeElement), gi = groupes.indexOf(ouvert.gr);
+    if (e.key === "ArrowDown"){ e.preventDefault(); if (its.length) its[(i + 1) % its.length].focus(); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); if (its.length) its[(i - 1 + its.length) % its.length].focus(); }
+    else if (e.key === "ArrowRight" || e.key === "ArrowLeft"){
+      e.preventDefault();
+      ouvrirMenu(groupes[(gi + (e.key === "ArrowRight" ? 1 : -1) + groupes.length) % groupes.length], true);
+    }
+    else if (e.key === "Escape"){ e.preventDefault(); var t = ouvert.titre; fermerMenu(); t.focus(); }
+  });
+
+  // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
-    if (!fichiers.length || $("#editeur").hidden) return;
-    var t = e.target.tagName;
-    if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA" || $("#confirmer").open) return;
-    var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey;
-    if (mod && k === "z" && !e.shiftKey){ e.preventDefault(); annuler(); }
-    else if (mod && (k === "y" || (k === "z" && e.shiftKey))){ e.preventDefault(); retablir(); }
-    else if (e.key === "Delete" && choix.size){ e.preventDefault(); supprimer(); }
+    if (!fichiers.length || $("#editeur").hidden || ouvert || $("#confirmer").open || $("#aide").open) return;
+    var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
+    var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
+    if (mod && k === "o") c = e.shiftKey ? "ajouter" : "ouvrir";
+    else if (mod && k === "s") c = "exporter";
+    else if (saisie) return;
+    else if (mod && k === "z" && !e.shiftKey) c = "annuler";
+    else if (mod && (k === "y" || (k === "z" && e.shiftKey))) c = "retablir";
+    else if (mod && k === "a") c = "tout";
+    else if (mod || e.altKey) return;
+    else if (e.key === "Delete" && choix.size) c = "supprimer";
+    else if (e.key === "Escape" && choix.size) c = "rien";
+    else if (k === "f") c = "recadrer";
+    else if (k === "1") c = "vue-iso";
+    else if (k === "2") c = "vue-dessus";
+    else if (k === "3") c = "vue-face";
+    else if (k === "4") c = "vue-cote";
+    else if (k === "h") c = e.shiftKey ? "tout-afficher" : "masquer";
+    else if (k === "i") c = "isoler";
+    else if (e.key === "?") c = "raccourcis";
+    if (!c) return;
+    e.preventDefault();
+    var b = document.querySelector('[data-cmd="' + c + '"]');
+    maj();
+    if (b && b.disabled) return;
+    COMMANDES[c]();
   });
 
   window.addEventListener("beforeunload", function(e){
@@ -466,7 +632,6 @@
   var entree = $("#fichier");
   function choisir(){ entree.value = ""; entree.click(); }
   $("#choisir").addEventListener("click", choisir);
-  $("#b-autre").addEventListener("click", choisir);
   entree.addEventListener("change", function(){ if (entree.files && entree.files.length) charger(entree.files); });
 
   function deposeFichiers(e){ var t = e.dataTransfer && e.dataTransfer.types; return !!t && [].indexOf.call(t, "Files") >= 0; }
