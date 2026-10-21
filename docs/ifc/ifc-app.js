@@ -23,7 +23,7 @@
   var lignes = [], choix = new Set(), caches = new Set(), plies = new Set(), actif = "", histo = [], aRefaire = [];
 
   function lireMoteur(){ try { return localStorage.getItem("ifc.moteur") || "webgl"; } catch (e){ return "webgl"; } }
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, moteur: lireMoteur() });
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: lireMoteur() });
 
   // Accueil ou éditeur ; dans l'éditeur, le bandeau du site laisse la place à l'interface
   function modeEditeur(oui){
@@ -347,6 +347,45 @@
     etat("« " + f.m.nom + " » : " + nomTeinte(h) + ".");
   }
 
+  // ---------- Actions de vue sur des éléments : masquer, isoler, zoomer, boîte de coupe ----------
+  function quoiDe(cles){
+    if (cles.length !== 1) return pluriel(cles.length, "élément");
+    var d = lireCle(cles[0]);
+    return "« " + nomAff(IFC.infos(d.f.m, d.id)) + " »";
+  }
+  function masquerCles(c){
+    c.forEach(function(x){ caches.add(x); });
+    majVue();
+    etat(pluriel(c.length, "élément masqué", "éléments masqués") + " dans la vue 3D (Maj+H pour tout afficher).");
+  }
+  function isolerCles(liste){
+    var c = new Set(liste), n = 0;
+    caches = new Set();
+    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && !c.has(l.cle)){ caches.add(l.cle); n++; } });
+    majVue();
+    etat(pluriel(c.size, "élément isolé", "éléments isolés") + ", " + fmtN(n) + " masqués.");
+  }
+  function zoomerCles(c){ if (vue.cadrer(c)) etat("Zoom sur " + quoiDe(c) + "."); }
+  function couperCles(c){
+    if (vue.coupe(c)) etat("Boîte de coupe autour de " + quoiDe(c) + " : les autres pièces restent visibles dedans (Maj+B pour la retirer).");
+    maj();
+  }
+  function sansCoupe(){ vue.coupe(null); etat("Boîte de coupe retirée."); maj(); }
+  function actionVue(a, c){
+    if (!c.length) return false;
+    if (a === "masquer") masquerCles(c);
+    else if (a === "isoler") isolerCles(c);
+    else if (a === "zoomer") zoomerCles(c);
+    else if (a === "coupe") couperCles(c);
+    else return false;
+    return true;
+  }
+  function boutonsVue(c, sansMasquer){
+    var q = c.length > 1 ? " (" + fmtN(c.length) + ")" : "";
+    return (sansMasquer ? [] : [bouton("masquer", "Masquer" + q)]).concat([bouton("isoler", "Isoler" + q),
+      bouton("zoomer", "Zoomer dessus"), bouton("coupe", "Boîte de coupe autour")]).join("");
+  }
+
   // ---------- Menu contextuel (clic droit ou appui long) ----------
   var ctx = $("#ctx"), cible = null, teinteLibre = $("#teinte-libre"), cibleTeinte = null;
   function bouton(act, txt, classe){
@@ -363,6 +402,8 @@
       h.push(bouton("developper-tout", "Développer tout"), bouton("reduire-tout", "Réduire tout"));
     }
     if (noeud && l.i.supprimable) h.push("<hr>", bouton("selectionner", l.enfants ? "Sélectionner avec son contenu" : "Sélectionner"));
+    c.cles = elementsDe([l].concat(sousLignes(c.k)).filter(function(x){ return x.i && x.f.visible; }).map(function(x){ return x.cle; }));
+    if (c.cles.length) h.push("<hr>", '<div class="mb-sous">Vue 3D</div>', boutonsVue(c.cles, !noeud));
     h.push("<hr>", '<div class="mb-sous">Couleur de la maquette</div><div class="teintes">' +
       '<button type="button" role="menuitemradio" class="defaut" data-ctx="teinte" data-h="" aria-checked="' + (f.teinte == null) + '" title="Couleur par défaut" aria-label="Couleur par défaut"></button>' +
       TEINTES.map(function(t){
@@ -371,6 +412,27 @@
       '<button type="button" role="menuitem" class="autre" data-ctx="autre" title="Autre couleur…" aria-label="Autre couleur"></button></div>');
     if (!noeud) h.push("<hr>", bouton("voir", f.visible ? "Masquer dans la vue 3D" : "Afficher dans la vue 3D"), bouton("export", "Exporter ce fichier"), bouton("fermer", "Fermer ce fichier", "danger"));
     h.push("<hr>", bouton("tout-reduire", "Tout réduire"), bouton("tout-developper", "Tout développer"));
+    montrerCtx(x, y, h, c);
+  }
+  // Clic droit dans la vue 3D : sur l'élément visé, ou sur la sélection s'il en fait partie
+  function menuVue(cl, x, y){
+    if (!fichiers.length) return;
+    var c = [], h = [];
+    if (cl){
+      c = choix.has(cl) ? elementsDe(Array.from(choix)) : [cl];
+      if (c.indexOf(cl) < 0) c = [cl];
+      activer(cl, true);
+      var d = lireCle(cl), i = IFC.infos(d.f.m, d.id);
+      h.push('<div class="ctx-titre">' + esc(c.length > 1 ? "Sélection : " + pluriel(c.length, "élément") : nomAff(i)) + "</div>");
+      if (i.supprimable) h.push(bouton("basculer", choix.has(cl) ? "Retirer de la sélection" : "Ajouter à la sélection"), "<hr>");
+      h.push(boutonsVue(c), "<hr>");
+    }
+    if (vue.aCoupe()) h.push(bouton("sans-coupe", "Retirer la boîte de coupe"));
+    if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
+    h.push(bouton("recadrer", "Recadrer"));
+    montrerCtx(x, y, h, { vue: true, cle: cl, cles: c });
+  }
+  function montrerCtx(x, y, h, c){
     ctx.innerHTML = h.join("");
     cible = c;
     ctx.hidden = false;
@@ -393,7 +455,14 @@
   ctx.addEventListener("click", function(e){
     var b = e.target.closest("[data-ctx]");
     if (!b || !cible) return;
-    var a = b.getAttribute("data-ctx"), c = cible, f = c.f, l = c.l, noeud = !l.fichier, sous = sousLignes(c.k);
+    var a = b.getAttribute("data-ctx"), c = cible;
+    if (c.vue || a === "masquer" || a === "isoler" || a === "zoomer" || a === "coupe"){
+      fermerCtx();
+      if (a === "basculer"){ cliqueVue(c.cle); return; }
+      if (!actionVue(a, c.cles) && COMMANDES[a]) COMMANDES[a]();
+      return;
+    }
+    var f = c.f, l = c.l, noeud = !l.fichier, sous = sousLignes(c.k);
     if (a === "autre"){
       // sélecteur de couleur du système, ouvert à l'endroit du menu
       cibleTeinte = f;
@@ -484,6 +553,9 @@
     activerCmd("masquer", n > 0 || a);
     activerCmd("isoler", n > 0 || a);
     activerCmd("tout-afficher", caches.size > 0);
+    activerCmd("zoomer", n > 0 || a);
+    activerCmd("coupe", n > 0 || a);
+    activerCmd("sans-coupe", vue.aCoupe());
     activerCmd("rien", n > 0);
     var mo = vue.moteur() === "WebGL" ? "webgl" : "canvas";
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
@@ -666,19 +738,11 @@
     "vue-dessus": function(){ vue.orienter(0, 1.55); },
     "vue-face": function(){ vue.orienter(0, 0); },
     "vue-cote": function(){ vue.orienter(Math.PI/2, 0); },
-    masquer: function(){
-      var c = cibles();
-      c.forEach(function(x){ caches.add(x); });
-      majVue();
-      etat(pluriel(c.length, "élément masqué", "éléments masqués") + " dans la vue 3D (Maj+H pour tout afficher).");
-    },
-    isoler: function(){
-      var c = new Set(cibles()), n = 0;
-      caches = new Set();
-      lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && !c.has(l.cle)){ caches.add(l.cle); n++; } });
-      majVue();
-      etat(pluriel(c.size, "élément isolé", "éléments isolés") + ", " + fmtN(n) + " masqués.");
-    },
+    masquer: function(){ masquerCles(cibles()); },
+    isoler: function(){ isolerCles(cibles()); },
+    zoomer: function(){ zoomerCles(cibles()); },
+    coupe: function(){ couperCles(cibles()); },
+    "sans-coupe": sansCoupe,
     "tout-reduire": function(){ fichiers.forEach(function(f){ f.plie = true; }); rendreListe(); },
     "tout-developper": function(){ fichiers.forEach(function(f){ f.plie = false; }); plies.clear(); rendreListe(); },
     theme: function(b){ if (choisirTheme) choisirTheme(b.getAttribute("data-choix-theme")); },
@@ -695,8 +759,10 @@
         ["Ctrl+O", "Ouvrir des fichiers (remplace ceux ouverts)"], ["Ctrl+Maj+O", "Ajouter des fichiers"], ["Ctrl+S", "Exporter"],
         ["Ctrl+Z / Ctrl+Y", "Annuler / Rétablir"], ["Suppr", "Supprimer la sélection"], ["Ctrl+A", "Tout sélectionner"], ["Échap", "Ne rien sélectionner"],
         ["F", "Recadrer"], ["1 · 2 · 3 · 4", "Vue isométrique, dessus, face, côté"], ["H · I · Maj+H", "Masquer, isoler, tout afficher"],
+        ["Z", "Zoomer sur la sélection"], ["B · Maj+B", "Boîte de coupe autour de la sélection, la retirer"],
         ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
-        ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"]
+        ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
+        ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
@@ -776,6 +842,8 @@
     else if (k === "4") c = "vue-cote";
     else if (k === "h") c = e.shiftKey ? "tout-afficher" : "masquer";
     else if (k === "i") c = "isoler";
+    else if (k === "z") c = "zoomer";
+    else if (k === "b") c = e.shiftKey ? "sans-coupe" : "coupe";
     else if (e.key === "?") c = "raccourcis";
     if (!c) return;
     e.preventDefault();

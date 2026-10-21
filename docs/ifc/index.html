@@ -387,6 +387,9 @@ footer a:hover{color:var(--or)}
             <button type="button" role="menuitem" data-cmd="masquer"><span>Masquer la sélection</span><kbd>H</kbd></button>
             <button type="button" role="menuitem" data-cmd="isoler"><span>Isoler la sélection</span><kbd>I</kbd></button>
             <button type="button" role="menuitem" data-cmd="tout-afficher"><span>Tout afficher</span><kbd>Maj+H</kbd></button>
+            <button type="button" role="menuitem" data-cmd="zoomer"><span>Zoomer sur la sélection</span><kbd>Z</kbd></button>
+            <button type="button" role="menuitem" data-cmd="coupe"><span>Boîte de coupe autour de la sélection</span><kbd>B</kbd></button>
+            <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
             <hr>
             <div class="mb-sous">Arborescence</div>
             <button type="button" role="menuitem" data-cmd="tout-reduire"><span>Tout réduire</span><kbd></kbd></button>
@@ -447,7 +450,7 @@ footer a:hover{color:var(--or)}
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
         </div>
-        <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner</div>
+        <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner · Clic droit : menu</div>
       </div>
 
       <aside class="panneau p-props" id="p-props" aria-label="Propriétés de l'élément actif">
@@ -495,8 +498,8 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=1"></script>
 <script src="/ifc/ifc-core.js?v=1"></script>
-<script src="/ifc/ifc-vue.js?v=7"></script>
-<script src="/ifc/ifc-app.js?v=5"></script>
+<script src="/ifc/ifc-vue.js?v=8"></script>
+<script src="/ifc/ifc-app.js?v=6"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>

@@ -761,14 +761,18 @@
   }
 
   // ================= Moteur WebGL =================
+  // Boîte de coupe dans les fragment shaders (coordonnées relatives à l'origine du tampon)
+  var COUPE = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
+    "uniform float uK;uniform vec3 uB0;uniform vec3 uB1;varying vec3 vP;" +
+    "void coupe(){if(uK>0.5&&(any(lessThan(vP,uB0))||any(greaterThan(vP,uB1))))discard;}";
   var SOURCES = {
-    vFaces: "attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;uniform mat4 uM;uniform vec3 uL;varying vec3 vC;" +
-      "void main(){gl_Position=uM*vec4(aP,1.0);float l=abs(dot(aN,uL));vC=aC*(0.34+0.66*l);}",
-    fFaces: "precision mediump float;varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}",
-    vLignes: "attribute vec3 aP;attribute vec4 aC;uniform mat4 uM;varying vec4 vC;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;}",
-    fLignes: "precision mediump float;varying vec4 vC;void main(){gl_FragColor=vC;}",
-    vId: "attribute vec3 aP;attribute vec3 aC;uniform mat4 uM;varying vec3 vC;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;}",
-    fId: "precision mediump float;varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.0);}"
+    vFaces: "attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;uniform mat4 uM;uniform vec3 uL;varying vec3 vC;varying vec3 vP;" +
+      "void main(){gl_Position=uM*vec4(aP,1.0);float l=abs(dot(aN,uL));vC=aC*(0.34+0.66*l);vP=aP;}",
+    fFaces: COUPE + "varying vec3 vC;void main(){coupe();gl_FragColor=vec4(vC,1.0);}",
+    vLignes: "attribute vec3 aP;attribute vec4 aC;uniform mat4 uM;varying vec4 vC;varying vec3 vP;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;vP=aP;}",
+    fLignes: COUPE + "varying vec4 vC;void main(){coupe();gl_FragColor=vC;}",
+    vId: "attribute vec3 aP;attribute vec3 aC;uniform mat4 uM;varying vec3 vC;varying vec3 vP;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;vP=aP;}",
+    fId: COUPE + "varying vec3 vC;void main(){coupe();gl_FragColor=vec4(vC,1.0);}"
   };
 
   function moteurGL(cv){
@@ -792,14 +796,15 @@
       attrs.forEach(function(a, i){ if (a) gl.bindAttribLocation(p, i, a); });
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-      return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL") };
+      return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
+        uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1") };
     }
-    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null;
+    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190];
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
       P.id = programme(SOURCES.vId, SOURCES.fId, ["aP", null, "aC"]);
-      ["pos", "nor", "col", "ids", "lpos", "lcol"].forEach(function(k){ B[k] = gl.createBuffer(); });
+      ["pos", "nor", "col", "ids", "lpos", "lcol", "cadre"].forEach(function(k){ B[k] = gl.createBuffer(); });
       fbo = null;
     }
     try { init(); } catch (e){ if (window.console) console.warn("WebGL indisponible :", e); return { echec: true }; }
@@ -833,9 +838,15 @@
       remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
       remplir(B.col, new Uint8Array(3*nv), gl.DYNAMIC_DRAW);
       remplir(B.lcol, new Uint8Array(4*nl), gl.DYNAMIC_DRAW);
+      if (coupe) poserCoupe(coupe);
     }
 
+    function poserCoupe(b){
+      coupe = b;
+      if (b) remplir(B.cadre, new Float32Array(aretesBoite(b).map(function(v, k){ return v - origine[k % 3]; })));
+    }
     function teinter(liste, sel, actif, coul){
+      kad = coul.cadreRGBA;
       var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
       var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA;
       liste.forEach(function(it, e){
@@ -865,6 +876,13 @@
         t(r0) + 2*c.px/c.W, t(r1) - 2*c.py/c.H, t(r2), 1
       ]);
     }
+    function decoupe(prog, oui){
+      gl.uniform1f(prog.uK, oui && coupe ? 1 : 0);
+      if (oui && coupe){
+        gl.uniform3f(prog.uB0, coupe.min[0] - origine[0], coupe.min[1] - origine[1], coupe.min[2] - origine[2]);
+        gl.uniform3f(prog.uB1, coupe.max[0] - origine[0], coupe.max[1] - origine[1], coupe.max[2] - origine[2]);
+      }
+    }
     function attrib(i, buf, n, type, normalise){
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.enableVertexAttribArray(i);
@@ -875,6 +893,7 @@
       gl.useProgram(prog.p);
       gl.uniformMatrix4fv(prog.uM, false, M);
       if (prog.uL) gl.uniform3fv(prog.uL, c.lumiere);
+      decoupe(prog, true);
       attrib(0, B.pos, 3, gl.FLOAT);
       if (prog === P.faces) attrib(1, B.nor, 3, gl.FLOAT); else gl.disableVertexAttribArray(1);
       attrib(2, couleurBuf, 3, gl.UNSIGNED_BYTE, true);
@@ -896,6 +915,7 @@
       if (nLig){
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        decoupe(P.lignes, true);
         attrib(0, B.lpos, 3, gl.FLOAT);
         gl.disableVertexAttribArray(1);
         attrib(2, B.lcol, 4, gl.UNSIGNED_BYTE, true);
@@ -904,6 +924,22 @@
         gl.depthMask(false);
         gl.drawArrays(gl.LINES, 0, nLig);
         gl.depthMask(true);
+        gl.disable(gl.BLEND);
+      }
+      if (coupe){
+        // arêtes de la boîte de coupe, en or, visibles à travers les pièces
+        gl.useProgram(P.lignes.p);
+        gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        decoupe(P.lignes, false);
+        attrib(0, B.cadre, 3, gl.FLOAT);
+        gl.disableVertexAttribArray(1);
+        gl.disableVertexAttribArray(2);
+        gl.vertexAttrib4f(2, kad[0]/255, kad[1]/255, kad[2]/255, kad[3]/255);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.DEPTH_TEST);
+        gl.drawArrays(gl.LINES, 0, 24);
+        gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND);
       }
     }
@@ -942,15 +978,89 @@
 
     return {
       nom: "WebGL", charger: charger, teinter: teinter, dessiner: dessiner, viser: viser,
+      coupe: poserCoupe,
       perdu: function(){ return gl.isContextLost(); },
       restaurer: function(){ init(); if (dernier) charger(dernier.liste, dernier.orig); },
       liberer: function(){ var x = gl.getExtension("WEBGL_lose_context"); if (x) x.loseContext(); }
     };
   }
 
+  // ================= Boîte de coupe : utilitaires =================
+  // 12 arêtes de la boîte → 24 sommets x, y, z à plat
+  function aretesBoite(b){
+    var x = [b.min[0], b.max[0]], y = [b.min[1], b.max[1]], z = [b.min[2], b.max[2]], r = [];
+    function s(i, j, k, i2, j2, k2){ r.push(x[i], y[j], z[k], x[i2], y[j2], z[k2]); }
+    for (var a = 0; a < 2; a++) for (var c = 0; c < 2; c++){ s(0, a, c, 1, a, c); s(a, 0, c, a, 1, c); s(a, c, 0, a, c, 1); }
+    return r;
+  }
+  // Boucle plane (x, y, z à plat) coupée par la boîte (Sutherland–Hodgman) ; null s'il ne reste rien
+  function couperBoucle(pts, b){
+    for (var ax = 0; ax < 3; ax++) for (var cote = 0; cote < 2; cote++){
+      var lim = cote ? b.max[ax] : b.min[ax], sg = cote ? -1 : 1, n = pts.length/3, out = [];
+      for (var i = 0; i < n; i++){
+        var j = (i + 1) % n, da = sg*(pts[3*i + ax] - lim), dj = sg*(pts[3*j + ax] - lim);
+        if (da >= 0) out.push(pts[3*i], pts[3*i + 1], pts[3*i + 2]);
+        if ((da >= 0) !== (dj >= 0)){
+          var t = da/(da - dj);
+          out.push(pts[3*i] + t*(pts[3*j] - pts[3*i]), pts[3*i + 1] + t*(pts[3*j + 1] - pts[3*i + 1]), pts[3*i + 2] + t*(pts[3*j + 2] - pts[3*i + 2]));
+        }
+      }
+      if (out.length < 9) return null;
+      pts = out;
+    }
+    return pts;
+  }
+  // Segment coupé par la boîte (Liang–Barsky) ; null s'il est dehors
+  function couperSegment(a, b, B){
+    var t0 = 0, t1 = 1;
+    for (var ax = 0; ax < 3; ax++){
+      var d = b[ax] - a[ax];
+      if (Math.abs(d) < 1e-12){ if (a[ax] < B.min[ax] || a[ax] > B.max[ax]) return null; continue; }
+      var u = (B.min[ax] - a[ax])/d, v = (B.max[ax] - a[ax])/d;
+      if (u > v){ var w = u; u = v; v = w; }
+      if (u > t0) t0 = u;
+      if (v < t1) t1 = v;
+      if (t0 > t1) return null;
+    }
+    return [a[0] + t0*(b[0] - a[0]), a[1] + t0*(b[1] - a[1]), a[2] + t0*(b[2] - a[2]), a[0] + t1*(b[0] - a[0]), a[1] + t1*(b[1] - a[1]), a[2] + t1*(b[2] - a[2])];
+  }
+  function dansBoite(B, x, y, z, e){
+    return x >= B.min[0] - e && x <= B.max[0] + e && y >= B.min[1] - e && y <= B.max[1] + e && z >= B.min[2] - e && z <= B.max[2] + e;
+  }
+
+  var versionCoupe = 0;
+
   // ================= Moteur canvas 2D (secours) =================
   function moteurCanvas(cv){
-    var ctx = cv.getContext("2d"), liste = [], dessin = [], sel = new Set(), actif = 0, coul = null, teintes = {};
+    var ctx = cv.getContext("2d"), liste = [], dessin = [], sel = new Set(), actif = 0, coul = null, teintes = {}, coupe = null, vCoupe = 0;
+    // la découpe est gardée en cache sur les faces (partagées entre moteurs) : version unique pour toute la page
+    function nouvelleCoupe(b){ coupe = b; vCoupe = ++versionCoupe; }
+    // Face vue à travers la boîte de coupe : f.b si elle y est entière, null si elle est dehors, sinon ses boucles coupées
+    function decouper(f){
+      var b0 = f.b[0], tout = true, mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+      for (var k = 0; k < b0.length; k += 3){
+        for (var a = 0; a < 3; a++){ if (b0[k + a] < mn[a]) mn[a] = b0[k + a]; if (b0[k + a] > mx[a]) mx[a] = b0[k + a]; }
+      }
+      for (a = 0; a < 3; a++){
+        if (mx[a] < coupe.min[a] || mn[a] > coupe.max[a]) return null;
+        if (mn[a] < coupe.min[a] || mx[a] > coupe.max[a]) tout = false;
+      }
+      if (tout) return f.b;
+      var ext = couperBoucle(b0, coupe);
+      if (!ext) return null;
+      var r = [ext];
+      for (var i = 1; i < f.b.length; i++){ var t = couperBoucle(f.b[i], coupe); if (t) r.push(t); }
+      return r;
+    }
+    function segmentsCoupes(f){
+      var r = [];
+      for (var k = 0; f.ar && k < f.ar.length; k += 2){
+        var l = f.b[f.ar[k]], a = f.ar[k + 1], z = (a + 1) % (l.length/3);
+        var sg = couperSegment([l[3*a], l[3*a + 1], l[3*a + 2]], [l[3*z], l[3*z + 1], l[3*z + 2]], coupe);
+        if (sg) r.push(sg);
+      }
+      return r;
+    }
     function teinte(base, k){
       var cle = base.join(",") + "/" + k, t = teintes[cle];
       if (!t){
@@ -970,8 +1080,20 @@
         for (var fi = 0; fi < faces.length; fi++){
           var f = faces[fi], zs = 0, nz = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
           if (!f.p) f.p = f.b.map(function(b){ return new Float32Array(b.length/3*2); });
-          for (var bi = 0; bi < f.b.length; bi++){
-            var b = f.b[bi], p = f.p[bi];
+          var bs = f.b, ps = f.p, s3 = null;
+          if (coupe){
+            if (f.kv !== vCoupe){
+              f.kv = vCoupe; f.kb = decouper(f);
+              var part = f.kb && f.kb !== f.b;
+              f.kp = part ? f.kb.map(function(b){ return new Float32Array(b.length/3*2); }) : null;
+              f.ks = part ? segmentsCoupes(f) : null;
+            }
+            if (!f.kb) continue;
+            if (f.kb !== f.b){ bs = f.kb; ps = f.kp; s3 = f.ks; }
+          }
+          f.q = ps; f.s3 = s3;
+          for (var bi = 0; bi < bs.length; bi++){
+            var b = bs[bi], p = ps[bi];
             for (var k = 0, j = 0; k < b.length; k += 3, j += 2){
               var qx = b[k] - c0, qy = b[k+1] - c1, qz = b[k+2] - c2;
               var xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
@@ -999,8 +1121,8 @@
         var choisi = sel.has(it.id), estActif = it.id === actif, pa = it.h != null ? coul.pastel(it.h) : null;
         var fond = teinte(choisi ? OR : pa ? pa.piece : coul.piece, Math.round(lum*24));
         ctx.beginPath();
-        for (var bj = 0; bj < F.p.length; bj++){
-          var P = F.p[bj];
+        for (var bj = 0; bj < F.q.length; bj++){
+          var P = F.q[bj];
           ctx.moveTo(P[0], P[1]);
           for (var q = 2; q < P.length; q += 2) ctx.lineTo(P[q], P[q+1]);
           ctx.closePath();
@@ -1008,9 +1130,15 @@
         ctx.fillStyle = fond;
         ctx.fill("evenodd");
         if (detail){ ctx.strokeStyle = fond; ctx.lineWidth = .8; ctx.stroke(); }     // bouche les joints entre facettes
-        if ((detail || estActif) && F.ar && F.ar.length){
+        if ((detail || estActif) && (F.s3 ? F.s3.length : F.ar && F.ar.length)){
           ctx.beginPath();
-          for (var r = 0; r < F.ar.length; r += 2){
+          if (F.s3) F.s3.forEach(function(g){
+            for (var u = 0; u < 6; u += 3){
+              var qx = g[u] - c0, qy = g[u+1] - c1, qz = g[u+2] - c2, xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
+              ctx[u ? "lineTo" : "moveTo"](cx + xv*s, cy - (qz*cb + yv*sb)*s);
+            }
+          });
+          else for (var r = 0; r < F.ar.length; r += 2){
             var Q = F.p[F.ar[r]], a = F.ar[r+1], m = Q.length/2, z = (a + 1) % m;
             ctx.moveTo(Q[2*a], Q[2*a+1]); ctx.lineTo(Q[2*z], Q[2*z+1]);
           }
@@ -1019,6 +1147,15 @@
           ctx.stroke();
         }
       }
+      if (coupe){
+        var A = aretesBoite(coupe);
+        ctx.beginPath();
+        for (var u = 0; u < A.length; u += 3){
+          var qx = A[u] - c0, qy = A[u+1] - c1, qz = A[u+2] - c2, xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
+          ctx[(u/3) % 2 ? "lineTo" : "moveTo"](cx + xv*s, cy - (qz*cb + yv*sb)*s);
+        }
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = coul.cadre; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+      }
       if (!liste.length){
         ctx.fillStyle = coul.texte; ctx.font = "11px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center";
         ctx.fillText("Aucune géométrie à afficher", W/2, H/2);
@@ -1026,8 +1163,8 @@
     }
     function dedans(F, x, y){
       var c = false;
-      for (var bi = 0; bi < F.p.length; bi++){
-        var p = F.p[bi], n = p.length/2;
+      for (var bi = 0; bi < F.q.length; bi++){
+        var p = F.q[bi], n = p.length/2;
         for (var i = 0, j = n - 1; i < n; j = i++){
           var xi = p[2*i], yi = p[2*i+1], xj = p[2*j], yj = p[2*j+1];
           if ((yi > y) !== (yj > y) && x < (xj - xi)*(y - yi)/(yj - yi) + xi) c = !c;
@@ -1048,6 +1185,7 @@
       charger: function(l){ liste = l; l.forEach(function(it){ aretesVives(it.geo); }); },
       teinter: function(l, s, a, k){ sel = s; actif = a; if (coul !== k){ coul = k; teintes = {}; } },
       dessiner: dessiner, viser: viser,
+      coupe: nouvelleCoupe,
       perdu: function(){ return false; }, restaurer: function(){}, liberer: function(){}
     };
   }
@@ -1075,7 +1213,7 @@
 
     var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0;
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
-    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {};
+    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -1093,7 +1231,8 @@
         arete: "rgba(" + a.join(",") + ",.24)", areteRGBA: [a[0], a[1], a[2], Math.round(255*(clair ? .32 : .2))],
         areteOr: "rgba(120,86,30,.55)", areteOrRGBA: [120, 86, 30, 140],
         actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
-        texte: "rgba(" + a.join(",") + ",.45)"
+        texte: "rgba(" + a.join(",") + ",.45)",
+        cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190]
       };
       // couleur d'une maquette (teinte 0–360) : remplissage très pastel, arêtes pastel un peu plus soutenues
       var cache = {};
@@ -1152,7 +1291,26 @@
       if (!isFinite(mn[0])) return null;
       return { c: [(mn[0] + mx[0])/2, (mn[1] + mx[1])/2, (mn[2] + mx[2])/2], r: Math.max(1e-9, Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])/2) };
     }
+    // Boîte englobante d'une partie des éléments (clés), ou de tous
+    function boiteDe(cles){
+      var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], S = cles ? new Set(cles) : null;
+      liste.forEach(function(it){
+        if (S && !S.has(it.id)) return;
+        for (var k = 0; k < 3; k++){
+          if (it.geo.min[k] < mn[k]) mn[k] = it.geo.min[k];
+          if (it.geo.max[k] > mx[k]) mx[k] = it.geo.max[k];
+        }
+      });
+      return isFinite(mn[0]) ? { min: mn, max: mx } : null;
+    }
+    function cadrerSur(b){
+      centre = [(b.min[0] + b.max[0])/2, (b.min[1] + b.max[1])/2, (b.min[2] + b.max[2])/2];
+      rayon = Math.max(1e-9, Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])/2);
+      zoom = 1; px = 0; py = 0;
+      demander();
+    }
     function recadrer(){
+      if (coupe){ cadrerSur(coupe); return; }
       var b = boite();
       if (b){ centre = b.c; rayon = b.r; } else { centre = [0,0,0]; rayon = 1; }
       zoom = 1; px = 0; py = 0;
@@ -1160,7 +1318,7 @@
     }
 
     // ---------- Souris, doigt, molette ----------
-    var ptrs = new Map(), depart = null, bouge = false, multi = false;
+    var ptrs = new Map(), depart = null, bouge = false, multi = false, doigt = false;
     function zoomAutour(f, x, y){
       var nzm = Math.min(400, Math.max(.05, zoom*f));
       f = nzm/zoom; zoom = nzm;
@@ -1190,7 +1348,9 @@
         var b = ((P[7] - P[1])*(X - P[6]) + (P[0] - P[6])*(Y - P[7]))/d;
         if (a < -1e-6 || b < -1e-6 || a + b > 1 + 1e-6) continue;
         var z = a*P[2] + b*P[5] + (1 - a - b)*P[8];
-        if (z < best) best = z;
+        if (z >= best) continue;
+        if (coupe && !dansBoite(coupe, centre[0] + X*r0[0] + Y*r1[0] + z*r2[0], centre[1] + X*r0[1] + Y*r1[1] + z*r2[1], centre[2] + Y*r1[2] + z*r2[2], rayon*1e-6)) continue;
+        best = z;
       }
       if (!isFinite(best)) return null;
       return [0, 1, 2].map(function(i){ return centre[i] + X*r0[i] + Y*r1[i] + best*r2[i]; });
@@ -1205,7 +1365,7 @@
       cv.addEventListener("pointerdown", function(e){
         try { cv.setPointerCapture(e.pointerId); } catch (x){}
         ptrs.set(e.pointerId, local(e));
-        if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; }
+        if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; doigt = e.pointerType !== "mouse"; }
         else multi = true;
         cv.classList.add("tire");
       });
@@ -1247,10 +1407,23 @@
           if (M.nom === "WebGL") demander();
           if (rappels.surClic) rappels.surClic(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e);
         }
+        else if (e.type === "pointerup" && !bouge && !multi && e.button === 2) menu(e);
+      }
+      // clic droit sans bouger, ou appui long au doigt : menu contextuel sur l'élément visé
+      function menu(e){
+        if (!rappels.surMenu) return;
+        var p = local(e), k = W && H ? M.viser(camera(), p.x, p.y) : 0;
+        if (M.nom === "WebGL") demander();
+        rappels.surMenu(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e.clientX, e.clientY);
       }
       cv.addEventListener("pointerup", fin);
       cv.addEventListener("pointercancel", fin);
-      cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+      cv.addEventListener("contextmenu", function(e){
+        e.preventDefault();
+        if (!doigt || bouge || multi || ptrs.size > 1) return;
+        ptrs.clear(); cv.classList.remove("tire");
+        menu(e);
+      });
       cv.addEventListener("dblclick", function(e){ e.preventDefault(); recadrer(); });
       var minuterie = 0;
       cv.addEventListener("wheel", function(e){
@@ -1273,6 +1446,7 @@
         Gs = new Map();
         ms.forEach(function(m){ Gs.set(m, avant.get(m) || Contexte(m)); });
         liste = []; origine = null;
+        if (!ms.length){ coupe = null; M.coupe(null); }
       },
       // Éléments à dessiner : [{ cle, m, id }] ; renvoie le bilan de lecture
       afficher: function(items){
@@ -1301,6 +1475,21 @@
       // vue type : lacet (autour de Z) et plongée en radians, puis recadrage
       orienter: function(l, p){ yaw = l; pitch = Math.max(-1.55, Math.min(1.55, p)); recadrer(); },
       redessiner: function(){ taille(); },
+      // Zoom sur des éléments (clés), sans rien masquer
+      cadrer: function(cles){ var b = boiteDe(cles); if (b) cadrerSur(b); return !!b; },
+      // Boîte de coupe autour d'éléments (clés), avec une petite marge ; null l'enlève. Renvoie vrai si une boîte est posée.
+      coupe: function(cles){
+        var b = cles ? boiteDe(cles) : null;
+        if (b){
+          var m = Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
+          b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }) };
+        }
+        coupe = b;
+        M.coupe(b);
+        if (b) cadrerSur(b); else demander();
+        return !!b;
+      },
+      aCoupe: function(){ return !!coupe; },
       // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
       moteur: function(nom){
         if (nom === undefined) return M.nom;
@@ -1313,6 +1502,7 @@
         brancher();
         if (ro) ro.observe(cv);
         M.charger(liste, origine || [0,0,0]);
+        M.coupe(coupe);
         M.teinter(liste, sel, actif, coul);
         taille();
         return M.nom;
