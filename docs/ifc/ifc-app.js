@@ -138,6 +138,40 @@
     if (fichiers.length) etat(texte);
   }
 
+  // Travail découpé en tranches d'environ 40 ms : f(k) pour k de 0 à n − 1, la page reste vivante entre deux
+  function parTranches(n, f, progres){
+    return new Promise(function(ok){
+      var i = 0;
+      (function tranche(){
+        var t0 = performance.now();
+        while (i < n && performance.now() - t0 < 40) f(i++);
+        progres(n ? i/n : 1);
+        if (i < n) setTimeout(tranche, 0); else ok();
+      })();
+    });
+  }
+  // Après la lecture : fiches des éléments (nom, type, matériau) puis géométrie 3D, avec la barre de
+  // progression ; l'ouverture n'a ensuite plus qu'à assembler ce qui est prêt.
+  function preparer(modeles){
+    var suite = Promise.resolve();
+    modeles.forEach(function(m, n){
+      var nom = "« " + m.nom + " »" + (modeles.length > 1 ? " (" + (n + 1) + "/" + modeles.length + ")" : ""), ids = [];
+      suite = suite.then(function(){
+        progresLecture("Liste des éléments de " + nom + "…", 0);
+        return pause();
+      }).then(function(){
+        var a = IFC.arbre(m);
+        return parTranches(a.length, function(k){
+          var i = IFC.infos(m, a[k].id);
+          if (i && i.genre === "element") ids.push(a[k].id);
+        }, function(p){ progresLecture("Liste des éléments de " + nom + " : " + Math.floor(100*p) + " %", p); });
+      }).then(function(){
+        return vue.preparer(m, ids, function(p){ progresLecture("Géométrie 3D de " + nom + " : " + pluriel(Math.round(p*ids.length), "élément") + " sur " + fmtN(ids.length), p); });
+      });
+    });
+    return suite;
+  }
+
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
   function charger(liste){
     liste = [].slice.call(liste || []);
@@ -162,8 +196,10 @@
     });
     suite.then(function(){
       if (!ajoutes.length) return;
-      progresLecture("Construction de la liste et de la vue 3D…", 1);
-      return pause();
+      return preparer(ajoutes).then(function(){
+        progresLecture("Affichage…", 1);
+        return pause();
+      });
     }).then(function(){
       $("#chargement").hidden = true;
       if (ajoutes.length && remplacer) vider();
@@ -203,8 +239,8 @@
   function geometrieWebIfc(f, progres){
     return new Promise(function(ok, ko){
       var w;
-      try { w = new Worker("/ifc/ifc-webifc.js?v=1"); } catch (e){ ko(e); return; }
-      var carte = new Map();
+      try { w = new Worker("/ifc/ifc-webifc.js?v=2"); } catch (e){ ko(e); return; }
+      var carte = new Map(), couleurs = new Map();
       w.onmessage = function(e){
         var d = e.data;
         if (d.progres !== undefined) progres(d.progres);
@@ -212,8 +248,9 @@
           var avant = carte.get(id), T = d.tri[i];
           if (avant){ var u = new Float64Array(avant.length + T.length); u.set(avant); u.set(T, avant.length); T = u; }
           carte.set(id, T);
+          if (d.coul && d.coul[i] && !couleurs.has(id)) couleurs.set(id, d.coul[i]);
         });
-        else { w.terminate(); if (d.erreur) ko(new Error(d.erreur)); else ok(carte); }
+        else { w.terminate(); if (d.erreur) ko(new Error(d.erreur)); else ok({ carte: carte, couleurs: couleurs }); }
       };
       w.onerror = function(e){
         if (e && e.preventDefault) e.preventDefault();
@@ -232,11 +269,12 @@
     enCalcul = true;
     var quoi = "web-ifc : géométrie de « " + f.m.nom + " »";
     etat(quoi + ", chargement du moteur…");
-    geometrieWebIfc(f, function(p){ etat(quoi + " : " + Math.floor(100*p) + " %"); }).then(function(carte){
-      var info = parUid.has(f.uid) ? vue.geometriesExternes(f.m, carte) : null;
+    geometrieWebIfc(f, function(p){ etat(quoi + " : " + Math.floor(100*p) + " %"); }).then(function(r){
+      var info = parUid.has(f.uid) ? vue.geometriesExternes(f.m, r.carte, r.couleurs) : null;
       if (!info) return;
       if (geoVoulue === "webifc") majVue();
       etat(quoi + " : " + pluriel(info.elements, "élément calculé", "éléments calculés") +
+        (info.couleurs ? ", couleurs du fichier reprises" : "") +
         (info.ecart > .05 ? " (calage incertain : des éléments peuvent être décalés, repasse sur le lecteur de l'outil au besoin)" : "") + ".");
     }).catch(function(err){
       if (window.console) console.error(err);
@@ -315,15 +353,18 @@
       '<button type="button" class="fermer" data-act="fermer" title="Fermer ce fichier" aria-label="Fermer ' + esc(m.nom) + '">×</button></span></div>';
   }
 
-  var visibles = [];
+  // Lignes affichées : { f } pour un en-tête de fichier, { l, pli, plie, filtre } pour un élément.
+  // Au-delà de VIRTUEL lignes, seule la partie visible (et une marge) existe dans la page : deux cales
+  // vides tiennent la place du reste, et le défilement redessine la fenêtre.
+  var visibles = [], rangs = [], VIRTUEL = 1500, MARGE = 800, hauts = { el: 46, fic: 62 }, fenetre = null, totalH = 0;
   function rendreListe(){
     var q = $("#recherche").value.trim().toLowerCase(), t = $("#filtre-type").value, filtre = !!(q || t);
-    var html = [], f = null, seuil = Infinity;
-    visibles = [];
+    var f = null, seuil = Infinity;
+    visibles = []; rangs = [];
     lignes.forEach(function(l){
       if (l.fichier){
         f = l.fichier; seuil = Infinity;
-        html.push(enteteFichier(f));
+        rangs.push({ f: f });
         return;
       }
       if (f.plie && !filtre) return;     // une recherche fouille aussi les maquettes réduites
@@ -339,15 +380,71 @@
         if (t && i.type !== t) return;
         if (q && l.rech.indexOf(q) < 0) return;
       }
-      var c = choix.has(l.cle);
       if (i.supprimable) visibles.push(l.cle);
-      var info = [i.typeLib, i.materiau, "#" + i.id].filter(Boolean).join(" · ");
-      html.push('<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + (pli && seuil === l.niv ? " plie" : "") + '" role="listitem" data-cle="' + l.cle +
-        '" style="--niv:' + (filtre ? 0 : Math.min(l.niv, 8)) + '">' +
-        (i.supprimable ? '<input type="checkbox" aria-label="Sélectionner ' + esc(nomAff(i)) + '"' + (c ? " checked" : "") + ">" : '<span class="vide"></span>') +
-        '<div><div class="el-nom">' + pli + esc(nomAff(i)) + '</div><div class="el-info">' + esc(info) + "</div></div></div>");
+      rangs.push({ l: l, pli: pli, plie: !!pli && seuil === l.niv, filtre: filtre });
     });
-    $("#liste").innerHTML = html.join("") || '<p class="liste-vide">Aucun élément ne correspond.</p>';
+    placer();
+    fenetre = null;
+    peindre();
+  }
+  function htmlRang(r){
+    if (r.f) return enteteFichier(r.f);
+    var l = r.l, i = l.i, c = choix.has(l.cle);
+    var info = [i.typeLib, i.materiau, "#" + i.id].filter(Boolean).join(" · ");
+    return '<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + (r.plie ? " plie" : "") + '" role="listitem" data-cle="' + l.cle +
+      '" style="--niv:' + (r.filtre ? 0 : Math.min(l.niv, 8)) + '">' +
+      (i.supprimable ? '<input type="checkbox" aria-label="Sélectionner ' + esc(nomAff(i)) + '"' + (c ? " checked" : "") + ">" : '<span class="vide"></span>') +
+      '<div><div class="el-nom">' + r.pli + esc(nomAff(i)) + '</div><div class="el-info">' + esc(info) + "</div></div></div>";
+  }
+  // position verticale de chaque ligne, d'après les hauteurs mesurées
+  function placer(){
+    var y = 0;
+    rangs.forEach(function(r){ r.y = y; y += r.f ? hauts.fic : hauts.el; });
+    totalH = y;
+  }
+  function virtuelle(){ return rangs.length > VIRTUEL; }
+  function rangA(y){      // première ligne qui finit après y
+    var a = 0, b = rangs.length - 1;
+    while (a < b){ var k = (a + b) >> 1, r = rangs[k]; if (r.y + (r.f ? hauts.fic : hauts.el) <= y) a = k + 1; else b = k; }
+    return a;
+  }
+  function peindre(){
+    var z = $("#liste");
+    if (!rangs.length){ z.innerHTML = '<p class="liste-vide">Aucun élément ne correspond.</p>'; return; }
+    if (!virtuelle()){ z.innerHTML = rangs.map(htmlRang).join(""); return; }
+    var st = z.scrollTop, k0 = rangA(Math.max(0, st - MARGE)), k1 = rangA(st + (z.clientHeight || window.innerHeight) + MARGE);
+    if (fenetre && fenetre[0] === k0 && fenetre[1] === k1) return;
+    fenetre = [k0, k1];
+    var fin = rangs[k1].y + (rangs[k1].f ? hauts.fic : hauts.el);
+    z.innerHTML = '<div class="cale" style="height:' + rangs[k0].y + 'px"></div>' + rangs.slice(k0, k1 + 1).map(htmlRang).join("") +
+      '<div class="cale" style="height:' + Math.max(0, totalH - fin) + 'px"></div>';
+    z.scrollTop = st;
+    // hauteurs réelles (thème, écran étroit) : on corrige une fois si l'estimation était fausse
+    var e = z.querySelector(".el"), fi = z.querySelector(".fic"), neuf = false;
+    if (e){ var he = e.getBoundingClientRect().height; if (he && Math.abs(he - hauts.el) > .5){ hauts.el = he; neuf = true; } }
+    if (fi){ var hf = fi.getBoundingClientRect().height + (parseFloat(getComputedStyle(fi).marginTop) || 0); if (hf && Math.abs(hf - hauts.fic) > .5){ hauts.fic = hf; neuf = true; } }
+    if (neuf){ placer(); fenetre = null; peindre(); }
+  }
+  var peinture = 0;
+  $("#liste").addEventListener("scroll", function(){
+    if (!virtuelle() || peinture) return;
+    peinture = requestAnimationFrame(function(){ peinture = 0; peindre(); });
+  });
+  window.addEventListener("resize", function(){ if (virtuelle()) peindre(); });
+  // Amène la ligne d'un élément dans la zone visible de la liste
+  function defilerVers(c){
+    if (!virtuelle()){
+      var r = $('#liste [data-cle="' + c + '"]');
+      if (r) r.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    var k = -1;
+    for (var j = 0; j < rangs.length; j++) if (rangs[j].l && rangs[j].l.cle === c){ k = j; break; }
+    if (k < 0) return;
+    var z = $("#liste"), y = rangs[k].y, h = hauts.el;
+    if (y < z.scrollTop) z.scrollTop = y;
+    else if (y + h > z.scrollTop + z.clientHeight) z.scrollTop = y + h - z.clientHeight + 8;
+    peindre();
   }
 
   // Met à jour cases et surbrillances sans reconstruire la liste
@@ -381,10 +478,7 @@
     majLignes();
     afficherProps();
     maj();
-    if (defiler){
-      var r = $('#liste [data-cle="' + c + '"]');
-      if (r) r.scrollIntoView({ block: "nearest" });
-    }
+    if (defiler) defilerVers(c);
   }
   function cliqueVue(c){
     if (!c) return;

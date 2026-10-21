@@ -457,11 +457,11 @@ footer a:hover{color:var(--or)}
                   data-aide="Moteur écrit pour l'outil, dessiné par la carte graphique. Rapide, sélection au pixel près, sections remplies en rouge dans la boîte de coupe."
                   data-alerte=""><span>WebGL (recommandé)</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgpu" aria-checked="false"
-                  data-aide="La nouvelle interface graphique des navigateurs, successeur de WebGL. Même rendu que WebGL, lissage des arêtes ×4."
-                  data-alerte="Récent : Chrome ou Edge à jour, Safari et Firefox selon la version.|Pas de remplissage rouge des sections dans la boîte de coupe.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>WebGPU</span><kbd></kbd></button>
+                  data-aide="La nouvelle interface graphique des navigateurs, successeur de WebGL. Même rendu que WebGL, sections rouges comprises, avec lissage des arêtes ×4."
+                  data-alerte="Récent : Chrome ou Edge à jour, Safari et Firefox selon la version.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>WebGPU</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="three" aria-checked="false"
-                  data-aide="Three.js, la bibliothèque 3D de référence du web (licence MIT), hébergée sur ce site. Éclairage physique, faces plus modelées."
-                  data-alerte="Environ 2 Mo téléchargés depuis ce site au premier choix.|Pas de remplissage rouge des sections dans la boîte de coupe.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>Three.js</span><kbd></kbd></button>
+                  data-aide="Three.js, la bibliothèque 3D de référence du web (licence MIT), hébergée sur ce site. Éclairage physique, faces plus modelées, sections rouges comprises."
+                  data-alerte="Environ 2 Mo téléchargés depuis ce site au premier choix.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>Three.js</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"
                   data-aide="Dessin à plat, face par face, sans carte graphique. Marche partout, même sur un vieil appareil."
                   data-alerte="Lent dès quelques milliers de faces.|Des faces peuvent passer devant d'autres par erreur (pas de tampon de profondeur)."><span>Canvas 2D (secours)</span><kbd></kbd></button>
@@ -474,8 +474,8 @@ footer a:hover{color:var(--or)}
                   data-aide="Lecteur écrit pour l'outil : extrusions, maillages et représentations courantes, calculés à l'ouverture. Léger et rapide."
                   data-alerte="Les ouvertures (portes, fenêtres, réservations) ne sont pas découpées dans les murs et les dalles.|Les opérations booléennes et certaines formes (balayages, surfaces NURBS) ne sont pas lues."><span>Lecteur de l'outil</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="webifc" aria-checked="false"
-                  data-aide="web-ifc (That Open Company, licence MPL-2.0), hébergé sur ce site. Moteur géométrique complet en WebAssembly : ouvertures découpées, booléens, balayages."
-                  data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
+                  data-aide="web-ifc (That Open Company, licence MPL-2.0), hébergé sur ce site. Moteur géométrique complet en WebAssembly : ouvertures découpées, booléens, balayages, et vraies couleurs des matériaux du fichier (une couleur choisie pour la maquette reste prioritaire)."
+                  data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace.|Les vitrages gardent leur couleur mais restent opaques."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
               </div>
             </div>
           </div>
@@ -575,9 +575,9 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=2"></script>
 <script src="/ifc/ifc-core.js?v=2"></script>
-<script src="/ifc/ifc-vue.js?v=14"></script>
-<script src="/ifc/ifc-moteurs.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=14"></script>
+<script src="/ifc/ifc-vue.js?v=15"></script>
+<script src="/ifc/ifc-moteurs.js?v=2"></script>
+<script src="/ifc/ifc-app.js?v=15"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>

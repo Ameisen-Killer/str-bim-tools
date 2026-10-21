@@ -854,7 +854,7 @@
         if (!pl) return;
         var t = it.h != null ? coul.pastel(it.h) : null;
         // contour doré seulement pour la sélection ; l'élément actif non sélectionné garde un contour neutre renforcé
-        var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : P1, l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
+        var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : it.rgb || P1, l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
         for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
       });
@@ -1197,7 +1197,7 @@
         var nup = n[2]*cb + ny1*sb, ndp = ny1*cb - n[2]*sb;
         var lum = Math.abs(nx1*L[0] + nup*L[1] - ndp*L[2]);
         var choisi = sel.has(it.id), estActif = it.id === actif, pa = it.h != null ? coul.pastel(it.h) : null;
-        var fond = teinte(choisi ? OR : pa ? pa.piece : coul.piece, Math.round(lum*24));
+        var fond = teinte(choisi ? OR : pa ? pa.piece : it.rgb || coul.piece, Math.round(lum*24));
         ctx.beginPath();
         for (var bj = 0; bj < F.q.length; bj++){
           var P = F.q[bj];
@@ -1301,12 +1301,12 @@
     }
     demarrer(/[?&]moteur=canvas\b/.test(location.search) ? "canvas" : rappels.moteur);
 
-    var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0, source = "maison";
+    var Gs = new Map(), prets = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0, source = "maison";
 
     // Géométrie externe (web-ifc) : ses unités et ses axes peuvent différer (mètres, Y vers le haut).
     // On compare les boîtes d'éléments lus des deux côtés et on retient l'échelle, la rotation et le
-    // décalage qui collent le mieux ; carte : Map(id → Float64Array de triangles).
-    function calibrer(G, carte){
+    // décalage qui collent le mieux ; carte : Map(id → Float64Array de triangles), couleurs : Map(id → [r, v, b, a]).
+    function calibrer(G, carte, couleurs){
       var ROT = [function(x, y, z){ return [x, y, z]; }, function(x, y, z){ return [x, -z, y]; }];
       var echant = [];
       carte.forEach(function(T, id){ if (echant.length < 40 && T.length >= 9){ var g = geometrie(G, id); if (g) echant.push({ T: T, g: g }); } });
@@ -1334,14 +1334,18 @@
         }));
         if (err < meilleur.err) meilleur = { r: ri, k: k, t: t, err: err };
       });
-      var R = ROT[meilleur.r], k = meilleur.k, t = meilleur.t, geos = new Map();
+      var R = ROT[meilleur.r], k = meilleur.k, t = meilleur.t, geos = new Map(), teintes = new Map();
       carte.forEach(function(T, id){
         var U = new Float64Array(T.length);
         for (var i = 0; i < T.length; i += 3){ var p = R(T[i], T[i+1], T[i+2]); U[i] = k*p[0] + t[0]; U[i+1] = k*p[1] + t[1]; U[i+2] = k*p[2] + t[2]; }
         var g = geoTriangles(U);
         if (g) geos.set(id, g);
       });
-      return { geos: geos, info: { elements: geos.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
+      // couleurs des matériaux du fichier (0–1) → 0–255
+      if (couleurs) couleurs.forEach(function(c, id){
+        if (c && geos.has(id)) teintes.set(id, [0, 1, 2].map(function(a){ return Math.max(0, Math.min(255, Math.round(255*c[a]))); }));
+      });
+      return { geos: geos, teintes: teintes, info: { elements: geos.size, couleurs: teintes.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
     var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null;
@@ -1663,19 +1667,36 @@
       modeles: function(ms){
         var avant = Gs;
         Gs = new Map();
-        ms.forEach(function(m){ Gs.set(m, avant.get(m) || Contexte(m)); });
+        ms.forEach(function(m){ Gs.set(m, avant.get(m) || prets.get(m) || Contexte(m)); prets.delete(m); });
         liste = []; origine = null;
         if (!ms.length){ coupe = null; M.coupe(null); }
+      },
+      // Géométrie calculée à l'avance, par tranches, pour que la page ne gèle pas à l'ouverture d'un gros
+      // fichier : ids des éléments du modèle, progres(0–1) ; promesse résolue quand tout est prêt.
+      preparer: function(m, ids, progres){
+        var G = Gs.get(m) || prets.get(m), i = 0;
+        if (!G){ G = Contexte(m); prets.set(m, G); }
+        return new Promise(function(ok){
+          (function tranche(){
+            var t0 = performance.now();
+            while (i < ids.length && performance.now() - t0 < 40){
+              var g = geometrie(G, ids[i++]);
+              if (g){ triangles(g); aretesVives(g); }
+            }
+            if (progres) progres(ids.length ? i/ids.length : 1);
+            if (i < ids.length) setTimeout(tranche, 0); else ok();
+          })();
+        });
       },
       // Éléments à dessiner : [{ cle, m, id }] ; renvoie le bilan de lecture
       afficher: function(items){
         liste = [];
         nbFaces = 0;
         items.forEach(function(it){
-          var G = Gs.get(it.m), g = null;
-          if (G && source === "externe" && G.externe) g = G.externe.geos.get(it.id) || null;
+          var G = Gs.get(it.m), g = null, rgb = null;
+          if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
           if (G && !g) g = geometrie(G, it.id);
-          if (g){ liste.push({ id: it.cle, geo: g, h: it.h }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
@@ -1743,10 +1764,10 @@
       },
       // Source de la géométrie : "maison" (lecteur de l'outil) ou "externe" (web-ifc, fournie par fichier)
       sourceGeo: function(nom){ if (nom !== undefined) source = nom; return source; },
-      geometriesExternes: function(m, carte){
+      geometriesExternes: function(m, carte, couleurs){
         var G = Gs.get(m);
         if (!G) return null;
-        G.externe = calibrer(G, carte);
+        G.externe = calibrer(G, carte, couleurs);
         return G.externe.info;
       },
       aExterne: function(m){ var G = Gs.get(m); return !!(G && G.externe); }

@@ -1,7 +1,8 @@
 // Web Worker de /ifc/ : géométrie calculée par web-ifc (That Open Company, licence MPL-2.0, hébergé sur
 // le site dans /ifc/vendor/web-ifc/). Reçoit { buffer } (octets IFC), renvoie { progres } de temps en
-// temps, des lots { lot: [ids], tri: [Float64Array] } (triangles à plat, 9 nombres par triangle, dans le
-// repère de web-ifc), puis { fin: true } ou { erreur }. Aucune requête hors du site.
+// temps, des lots { lot: [ids], tri: [Float64Array], coul: [[r, v, b, a]] } (triangles à plat, 9 nombres
+// par triangle, dans le repère de web-ifc ; couleur du style de surface, 0–1, celle du plus gros morceau),
+// puis { fin: true } ou { erreur }. Aucune requête hors du site.
 importScripts("/ifc/vendor/web-ifc/web-ifc-api-iife.js");
 
 onmessage = function(e){
@@ -11,14 +12,14 @@ onmessage = function(e){
   api.Init(undefined, true).then(function(){
     var id = api.OpenModel(new Uint8Array(e.data.buffer), { COORDINATE_TO_ORIGIN: false });
     if (id < 0) throw new Error("fichier refusé par web-ifc");
-    var lotIds = [], lotT = [], taille = 0, vus = 0, total = 0;
+    var lotIds = [], lotT = [], lotC = [], taille = 0, vus = 0, total = 0;
     function envoyer(){
       if (!lotIds.length) return;
-      postMessage({ lot: lotIds, tri: lotT }, lotT.map(function(T){ return T.buffer; }));
-      lotIds = []; lotT = []; taille = 0;
+      postMessage({ lot: lotIds, tri: lotT, coul: lotC }, lotT.map(function(T){ return T.buffer; }));
+      lotIds = []; lotT = []; lotC = []; taille = 0;
     }
     api.StreamAllMeshes(id, function(mesh, n, nb){
-      var pgs = mesh.geometries, morceaux = [], long = 0;
+      var pgs = mesh.geometries, morceaux = [], long = 0, coul = null, plus = 0;
       for (var g = 0; g < pgs.size(); g++){
         var pg = pgs.get(g), geo = api.GetGeometry(id, pg.geometryExpressID);
         var V = api.GetVertexArray(geo.GetVertexData(), geo.GetVertexDataSize());
@@ -32,12 +33,15 @@ onmessage = function(e){
           T[3*i+2] = m[2]*x + m[6]*y + m[10]*z + m[14];
         }
         if (geo.delete) geo.delete();
-        if (T.length){ morceaux.push(T); long += T.length; }
+        if (T.length){
+          morceaux.push(T); long += T.length;
+          if (T.length > plus && pg.color){ plus = T.length; coul = [pg.color.x, pg.color.y, pg.color.z, pg.color.w]; }
+        }
       }
       if (long){
         var tout = morceaux.length === 1 ? morceaux[0] : new Float64Array(long), k = 0;
         if (morceaux.length > 1) morceaux.forEach(function(T){ tout.set(T, k); k += T.length; });
-        lotIds.push(mesh.expressID); lotT.push(tout); taille += long;
+        lotIds.push(mesh.expressID); lotT.push(tout); lotC.push(coul); taille += long;
       }
       vus++;
       if (nb) total = nb;
