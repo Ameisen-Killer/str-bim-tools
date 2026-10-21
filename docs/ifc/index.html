@@ -182,6 +182,15 @@ body.edition{overflow:hidden}
 .mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:4px 0}
 .mb-liste [role="menuitemradio"] span::before{content:"";display:inline-block;width:1.3em}
 .mb-liste [role="menuitemradio"][aria-checked="true"] span::before{content:"●";color:var(--or);font-size:9px;vertical-align:2px}
+/* infobulle des menus : description, puis avertissements */
+.infobulle{position:fixed;z-index:60;width:300px;max-width:calc(100vw - 16px);padding:10px 12px;background:var(--noir-2);border:1px solid var(--ligne);border-left:2px solid var(--or);box-shadow:0 14px 36px rgba(0,0,0,.32);font-size:12.5px;line-height:1.45;color:var(--texte);pointer-events:none}
+.infobulle p{margin:0}
+.infobulle ul{margin:8px 0 0;padding:0;list-style:none}
+.infobulle li{position:relative;padding-left:1.5em;margin-top:4px;color:var(--texte-doux)}
+.infobulle li::before{content:"⚠";position:absolute;left:0;color:var(--or)}
+.infobulle li.indispo{color:var(--rouge)}
+.infobulle li.indispo::before{color:var(--rouge)}
+.mb-liste button[aria-disabled="true"]{opacity:.45}
 .mb-sous{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);padding:7px 14px 3px}
 .fichier{padding-left:16px;border-left:1px solid var(--ligne)}
 @media (max-width:899px){.fichier{padding-left:0;border-left:0;flex-basis:100%}.mb{margin-left:-8px}.mb-titre{padding:9px 8px;letter-spacing:.06em}}
@@ -443,8 +452,30 @@ footer a:hover{color:var(--or)}
             <div class="mb-sm">
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Moteur 3D</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"><span>WebGL (carte graphique)</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"><span>Canvas 2D (secours)</span><kbd></kbd></button>
+                <!-- data-aide : description dans l'infobulle ; data-alerte : avertissements séparés par | -->
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"
+                  data-aide="Moteur écrit pour l'outil, dessiné par la carte graphique. Rapide, sélection au pixel près, sections remplies en rouge dans la boîte de coupe."
+                  data-alerte=""><span>WebGL (recommandé)</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgpu" aria-checked="false"
+                  data-aide="La nouvelle interface graphique des navigateurs, successeur de WebGL. Même rendu que WebGL, lissage des arêtes ×4."
+                  data-alerte="Récent : Chrome ou Edge à jour, Safari et Firefox selon la version.|Pas de remplissage rouge des sections dans la boîte de coupe.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>WebGPU</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="three" aria-checked="false"
+                  data-aide="Three.js, la bibliothèque 3D de référence du web (licence MIT), hébergée sur ce site. Éclairage physique, faces plus modelées."
+                  data-alerte="Environ 2 Mo téléchargés depuis ce site au premier choix.|Pas de remplissage rouge des sections dans la boîte de coupe.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>Three.js</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"
+                  data-aide="Dessin à plat, face par face, sans carte graphique. Marche partout, même sur un vieil appareil."
+                  data-alerte="Lent dès quelques milliers de faces.|Des faces peuvent passer devant d'autres par erreur (pas de tampon de profondeur)."><span>Canvas 2D (secours)</span><kbd></kbd></button>
+              </div>
+            </div>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Géométrie</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="maison" aria-checked="false"
+                  data-aide="Lecteur écrit pour l'outil : extrusions, maillages et représentations courantes, calculés à l'ouverture. Léger et rapide."
+                  data-alerte="Les ouvertures (portes, fenêtres, réservations) ne sont pas découpées dans les murs et les dalles.|Les opérations booléennes et certaines formes (balayages, surfaces NURBS) ne sont pas lues."><span>Lecteur de l'outil</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="webifc" aria-checked="false"
+                  data-aide="web-ifc (That Open Company, licence MPL-2.0), hébergé sur ce site. Moteur géométrique complet en WebAssembly : ouvertures découpées, booléens, balayages."
+                  data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
               </div>
             </div>
           </div>
@@ -506,6 +537,8 @@ footer a:hover{color:var(--or)}
 </main>
 
 <!-- menu contextuel de l'arborescence (clic droit, appui long) : rempli par ifc-app.js -->
+<!-- infobulle des menus (description et avertissements des moteurs) -->
+<div class="infobulle" id="infobulle" role="tooltip" hidden></div>
 <div class="ctx mb-liste" id="ctx" role="menu" aria-label="Actions de l'arborescence" hidden></div>
 <input type="color" id="teinte-libre" class="teinte-libre" value="#9ec5f0" tabindex="-1" aria-hidden="true">
 
@@ -542,8 +575,9 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=2"></script>
 <script src="/ifc/ifc-core.js?v=2"></script>
-<script src="/ifc/ifc-vue.js?v=13"></script>
-<script src="/ifc/ifc-app.js?v=13"></script>
+<script src="/ifc/ifc-vue.js?v=14"></script>
+<script src="/ifc/ifc-moteurs.js?v=1"></script>
+<script src="/ifc/ifc-app.js?v=14"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>

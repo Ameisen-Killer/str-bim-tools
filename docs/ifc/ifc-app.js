@@ -22,8 +22,40 @@
   var fichiers = [], parUid = new Map(), uidSuivant = 1;
   var lignes = [], choix = new Set(), caches = new Set(), plies = new Set(), actif = "", histo = [], aRefaire = [];
 
-  function lireMoteur(){ try { return localStorage.getItem("ifc.moteur") || "webgl"; } catch (e){ return "webgl"; } }
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: lireMoteur() });
+  function lire(cle, permis){ var v = null; try { v = localStorage.getItem(cle); } catch (e){} return permis.indexOf(v) >= 0 ? v : permis[0]; }
+  function garder(cle, v){ try { localStorage.setItem(cle, v); } catch (e){} }
+  var moteurVoulu = lire("ifc.moteur", ["webgl", "webgpu", "three", "canvas"]), geoVoulue = lire("ifc.geometrie", ["maison", "webifc"]);
+  // WebGL et canvas démarrent tout de suite ; WebGPU et Three.js (ifc-moteurs.js) se chargent ensuite
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu });
+
+  // Moteurs et géométries que ce navigateur ne peut pas faire tourner : clé → raison (montrée dans l'infobulle)
+  var INDISPO = {};
+  (function(){
+    function contexte(type){
+      var c = document.createElement("canvas"), g = null;
+      try { g = c.getContext(type); } catch (e){}
+      var l = g && g.getExtension("WEBGL_lose_context");
+      if (l) l.loseContext();
+      return !!g;
+    }
+    if (!contexte("webgl")) INDISPO.webgl = "WebGL est indisponible sur cet appareil ou ce navigateur.";
+    if (!contexte("webgl2")) INDISPO.three = "Three.js demande WebGL 2, indisponible sur cet appareil ou ce navigateur.";
+    if (!navigator.gpu) INDISPO.webgpu = "Ce navigateur ne propose pas WebGPU (ou pas sur cette page non sécurisée).";
+    if (typeof Worker === "undefined" || typeof WebAssembly === "undefined") INDISPO.webifc = "Ce navigateur ne permet pas WebAssembly en arrière-plan.";
+  })();
+  function marquerIndispo(){
+    [].forEach.call(document.querySelectorAll("[data-moteur],[data-geo]"), function(b){
+      var k = b.getAttribute("data-moteur") || b.getAttribute("data-geo");
+      if (INDISPO[k]) b.setAttribute("aria-disabled", "true"); else b.removeAttribute("aria-disabled");
+    });
+  }
+  marquerIndispo();
+  if (moteurVoulu === "webgpu" || moteurVoulu === "three"){
+    vue.moteur(moteurVoulu).then(function(){ if (fichiers.length) majVue(); }).catch(function(err){
+      INDISPO[moteurVoulu] = err && err.message || String(err); marquerIndispo();
+      if (fichiers.length){ majVue(); etat("Le moteur choisi n'a pas démarré (" + INDISPO[moteurVoulu] + ") : WebGL le remplace."); }
+    });
+  }
 
   // Accueil ou éditeur ; dans l'éditeur, le bandeau du site laisse la place à l'interface
   function modeEditeur(oui){
@@ -162,6 +194,58 @@
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
     if (premier) window.scrollTo(0, 0);
+    if (geoVoulue === "webifc") calculerWebIfc();
+  }
+
+  // ================= Géométrie web-ifc =================
+  // Calculée dans un Web Worker (ifc-webifc.js) à partir du fichier tel qu'il est maintenant, un fichier
+  // après l'autre ; un élément que web-ifc ne rend pas garde la géométrie de l'outil.
+  function geometrieWebIfc(f, progres){
+    return new Promise(function(ok, ko){
+      var w;
+      try { w = new Worker("/ifc/ifc-webifc.js?v=1"); } catch (e){ ko(e); return; }
+      var carte = new Map();
+      w.onmessage = function(e){
+        var d = e.data;
+        if (d.progres !== undefined) progres(d.progres);
+        else if (d.lot) d.lot.forEach(function(id, i){
+          var avant = carte.get(id), T = d.tri[i];
+          if (avant){ var u = new Float64Array(avant.length + T.length); u.set(avant); u.set(T, avant.length); T = u; }
+          carte.set(id, T);
+        });
+        else { w.terminate(); if (d.erreur) ko(new Error(d.erreur)); else ok(carte); }
+      };
+      w.onerror = function(e){
+        if (e && e.preventDefault) e.preventDefault();
+        w.terminate();
+        ko(new Error(e && e.message || "web-ifc n'a pas pu démarrer"));
+      };
+      var oct = IFC.versOctets(IFC.ecrire(f.m));
+      w.postMessage({ buffer: oct.buffer }, [oct.buffer]);
+    });
+  }
+  var enCalcul = false, echecsWebIfc = new Set();
+  function calculerWebIfc(){
+    if (enCalcul || geoVoulue !== "webifc") return;
+    var f = fichiers.filter(function(x){ return !vue.aExterne(x.m) && !echecsWebIfc.has(x.m); })[0];
+    if (!f) return;
+    enCalcul = true;
+    var quoi = "web-ifc : géométrie de « " + f.m.nom + " »";
+    etat(quoi + ", chargement du moteur…");
+    geometrieWebIfc(f, function(p){ etat(quoi + " : " + Math.floor(100*p) + " %"); }).then(function(carte){
+      var info = parUid.has(f.uid) ? vue.geometriesExternes(f.m, carte) : null;
+      if (!info) return;
+      if (geoVoulue === "webifc") majVue();
+      etat(quoi + " : " + pluriel(info.elements, "élément calculé", "éléments calculés") +
+        (info.ecart > .05 ? " (calage incertain : des éléments peuvent être décalés, repasse sur le lecteur de l'outil au besoin)" : "") + ".");
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      echecsWebIfc.add(f.m);
+      etat(quoi + " impossible (" + (err && err.message || err) + ") : la géométrie de l'outil reste affichée.");
+    }).then(function(){
+      enCalcul = false;
+      calculerWebIfc();
+    });
   }
 
   function fermer(f){
@@ -625,8 +709,9 @@
     activerCmd("figer-coupe", vue.aCoupe());
     $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
-    var mo = vue.moteur() === "WebGL" ? "webgl" : "canvas";
+    var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
+    [].forEach.call(document.querySelectorAll("[data-geo]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-geo") === geoVoulue)); });
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
       return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
@@ -653,7 +738,7 @@
       (nl.length ? " · géométrie non lue : " + nl.slice(0, 4).map(IFC.nomType).join(", ") + (nl.length > 4 ? "…" : "") : "") +
       (b.erreurs ? " · " + pluriel(b.erreurs, "élément illisible", "éléments illisibles") : "") +
       (caches.size ? " · " + fmtN(caches.size) + " masqués" : "") +
-      " · moteur " + b.moteur;
+      " · moteur " + b.moteur + (vue.sourceGeo() === "externe" ? " · géométrie web-ifc" : "");
   }
 
   function confirmer(texte, ok){
@@ -821,10 +906,27 @@
     "tout-developper": function(){ fichiers.forEach(function(f){ f.plie = false; }); plies.clear(); rendreListe(); },
     theme: function(b){ if (choisirTheme) choisirTheme(b.getAttribute("data-choix-theme")); },
     moteur: function(b){
-      var v = b.getAttribute("data-moteur"), n = vue.moteur(v);
-      try { localStorage.setItem("ifc.moteur", v); } catch (e){}
+      var v = b.getAttribute("data-moteur"), nom = b.querySelector("span").textContent;
+      if (INDISPO[v]){ etat(nom + " indisponible : " + INDISPO[v]); return; }
+      if (v === vue.moteur()) return;
+      etat("Démarrage du moteur " + nom + "…");
+      vue.moteur(v).then(function(n){
+        moteurVoulu = v; garder("ifc.moteur", v);
+        majVue();
+        etat("Moteur d'affichage : " + n + ".");
+      }).catch(function(err){
+        INDISPO[v] = err && err.message || String(err); marquerIndispo();
+        etat(nom + " n'a pas démarré (" + INDISPO[v] + ") : le moteur actuel reste en place.");
+      });
+    },
+    geometrie: function(b){
+      var v = b.getAttribute("data-geo");
+      if (INDISPO[v]){ etat("web-ifc indisponible : " + INDISPO[v]); return; }
+      geoVoulue = v; garder("ifc.geometrie", v);
+      vue.sourceGeo(v === "webifc" ? "externe" : "maison");
       majVue();
-      etat("Moteur d'affichage : " + n + (v === "webgl" && n !== "WebGL" ? " (WebGL indisponible sur cet appareil, le canvas 2D prend le relais)" : "") + ".");
+      if (v === "webifc"){ echecsWebIfc.clear(); calculerWebIfc(); }
+      else etat("Géométrie : lecteur de l'outil.");
     },
     site: function(){ location.href = "/"; },
     "tout-afficher": function(){ var n = caches.size; caches = new Set(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
@@ -841,7 +943,8 @@
     },
     "a-propos": function(){
       aide("Éditeur IFC", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
-        "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne fait aucun appel réseau.</p>");
+        "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
+        "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>");
     }
   };
   function activerCmd(c, ok){ [].forEach.call(document.querySelectorAll('[data-cmd="' + c + '"]'), function(b){ b.disabled = !ok; }); }
@@ -851,6 +954,7 @@
   // boutons atteignables au clavier : actifs et affichés (un sous-menu fermé ne compte pas)
   function itemsDe(liste){ return [].filter.call(liste.querySelectorAll("button"), function(b){ return !b.disabled && b.getClientRects().length > 0; }); }
   function fermerMenu(){
+    $("#infobulle").hidden = true;
     if (!ouvert) return;
     ouvert.liste.hidden = true;
     ouvert.titre.setAttribute("aria-expanded", "false");
@@ -892,6 +996,28 @@
     sl.classList.remove("a-gauche");
     if (sl.getBoundingClientRect().right > window.innerWidth - 8) sl.classList.add("a-gauche");
   });
+  // infobulle des choix de moteur : data-aide (description), data-alerte (avertissements séparés par |)
+  var bulle = $("#infobulle");
+  function montrerBulle(b){
+    var aide = b.getAttribute("data-aide");
+    if (!aide){ bulle.hidden = true; return; }
+    var k = b.getAttribute("data-moteur") || b.getAttribute("data-geo"), al = (b.getAttribute("data-alerte") || "").split("|").filter(Boolean);
+    bulle.innerHTML = "<p>" + esc(aide) + "</p>" + (al.length || INDISPO[k] ? "<ul>" +
+      (INDISPO[k] ? '<li class="indispo">' + esc("Indisponible ici : " + INDISPO[k]) + "</li>" : "") +
+      al.map(function(a){ return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "");
+    bulle.hidden = false;
+    // à côté du sous-menu, du côté où il reste de la place ; sinon sous la ligne survolée
+    var L = b.closest(".mb-liste").getBoundingClientRect(), r = b.getBoundingClientRect(), w = bulle.offsetWidth, h = bulle.offsetHeight;
+    var x = L.right + 6, y = r.top;
+    if (x + w > window.innerWidth - 8) x = L.left - 6 - w;
+    if (x < 8){ x = Math.max(8, Math.min(r.left, window.innerWidth - 8 - w)); y = r.bottom + 4; }
+    bulle.style.left = x + "px";
+    bulle.style.top = Math.max(8, Math.min(y, window.innerHeight - 8 - h)) + "px";
+  }
+  mb.addEventListener("mouseover", function(e){ var b = e.target.closest("button"); if (b) montrerBulle(b); });
+  mb.addEventListener("focusin", function(e){ montrerBulle(e.target); });
+  mb.addEventListener("mouseleave", function(){ bulle.hidden = true; });
+  mb.addEventListener("focusout", function(e){ if (!mb.contains(e.relatedTarget)) bulle.hidden = true; });
   mb.addEventListener("keydown", function(e){
     if (!ouvert) return;
     var its = itemsDe(ouvert.liste), i = its.indexOf(document.activeElement), gi = groupes.indexOf(ouvert.gr);

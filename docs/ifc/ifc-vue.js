@@ -862,21 +862,7 @@
       remplir(B.lcol, lcol, gl.DYNAMIC_DRAW);
     }
 
-    // Matrice de vue (colonnes) : même projection orthographique que le moteur canvas
-    function matrice(c){
-      var dx = origine[0] - c.centre[0], dy = origine[1] - c.centre[1], dz = origine[2] - c.centre[2];
-      var kx = 2*c.s/c.W, ky = 2*c.s/c.H, kz = 1/c.prof;
-      var r0 = [kx*c.ca, kx*c.sa, 0];
-      var r1 = [-ky*c.sb*c.sa, ky*c.sb*c.ca, ky*c.cb];
-      var r2 = [-kz*c.cb*c.sa, kz*c.cb*c.ca, -kz*c.sb];
-      function t(r){ return r[0]*dx + r[1]*dy + r[2]*dz; }
-      return new Float32Array([
-        r0[0], r1[0], r2[0], 0,
-        r0[1], r1[1], r2[1], 0,
-        r0[2], r1[2], r2[2], 0,
-        t(r0) + 2*c.px/c.W, t(r1) - 2*c.py/c.H, t(r2), 1
-      ]);
-    }
+    function matrice(c){ return matriceVue(c, origine); }
     function decoupe(prog, oui){
       gl.uniform1f(prog.uK, oui && coupe ? 1 : 0);
       if (oui && coupe){
@@ -1027,6 +1013,54 @@
       restaurer: function(){ init(); if (dernier) charger(dernier.liste, dernier.orig); },
       liberer: function(){ var x = gl.getExtension("WEBGL_lose_context"); if (x) x.loseContext(); }
     };
+  }
+
+  // Matrice de vue (colonnes) : même projection orthographique que le moteur canvas, sommets relatifs à l'origine
+  function matriceVue(c, origine){
+    var dx = origine[0] - c.centre[0], dy = origine[1] - c.centre[1], dz = origine[2] - c.centre[2];
+    var kx = 2*c.s/c.W, ky = 2*c.s/c.H, kz = 1/c.prof;
+    var r0 = [kx*c.ca, kx*c.sa, 0];
+    var r1 = [-ky*c.sb*c.sa, ky*c.sb*c.ca, ky*c.cb];
+    var r2 = [-kz*c.cb*c.sa, kz*c.cb*c.ca, -kz*c.sb];
+    function t(r){ return r[0]*dx + r[1]*dy + r[2]*dz; }
+    return new Float32Array([
+      r0[0], r1[0], r2[0], 0,
+      r0[1], r1[1], r2[1], 0,
+      r0[2], r1[2], r2[2], 0,
+      t(r0) + 2*c.px/c.W, t(r1) - 2*c.py/c.H, t(r2), 1
+    ]);
+  }
+
+  // Sélection par le processeur (moteurs sans lecture de pixel synchrone) : rayon de vue lancé sur les
+  // triangles des éléments dont la boîte projetée contient le point ; renvoie rang + 1, ou 0
+  function viserCPU(liste, c, x, y, coupe){
+    var X = (x - c.W/2 - c.px)/c.s, Y = (c.H/2 + c.py - y)/c.s, best = Infinity, rang = 0, C = c.centre, P = new Array(9);
+    var r0 = [c.ca, c.sa, 0], r1 = [-c.sb*c.sa, c.sb*c.ca, c.cb], r2 = [-c.cb*c.sa, c.cb*c.ca, -c.sb];
+    for (var e = 0; e < liste.length; e++){
+      var g = liste[e].geo, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (var k = 0; k < 8; k++){
+        var qx = (k & 1 ? g.max[0] : g.min[0]) - C[0], qy = (k & 2 ? g.max[1] : g.min[1]) - C[1], qz = (k & 4 ? g.max[2] : g.min[2]) - C[2];
+        var u = r0[0]*qx + r0[1]*qy, v = r1[0]*qx + r1[1]*qy + r1[2]*qz;
+        if (u < x0) x0 = u; if (u > x1) x1 = u; if (v < y0) y0 = v; if (v > y1) y1 = v;
+      }
+      if (X < x0 || X > x1 || Y < y0 || Y > y1) continue;
+      var T = triangles(g);
+      for (var t = 0; t < T.length; t += 9){
+        for (var w = 0; w < 3; w++){
+          var ax = T[t + 3*w] - C[0], ay = T[t + 3*w + 1] - C[1], az = T[t + 3*w + 2] - C[2];
+          P[3*w] = r0[0]*ax + r0[1]*ay; P[3*w + 1] = r1[0]*ax + r1[1]*ay + r1[2]*az; P[3*w + 2] = r2[0]*ax + r2[1]*ay + r2[2]*az;
+        }
+        var d = (P[4] - P[7])*(P[0] - P[6]) + (P[6] - P[3])*(P[1] - P[7]);
+        if (!d) continue;
+        var a = ((P[4] - P[7])*(X - P[6]) + (P[6] - P[3])*(Y - P[7]))/d, b = ((P[7] - P[1])*(X - P[6]) + (P[0] - P[6])*(Y - P[7]))/d;
+        if (a < -1e-6 || b < -1e-6 || a + b > 1 + 1e-6) continue;
+        var z = a*P[2] + b*P[5] + (1 - a - b)*P[8];
+        if (z >= best) continue;
+        if (coupe && !dansBoite(coupe, C[0] + X*r0[0] + Y*r1[0] + z*r2[0], C[1] + X*r0[1] + Y*r1[1] + z*r2[1], C[2] + Y*r1[2] + z*r2[2], 1e-6)) continue;
+        best = z; rang = e + 1;
+      }
+    }
+    return rang;
   }
 
   // ================= Boîte de coupe : utilitaires =================
@@ -1237,6 +1271,18 @@
   // ================= Vue : caméra, interaction, choix du moteur =================
   var OR = [214,168,92];
 
+  function geoTriangles(T){
+    var faces = [], TF = new Array(T.length/9), mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    for (var t = 0, f = 0; t < T.length; t += 9, f++){
+      var ux = T[t+3] - T[t], uy = T[t+4] - T[t+1], uz = T[t+5] - T[t+2], vx = T[t+6] - T[t], vy = T[t+7] - T[t+1], vz = T[t+8] - T[t+2];
+      var nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, l = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+      faces.push({ b: [T.subarray(t, t + 9)], n: [nx/l, ny/l, nz/l], p: null, z: 0, el: 0, x0: 0, x1: 0, y0: 0, y1: 0 });
+      TF[f] = f;
+      for (var k = 0; k < 9; k++){ var a = k % 3; if (T[t+k] < mn[a]) mn[a] = T[t+k]; if (T[t+k] > mx[a]) mx[a] = T[t+k]; }
+    }
+    return faces.length ? { faces: faces, T: T, TF: TF, min: mn, max: mx } : null;
+  }
+
   function creer(cv, rappels){
     rappels = rappels || {};
     // WebGL d'abord ; le moteur canvas 2D prend le relais s'il manque, ou s'il est demandé
@@ -1249,13 +1295,54 @@
     }
     function demarrer(nom){
       M = null;
-      if (nom !== "canvas") M = moteurGL(cv);
+      if (nom !== "canvas"){ M = moteurGL(cv); if (M && !M.echec) M.cle = "webgl"; }
       if (M && M.echec){ neufCanvas(); M = null; }
-      if (!M) M = moteurCanvas(cv);
+      if (!M){ M = moteurCanvas(cv); M.cle = "canvas"; }
     }
     demarrer(/[?&]moteur=canvas\b/.test(location.search) ? "canvas" : rappels.moteur);
 
-    var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0;
+    var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0, source = "maison";
+
+    // Géométrie externe (web-ifc) : ses unités et ses axes peuvent différer (mètres, Y vers le haut).
+    // On compare les boîtes d'éléments lus des deux côtés et on retient l'échelle, la rotation et le
+    // décalage qui collent le mieux ; carte : Map(id → Float64Array de triangles).
+    function calibrer(G, carte){
+      var ROT = [function(x, y, z){ return [x, y, z]; }, function(x, y, z){ return [x, -z, y]; }];
+      var echant = [];
+      carte.forEach(function(T, id){ if (echant.length < 40 && T.length >= 9){ var g = geometrie(G, id); if (g) echant.push({ T: T, g: g }); } });
+      function med(a){ a = a.slice().sort(function(p, q){ return p - q; }); return a.length ? a[a.length >> 1] : 0; }
+      var meilleur = { r: 0, k: 1, t: [0, 0, 0], err: Infinity };
+      ROT.forEach(function(R, ri){
+        var ks = [], bs = echant.map(function(s){
+          var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+          for (var i = 0; i < s.T.length; i += 3){
+            var p = R(s.T[i], s.T[i+1], s.T[i+2]);
+            for (var a = 0; a < 3; a++){ if (p[a] < mn[a]) mn[a] = p[a]; if (p[a] > mx[a]) mx[a] = p[a]; }
+          }
+          var dE = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]), dM = Math.hypot(s.g.max[0] - s.g.min[0], s.g.max[1] - s.g.min[1], s.g.max[2] - s.g.min[2]);
+          if (dE > 0 && dM > 0) ks.push(dM/dE);
+          return { mn: mn, mx: mx };
+        });
+        var k = med(ks) || 1;
+        // échelle arrondie aux conversions d'unités courantes quand elle en est proche
+        [1, 10, 100, 1000, .1, .01, .001, 304.8, 25.4, 1/304.8, 1/25.4].forEach(function(u){ if (Math.abs(k/u - 1) < .02) k = u; });
+        var t = [0, 1, 2].map(function(a){ return med(echant.map(function(s, i){ return (s.g.min[a] + s.g.max[a])/2 - k*(bs[i].mn[a] + bs[i].mx[a])/2; })); });
+        var err = med(echant.map(function(s, i){
+          var d = Math.hypot(s.g.max[0] - s.g.min[0], s.g.max[1] - s.g.min[1], s.g.max[2] - s.g.min[2]) || 1, e = 0;
+          for (var a = 0; a < 3; a++) e += Math.abs(s.g.min[a] - (k*bs[i].mn[a] + t[a])) + Math.abs(s.g.max[a] - (k*bs[i].mx[a] + t[a]));
+          return e/d;
+        }));
+        if (err < meilleur.err) meilleur = { r: ri, k: k, t: t, err: err };
+      });
+      var R = ROT[meilleur.r], k = meilleur.k, t = meilleur.t, geos = new Map();
+      carte.forEach(function(T, id){
+        var U = new Float64Array(T.length);
+        for (var i = 0; i < T.length; i += 3){ var p = R(T[i], T[i+1], T[i+2]); U[i] = k*p[0] + t[0]; U[i+1] = k*p[1] + t[1]; U[i+2] = k*p[2] + t[2]; }
+        var g = geoTriangles(U);
+        if (g) geos.set(id, g);
+      });
+      return { geos: geos, info: { elements: geos.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
+    }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
     var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
@@ -1585,7 +1672,9 @@
         liste = [];
         nbFaces = 0;
         items.forEach(function(it){
-          var G = Gs.get(it.m), g = G ? geometrie(G, it.id) : null;
+          var G = Gs.get(it.m), g = null;
+          if (G && source === "externe" && G.externe) g = G.externe.geos.get(it.id) || null;
+          if (G && !g) g = geometrie(G, it.id);
           if (g){ liste.push({ id: it.cle, geo: g, h: it.h }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
@@ -1626,24 +1715,52 @@
       fige: function(){ return fige; },
       aCoupe: function(){ return !!coupe; },
       // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
+      // Sans argument : clé du moteur en cours. Avec une clé : promesse du nom du moteur démarré ; le
+      // nouveau moteur prépare un canvas neuf à part et ne remplace l'ancien qu'une fois prêt.
       moteur: function(nom){
-        if (nom === undefined) return M.nom;
-        if ((nom === "canvas") === (M.nom !== "WebGL")) return M.nom;
-        M.liberer();
-        ptrs.clear(); vite = false;
-        if (ro) ro.unobserve(cv);
-        neufCanvas();
-        demarrer(nom);
-        brancher();
-        if (ro) ro.observe(cv);
-        M.charger(liste, origine || [0,0,0]);
-        M.coupe(coupe);
-        M.teinter(liste, sel, actif, coul);
-        taille();
-        return M.nom;
-      }
+        if (nom === undefined) return M.cle;
+        if (nom === M.cle) return Promise.resolve(M.nom);
+        var f = FABRIQUES[nom];
+        if (!f) return Promise.reject(new Error("moteur inconnu"));
+        var neuf = cv.cloneNode(false);
+        neuf.width = cv.width; neuf.height = cv.height;
+        return Promise.resolve().then(function(){ return f(neuf, OUTILS); }).then(function(N){
+          if (!N || N.echec) throw new Error((N && N.message) || "indisponible sur cet appareil ou ce navigateur");
+          N.cle = nom;
+          M.liberer();
+          ptrs.clear(); vite = false;
+          if (ro) ro.unobserve(cv);
+          cv.parentNode.replaceChild(neuf, cv);
+          cv = neuf; M = N;
+          brancher();
+          if (ro) ro.observe(cv);
+          M.charger(liste, origine || [0,0,0]);
+          M.coupe(coupe);
+          M.teinter(liste, sel, actif, coul);
+          taille();
+          return M.nom;
+        });
+      },
+      // Source de la géométrie : "maison" (lecteur de l'outil) ou "externe" (web-ifc, fournie par fichier)
+      sourceGeo: function(nom){ if (nom !== undefined) source = nom; return source; },
+      geometriesExternes: function(m, carte){
+        var G = Gs.get(m);
+        if (!G) return null;
+        G.externe = calibrer(G, carte);
+        return G.externe.info;
+      },
+      aExterne: function(m){ var G = Gs.get(m); return !!(G && G.externe); }
     };
   }
 
-  global.IFCVue = { creer: creer };
+  // Moteurs d'affichage : fabrique(canvas, outils) → moteur, promesse de moteur, ou null (indisponible).
+  // WebGL et canvas 2D sont ici ; WebGPU et Three.js sont ajoutés par ifc-moteurs.js.
+  var FABRIQUES = { webgl: function(cv){ return moteurGL(cv); }, canvas: function(cv){ return moteurCanvas(cv); } };
+  var OUTILS = { triangles: triangles, aretesVives: aretesVives, aretesBoite: aretesBoite, matriceVue: matriceVue, viserCPU: viserCPU, OR: OR };
+  global.IFCVue = {
+    creer: creer,
+    ajouterMoteur: function(cle, fabrique){ FABRIQUES[cle] = fabrique; },
+    // géométrie venue d'ailleurs (web-ifc) : triangles à plat (9 nombres par triangle) → objet géométrie de l'aperçu
+    geoTriangles: geoTriangles
+  };
 })(window);

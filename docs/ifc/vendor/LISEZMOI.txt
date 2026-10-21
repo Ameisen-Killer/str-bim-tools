@@ -1,0 +1,7 @@
+Bibliothèques tierces de l'éditeur IFC, hébergées ici pour que la page ne dépende d'aucun autre site.
+Elles ne se chargent que si l'utilisateur les choisit dans le menu Affichage.
+
+three/    Three.js 0.186.1 (paquet npm « three », fichiers build/three.module.js et build/three.core.js)
+          Licence MIT, voir three/LICENSE.
+web-ifc/  web-ifc 0.0.78 de That Open Company (paquet npm « web-ifc », web-ifc-api-iife.js et web-ifc.wasm)
+          Licence MPL-2.0, voir web-ifc/LICENSE.md. Fichiers non modifiés ; sources : https://github.com/ThatOpen/engine_web-ifc
