@@ -183,6 +183,20 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .el-info{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el.spatial .el-nom{color:var(--texte-doux);font-weight:400}
 .el.ouverture{opacity:.62}
+/* en-tête de fichier dans la liste (plusieurs IFC ouverts) */
+.fic{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px 9px 12px;margin-top:6px;border-top:1px solid var(--ligne);border-bottom:1px solid var(--ligne);background:var(--noir-2);cursor:pointer}
+.fic:first-child{margin-top:0;border-top:0}
+.fic .el-nom{font-weight:400}
+.fic.masque .el-nom,.fic.masque .el-info{opacity:.45}
+.fic-oeil,.fic-act button{background:none;border:0;padding:4px;cursor:pointer;color:var(--texte-doux);font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1}
+.fic-oeil{font-size:14px;width:22px;text-align:center}
+.fic-oeil:hover,.fic-act button:hover,.fic-oeil:focus-visible,.fic-act button:focus-visible{color:var(--or);outline:none}
+.fic.masque .fic-oeil{color:var(--texte-faible)}
+.fic-act{display:flex;gap:2px;align-items:center}
+.fic-act .fermer{font-size:16px;padding:2px 6px}
+.fic .pli{display:inline-block;width:1em;color:var(--texte-faible);transition:transform .2s}
+.fic.plie .pli{transform:rotate(-90deg)}
+.fic.modifie .el-nom::after{content:" ●";color:var(--or);font-size:10px;vertical-align:middle}
 .liste-vide{padding:18px 16px;color:var(--texte-faible);font-size:13px}
 
 /* aperçu 3D */
@@ -278,16 +292,16 @@ footer a:hover{color:var(--or)}
       <h1 class="rv" style="--d:.8s">IFC</h1>
       <p class="chapeau rv" style="--d:1s">Ouvre une maquette IFC, coche les éléments en trop, supprime-les proprement et récupère le fichier réécrit.</p>
       <div class="depot rv" style="--d:1.2s" id="depot">
-        <div class="depot-titre">Dépose ton fichier .ifc ici</div>
+        <div class="depot-titre">Dépose un ou plusieurs fichiers .ifc ici</div>
         <div class="actions">
-          <button type="button" class="btn plein" id="choisir">Choisir un fichier</button>
+          <button type="button" class="btn plein" id="choisir">Choisir des fichiers</button>
         </div>
-        <div class="depot-note">IFC2X3 ou IFC4 · le fichier reste dans ton navigateur, rien n'est envoyé</div>
+        <div class="depot-note">IFC2X3 ou IFC4 · plusieurs fichiers se superposent dans la même vue · rien ne quitte ton navigateur</div>
         <div class="chargement" id="chargement" hidden>Lecture du fichier…</div>
       </div>
       <div class="erreur" id="erreur" role="alert" hidden></div>
     </div>
-    <input type="file" id="fichier" accept=".ifc,.IFC" hidden>
+    <input type="file" id="fichier" accept=".ifc,.IFC" multiple hidden>
   </section>
 
   <!-- ===== Après chargement : éditeur ===== -->
@@ -302,7 +316,7 @@ footer a:hover{color:var(--or)}
         <button type="button" class="btn" id="b-annuler" disabled title="Annuler (Ctrl+Z)">Annuler</button>
         <button type="button" class="btn" id="b-retablir" disabled title="Rétablir (Ctrl+Y)">Rétablir</button>
         <button type="button" class="btn plein" id="b-export">Exporter l'IFC</button>
-        <button type="button" class="btn" id="b-autre" title="Ouvrir un autre fichier">Autre fichier</button>
+        <button type="button" class="btn" id="b-autre" title="Ajouter un ou plusieurs fichiers IFC à la vue">Ajouter un IFC</button>
       </div>
       <div class="etat" id="etat" role="status" aria-live="polite"></div>
     </div>
@@ -368,8 +382,8 @@ footer a:hover{color:var(--or)}
 </footer>
 
 <script src="/ifc/ifc-core.js?v=1"></script>
-<script src="/ifc/ifc-vue.js?v=3"></script>
-<script src="/ifc/ifc-app.js?v=2"></script>
+<script src="/ifc/ifc-vue.js?v=4"></script>
+<script src="/ifc/ifc-app.js?v=3"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>

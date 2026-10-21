@@ -1064,7 +1064,7 @@
     }
     if (!M) M = moteurCanvas(cv);
 
-    var G = null, liste = [], sel = new Set(), actif = 0, nbFaces = 0;
+    var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0;
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
     var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {};
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
@@ -1205,26 +1205,34 @@
     cv.addEventListener("webglcontextrestored", function(){ M.restaurer(); M.teinter(liste, sel, actif, coul); demander(); });
 
     return {
-      // Nouveau modèle : la géométrie en cache repart de zéro
-      modele: function(m){ G = Contexte(m); liste = []; origine = null; },
-      // Éléments à dessiner (ids) ; renvoie le bilan de lecture
-      afficher: function(ids){
+      // Modèles ouverts (plusieurs fichiers dans le même repère) : la géométrie déjà lue reste en cache
+      modeles: function(ms){
+        var avant = Gs;
+        Gs = new Map();
+        ms.forEach(function(m){ Gs.set(m, avant.get(m) || Contexte(m)); });
+        liste = []; origine = null;
+      },
+      // Éléments à dessiner : [{ cle, m, id }] ; renvoie le bilan de lecture
+      afficher: function(items){
         liste = [];
         nbFaces = 0;
-        ids.forEach(function(id){
-          var g = geometrie(G, id);
-          if (g){ liste.push({ id: id, geo: g }); nbFaces += g.faces.length; }
+        items.forEach(function(it){
+          var G = Gs.get(it.m), g = G ? geometrie(G, it.id) : null;
+          if (g){ liste.push({ id: it.cle, geo: g }); nbFaces += g.faces.length; }
         });
-        // origine et profondeur fixées au premier affichage du modèle (précision des coordonnées en float32)
-        if (!origine){
-          var b = boite();
-          origine = b ? b.c : [0,0,0];
-          prof = (b ? b.r : 1)*3;
-        }
+        // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
+        var b = boite();
+        if (!origine){ origine = b ? b.c : [0,0,0]; prof = 1; }
+        if (b) prof = Math.max(prof, (Math.hypot(b.c[0] - origine[0], b.c[1] - origine[1], b.c[2] - origine[2]) + b.r)*3);
         M.charger(liste, origine);
         M.teinter(liste, sel, actif, coul);
         demander();
-        return { elements: liste.length, faces: nbFaces, nonLus: G.nonLus, erreurs: G.erreurs, moteur: M.nom };
+        var nonLus = {}, erreurs = 0;
+        Gs.forEach(function(G){
+          Object.keys(G.nonLus).forEach(function(k){ nonLus[k] = (nonLus[k] || 0) + G.nonLus[k]; });
+          erreurs += G.erreurs;
+        });
+        return { elements: liste.length, faces: nbFaces, nonLus: nonLus, erreurs: erreurs, moteur: M.nom };
       },
       selection: function(s, a){ sel = s; actif = a || 0; M.teinter(liste, sel, actif, coul); demander(); },
       recadrer: recadrer,
