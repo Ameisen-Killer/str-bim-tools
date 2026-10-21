@@ -2,14 +2,15 @@
 // d'ancrage) en volumes ombrés, qui s'assemble pièce par pièce puis tourne lentement (un tour en 60 s).
 // Ensuite, en boucle, un groupe de pièces passe en or (sélection), se soulève et s'efface
 // (suppression), puis revient à sa place (annulation) : le geste de l'outil.
-// Canvas 2D, faces triées (peintre), reflet au sol, halo doré, reflet qui glisse sur les faces.
+// WebGL (profondeur exacte, acier ombré, congés du HEB, tiges lisses, ombre douce, reflet au sol, halo
+// doré, reflet qui glisse) ; sans WebGL, le même montage en canvas 2D, faces triées (peintre).
 // Glisser pour tourner. Les animations jouent même si le système demande moins de mouvement (choix de Tony).
 (function(){
   "use strict";
 
   var cv = document.getElementById("scene"), hote = document.getElementById("accueil");
   if (!cv || !cv.getContext) return;
-  var ctx = cv.getContext("2d");
+  var ctx = null;          // contexte 2D, seulement si WebGL manque
 
   function clamp(x){ return x < 0 ? 0 : x > 1 ? 1 : x; }
   function ease(p){ return p < .5 ? 4*p*p*p : 1 - Math.pow(-2*p + 2, 3)/2; }
@@ -63,6 +64,9 @@
     cylindre(p[0], p[1], EP + 8, EP + 34, 27, 6, d + .08, "b", Math.PI/6);
     cylindre(p[0], p[1], EP + 34, EP + 78, 12, 12, d + .16, "b");
   });
+  // points qui servent au cadrage (enveloppe du modèle)
+  var sommets = [];
+  pieces.forEach(function(pc){ pc.faces.forEach(function(f){ f.p.forEach(function(p){ sommets.push(p); }); }); });
   var FIN_MONTAGE = 3.4, CYCLE = 7.5, ORDRE = ["ry", "b", "rx"], DEBUT_DEMO = 5;
   var CENTRE = [0, 0, HC*.42], PHI = .3;
 
@@ -100,10 +104,10 @@
     var mx = 0, y0 = Infinity, y1 = -Infinity;
     for (var k = 0; k < 48; k++){
       var c = vue(2*Math.PI*k/48);
-      pieces.forEach(function(pc){ pc.faces.forEach(function(f){ f.p.forEach(function(p){
+      sommets.forEach(function(p){
         var q = proj(c, p);
         mx = Math.max(mx, Math.abs(q[0])); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]);
-      }); }); });
+      });
     }
     var Hs = H*.78;                                      // le bas est laissé au reflet
     S = .9*Math.min(W/(2*mx), Hs/(y1 - y0));
@@ -204,6 +208,7 @@
     peindre(faces(c, T, false), 1, true, Lr);
   }
 
+  var dessinerScene = dessiner;
   function image(now){
     requestAnimationFrame(image);
     if (hote && hote.hidden) return;
@@ -212,10 +217,259 @@
     if (t0 === null){ t0 = now; avant = now; }
     var dt = Math.min(.05, (now - avant)/1000);
     avant = now;
-    dessiner((now - t0)/1000, dt);
+    dessinerScene((now - t0)/1000, dt);
   }
+  if (!sceneGL()) ctx = cv.getContext("2d");
   requestAnimationFrame(image);
   if ("IntersectionObserver" in window) new IntersectionObserver(function(e){ visible = e[0].isIntersecting; }).observe(cv);
+
+
+  // ================= Rendu WebGL =================
+  // Maillages propres à ce rendu : profils extrudés avec normales lissées sur les arrondis (congés, tiges),
+  // arêtes vives seulement là où l'angle est franc. Même chorégraphie que le canvas (etatPiece).
+  function sceneGL(){
+    var gl = null;
+    try { gl = cv.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false }); } catch (e){ gl = null; }
+    if (!gl) return false;
+
+    // ---------- Géométrie ----------
+    var mailles = [], cour = null;
+    function piece(d, groupe){ cour = { d: d, groupe: groupe || "", P: [], N: [], L: [] }; mailles.push(cour); }
+    function pt(o, du, dv, uv){ return [o[0] + uv[0]*du[0] + uv[1]*dv[0], o[1] + uv[0]*du[1] + uv[1]*dv[1], o[2] + uv[0]*du[2] + uv[1]*dv[2]]; }
+    function add(a, b){ return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+    function sommet(p, n){ cour.P.push(p[0], p[1], p[2]); cour.N.push(n[0], n[1], n[2]); }
+    function ligne(a, b){ cour.L.push(a[0], a[1], a[2], b[0], b[1], b[2]); }
+    // triangulation d'un polygone simple (oreilles), sommets [u, v] dans le sens trigonométrique
+    function oreilles(P){
+      var idx = P.map(function(_, i){ return i; }), out = [], garde = 0;
+      function aire(a, b, c){ return (b[0] - a[0])*(c[1] - a[1]) - (b[1] - a[1])*(c[0] - a[0]); }
+      function dedans(p, a, b, c){ return aire(a, b, p) >= 0 && aire(b, c, p) >= 0 && aire(c, a, p) >= 0; }
+      while (idx.length > 3 && garde++ < 5000){
+        for (var i = 0; i < idx.length; i++){
+          var ia = idx[(i + idx.length - 1) % idx.length], ib = idx[i], ic = idx[(i + 1) % idx.length];
+          var a = P[ia], b = P[ib], c = P[ic];
+          if (aire(a, b, c) <= 1e-9) continue;
+          var ok = true;
+          for (var k = 0; k < idx.length && ok; k++){ var q = idx[k]; if (q !== ia && q !== ib && q !== ic && dedans(P[q], a, b, c)) ok = false; }
+          if (!ok) continue;
+          out.push(ia, ib, ic); idx.splice(i, 1); break;
+        }
+      }
+      if (idx.length === 3) out.push(idx[0], idx[1], idx[2]);
+      return out;
+    }
+    // Profil [u, v] posé à l'origine o dans le plan (du, dv) orthonormé, extrudé de h selon du × dv
+    function extruder(prof, o, du, dv, h){
+      var a2 = 0;
+      for (var i = 0, j = prof.length - 1; i < prof.length; j = i++) a2 += (prof[j][0] - prof[i][0])*(prof[j][1] + prof[i][1]);
+      if (a2 < 0) prof = prof.slice().reverse();          // sens trigonométrique (a2 = deux fois l'aire signée)
+      var n = prof.length, dir = cross(du, dv), v = [dir[0]*h, dir[1]*h, dir[2]*h];
+      var bas = prof.map(function(uv){ return pt(o, du, dv, uv); }), haut = bas.map(function(p){ return add(p, v); });
+      var nArete = [];
+      for (i = 0; i < n; i++){
+        var a = prof[i], b = prof[(i + 1) % n], eu = b[0] - a[0], ev = b[1] - a[1], l = Math.hypot(eu, ev) || 1;
+        nArete.push(norm([(ev*du[0] - eu*dv[0])/l, (ev*du[1] - eu*dv[1])/l, (ev*du[2] - eu*dv[2])/l]));
+      }
+      var lisse = [], nLisse = [];
+      for (i = 0; i < n; i++){
+        var np = nArete[(i + n - 1) % n], nn = nArete[i];
+        lisse.push(dot(np, nn) > Math.cos(40*Math.PI/180));
+        nLisse.push(norm(add(np, nn)));
+      }
+      for (i = 0; i < n; i++){
+        var j2 = (i + 1) % n, na = lisse[i] ? nLisse[i] : nArete[i], nb = lisse[j2] ? nLisse[j2] : nArete[i];
+        sommet(bas[i], na); sommet(bas[j2], nb); sommet(haut[j2], nb);
+        sommet(bas[i], na); sommet(haut[j2], nb); sommet(haut[i], na);
+        if (!lisse[i]) ligne(bas[i], haut[i]);
+        ligne(bas[i], bas[j2]); ligne(haut[i], haut[j2]);
+      }
+      var t = oreilles(prof), nh = norm(dir), nb2 = [-nh[0], -nh[1], -nh[2]];
+      for (i = 0; i < t.length; i += 3){
+        sommet(haut[t[i]], nh); sommet(haut[t[i + 1]], nh); sommet(haut[t[i + 2]], nh);
+        sommet(bas[t[i]], nb2); sommet(bas[t[i + 2]], nb2); sommet(bas[t[i + 1]], nb2);
+      }
+    }
+    function arc(out, cx, cy, r, a0, a1, n){ for (var k = 0; k <= n; k++){ var a = a0 + (a1 - a0)*k/n; out.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]); } }
+    function cercle(r, n, ph){ var o = []; for (var k = 0; k < n; k++){ var a = (ph || 0) + 2*Math.PI*k/n; o.push([r*Math.cos(a), r*Math.sin(a)]); } return o; }
+    var X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1];
+
+    // platine
+    piece(.2); extruder([[-260, -260], [260, -260], [260, 260], [-260, 260]], [0, 0, 0], X, Y, EP);
+    // HEB 300 : b = 300, h = 300, tw = 11, tf = 19, r = 27 ; ailes parallèles à X
+    var b2 = 150, tw = 5.5, ti = 131, r = 27, hp = [], Q = Math.PI/2;
+    hp.push([-b2, -b2], [b2, -b2], [b2, -ti]);
+    arc(hp, tw + r, -ti + r, r, -Q, -2*Q, 6);
+    arc(hp, tw + r, ti - r, r, 2*Q, Q, 6);
+    hp.push([b2, ti], [b2, b2], [-b2, b2], [-b2, ti]);
+    arc(hp, -tw - r, ti - r, r, Q, 0, 6);
+    arc(hp, -tw - r, -ti + r, r, 0, -Q, 6);
+    hp.push([-b2, -ti]);
+    piece(.75); extruder(hp, [0, 0, EP], X, Y, HC - EP);
+    // raidisseurs : plats de 14 mm de longueur L, coin chanfreiné contre le poteau, bout incliné ;
+    // u part du poteau, v monte ; l'épaisseur suit du × Z, d'où les origines décalées de 7 mm
+    function raidisseur(o, du, L, d, g){
+      piece(d, g);
+      extruder([[0, 22], [22, 0], [L, 0], [L, 38], [22, 250], [0, 250]], o, du, Z, 14);
+    }
+    raidisseur([-7, 150, EP], Y, 98, 1.45, "ry");                 // hors des ailes
+    raidisseur([7, -150, EP], [0, -1, 0], 98, 1.55, "ry");
+    raidisseur([tw, 7, EP], X, 248 - tw, 1.65, "rx");              // dans le plan de l'âme, de part et d'autre
+    raidisseur([-tw, -7, EP], [-1, 0, 0], 248 - tw, 1.75, "rx");
+    // tiges d'ancrage : plaque de répartition, écrou six pans, tige ronde avec chanfrein
+    [[200, 200], [-200, 200], [-200, -200], [200, -200]].forEach(function(p, k){
+      var d = 2.05 + k*.14;
+      piece(d, "b"); extruder([[-34, -34], [34, -34], [34, 34], [-34, 34]], [p[0], p[1], EP], X, Y, 8);
+      piece(d + .08, "b"); extruder(cercle(27, 6, Math.PI/6), [p[0], p[1], EP + 8], X, Y, 26);
+      piece(d + .16, "b"); extruder(cercle(12, 28), [p[0], p[1], EP + 8], X, Y, 66); extruder(cercle(10, 28), [p[0], p[1], EP + 74], X, Y, 4);
+    });
+
+    // ---------- Shaders ----------
+    var PREC = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+    var SRC = {
+      v: "attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform float uDz;uniform float uMir;varying vec3 vN;varying vec3 vW;" +
+        "void main(){vec3 w=aP+vec3(0.0,0.0,uDz);w.z*=uMir;vW=w;vN=vec3(aN.xy,aN.z*uMir);gl_Position=uM*vec4(w,1.0);}",
+      f: PREC + "uniform vec3 uEye;uniform vec3 uL;uniform vec3 uL2;uniform vec3 uBase;uniform vec3 uOr;uniform vec3 uFond;uniform vec3 uSpec;" +
+        "uniform float uSel;uniform float uRefl;uniform float uA;varying vec3 vN;varying vec3 vW;" +
+        "void main(){vec3 N=normalize(vN);vec3 V=normalize(uEye-vW);if(dot(N,V)<0.0)N=-N;" +
+        "float lam=max(dot(N,uL),0.0);float hemi=0.55+0.45*N.z;" +
+        "float sp=pow(max(dot(N,normalize(uL+V)),0.0),40.0);float sp2=pow(max(dot(N,normalize(uL2+V)),0.0),90.0);" +
+        "float fr=pow(1.0-max(dot(N,V),0.0),4.0);" +
+        "vec3 c=uBase*(0.42*hemi+0.62*lam)+uSpec*(0.32*sp+0.6*sp2+0.16*fr);" +
+        "c=mix(c,uOr*(0.62+0.55*lam)+uSpec*0.3*sp,uSel*0.62);" +
+        "if(uRefl>0.0){float k=clamp(1.0+vW.z/650.0,0.0,1.0);gl_FragColor=vec4(mix(uFond,c,uRefl*k*k*uA),1.0);}" +
+        "else gl_FragColor=vec4(c,uA);}",
+      vl: "attribute vec3 aP;uniform mat4 uM;uniform float uDz;void main(){gl_Position=uM*vec4(aP+vec3(0.0,0.0,uDz),1.0);}",
+      fl: PREC + "uniform vec4 uC;void main(){gl_FragColor=uC;}",
+      vs: "attribute vec3 aP;uniform mat4 uM;varying vec2 vXY;void main(){vXY=aP.xy;gl_Position=uM*vec4(aP,1.0);}",
+      fs: PREC + "uniform vec3 uOr;uniform vec3 uOmbre;uniform float uHalo;uniform float uForce;varying vec2 vXY;" +
+        "void main(){float r=length(vXY)/430.0;float h=uHalo*pow(clamp(1.0-r,0.0,1.0),2.0);" +
+        "float d=max(abs(vXY.x),abs(vXY.y))-262.0;float o=uForce*(1.0-smoothstep(-30.0,110.0,d));" +
+        "float a=h+o;gl_FragColor=vec4(a>0.0?(uOr*h+uOmbre*o)/a:uOr,clamp(a,0.0,1.0));}"
+    };
+    function programme(vs, fs, attrs){
+      function sh(t, src){ var x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; }
+      var p = gl.createProgram();
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      attrs.forEach(function(a, i){ gl.bindAttribLocation(p, i, a); });
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      var u = {};
+      for (var k = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); k < n; k++){ var nom = gl.getActiveUniform(p, k).name; u[nom] = gl.getUniformLocation(p, nom); }
+      return { p: p, u: u };
+    }
+    var PF, PL, PS, bufP, bufN, bufL, bufS;
+    function init(){
+      PF = programme(SRC.v, SRC.f, ["aP", "aN"]); PL = programme(SRC.vl, SRC.fl, ["aP"]); PS = programme(SRC.vs, SRC.fs, ["aP"]);
+      var P = [], N = [], L = [];
+      mailles.forEach(function(m){
+        m.t0 = P.length/3; P.push.apply(P, m.P); N.push.apply(N, m.N); m.nt = m.P.length/3;
+        m.l0 = L.length/3; L.push.apply(L, m.L); m.nl = m.L.length/3;
+      });
+      function buf(data){ var b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW); return b; }
+      bufP = buf(P); bufN = buf(N); bufL = buf(L); bufS = buf([-900, -900, 0, 900, -900, 0, 900, 900, 0, -900, -900, 0, 900, 900, 0, -900, 900, 0]);
+    }
+    try { init(); } catch (e){ if (window.console) console.warn("Scène WebGL indisponible :", e); return false; }
+
+    sommets = [];
+    mailles.forEach(function(m){ for (var k = 0; k < m.P.length; k += 3) sommets.push([m.P[k], m.P[k + 1], m.P[k + 2]]); });
+    cadrer();
+
+    // ---------- Caméra : même projection que le canvas (perspective, cadrage S / OY) ----------
+    function matrice(c){
+      var n = 400, f = 9000, A = (f + n)/(f - n), B = -2*f*n/(f - n), kx = 2*S/W, ky = 2*S/H, k = 1 - 2*OY/H;
+      function ligneM(v){ return [v[0], v[1], v[2], -dot(v, c.eye)]; }
+      var r0 = ligneM(c.rt), r1 = ligneM(c.up), r3 = ligneM(c.fw), R = [];
+      R[0] = r0.map(function(x){ return kx*x; });
+      R[1] = r1.map(function(x, i){ return ky*x + k*r3[i]; });
+      R[2] = r3.map(function(x, i){ return A*x + (i === 3 ? B : 0); });
+      R[3] = r3;
+      var m = new Float32Array(16);
+      for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) m[j*4 + i] = R[i][j];
+      return m;
+    }
+    function v3(c){ return [c[0]/255, c[1]/255, c[2]/255]; }
+    function attrib(i, b, n){ gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.enableVertexAttribArray(i); gl.vertexAttribPointer(i, n, gl.FLOAT, false, 0, 0); }
+
+    function dessinerGL(T, dt){
+      if (gl.isContextLost()) return;
+      if (!glisse){
+        var cible = T > FIN_MONTAGE ? 2*Math.PI/60 : 0;
+        omega += (cible + elan - omega)*Math.min(1, dt*1.5);
+        elan *= Math.pow(.2, dt);
+        th += omega*dt;
+      }
+      var c = vue(th), M = matrice(c), cl = coul.clair;
+      var a = -T*.35, Lr = norm([Math.cos(a)*.8, Math.sin(a)*.8, .55]);
+      var base = cl ? [.78, .79, .81] : [.36, .375, .40], spec = cl ? [1, 1, 1] : [1, .93, .82], fond = v3(coul.fond), or = v3(coul.or);
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+
+      var etats = mailles.map(function(m){ return etatPiece(m, T); });
+      function faces(refl){
+        gl.useProgram(PF.p);
+        var u = PF.u;
+        gl.uniformMatrix4fv(u.uM, false, M);
+        gl.uniform3fv(u.uEye, c.eye); gl.uniform3fv(u.uL, LUM); gl.uniform3fv(u.uL2, Lr);
+        gl.uniform3fv(u.uBase, base); gl.uniform3fv(u.uSpec, spec); gl.uniform3fv(u.uOr, or); gl.uniform3fv(u.uFond, fond);
+        gl.uniform1f(u.uMir, refl ? -1 : 1); gl.uniform1f(u.uRefl, refl ? .32 : 0);
+        attrib(0, bufP, 3); attrib(1, bufN, 3);
+        // pièces pleines d'abord, puis celles qui apparaissent ou s'effacent (transparentes)
+        [true, false].forEach(function(pleines){
+          mailles.forEach(function(m, i){
+            var st = etats[i];
+            if (st.a <= .003 || (st.a >= .999) !== pleines) return;
+            if (!refl && !pleines){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
+            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a);
+            gl.drawArrays(gl.TRIANGLES, m.t0, m.nt);
+            gl.disable(gl.BLEND);
+          });
+        });
+        gl.disableVertexAttribArray(1);
+      }
+      // 1) reflet au sol (fondu dans le fond de page)
+      faces(true);
+      // 2) ombre douce et halo doré sur le sol
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.disable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.useProgram(PS.p);
+      gl.uniformMatrix4fv(PS.u.uM, false, M);
+      gl.uniform3fv(PS.u.uOr, or); gl.uniform3fv(PS.u.uOmbre, cl ? [.35, .3, .24] : [0, 0, 0]);
+      var mont = ease(clamp((T - .2)/1.6));
+      gl.uniform1f(PS.u.uHalo, mont*(cl ? .3 : .36)); gl.uniform1f(PS.u.uForce, mont*(cl ? .22 : .5));
+      attrib(0, bufS, 3);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST);
+      // 3) le pied de poteau, puis ses arêtes vives (dorées à l'arrivée et en sélection)
+      gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1);
+      faces(false);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+      gl.useProgram(PL.p);
+      gl.uniformMatrix4fv(PL.u.uM, false, M);
+      attrib(0, bufL, 3);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+      var e = coul.encre;
+      mailles.forEach(function(m, i){
+        var st = etats[i];
+        if (st.a <= .003 || !m.nl) return;
+        var g = Math.max(st.sel, st.lueur), k = cl ? .34 : .3;
+        var col = melange(e, coul.or, g);
+        gl.uniform1f(PL.u.uDz, st.dz);
+        gl.uniform4f(PL.u.uC, col[0]/255, col[1]/255, col[2]/255, (k + (.85 - k)*g)*st.a);
+        gl.drawArrays(gl.LINES, m.l0, m.nl);
+      });
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
+    }
+    cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); });
+    cv.addEventListener("webglcontextrestored", function(){ try { init(); } catch (x){} });
+    dessinerScene = dessinerGL;
+    return true;
+  }
 
   // ================= Glisser pour tourner =================
   cv.addEventListener("pointerdown", function(e){
