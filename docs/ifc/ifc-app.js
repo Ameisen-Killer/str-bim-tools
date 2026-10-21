@@ -64,23 +64,64 @@
       r.readAsArrayBuffer(f);
     });
   }
+  function pause(ms){ return new Promise(function(ok){ setTimeout(ok, ms || 30); }); }   // laisse l'écran se rafraîchir
+
+  // Lecture d'un fichier : en arrière-plan dans un Web Worker (ifc-lecteur.js), la page reste vivante ;
+  // progres(0–1). Sans worker possible, lecture d'un coup comme avant.
+  var avecWorker = typeof Worker !== "undefined";
+  function lireClassique(fic){
+    return lireFichier(fic).then(function(buf){ return pause().then(function(){ return IFC.lire(buf, fic.name); }); });
+  }
+  function lecture(fic, progres){
+    if (!avecWorker) return lireClassique(fic);
+    return lireFichier(fic).then(function(buf){
+      return new Promise(function(ok, ko){
+        var w;
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=1"); }
+        catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
+        w.onmessage = function(e){
+          var d = e.data;
+          if (d.progres !== undefined){ progres(.7*d.progres); return; }
+          w.terminate();
+          if (d.erreur){ var err = new Error(d.erreur); err.ifc = d.ifc; ko(err); return; }
+          // la page reconstruit le texte et fige les entités par tranches
+          IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), fic.name, function(p, etape){
+            progres(etape === "texte" ? .7 + .1*p : .8 + .2*p);
+          }).then(ok, ko);
+        };
+        w.onerror = function(e){
+          // worker indisponible ou tombé (script bloqué, mémoire) : les octets lui ont été transférés,
+          // on relit le fichier et on le lit d'un coup
+          if (e && e.preventDefault) e.preventDefault();
+          w.terminate(); avecWorker = false;
+          lireClassique(fic).then(ok, ko);
+        };
+        w.postMessage({ buffer: buf }, [buf]);
+      });
+    });
+  }
+  function progresLecture(texte, p){
+    $("#chargement-txt").textContent = texte;
+    $("#prog").style.width = Math.round(100*p) + "%";
+    if (fichiers.length) etat(texte);
+  }
+
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
   function charger(liste){
     liste = [].slice.call(liste || []);
     if (!liste.length) return;
     erreur("");
     $("#chargement").hidden = false;
-    $("#chargement").textContent = liste.length > 1 ? "Lecture de " + liste.length + " fichiers…" : "Lecture du fichier…";
-    if (fichiers.length) etat("Lecture de " + (liste.length > 1 ? liste.length + " fichiers" : "« " + liste[0].name + " »") + "…");
+    progresLecture(liste.length > 1 ? "Lecture de " + liste.length + " fichiers…" : "Lecture du fichier…", 0);
     var ajoutes = [], refus = [], t0 = performance.now();
     // un fichier après l'autre, pour ne pas garder tous les octets en mémoire en même temps
     var suite = Promise.resolve();
-    liste.forEach(function(fic){
+    liste.forEach(function(fic, n){
       suite = suite.then(function(){
-        return lireFichier(fic).then(function(buf){
-          return new Promise(function(ok){ setTimeout(function(){ ok(buf); }, 30); });   // laisse l'écran se rafraîchir
-        }).then(function(buf){
-          ajoutes.push(IFC.lire(buf, fic.name));
+        var quoi = "Lecture de « " + fic.name + " »" + (liste.length > 1 ? " (" + (n + 1) + "/" + liste.length + ")" : "");
+        progresLecture(quoi + "…", 0);
+        return lecture(fic, function(p){ progresLecture(quoi + " : " + Math.floor(100*p) + " %", p); }).then(function(m){
+          ajoutes.push(m);
         }).catch(function(err){
           if (window.console) console.error(err);
           refus.push("« " + fic.name + " » : " + (err && err.ifc ? err.message : "lecture impossible (" + (err && err.message || err) + ")"));
@@ -88,6 +129,10 @@
       });
     });
     suite.then(function(){
+      if (!ajoutes.length) return;
+      progresLecture("Construction de la liste et de la vue 3D…", 1);
+      return pause();
+    }).then(function(){
       $("#chargement").hidden = true;
       if (ajoutes.length && remplacer) vider();
       remplacer = false;

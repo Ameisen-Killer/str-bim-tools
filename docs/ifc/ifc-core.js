@@ -1,4 +1,5 @@
 // Noyau IFC de /ifc/ : lecture STEP (ISO 10303-21), index des éléments, suppression propre, export.
+// Aussi chargé par le Web Worker ifc-lecteur.js (lecture en arrière-plan) : rien ici ne touche à la page.
 // - Le fichier est lu octet par octet (un caractère = un octet) : tout ce qui n'est pas touché
 //   ressort à l'identique à l'export, accents compris, quel que soit l'encodage d'origine.
 // - Chaque entité est figée (Object.freeze) : { id, type, src (texte d'origine sans le « ; »), refs }.
@@ -26,10 +27,13 @@
   }
 
   // ================= Découpage en instructions =================
-  // Appelle traiter(texte) pour chaque instruction terminée par « ; » hors chaîne et hors commentaire.
-  function instructions(txt, traiter){
-    var n = txt.length, i = 0, deb = 0, morceaux = [], c, f;
+  // Appelle traiter(texte, début, fin, pur) pour chaque instruction terminée par « ; » hors chaîne et hors
+  // commentaire ; pur = sans commentaire, le texte est alors txt[début..fin[ débarrassé de ses blancs.
+  // progres(fraction) est appelé de temps en temps sur les gros fichiers.
+  function instructions(txt, traiter, progres){
+    var n = txt.length, i = 0, deb = 0, morceaux = [], c, f, prochain = 4e6;
     while (i < n){
+      if (progres && i >= prochain){ progres(i/n); prochain = i + 4e6; }
       c = txt.charCodeAt(i);
       if (c === 39){                                   // ' : chaîne, '' = apostrophe échappée
         i++;
@@ -51,7 +55,8 @@
       }
       if (c === 59){                                   // ;
         morceaux.push(txt.slice(deb, i));
-        if (traiter((morceaux.length === 1 ? morceaux[0] : morceaux.join("")).trim()) === false) return;
+        var pur = morceaux.length === 1;
+        if (traiter((pur ? morceaux[0] : morceaux.join("")).trim(), deb, i, pur) === false) return;
         morceaux = []; i++; deb = i; continue;
       }
       i++;
@@ -208,23 +213,45 @@
   // ================= Lecture d'un fichier =================
   var SCHEMAS_OK = /^(IFC2X3(_TC1|_FINAL)?|IFC4(_ADD1|_ADD2|_ADD2_TC1)?)$/;
 
-  function lire(buffer, nom){
-    var octets = new Uint8Array(buffer);
+  // Les blancs que trim() retire, pour les caractères 0–255 (le fichier est lu octet = caractère)
+  function blanc(c){ return c === 32 || (c >= 9 && c <= 13) || c === 160; }
+
+  // Première étape de la lecture, faisable dans un Web Worker (ifc-lecteur.js) : contrôle du fichier et
+  // découpage des entités sous une forme compacte (tableaux typés, positions dans le texte) qui passe
+  // d'un fil à l'autre sans copie. Le texte complet est rendu à part (r.txt), il ne voyage pas.
+  function analyser(octets, progres){
     if (octets.length < 20) throw erreur("Le fichier est vide ou tronqué.");
     if (octets[0] === 0x50 && octets[1] === 0x4B) throw erreur("Ce fichier est compressé (.ifczip ou .zip). Décompresse-le d'abord, puis ouvre le .ifc qu'il contient.");
     var txt = versTexte(octets);
-    octets = null;
     var debut = txt.slice(0, 4000);
     if (/^\s*<\?xml/.test(debut) || /<ifcXML|iso_10303_28/i.test(debut)) throw erreur("Ce fichier est un ifcXML : seul le format texte .ifc (STEP) est pris en charge.");
     if (debut.indexOf("ISO-10303-21") < 0) throw erreur("Ce fichier n'est pas un IFC valide : la ligne d'ouverture « ISO-10303-21; » est absente.");
 
-    var etat = 0, entetes = [], dataDecl = "DATA", ent = new Map(), ordre = [], maxId = 0, doublons = 0;
-    instructions(txt, function(s){
+    // tableaux qui grandissent par doublement
+    var cap = 1024, nb = 0, ids = new Int32Array(cap), deb = new Int32Array(cap), fin = new Int32Array(cap), typ = new Int32Array(cap), rdeb = new Int32Array(cap + 1);
+    var rcap = 4096, nr = 0, refs = new Int32Array(rcap);
+    var types = [], typeNum = new Map(), speciaux = {}, vus = new Set();
+    function agrandir(t, n){ var u = new t.constructor(n); u.set(t); return u; }
+
+    var etat = 0, entetes = [], dataDecl = "DATA", maxId = 0, doublons = 0;
+    instructions(txt, function(s, d, f, pur){
       if (etat === 3){
         if (s.charCodeAt(0) === 35){
           var e = lireEntite(s);
-          if (ent.has(e.id)){ doublons++; return; }
-          ent.set(e.id, e); ordre.push(e.id);
+          if (vus.has(e.id)){ doublons++; return; }
+          vus.add(e.id);
+          if (nb === cap){
+            cap *= 2;
+            ids = agrandir(ids, cap); deb = agrandir(deb, cap); fin = agrandir(fin, cap); typ = agrandir(typ, cap); rdeb = agrandir(rdeb, cap + 1);
+          }
+          if (pur){ while (blanc(txt.charCodeAt(d))) d++; while (blanc(txt.charCodeAt(f - 1))) f--; }
+          if (!pur || f - d !== s.length){ speciaux[nb] = s; d = f = -1; }
+          var t = typeNum.get(e.type);
+          if (t === undefined){ t = types.length; types.push(e.type); typeNum.set(e.type, t); }
+          ids[nb] = e.id; deb[nb] = d; fin[nb] = f; typ[nb] = t; rdeb[nb] = nr;
+          if (nr + e.refs.length > rcap){ while (nr + e.refs.length > rcap) rcap *= 2; refs = agrandir(refs, rcap); }
+          for (var k = 0; k < e.refs.length; k++) refs[nr++] = e.refs[k];
+          nb++;
           if (e.id > maxId) maxId = e.id;
           return;
         }
@@ -250,10 +277,10 @@
         if (etat === 25) throw erreur("Ce fichier n'est pas un IFC valide : la section DATA est absente.");
         return;
       }
-    });
+    }, progres);
     if (etat < 3) throw erreur("Ce fichier n'est pas un IFC valide : la section DATA est absente.");
     if (etat === 3) throw erreur("Fichier tronqué : la section DATA ne se termine pas (ENDSEC manquant). Le téléchargement ou l'export a peut-être été interrompu.");
-    if (!ent.size) throw erreur("Le fichier ne contient aucune entité.");
+    if (!nb) throw erreur("Le fichier ne contient aucune entité.");
 
     var schema = "";
     entetes.forEach(function(h){
@@ -264,21 +291,74 @@
     });
     if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
     if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    rdeb[nb] = nr;
 
     return {
+      txt: txt, taille: octets.length, schema: schema, eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
+      entetes: entetes, dataDecl: dataDecl, maxId: maxId, doublons: doublons,
+      nb: nb, ids: ids.slice(0, nb), deb: deb.slice(0, nb), fin: fin.slice(0, nb), typ: typ.slice(0, nb),
+      rdeb: rdeb.slice(0, nb + 1), refs: refs.slice(0, nr), types: types, speciaux: speciaux
+    };
+  }
+
+  // Deuxième étape : les entités figées, par tranches [k0, k1[ (pour rendre la main entre deux tranches)
+  function assembler(r, txt, ent, ordre, k0, k1){
+    for (var k = k0; k < k1; k++){
+      var a = r.rdeb[k], b = r.rdeb[k + 1], refs = new Array(b - a);
+      for (var j = a; j < b; j++) refs[j - a] = r.refs[j];
+      var src = r.deb[k] < 0 ? r.speciaux[k] : txt.slice(r.deb[k], r.fin[k]);
+      ent.set(r.ids[k], GEL({ id: r.ids[k], type: r.types[r.typ[k]], src: src, refs: GEL(refs) }));
+      ordre.push(r.ids[k]);
+    }
+  }
+  function modele(r, nom, ent, ordre){
+    return {
       nom: nom || "modele.ifc",
-      taille: buffer.byteLength,
-      schema: schema,
-      eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
-      entetes: entetes,
-      dataDecl: dataDecl,
+      taille: r.taille,
+      schema: r.schema,
+      eol: r.eol,
+      entetes: r.entetes,
+      dataDecl: r.dataDecl,
       ordre: ordre,
       ent: ent,
-      maxId: maxId,
+      maxId: r.maxId,
       nbOrigine: ent.size,
-      doublons: doublons,
+      doublons: r.doublons,
       version: 0
     };
+  }
+
+  // Lecture d'un coup (sans Web Worker)
+  function lire(buffer, nom){
+    var r = analyser(new Uint8Array(buffer)), ent = new Map(), ordre = [];
+    assembler(r, r.txt, ent, ordre, 0, r.nb);
+    return modele(r, nom, ent, ordre);
+  }
+
+  // Lecture par étapes : progres(fraction 0–1, étape) ; le texte est reconstruit et les entités
+  // assemblées par tranches de ~40 ms, la page reste vivante.
+  function pause(){ return new Promise(function(ok){ setTimeout(ok, 0); }); }
+  function lireParEtapes(r, octets, nom, progres){
+    var parts = [], PAS = 0x8000, i = 0, ent = new Map(), ordre = [], k = 0;
+    function texte(){
+      var t0 = performance.now();
+      while (i < octets.length && performance.now() - t0 < 40){
+        for (var n = 0; n < 32 && i < octets.length; n++, i += PAS) parts.push(String.fromCharCode.apply(null, octets.subarray(i, i + PAS)));
+      }
+      if (progres) progres(i/octets.length, "texte");
+      return i < octets.length ? pause().then(texte) : null;
+    }
+    function entites(txt){
+      var t0 = performance.now();
+      while (k < r.nb && performance.now() - t0 < 40){ var k1 = Math.min(r.nb, k + 5000); assembler(r, txt, ent, ordre, k, k1); k = k1; }
+      if (progres) progres(k/r.nb, "entites");
+      return k < r.nb ? pause().then(function(){ return entites(txt); }) : modele(r, nom, ent, ordre);
+    }
+    return Promise.resolve(texte()).then(function(){
+      var txt = parts.join("");
+      parts = null;
+      return pause().then(function(){ return entites(txt); });
+    });
   }
   function toutesChaines(v, out){
     out = out || [];
@@ -695,8 +775,8 @@
   }
 
   global.IFC = {
-    lire: lire, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
+    lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType
   };
-})(window);
+})(typeof window !== "undefined" ? window : self);

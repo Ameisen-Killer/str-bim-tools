@@ -135,6 +135,8 @@ button,input,select{font:inherit;color:inherit}
 .erreur{margin-top:18px;max-width:640px;padding:14px 16px;border-left:2px solid var(--rouge);background:rgba(224,128,106,.08);color:var(--texte)}
 .erreur b{display:block;font-weight:500;margin-bottom:4px;color:var(--rouge)}
 .chargement{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
+.prog{height:2px;margin-top:10px;background:rgba(var(--encre),.12);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--or);transition:width .25s ease}
 @media (min-width:1000px){
   .accueil{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr;column-gap:32px}
   .accueil-scene{grid-column:2;grid-row:1}
@@ -327,7 +329,7 @@ footer a:hover{color:var(--or)}
           <button type="button" class="btn plein" id="choisir">Choisir des fichiers</button>
         </div>
         <div class="depot-note">IFC2X3 ou IFC4 · plusieurs fichiers se superposent dans la même vue · rien ne quitte ton navigateur</div>
-        <div class="chargement" id="chargement" hidden>Lecture du fichier…</div>
+        <div class="chargement" id="chargement" hidden><span id="chargement-txt">Lecture du fichier…</span><div class="prog" aria-hidden="true"><i id="prog"></i></div></div>
       </div>
       <div class="erreur" id="erreur" role="alert" hidden></div>
     </div>
@@ -497,9 +499,9 @@ footer a:hover{color:var(--or)}
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=1"></script>
-<script src="/ifc/ifc-core.js?v=1"></script>
+<script src="/ifc/ifc-core.js?v=2"></script>
 <script src="/ifc/ifc-vue.js?v=8"></script>
-<script src="/ifc/ifc-app.js?v=6"></script>
+<script src="/ifc/ifc-app.js?v=7"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>
