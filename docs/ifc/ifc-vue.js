@@ -778,7 +778,7 @@
   function moteurGL(cv){
     var gl = null;
     try {
-      var opts = { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false };
+      var opts = { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false, stencil: true };
       gl = cv.getContext("webgl", opts) || cv.getContext("experimental-webgl", opts);
     } catch (e){ gl = null; }
     if (!gl) return null;
@@ -799,12 +799,12 @@
       return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
         uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1") };
     }
-    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190];
+    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
       P.id = programme(SOURCES.vId, SOURCES.fId, ["aP", null, "aC"]);
-      ["pos", "nor", "col", "ids", "lpos", "lcol", "cadre"].forEach(function(k){ B[k] = gl.createBuffer(); });
+      ["pos", "nor", "col", "ids", "lpos", "lcol", "cadre", "quad"].forEach(function(k){ B[k] = gl.createBuffer(); });
       fbo = null;
     }
     try { init(); } catch (e){ if (window.console) console.warn("WebGL indisponible :", e); return { echec: true }; }
@@ -846,7 +846,7 @@
       if (b) remplir(B.cadre, new Float32Array(aretesBoite(b).map(function(v, k){ return v - origine[k % 3]; })));
     }
     function teinter(liste, sel, actif, coul){
-      kad = coul.cadreRGBA;
+      kad = coul.cadreRGBA; krouge = coul.coupeRGB;
       var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
       var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA;
       liste.forEach(function(it, e){
@@ -926,6 +926,7 @@
         gl.depthMask(true);
         gl.disable(gl.BLEND);
       }
+      if (coupe) remplirCoupes(c, M);
       if (coupe){
         // arêtes de la boîte de coupe, en or, visibles à travers les pièces
         gl.useProgram(P.lignes.p);
@@ -943,6 +944,48 @@
         gl.disable(gl.BLEND);
       }
     }
+    // Surfaces coupées en rouge, face par face de la boîte tournée vers l'œil (méthode du pochoir) :
+    // la géométrie coupée par ce seul plan inverse le pochoir à chaque surface traversée ; là où le compte
+    // est impair, le plan est à l'intérieur d'un solide et on y peint le rectangle de la face en rouge.
+    var avecPochoir = !!(gl.getContextAttributes() || {}).stencil;
+    function remplirCoupes(c, M){
+      if (!avecPochoir || !nTri) return;
+      var versOeil = [c.cb*c.sa, -c.cb*c.ca, c.sb], G = 1e7;
+      for (var f = 0; f < 6; f++){
+        var ax = f >> 1, max = f & 1;
+        if ((max ? 1 : -1)*versOeil[ax] <= 1e-6) continue;        // face de la boîte vue de dos
+        var b0 = [-G, -G, -G], b1 = [G, G, G];
+        if (max) b1[ax] = coupe.max[ax] - origine[ax]; else b0[ax] = coupe.min[ax] - origine[ax];
+        // 1) pochoir : parité des surfaces derrière le plan
+        gl.enable(gl.STENCIL_TEST);
+        gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
+        gl.stencilFunc(gl.ALWAYS, 0, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+        gl.colorMask(false, false, false, false); gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
+        gl.useProgram(P.id.p);
+        gl.uniformMatrix4fv(P.id.uM, false, M);
+        gl.uniform1f(P.id.uK, 1); gl.uniform3fv(P.id.uB0, b0); gl.uniform3fv(P.id.uB1, b1);
+        attrib(0, B.pos, 3, gl.FLOAT); gl.disableVertexAttribArray(1); attrib(2, B.ids, 3, gl.UNSIGNED_BYTE, true);
+        gl.drawArrays(gl.TRIANGLES, 0, nTri);
+        // 2) rectangle de la face, en rouge uni, là où le pochoir est impair et devant la scène
+        gl.colorMask(true, true, true, true); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
+        gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+        var u = (ax + 1) % 3, v = (ax + 2) % 3, w = max ? coupe.max[ax] : coupe.min[ax], q = [];
+        [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]].forEach(function(k){
+          var p = [0, 0, 0];
+          p[ax] = w; p[u] = k[0] ? coupe.max[u] : coupe.min[u]; p[v] = k[1] ? coupe.max[v] : coupe.min[v];
+          q.push(p[0] - origine[0], p[1] - origine[1], p[2] - origine[2]);
+        });
+        remplir(B.quad, new Float32Array(q), gl.DYNAMIC_DRAW);
+        gl.useProgram(P.lignes.p);
+        gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        decoupe(P.lignes, false);
+        attrib(0, B.quad, 3, gl.FLOAT); gl.disableVertexAttribArray(2);
+        gl.vertexAttrib4f(2, krouge[0]/255, krouge[1]/255, krouge[2]/255, 1);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disable(gl.STENCIL_TEST);
+      }
+    }
+
     // Sélection : rendu des identifiants dans une image hors écran, lecture du pixel visé
     function viser(c, x, y){
       if (gl.isContextLost() || !nTri) return 0;
@@ -1232,7 +1275,8 @@
         areteOr: "rgba(120,86,30,.55)", areteOrRGBA: [120, 86, 30, 140],
         actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
         texte: "rgba(" + a.join(",") + ",.45)",
-        cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190]
+        cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190],
+        coupeRGB: clair ? [204, 44, 38] : [196, 48, 42]
       };
       // couleur d'une maquette (teinte 0–360) : remplissage très pastel, arêtes pastel un peu plus soutenues
       var cache = {};
