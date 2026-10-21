@@ -1,5 +1,5 @@
 // Aperçu 3D de /ifc/ : rendu maison, sans bibliothèque. WebGL écrit à la main (tampon de profondeur,
-// exact), avec en secours le moteur canvas 2D du peintre (ou forcé par ?moteur=canvas dans l'adresse).
+// exact), avec en secours le moteur canvas 2D du peintre (choisi dans Affichage, ou forcé par ?moteur=canvas).
 // - Géométrie lue : IFCFACETEDBREP (faces, boucles, points), IFCMAPPEDITEM (IFCREPRESENTATIONMAP +
 //   IFCCARTESIANTRANSFORMATIONOPERATOR3D), IFCEXTRUDEDAREASOLID (profils paramétrés ou polylignes),
 //   surfaces à facettes, faces triangulées/polygonales IFC4, quelques primitives ; chaîne
@@ -841,7 +841,8 @@
       liste.forEach(function(it, e){
         var pl = plages[e];
         if (!pl) return;
-        var c = sel.has(it.id) ? OR : P1, l = it.id === actif ? act : sel.has(it.id) ? aro : ar;
+        var t = it.h != null ? coul.pastel(it.h) : null;
+        var c = sel.has(it.id) ? OR : t ? t.piece : P1, l = it.id === actif ? act : sel.has(it.id) ? aro : t ? t.areteRGBA : ar;
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
         for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
       });
@@ -942,7 +943,8 @@
     return {
       nom: "WebGL", charger: charger, teinter: teinter, dessiner: dessiner, viser: viser,
       perdu: function(){ return gl.isContextLost(); },
-      restaurer: function(){ init(); if (dernier) charger(dernier.liste, dernier.orig); }
+      restaurer: function(){ init(); if (dernier) charger(dernier.liste, dernier.orig); },
+      liberer: function(){ var x = gl.getExtension("WEBGL_lose_context"); if (x) x.loseContext(); }
     };
   }
 
@@ -950,7 +952,7 @@
   function moteurCanvas(cv){
     var ctx = cv.getContext("2d"), liste = [], dessin = [], sel = new Set(), actif = 0, coul = null, teintes = {};
     function teinte(base, k){
-      var cle = (base === OR ? "o" : "p") + k, t = teintes[cle];
+      var cle = base.join(",") + "/" + k, t = teintes[cle];
       if (!t){
         var f = .34 + .66*k/24;
         t = teintes[cle] = "rgb(" + Math.round(base[0]*f) + "," + Math.round(base[1]*f) + "," + Math.round(base[2]*f) + ")";
@@ -994,7 +996,8 @@
         var nx1 = ca*n[0] + sa*n[1], ny1 = -sa*n[0] + ca*n[1];
         var nup = n[2]*cb + ny1*sb, ndp = ny1*cb - n[2]*sb;
         var lum = Math.abs(nx1*L[0] + nup*L[1] - ndp*L[2]);
-        var choisi = sel.has(it.id), estActif = it.id === actif, fond = teinte(choisi ? OR : coul.piece, Math.round(lum*24));
+        var choisi = sel.has(it.id), estActif = it.id === actif, pa = it.h != null ? coul.pastel(it.h) : null;
+        var fond = teinte(choisi ? OR : pa ? pa.piece : coul.piece, Math.round(lum*24));
         ctx.beginPath();
         for (var bj = 0; bj < F.p.length; bj++){
           var P = F.p[bj];
@@ -1011,7 +1014,7 @@
             var Q = F.p[F.ar[r]], a = F.ar[r+1], m = Q.length/2, z = (a + 1) % m;
             ctx.moveTo(Q[2*a], Q[2*a+1]); ctx.lineTo(Q[2*z], Q[2*z+1]);
           }
-          ctx.strokeStyle = estActif ? coul.actif : choisi ? coul.areteOr : coul.arete;
+          ctx.strokeStyle = estActif ? coul.actif : choisi ? coul.areteOr : pa ? pa.arete : coul.arete;
           ctx.lineWidth = estActif ? 1.1 : .6;
           ctx.stroke();
         }
@@ -1045,7 +1048,7 @@
       charger: function(l){ liste = l; l.forEach(function(it){ aretesVives(it.geo); }); },
       teinter: function(l, s, a, k){ sel = s; actif = a; if (coul !== k){ coul = k; teintes = {}; } },
       dessiner: dessiner, viser: viser,
-      perdu: function(){ return false; }, restaurer: function(){}
+      perdu: function(){ return false; }, restaurer: function(){}, liberer: function(){}
     };
   }
 
@@ -1054,15 +1057,21 @@
 
   function creer(cv, rappels){
     rappels = rappels || {};
-    // WebGL d'abord ; le moteur canvas 2D prend le relais s'il manque (ou avec ?moteur=canvas dans l'adresse)
+    // WebGL d'abord ; le moteur canvas 2D prend le relais s'il manque, ou s'il est demandé
+    // (rappels.moteur = "canvas", ou ?moteur=canvas dans l'adresse)
     var M = null;
-    if (!/[?&]moteur=canvas\b/.test(location.search)) M = moteurGL(cv);
-    if (M && M.echec){
-      var neuf = cv.cloneNode(false);           // un canvas qui a servi à WebGL ne peut plus donner de contexte 2D
+    function neufCanvas(){
+      var neuf = cv.cloneNode(false);           // un canvas qui a servi à un moteur ne peut plus donner l'autre contexte
       cv.parentNode.replaceChild(neuf, cv);
-      cv = neuf; M = null;
+      cv = neuf;
     }
-    if (!M) M = moteurCanvas(cv);
+    function demarrer(nom){
+      M = null;
+      if (nom !== "canvas") M = moteurGL(cv);
+      if (M && M.echec){ neufCanvas(); M = null; }
+      if (!M) M = moteurCanvas(cv);
+    }
+    demarrer(/[?&]moteur=canvas\b/.test(location.search) ? "canvas" : rappels.moteur);
 
     var Gs = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0;
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
@@ -1073,6 +1082,10 @@
       var v = getComputedStyle(document.documentElement).getPropertyValue(nom).trim().split(",").map(Number);
       return v.length === 3 && v.every(isFinite) ? v : defaut;
     }
+    function tsl(h, s, l){     // teinte, saturation, luminosité → [r, v, b]
+      var a = s*Math.min(l, 1 - l);
+      return [0, 8, 4].map(function(n){ var k = (n + h/30) % 12; return Math.round(255*(l - a*Math.max(-1, Math.min(k - 3, 9 - k, 1)))); });
+    }
     function couleurs(){
       var a = rvb("--vue-arete", [236,232,224]), clair = document.documentElement.getAttribute("data-theme") === "clair";
       coul = {
@@ -1081,6 +1094,16 @@
         areteOr: "rgba(120,86,30,.55)", areteOrRGBA: [120, 86, 30, 140],
         actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
         texte: "rgba(" + a.join(",") + ",.45)"
+      };
+      // couleur d'une maquette (teinte 0–360) : remplissage très pastel, arêtes pastel un peu plus soutenues
+      var cache = {};
+      coul.pastel = function(h){
+        var p = cache[h];
+        if (!p){
+          var r = tsl(h, .75, clair ? .86 : .84), q = tsl(h, clair ? .5 : .58, clair ? .5 : .66);
+          p = cache[h] = { piece: r, areteRGBA: [q[0], q[1], q[2], Math.round(255*.9)], arete: "rgba(" + q.join(",") + ",.9)" };
+        }
+        return p;
       };
       M.teinter(liste, sel, actif, coul);
     }
@@ -1095,7 +1118,8 @@
       cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
       rendre();
     }
-    if ("ResizeObserver" in window) new ResizeObserver(taille).observe(cv);
+    var ro = "ResizeObserver" in window ? new ResizeObserver(taille) : null;
+    if (ro) ro.observe(cv);
     window.addEventListener("resize", taille);
 
     function camera(){
@@ -1145,64 +1169,102 @@
       py = y - H/2 - (y - cy)*f;
     }
     function local(e){ var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-    cv.addEventListener("pointerdown", function(e){
-      try { cv.setPointerCapture(e.pointerId); } catch (x){}
-      ptrs.set(e.pointerId, local(e));
-      if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; }
-      else multi = true;
-      cv.classList.add("tire");
-    });
-    cv.addEventListener("pointermove", function(e){
-      var p = ptrs.get(e.pointerId);
+    // Point de la pièce sous le curseur : rayon de vue lancé sur les triangles de l'élément visé, null si vide
+    function pointSous(x, y){
+      if (!W || !H) return null;
+      var c = camera(), k = M.viser(c, x, y), it = k > 0 ? liste[k - 1] : null;
+      if (M.nom === "WebGL") demander();
+      if (!it) return null;
+      var X = (x - W/2 - c.px)/c.s, Y = (H/2 + c.py - y)/c.s, T = triangles(it.geo), best = Infinity, P = new Array(9);
+      var r0 = [c.ca, c.sa, 0], r1 = [-c.sb*c.sa, c.sb*c.ca, c.cb], r2 = [-c.cb*c.sa, c.cb*c.ca, -c.sb];
+      for (var t = 0; t < T.length; t += 9){
+        for (var v = 0; v < 3; v++){
+          var qx = T[t + 3*v] - centre[0], qy = T[t + 3*v + 1] - centre[1], qz = T[t + 3*v + 2] - centre[2];
+          P[3*v] = r0[0]*qx + r0[1]*qy;
+          P[3*v + 1] = r1[0]*qx + r1[1]*qy + r1[2]*qz;
+          P[3*v + 2] = r2[0]*qx + r2[1]*qy + r2[2]*qz;      // profondeur : plus petite = plus près
+        }
+        var d = (P[4] - P[7])*(P[0] - P[6]) + (P[6] - P[3])*(P[1] - P[7]);
+        if (!d) continue;
+        var a = ((P[4] - P[7])*(X - P[6]) + (P[6] - P[3])*(Y - P[7]))/d;
+        var b = ((P[7] - P[1])*(X - P[6]) + (P[0] - P[6])*(Y - P[7]))/d;
+        if (a < -1e-6 || b < -1e-6 || a + b > 1 + 1e-6) continue;
+        var z = a*P[2] + b*P[5] + (1 - a - b)*P[8];
+        if (z < best) best = z;
+      }
+      if (!isFinite(best)) return null;
+      return [0, 1, 2].map(function(i){ return centre[i] + X*r0[i] + Y*r1[i] + best*r2[i]; });
+    }
+    // La rotation tourne autour du point cliqué : il devient le centre, sans que l'image bouge
+    function pivoter(x, y){
+      var p = pointSous(x, y);
       if (!p) return;
-      var n = local(e);
-      if (ptrs.size === 1){
-        if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5) bouge = true;
-        if (bouge){
-          var dx = n.x - p.x, dy = n.y - p.y;
-          if (e.shiftKey || (e.buttons & 6)){ px += dx; py += dy; }
-          else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); }
+      centre = p; px = x - W/2; py = y - H/2;
+    }
+    function brancher(){
+      cv.addEventListener("pointerdown", function(e){
+        try { cv.setPointerCapture(e.pointerId); } catch (x){}
+        ptrs.set(e.pointerId, local(e));
+        if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; }
+        else multi = true;
+        cv.classList.add("tire");
+      });
+      cv.addEventListener("pointermove", function(e){
+        var p = ptrs.get(e.pointerId);
+        if (!p) return;
+        var n = local(e);
+        if (ptrs.size === 1){
+          if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
+          bouge = true;
+          if (!(e.shiftKey || (e.buttons & 6))) pivoter(depart.x, depart.y);
+        }
+          if (bouge){
+            var dx = n.x - p.x, dy = n.y - p.y;
+            if (e.shiftKey || (e.buttons & 6)){ px += dx; py += dy; }
+            else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); }
+            vite = true; demander();
+          }
+          p.x = n.x; p.y = n.y;
+        } else if (ptrs.size === 2){
+          var q = null;
+          ptrs.forEach(function(v, k){ if (k !== e.pointerId) q = v; });
+          var am = { x: (p.x + q.x)/2, y: (p.y + q.y)/2 }, ad = Math.hypot(p.x - q.x, p.y - q.y);
+          p.x = n.x; p.y = n.y;
+          var nm = { x: (p.x + q.x)/2, y: (p.y + q.y)/2 }, nd = Math.hypot(p.x - q.x, p.y - q.y);
+          if (ad > 0 && nd > 0) zoomAutour(nd/ad, nm.x, nm.y);
+          px += nm.x - am.x; py += nm.y - am.y;
           vite = true; demander();
         }
-        p.x = n.x; p.y = n.y;
-      } else if (ptrs.size === 2){
-        var q = null;
-        ptrs.forEach(function(v, k){ if (k !== e.pointerId) q = v; });
-        var am = { x: (p.x + q.x)/2, y: (p.y + q.y)/2 }, ad = Math.hypot(p.x - q.x, p.y - q.y);
-        p.x = n.x; p.y = n.y;
-        var nm = { x: (p.x + q.x)/2, y: (p.y + q.y)/2 }, nd = Math.hypot(p.x - q.x, p.y - q.y);
-        if (ad > 0 && nd > 0) zoomAutour(nd/ad, nm.x, nm.y);
-        px += nm.x - am.x; py += nm.y - am.y;
+      });
+      function fin(e){
+        if (!ptrs.has(e.pointerId)) return;
+        ptrs.delete(e.pointerId);
+        if (ptrs.size) return;
+        cv.classList.remove("tire");
+        if (vite){ vite = false; demander(); }
+        if (e.type === "pointerup" && !bouge && !multi && (e.button === 0 || e.pointerType !== "mouse")){
+          var p = local(e), k = W && H ? M.viser(camera(), p.x, p.y) : 0;
+          if (M.nom === "WebGL") demander();
+          if (rappels.surClic) rappels.surClic(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e);
+        }
+      }
+      cv.addEventListener("pointerup", fin);
+      cv.addEventListener("pointercancel", fin);
+      cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+      cv.addEventListener("dblclick", function(e){ e.preventDefault(); recadrer(); });
+      var minuterie = 0;
+      cv.addEventListener("wheel", function(e){
+        e.preventDefault();
+        var p = local(e);
+        zoomAutour(Math.exp(-e.deltaY*(e.deltaMode === 1 ? .05 : .0015)), p.x, p.y);
         vite = true; demander();
-      }
-    });
-    function fin(e){
-      if (!ptrs.has(e.pointerId)) return;
-      ptrs.delete(e.pointerId);
-      if (ptrs.size) return;
-      cv.classList.remove("tire");
-      if (vite){ vite = false; demander(); }
-      if (e.type === "pointerup" && !bouge && !multi && (e.button === 0 || e.pointerType !== "mouse")){
-        var p = local(e), k = W && H ? M.viser(camera(), p.x, p.y) : 0;
-        if (M.nom === "WebGL") demander();
-        if (rappels.surClic) rappels.surClic(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e);
-      }
+        clearTimeout(minuterie);
+        minuterie = setTimeout(function(){ vite = false; demander(); }, 160);
+      }, { passive: false });
+      cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); });
+      cv.addEventListener("webglcontextrestored", function(){ M.restaurer(); M.teinter(liste, sel, actif, coul); demander(); });
     }
-    cv.addEventListener("pointerup", fin);
-    cv.addEventListener("pointercancel", fin);
-    cv.addEventListener("contextmenu", function(e){ e.preventDefault(); });
-    cv.addEventListener("dblclick", function(e){ e.preventDefault(); recadrer(); });
-    var minuterie = 0;
-    cv.addEventListener("wheel", function(e){
-      e.preventDefault();
-      var p = local(e);
-      zoomAutour(Math.exp(-e.deltaY*(e.deltaMode === 1 ? .05 : .0015)), p.x, p.y);
-      vite = true; demander();
-      clearTimeout(minuterie);
-      minuterie = setTimeout(function(){ vite = false; demander(); }, 160);
-    }, { passive: false });
-    cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); });
-    cv.addEventListener("webglcontextrestored", function(){ M.restaurer(); M.teinter(liste, sel, actif, coul); demander(); });
+    brancher();
 
     return {
       // Modèles ouverts (plusieurs fichiers dans le même repère) : la géométrie déjà lue reste en cache
@@ -1218,7 +1280,7 @@
         nbFaces = 0;
         items.forEach(function(it){
           var G = Gs.get(it.m), g = G ? geometrie(G, it.id) : null;
-          if (g){ liste.push({ id: it.cle, geo: g }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
@@ -1238,7 +1300,23 @@
       recadrer: recadrer,
       // vue type : lacet (autour de Z) et plongée en radians, puis recadrage
       orienter: function(l, p){ yaw = l; pitch = Math.max(-1.55, Math.min(1.55, p)); recadrer(); },
-      redessiner: function(){ taille(); }
+      redessiner: function(){ taille(); },
+      // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
+      moteur: function(nom){
+        if (nom === undefined) return M.nom;
+        if ((nom === "canvas") === (M.nom !== "WebGL")) return M.nom;
+        M.liberer();
+        ptrs.clear(); vite = false;
+        if (ro) ro.unobserve(cv);
+        neufCanvas();
+        demarrer(nom);
+        brancher();
+        if (ro) ro.observe(cv);
+        M.charger(liste, origine || [0,0,0]);
+        M.teinter(liste, sel, actif, coul);
+        taille();
+        return M.nom;
+      }
     };
   }
 

@@ -1,6 +1,7 @@
 // Interface de /ifc/ : chargement d'un ou plusieurs fichiers, liste des éléments groupée par fichier,
 // propriétés, suppression avec confirmation, annuler / rétablir, export, onglets sur smartphone,
-// thème clair / sombre. Les fichiers ne quittent jamais le navigateur : aucune requête réseau ici.
+// thème clair / sombre, arborescence repliable avec menu contextuel, couleur par maquette.
+// Les fichiers ne quittent jamais le navigateur : aucune requête réseau ici.
 // Plusieurs IFC : ils se superposent dans la vue 3D (même repère), chacun garde son historique de
 // modifications et s'exporte à part. Un élément est désigné par sa clé « n° de fichier:id ».
 (function(){
@@ -17,11 +18,19 @@
   }
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
-  // fichier ouvert : { uid, m (modèle IFC), propre (version exportée), visible, plie, taille: {v, t} }
+  // fichier ouvert : { uid, m (modèle IFC), propre (version exportée), visible, plie, teinte (0–360 ou null), taille: {v, t} }
   var fichiers = [], parUid = new Map(), uidSuivant = 1;
-  var lignes = [], choix = new Set(), caches = new Set(), actif = "", histo = [], aRefaire = [];
+  var lignes = [], choix = new Set(), caches = new Set(), plies = new Set(), actif = "", histo = [], aRefaire = [];
 
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue });
+  function lireMoteur(){ try { return localStorage.getItem("ifc.moteur") || "webgl"; } catch (e){ return "webgl"; } }
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, moteur: lireMoteur() });
+
+  // Accueil ou éditeur ; dans l'éditeur, le bandeau du site laisse la place à l'interface
+  function modeEditeur(oui){
+    $("#accueil").hidden = oui;
+    $("#editeur").hidden = !oui;
+    document.body.classList.toggle("edition", oui);
+  }
 
   function cle(f, id){ return f.uid + ":" + id; }
   function lireCle(c){
@@ -91,12 +100,11 @@
   function ouvrir(modeles, ms, refus){
     var premier = !fichiers.length;
     modeles.forEach(function(m){
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, taille: { v: -1, t: 0 } };
+      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 } };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
-    $("#accueil").hidden = true;
-    $("#editeur").hidden = false;
+    modeEditeur(true);
     if (premier){ $("#recherche").value = ""; $("#filtre-type").value = ""; }
     reconstruire();
     vue.redessiner();
@@ -124,9 +132,8 @@
     });
     vue.modeles(fichiers.map(function(x){ return x.m; }));
     if (!fichiers.length){
-      choix = new Set(); caches = new Set(); actif = ""; lignes = [];
-      $("#editeur").hidden = true;
-      $("#accueil").hidden = false;
+      choix = new Set(); caches = new Set(); plies = new Set(); actif = ""; lignes = [];
+      modeEditeur(false);
       etat("");
       window.scrollTo(0, 0);
       return;
@@ -147,14 +154,14 @@
           rech: [nomAff(i), i.typeLib, i.type, i.materiau, i.globalId, i.tag, i.objectType, "#" + i.id].join(" ").toLowerCase() });
       });
     });
+    lignes.forEach(function(l, k){ var n = lignes[k + 1]; l.enfants = !l.fichier && !!n && !n.fichier && n.niv > l.niv; });
     choix.forEach(function(c){ if (!existe(c)) choix.delete(c); });
     caches.forEach(function(c){ if (!existe(c)) caches.delete(c); });
+    plies.forEach(function(c){ if (!existe(c)) plies.delete(c); });
     if (actif && !existe(actif)) actif = "";
     remplirTypes();
     rendreListe();
-    var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id }); });
-    infoVue(vue.afficher(items));
+    infoVue(vue.afficher(itemsVue()));
     afficherProps();
     maj();
   }
@@ -173,7 +180,7 @@
     var m = f.m;
     return '<div class="fic' + (f.visible ? "" : " masque") + (f.plie ? " plie" : "") + (modifie(f) ? " modifie" : "") + '" data-fic="' + f.uid + '">' +
       '<button type="button" class="fic-oeil" data-act="voir" aria-pressed="' + f.visible + '" title="' + (f.visible ? "Masquer" : "Afficher") + ' dans la vue 3D">' + (f.visible ? "◉" : "○") + "</button>" +
-      '<div><div class="el-nom"><span class="pli" aria-hidden="true">▾</span> ' + esc(m.nom) + '</div><div class="el-info">' +
+      '<div><div class="el-nom"><span class="pli" aria-hidden="true">▾</span> ' + (f.teinte != null ? '<span class="fic-teinte" style="--t:' + pastille(f.teinte) + '"></span>' : "") + esc(m.nom) + '</div><div class="el-info">' +
       esc(m.schema + " · " + fmtN(m.nbOrigine) + (m.ent.size !== m.nbOrigine ? " → " + fmtN(m.ent.size) : "") + " entités · " + fmtTaille(tailleDe(f))) + "</div></div>" +
       '<span class="fic-act"><button type="button" data-act="export" title="Exporter ce fichier">Exporter</button>' +
       '<button type="button" class="fermer" data-act="fermer" title="Fermer ce fichier" aria-label="Fermer ' + esc(m.nom) + '">×</button></span></div>';
@@ -182,16 +189,22 @@
   var visibles = [];
   function rendreListe(){
     var q = $("#recherche").value.trim().toLowerCase(), t = $("#filtre-type").value, filtre = !!(q || t);
-    var html = [], plusieurs = fichiers.length > 1, f = null;
+    var html = [], f = null, seuil = Infinity;
     visibles = [];
     lignes.forEach(function(l){
       if (l.fichier){
-        f = l.fichier;
-        if (plusieurs) html.push(enteteFichier(f));
+        f = l.fichier; seuil = Infinity;
+        html.push(enteteFichier(f));
         return;
       }
-      if (plusieurs && f.plie) return;
-      var i = l.i;
+      if (f.plie && !filtre) return;     // une recherche fouille aussi les maquettes réduites
+      var i = l.i, pli = "";
+      if (!filtre){
+        // un nœud replié cache tout ce qui est plus profond que lui
+        if (l.niv > seuil) return;
+        seuil = l.enfants && plies.has(l.cle) ? l.niv : Infinity;
+        pli = l.enfants ? '<span class="pli" data-pli title="Réduire ou développer">▾</span>' : '<span class="pli" aria-hidden="true"></span>';
+      }
       if (filtre){
         if (!i.supprimable) return;
         if (t && i.type !== t) return;
@@ -200,10 +213,10 @@
       var c = choix.has(l.cle);
       if (i.supprimable) visibles.push(l.cle);
       var info = [i.typeLib, i.materiau, "#" + i.id].filter(Boolean).join(" · ");
-      html.push('<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + '" role="listitem" data-cle="' + l.cle +
+      html.push('<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + (pli && seuil === l.niv ? " plie" : "") + '" role="listitem" data-cle="' + l.cle +
         '" style="--niv:' + (filtre ? 0 : Math.min(l.niv, 8)) + '">' +
         (i.supprimable ? '<input type="checkbox" aria-label="Sélectionner ' + esc(nomAff(i)) + '"' + (c ? " checked" : "") + ">" : '<span class="vide"></span>') +
-        '<div><div class="el-nom">' + esc(nomAff(i)) + '</div><div class="el-info">' + esc(info) + "</div></div></div>");
+        '<div><div class="el-nom">' + pli + esc(nomAff(i)) + '</div><div class="el-info">' + esc(info) + "</div></div></div>");
     });
     $("#liste").innerHTML = html.join("") || '<p class="liste-vide">Aucun élément ne correspond.</p>';
   }
@@ -250,8 +263,8 @@
     if (!i) return;
     if (choix.has(c)){ choix.delete(c); etat("« " + nomAff(i) + " » retiré de la sélection."); }
     else if (i.supprimable){ choix.add(c); etat("« " + nomAff(i) + " » ajouté à la sélection."); }
-    // déplie le fichier si besoin, pour retrouver l'élément dans la liste
-    if (d.f.plie){ d.f.plie = false; rendreListe(); }
+    // déplie le fichier et les parents si besoin, pour retrouver l'élément dans la liste
+    if (deplierVers(c)) rendreListe();
     activer(c, true);
   }
 
@@ -260,7 +273,7 @@
     if (fic){
       var f = parUid.get(+fic.getAttribute("data-fic")), b = e.target.closest("[data-act]"), act = b && b.getAttribute("data-act");
       if (!f) return;
-      if (act === "voir"){ f.visible = !f.visible; reconstruire(); etat("« " + f.m.nom + " » " + (f.visible ? "affiché" : "masqué") + " dans la vue 3D."); }
+      if (act === "voir") basculerVisible(f);
       else if (act === "export") exporter(f);
       else if (act === "fermer") fermer(f);
       else { f.plie = !f.plie; rendreListe(); }
@@ -269,6 +282,7 @@
     var r = e.target.closest(".el");
     if (!r) return;
     var c = r.getAttribute("data-cle");
+    if (e.target.closest("[data-pli]")){ if (plies.has(c)) plies.delete(c); else plies.add(c); rendreListe(); return; }
     if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); activer(c, false); return; }
     activer(c, false);
   });
@@ -286,6 +300,137 @@
     visibles.forEach(function(c){ if (choix.has(c)) choix.delete(c); else choix.add(c); });
     majLignes(); maj();
   });
+
+  // ================= Arborescence : réduire, développer, couleur des maquettes =================
+  var TEINTES = [[0, "rouge"], [24, "orange"], [48, "jaune"], [90, "vert tilleul"], [135, "vert"], [165, "menthe"], [188, "turquoise"],
+    [210, "bleu"], [236, "indigo"], [262, "lavande"], [290, "violet"], [326, "rose"]];
+  function pastille(h){ return "hsl(" + h + " 62% 70%)"; }
+  function nomTeinte(h){
+    if (h == null) return "couleur par défaut";
+    var t = TEINTES.filter(function(x){ return x[0] === h; })[0];
+    return t ? t[1] : "teinte " + h + "°";
+  }
+  function teinteDe(hex){     // #rrvvbb → teinte 0–360
+    var r = parseInt(hex.substr(1, 2), 16)/255, g = parseInt(hex.substr(3, 2), 16)/255, b = parseInt(hex.substr(5, 2), 16)/255;
+    var mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+    if (!d) return 0;
+    var h = mx === r ? ((g - b)/d + 6) % 6 : mx === g ? (b - r)/d + 2 : (r - g)/d + 4;
+    return Math.round(h*60) % 360;
+  }
+  function indexDe(c){ for (var k = 0; k < lignes.length; k++) if (lignes[k].cle === c) return k; return -1; }
+  function indexFichier(f){ for (var k = 0; k < lignes.length; k++) if (lignes[k].fichier === f) return k; return -1; }
+  // lignes sous un nœud, ou tout le contenu d'un fichier
+  function sousLignes(k){
+    var l = lignes[k], r = [];
+    for (var j = k + 1; j < lignes.length && !lignes[j].fichier && (l.fichier || lignes[j].niv > l.niv); j++) r.push(lignes[j]);
+    return r;
+  }
+  function plierTout(liste, oui){ liste.forEach(function(x){ if (x.enfants){ if (oui) plies.add(x.cle); else plies.delete(x.cle); } }); }
+  // déplie le fichier et les parents d'un élément ; vrai si quelque chose a changé
+  function deplierVers(c){
+    var k = indexDe(c), change = false;
+    if (k < 0) return false;
+    for (var j = k - 1, niv = lignes[k].niv; j >= 0 && !lignes[j].fichier; j--){
+      if (lignes[j].niv < niv){ if (plies.delete(lignes[j].cle)) change = true; niv = lignes[j].niv; }
+    }
+    if (lignes[k].f.plie){ lignes[k].f.plie = false; change = true; }
+    return change;
+  }
+  function basculerVisible(f){
+    f.visible = !f.visible;
+    reconstruire();
+    etat("« " + f.m.nom + " » " + (f.visible ? "affiché" : "masqué") + " dans la vue 3D.");
+  }
+  function teinter(f, h){
+    f.teinte = h;
+    rendreListe(); majVue();
+    etat("« " + f.m.nom + " » : " + nomTeinte(h) + ".");
+  }
+
+  // ---------- Menu contextuel (clic droit ou appui long) ----------
+  var ctx = $("#ctx"), cible = null, teinteLibre = $("#teinte-libre"), cibleTeinte = null;
+  function bouton(act, txt, classe){
+    return '<button type="button" role="menuitem" data-ctx="' + act + '"' + (classe ? ' class="' + classe + '"' : "") + "><span>" + esc(txt) + "</span><kbd></kbd></button>";
+  }
+  function ouvrirCtx(x, y, c){
+    var f = c.f, l = c.l, noeud = !l.fichier, h = [];
+    h.push('<div class="ctx-titre">' + esc(noeud ? nomAff(l.i) : f.m.nom) + "</div>");
+    if (!noeud){
+      h.push(f.plie ? bouton("developper", "Développer la maquette") : bouton("reduire", "Réduire la maquette"));
+      h.push(bouton("developper-tout", "Développer tout son contenu"), bouton("reduire-contenu", "Réduire tout son contenu"));
+    } else if (l.enfants){
+      h.push(plies.has(l.cle) ? bouton("developper", "Développer") : bouton("reduire", "Réduire"));
+      h.push(bouton("developper-tout", "Développer tout"), bouton("reduire-tout", "Réduire tout"));
+    }
+    if (noeud && l.i.supprimable) h.push("<hr>", bouton("selectionner", l.enfants ? "Sélectionner avec son contenu" : "Sélectionner"));
+    h.push("<hr>", '<div class="mb-sous">Couleur de la maquette</div><div class="teintes">' +
+      '<button type="button" role="menuitemradio" class="defaut" data-ctx="teinte" data-h="" aria-checked="' + (f.teinte == null) + '" title="Couleur par défaut" aria-label="Couleur par défaut"></button>' +
+      TEINTES.map(function(t){
+        return '<button type="button" role="menuitemradio" data-ctx="teinte" data-h="' + t[0] + '" aria-checked="' + (f.teinte === t[0]) + '" style="--t:' + pastille(t[0]) + '" title="' + t[1] + '" aria-label="' + t[1] + '"></button>';
+      }).join("") +
+      '<button type="button" role="menuitem" class="autre" data-ctx="autre" title="Autre couleur…" aria-label="Autre couleur"></button></div>');
+    if (!noeud) h.push("<hr>", bouton("voir", f.visible ? "Masquer dans la vue 3D" : "Afficher dans la vue 3D"), bouton("export", "Exporter ce fichier"), bouton("fermer", "Fermer ce fichier", "danger"));
+    h.push("<hr>", bouton("tout-reduire", "Tout réduire"), bouton("tout-developper", "Tout développer"));
+    ctx.innerHTML = h.join("");
+    cible = c;
+    ctx.hidden = false;
+    var w = ctx.offsetWidth, ht = ctx.offsetHeight;
+    ctx.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px";
+    ctx.style.top = Math.max(8, Math.min(y, innerHeight - ht - 8)) + "px";
+    var b = ctx.querySelector("button");
+    if (b) b.focus({ preventScroll: true });
+  }
+  function fermerCtx(){ if (!ctx.hidden){ ctx.hidden = true; cible = null; } }
+  $("#liste").addEventListener("contextmenu", function(e){
+    var fic = e.target.closest(".fic"), r = e.target.closest(".el"), k = -1;
+    if (fic){ var f = parUid.get(+fic.getAttribute("data-fic")); if (f) k = indexFichier(f); }
+    else if (r) k = indexDe(r.getAttribute("data-cle"));
+    if (k < 0) return;
+    e.preventDefault();
+    if (r) activer(r.getAttribute("data-cle"), false);
+    ouvrirCtx(e.clientX, e.clientY, { f: lignes[k].fichier || lignes[k].f, l: lignes[k], k: k });
+  });
+  ctx.addEventListener("click", function(e){
+    var b = e.target.closest("[data-ctx]");
+    if (!b || !cible) return;
+    var a = b.getAttribute("data-ctx"), c = cible, f = c.f, l = c.l, noeud = !l.fichier, sous = sousLignes(c.k);
+    if (a === "autre"){
+      // sélecteur de couleur du système, ouvert à l'endroit du menu
+      cibleTeinte = f;
+      teinteLibre.style.left = ctx.style.left; teinteLibre.style.top = ctx.style.top;
+      fermerCtx();
+      try { teinteLibre.showPicker(); } catch (x){ teinteLibre.click(); }
+      return;
+    }
+    fermerCtx();
+    if (a === "reduire"){ if (noeud) plies.add(l.cle); else f.plie = true; rendreListe(); }
+    else if (a === "developper"){ if (noeud) plies.delete(l.cle); else f.plie = false; rendreListe(); }
+    else if (a === "developper-tout"){ if (noeud) plies.delete(l.cle); else f.plie = false; plierTout(sous, false); rendreListe(); }
+    else if (a === "reduire-tout"){ plies.add(l.cle); plierTout(sous, true); rendreListe(); }
+    else if (a === "reduire-contenu"){ f.plie = false; plierTout(sous, true); rendreListe(); }
+    else if (a === "selectionner"){
+      cocher(l.cle, true); majLignes(); maj();
+      etat("« " + nomAff(l.i) + " »" + (l.enfants ? " et son contenu ajoutés" : " ajouté") + " à la sélection.");
+    }
+    else if (a === "teinte") teinter(f, b.getAttribute("data-h") === "" ? null : +b.getAttribute("data-h"));
+    else if (a === "voir") basculerVisible(f);
+    else if (a === "export") exporter(f);
+    else if (a === "fermer") fermer(f);
+    else if (COMMANDES[a]) COMMANDES[a]();
+  });
+  ctx.addEventListener("keydown", function(e){
+    e.stopPropagation();      // pas de raccourcis de l'éditeur tant que le menu est ouvert
+    var its = [].slice.call(ctx.querySelectorAll("button")), i = its.indexOf(document.activeElement);
+    if (e.key === "ArrowDown"){ e.preventDefault(); its[(i + 1) % its.length].focus(); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); its[(i - 1 + its.length) % its.length].focus(); }
+    else if (e.key === "Escape" || e.key === "Tab"){ e.preventDefault(); fermerCtx(); }
+  });
+  document.addEventListener("pointerdown", function(e){ if (!ctx.hidden && !ctx.contains(e.target)) fermerCtx(); });
+  window.addEventListener("resize", fermerCtx);
+  $("#liste").addEventListener("scroll", fermerCtx);
+  function surTeinteLibre(){ if (cibleTeinte && fichiers.indexOf(cibleTeinte) >= 0) teinter(cibleTeinte, teinteDe(teinteLibre.value)); }
+  teinteLibre.addEventListener("input", surTeinteLibre);
+  teinteLibre.addEventListener("change", surTeinteLibre);
 
   // ================= Propriétés =================
   function ligne(dt, dd, mono){ return dd ? "<dt>" + esc(dt) + "</dt><dd" + (mono ? ' class="mono"' : "") + ">" + esc(dd) + "</dd>" : ""; }
@@ -340,6 +485,8 @@
     activerCmd("isoler", n > 0 || a);
     activerCmd("tout-afficher", caches.size > 0);
     activerCmd("rien", n > 0);
+    var mo = vue.moteur() === "WebGL" ? "webgl" : "canvas";
+    [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
       return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
@@ -465,17 +612,20 @@
     return liste.filter(function(c){ var d = lireCle(c), i = d.f && IFC.infos(d.f.m, d.id); return i && i.genre === "element"; });
   }
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
-  function majVue(){
+  function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id }); });
-    infoVue(vue.afficher(items));
+    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: l.f.teinte }); });
+    return items;
+  }
+  function majVue(){
+    infoVue(vue.afficher(itemsVue()));
     majLignes(); maj();
   }
 
   // ================= Commandes (menus et raccourcis) =================
   var remplacer = false;
   function vider(){
-    fichiers = []; parUid.clear(); histo = []; aRefaire = []; choix = new Set(); caches = new Set(); actif = ""; lignes = [];
+    fichiers = []; parUid.clear(); histo = []; aRefaire = []; choix = new Set(); caches = new Set(); plies = new Set(); actif = ""; lignes = [];
     vue.modeles([]);
   }
   function comme(test, quoi){
@@ -501,7 +651,7 @@
     "fermer-tout": function(){
       if (fichiers.some(modifie) && !confirm("Les modifications non exportées seront perdues. Tout fermer ?")) return;
       vider();
-      $("#editeur").hidden = true; $("#accueil").hidden = false;
+      modeEditeur(false);
       etat(""); window.scrollTo(0, 0);
     },
     annuler: annuler, retablir: retablir, supprimer: supprimer,
@@ -529,13 +679,24 @@
       majVue();
       etat(pluriel(c.size, "élément isolé", "éléments isolés") + ", " + fmtN(n) + " masqués.");
     },
+    "tout-reduire": function(){ fichiers.forEach(function(f){ f.plie = true; }); rendreListe(); },
+    "tout-developper": function(){ fichiers.forEach(function(f){ f.plie = false; }); plies.clear(); rendreListe(); },
+    theme: function(b){ if (choisirTheme) choisirTheme(b.getAttribute("data-choix-theme")); },
+    moteur: function(b){
+      var v = b.getAttribute("data-moteur"), n = vue.moteur(v);
+      try { localStorage.setItem("ifc.moteur", v); } catch (e){}
+      majVue();
+      etat("Moteur d'affichage : " + n + (v === "webgl" && n !== "WebGL" ? " (WebGL indisponible sur cet appareil, le canvas 2D prend le relais)" : "") + ".");
+    },
+    site: function(){ location.href = "/"; },
     "tout-afficher": function(){ var n = caches.size; caches = new Set(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
     raccourcis: function(){
       aide("Raccourcis clavier", '<div class="aide-table">' + [
         ["Ctrl+O", "Ouvrir des fichiers (remplace ceux ouverts)"], ["Ctrl+Maj+O", "Ajouter des fichiers"], ["Ctrl+S", "Exporter"],
         ["Ctrl+Z / Ctrl+Y", "Annuler / Rétablir"], ["Suppr", "Supprimer la sélection"], ["Ctrl+A", "Tout sélectionner"], ["Échap", "Ne rien sélectionner"],
         ["F", "Recadrer"], ["1 · 2 · 3 · 4", "Vue isométrique, dessus, face, côté"], ["H · I · Maj+H", "Masquer, isoler, tout afficher"],
-        ["Glisser", "Tourner (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"]
+        ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
+        ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
@@ -596,7 +757,7 @@
 
   // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
-    if (!fichiers.length || $("#editeur").hidden || ouvert || $("#confirmer").open || $("#aide").open) return;
+    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open) return;
     var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
     var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
     if (mod && k === "o") c = e.shiftKey ? "ajouter" : "ouvrir";
@@ -667,6 +828,7 @@
   });
 
   // ================= Thème sombre / clair / système =================
+  var choisirTheme = null;
   (function(){
     var btn = $("#theme-btn"), menu = $("#menu-theme"), FOND = { clair: "#F3F0E8", sombre: "#050505" };
     function choisi(){ try { return localStorage.getItem("ifc.theme") || "sombre"; } catch (e){ return "sombre"; } }
@@ -674,8 +836,13 @@
       var eff = c === "systeme" ? (matchMedia("(prefers-color-scheme: light)").matches ? "clair" : "sombre") : c;
       document.documentElement.setAttribute("data-theme", eff);
       var m = document.querySelector("meta[name=theme-color]"); if (m) m.setAttribute("content", FOND[eff]);
-      [].forEach.call(menu.querySelectorAll("[data-choix-theme]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === c)); });
+      [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === c)); });
     }
+    // aussi dans le menu Affichage de l'éditeur
+    choisirTheme = function(c){
+      try { localStorage.setItem("ifc.theme", c); } catch (e){}
+      applique(c);
+    };
     function ouvre(o){ menu.hidden = !o; btn.setAttribute("aria-expanded", String(o)); }
     btn.addEventListener("click", function(e){ e.stopPropagation(); ouvre(menu.hidden); });
     document.addEventListener("click", function(e){ if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });

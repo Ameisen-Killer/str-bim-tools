@@ -142,7 +142,9 @@ button,input,select{font:inherit;color:inherit}
 }
 
 /* ---------- Éditeur ---------- */
-.editeur{height:100svh;display:flex;flex-direction:column;padding-top:calc(max(18px, env(safe-area-inset-top)) + 35px)}
+/* l'éditeur prend tout l'écran : le bandeau du site disparaît (thème et moteur sont dans Affichage) */
+body.edition .barre{display:none}
+.editeur{height:100svh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
 .outils{
   display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;
   padding:6px var(--g) 8px;border-bottom:1px solid var(--ligne);background:var(--noir-2);
@@ -160,6 +162,8 @@ button,input,select{font:inherit;color:inherit}
 .mb-liste button:disabled{opacity:.36;cursor:default}
 .mb-liste kbd{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible)}
 .mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:5px 0}
+.mb-liste [role="menuitemradio"] span::before{content:"";display:inline-block;width:1.3em}
+.mb-liste [role="menuitemradio"][aria-checked="true"] span::before{content:"●";color:var(--or);font-size:9px;vertical-align:2px}
 .mb-sous{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);padding:7px 14px 3px}
 .fichier{padding-left:16px;border-left:1px solid var(--ligne)}
 @media (max-width:899px){.fichier{padding-left:0;border-left:0;flex-basis:100%}.mb{margin-left:-8px}.mb-titre{padding:9px 8px;letter-spacing:.06em}}
@@ -216,6 +220,23 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .fic .pli{display:inline-block;width:1em;color:var(--texte-faible);transition:transform .2s}
 .fic.plie .pli{transform:rotate(-90deg)}
 .fic.modifie .el-nom::after{content:" ●";color:var(--or);font-size:10px;vertical-align:middle}
+/* arborescence : chevrons et menu contextuel */
+.el .pli{display:inline-block;width:1.1em;margin-left:-2px;color:var(--texte-faible);text-align:center;transition:transform .2s}
+.el .pli[data-pli]{cursor:pointer}
+.el .pli[data-pli]:hover{color:var(--or)}
+.el.plie .pli{transform:rotate(-90deg)}
+.fic-teinte{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 3px 1px 0;background:var(--t);box-shadow:0 0 0 1px rgba(var(--encre),.18);vertical-align:middle}
+.ctx{position:fixed;z-index:60;min-width:240px;max-height:calc(100svh - 16px);overflow:auto}
+.ctx .ctx-titre{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--texte-doux);padding:6px 14px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.teintes{display:grid;grid-template-columns:repeat(7,26px);gap:6px;padding:6px 14px 8px}
+.mb-liste .teintes button{width:26px;height:26px;padding:0;border-radius:50%;background:var(--t);border:2px solid rgba(var(--encre),.12);display:block}
+.mb-liste .teintes button:hover,.mb-liste .teintes button:focus-visible{background:var(--t);border-color:var(--texte)}
+.mb-liste .teintes button[aria-checked="true"]{border-color:var(--or);box-shadow:0 0 0 2px rgba(var(--or-rvb),.35)}
+.mb-liste .teintes .defaut{background:linear-gradient(135deg,rgb(var(--vue-piece)) 50%,rgba(var(--encre),.25) 50%)}
+.mb-liste .teintes .defaut:hover,.mb-liste .teintes .defaut:focus-visible{background:linear-gradient(135deg,rgb(var(--vue-piece)) 50%,rgba(var(--encre),.25) 50%)}
+.mb-liste .teintes .autre{background:conic-gradient(hsl(0 75% 80%),hsl(60 75% 80%),hsl(120 75% 80%),hsl(180 75% 80%),hsl(240 75% 80%),hsl(300 75% 80%),hsl(360 75% 80%))}
+.mb-liste .teintes .autre:hover,.mb-liste .teintes .autre:focus-visible{background:conic-gradient(hsl(0 75% 80%),hsl(60 75% 80%),hsl(120 75% 80%),hsl(180 75% 80%),hsl(240 75% 80%),hsl(300 75% 80%),hsl(360 75% 80%))}
+.teinte-libre{position:fixed;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
 .liste-vide{padding:18px 16px;color:var(--texte-faible);font-size:13px}
 
 /* aperçu 3D */
@@ -366,6 +387,19 @@ footer a:hover{color:var(--or)}
             <button type="button" role="menuitem" data-cmd="masquer"><span>Masquer la sélection</span><kbd>H</kbd></button>
             <button type="button" role="menuitem" data-cmd="isoler"><span>Isoler la sélection</span><kbd>I</kbd></button>
             <button type="button" role="menuitem" data-cmd="tout-afficher"><span>Tout afficher</span><kbd>Maj+H</kbd></button>
+            <hr>
+            <div class="mb-sous">Arborescence</div>
+            <button type="button" role="menuitem" data-cmd="tout-reduire"><span>Tout réduire</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="tout-developper"><span>Tout développer</span><kbd></kbd></button>
+            <hr>
+            <div class="mb-sous">Thème</div>
+            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
+            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
+            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="systeme" aria-checked="false"><span>Comme le système</span><kbd></kbd></button>
+            <hr>
+            <div class="mb-sous">Moteur d'affichage 3D</div>
+            <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"><span>WebGL (carte graphique)</span><kbd></kbd></button>
+            <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"><span>Canvas 2D (secours)</span><kbd></kbd></button>
           </div>
         </div>
         <div class="mb-gr">
@@ -373,6 +407,8 @@ footer a:hover{color:var(--or)}
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="raccourcis"><span>Raccourcis clavier</span><kbd>?</kbd></button>
             <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos de l'éditeur</span><kbd></kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="site"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
           </div>
         </div>
       </nav>
@@ -411,7 +447,7 @@ footer a:hover{color:var(--or)}
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
         </div>
-        <div class="vue-aide" id="vue-aide">Glisser : tourner · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner</div>
+        <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner</div>
       </div>
 
       <aside class="panneau p-props" id="p-props" aria-label="Propriétés de l'élément actif">
@@ -421,6 +457,10 @@ footer a:hover{color:var(--or)}
     </div>
   </div>
 </main>
+
+<!-- menu contextuel de l'arborescence (clic droit, appui long) : rempli par ifc-app.js -->
+<div class="ctx mb-liste" id="ctx" role="menu" aria-label="Actions de l'arborescence" hidden></div>
+<input type="color" id="teinte-libre" class="teinte-libre" value="#9ec5f0" tabindex="-1" aria-hidden="true">
 
 <dialog id="confirmer">
   <form method="dialog">
@@ -455,8 +495,8 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=1"></script>
 <script src="/ifc/ifc-core.js?v=1"></script>
-<script src="/ifc/ifc-vue.js?v=6"></script>
-<script src="/ifc/ifc-app.js?v=4"></script>
+<script src="/ifc/ifc-vue.js?v=7"></script>
+<script src="/ifc/ifc-app.js?v=5"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>
