@@ -848,7 +848,8 @@
 
   // ================= Barre de menus =================
   var mb = $("#mb"), groupes = [].slice.call(mb.querySelectorAll(".mb-gr")), ouvert = null;
-  function itemsDe(liste){ return [].filter.call(liste.querySelectorAll("button"), function(b){ return !b.disabled; }); }
+  // boutons atteignables au clavier : actifs et affichés (un sous-menu fermé ne compte pas)
+  function itemsDe(liste){ return [].filter.call(liste.querySelectorAll("button"), function(b){ return !b.disabled && b.getClientRects().length > 0; }); }
   function fermerMenu(){
     if (!ouvert) return;
     ouvert.liste.hidden = true;
@@ -883,11 +884,29 @@
     if (f) f(b);
   });
   document.addEventListener("click", function(e){ if (ouvert && !mb.contains(e.target)) fermerMenu(); });
+  // un sous-menu qui sortirait de l'écran à droite s'ouvre à gauche
+  mb.addEventListener("mouseover", function(e){
+    var sm = e.target.closest(".mb-sm");
+    if (!sm) return;
+    var sl = sm.querySelector(".mb-sl");
+    sl.classList.remove("a-gauche");
+    if (sl.getBoundingClientRect().right > window.innerWidth - 8) sl.classList.add("a-gauche");
+  });
   mb.addEventListener("keydown", function(e){
     if (!ouvert) return;
     var its = itemsDe(ouvert.liste), i = its.indexOf(document.activeElement), gi = groupes.indexOf(ouvert.gr);
     if (e.key === "ArrowDown"){ e.preventDefault(); if (its.length) its[(i + 1) % its.length].focus(); }
     else if (e.key === "ArrowUp"){ e.preventDefault(); if (its.length) its[(i - 1 + its.length) % its.length].focus(); }
+    else if (e.key === "ArrowRight" && document.activeElement.classList.contains("mb-sm-titre")){
+      // entrer dans le sous-menu
+      e.preventDefault();
+      var sl = document.activeElement.parentNode.querySelector(".mb-sl button:not(:disabled)");
+      if (sl) sl.focus();
+    }
+    else if (e.key === "ArrowLeft" && document.activeElement.closest(".mb-sl")){
+      e.preventDefault();
+      document.activeElement.closest(".mb-sm").querySelector(".mb-sm-titre").focus();
+    }
     else if (e.key === "ArrowRight" || e.key === "ArrowLeft"){
       e.preventDefault();
       ouvrirMenu(groupes[(gi + (e.key === "ArrowRight" ? 1 : -1) + groupes.length) % groupes.length], true);

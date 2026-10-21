@@ -162,14 +162,24 @@ body.edition{overflow:hidden}
 .mb-gr{position:relative}
 .mb-titre{background:none;border:0;padding:9px 10px;cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-doux);transition:color .2s,background .2s}
 .mb-titre:hover,.mb-titre:focus-visible,.mb-titre[aria-expanded="true"]{color:var(--or);background:rgba(var(--encre),.05);outline:none}
-.mb-liste{position:absolute;left:0;top:100%;z-index:50;min-width:260px;max-width:calc(100vw - 16px);padding:6px 0;background:var(--noir-2);border:1px solid var(--ligne);box-shadow:0 14px 36px rgba(0,0,0,.32);display:flex;flex-direction:column}
-.mb-liste button{display:flex;justify-content:space-between;align-items:baseline;gap:28px;background:none;border:0;text-align:left;padding:8px 14px;cursor:pointer;font-size:13.5px;color:var(--texte);white-space:nowrap}
+.mb-liste{position:absolute;left:0;top:100%;z-index:50;min-width:240px;max-width:calc(100vw - 16px);padding:6px 0;background:var(--noir-2);border:1px solid var(--ligne);box-shadow:0 14px 36px rgba(0,0,0,.32);display:flex;flex-direction:column}
+.mb-liste button{display:flex;justify-content:space-between;align-items:baseline;gap:24px;background:none;border:0;text-align:left;padding:5px 12px;cursor:pointer;font-size:13px;line-height:1.35;color:var(--texte);white-space:nowrap}
+/* sous-menus : ouverts au survol ou au focus, à droite du menu */
+.mb-sm{position:relative}
+.mb-sm-titre{width:100%}
+.mb-sm>.mb-sl{display:none;left:100%;top:-7px;min-width:220px}
+.mb-sm:hover>.mb-sl,.mb-sm:focus-within>.mb-sl{display:flex}
+.mb-sm:hover>.mb-sm-titre,.mb-sm:focus-within>.mb-sm-titre{background:rgba(var(--or-rvb),.13);color:var(--or)}
+.mb-sl.a-gauche{left:auto;right:100%}
+@media (max-width:899px){
+  .mb-sm>.mb-sl{position:static;box-shadow:none;border:0;border-left:1px solid var(--ligne);margin:0 0 4px 14px;padding:2px 0;min-width:0}
+}
 .mb-liste button span{overflow:hidden;text-overflow:ellipsis}
 .mb-liste button:hover:not(:disabled),.mb-liste button:focus-visible{background:rgba(var(--or-rvb),.13);color:var(--or);outline:none}
 .mb-liste button.danger:hover:not(:disabled),.mb-liste button.danger:focus-visible{background:rgba(224,128,106,.12);color:var(--rouge)}
 .mb-liste button:disabled{opacity:.36;cursor:default}
 .mb-liste kbd{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible)}
-.mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:5px 0}
+.mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:4px 0}
 .mb-liste [role="menuitemradio"] span::before{content:"";display:inline-block;width:1.3em}
 .mb-liste [role="menuitemradio"][aria-checked="true"] span::before{content:"●";color:var(--or);font-size:9px;vertical-align:2px}
 .mb-sous{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--texte-faible);padding:7px 14px 3px}
@@ -392,33 +402,51 @@ footer a:hover{color:var(--or)}
           <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Affichage</button>
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="recadrer"><span>Recadrer</span><kbd>F</kbd></button>
-            <hr>
-            <div class="mb-sous">Vues</div>
-            <button type="button" role="menuitem" data-cmd="vue-iso"><span>Perspective isométrique</span><kbd>1</kbd></button>
-            <button type="button" role="menuitem" data-cmd="vue-dessus"><span>Dessus</span><kbd>2</kbd></button>
-            <button type="button" role="menuitem" data-cmd="vue-face"><span>Face</span><kbd>3</kbd></button>
-            <button type="button" role="menuitem" data-cmd="vue-cote"><span>Côté</span><kbd>4</kbd></button>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Vues</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitem" data-cmd="vue-iso"><span>Perspective isométrique</span><kbd>1</kbd></button>
+                <button type="button" role="menuitem" data-cmd="vue-dessus"><span>Dessus</span><kbd>2</kbd></button>
+                <button type="button" role="menuitem" data-cmd="vue-face"><span>Face</span><kbd>3</kbd></button>
+                <button type="button" role="menuitem" data-cmd="vue-cote"><span>Côté</span><kbd>4</kbd></button>
+              </div>
+            </div>
             <hr>
             <button type="button" role="menuitem" data-cmd="masquer"><span>Masquer la sélection</span><kbd>H</kbd></button>
             <button type="button" role="menuitem" data-cmd="isoler"><span>Isoler la sélection</span><kbd>I</kbd></button>
             <button type="button" role="menuitem" data-cmd="tout-afficher"><span>Tout afficher</span><kbd>Maj+H</kbd></button>
             <button type="button" role="menuitem" data-cmd="zoomer"><span>Zoomer sur la sélection</span><kbd>Z</kbd></button>
-            <button type="button" role="menuitem" data-cmd="coupe"><span>Boîte de coupe autour de la sélection</span><kbd>B</kbd></button>
-            <button type="button" role="menuitem" data-cmd="figer-coupe"><span id="cmd-figer">Figer la boîte de coupe</span><kbd></kbd></button>
-            <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Boîte de coupe</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitem" data-cmd="coupe"><span>Autour de la sélection</span><kbd>B</kbd></button>
+                <button type="button" role="menuitem" data-cmd="figer-coupe"><span id="cmd-figer">Figer la boîte de coupe</span><kbd></kbd></button>
+                <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
+              </div>
+            </div>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Arborescence</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitem" data-cmd="tout-reduire"><span>Tout réduire</span><kbd></kbd></button>
+                <button type="button" role="menuitem" data-cmd="tout-developper"><span>Tout développer</span><kbd></kbd></button>
+              </div>
+            </div>
             <hr>
-            <div class="mb-sous">Arborescence</div>
-            <button type="button" role="menuitem" data-cmd="tout-reduire"><span>Tout réduire</span><kbd></kbd></button>
-            <button type="button" role="menuitem" data-cmd="tout-developper"><span>Tout développer</span><kbd></kbd></button>
-            <hr>
-            <div class="mb-sous">Thème</div>
-            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
-            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
-            <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="systeme" aria-checked="false"><span>Comme le système</span><kbd></kbd></button>
-            <hr>
-            <div class="mb-sous">Moteur d'affichage 3D</div>
-            <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"><span>WebGL (carte graphique)</span><kbd></kbd></button>
-            <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"><span>Canvas 2D (secours)</span><kbd></kbd></button>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Thème</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="systeme" aria-checked="false"><span>Comme le système</span><kbd></kbd></button>
+              </div>
+            </div>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Moteur 3D</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"><span>WebGL (carte graphique)</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"><span>Canvas 2D (secours)</span><kbd></kbd></button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="mb-gr">
@@ -515,7 +543,7 @@ footer a:hover{color:var(--or)}
 <script src="/ifc/ifc-accueil.js?v=2"></script>
 <script src="/ifc/ifc-core.js?v=2"></script>
 <script src="/ifc/ifc-vue.js?v=13"></script>
-<script src="/ifc/ifc-app.js?v=12"></script>
+<script src="/ifc/ifc-app.js?v=13"></script>
 <script src="/assets/menu.js?v=24"></script>
 </body>
 </html>
