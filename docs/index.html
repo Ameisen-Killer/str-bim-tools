@@ -33,8 +33,9 @@ body{
   font-family:"Inter Tight","Inter Tight repli","Inter Tight repli Android",system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:300;
   -webkit-font-smoothing:antialiased;overflow-x:hidden;
 }
+/* la page tient exactement dans l'écran : la scène prend la hauteur qui reste, sans ascenseur */
 .page{
-  min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;
+  height:100vh;height:100svh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
   padding-block:max(clamp(18px,3vw,36px),env(safe-area-inset-top)) max(clamp(18px,3vw,36px),env(safe-area-inset-bottom));
   padding-inline:var(--g);
 }
@@ -44,7 +45,7 @@ body{
   text-transform:uppercase;color:var(--texte-doux);
 }
 .scene{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
-.stage{position:relative;width:100%;height:clamp(300px,62svh,780px)}
+.stage{position:relative;width:100%;flex:1 1 0;min-height:200px;max-height:780px}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
 canvas.drag{cursor:grabbing}
 .titre{text-align:center;margin-top:clamp(4px,1.5vh,20px)}
@@ -59,13 +60,13 @@ h1{
 .go .fade{opacity:1;transform:none}
 
 @media (max-width:560px){
-  .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));height:min(58svh,125vw)}
+  .stage{width:calc(100% + 2*var(--g));margin-inline:calc(-1*var(--g));max-height:125vw}
   .titre{margin-top:0}
   h1{letter-spacing:.12em;padding-left:.12em}
   .auteur{letter-spacing:.12em;padding-left:.12em}
 }
 @media (max-height:520px) and (orientation:landscape){
-  .stage{height:60svh}
+  .stage{min-height:140px}
   h1{font-size:clamp(22px,8svh,40px)}
   .sous{display:none}
 }
@@ -503,6 +504,8 @@ h1{
   }
 
   window.addEventListener("resize", taille);
+  // la scène prend la place laissée par le titre : elle change aussi quand les polices arrivent
+  if ("ResizeObserver" in window) new ResizeObserver(function(){ taille(); }).observe(cv);
   taille();
 
   requestAnimationFrame(function(){ requestAnimationFrame(function(){ page.classList.add("go"); }); });
@@ -578,7 +581,7 @@ h1{
   cv.addEventListener("pointercancel", relacher);
 })();
 </script>
-<script src="/assets/menu.js?v=24"></script>
+<script src="/assets/menu.js?v=25"></script>
 <script src="/assets/mesure.js?v=2" defer></script>
 </body>
 </html>
