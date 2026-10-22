@@ -634,6 +634,16 @@
     maj();
   }
   function sansCoupe(){ vue.coupe(null); etat("Boîte de coupe retirée."); maj(); }
+  function degres(a){ return (a*180/Math.PI).toFixed(1).replace(".", ",").replace(/,0$/, "") + "°"; }
+  // Boîte de coupe tournée autour de la verticale pour suivre la face visée (maquette géoréférencée, bâtiment
+  // de biais) : la boîte en place tourne sur son centre, sinon une boîte alignée est posée autour des éléments c
+  function alignerCoupe(ang, c){
+    if (ang == null) return;
+    if (vue.aCoupe()){ vue.orienterCoupe(ang); etat("Boîte de coupe alignée sur la face (" + degres(ang) + ")."); }
+    else { vue.orienterCoupe(ang); if (vue.coupe(c)) etat("Boîte de coupe autour de " + quoiDe(c) + ", alignée sur la face (" + degres(ang) + ")."); }
+    maj();
+  }
+  function equerreCoupe(){ vue.orienterCoupe(0); etat("Boîte de coupe remise d'équerre avec les axes du fichier."); maj(); }
   function actionVue(a, c){
     if (!c.length) return false;
     if (a === "masquer") masquerCles(c);
@@ -681,7 +691,7 @@
   // Clic droit dans la vue 3D : sur l'élément visé, ou sur la sélection s'il en fait partie
   function menuVue(cl, x, y){
     if (!fichiers.length) return;
-    var c = [], h = [];
+    var c = [], h = [], ang = null;
     if (cl){
       c = choix.has(cl) ? elementsDe(Array.from(choix)) : [cl];
       if (c.indexOf(cl) < 0) c = [cl];
@@ -691,11 +701,15 @@
       if (i.supprimable) h.push(bouton("basculer", choix.has(cl) ? "Retirer de la sélection" : "Ajouter à la sélection"));
       if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")));
       if (i.supprimable || choix.size) h.push("<hr>");
-      h.push(boutonsVue(c), "<hr>");
+      h.push(boutonsVue(c));
+      var ang = vue.angleSous(x, y);
+      if (ang != null) h.push(bouton("aligner", vue.aCoupe() ? "Aligner la boîte de coupe sur cette face" : "Boîte de coupe alignée sur cette face"));
+      h.push("<hr>");
     }
     else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
     if (vue.aCoupe()) h.push(bouton("cadre-coupe", vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe"),
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
+    if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     var fd = fondVue();
@@ -707,7 +721,7 @@
       '<button type="button" role="menuitemradio" data-ctx="fond" data-fond="" aria-checked="' + !fd + '" style="--t:linear-gradient(135deg,#070707 50%,#E9E5DA 50%)" title="Selon le thème" aria-label="Fond selon le thème"></button>' +
       FONDS.slice(1).map(pastilleFond).join("") +
       '<button type="button" role="menuitem" class="autre" data-ctx="fond-autre" title="Autre couleur…" aria-label="Autre couleur de fond"></button></div>');
-    montrerCtx(x, y, h, { vue: true, cle: cl, cles: c });
+    montrerCtx(x, y, h, { vue: true, cle: cl, cles: c, angle: ang });
   }
   function montrerCtx(x, y, h, c){
     ctx.innerHTML = h.join("");
@@ -745,6 +759,7 @@
     if (c.vue || a === "masquer" || a === "isoler" || a === "zoomer" || a === "coupe"){
       fermerCtx();
       if (a === "basculer"){ cliqueVue(c.cle); return; }
+      if (a === "aligner"){ alignerCoupe(c.angle, c.cles); return; }
       if (!actionVue(a, c.cles) && COMMANDES[a]) COMMANDES[a]();
       return;
     }
@@ -872,6 +887,7 @@
     activerCmd("sans-coupe", vue.aCoupe());
     activerCmd("figer-coupe", vue.aCoupe());
     activerCmd("cadre-coupe", vue.aCoupe());
+    activerCmd("equerre-coupe", !!vue.orienterCoupe());
     $("#cmd-cadre").textContent = vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe";
     $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
@@ -1066,6 +1082,7 @@
     zoomer: function(){ zoomerCles(cibles()); },
     coupe: function(){ couperCles(cibles()); },
     "sans-coupe": sansCoupe,
+    "equerre-coupe": equerreCoupe,
     "cadre-coupe": function(){
       var v = vue.cadre(!vue.cadre());
       etat(v ? "Boîte de coupe affichée." : "Boîte de coupe masquée : la coupe reste active.");

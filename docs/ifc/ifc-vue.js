@@ -763,8 +763,9 @@
   // ================= Moteur WebGL =================
   // Boîte de coupe dans les fragment shaders (coordonnées relatives à l'origine du tampon)
   var COUPE = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
-    "uniform float uK;uniform vec3 uB0;uniform vec3 uB1;varying vec3 vP;" +
-    "void coupe(){if(uK>0.5&&(any(lessThan(vP,uB0))||any(greaterThan(vP,uB1))))discard;}";
+    "uniform float uK;uniform vec3 uB0;uniform vec3 uB1;uniform vec2 uR;varying vec3 vP;" +
+    "void coupe(){vec3 q=vec3(uR.x*vP.x+uR.y*vP.y,-uR.y*vP.x+uR.x*vP.y,vP.z);" +
+    "if(uK>0.5&&(any(lessThan(q,uB0))||any(greaterThan(q,uB1))))discard;}";
   var SOURCES = {
     vFaces: "attribute vec3 aP;attribute vec3 aN;attribute vec3 aC;uniform mat4 uM;uniform vec3 uL;varying vec3 vC;varying vec3 vP;" +
       "void main(){gl_Position=uM*vec4(aP,1.0);float l=abs(dot(aN,uL));vC=aC*(0.34+0.66*l);vP=aP;}",
@@ -797,7 +798,7 @@
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
       return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
-        uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1") };
+        uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR") };
     }
     var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     function init(){
@@ -866,8 +867,8 @@
     function decoupe(prog, oui){
       gl.uniform1f(prog.uK, oui && coupe ? 1 : 0);
       if (oui && coupe){
-        gl.uniform3f(prog.uB0, coupe.min[0] - origine[0], coupe.min[1] - origine[1], coupe.min[2] - origine[2]);
-        gl.uniform3f(prog.uB1, coupe.max[0] - origine[0], coupe.max[1] - origine[1], coupe.max[2] - origine[2]);
+        var r = boiteRel(coupe, origine), k = cs(coupe);
+        gl.uniform3fv(prog.uB0, r.b0); gl.uniform3fv(prog.uB1, r.b1); gl.uniform2f(prog.uR, k[0], k[1]);
       }
     }
     function attrib(i, buf, n, type, normalise){
@@ -937,12 +938,12 @@
     var avecPochoir = !!(gl.getContextAttributes() || {}).stencil;
     function remplirCoupes(c, M){
       if (!avecPochoir || !nTri) return;
-      var versOeil = [c.cb*c.sa, -c.cb*c.ca, c.sb], G = 1e7;
+      var versOeil = [c.cb*c.sa, -c.cb*c.ca, c.sb], G = 1e7, rel = boiteRel(coupe, origine), kr = cs(coupe);
       for (var f = 0; f < 6; f++){
-        var ax = f >> 1, max = f & 1;
-        if ((max ? 1 : -1)*versOeil[ax] <= 1e-6) continue;        // face de la boîte vue de dos
+        var ax = f >> 1, max = f & 1, n = axeBoite(coupe, ax);
+        if ((max ? 1 : -1)*(n[0]*versOeil[0] + n[1]*versOeil[1] + n[2]*versOeil[2]) <= 1e-6) continue;        // face vue de dos
         var b0 = [-G, -G, -G], b1 = [G, G, G];
-        if (max) b1[ax] = coupe.max[ax] - origine[ax]; else b0[ax] = coupe.min[ax] - origine[ax];
+        if (max) b1[ax] = rel.b1[ax]; else b0[ax] = rel.b0[ax];
         // 1) pochoir : parité des surfaces derrière le plan
         gl.enable(gl.STENCIL_TEST);
         gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
@@ -950,19 +951,13 @@
         gl.colorMask(false, false, false, false); gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
         gl.useProgram(P.id.p);
         gl.uniformMatrix4fv(P.id.uM, false, M);
-        gl.uniform1f(P.id.uK, 1); gl.uniform3fv(P.id.uB0, b0); gl.uniform3fv(P.id.uB1, b1);
+        gl.uniform1f(P.id.uK, 1); gl.uniform3fv(P.id.uB0, b0); gl.uniform3fv(P.id.uB1, b1); gl.uniform2f(P.id.uR, kr[0], kr[1]);
         attrib(0, B.pos, 3, gl.FLOAT); gl.disableVertexAttribArray(1); attrib(2, B.ids, 3, gl.UNSIGNED_BYTE, true);
         gl.drawArrays(gl.TRIANGLES, 0, nTri);
         // 2) rectangle de la face, en rouge uni, là où le pochoir est impair et devant la scène
         gl.colorMask(true, true, true, true); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
         gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
-        var u = (ax + 1) % 3, v = (ax + 2) % 3, w = max ? coupe.max[ax] : coupe.min[ax], q = [];
-        [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]].forEach(function(k){
-          var p = [0, 0, 0];
-          p[ax] = w; p[u] = k[0] ? coupe.max[u] : coupe.min[u]; p[v] = k[1] ? coupe.max[v] : coupe.min[v];
-          q.push(p[0] - origine[0], p[1] - origine[1], p[2] - origine[2]);
-        });
-        remplir(B.quad, new Float32Array(q), gl.DYNAMIC_DRAW);
+        remplir(B.quad, new Float32Array(faceBoite(coupe, ax, max, origine)), gl.DYNAMIC_DRAW);
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
         decoupe(P.lignes, false);
@@ -1064,19 +1059,52 @@
   }
 
   // ================= Boîte de coupe : utilitaires =================
+  // La boîte peut tourner autour de la verticale (b.a, radians) pour suivre un bâtiment qui n'est pas
+  // d'équerre avec les axes du fichier (IFC géoréférencé) : b.min et b.max sont alors exprimés dans le
+  // repère de la boîte, obtenu en tournant le repère du fichier de b.a autour de l'axe Z passant par 0.
+  function cs(b){ var a = b.a || 0; return [Math.cos(a), Math.sin(a)]; }
+  function versBoite(b, x, y){ var k = cs(b); return [k[0]*x + k[1]*y, -k[1]*x + k[0]*y]; }
+  function versMonde(b, u, v, w){ var k = cs(b); return [k[0]*u - k[1]*v, k[1]*u + k[0]*v, w]; }
+  function axeBoite(b, ax){ var k = cs(b); return ax === 0 ? [k[0], k[1], 0] : ax === 1 ? [-k[1], k[0], 0] : [0, 0, 1]; }
+  function centreBoite(b){ return versMonde(b, (b.min[0] + b.max[0])/2, (b.min[1] + b.max[1])/2, (b.min[2] + b.max[2])/2); }
+  // Limites de la boîte dans le repère de la boîte, relatives à un point (origine des tampons GPU)
+  function boiteRel(b, o){
+    var l = versBoite(b, o[0], o[1]), lo = [l[0], l[1], o[2]];
+    return { b0: [0, 1, 2].map(function(i){ return b.min[i] - lo[i]; }), b1: [0, 1, 2].map(function(i){ return b.max[i] - lo[i]; }), lo: lo };
+  }
+  // Rectangle d'une face (axe, côté max ou min) : 6 sommets (deux triangles), relatifs à o
+  function faceBoite(b, ax, max, o){
+    var u = (ax + 1) % 3, v = (ax + 2) % 3, q = [];
+    [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]].forEach(function(k){
+      var p = [0, 0, 0];
+      p[ax] = max ? b.max[ax] : b.min[ax]; p[u] = k[0] ? b.max[u] : b.min[u]; p[v] = k[1] ? b.max[v] : b.min[v];
+      var w = versMonde(b, p[0], p[1], p[2]);
+      q.push(w[0] - o[0], w[1] - o[1], w[2] - o[2]);
+    });
+    return q;
+  }
   // 12 arêtes de la boîte → 24 sommets x, y, z à plat
   function aretesBoite(b){
     var x = [b.min[0], b.max[0]], y = [b.min[1], b.max[1]], z = [b.min[2], b.max[2]], r = [];
-    function s(i, j, k, i2, j2, k2){ r.push(x[i], y[j], z[k], x[i2], y[j2], z[k2]); }
+    function s(i, j, k, i2, j2, k2){
+      var p = versMonde(b, x[i], y[j], z[k]), q = versMonde(b, x[i2], y[j2], z[k2]);
+      r.push(p[0], p[1], p[2], q[0], q[1], q[2]);
+    }
     for (var a = 0; a < 2; a++) for (var c = 0; c < 2; c++){ s(0, a, c, 1, a, c); s(a, 0, c, a, 1, c); s(a, c, 0, a, c, 1); }
     return r;
+  }
+  // coordonnée ax (repère de la boîte) du sommet i d'une boucle à plat
+  function coordBoite(b, pts, i, ax){
+    if (ax === 2 || !b.a) return pts[3*i + ax];
+    var k = cs(b), x = pts[3*i], y = pts[3*i + 1];
+    return ax === 0 ? k[0]*x + k[1]*y : -k[1]*x + k[0]*y;
   }
   // Boucle plane (x, y, z à plat) coupée par la boîte (Sutherland–Hodgman) ; null s'il ne reste rien
   function couperBoucle(pts, b){
     for (var ax = 0; ax < 3; ax++) for (var cote = 0; cote < 2; cote++){
       var lim = cote ? b.max[ax] : b.min[ax], sg = cote ? -1 : 1, n = pts.length/3, out = [];
       for (var i = 0; i < n; i++){
-        var j = (i + 1) % n, da = sg*(pts[3*i + ax] - lim), dj = sg*(pts[3*j + ax] - lim);
+        var j = (i + 1) % n, da = sg*(coordBoite(b, pts, i, ax) - lim), dj = sg*(coordBoite(b, pts, j, ax) - lim);
         if (da >= 0) out.push(pts[3*i], pts[3*i + 1], pts[3*i + 2]);
         if ((da >= 0) !== (dj >= 0)){
           var t = da/(da - dj);
@@ -1090,11 +1118,11 @@
   }
   // Segment coupé par la boîte (Liang–Barsky) ; null s'il est dehors
   function couperSegment(a, b, B){
-    var t0 = 0, t1 = 1;
+    var t0 = 0, t1 = 1, la = versBoite(B, a[0], a[1]).concat(a[2]), lb = versBoite(B, b[0], b[1]).concat(b[2]);
     for (var ax = 0; ax < 3; ax++){
-      var d = b[ax] - a[ax];
-      if (Math.abs(d) < 1e-12){ if (a[ax] < B.min[ax] || a[ax] > B.max[ax]) return null; continue; }
-      var u = (B.min[ax] - a[ax])/d, v = (B.max[ax] - a[ax])/d;
+      var d = lb[ax] - la[ax];
+      if (Math.abs(d) < 1e-12){ if (la[ax] < B.min[ax] || la[ax] > B.max[ax]) return null; continue; }
+      var u = (B.min[ax] - la[ax])/d, v = (B.max[ax] - la[ax])/d;
       if (u > v){ var w = u; u = v; v = w; }
       if (u > t0) t0 = u;
       if (v < t1) t1 = v;
@@ -1103,6 +1131,7 @@
     return [a[0] + t0*(b[0] - a[0]), a[1] + t0*(b[1] - a[1]), a[2] + t0*(b[2] - a[2]), a[0] + t1*(b[0] - a[0]), a[1] + t1*(b[1] - a[1]), a[2] + t1*(b[2] - a[2])];
   }
   function dansBoite(B, x, y, z, e){
+    if (B.a){ var l = versBoite(B, x, y); x = l[0]; y = l[1]; }
     return x >= B.min[0] - e && x <= B.max[0] + e && y >= B.min[1] - e && y <= B.max[1] + e && z >= B.min[2] - e && z <= B.max[2] + e;
   }
 
@@ -1116,8 +1145,8 @@
     // Face vue à travers la boîte de coupe : f.b si elle y est entière, null si elle est dehors, sinon ses boucles coupées
     function decouper(f){
       var b0 = f.b[0], tout = true, mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
-      for (var k = 0; k < b0.length; k += 3){
-        for (var a = 0; a < 3; a++){ if (b0[k + a] < mn[a]) mn[a] = b0[k + a]; if (b0[k + a] > mx[a]) mx[a] = b0[k + a]; }
+      for (var k = 0; k < b0.length/3; k++){
+        for (var a = 0; a < 3; a++){ var v = coordBoite(coupe, b0, k, a); if (v < mn[a]) mn[a] = v; if (v > mx[a]) mx[a] = v; }
       }
       for (a = 0; a < 3; a++){
         if (mx[a] < coupe.min[a] || mn[a] > coupe.max[a]) return null;
@@ -1425,10 +1454,10 @@
       var xv = c.ca*qx + c.sa*qy, yv = -c.sa*qx + c.ca*qy;
       return [W/2 + c.px + xv*c.s, H/2 + c.py - (qz*c.cb + yv*c.sb)*c.s];
     }
-    function centreFace(f){        // f = 2·axe + côté (0 : min, 1 : max)
+    function centreFace(f){        // f = 2·axe + côté (0 : min, 1 : max), point du monde
       var ax = f >> 1, p = [0, 1, 2].map(function(i){ return (coupe.min[i] + coupe.max[i])/2; });
       p[ax] = f & 1 ? coupe.max[ax] : coupe.min[ax];
-      return p;
+      return versMonde(coupe, p[0], p[1], p[2]);
     }
     var NOMS_FACES = ["ouest", "est", "sud", "nord", "bas", "haut"], poignees = [], tire = null, fige = false;
     // à la souris, les poignées n'apparaissent qu'au survol de la boîte ; au doigt, elles restent visibles
@@ -1436,7 +1465,7 @@
     function pres(x, y){        // le point écran est-il dans l'enveloppe de la boîte projetée (marge 28 px) ?
       if (!coupe || !W) return false;
       var c = camera(), P = [];
-      for (var k = 0; k < 8; k++) P.push(ecran(c, [k & 1 ? coupe.max[0] : coupe.min[0], k & 2 ? coupe.max[1] : coupe.min[1], k & 4 ? coupe.max[2] : coupe.min[2]]));
+      for (var k = 0; k < 8; k++) P.push(ecran(c, versMonde(coupe, k & 1 ? coupe.max[0] : coupe.min[0], k & 2 ? coupe.max[1] : coupe.min[1], k & 4 ? coupe.max[2] : coupe.min[2])));
       P.sort(function(a, b){ return a[0] - b[0] || a[1] - b[1]; });
       function cr(o, a, b){ return (a[0] - o[0])*(b[1] - o[1]) - (a[1] - o[1])*(b[0] - o[0]); }
       var bas = [], haut = [];
@@ -1460,8 +1489,7 @@
         if (!coupe) return;
         e.preventDefault(); e.stopPropagation();
         try { b.setPointerCapture(e.pointerId); } catch (x){}
-        var c = camera(), ax = f >> 1, p = centreFace(f), q = p.slice();
-        q[ax] += 1;
+        var c = camera(), ax = f >> 1, p = centreFace(f), n = axeBoite(coupe, ax), q = [p[0] + n[0], p[1] + n[1], p[2] + n[2]];
         var a = ecran(c, p), z = ecran(c, q), d = [z[0] - a[0], z[1] - a[1]], l2 = d[0]*d[0] + d[1]*d[1];
         tire = { f: f, ax: ax, x: e.clientX, y: e.clientY, d: d, l2: l2, v0: f & 1 ? coupe.max[ax] : coupe.min[ax] };
         b.classList.add("tiree");
@@ -1509,20 +1537,34 @@
       if (!isFinite(mn[0])) return null;
       return { c: [(mn[0] + mx[0])/2, (mn[1] + mx[1])/2, (mn[2] + mx[2])/2], r: Math.max(1e-9, Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])/2) };
     }
-    // Boîte englobante d'une partie des éléments (clés), ou de tous
-    function boiteDe(cles){
-      var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], S = cles ? new Set(cles) : null;
+    // Boîte englobante d'une partie des éléments (clés), ou de tous ; avec un angle a, dans le repère tourné
+    // de a autour de la verticale (les sommets sont alors parcourus un à un)
+    function boiteDe(cles, a){
+      var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], S = cles ? new Set(cles) : null, r = { a: a || 0 };
       liste.forEach(function(it){
         if (S && !S.has(it.id)) return;
+        if (r.a){
+          var T = triangles(it.geo);
+          for (var i = 0; i < T.length; i += 3){
+            var l = versBoite(r, T[i], T[i + 1]);
+            if (l[0] < mn[0]) mn[0] = l[0]; if (l[0] > mx[0]) mx[0] = l[0];
+            if (l[1] < mn[1]) mn[1] = l[1]; if (l[1] > mx[1]) mx[1] = l[1];
+          }
+          if (it.geo.min[2] < mn[2]) mn[2] = it.geo.min[2];
+          if (it.geo.max[2] > mx[2]) mx[2] = it.geo.max[2];
+          return;
+        }
         for (var k = 0; k < 3; k++){
           if (it.geo.min[k] < mn[k]) mn[k] = it.geo.min[k];
           if (it.geo.max[k] > mx[k]) mx[k] = it.geo.max[k];
         }
       });
-      return isFinite(mn[0]) ? { min: mn, max: mx } : null;
+      if (!isFinite(mn[0])) return null;
+      r.min = mn; r.max = mx;
+      return r;
     }
     function cadrerSur(b){
-      centre = [(b.min[0] + b.max[0])/2, (b.min[1] + b.max[1])/2, (b.min[2] + b.max[2])/2];
+      centre = centreBoite(b);
       rayon = Math.max(1e-9, Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])/2);
       zoom = 1; px = 0; py = 0;
       demander();
@@ -1546,12 +1588,14 @@
     }
     function local(e){ var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
     // Point de la pièce sous le curseur : rayon de vue lancé sur les triangles de l'élément visé, null si vide
-    function pointSous(x, y){
+    function pointSous(x, y){ var v = viseeSous(x, y); return v ? v.p : null; }
+    // Élément, triangle et point visés : { it, T, t (indice du triangle dans T), p }
+    function viseeSous(x, y){
       if (!W || !H) return null;
       var c = camera(), k = M.viser(c, x, y), it = k > 0 ? liste[k - 1] : null;
       if (M.nom === "WebGL") demander();
       if (!it) return null;
-      var X = (x - W/2 - c.px)/c.s, Y = (H/2 + c.py - y)/c.s, T = triangles(it.geo), best = Infinity, P = new Array(9);
+      var X = (x - W/2 - c.px)/c.s, Y = (H/2 + c.py - y)/c.s, T = triangles(it.geo), best = Infinity, tb = -1, P = new Array(9);
       var r0 = [c.ca, c.sa, 0], r1 = [-c.sb*c.sa, c.sb*c.ca, c.cb], r2 = [-c.cb*c.sa, c.cb*c.ca, -c.sb];
       for (var t = 0; t < T.length; t += 9){
         for (var v = 0; v < 3; v++){
@@ -1568,11 +1612,32 @@
         var z = a*P[2] + b*P[5] + (1 - a - b)*P[8];
         if (z >= best) continue;
         if (coupe && !dansBoite(coupe, centre[0] + X*r0[0] + Y*r1[0] + z*r2[0], centre[1] + X*r0[1] + Y*r1[1] + z*r2[1], centre[2] + Y*r1[2] + z*r2[2], rayon*1e-6)) continue;
-        best = z;
+        best = z; tb = t;
       }
       if (!isFinite(best)) return null;
-      return [0, 1, 2].map(function(i){ return centre[i] + X*r0[i] + Y*r1[i] + best*r2[i]; });
+      return { it: it, T: T, t: tb, p: [0, 1, 2].map(function(i){ return centre[i] + X*r0[i] + Y*r1[i] + best*r2[i]; }) };
     }
+    // Angle de la face visée autour de la verticale, ramené entre −45° et 45° : sa normale horizontale, ou,
+    // pour une face horizontale (dessus d'une dalle), celle de la plus grande face verticale de l'élément
+    function angleFace(T, t){
+      function normale(t){
+        var ux = T[t+3] - T[t], uy = T[t+4] - T[t+1], uz = T[t+5] - T[t+2], vx = T[t+6] - T[t], vy = T[t+7] - T[t+1], vz = T[t+8] - T[t+2];
+        return [uy*vz - uz*vy, uz*vx - ux*vz, ux*vy - uy*vx];
+      }
+      var n = normale(t), l = Math.hypot(n[0], n[1], n[2]);
+      if (!l || Math.abs(n[2])/l > .9){
+        var best = 0;
+        n = null;
+        for (var k = 0; k < T.length; k += 9){
+          var m = normale(k), a = Math.hypot(m[0], m[1], m[2]), h = Math.hypot(m[0], m[1]);
+          if (a && h/a > .9 && a > best){ best = a; n = m; }
+        }
+        if (!n) return null;
+      }
+      var ang = Math.atan2(n[1], n[0]), q = Math.PI/2;
+      return ang - q*Math.round(ang/q);
+    }
+    var angleCoupe = 0;        // orientation des prochaines boîtes de coupe (la dernière choisie)
     // La rotation tourne autour du point cliqué : il devient le centre, sans que l'image bouge
     function pivoter(x, y){
       var p = pointSous(x, y);
@@ -1738,10 +1803,10 @@
       cadrer: function(cles){ var b = boiteDe(cles); if (b) cadrerSur(b); return !!b; },
       // Boîte de coupe autour d'éléments (clés), avec une petite marge ; null l'enlève. Renvoie vrai si une boîte est posée.
       coupe: function(cles){
-        var b = cles ? boiteDe(cles) : null;
+        var b = cles ? boiteDe(cles, angleCoupe) : null;
         if (b){
           var m = Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
-          b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }) };
+          b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }), a: b.a };
         }
         coupe = b; fige = false; cadreMasque = false;
         M.coupe(b);
@@ -1754,6 +1819,26 @@
       // Cadre de la boîte (arêtes et poignées) masqué ou affiché ; la coupe reste active
       cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
+      // Orientation de la boîte (radians autour de la verticale) ; la boîte en place tourne autour de son centre
+      // en gardant ses dimensions. Sans argument : l'angle actuel.
+      orienterCoupe: function(a){
+        if (a === undefined) return coupe ? coupe.a || 0 : angleCoupe;
+        angleCoupe = a;
+        if (coupe){
+          var C = centreBoite(coupe), h = [0, 1, 2].map(function(i){ return (coupe.max[i] - coupe.min[i])/2; });
+          var b = { a: a }, l = versBoite(b, C[0], C[1]), lc = [l[0], l[1], C[2]];
+          b.min = lc.map(function(v, i){ return v - h[i]; }); b.max = lc.map(function(v, i){ return v + h[i]; });
+          coupe = b;
+          M.coupe(b);
+          demander();
+        }
+        return a;
+      },
+      // Angle de la face visée sous le point écran (clientX, clientY), ou null
+      angleSous: function(cx, cy){
+        var r = cv.getBoundingClientRect(), v = viseeSous(cx - r.left, cy - r.top);
+        return v && v.t >= 0 ? angleFace(v.T, v.t) : null;
+      },
       // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
       // Sans argument : clé du moteur en cours. Avec une clé : promesse du nom du moteur démarré ; le
       // nouveau moteur prépare un canvas neuf à part et ne remplace l'ancien qu'une fois prêt.
@@ -1796,7 +1881,7 @@
   // Moteurs d'affichage : fabrique(canvas, outils) → moteur, promesse de moteur, ou null (indisponible).
   // WebGL et canvas 2D sont ici ; WebGPU et Three.js sont ajoutés par ifc-moteurs.js.
   var FABRIQUES = { webgl: function(cv){ return moteurGL(cv); }, canvas: function(cv){ return moteurCanvas(cv); } };
-  var OUTILS = { triangles: triangles, aretesVives: aretesVives, aretesBoite: aretesBoite, matriceVue: matriceVue, viserCPU: viserCPU, OR: OR };
+  var OUTILS = { triangles: triangles, aretesVives: aretesVives, aretesBoite: aretesBoite, boiteRel: boiteRel, axeBoite: axeBoite, faceBoite: faceBoite, matriceVue: matriceVue, viserCPU: viserCPU, OR: OR };
   global.IFCVue = {
     creer: creer,
     ajouterMoteur: function(cle, fabrique){ FABRIQUES[cle] = fabrique; },

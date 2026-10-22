@@ -60,7 +60,9 @@
     "@vertex fn vLignes(@location(0) p: vec3<f32>, @location(2) c: vec4<f32>) -> S {",
     "  var o: S; o.p = proj(p); o.c = c; o.w = p; return o; }",
     "@fragment fn f(i: S) -> @location(0) vec4<f32> {",
-    "  if (u.k.x > 0.5 && (any(i.w < u.b0.xyz) || any(i.w > u.b1.xyz))) { discard; }",
+    // boîte de coupe tournée autour de la verticale : point ramené dans son repère (k.y = cos, k.z = sin)
+    "  let q = vec3<f32>(u.k.y * i.w.x + u.k.z * i.w.y, -u.k.z * i.w.x + u.k.y * i.w.y, i.w.z);",
+    "  if (u.k.x > 0.5 && (any(q < u.b0.xyz) || any(q > u.b1.xyz))) { discard; }",
     "  return vec4<f32>(i.c.rgb * i.c.a, i.c.a); }"
   ].join("\n");
 
@@ -165,28 +167,24 @@
           var u = new Float32Array(32);
           u.set(M, 0);
           u[16] = c.lumiere[0]; u[17] = c.lumiere[1]; u[18] = c.lumiere[2];
-          u[20] = oui && coupe ? 1 : 0;
-          if (coupe) for (var a = 0; a < 3; a++){
-            u[24 + a] = b0 ? b0[a] : coupe.min[a] - origine[a];
-            u[28 + a] = b1 ? b1[a] : coupe.max[a] - origine[a];
+          u[20] = oui && coupe ? 1 : 0; u[21] = 1;
+          if (coupe){
+            var r = O.boiteRel(coupe, origine);
+            u[21] = Math.cos(coupe.a || 0); u[22] = Math.sin(coupe.a || 0);
+            for (var a = 0; a < 3; a++){ u[24 + a] = b0 ? b0[a] : r.b0[a]; u[28 + a] = b1 ? b1[a] : r.b1[a]; }
           }
           dev.queue.writeBuffer(buf, 0, u);
         }
         // faces de la boîte tournées vers l'œil : [{ axe, demi-espace gardé b0/b1 }] et leurs rectangles dans quad
         function facesVues(c, M){
-          var versOeil = [c.cb*c.sa, -c.cb*c.ca, c.sb], G = 1e7, vues = [], q = new Float32Array(18*3);
+          var versOeil = [c.cb*c.sa, -c.cb*c.ca, c.sb], G = 1e7, vues = [], q = new Float32Array(18*3), rel = O.boiteRel(coupe, origine);
           for (var f = 0; f < 6; f++){
-            var ax = f >> 1, max = f & 1;
-            if ((max ? 1 : -1)*versOeil[ax] <= 1e-6) continue;
+            var ax = f >> 1, max = f & 1, n = O.axeBoite(coupe, ax);
+            if ((max ? 1 : -1)*(n[0]*versOeil[0] + n[1]*versOeil[1] + n[2]*versOeil[2]) <= 1e-6) continue;
             var b0 = [-G, -G, -G], b1 = [G, G, G];
-            if (max) b1[ax] = coupe.max[ax] - origine[ax]; else b0[ax] = coupe.min[ax] - origine[ax];
+            if (max) b1[ax] = rel.b1[ax]; else b0[ax] = rel.b0[ax];
             uniformes(UA[ax], M, c, true, b0, b1);
-            var u = (ax + 1) % 3, v = (ax + 2) % 3, w = max ? coupe.max[ax] : coupe.min[ax];
-            [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]].forEach(function(k, n){
-              var p = [0, 0, 0];
-              p[ax] = w; p[u] = k[0] ? coupe.max[u] : coupe.min[u]; p[v] = k[1] ? coupe.max[v] : coupe.min[v];
-              for (var a = 0; a < 3; a++) q[3*(6*ax + n) + a] = p[a] - origine[a];
-            });
+            q.set(O.faceBoite(coupe, ax, max, origine), 18*ax);
             vues.push(ax);
           }
           dev.queue.writeBuffer(quad, 0, q);
@@ -329,10 +327,11 @@
         coupe = b;
         if (cadre){ scene.remove(cadre); cadre.geometry.dispose(); cadre = null; }
         if (!b){ matF.clippingPlanes = null; matL.clippingPlanes = null; matF.needsUpdate = matL.needsUpdate = true; return; }
+        var r = O.boiteRel(b, origine);
         for (var a = 0; a < 3; a++){
-          var n = [0, 0, 0];
-          n[a] = 1; plans[2*a].normal.set(n[0], n[1], n[2]); plans[2*a].constant = -(b.min[a] - origine[a]);
-          n[a] = -1; plans[2*a + 1].normal.set(n[0], n[1], n[2]); plans[2*a + 1].constant = b.max[a] - origine[a];
+          var n = O.axeBoite(b, a);       // plan n·p + d ≥ 0 gardé ; coordonnée de p le long de n = r.b0/b1
+          plans[2*a].normal.set(n[0], n[1], n[2]); plans[2*a].constant = -r.b0[a];
+          plans[2*a + 1].normal.set(-n[0], -n[1], -n[2]); plans[2*a + 1].constant = r.b1[a];
         }
         matF.clippingPlanes = plans; matL.clippingPlanes = plans; matF.needsUpdate = matL.needsUpdate = true;
         var g = new T.BufferGeometry();
@@ -343,22 +342,17 @@
       }
       // faces de la boîte tournées vers l'œil : plan du demi-espace gardé et rectangle de la face
       function sections(c){
-        var vo = [c.cb*c.sa, -c.cb*c.ca, c.sb];
+        var vo = [c.cb*c.sa, -c.cb*c.ca, c.sb], rel = coupe ? O.boiteRel(coupe, origine) : null;
         for (var ax = 0; ax < 3; ax++){
-          var vue = !!coupe && pochoirs.length > 0 && Math.abs(vo[ax]) > 1e-6, max = vo[ax] > 0;
+          var e = coupe ? O.axeBoite(coupe, ax) : [0, 0, 0], d = e[0]*vo[0] + e[1]*vo[1] + e[2]*vo[2];
+          var vue = !!coupe && pochoirs.length > 0 && Math.abs(d) > 1e-6, max = d > 0;
           quads[ax].visible = vue;
           if (pochoirs[ax]) pochoirs[ax].visible = vue;
           if (!vue) continue;
-          var n = [0, 0, 0], w = max ? coupe.max[ax] : coupe.min[ax];
-          n[ax] = max ? -1 : 1;
-          demi[ax].normal.set(n[0], n[1], n[2]);
-          demi[ax].constant = max ? w - origine[ax] : -(w - origine[ax]);
-          var u = (ax + 1) % 3, v = (ax + 2) % 3, at = quads[ax].geometry.getAttribute("position");
-          [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]].forEach(function(k, i){
-            var p = [0, 0, 0];
-            p[ax] = w; p[u] = k[0] ? coupe.max[u] : coupe.min[u]; p[v] = k[1] ? coupe.max[v] : coupe.min[v];
-            at.setXYZ(i, p[0] - origine[0], p[1] - origine[1], p[2] - origine[2]);
-          });
+          if (max){ demi[ax].normal.set(-e[0], -e[1], -e[2]); demi[ax].constant = rel.b1[ax]; }
+          else { demi[ax].normal.set(e[0], e[1], e[2]); demi[ax].constant = -rel.b0[ax]; }
+          var q = O.faceBoite(coupe, ax, max, origine), at = quads[ax].geometry.getAttribute("position");
+          for (var i = 0; i < 6; i++) at.setXYZ(i, q[3*i], q[3*i + 1], q[3*i + 2]);
           at.needsUpdate = true;
         }
       }
