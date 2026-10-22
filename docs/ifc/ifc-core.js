@@ -879,6 +879,8 @@
     lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
-    fusionner: fusionner
+    fusionner: fusionner,
+    // pour écrire de nouvelles entités ailleurs (retaille selon la boîte de coupe, dans ifc-vue.js)
+    lireEntite: lireEntite, refaire: refaire, bruts: bruts
   };
 })(typeof window !== "undefined" ? window : self);

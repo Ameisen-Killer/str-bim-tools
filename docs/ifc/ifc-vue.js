@@ -523,6 +523,130 @@
     });
   }
 
+  // ---------- Découpe par un demi-espace ----------
+  // IFCHALFSPACESOLID(IFCPLANE, AgreementFlag) sous la matrice M : plan { p, n } dans le monde, n tournée vers
+  // la matière du demi-espace (celle qu'une différence enlève). null pour les demi-espaces bornés.
+  function demiEspace(G, hs, M){
+    if (!hs || hs.type !== "IFCHALFSPACESOLID") return null;
+    var a = C(hs), pl = G.m.ent.get(R(a[0]));
+    if (!pl || pl.type !== "IFCPLANE") return null;
+    var P = mul(M, axe(G, C(pl)[0])), n = norm(cross([P[0], P[1], P[2]], [P[3], P[4], P[5]]));
+    if (!n) return null;
+    if (dot(n, [P[6], P[7], P[8]]) < 0) n = [-n[0], -n[1], -n[2]];
+    // AgreementFlag vrai : la normale du plan s'éloigne de la matière
+    if (a[1] && a[1].enu === "T") n = [-n[0], -n[1], -n[2]];
+    return { p: [P[9], P[10], P[11]], n: n };
+  }
+  // Boucle plane coupée par le plan (on garde n·x ≤ d) ; les passages sortie → entrée sont des arêtes posées
+  // sur le plan, ajoutées à segs. Renvoie la boucle (inchangée si rien ne dépasse) ou null.
+  function couperPlan(pts, n, d0, eps, segs){
+    var m = pts.length/3, d = new Array(m), dehors = 0, i;
+    for (i = 0; i < m; i++){
+      d[i] = n[0]*pts[3*i] + n[1]*pts[3*i + 1] + n[2]*pts[3*i + 2] - d0;
+      if (d[i] > eps) dehors++;
+    }
+    if (!dehors) return pts;
+    if (dehors === m) return null;
+    var out = [], ev = [];
+    for (i = 0; i < m; i++){
+      var j = (i + 1) % m, a = d[i] <= eps, b = d[j] <= eps;
+      if (a) out.push(pts[3*i], pts[3*i + 1], pts[3*i + 2]);
+      if (a === b) continue;
+      // point de passage calculé toujours dans le même sens de l'arête : identique pour les deux faces voisines
+      var u = i, v = j;
+      if (pts[3*u] > pts[3*v] || (pts[3*u] === pts[3*v] && (pts[3*u + 1] > pts[3*v + 1] || (pts[3*u + 1] === pts[3*v + 1] && pts[3*u + 2] > pts[3*v + 2])))){ u = j; v = i; }
+      var t = Math.max(0, Math.min(1, d[u]/(d[u] - d[v])));
+      var q = [pts[3*u] + t*(pts[3*v] - pts[3*u]), pts[3*u + 1] + t*(pts[3*v + 1] - pts[3*u + 1]), pts[3*u + 2] + t*(pts[3*v + 2] - pts[3*u + 2])];
+      out.push(q[0], q[1], q[2]);
+      ev.push({ sortie: a, q: q });
+    }
+    var k0 = 0;
+    while (k0 < ev.length && !ev[k0].sortie) k0++;
+    for (var k = 0; k < ev.length - 1 && k0 < ev.length; k += 2){
+      var s = ev[(k0 + k) % ev.length], e = ev[(k0 + k + 1) % ev.length];
+      if (s.sortie && !e.sortie) segs.push(s.q, e.q);
+    }
+    return out.length >= 9 ? out : null;
+  }
+  // Faces (monde) d'un solide coupées par le plan (p, n) : on garde le côté n·(x − p) ≤ 0 et on ferme la
+  // coupe par des faces posées sur le plan (contours chaînés, trous rangés dans leur contour)
+  function couperDemiEspace(faces, p, n, out){
+    if (!faces.length) return;
+    var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    faces.forEach(function(f){ var b = f.b[0]; for (var i = 0; i < b.length; i += 3) for (var k = 0; k < 3; k++){ if (b[i+k] < mn[k]) mn[k] = b[i+k]; if (b[i+k] > mx[k]) mx[k] = b[i+k]; } });
+    var taille = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) || 1, eps = taille*1e-9, d0 = dot(n, p), segs = [];
+    faces.forEach(function(f){
+      var bs = [], s = [], change = false;
+      for (var k = 0; k < f.b.length; k++){
+        var r = couperPlan(f.b[k], n, d0, eps, s);
+        if (r !== f.b[k]) change = true;
+        if (r) bs.push(r);
+        else if (k === 0) return;          // contour extérieur entièrement dehors : la face part
+      }
+      if (!change){ out.push(f); return; }
+      for (var i = 0; i < s.length; i++) segs.push(s[i]);
+      ajouterFace(out, bs);
+    });
+    if (!segs.length) return;
+    // chaînage des arêtes de coupe en boucles fermées
+    var q = taille*1e-7, bouts = new Map();
+    function cle(v){ return Math.round(v[0]/q) + "," + Math.round(v[1]/q) + "," + Math.round(v[2]/q); }
+    var S = [];
+    for (var i = 0; i < segs.length; i += 2){
+      var ka = cle(segs[i]), kb = cle(segs[i + 1]);
+      if (ka === kb) continue;
+      var x = { a: segs[i], b: segs[i + 1], ka: ka, kb: kb, pris: false };
+      S.push(x);
+      [ka, kb].forEach(function(k){ var l = bouts.get(k); if (!l) bouts.set(k, l = []); l.push(x); });
+    }
+    var boucles = [];
+    S.forEach(function(s0){
+      if (s0.pris) return;
+      s0.pris = true;
+      var pts = [s0.a], debut = s0.ka, cur = s0.kb, pt = s0.b, ferme = false;
+      for (var g = 0; g < S.length; g++){
+        if (cur === debut){ ferme = true; break; }
+        pts.push(pt);
+        var suiv = (bouts.get(cur) || []).filter(function(y){ return !y.pris; })[0];
+        if (!suiv) break;
+        suiv.pris = true;
+        if (suiv.ka === cur){ cur = suiv.kb; pt = suiv.b; } else { cur = suiv.ka; pt = suiv.a; }
+      }
+      if (ferme && pts.length >= 3) boucles.push(pts);
+    });
+    if (!boucles.length) return;
+    // repère du plan : (u, v, n) direct
+    var u = ortho(Math.abs(n[0]) < .9 ? [1, 0, 0] : [0, 1, 0], n), v = cross(n, u);
+    var B = boucles.map(function(pts){
+      var X = pts.map(function(P){ return dot(P, u); }), Y = pts.map(function(P){ return dot(P, v); }), A = 0;
+      for (var i = 0, j = X.length - 1; i < X.length; j = i++) A += (X[j] - X[i])*(Y[j] + Y[i]);
+      return { pts: pts, X: X, Y: Y, aire: A/2 };
+    });
+    function dedans(b, x, y){
+      var c = false;
+      for (var i = 0, j = b.X.length - 1; i < b.X.length; j = i++)
+        if ((b.Y[i] > y) !== (b.Y[j] > y) && x < (b.X[j] - b.X[i])*(y - b.Y[i])/(b.Y[j] - b.Y[i]) + b.X[i]) c = !c;
+      return c;
+    }
+    B.forEach(function(b){
+      b.contenants = B.filter(function(o){ return o !== b && Math.abs(o.aire) > Math.abs(b.aire) && dedans(o, b.X[0], b.Y[0]); });
+    });
+    function aplat(b, sens){
+      var pts = b.aire*sens >= 0 ? b.pts : b.pts.slice().reverse(), r = [];
+      pts.forEach(function(P){ r.push(P[0], P[1], P[2]); });
+      return r;
+    }
+    B.forEach(function(b){
+      if (b.contenants.length % 2) return;          // trou : rangé avec son contour
+      var bs = [aplat(b, 1)];
+      B.forEach(function(h){
+        if (h.contenants.length !== b.contenants.length + 1 || h.contenants.indexOf(b) < 0) return;
+        bs.push(aplat(h, -1));
+      });
+      ajouterFace(out, bs);
+    });
+  }
+
   function item(G, id, M, out, prof){
     var e = G.m.ent.get(id);
     if (!e || prof > 12) return;
@@ -548,11 +672,20 @@
         revolution(G, a, M, out); break;
       case "IFCSWEPTDISKSOLID": case "IFCSWEPTDISKSOLIDPOLYGONAL":
         tube(G, a, M, out); break;
-      case "IFCBOOLEANRESULT": case "IFCBOOLEANCLIPPINGRESULT":
-        // aperçu : on dessine l'opérande principal (les découpes ne sont pas calculées)
+      case "IFCBOOLEANRESULT": case "IFCBOOLEANCLIPPINGRESULT": {
+        // différence avec un demi-espace plan : découpe calculée (face de fermeture comprise)
+        var pl = a[0] && a[0].enu === "DIFFERENCE" ? demiEspace(G, G.m.ent.get(R(a[2])), M) : null;
+        if (pl){
+          var avant = [];
+          item(G, R(a[1]), M, avant, prof + 1);
+          couperDemiEspace(avant, pl.p, pl.n, out);
+          break;
+        }
+        // aperçu : sinon on dessine l'opérande principal (les autres découpes ne sont pas calculées)
         item(G, R(a[1]), M, out, prof + 1);
         if (a[0] && a[0].enu === "UNION") item(G, R(a[2]), M, out, prof + 1);
         break;
+      }
       case "IFCCSGSOLID":
         item(G, R(a[0]), M, out, prof + 1); break;
       case "IFCPOLYGONALFACESET": case "IFCTRIANGULATEDFACESET":
@@ -574,15 +707,19 @@
     }
   }
 
+  // Représentations 3D d'un IFCPRODUCTDEFINITIONSHAPE : « Body », sinon celles d'un type 3D
+  function corps(G, pds){
+    var reps = L(C(pds)[2]).map(function(r){ return G.m.ent.get(r); }).filter(Boolean);
+    var choix = reps.filter(function(r){ return IFC.chaine(C(r)[1]).toLowerCase() === "body"; });
+    return choix.length ? choix : reps.filter(function(r){ return TYPES_3D[IFC.chaine(C(r)[2])]; });
+  }
   function geometrie(G, id){
     if (G.cache.has(id)) return G.cache.get(id);
     var res = null;
     try {
       var e = G.m.ent.get(id), a = C(e), pds = G.m.ent.get(R(a[6]));
       if (pds){
-        var reps = L(C(pds)[2]).map(function(r){ return G.m.ent.get(r); }).filter(Boolean);
-        var choix = reps.filter(function(r){ return IFC.chaine(C(r)[1]).toLowerCase() === "body"; });
-        if (!choix.length) choix = reps.filter(function(r){ return TYPES_3D[IFC.chaine(C(r)[2])]; });
+        var choix = corps(G, pds);
         var M = placement(G, R(a[5])), faces = [];
         choix.forEach(function(r){ L(C(r)[3]).forEach(function(i){ item(G, i, M, faces, 0); }); });
         if (faces.length){
@@ -1133,6 +1270,169 @@
   function dansBoite(B, x, y, z, e){
     if (B.a){ var l = versBoite(B, x, y); x = l[0]; y = l[1]; }
     return x >= B.min[0] - e && x <= B.max[0] + e && y >= B.min[1] - e && y <= B.max[1] + e && z >= B.min[2] - e && z <= B.max[2] + e;
+  }
+
+  // ================= Retaille d'un modèle selon la boîte de coupe =================
+  // Plan d'une face de la boîte, normale vers l'extérieur : l'intérieur est n·x ≤ d
+  function planBoite(b, ax, max){
+    var e = axeBoite(b, ax);
+    return max ? { n: e, d: b.max[ax] } : { n: [-e[0], -e[1], -e[2]], d: -b.min[ax] };
+  }
+  // Point dans un solide fermé (triangles à plat) : parité des traversées d'un rayon
+  function dansSolide(T, p){
+    var r = [.5773, .5774, .5775], c = 0;
+    for (var t = 0; t < T.length; t += 9){
+      var e1 = [T[t+3] - T[t], T[t+4] - T[t+1], T[t+5] - T[t+2]], e2 = [T[t+6] - T[t], T[t+7] - T[t+1], T[t+8] - T[t+2]];
+      var h = cross(r, e2), a = dot(e1, h);
+      if (Math.abs(a) < 1e-14) continue;
+      var s = [p[0] - T[t], p[1] - T[t+1], p[2] - T[t+2]], u = dot(s, h)/a;
+      if (u < 0 || u > 1) continue;
+      var q = cross(s, e1), v = dot(r, q)/a;
+      if (v < 0 || u + v > 1) continue;
+      if (dot(e2, q)/a > 0) c++;
+    }
+    return c % 2 === 1;
+  }
+  // Éléments (ids) d'un modèle rangés par rapport à la boîte : dedans, dehors, à cheval (avec les plans de la
+  // boîte qui les coupent), sans géométrie lue
+  function classer(G, ids, b){
+    var r = { dedans: [], dehors: [], acheval: [], sansGeo: [] };
+    var tol = 1e-7*Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+    ids.forEach(function(id){
+      var g = geometrie(G, id);
+      if (!g){ r.sansGeo.push(id); return; }
+      var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+      g.faces.forEach(function(f){
+        var p = f.b[0];
+        for (var k = 0; k < p.length/3; k++) for (var a = 0; a < 3; a++){ var v = coordBoite(b, p, k, a); if (v < mn[a]) mn[a] = v; if (v > mx[a]) mx[a] = v; }
+      });
+      var plans = [], loin = false;
+      for (var a = 0; a < 3; a++){
+        if (mx[a] < b.min[a] - tol || mn[a] > b.max[a] + tol) loin = true;
+        if (mn[a] < b.min[a] - tol) plans.push(planBoite(b, a, false));
+        if (mx[a] > b.max[a] + tol) plans.push(planBoite(b, a, true));
+      }
+      if (loin){ r.dehors.push(id); return; }
+      if (!plans.length){ r.dedans.push(id); return; }
+      // une face entre dans la boîte, ou la boîte est noyée dans le solide
+      if (g.faces.some(function(f){ return !!couperBoucle(f.b[0], b); }) || dansSolide(triangles(g), centreBoite(b))) r.acheval.push({ id: id, plans: plans });
+      else r.dehors.push(id);
+    });
+    return r;
+  }
+  // Nombre réel au format STEP (toujours un point décimal)
+  function reel(x){
+    if (!isFinite(x) || Math.abs(x) < 1e-12) return "0.";
+    var t = String(parseFloat(x.toPrecision(15))), k = t.indexOf("e");
+    if (k >= 0){ var m = t.slice(0, k); return (m.indexOf(".") < 0 ? m + "." : m) + "E" + t.slice(k + 1); }
+    return t.indexOf(".") < 0 ? t + "." : t;
+  }
+  // Solides qu'une opération booléenne accepte, et ceux qu'une IFCBOOLEANCLIPPINGRESULT accepte en 1er opérande
+  var OPERANDES = /^IFC(EXTRUDEDAREASOLID(TAPERED)?|REVOLVEDAREASOLID(TAPERED)?|SWEPTDISKSOLID(POLYGONAL)?|SURFACECURVESWEPTAREASOLID|FIXEDREFERENCESWEPTAREASOLID|DIRECTRIXCURVESWEPTAREASOLID|FACETEDBREP(WITHVOIDS)?|ADVANCEDBREP(WITHVOIDS)?|CSGSOLID|BOOLEANRESULT|BOOLEANCLIPPINGRESULT|BLOCK|RIGHTCIRCULARCYLINDER|RIGHTCIRCULARCONE|SPHERE|RECTANGULARPYRAMID|TRIANGULATEDFACESET|POLYGONALFACESET)$/;
+  var CLIPPABLES = /^IFC(EXTRUDEDAREASOLID(TAPERED)?|REVOLVEDAREASOLID(TAPERED)?|SURFACECURVESWEPTAREASOLID|FIXEDREFERENCESWEPTAREASOLID|DIRECTRIXCURVESWEPTAREASOLID|BOOLEANCLIPPINGRESULT)$/;
+  // Éléments à cheval [{ id, plans }] coupés net aux plans de la boîte avec les découpes de l'IFC : chaque solide
+  // du corps devient une suite de différences avec des demi-espaces (IFCHALFSPACESOLID sur un IFCPLANE), posés
+  // dans le repère du solide ; la géométrie d'origine est gardée dessous. Les représentations partagées sont
+  // copiées, les IFCMAPPEDITEM reçoivent leur propre IFCREPRESENTATIONMAP. Renvoie le changement (annulable),
+  // les éléments touchés et le nombre de solides laissés entiers (surfaces, types non booléens).
+  function retaillerModele(G, acheval){
+    var m = G.m, ifc4 = !/^IFC2X3/i.test(m.schema), avant = new Map(), apres = new Map(), nouveaux = [], suivant = m.maxId;
+    var nonCoupes = 0, touches = [], plans = null;
+    function ent(id){ return apres.get(id) || m.ent.get(id); }
+    function cree(type, args){
+      var id = ++suivant;
+      apres.set(id, IFC.lireEntite("#" + id + "=" + type + "(" + args.join(",") + ")"));
+      nouveaux.push(id);
+      return id;
+    }
+    function modifie(e, args){
+      if (id0(e.id) && !avant.has(e.id)) avant.set(e.id, m.ent.get(e.id));
+      apres.set(e.id, IFC.refaire(e, args));
+    }
+    function id0(id){ return id <= m.maxId && m.ent.has(id); }
+    function liste(ids){ return "(" + ids.map(function(i){ return "#" + i; }).join(",") + ")"; }
+    function triplet(v){ return "(" + v.map(reel).join(",") + ")"; }
+    // demi-espace à enlever, dans le repère M (x_monde = A·y + t) : (Aᵀn)·y ≤ d − n·t reste
+    function demi(M, pl){
+      var n = pl.n, nl = [M[0]*n[0] + M[1]*n[1] + M[2]*n[2], M[3]*n[0] + M[4]*n[1] + M[5]*n[2], M[6]*n[0] + M[7]*n[1] + M[8]*n[2]];
+      var dl = pl.d - (n[0]*M[9] + n[1]*M[10] + n[2]*M[11]), l = Math.hypot(nl[0], nl[1], nl[2]);
+      nl = [nl[0]/l, nl[1]/l, nl[2]/l]; dl /= l;
+      var x = ortho(Math.abs(nl[0]) < .9 ? [1, 0, 0] : [0, 1, 0], nl);
+      var o = cree("IFCCARTESIANPOINT", [triplet([nl[0]*dl, nl[1]*dl, nl[2]*dl])]);
+      var ax = cree("IFCAXIS2PLACEMENT3D", ["#" + o, "#" + cree("IFCDIRECTION", [triplet(nl)]), "#" + cree("IFCDIRECTION", [triplet(x)])]);
+      // normale vers la matière enlevée : AgreementFlag faux
+      return cree("IFCHALFSPACESOLID", ["#" + cree("IFCPLANE", ["#" + ax]), ".F."]);
+    }
+    function couperItem(id, M){
+      var e = ent(id);
+      if (!e) return 0;
+      if (e.type === "IFCMAPPEDITEM"){
+        var a = C(e), src = ent(R(a[0]));
+        if (!src) return 0;
+        var sa = C(src), rep = ent(R(sa[1]));
+        if (!rep) return 0;
+        var r = couperListe(L(C(rep)[3]), mul(mul(M, operateur(G, a[1])), axe(G, sa[0])));
+        if (!r) return 0;
+        var rb = IFC.bruts(rep).slice(), sb = IFC.bruts(src).slice(), mb = IFC.bruts(e).slice();
+        rb[3] = liste(r.items); if (r.type) rb[2] = "'" + r.type + "'";
+        sb[1] = "#" + cree(rep.type, rb);
+        mb[0] = "#" + cree(src.type, sb);
+        return cree(e.type, mb);
+      }
+      if (!OPERANDES.test(e.type) || (!ifc4 && /FACESET$/.test(e.type))){ nonCoupes++; return 0; }
+      var cur = id, clip = CLIPPABLES.test(e.type) || (ifc4 && /^IFCSWEPTDISKSOLID/.test(e.type));
+      plans.forEach(function(pl){ cur = cree(clip ? "IFCBOOLEANCLIPPINGRESULT" : "IFCBOOLEANRESULT", [".DIFFERENCE.", "#" + cur, "#" + demi(M, pl)]); });
+      return cur;
+    }
+    function couperListe(ids, M){
+      var chg = false, items = ids.map(function(i){ var n = couperItem(i, M); if (n) chg = true; return n || i; });
+      if (!chg) return null;
+      var types = items.map(function(i){ var x = ent(i); return x ? x.type : ""; });
+      return { items: items, type: types.every(function(t){ return t === "IFCBOOLEANCLIPPINGRESULT"; }) ? "Clipping" :
+        types.every(function(t){ return /^IFCBOOLEAN/.test(t); }) ? "CSG" : null };
+    }
+    // représentations et formes partagées : comptées pour savoir si on peut les modifier sur place
+    var compte = new Map(), FAIBLE = { IFCPRESENTATIONLAYERASSIGNMENT: 1, IFCPRESENTATIONLAYERWITHSTYLE: 1, IFCSTYLEDITEM: 1 };
+    acheval.forEach(function(x){
+      var e = m.ent.get(x.id), pds = e && m.ent.get(R(C(e)[6]));
+      if (!pds) return;
+      compte.set(pds.id, 0);
+      L(C(pds)[2]).forEach(function(r){ compte.set(r, 0); });
+    });
+    m.ent.forEach(function(e){
+      if (FAIBLE[e.type]) return;
+      for (var i = 0; i < e.refs.length; i++){ var c = compte.get(e.refs[i]); if (c !== undefined) compte.set(e.refs[i], c + 1); }
+    });
+    acheval.forEach(function(x){
+      var e = ent(x.id), a = C(e), pds = ent(R(a[6]));
+      if (!pds) return;
+      plans = x.plans;
+      var Mp = placement(G, R(a[5])), choisis = corps(G, pds).map(function(r){ return r.id; });
+      var reps = L(C(pds)[2]), nouvelles = reps.slice(), copie = false, coupe = false, pdsSeule = compte.get(pds.id) <= 1;
+      reps.forEach(function(rid, k){
+        if (choisis.indexOf(rid) < 0) return;
+        var rep = ent(rid), r = couperListe(L(C(rep)[3]), Mp);
+        if (!r) return;
+        coupe = true;
+        var rb = IFC.bruts(rep).slice();
+        rb[3] = liste(r.items); if (r.type) rb[2] = "'" + r.type + "'";
+        if (pdsSeule && compte.get(rid) <= 1) modifie(rep, rb);
+        else { nouvelles[k] = cree(rep.type, rb); copie = true; }
+      });
+      if (!coupe) return;
+      touches.push(x.id);
+      if (!copie) return;
+      var pb = IFC.bruts(pds).slice();
+      pb[2] = liste(nouvelles);
+      if (pdsSeule) modifie(pds, pb);
+      else { var eb = IFC.bruts(e).slice(); eb[6] = "#" + cree(pds.type, pb); modifie(e, eb); }
+    });
+    m.maxId = suivant;
+    nouveaux.forEach(function(id){ m.ordre.push(id); });
+    var av = [], ap = [];
+    avant.forEach(function(e){ av.push(e); });
+    apres.forEach(function(e){ ap.push(e); });
+    return { changement: { avant: av, apres: ap, nbRetirees: 0 }, ids: touches, nonCoupes: nonCoupes, nbEntites: nouveaux.length };
   }
 
   var versionCoupe = 0;
@@ -1819,6 +2119,12 @@
       // Cadre de la boîte (arêtes et poignées) masqué ou affiché ; la coupe reste active
       cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
+      // Retaille : éléments d'un modèle (ids) rangés par rapport à la boîte de coupe (null sans boîte)
+      classerCoupe: function(m, ids){ var G = Gs.get(m); return coupe && G ? classer(G, ids, coupe) : null; },
+      // Coupe net les éléments à cheval [{ id, plans }] (découpes IFC) ; renvoie { changement, ids, nonCoupes }
+      retailler: function(m, acheval){ var G = Gs.get(m); return G ? retaillerModele(G, acheval) : null; },
+      // Géométrie d'éléments à relire (représentation changée) ; celle de web-ifc est à recalculer
+      oublier: function(m, ids){ var G = Gs.get(m); if (!G) return; ids.forEach(function(id){ G.cache.delete(id); }); G.externe = null; },
       // Orientation de la boîte (radians autour de la verticale) ; la boîte en place tourne autour de son centre
       // en gardant ses dimensions. Sans argument : l'angle actuel.
       orienterCoupe: function(a){

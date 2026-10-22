@@ -710,6 +710,7 @@
     if (vue.aCoupe()) h.push(bouton("cadre-coupe", vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe"),
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
+    if (vue.aCoupe()) h.push(bouton("retailler", "Retailler l'IFC selon la boîte…"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     var fd = fondVue();
@@ -892,6 +893,7 @@
     $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
     activerCmd("fusionner", fichiers.length > 1);
+    activerCmd("retailler", vue.aCoupe());
     $("#cmd-fusionner").textContent = fichiers.length > 1 ? "Fusionner les " + fichiers.length + " maquettes" : "Fusionner les maquettes";
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
@@ -925,9 +927,11 @@
       " · moteur " + b.moteur + (vue.sourceGeo() === "externe" ? " · géométrie web-ifc" : "");
   }
 
-  function confirmer(texte, ok){
+  function confirmer(texte, ok, titre, bouton){
     var d = $("#confirmer");
     $("#confirmer-texte").textContent = texte;
+    $("#confirmer-titre").textContent = titre || "Supprimer la sélection ?";
+    $("#confirmer-oui").textContent = bouton || "Supprimer";
     if (typeof d.showModal !== "function"){ if (window.confirm(texte)) ok(); return; }
     d.returnValue = "";
     d.addEventListener("close", function f(){
@@ -969,20 +973,95 @@
         (nbMod ? ", " + pluriel(nbMod, "relation raccourcie", "relations raccourcies") : "") + ".");
     });
   }
+  // Retaille selon la boîte de coupe, fichier par fichier (maquettes affichées) : les éléments hors de la boîte
+  // partent (comme une suppression), ceux à cheval sont coupés net à la boîte par des découpes IFC
+  function retailler(){
+    if (!vue.aCoupe()) return;
+    var plans = [], nbDehors = 0, nbAcheval = 0, nbDedans = 0;
+    fichiers.forEach(function(f){
+      if (!f.visible) return;
+      var m = f.m, ids = IFC.index(m).produits.filter(function(id){ return IFC.infos(m, id).genre !== "ouverture"; });
+      var c = vue.classerCoupe(m, ids);
+      if (!c) return;
+      var dehors = new Set(c.dehors), change = true;
+      // un élément ne part pas sans ses enfants d'assemblage restés dans la boîte ; un assemblage sans
+      // géométrie dont tout le contenu part s'en va aussi
+      while (change){
+        change = false;
+        dehors.forEach(function(id){
+          if (IFC.descendants(m, id).some(function(d){ return !dehors.has(d) && c.sansGeo.indexOf(d) < 0; })){ dehors.delete(id); change = true; }
+        });
+      }
+      c.sansGeo.forEach(function(id){
+        if (IFC.infos(m, id).genre !== "element") return;
+        var d = IFC.descendants(m, id);
+        if (d.length && d.every(function(x){ return dehors.has(x); })) dehors.add(id);
+      });
+      if (!dehors.size && !c.acheval.length) return;
+      plans.push({ f: f, dehors: Array.from(dehors), acheval: c.acheval });
+      nbDehors += dehors.size; nbAcheval += c.acheval.length; nbDedans += c.dedans.length;
+    });
+    if (!plans.length){ etat("Rien à retailler : tout ce qui est affiché tient déjà dans la boîte de coupe."); return; }
+    var texte = pluriel(nbDehors, "élément") + " hors de la boîte " + (nbDehors > 1 ? "vont partir" : "va partir") +
+      ", " + pluriel(nbAcheval, "élément") + " à cheval " + (nbAcheval > 1 ? "seront coupés" : "sera coupé") + " net à la boîte (découpes IFC, la géométrie d'origine reste dessous), " +
+      pluriel(nbDedans, "élément") + " " + (nbDedans > 1 ? "restent entiers" : "reste entier") + ".";
+    confirmer(texte, function(){
+      var parts = [], nbEnt = 0, nbSupp = 0, nbCoupes = 0, nonCoupes = 0, ajout = 0;
+      plans.forEach(function(x){
+        if (x.acheval.length){
+          var r = vue.retailler(x.f.m, x.acheval);
+          if (r && r.ids.length){
+            IFC.appliquer(x.f.m, r.changement);
+            vue.oublier(x.f.m, r.ids);
+            parts.push({ f: x.f, ch: r.changement, ids: r.ids });
+            nbCoupes += r.ids.length; ajout += r.nbEntites;
+          }
+          if (r) nonCoupes += r.nonCoupes;
+        }
+        if (x.dehors.length){
+          var p = IFC.planifier(x.f.m, x.dehors);
+          if (p.nbElements){
+            IFC.appliquer(x.f.m, p.changement);
+            parts.push({ f: x.f, ch: p.changement });
+            nbSupp += p.nbElements; nbEnt += p.nbEntites;
+          }
+        }
+      });
+      if (!parts.length){ etat("Rien n'a pu être retaillé."); return; }
+      histo.push({ parts: parts, txt: "retaille selon la boîte de coupe", e: nbEnt });
+      aRefaire = [];
+      reconstruire();
+      calculerWebIfc();
+      etat("Retaille faite : " + pluriel(nbSupp, "élément supprimé", "éléments supprimés") + ", " + pluriel(nbCoupes, "élément coupé", "éléments coupés") +
+        " à la boîte (" + pluriel(ajout, "entité ajoutée", "entités ajoutées") + ")" +
+        (nonCoupes ? ", " + pluriel(nonCoupes, "solide laissé entier", "solides laissés entiers") + " (surfaces ou géométrie non découpable)" : "") +
+        ". Exporte l'IFC pour garder le résultat.");
+    }, "Retailler l'IFC ?", "Retailler");
+  }
+  // une retaille change la géométrie d'éléments : à relire après annuler / rétablir
+  function relire(parts){
+    var oui = false;
+    parts.forEach(function(p){ if (p.ids){ vue.oublier(p.f.m, p.ids); oui = true; } });
+    return oui;
+  }
   function annuler(){
     if (!histo.length) return;
     var h = histo.pop();
     h.parts.slice().reverse().forEach(function(p){ IFC.appliquer(p.f.m, p.ch, true); });
+    var geo = relire(h.parts);
     aRefaire.push(h);
     reconstruire();
+    if (geo) calculerWebIfc();
     etat("Annulé : " + h.txt + " (" + pluriel(h.e, "entité remise", "entités remises") + ").");
   }
   function retablir(){
     if (!aRefaire.length) return;
     var h = aRefaire.pop();
     h.parts.forEach(function(p){ IFC.appliquer(p.f.m, p.ch); });
+    var geo = relire(h.parts);
     histo.push(h);
     reconstruire();
+    if (geo) calculerWebIfc();
     etat("Rétabli : " + h.txt + ".");
   }
 
@@ -1057,6 +1136,7 @@
     },
     ajouter: function(){ remplacer = false; choisir(); },
     fusionner: fusionnerTout,
+    retailler: retailler,
     exporter: function(){ exporter(null); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
