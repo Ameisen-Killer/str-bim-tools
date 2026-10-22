@@ -274,6 +274,14 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .p-vue canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .p-vue canvas.sur-objet{cursor:default}     /* flèche au survol d'un objet, main ailleurs */
 .p-vue canvas.tire{cursor:grabbing}
+.p-vue canvas.mesure{cursor:crosshair}       /* outil de mesure */
+.mesures{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:hidden}
+.mesures .m-trait{stroke:rgb(var(--or-rvb));stroke-width:2}
+.mesures .m-trait.provisoire{stroke-dasharray:6 4}
+.mesures .m-point{fill:rgba(var(--or-rvb),.25);stroke:rgb(var(--or-rvb));stroke-width:2}
+.mesures text{text-anchor:middle;paint-order:stroke;stroke:var(--vue-fond);stroke-width:4px;stroke-linejoin:round;fill:var(--texte);font-family:var(--mono)}
+.mesures .m-texte{font-size:13px;font-weight:600}
+.mesures .m-delta{font-size:10px;fill:var(--texte-faible)}
 .vue-outils{position:absolute;top:10px;right:10px;display:flex;gap:6px}
 /* poignées de la boîte de coupe (placées par ifc-vue.js) */
 .poignee{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:rgb(var(--or-rvb));border:2px solid var(--vue-fond);box-shadow:0 0 0 1px rgba(var(--or-rvb),.7),0 2px 8px rgba(0,0,0,.35);cursor:grab;touch-action:none;z-index:2}
@@ -441,6 +449,8 @@ footer a:hover{color:var(--or)}
                 <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
               </div>
             </div>
+            <button type="button" role="menuitem" data-cmd="mesurer"><span id="cmd-mesurer">Mesurer</span><kbd>M</kbd></button>
+            <button type="button" role="menuitem" data-cmd="effacer-mesures"><span>Effacer les mesures</span><kbd></kbd></button>
             <div class="mb-sm">
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Arborescence</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
@@ -582,10 +592,10 @@ footer a:hover{color:var(--or)}
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=2"></script>
-<script src="/ifc/ifc-core.js?v=4"></script>
-<script src="/ifc/ifc-vue.js?v=21"></script>
+<script src="/ifc/ifc-core.js?v=5"></script>
+<script src="/ifc/ifc-vue.js?v=22"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=20"></script>
+<script src="/ifc/ifc-app.js?v=21"></script>
 <script src="/assets/menu.js?v=25"></script>
 </body>
 </html>

@@ -1746,6 +1746,7 @@
       var c = camera();
       M.dessiner(c);
       placerPoignees(c);
+      placerMesures(c);
     }
 
     // ---------- Poignées de la boîte de coupe : une par face, à tirer pour l'étirer ou la réduire ----------
@@ -1824,6 +1825,100 @@
         b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
         b.classList.toggle("loin", souris && !survol && !surPoignee && !tire);
       });
+    }
+
+    // ---------- Mesure : deux clics, accrochage aux sommets, milieux et arêtes vives de l'élément visé ----------
+    var SVG = "http://www.w3.org/2000/svg", calque = document.createElementNS(SVG, "svg");
+    calque.setAttribute("class", "mesures");
+    cv.parentNode.appendChild(calque);
+    var mesure = { actif: false, a: null, survol: null, liste: [], unite: { nom: "", k: 3 } };
+    var FMT = {};
+    function longueur(v){
+      var k = mesure.unite.k, f = FMT[k] || (FMT[k] = new Intl.NumberFormat("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: k }));
+      return f.format(Math.abs(v) < Math.pow(10, -k)/2 ? 0 : v) + (mesure.unite.nom ? " " + mesure.unite.nom : "");
+    }
+    // A, B : points accrochés { p, type, n (normale si face) } ; une face cliquée donne aussi la distance
+    // perpendiculaire à son plan (entre deux faces parallèles : leur écartement)
+    function texteMesure(A, B){
+      var a = A.p, b = B.p, d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], F = A.n ? A : B.n ? B : null;
+      return { l: longueur(Math.hypot(d[0], d[1], d[2])), d: "ΔX " + longueur(Math.abs(d[0])) + " · ΔY " + longueur(Math.abs(d[1])) + " · ΔZ " + longueur(Math.abs(d[2])),
+        perp: F ? "⊥ face : " + longueur(Math.abs(dot(F.n, d))) : "" };
+    }
+    // point visé, accroché au plus proche : sommet (12 px), milieu d'arête (10 px), arête (8 px), sinon la face
+    function accroche(x, y){
+      var v = viseeSous(x, y);
+      if (!v) return null;
+      var c = camera(), A = aretesVives(v.it.geo), best = null, e = rayon*1e-6;
+      function prendre(P, type, rang, d, lim){
+        if (d > lim || (best && (best.rang < rang || (best.rang === rang && best.d <= d)))) return;
+        if (coupe && !dansBoite(coupe, P[0], P[1], P[2], e)) return;
+        best = { p: P, type: type, rang: rang, d: d };
+      }
+      for (var i = 0; i < A.length; i += 6){
+        var a = [A[i], A[i+1], A[i+2]], b = [A[i+3], A[i+4], A[i+5]], sa = ecran(c, a), sb = ecran(c, b);
+        prendre(a, "sommet", 0, Math.hypot(sa[0] - x, sa[1] - y), 12);
+        prendre(b, "sommet", 0, Math.hypot(sb[0] - x, sb[1] - y), 12);
+        prendre([(a[0] + b[0])/2, (a[1] + b[1])/2, (a[2] + b[2])/2], "milieu", 1, Math.hypot((sa[0] + sb[0])/2 - x, (sa[1] + sb[1])/2 - y), 10);
+        var dx = sb[0] - sa[0], dy = sb[1] - sa[1], l2 = dx*dx + dy*dy;
+        if (l2 > 1e-9){
+          var t = Math.max(0, Math.min(1, ((x - sa[0])*dx + (y - sa[1])*dy)/l2));
+          prendre([a[0] + t*(b[0] - a[0]), a[1] + t*(b[1] - a[1]), a[2] + t*(b[2] - a[2])], "arête", 2, Math.hypot(sa[0] + t*dx - x, sa[1] + t*dy - y), 8);
+        }
+      }
+      if (best) return best;
+      var T = v.T, t = v.t, n = norm(cross([T[t+3] - T[t], T[t+4] - T[t+1], T[t+5] - T[t+2]], [T[t+6] - T[t], T[t+7] - T[t+1], T[t+8] - T[t+2]]));
+      return { p: v.p, type: "face", n: n };
+    }
+    function el(type, attrs, parent){
+      var n = document.createElementNS(SVG, type);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      parent.appendChild(n);
+      return n;
+    }
+    function symbole(P, type, c, g){
+      var q = ecran(c, P), x = q[0], y = q[1];
+      if (type === "sommet") el("rect", { x: x - 5, y: y - 5, width: 10, height: 10, "class": "m-point" }, g);
+      else if (type === "milieu") el("path", { d: "M" + x + " " + (y - 6) + "L" + (x + 6) + " " + (y + 5) + "L" + (x - 6) + " " + (y + 5) + "Z", "class": "m-point" }, g);
+      else if (type === "arête") el("path", { d: "M" + x + " " + (y - 6) + "L" + (x + 6) + " " + y + "L" + x + " " + (y + 6) + "L" + (x - 6) + " " + y + "Z", "class": "m-point" }, g);
+      else el("circle", { cx: x, cy: y, r: 4, "class": "m-point" }, g);
+    }
+    function trait(A, B, c, g, provisoire){
+      var p = ecran(c, A.p), q = ecran(c, B.p), t = texteMesure(A, B), mx = (p[0] + q[0])/2, my = (p[1] + q[1])/2;
+      el("line", { x1: p[0], y1: p[1], x2: q[0], y2: q[1], "class": "m-trait" + (provisoire ? " provisoire" : "") }, g);
+      var tx = el("text", { x: mx, y: my - 8, "class": "m-texte" }, g);
+      tx.textContent = t.l;
+      var td = el("text", { x: mx, y: my + 14, "class": "m-delta" }, g);
+      td.textContent = t.d;
+      if (t.perp){ var tp = el("text", { x: mx, y: my + 28, "class": "m-delta" }, g); tp.textContent = t.perp; }
+    }
+    function placerMesures(c){
+      cv.classList.toggle("mesure", mesure.actif);          // le canvas change avec le moteur
+      while (calque.firstChild) calque.removeChild(calque.firstChild);
+      if (!W || (!mesure.liste.length && !mesure.actif)) return;
+      mesure.liste.forEach(function(m){ trait(m.a, m.b, c, calque); symbole(m.a.p, m.a.type, c, calque); symbole(m.b.p, m.b.type, c, calque); });
+      if (mesure.a && mesure.survol) trait(mesure.a, mesure.survol, c, calque, true);
+      if (mesure.a) symbole(mesure.a.p, mesure.a.type, c, calque);
+      if (mesure.survol) symbole(mesure.survol.p, mesure.survol.type, c, calque);
+    }
+    var attenteMesure = 0;
+    function survolMesure(e){
+      clearTimeout(attenteMesure);
+      var p = local(e), ici = cv;
+      attenteMesure = setTimeout(function(){
+        if (ici !== cv || ptrs.size || !W || !H || !mesure.actif) return;
+        mesure.survol = accroche(p.x, p.y);
+        demander();
+      }, 40);
+    }
+    function cliqueMesure(x, y){
+      var P = accroche(x, y);
+      demander();
+      if (!P) return;
+      if (!mesure.a){ mesure.a = P; mesure.survol = null; if (rappels.surMesure) rappels.surMesure("Mesure : clique le second point (Échap pour annuler)."); return; }
+      var m = { a: mesure.a, b: P }, t = texteMesure(m.a, m.b);
+      mesure.liste.push(m);
+      mesure.a = null; mesure.survol = null;
+      if (rappels.surMesure) rappels.surMesure("Mesure : " + t.l + " (" + t.d + (t.perp ? " · " + t.perp : "") + ").");
     }
 
     function boite(){
@@ -1968,7 +2063,7 @@
       cv.addEventListener("pointermove", function(e){
         if (coupe && souris && e.pointerType === "mouse") survoler(pres(local(e).x, local(e).y));
         var p = ptrs.get(e.pointerId);
-        if (!p){ if (e.pointerType === "mouse") survolObjet(e); return; }
+        if (!p){ if (e.pointerType === "mouse"){ if (mesure.actif) survolMesure(e); else survolObjet(e); } return; }
         var n = local(e);
         if (ptrs.size === 1){
           if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
@@ -1999,7 +2094,11 @@
         if (ptrs.size) return;
         cv.classList.remove("tire");
         if (vite){ vite = false; demander(); }
-        if (e.type === "pointerup" && !bouge && !multi && (e.button === 0 || e.pointerType !== "mouse")){
+        if (e.type === "pointerup" && !bouge && !multi && mesure.actif && (e.button === 0 || e.pointerType !== "mouse")){
+          var pm = local(e);
+          if (W && H) cliqueMesure(pm.x, pm.y);
+        }
+        else if (e.type === "pointerup" && !bouge && !multi && (e.button === 0 || e.pointerType !== "mouse")){
           var p = local(e), k = W && H ? M.viser(camera(), p.x, p.y) : 0;
           if (M.nom === "WebGL") demander();
           if (rappels.surClic) rappels.surClic(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e);
@@ -2016,6 +2115,8 @@
       cv.addEventListener("pointerup", fin);
       cv.addEventListener("pointerleave", function(e){
         clearTimeout(attenteSurvol); cv.classList.remove("sur-objet");
+        clearTimeout(attenteMesure);
+        if (mesure.survol){ mesure.survol = null; demander(); }
         var r = e.relatedTarget;
         if (!(r && r.classList && r.classList.contains("poignee"))) survoler(false);     // passer sur une poignée n'est pas sortir
       });
@@ -2117,6 +2218,25 @@
       // Cadre de la boîte (arêtes et poignées) masqué ou affiché ; la coupe reste active
       cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
+      // Outil de mesure : mode actif ou non (sans argument : l'état) ; les mesures faites restent affichées
+      mesurer: function(oui){
+        if (oui !== undefined){
+          mesure.actif = !!oui; mesure.a = null; mesure.survol = null;
+          cv.classList.toggle("mesure", mesure.actif);
+          demander();
+        }
+        return mesure.actif;
+      },
+      // Échap : abandonne le premier point posé, sinon quitte le mode ; vrai si quelque chose a changé
+      annulerMesure: function(){
+        if (mesure.a){ mesure.a = null; mesure.survol = null; demander(); return true; }
+        if (mesure.actif){ this.mesurer(false); return true; }
+        return false;
+      },
+      nbMesures: function(){ return mesure.liste.length; },
+      effacerMesures: function(){ mesure.liste = []; mesure.a = null; demander(); },
+      // unité des longueurs affichées : { nom: "mm", k: décimales }
+      uniteMesure: function(u){ mesure.unite = u; demander(); },
       // Retaille : éléments d'un modèle (ids) rangés par rapport à la boîte de coupe (null sans boîte)
       classerCoupe: function(m, ids){ var G = Gs.get(m); return coupe && G ? classer(G, ids, coupe) : null; },
       // Coupe net les éléments à cheval [{ id, plans }] (découpes IFC) ; renvoie { changement, ids, nonCoupes }

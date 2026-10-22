@@ -881,6 +881,6 @@
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
     fusionner: fusionner,
     // pour écrire de nouvelles entités ailleurs (retaille selon la boîte de coupe, dans ifc-vue.js)
-    lireEntite: lireEntite, refaire: refaire, bruts: bruts
+    lireEntite: lireEntite, refaire: refaire, bruts: bruts, uniteLongueur: uniteLongueur
   };
 })(typeof window !== "undefined" ? window : self);

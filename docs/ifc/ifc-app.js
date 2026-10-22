@@ -26,7 +26,7 @@
   function garder(cle, v){ try { localStorage.setItem(cle, v); } catch (e){} }
   var moteurVoulu = lire("ifc.moteur", ["webgl", "webgpu", "three", "canvas"]), geoVoulue = lire("ifc.geometrie", ["maison", "webifc"]);
   // WebGL et canvas démarrent tout de suite ; WebGPU et Three.js (ifc-moteurs.js) se chargent ensuite
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu });
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu, surMesure: function(t){ etat(t); } });
 
   // Moteurs et géométries que ce navigateur ne peut pas faire tourner : clé → raison (montrée dans l'infobulle)
   var INDISPO = {};
@@ -247,7 +247,7 @@
   function ouvrir(modeles, ms, refus){
     var premier = !fichiers.length;
     modeles.forEach(function(m){
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 } };
+      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m) };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
@@ -345,7 +345,19 @@
   }
 
   // ================= Liste des éléments =================
+  // Unité de longueur du fichier pour les mesures : symbole et décimales affichées
+  function uniteMesure(m){
+    var u = IFC.uniteLongueur(m).toUpperCase();
+    if (u === "MILLIMETRE") return { nom: "mm", k: 1 };
+    if (u === "CENTIMETRE") return { nom: "cm", k: 2 };
+    if (u === "DECIMETRE") return { nom: "dm", k: 2 };
+    if (u === "METRE") return { nom: "m", k: 3 };
+    if (/FOOT|FEET/.test(u)) return { nom: "ft", k: 3 };
+    if (/INCH/.test(u)) return { nom: "in", k: 2 };
+    return { nom: "", k: 3 };
+  }
   function reconstruire(){
+    if (fichiers.length) vue.uniteMesure(fichiers[0].unite);
     lignes = [];
     fichiers.forEach(function(f){
       lignes.push({ fichier: f });
@@ -711,6 +723,8 @@
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
     if (vue.aCoupe()) h.push(bouton("retailler", "Retailler l'IFC selon la boîte…"));
+    h.push("<hr>", bouton("mesurer", vue.mesurer() ? "Arrêter de mesurer" : "Mesurer"));
+    if (vue.nbMesures()) h.push(bouton("effacer-mesures", "Effacer les mesures (" + fmtN(vue.nbMesures()) + ")"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     var fd = fondVue();
@@ -894,6 +908,8 @@
     activerCmd("rien", n > 0);
     activerCmd("fusionner", fichiers.length > 1);
     activerCmd("retailler", vue.aCoupe());
+    activerCmd("effacer-mesures", vue.nbMesures() > 0);
+    $("#cmd-mesurer").textContent = vue.mesurer() ? "Arrêter de mesurer" : "Mesurer";
     $("#cmd-fusionner").textContent = fichiers.length > 1 ? "Fusionner les " + fichiers.length + " maquettes" : "Fusionner les maquettes";
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
@@ -1137,6 +1153,12 @@
     ajouter: function(){ remplacer = false; choisir(); },
     fusionner: fusionnerTout,
     retailler: retailler,
+    mesurer: function(){
+      var oui = vue.mesurer(!vue.mesurer());
+      etat(oui ? "Mesure : clique deux points. Accroche aux sommets (carré), milieux (triangle), arêtes (losange), sinon à la face (rond). Échap pour annuler ou quitter." : "Mesure terminée.");
+      maj();
+    },
+    "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures effacées."); maj(); },
     exporter: function(){ exporter(null); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
@@ -1207,6 +1229,7 @@
         ["Ctrl+Z / Ctrl+Y", "Annuler / Rétablir"], ["Suppr", "Supprimer la sélection"], ["Ctrl+A", "Tout sélectionner"], ["Échap", "Ne rien sélectionner"],
         ["F", "Recadrer"], ["1 · 2 · 3 · 4", "Vue isométrique, dessus, face, côté"], ["H · I · Maj+H", "Masquer, isoler, tout afficher"],
         ["Z", "Zoomer sur la sélection"], ["B · Maj+B", "Boîte de coupe autour de la sélection, la retirer"],
+        ["M", "Mesurer (deux clics ; Échap : annuler le point, puis quitter)"],
         ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
         ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe"]
@@ -1324,7 +1347,9 @@
     else if (mod && k === "a") c = "tout";
     else if (mod || e.altKey) return;
     else if (e.key === "Delete" && choix.size) c = "supprimer";
+    else if (e.key === "Escape" && vue.annulerMesure()){ e.preventDefault(); etat(vue.mesurer() ? "Point de départ annulé." : "Mesure terminée."); maj(); return; }
     else if (e.key === "Escape" && choix.size) c = "rien";
+    else if (k === "m") c = "mesurer";
     else if (k === "f") c = "recadrer";
     else if (k === "1") c = "vue-iso";
     else if (k === "2") c = "vue-dessus";
