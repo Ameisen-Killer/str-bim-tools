@@ -109,7 +109,7 @@
     return lireFichier(fic).then(function(buf){
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=1"); }
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=2"); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
@@ -170,6 +170,40 @@
       });
     });
     return suite;
+  }
+
+  // Toutes les maquettes ouvertes (modifications comprises) deviennent une seule, à exporter ensuite
+  function fusionnerTout(){
+    if (fichiers.length < 2) return;
+    var n = fichiers.length, base = fichiers.map(function(f){ return f.m.nom.replace(/\.ifc$/i, ""); }).join("+");
+    var nom = "fusion_" + (base.length <= 60 ? base : n + "_maquettes") + ".ifc";
+    if (!confirm("Les " + n + " maquettes ouvertes vont être remplacées par une seule, « " + nom + " », avec leurs modifications. " +
+      "Rien n'est perdu tant que tu ne fermes pas la page sans exporter. Continuer ?")) return;
+    var t0 = performance.now(), ms = fichiers.map(function(f){ return f.m; }), bilan = null;
+    $("#chargement").hidden = false;
+    progresLecture("Fusion des maquettes…", 0);
+    pause().then(function(){
+      return IFC.fusionner(ms, nom, function(p){ progresLecture("Fusion des maquettes : " + Math.floor(100*p) + " %", p); });
+    }).then(function(r){
+      bilan = r;
+      return preparer([r.m]);
+    }).then(function(){
+      progresLecture("Affichage…", 1);
+      return pause();
+    }).then(function(){
+      $("#chargement").hidden = true;
+      vider();
+      ouvrir([bilan.m], performance.now() - t0, []);
+      fichiers[0].propre = -1;            // jamais exportée : comptée comme modifiée
+      rendreListe(); maj();
+      etat("Fusion de " + n + " maquettes : « " + nom + " », " + pluriel(bilan.m.ent.size, "entité") + ". Exporte-la avec Ctrl+S." +
+        (bilan.unites ? " Attention : unités de longueur différentes (" + bilan.unites.map(function(u){ return u || "?"; }).join(", ") + "), les maquettes ne sont pas à la même échelle." : "") +
+        (bilan.guidsDoubles ? " Attention : " + pluriel(bilan.guidsDoubles, "GlobalId en double", "GlobalId en double") + " (même maquette ouverte deux fois ?)." : ""));
+    }).catch(function(err){
+      $("#chargement").hidden = true;
+      if (window.console) console.error(err);
+      etat(err && err.ifc ? err.message : "Fusion impossible (" + (err && err.message || err) + ").");
+    });
   }
 
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
@@ -803,6 +837,8 @@
     activerCmd("figer-coupe", vue.aCoupe());
     $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
+    activerCmd("fusionner", fichiers.length > 1);
+    $("#cmd-fusionner").textContent = fichiers.length > 1 ? "Fusionner les " + fichiers.length + " maquettes" : "Fusionner les maquettes";
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
     [].forEach.call(document.querySelectorAll("[data-geo]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-geo") === geoVoulue)); });
@@ -966,6 +1002,7 @@
       remplacer = true; choisir();
     },
     ajouter: function(){ remplacer = false; choisir(); },
+    fusionner: fusionnerTout,
     exporter: function(){ exporter(null); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){

@@ -771,12 +771,114 @@
     return t;
   }
   function nomExport(nom){
+    if (/^fusion_/i.test(nom)) return nom;            // une fusion porte déjà un nom à elle
     return nom.replace(/\.ifc$/i, "") + "_modifie.ifc";
+  }
+
+  // ================= Fusion =================
+  // Réécrit les références #n hors chaînes (y compris l'identifiant en tête de ligne) avec nouveau(n).
+  function renumeroter(s, nouveau){
+    var out = [], n = s.length, i = 0, d = 0, c, v;
+    while (i < n){
+      c = s.charCodeAt(i);
+      if (c === 39){
+        i++;
+        while (i < n){
+          if (s.charCodeAt(i) === 39){ if (s.charCodeAt(i + 1) === 39){ i += 2; continue; } break; }
+          i++;
+        }
+        i++; continue;
+      }
+      if (c === 35){
+        var j = i + 1; v = 0;
+        while (j < n){ c = s.charCodeAt(j); if (c < 48 || c > 57) break; v = v*10 + (c - 48); j++; }
+        if (v > 0){ out.push(s.slice(d, i + 1), String(nouveau(v))); d = j; }
+        i = j; continue;
+      }
+      i++;
+    }
+    out.push(s.slice(d));
+    return out.join("");
+  }
+  // Unité de longueur d'un modèle (pour signaler des maquettes à des échelles différentes)
+  function uniteLongueur(m){
+    var u = "";
+    m.ent.forEach(function(e){
+      if (u || (e.type !== "IFCSIUNIT" && e.type !== "IFCCONVERSIONBASEDUNIT")) return;
+      var a = champs(e);
+      if (!a[1] || a[1].enu !== "LENGTHUNIT") return;
+      u = e.type === "IFCSIUNIT" ? ((a[2] && a[2].enu) || "") + (a[3] && a[3].enu || "") : chaine(a[2]);
+    });
+    return u;
+  }
+  // Fusion de plusieurs modèles en un seul : les identifiants sont décalés fichier par fichier, les
+  // projets des fichiers suivants disparaissent au profit de celui du premier (leurs sites s'y rattachent)
+  // et leurs contextes de représentation s'ajoutent à la liste du projet gardé. Promesse du modèle fusionné
+  // et d'un bilan { unites, guidsDoubles } ; progres(0–1). Les modèles d'origine ne sont pas touchés.
+  function fusionner(ms, nom, progres){
+    if (ms.length < 2) return Promise.reject(erreur("Il faut au moins deux maquettes pour une fusion."));
+    var schemas = ms.map(function(m){ return m.schema; });
+    if (schemas.some(function(x){ return x !== schemas[0]; }))
+      return Promise.reject(erreur("Fusion impossible : les maquettes n'ont pas le même schéma (" + schemas.join(", ") + ")."));
+    var m0 = ms[0], projet0 = 0;
+    m0.ent.forEach(function(e){ if (!projet0 && e.type === "IFCPROJECT") projet0 = e.id; });
+    if (!projet0) return Promise.reject(erreur("Fusion impossible : « " + m0.nom + " » n'a pas d'IfcProject."));
+    var ent = new Map(), ordre = [], decal = 0, contextes = [], total = 0, guids = new Set(), doublons = 0;
+    ms.forEach(function(m){ total += m.ordre.length; });
+    var unites = ms.map(uniteLongueur);
+    var suite = Promise.resolve();
+    ms.forEach(function(m, k){
+      suite = suite.then(function(){
+        var d = decal, projets = new Set(), max = 0;
+        m.ent.forEach(function(e){ if (e.id > max) max = e.id; if (k > 0 && e.type === "IFCPROJECT") projets.add(e.id); });
+        // contextes des projets abandonnés : rattachés au projet gardé
+        projets.forEach(function(id){ refsListe(champs(m.ent.get(id))[7]).forEach(function(r){ contextes.push(r + d); }); });
+        function nouveau(id){ return projets.has(id) ? projet0 : id + d; }
+        var ids = m.ordre, i = 0;
+        decal += max;
+        return new Promise(function(ok, ko){
+          (function tranche(){
+            try {
+              var t0 = Date.now();
+              while (i < ids.length && Date.now() - t0 < 40){
+                var e = m.ent.get(ids[i++]);
+                if (!e || projets.has(e.id)) continue;
+                var n = d ? lireEntite(renumeroter(e.src, nouveau)) : e;
+                ent.set(n.id, n); ordre.push(n.id);
+                if (aGlobalId(n)){ var g = champs(n)[0].str; if (guids.has(g)) doublons++; else guids.add(g); }
+              }
+            } catch (err){ ko(err); return; }
+            if (progres) progres(Math.min(1, (ordre.length + projets.size)/total));
+            if (i < ids.length) setTimeout(tranche, 0); else ok();
+          })();
+        });
+      });
+    });
+    return suite.then(function(){
+      var p = ent.get(projet0);
+      if (contextes.length){
+        var a = bruts(p).slice(), liste = a[7] && a[7] !== "$" ? refsListe(valeur(a[7])) : [];
+        a[7] = "(" + liste.concat(contextes).map(function(r){ return "#" + r; }).join(",") + ")";
+        ent.set(projet0, refaire(p, a));
+      }
+      var entetes = m0.entetes.map(function(h){
+        if (!/^FILE_NAME\s*\(/i.test(h)) return h;
+        var q = h.indexOf("("), a = decouper(h, q + 1, h.lastIndexOf(")"));
+        if (!a.length) return h;
+        a[0] = "'" + nom.replace(/'/g, "''") + "'";
+        return h.slice(0, q + 1) + a.join(",") + ")";
+      });
+      var taille = 0;
+      ms.forEach(function(m){ taille += m.taille; });
+      var m = modele({ taille: taille, schema: m0.schema, eol: m0.eol, entetes: entetes, dataDecl: m0.dataDecl, maxId: decal, doublons: 0 }, nom, ent, ordre);
+      return { m: m, unites: unites.every(function(u){ return u === unites[0]; }) ? null : unites, guidsDoubles: doublons };
+    });
   }
 
   global.IFC = {
     lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
-    champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType
+    champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
+    fusionner: fusionner
   };
 })(typeof window !== "undefined" ? window : self);
