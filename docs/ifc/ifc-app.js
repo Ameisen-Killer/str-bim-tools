@@ -247,7 +247,7 @@
   function ouvrir(modeles, ms, refus){
     var premier = !fichiers.length;
     modeles.forEach(function(m){
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m) };
+      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m) };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
@@ -345,19 +345,41 @@
   }
 
   // ================= Liste des éléments =================
-  // Unité de longueur du fichier pour les mesures : symbole et décimales affichées
-  function uniteMesure(m){
-    var u = IFC.uniteLongueur(m).toUpperCase();
-    if (u === "MILLIMETRE") return { nom: "mm", k: 1 };
-    if (u === "CENTIMETRE") return { nom: "cm", k: 2 };
-    if (u === "DECIMETRE") return { nom: "dm", k: 2 };
-    if (u === "METRE") return { nom: "m", k: 3 };
-    if (/FOOT|FEET/.test(u)) return { nom: "ft", k: 3 };
-    if (/INCH/.test(u)) return { nom: "in", k: 2 };
-    return { nom: "", k: 3 };
+  // Unité de longueur : symbole et longueur en mètres ; nom IFC (« MILLIMETRE », « FOOT »…)
+  function uniteDe(u){
+    u = (u || "").toUpperCase();
+    if (u === "MILLIMETRE") return { nom: "mm", f: .001 };
+    if (u === "CENTIMETRE") return { nom: "cm", f: .01 };
+    if (u === "DECIMETRE") return { nom: "dm", f: .1 };
+    if (u === "METRE") return { nom: "m", f: 1 };
+    if (u === "KILOMETRE") return { nom: "km", f: 1000 };
+    if (/FOOT|FEET/.test(u)) return { nom: "ft", f: .3048 };
+    if (/INCH/.test(u)) return { nom: "in", f: .0254 };
+    return { nom: "", f: 1 };
+  }
+  function uniteMesure(m){ return uniteDe(IFC.uniteLongueur(m)); }
+  // Géoréférencement (IFC4 IfcMapConversion, IFC4X3 IfcMapConversionScaled) : origine E N H en unités de la carte,
+  // rotation de l'axe X, échelles ; fu : mètres par unité de la carte (MapUnit de l'IfcProjectedCRS, mètre sinon)
+  function conversionCarte(m){
+    var r = null, up = uniteMesure(m).f;
+    m.ent.forEach(function(e){
+      if (r || (e.type !== "IFCMAPCONVERSION" && e.type !== "IFCMAPCONVERSIONSCALED")) return;
+      var a = IFC.champs(e), crs = m.ent.get(IFC.idRef(a[1])), fu = 1, nom = "";
+      if (crs && crs.type === "IFCPROJECTEDCRS"){
+        var c = IFC.champs(crs), u = m.ent.get(IFC.idRef(c[6]));
+        nom = IFC.chaine(c[0]);
+        if (u){ var b = IFC.champs(u); fu = uniteDe(u.type === "IFCSIUNIT" ? ((b[2] && b[2].enu) || "") + ((b[3] && b[3].enu) || "") : IFC.chaine(b[2])).f; }
+      }
+      var n = function(v, d){ var x = IFC.nombre(v); return isFinite(x) ? x : d; };
+      var xa = n(a[5], 1), xo = n(a[6], 0), l = Math.hypot(xa, xo) || 1;
+      // sans Scale : passage des unités du projet à celles de la carte
+      var k = n(a[7], up/fu), fx = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[8], 1) : 1, fy = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[9], 1) : 1, fz = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[10], 1) : 1;
+      r = { E: n(a[2], 0), N: n(a[3], 0), H: n(a[4], 0), c: xa/l, s: xo/l, kx: k*fx, ky: k*fy, kz: k*fz, fu: fu, crs: nom };
+    });
+    return r;
   }
   function reconstruire(){
-    if (fichiers.length) vue.uniteMesure(fichiers[0].unite);
+    vue.formats(formatsMesure());
     lignes = [];
     fichiers.forEach(function(f){
       lignes.push({ fichier: f });
@@ -723,8 +745,9 @@
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
     if (vue.aCoupe()) h.push(bouton("retailler", "Retailler l'IFC selon la boîte…"));
-    h.push("<hr>", bouton("mesurer", vue.mesurer() ? "Arrêter de mesurer" : "Mesurer"));
-    if (vue.nbMesures()) h.push(bouton("effacer-mesures", "Effacer les mesures (" + fmtN(vue.nbMesures()) + ")"));
+    h.push("<hr>", bouton("mesurer", vue.outil() === "mesure" ? "Arrêter de mesurer" : "Mesurer"),
+      bouton("coordonnees", vue.outil() === "point" ? "Arrêter les coordonnées" : "Coordonnées d'un point"));
+    if (vue.nbMesures()) h.push(bouton("effacer-mesures", "Effacer les mesures et coordonnées (" + fmtN(vue.nbMesures()) + ")"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     var fd = fondVue();
@@ -909,7 +932,8 @@
     activerCmd("fusionner", fichiers.length > 1);
     activerCmd("retailler", vue.aCoupe());
     activerCmd("effacer-mesures", vue.nbMesures() > 0);
-    $("#cmd-mesurer").textContent = vue.mesurer() ? "Arrêter de mesurer" : "Mesurer";
+    $("#cmd-mesurer").textContent = vue.outil() === "mesure" ? "Arrêter de mesurer" : "Mesurer";
+    $("#cmd-coord").textContent = vue.outil() === "point" ? "Arrêter les coordonnées" : "Coordonnées d'un point";
     $("#cmd-fusionner").textContent = fichiers.length > 1 ? "Fusionner les " + fichiers.length + " maquettes" : "Fusionner les maquettes";
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
@@ -1127,6 +1151,73 @@
     majLignes(); maj();
   }
 
+  // ================= Préférences : unités et décimales des mesures et des coordonnées =================
+  var UNITES = { mm: .001, cm: .01, dm: .1, m: 1, ft: .3048, "in": .0254 };
+  var DECIMALES = { mm: 1, cm: 2, dm: 2, m: 3, km: 3, ft: 3, "in": 2 };
+  var PREFS = { lu: ["auto", "mm", "cm", "dm", "m", "ft", "in"], ld: ["auto", "0", "1", "2", "3", "4"],
+    cu: ["m", "auto", "mm", "cm", "dm", "ft", "in"], cd: ["auto", "0", "1", "2", "3", "4"], repere: ["fichier", "geo"] };
+  var prefs = (function(){
+    var p = {}, r = {};
+    try { p = JSON.parse(localStorage.getItem("ifc.prefs") || "{}") || {}; } catch (e){}
+    Object.keys(PREFS).forEach(function(k){ r[k] = PREFS[k].indexOf(p[k]) >= 0 ? p[k] : PREFS[k][0]; });
+    return r;
+  })();
+  // Mise en forme d'une valeur en mètres ; décimales « auto » : celles de l'unité, zéros de fin retirés
+  function regle(u, d){
+    var u0 = fichiers.length ? fichiers[0].unite : { nom: "", f: 1 };
+    var nom = u === "auto" ? u0.nom : u, f = u === "auto" ? u0.f : UNITES[u];
+    var k = d === "auto" ? (DECIMALES[nom] != null ? DECIMALES[nom] : 3) : +d;
+    var fmt = new Intl.NumberFormat("fr-CH", { minimumFractionDigits: d === "auto" ? 0 : k, maximumFractionDigits: k });
+    return function(v){ var x = v/f; return fmt.format(Math.abs(x) < Math.pow(10, -k)/2 ? 0 : x) + (nom ? " " + nom : ""); };
+  }
+  // Formats passés à la vue : longueurs et coordonnées (repère du fichier ou géoréférencé), valeurs de la vue
+  // en unités du premier fichier
+  function formatsMesure(){
+    var f0 = fichiers[0], up = f0 ? f0.unite.f : 1, lg = regle(prefs.lu, prefs.ld), co = regle(prefs.cu, prefs.cd);
+    var g = prefs.repere === "geo" && f0 && f0.carte;
+    return {
+      longueur: function(v){ return lg(v*up); },
+      point: function(p, zSeul){
+        var q = g ? [g.E + g.kx*(p[0]*g.c - p[1]*g.s), g.N + g.ky*(p[0]*g.s + p[1]*g.c), g.H + g.kz*p[2]].map(function(v){ return v*g.fu; })
+          : p.map(function(v){ return v*up; });
+        var noms = g ? ["E", "N", "H"] : ["X", "Y", "Z"];
+        return (zSeul ? [2] : [0, 1, 2]).map(function(i){ return noms[i] + " " + co(q[i]); });
+      }
+    };
+  }
+  function noteGeo(){
+    var f0 = fichiers[0], g = f0 && f0.carte;
+    $("#pref-geo").textContent = !f0 ? "" : g
+      ? "Géoréférencement lu dans « " + f0.m.nom + " »" + (g.crs ? " (" + g.crs + ")" : "") + " : E " + regle("m", "3")(g.E*g.fu) + ", N " + regle("m", "3")(g.N*g.fu) + ", H " + regle("m", "3")(g.H*g.fu) + "."
+      : "« " + f0.m.nom + " » n'a pas d'IfcMapConversion : les coordonnées restent celles du fichier.";
+  }
+  function preferences(){
+    var d = $("#preferences");
+    Object.keys(PREFS).forEach(function(k){ $("#pref-" + k).value = prefs[k]; });
+    noteGeo();
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+  }
+  function appliquerPrefs(){
+    try { localStorage.setItem("ifc.prefs", JSON.stringify(prefs)); } catch (e){}
+    vue.formats(formatsMesure());
+  }
+  Object.keys(PREFS).forEach(function(k){
+    $("#pref-" + k).addEventListener("change", function(){ prefs[k] = PREFS[k].indexOf(this.value) >= 0 ? this.value : PREFS[k][0]; appliquerPrefs(); });
+  });
+  $("#pref-defaut").addEventListener("click", function(){
+    Object.keys(PREFS).forEach(function(k){ prefs[k] = PREFS[k][0]; $("#pref-" + k).value = prefs[k]; });
+    appliquerPrefs();
+  });
+
+  // Outil de la vue : "mesure", "point" ou aucun (même commande : bascule)
+  function outil(nom){
+    var o = vue.outil(vue.outil() === nom ? null : nom);
+    etat(o === "mesure" ? "Mesure : clique deux points. Accroche aux sommets (carré), milieux (triangle), arêtes (losange), sinon à la face (rond) : depuis une face, la mesure part perpendiculairement à elle. Échap pour annuler ou quitter."
+      : o === "point" ? "Coordonnées : clique un sommet, un milieu ou une arête pour ses trois coordonnées, une face pour sa seule altitude. Unités et repère : Outils > Préférences. Échap pour quitter."
+      : "Outil terminé.");
+    maj();
+  }
+
   // ================= Commandes (menus et raccourcis) =================
   var remplacer = false;
   function vider(){
@@ -1153,12 +1244,10 @@
     ajouter: function(){ remplacer = false; choisir(); },
     fusionner: fusionnerTout,
     retailler: retailler,
-    mesurer: function(){
-      var oui = vue.mesurer(!vue.mesurer());
-      etat(oui ? "Mesure : clique deux points. Accroche aux sommets (carré), milieux (triangle), arêtes (losange), sinon à la face (rond) : depuis une face, la mesure part perpendiculairement à elle. Échap pour annuler ou quitter." : "Mesure terminée.");
-      maj();
-    },
-    "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures effacées."); maj(); },
+    mesurer: function(){ outil("mesure"); },
+    coordonnees: function(){ outil("point"); },
+    "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures et coordonnées effacées."); maj(); },
+    preferences: preferences,
     exporter: function(){ exporter(null); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
@@ -1230,6 +1319,7 @@
         ["F", "Recadrer"], ["1 · 2 · 3 · 4", "Vue isométrique, dessus, face, côté"], ["H · I · Maj+H", "Masquer, isoler, tout afficher"],
         ["Z", "Zoomer sur la sélection"], ["B · Maj+B", "Boîte de coupe autour de la sélection, la retirer"],
         ["M", "Mesurer (deux clics ; Échap : annuler le point, puis quitter)"],
+        ["C", "Coordonnées d'un point (X Y Z ; sur une face : Z seul)"],
         ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
         ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe"]
@@ -1336,7 +1426,7 @@
 
   // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
-    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open) return;
+    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open || $("#preferences").open) return;
     var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
     var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
     if (mod && k === "o") c = e.shiftKey ? "ajouter" : "ouvrir";
@@ -1347,9 +1437,10 @@
     else if (mod && k === "a") c = "tout";
     else if (mod || e.altKey) return;
     else if (e.key === "Delete" && choix.size) c = "supprimer";
-    else if (e.key === "Escape" && vue.annulerMesure()){ e.preventDefault(); etat(vue.mesurer() ? "Point de départ annulé." : "Mesure terminée."); maj(); return; }
+    else if (e.key === "Escape" && vue.annulerMesure()){ e.preventDefault(); etat(vue.outil() ? "Point de départ annulé." : "Outil terminé."); maj(); return; }
     else if (e.key === "Escape" && choix.size) c = "rien";
     else if (k === "m") c = "mesurer";
+    else if (k === "c") c = "coordonnees";
     else if (k === "f") c = "recadrer";
     else if (k === "1") c = "vue-iso";
     else if (k === "2") c = "vue-dessus";

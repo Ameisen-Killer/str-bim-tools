@@ -1827,16 +1827,20 @@
       });
     }
 
-    // ---------- Mesure : deux clics, accrochage aux sommets, milieux et arêtes vives de l'élément visé ----------
+    // ---------- Mesure (deux clics) et coordonnées (un clic) : accrochage aux sommets, milieux et arêtes vives
+    // de l'élément visé, sinon à la face ----------
     var SVG = "http://www.w3.org/2000/svg", calque = document.createElementNS(SVG, "svg");
     calque.setAttribute("class", "mesures");
     cv.parentNode.appendChild(calque);
-    var mesure = { actif: false, a: null, survol: null, liste: [], unite: { nom: "", k: 3 } };
-    var FMT = {};
-    function longueur(v){
-      var k = mesure.unite.k, f = FMT[k] || (FMT[k] = new Intl.NumberFormat("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: k }));
-      return f.format(Math.abs(v) < Math.pow(10, -k)/2 ? 0 : v) + (mesure.unite.nom ? " " + mesure.unite.nom : "");
-    }
+    // mode : "mesure" ou "point" (coordonnées) ; points : coordonnées relevées
+    var mesure = { actif: false, mode: null, a: null, survol: null, liste: [], points: [] };
+    // Mise en forme fournie par l'application (unités et décimales des préférences) : longueur(v) → texte,
+    // point(p, zSeul) → lignes de texte. Par défaut : nombres bruts du fichier.
+    var formats = {
+      longueur: function(v){ return String(Math.round(v*1000)/1000); },
+      point: function(p, zSeul){ return (zSeul ? ["Z"] : ["X", "Y", "Z"]).map(function(n){ return n + " " + Math.round(p["XYZ".indexOf(n)]*1000)/1000; }); }
+    };
+    function longueur(v){ return formats.longueur(v); }
     // Segment mesuré entre A et B (points accrochés { p, type, n : normale si face }). Une face cliquée en
     // premier : la mesure part perpendiculairement à elle jusqu'au plan parallèle qui passe par B ; une face
     // cliquée en second : la mesure tombe de A perpendiculairement sur elle. pied : bout calculé, relié au
@@ -1906,11 +1910,23 @@
     function placerMesures(c){
       cv.classList.toggle("mesure", mesure.actif);          // le canvas change avec le moteur
       while (calque.firstChild) calque.removeChild(calque.firstChild);
-      if (!W || (!mesure.liste.length && !mesure.actif)) return;
+      if (!W || (!mesure.liste.length && !mesure.points.length && !mesure.actif)) return;
+      mesure.points.forEach(function(P){ etiquette(P, c, calque); });
       mesure.liste.forEach(function(m){ trait(m.a, m.b, c, calque); symbole(m.a.p, m.a.type, c, calque); symbole(m.b.p, m.b.type, c, calque); });
       if (mesure.a && mesure.survol) trait(mesure.a, mesure.survol, c, calque, true);
       if (mesure.a) symbole(mesure.a.p, mesure.a.type, c, calque);
-      if (mesure.survol) symbole(mesure.survol.p, mesure.survol.type, c, calque);
+      if (mesure.survol && mesure.mode === "point") etiquette(mesure.survol, c, calque, true);
+      else if (mesure.survol) symbole(mesure.survol.p, mesure.survol.type, c, calque);
+    }
+    // Coordonnées d'un point : repère, trait de rappel et étiquette (X Y Z, ou Z seul sur une face)
+    function etiquette(P, c, g, provisoire){
+      var q = ecran(c, P.p), x = q[0] + 16, y = q[1] - 16, lignes = formats.point(P.p, P.type === "face");
+      el("line", { x1: q[0], y1: q[1], x2: x, y2: y, "class": "m-aide" }, g);
+      symbole(P.p, P.type, c, g);
+      lignes.forEach(function(t, i){
+        var tx = el("text", { x: x + 4, y: y - (lignes.length - 1 - i)*14, "class": "m-coord" + (provisoire ? " provisoire" : "") }, g);
+        tx.textContent = t;
+      });
     }
     var attenteMesure = 0;
     function survolMesure(e){
@@ -1926,6 +1942,11 @@
       var P = accroche(x, y);
       demander();
       if (!P) return;
+      if (mesure.mode === "point"){
+        mesure.points.push(P); mesure.survol = null;
+        if (rappels.surMesure) rappels.surMesure((P.type === "face" ? "Altitude de la face : " : "Coordonnées : ") + formats.point(P.p, P.type === "face").join(" · ") + ".");
+        return;
+      }
       if (!mesure.a){ mesure.a = P; mesure.survol = null; if (rappels.surMesure) rappels.surMesure(P.n ? "Mesure perpendiculaire à la face : clique le second point (Échap pour annuler)." : "Mesure : clique le second point (Échap pour annuler)."); return; }
       var m = { a: mesure.a, b: P }, t = texteMesure(m.a, m.b);
       mesure.liste.push(m);
@@ -2231,24 +2252,26 @@
       cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
       // Outil de mesure : mode actif ou non (sans argument : l'état) ; les mesures faites restent affichées
-      mesurer: function(oui){
-        if (oui !== undefined){
-          mesure.actif = !!oui; mesure.a = null; mesure.survol = null;
+      // Outil de la vue : "mesure", "point" (coordonnées) ou null ; sans argument : l'outil en cours.
+      // Les mesures et coordonnées relevées restent affichées.
+      outil: function(nom){
+        if (nom !== undefined){
+          mesure.mode = nom || null; mesure.actif = !!mesure.mode; mesure.a = null; mesure.survol = null;
           cv.classList.toggle("mesure", mesure.actif);
           demander();
         }
-        return mesure.actif;
+        return mesure.mode;
       },
-      // Échap : abandonne le premier point posé, sinon quitte le mode ; vrai si quelque chose a changé
+      // Échap : abandonne le premier point posé, sinon quitte l'outil ; vrai si quelque chose a changé
       annulerMesure: function(){
         if (mesure.a){ mesure.a = null; mesure.survol = null; demander(); return true; }
-        if (mesure.actif){ this.mesurer(false); return true; }
+        if (mesure.actif){ this.outil(null); return true; }
         return false;
       },
-      nbMesures: function(){ return mesure.liste.length; },
-      effacerMesures: function(){ mesure.liste = []; mesure.a = null; demander(); },
-      // unité des longueurs affichées : { nom: "mm", k: décimales }
-      uniteMesure: function(u){ mesure.unite = u; demander(); },
+      nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
+      effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
+      // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }
+      formats: function(f){ formats = f; demander(); },
       // Retaille : éléments d'un modèle (ids) rangés par rapport à la boîte de coupe (null sans boîte)
       classerCoupe: function(m, ids){ var G = Gs.get(m); return coupe && G ? classer(G, ids, coupe) : null; },
       // Coupe net les éléments à cheval [{ id, plans }] (découpes IFC) ; renvoie { changement, ids, nonCoupes }

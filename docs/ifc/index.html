@@ -284,6 +284,8 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .mesures text{text-anchor:middle;paint-order:stroke;stroke:var(--vue-fond);stroke-width:4px;stroke-linejoin:round;fill:var(--texte);font-family:var(--mono)}
 .mesures .m-texte{font-size:13px;font-weight:600}
 .mesures .m-delta{font-size:10px;fill:var(--texte-faible)}
+.mesures .m-coord{text-anchor:start;font-size:12px;font-weight:600}
+.mesures .m-coord.provisoire{opacity:.65}
 .vue-outils{position:absolute;top:10px;right:10px;display:flex;gap:6px}
 /* poignées de la boîte de coupe (placées par ifc-vue.js) */
 .poignee{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:rgb(var(--or-rvb));border:2px solid var(--vue-fond);box-shadow:0 0 0 1px rgba(var(--or-rvb),.7),0 2px 8px rgba(0,0,0,.35);cursor:grab;touch-action:none;z-index:2}
@@ -316,6 +318,11 @@ dialog h2{margin:0 0 10px;font-weight:300;font-size:22px}
 dialog p{color:var(--texte-doux);font-size:14.5px}
 dialog p+p{margin-top:8px}
 dialog .actions{margin-top:20px;justify-content:flex-end}
+.prefs fieldset{border:0;padding:0;margin:16px 0 0;min-width:0}
+.prefs legend{padding:0;margin-bottom:4px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
+.prefs label{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:12px;margin-top:8px;font-size:14px;color:var(--texte-doux)}
+.prefs p.pref-note{margin-top:10px;font-size:12.5px;color:var(--texte-faible)}
+.prefs p.pref-note:empty{display:none}
 .aide-table{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:6px;font-size:14px}
 .aide-table kbd{font-family:var(--mono);font-size:11.5px;color:var(--or);white-space:nowrap}
 .aide-table span{color:var(--texte-doux)}
@@ -451,8 +458,6 @@ footer a:hover{color:var(--or)}
                 <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
               </div>
             </div>
-            <button type="button" role="menuitem" data-cmd="mesurer"><span id="cmd-mesurer">Mesurer</span><kbd>M</kbd></button>
-            <button type="button" role="menuitem" data-cmd="effacer-mesures"><span>Effacer les mesures</span><kbd></kbd></button>
             <div class="mb-sm">
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Arborescence</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
@@ -498,6 +503,16 @@ footer a:hover{color:var(--or)}
                   data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace.|Les vitrages gardent leur couleur mais restent opaques."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
               </div>
             </div>
+          </div>
+        </div>
+        <div class="mb-gr">
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Outils</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="mesurer"><span id="cmd-mesurer">Mesurer</span><kbd>M</kbd></button>
+            <button type="button" role="menuitem" data-cmd="coordonnees"><span id="cmd-coord">Coordonnées d'un point</span><kbd>C</kbd></button>
+            <button type="button" role="menuitem" data-cmd="effacer-mesures"><span>Effacer les mesures et coordonnées</span><kbd></kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="preferences"><span>Préférences…</span><kbd></kbd></button>
           </div>
         </div>
         <div class="mb-gr">
@@ -584,6 +599,43 @@ footer a:hover{color:var(--or)}
   </form>
 </dialog>
 
+<dialog id="preferences" class="prefs">
+  <form method="dialog">
+    <h2>Préférences</h2>
+    <fieldset>
+      <legend>Mesures</legend>
+      <label><span>Unité</span><select class="champ" id="pref-lu">
+        <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
+        <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
+      </select></label>
+      <label><span>Précision</span><select class="champ" id="pref-ld">
+        <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
+        <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
+      </select></label>
+    </fieldset>
+    <fieldset>
+      <legend>Coordonnées</legend>
+      <label><span>Unité</span><select class="champ" id="pref-cu">
+        <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
+        <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
+      </select></label>
+      <label><span>Précision</span><select class="champ" id="pref-cd">
+        <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
+        <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
+      </select></label>
+      <label><span>Repère</span><select class="champ" id="pref-repere">
+        <option value="fichier">Celui du fichier (X Y Z)</option><option value="geo">Géoréférencé (E N H)</option>
+      </select></label>
+      <p class="pref-note" id="pref-geo"></p>
+    </fieldset>
+    <p class="pref-note">Appliqué tout de suite et gardé dans ce navigateur.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="pref-defaut">Valeurs par défaut</button>
+      <button type="submit" class="btn" value="ok">Fermer</button>
+    </div>
+  </form>
+</dialog>
+
 <footer class="pied">
   <a class="pied-site" href="/">← str-bim-tools.com</a>
   <div class="pied-droite">
@@ -595,9 +647,9 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=3"></script>
 <script src="/ifc/ifc-core.js?v=5"></script>
-<script src="/ifc/ifc-vue.js?v=23"></script>
+<script src="/ifc/ifc-vue.js?v=24"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=22"></script>
+<script src="/ifc/ifc-app.js?v=23"></script>
 <script src="/assets/menu.js?v=25"></script>
 </body>
 </html>
