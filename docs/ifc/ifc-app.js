@@ -347,7 +347,8 @@
   // ================= Liste des éléments =================
   // Unité de longueur : symbole et longueur en mètres ; nom IFC (« MILLIMETRE », « FOOT »…)
   function uniteDe(u){
-    u = (u || "").toUpperCase();
+    u = (u || "").trim().toUpperCase().replace(/METERS?$|METRES$/, "METRE");
+    u = { M: "METRE", MM: "MILLIMETRE", CM: "CENTIMETRE", DM: "DECIMETRE", KM: "KILOMETRE", FT: "FOOT", IN: "INCH" }[u] || u;
     if (u === "MILLIMETRE") return { nom: "mm", f: .001 };
     if (u === "CENTIMETRE") return { nom: "cm", f: .01 };
     if (u === "DECIMETRE") return { nom: "dm", f: .1 };
@@ -358,25 +359,55 @@
     return { nom: "", f: 1 };
   }
   function uniteMesure(m){ return uniteDe(IFC.uniteLongueur(m)); }
-  // Géoréférencement (IFC4 IfcMapConversion, IFC4X3 IfcMapConversionScaled) : origine E N H en unités de la carte,
-  // rotation de l'axe X, échelles ; fu : mètres par unité de la carte (MapUnit de l'IfcProjectedCRS, mètre sinon)
+  // Géoréférencement (IFC4 IfcMapConversion, IFC4X3 IfcMapConversionScaled, IFC2X3 jeux de propriétés
+  // ePset_MapConversion et ePset_ProjectedCRS) : origine E N H en unités de la carte, rotation de l'axe X,
+  // échelles ; fu : mètres par unité de la carte (MapUnit du système de coordonnées, mètre sinon)
+  function nomUniteIfc(m, u){
+    var b = IFC.champs(u);
+    return u.type === "IFCSIUNIT" ? ((b[2] && b[2].enu) || "") + ((b[3] && b[3].enu) || "") : IFC.chaine(b[2]);
+  }
   function conversionCarte(m){
     var r = null, up = uniteMesure(m).f;
+    function n(v, d){ var x = IFC.nombre(v); return isFinite(x) ? x : d; }
+    function repere(E, N, H, xa, xo, k, fx, fy, fz, fu, nom, source){
+      var l = Math.hypot(xa, xo) || 1;
+      return { E: E, N: N, H: H, c: xa/l, s: xo/l, kx: k*fx, ky: k*fy, kz: k*fz, fu: fu, crs: nom, source: source };
+    }
     m.ent.forEach(function(e){
       if (r || (e.type !== "IFCMAPCONVERSION" && e.type !== "IFCMAPCONVERSIONSCALED")) return;
       var a = IFC.champs(e), crs = m.ent.get(IFC.idRef(a[1])), fu = 1, nom = "";
       if (crs && crs.type === "IFCPROJECTEDCRS"){
         var c = IFC.champs(crs), u = m.ent.get(IFC.idRef(c[6]));
         nom = IFC.chaine(c[0]);
-        if (u){ var b = IFC.champs(u); fu = uniteDe(u.type === "IFCSIUNIT" ? ((b[2] && b[2].enu) || "") + ((b[3] && b[3].enu) || "") : IFC.chaine(b[2])).f; }
+        if (u) fu = uniteDe(nomUniteIfc(m, u)).f;
       }
-      var n = function(v, d){ var x = IFC.nombre(v); return isFinite(x) ? x : d; };
-      var xa = n(a[5], 1), xo = n(a[6], 0), l = Math.hypot(xa, xo) || 1;
       // sans Scale : passage des unités du projet à celles de la carte
-      var k = n(a[7], up/fu), fx = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[8], 1) : 1, fy = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[9], 1) : 1, fz = e.type === "IFCMAPCONVERSIONSCALED" ? n(a[10], 1) : 1;
-      r = { E: n(a[2], 0), N: n(a[3], 0), H: n(a[4], 0), c: xa/l, s: xo/l, kx: k*fx, ky: k*fy, kz: k*fz, fu: fu, crs: nom };
+      var sc = e.type === "IFCMAPCONVERSIONSCALED";
+      r = repere(n(a[2], 0), n(a[3], 0), n(a[4], 0), n(a[5], 1), n(a[6], 0), n(a[7], up/fu),
+        sc ? n(a[8], 1) : 1, sc ? n(a[9], 1) : 1, sc ? n(a[10], 1) : 1, fu, nom, "IfcMapConversion");
     });
-    return r;
+    if (r) return r;
+    // IFC2X3 : propriétés { nom : { v, unite } } des jeux ePset_MapConversion et ePset_ProjectedCRS
+    var jeux = {};
+    m.ent.forEach(function(e){
+      if (e.type !== "IFCPROPERTYSET") return;
+      var a = IFC.champs(e), nj = IFC.chaine(a[2]).toLowerCase();
+      if (nj !== "epset_mapconversion" && nj !== "epset_projectedcrs") return;
+      var j = jeux[nj] || (jeux[nj] = {});
+      (Array.isArray(a[4]) ? a[4] : []).forEach(function(ref){
+        var pe = m.ent.get(IFC.idRef(ref));
+        if (!pe || pe.type !== "IFCPROPERTYSINGLEVALUE") return;
+        var b = IFC.champs(pe);
+        j[IFC.chaine(b[0]).toLowerCase()] = { v: b[2], unite: m.ent.get(IFC.idRef(b[3])) };
+      });
+    });
+    var mc = jeux.epset_mapconversion, pc = jeux.epset_projectedcrs || {};
+    if (!mc || (!mc.eastings && !mc.northings)) return null;
+    var fu = 1, mu = pc.mapunit;
+    if (mu) fu = uniteDe(mu.unite ? nomUniteIfc(m, mu.unite) : IFC.chaine(mu.v)).f;
+    function val(k, d){ return mc[k] ? n(mc[k].v, d) : d; }
+    return repere(val("eastings", 0), val("northings", 0), val("orthogonalheight", 0), val("xaxisabscissa", 1), val("xaxisordinate", 0),
+      val("scale", up/fu), 1, 1, 1, fu, pc.name ? IFC.chaine(pc.name.v) : "", "ePset_MapConversion");
   }
   function reconstruire(){
     vue.formats(formatsMesure());
@@ -1188,8 +1219,8 @@
   function noteGeo(){
     var f0 = fichiers[0], g = f0 && f0.carte;
     $("#pref-geo").textContent = !f0 ? "" : g
-      ? "Géoréférencement lu dans « " + f0.m.nom + " »" + (g.crs ? " (" + g.crs + ")" : "") + " : E " + regle("m", "3")(g.E*g.fu) + ", N " + regle("m", "3")(g.N*g.fu) + ", H " + regle("m", "3")(g.H*g.fu) + "."
-      : "« " + f0.m.nom + " » n'a pas d'IfcMapConversion : les coordonnées restent celles du fichier.";
+      ? "Géoréférencement lu dans « " + f0.m.nom + " » (" + g.source + (g.crs ? ", " + g.crs : "") + ") : E " + regle("m", "3")(g.E*g.fu) + ", N " + regle("m", "3")(g.N*g.fu) + ", H " + regle("m", "3")(g.H*g.fu) + "."
+      : "« " + f0.m.nom + " » n'a ni IfcMapConversion ni ePset_MapConversion : les coordonnées restent celles du fichier.";
   }
   function preferences(){
     var d = $("#preferences");
