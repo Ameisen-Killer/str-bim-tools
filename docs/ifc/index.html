@@ -269,6 +269,7 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 /* aperçu 3D */
 .p-vue{position:relative;background:var(--vue-fond)}
 .p-vue canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.p-vue canvas.sur-objet{cursor:default}     /* flèche au survol d'un objet, main ailleurs */
 .p-vue canvas.tire{cursor:grabbing}
 .vue-outils{position:absolute;top:10px;right:10px;display:flex;gap:6px}
 /* poignées de la boîte de coupe (placées par ifc-vue.js) */
@@ -576,7 +577,7 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=2"></script>
 <script src="/ifc/ifc-core.js?v=3"></script>
-<script src="/ifc/ifc-vue.js?v=16"></script>
+<script src="/ifc/ifc-vue.js?v=17"></script>
 <script src="/ifc/ifc-moteurs.js?v=2"></script>
 <script src="/ifc/ifc-app.js?v=16"></script>
 <script src="/assets/menu.js?v=25"></script>

@@ -1579,6 +1579,19 @@
       if (!p) return;
       centre = p; px = x - W/2; py = y - H/2;
     }
+    // Survol à la souris : flèche sur un objet, main sur le vide. L'objet n'est cherché que quand la souris
+    // marque une courte pause, pour ne pas refaire le rendu de sélection à chaque pixel.
+    var attenteSurvol = 0;
+    function survolObjet(e){
+      clearTimeout(attenteSurvol);
+      var p = local(e), ici = cv;
+      attenteSurvol = setTimeout(function(){
+        if (ici !== cv || ptrs.size || !W || !H) return;
+        var k = M.viser(camera(), p.x, p.y);
+        if (M.nom === "WebGL") demander();
+        cv.classList.toggle("sur-objet", k > 0 && !!liste[k - 1]);
+      }, 60);
+    }
     function brancher(){
       cv.addEventListener("pointerdown", function(e){
         try { cv.setPointerCapture(e.pointerId); } catch (x){}
@@ -1590,7 +1603,7 @@
       cv.addEventListener("pointermove", function(e){
         if (coupe && souris && e.pointerType === "mouse") survoler(pres(local(e).x, local(e).y));
         var p = ptrs.get(e.pointerId);
-        if (!p) return;
+        if (!p){ if (e.pointerType === "mouse") survolObjet(e); return; }
         var n = local(e);
         if (ptrs.size === 1){
           if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
@@ -1637,6 +1650,7 @@
       }
       cv.addEventListener("pointerup", fin);
       cv.addEventListener("pointerleave", function(e){
+        clearTimeout(attenteSurvol); cv.classList.remove("sur-objet");
         var r = e.relatedTarget;
         if (!(r && r.classList && r.classList.contains("poignee"))) survoler(false);     // passer sur une poignée n'est pas sortir
       });
