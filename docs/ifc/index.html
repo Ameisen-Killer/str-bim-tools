@@ -103,7 +103,10 @@ button,input,select{font:inherit;color:inherit}
 .vu .draw{stroke-dashoffset:0}
 
 /* ---------- Accueil : chargement du fichier ---------- */
-.accueil{min-height:100svh;display:grid;grid-template-rows:minmax(220px,1fr) auto;padding:calc(var(--haut-barre) + 12px) var(--g) clamp(28px,6vh,64px);max-width:1360px;margin-inline:auto}
+/* accueil et pied de page tiennent ensemble dans la hauteur de l'écran (pas d'ascenseur) */
+body:not(.edition){display:flex;flex-direction:column;min-height:100vh;min-height:100svh}
+body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column}
+.accueil{flex:1 0 auto;width:100%;display:grid;grid-template-rows:minmax(220px,1fr) auto;padding:calc(var(--haut-barre) + 12px) var(--g) clamp(28px,6vh,64px);max-width:1360px;margin-inline:auto}
 .accueil-scene{position:relative;min-height:300px}
 .accueil-scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
 .accueil-scene canvas:active{cursor:grabbing}
