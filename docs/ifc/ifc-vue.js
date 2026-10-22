@@ -1837,12 +1837,19 @@
       var k = mesure.unite.k, f = FMT[k] || (FMT[k] = new Intl.NumberFormat("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: k }));
       return f.format(Math.abs(v) < Math.pow(10, -k)/2 ? 0 : v) + (mesure.unite.nom ? " " + mesure.unite.nom : "");
     }
-    // A, B : points accrochés { p, type, n (normale si face) } ; une face cliquée donne aussi la distance
-    // perpendiculaire à son plan (entre deux faces parallèles : leur écartement)
+    // Segment mesuré entre A et B (points accrochés { p, type, n : normale si face }). Une face cliquée en
+    // premier : la mesure part perpendiculairement à elle jusqu'au plan parallèle qui passe par B ; une face
+    // cliquée en second : la mesure tombe de A perpendiculairement sur elle. pied : bout calculé, relié au
+    // point cliqué par un trait d'aide.
+    function segment(A, B){
+      var a = A.p, b = B.p, k;
+      if (A.n){ k = dot(A.n, [b[0] - a[0], b[1] - a[1], b[2] - a[2]]); return { a: a, b: [a[0] + A.n[0]*k, a[1] + A.n[1]*k, a[2] + A.n[2]*k], perp: true }; }
+      if (B.n){ k = dot(B.n, [a[0] - b[0], a[1] - b[1], a[2] - b[2]]); return { a: a, b: [a[0] - B.n[0]*k, a[1] - B.n[1]*k, a[2] - B.n[2]*k], perp: true }; }
+      return { a: a, b: b, perp: false };
+    }
     function texteMesure(A, B){
-      var a = A.p, b = B.p, d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], F = A.n ? A : B.n ? B : null;
-      return { l: longueur(Math.hypot(d[0], d[1], d[2])), d: "ΔX " + longueur(Math.abs(d[0])) + " · ΔY " + longueur(Math.abs(d[1])) + " · ΔZ " + longueur(Math.abs(d[2])),
-        perp: F ? "⊥ face : " + longueur(Math.abs(dot(F.n, d))) : "" };
+      var S = segment(A, B), d = [S.b[0] - S.a[0], S.b[1] - S.a[1], S.b[2] - S.a[2]];
+      return { S: S, l: (S.perp ? "⊥ " : "") + longueur(Math.hypot(d[0], d[1], d[2])), d: "ΔX " + longueur(Math.abs(d[0])) + " · ΔY " + longueur(Math.abs(d[1])) + " · ΔZ " + longueur(Math.abs(d[2])) };
     }
     // point visé, accroché au plus proche : sommet (12 px), milieu d'arête (10 px), arête (8 px), sinon la face
     function accroche(x, y){
@@ -1883,13 +1890,18 @@
       else el("circle", { cx: x, cy: y, r: 4, "class": "m-point" }, g);
     }
     function trait(A, B, c, g, provisoire){
-      var p = ecran(c, A.p), q = ecran(c, B.p), t = texteMesure(A, B), mx = (p[0] + q[0])/2, my = (p[1] + q[1])/2;
+      var t = texteMesure(A, B), p = ecran(c, t.S.a), q = ecran(c, t.S.b), mx = (p[0] + q[0])/2, my = (p[1] + q[1])/2;
+      if (t.S.perp){
+        // trait d'aide entre le point cliqué et le pied de la perpendiculaire
+        var r = ecran(c, B.p);
+        if (Math.hypot(r[0] - q[0], r[1] - q[1]) > 1) el("line", { x1: r[0], y1: r[1], x2: q[0], y2: q[1], "class": "m-aide" }, g);
+        el("circle", { cx: q[0], cy: q[1], r: 2.5, "class": "m-pied" }, g);
+      }
       el("line", { x1: p[0], y1: p[1], x2: q[0], y2: q[1], "class": "m-trait" + (provisoire ? " provisoire" : "") }, g);
       var tx = el("text", { x: mx, y: my - 8, "class": "m-texte" }, g);
       tx.textContent = t.l;
       var td = el("text", { x: mx, y: my + 14, "class": "m-delta" }, g);
       td.textContent = t.d;
-      if (t.perp){ var tp = el("text", { x: mx, y: my + 28, "class": "m-delta" }, g); tp.textContent = t.perp; }
     }
     function placerMesures(c){
       cv.classList.toggle("mesure", mesure.actif);          // le canvas change avec le moteur
@@ -1914,11 +1926,11 @@
       var P = accroche(x, y);
       demander();
       if (!P) return;
-      if (!mesure.a){ mesure.a = P; mesure.survol = null; if (rappels.surMesure) rappels.surMesure("Mesure : clique le second point (Échap pour annuler)."); return; }
+      if (!mesure.a){ mesure.a = P; mesure.survol = null; if (rappels.surMesure) rappels.surMesure(P.n ? "Mesure perpendiculaire à la face : clique le second point (Échap pour annuler)." : "Mesure : clique le second point (Échap pour annuler)."); return; }
       var m = { a: mesure.a, b: P }, t = texteMesure(m.a, m.b);
       mesure.liste.push(m);
       mesure.a = null; mesure.survol = null;
-      if (rappels.surMesure) rappels.surMesure("Mesure : " + t.l + " (" + t.d + (t.perp ? " · " + t.perp : "") + ").");
+      if (rappels.surMesure) rappels.surMesure("Mesure" + (t.S.perp ? " perpendiculaire à la face" : "") + " : " + t.l.replace(/^⊥ /, "") + " (" + t.d + ").");
     }
 
     function boite(){

@@ -1155,7 +1155,7 @@
     retailler: retailler,
     mesurer: function(){
       var oui = vue.mesurer(!vue.mesurer());
-      etat(oui ? "Mesure : clique deux points. Accroche aux sommets (carré), milieux (triangle), arêtes (losange), sinon à la face (rond). Échap pour annuler ou quitter." : "Mesure terminée.");
+      etat(oui ? "Mesure : clique deux points. Accroche aux sommets (carré), milieux (triangle), arêtes (losange), sinon à la face (rond) : depuis une face, la mesure part perpendiculairement à elle. Échap pour annuler ou quitter." : "Mesure terminée.");
       maj();
     },
     "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures effacées."); maj(); },
