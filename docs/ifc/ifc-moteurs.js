@@ -222,7 +222,7 @@
             pass.setVertexBuffer(0, quad); pass.setVertexBuffer(1, quadCol);
             pass.draw(6, 1, 6*ax);
           });
-          if (coupe && cadre && cadreCol){
+          if (coupe && cadre && cadreCol && !c.sansCadre){
             pass.setPipeline(pCadre); pass.setBindGroup(0, G2);
             pass.setVertexBuffer(0, cadre); pass.setVertexBuffer(1, cadreCol);
             pass.draw(24);
@@ -381,6 +381,7 @@
         soleil.target.position.set(C[0], C[1], C[2]);
         soleil.target.updateMatrixWorld();
         sections(c);
+        if (cadre) cadre.visible = !c.sansCadre;
         R.render(scene, cam);
       }
       return {

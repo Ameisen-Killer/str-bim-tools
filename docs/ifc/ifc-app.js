@@ -694,7 +694,8 @@
       h.push(boutonsVue(c), "<hr>");
     }
     else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
-    if (vue.aCoupe()) h.push(bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
+    if (vue.aCoupe()) h.push(bouton("cadre-coupe", vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe"),
+      bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
     montrerCtx(x, y, h, { vue: true, cle: cl, cles: c });
@@ -835,6 +836,8 @@
     activerCmd("coupe", n > 0 || a);
     activerCmd("sans-coupe", vue.aCoupe());
     activerCmd("figer-coupe", vue.aCoupe());
+    activerCmd("cadre-coupe", vue.aCoupe());
+    $("#cmd-cadre").textContent = vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe";
     $("#cmd-figer").textContent = vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe";
     activerCmd("rien", n > 0);
     activerCmd("fusionner", fichiers.length > 1);
@@ -1028,6 +1031,11 @@
     zoomer: function(){ zoomerCles(cibles()); },
     coupe: function(){ couperCles(cibles()); },
     "sans-coupe": sansCoupe,
+    "cadre-coupe": function(){
+      var v = vue.cadre(!vue.cadre());
+      etat(v ? "Boîte de coupe affichée." : "Boîte de coupe masquée : la coupe reste active.");
+      maj();
+    },
     "figer-coupe": function(){
       var f = vue.figer(!vue.fige());
       etat(f ? "Boîte de coupe figée : poignées masquées." : "Boîte de coupe libérée : tire les poignées pour la retoucher.");

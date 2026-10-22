@@ -914,7 +914,7 @@
         gl.disable(gl.BLEND);
       }
       if (coupe) remplirCoupes(c, M);
-      if (coupe){
+      if (coupe && !c.sansCadre){
         // arêtes de la boîte de coupe, en or, visibles à travers les pièces
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
@@ -1225,7 +1225,7 @@
           ctx.stroke();
         }
       }
-      if (coupe){
+      if (coupe && !c.sansCadre){
         var A = aretesBoite(coupe);
         ctx.beginPath();
         for (var u = 0; u < A.length; u += 3){
@@ -1348,7 +1348,7 @@
       return { geos: geos, teintes: teintes, info: { elements: geos.size, couleurs: teintes.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
-    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null;
+    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -1408,7 +1408,7 @@
         lu*cb + lv*sb
       ];
       return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: dpr,
-        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM };
+        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque };
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
@@ -1490,7 +1490,7 @@
     });
     function placerPoignees(c){
       (poignees || []).forEach(function(b, f){
-        if (!coupe || fige){ b.hidden = true; return; }
+        if (!coupe || fige || cadreMasque){ b.hidden = true; return; }
         var p = ecran(c, centreFace(f));
         b.hidden = !(p[0] > -20 && p[0] < W + 20 && p[1] > -20 && p[1] < H + 20);
         b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
@@ -1743,7 +1743,7 @@
           var m = Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
           b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }) };
         }
-        coupe = b; fige = false;
+        coupe = b; fige = false; cadreMasque = false;
         M.coupe(b);
         if (b) cadrerSur(b); else demander();
         return !!b;
@@ -1751,6 +1751,8 @@
       // Boîte figée : plus de poignées, plus de retouche à la souris
       figer: function(oui){ fige = !!oui && !!coupe; demander(); return fige; },
       fige: function(){ return fige; },
+      // Cadre de la boîte (arêtes et poignées) masqué ou affiché ; la coupe reste active
+      cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
       // Changement de moteur à chaud : nouveau canvas, mêmes éléments, même caméra
       // Sans argument : clé du moteur en cours. Avec une clé : promesse du nom du moteur démarré ; le
