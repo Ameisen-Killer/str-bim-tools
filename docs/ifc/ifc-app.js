@@ -698,6 +698,15 @@
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (caches.size) h.push(bouton("tout-afficher", "Tout afficher"));
     h.push(bouton("recadrer", "Recadrer"));
+    var fd = fondVue();
+    function pastilleFond(t){
+      return '<button type="button" role="menuitemradio" data-ctx="fond" data-fond="' + t[0] + '" aria-checked="' + (fd === t[0]) + '" style="--t:' + t[0] + '" title="' + t[1] + '" aria-label="Fond ' + t[1] + '"></button>';
+    }
+    // blanc en premier (demande de Tony), puis le fond du thème, puis les autres
+    h.push("<hr>", '<div class="mb-sous">Fond de la vue 3D</div><div class="teintes">' + pastilleFond(FONDS[0]) +
+      '<button type="button" role="menuitemradio" data-ctx="fond" data-fond="" aria-checked="' + !fd + '" style="--t:linear-gradient(135deg,#070707 50%,#E9E5DA 50%)" title="Selon le thème" aria-label="Fond selon le thème"></button>' +
+      FONDS.slice(1).map(pastilleFond).join("") +
+      '<button type="button" role="menuitem" class="autre" data-ctx="fond-autre" title="Autre couleur…" aria-label="Autre couleur de fond"></button></div>');
     montrerCtx(x, y, h, { vue: true, cle: cl, cles: c });
   }
   function montrerCtx(x, y, h, c){
@@ -724,6 +733,15 @@
     var b = e.target.closest("[data-ctx]");
     if (!b || !cible) return;
     var a = b.getAttribute("data-ctx"), c = cible;
+    if (c.vue && a === "fond-autre"){
+      cibleTeinte = "fond";
+      teinteLibre.value = fondVue() || (document.documentElement.getAttribute("data-theme") === "clair" ? "#e9e5da" : "#070707");
+      teinteLibre.style.left = ctx.style.left; teinteLibre.style.top = ctx.style.top;
+      fermerCtx();
+      try { teinteLibre.showPicker(); } catch (x){ teinteLibre.click(); }
+      return;
+    }
+    if (c.vue && a === "fond"){ fermerCtx(); fondVue(b.getAttribute("data-fond")); return; }
     if (c.vue || a === "masquer" || a === "isoler" || a === "zoomer" || a === "coupe"){
       fermerCtx();
       if (a === "basculer"){ cliqueVue(c.cle); return; }
@@ -768,7 +786,24 @@
   ctx.addEventListener("contextmenu", function(e){ e.preventDefault(); });
   window.addEventListener("resize", fermerCtx);
   $("#liste").addEventListener("scroll", fermerCtx);
-  function surTeinteLibre(){ if (cibleTeinte && fichiers.indexOf(cibleTeinte) >= 0) teinter(cibleTeinte, teinteDe(teinteLibre.value)); }
+  function surTeinteLibre(){
+    if (cibleTeinte === "fond") fondVue(teinteLibre.value);
+    else if (cibleTeinte && fichiers.indexOf(cibleTeinte) >= 0) teinter(cibleTeinte, teinteDe(teinteLibre.value));
+  }
+  // Fond de la vue 3D : couleur choisie (#rrvvbb, gardée pour les prochaines visites) ou "" pour suivre le thème
+  var FONDS = [["#ffffff", "blanc"], ["#000000", "noir"], ["#26282c", "anthracite"], ["#7a7d82", "gris"], ["#d4d6d9", "gris clair"],
+    ["#172338", "bleu nuit"], ["#cfe0ee", "bleu ciel"]];
+  var fondChoisi = (function(){ try { var v = localStorage.getItem("ifc.fond") || ""; return /^#[0-9a-f]{6}$/i.test(v) ? v : ""; } catch (e){ return ""; } })();
+  function fondVue(v){
+    if (v !== undefined){
+      fondChoisi = /^#[0-9a-f]{6}$/i.test(v || "") ? v.toLowerCase() : "";
+      garder("ifc.fond", fondChoisi);
+    }
+    var p = $(".p-vue");
+    if (p){ if (fondChoisi) p.style.setProperty("--vue-fond", fondChoisi); else p.style.removeProperty("--vue-fond"); }
+    return fondChoisi;
+  }
+  fondVue();
   teinteLibre.addEventListener("input", surTeinteLibre);
   teinteLibre.addEventListener("change", surTeinteLibre);
 
