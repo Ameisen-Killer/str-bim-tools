@@ -1,5 +1,5 @@
-// Scène d'ouverture de /ifc/ : un pied de poteau métallique (HEB, platine, raidisseurs, tiges
-// d'ancrage) en volumes ombrés, qui s'assemble pièce par pièce puis tourne lentement (un tour en 60 s).
+// Scène d'ouverture de /ifc/ : un pied de poteau métallique (HEB, platine, raidisseurs, cordons de
+// soudure d'angle, tiges d'ancrage) en volumes ombrés, qui s'assemble pièce par pièce puis tourne lentement (un tour en 60 s).
 // Ensuite, en boucle, un groupe de pièces passe en or (sélection), se soulève et s'efface
 // (suppression), puis revient à sa place (annulation) : le geste de l'outil.
 // WebGL (profondeur exacte, acier ombré, congés du HEB, tiges lisses, ombre douce, reflet au sol, halo
@@ -48,6 +48,27 @@
   }
 
   var HC = 980, EP = 28;                                // hauteur du poteau, épaisseur de platine
+  // Raidisseurs (plats de 14 mm) : origine contre le poteau, direction du plat, longueur ; l'épaisseur suit
+  // du × Z. Coin chanfreiné de 22 mm contre le poteau et la platine.
+  var RAIDISSEURS = [
+    { o: [-7, 150, EP], du: [0, 1, 0], L: 98, d: 1.45, g: "ry" },                 // hors des ailes
+    { o: [7, -150, EP], du: [0, -1, 0], L: 98, d: 1.55, g: "ry" },
+    { o: [5.5, 7, EP], du: [1, 0, 0], L: 248 - 5.5, d: 1.65, g: "rx" },           // dans le plan de l'âme
+    { o: [-5.5, -7, EP], du: [-1, 0, 0], L: 248 - 5.5, d: 1.75, g: "rx" }
+  ];
+  var CORDON_HEB = 9, CORDON_RAID = 7;                  // côtés des cordons d'angle (mm)
+  // contour du HEB sans les congés (canvas), sens trigonométrique
+  var CONTOUR_HEB = [[-150, -150], [150, -150], [150, -131], [5.5, -131], [5.5, 131], [150, 131], [150, 150], [-150, 150], [-150, 131], [-5.5, 131], [-5.5, -131], [-150, -131]];
+  // Cordons d'un raidisseur, des deux côtés du plat : sur la platine (le long du plat) et contre le poteau
+  // (à la verticale), après le chanfrein. f(origine, axe, longueur, a, b) : cordon dans le coin (a, b).
+  function cordonsRaidisseur(r, f){
+    var Z = [0, 0, 1], t = cross(r.du, Z);
+    [0, 14].forEach(function(e, k){
+      var a = k ? t : [-t[0], -t[1], -t[2]], o = [r.o[0] + t[0]*e, r.o[1] + t[1]*e, r.o[2]];
+      f([o[0] + r.du[0]*22, o[1] + r.du[1]*22, o[2]], r.du, r.L - 22, a, Z);
+      f([o[0], o[1], o[2] + 22], Z, 250 - 22, a, r.du);
+    });
+  }
   boite(-260, 260, -260, 260, 0, EP, .2);               // platine
   boite(-150, 150, -150, -131, EP, HC, .75);            // HEB 300 : ailes et âme
   boite(-150, 150, 131, 150, EP, HC, .85);
@@ -57,6 +78,17 @@
   prisme([[-7, -150, EP], [-7, -248, EP], [-7, -150, EP + 250]], [14, 0, 0], 1.55, "ry");
   prisme([[5.5, -7, EP], [248, -7, EP], [5.5, -7, EP + 250]], [0, 14, 0], 1.65, "rx");
   prisme([[-5.5, -7, EP], [-248, -7, EP], [-5.5, -7, EP + 250]], [0, 14, 0], 1.75, "rx");
+  // cordons de soudure d'angle (prismes triangulaires) : tour du HEB sur la platine, raidisseurs sur la
+  // platine et contre le poteau, des deux côtés
+  function plus(a, b, k){ return [a[0] + b[0]*k, a[1] + b[1]*k, a[2] + b[2]*k]; }
+  CONTOUR_HEB.forEach(function(p, i){
+    var q = CONTOUR_HEB[(i + 1) % CONTOUR_HEB.length], e = [q[0] - p[0], q[1] - p[1], 0], l = Math.hypot(e[0], e[1]), n = [e[1]/l, -e[0]/l, 0];
+    var o = [p[0], p[1], EP];
+    prisme([o, plus(o, n, CORDON_HEB), plus(o, [0, 0, 1], CORDON_HEB)], e, .95);
+  });
+  RAIDISSEURS.forEach(function(r){
+    cordonsRaidisseur(r, function(o, ax, len, a, b){ prisme([o, plus(o, a, CORDON_RAID), plus(o, b, CORDON_RAID)], plus([0, 0, 0], ax, len), r.d + .12, r.g); });
+  });
   // tiges d'ancrage : rondelle, écrou, bout de tige
   [[200, 200], [-200, 200], [-200, -200], [200, -200]].forEach(function(p, k){
     var d = 2.05 + k*.14;
@@ -311,10 +343,52 @@
       piece(d, g);
       extruder([[0, 22], [22, 0], [L, 0], [L, 38], [22, 250], [0, 250]], o, du, Z, 14);
     }
-    raidisseur([-7, 150, EP], Y, 98, 1.45, "ry");                 // hors des ailes
-    raidisseur([7, -150, EP], [0, -1, 0], 98, 1.55, "ry");
-    raidisseur([tw, 7, EP], X, 248 - tw, 1.65, "rx");              // dans le plan de l'âme, de part et d'autre
-    raidisseur([-tw, -7, EP], [-1, 0, 0], 248 - tw, 1.75, "rx");
+    // Cordon d'angle : section en quart légèrement bombé, de (c, 0) à (0, c) dans le coin (a, b) ;
+    // [s, h, ns, nh] : position et normale de chaque point de la face bombée
+    function bombe(c){
+      var out = [], bz = c*.16, K = 6;
+      for (var k = 0; k <= K; k++){
+        var t = k/K, s = bz*Math.sin(Math.PI*t)*.707, dc = bz*Math.PI*Math.cos(Math.PI*t)*.707;
+        var ts = c + dc, tz = -c + dc, l = Math.hypot(ts, tz);
+        out.push([c*t + s, c*(1 - t) + s, -tz/l, ts/l]);
+      }
+      return out;
+    }
+    function cordonDroit(o, ax, len, a, b, c){
+      if (dot(cross(a, b), ax) < 0){ var t = a; a = b; b = t; }
+      extruder([[0, 0]].concat(bombe(c).map(function(q){ return [q[1], q[0]]; })), o, a, b, len);
+    }
+    // Cordon tout autour d'un contour (sens trigonométrique), posé sur le plan z : section balayée, coins en onglet
+    function cordonContour(poly, z, c){
+      var n = poly.length, nE = [], mi = [], S = bombe(c), K = S.length - 1, i, k;
+      for (i = 0; i < n; i++){
+        var p = poly[i], q = poly[(i + 1) % n], dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1;
+        nE.push([dy/l, -dx/l]);
+      }
+      for (i = 0; i < n; i++){
+        var u = nE[(i + n - 1) % n], w = nE[i], kk = 1 + u[0]*w[0] + u[1]*w[1];
+        mi.push(kk > .2 ? [(u[0] + w[0])/kk, (u[1] + w[1])/kk] : w);
+      }
+      function P(i, k){ var m = mi[i % n], p = poly[i % n]; return [p[0] + m[0]*S[k][0], p[1] + m[1]*S[k][0], z + S[k][1]]; }
+      function Nn(i, k){ var m = mi[i % n], l = Math.hypot(m[0], m[1]) || 1; return [m[0]/l*S[k][2], m[1]/l*S[k][2], S[k][3]]; }
+      for (i = 0; i < n; i++){
+        for (k = 0; k < K; k++){
+          sommet(P(i, k), Nn(i, k)); sommet(P(i + 1, k), Nn(i + 1, k)); sommet(P(i + 1, k + 1), Nn(i + 1, k + 1));
+          sommet(P(i, k), Nn(i, k)); sommet(P(i + 1, k + 1), Nn(i + 1, k + 1)); sommet(P(i, k + 1), Nn(i, k + 1));
+        }
+        ligne(P(i, 0), P(i + 1, 0)); ligne(P(i, K), P(i + 1, K));          // pieds du cordon
+      }
+    }
+    RAIDISSEURS.forEach(function(r){
+      raidisseur(r.o, r.du, r.L, r.d, r.g);
+      piece(r.d + .12, r.g);
+      cordonsRaidisseur(r, function(o, ax, len, a, b){ cordonDroit(o, ax, len, a, b, CORDON_RAID); });
+    });
+    // cordon du HEB sur la platine, autour du profil (congés compris)
+    var contour = hp.filter(function(p, i){ var q = hp[(i + 1) % hp.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-6; }), a2 = 0;
+    for (var i2 = 0, j2 = contour.length - 1; i2 < contour.length; j2 = i2++) a2 += (contour[j2][0] - contour[i2][0])*(contour[j2][1] + contour[i2][1]);
+    if (a2 < 0) contour.reverse();
+    piece(.95); cordonContour(contour, EP, CORDON_HEB);
     // tiges d'ancrage : plaque de répartition, écrou six pans, tige ronde avec chanfrein
     [[200, 200], [-200, 200], [-200, -200], [200, -200]].forEach(function(p, k){
       var d = 2.05 + k*.14;
