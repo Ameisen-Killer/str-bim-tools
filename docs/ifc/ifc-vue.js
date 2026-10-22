@@ -2031,10 +2031,8 @@
       cv.addEventListener("wheel", function(e){
         e.preventDefault();
         var p = local(e);
-        // molette inversée à la demande de Tony (vers soi : on se rapproche) ; le pincement du pavé tactile
-        // (ctrlKey) garde son sens naturel
-        var sens = e.ctrlKey ? -1 : 1;
-        zoomAutour(Math.exp(sens*e.deltaY*(e.deltaMode === 1 ? .05 : .0015)), p.x, p.y);
+        // sens d'origine, juste avec une vraie souris (molette vers l'avant : on se rapproche)
+        zoomAutour(Math.exp(-e.deltaY*(e.deltaMode === 1 ? .05 : .0015)), p.x, p.y);
         vite = true; demander();
         clearTimeout(minuterie);
         minuterie = setTimeout(function(){ vite = false; demander(); }, 160);
