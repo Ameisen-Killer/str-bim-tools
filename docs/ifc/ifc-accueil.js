@@ -75,7 +75,7 @@
   boite(-150, 150, -150, -131, EP, HC, .75);            // HEB 300 : ailes et âme
   boite(-150, 150, 131, 150, EP, HC, .85);
   boite(-5.5, 5.5, -131, 131, EP, HC, .8);
-  pieces.slice(1, 4).forEach(function(pc){ pc.coupe = true; });   // dessus du HEB : section coupée, en rouge
+  pieces.slice(1, 4).forEach(function(pc){ pc.coupe = true; });   // HEB : coupé par le plan, section en rouge
   // raidisseurs triangulaires, hors des ailes puis de part et d'autre de l'âme
   prisme([[-7, 150, EP], [-7, 248, EP], [-7, 150, EP + 250]], [14, 0, 0], 1.45, "ry");
   prisme([[-7, -150, EP], [-7, -248, EP], [-7, -150, EP + 250]], [14, 0, 0], 1.55, "ry");
@@ -199,7 +199,7 @@
         var ve = [c.eye[0] - m[0], c.eye[1] - m[1], c.eye[2] - m[2]];
         if (dot(n, ve) <= 0) return;                      // face de dos
         var pts = fp.map(function(p){ var q = proj(c, [p[0], p[1], (p[2] + st.dz)*sg]); return [W/2 + q[0]*S, OY - q[1]*S]; });
-        liste.push({ pts: pts, n: n, z: dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw), st: st, ve: norm(ve), coupe: pc.coupe && f.n[2] > .99 });
+        liste.push({ pts: pts, n: n, z: dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw), st: st, ve: norm(ve), coupe: pc.coupe && zc < HC && f.n[2] > .99 });
       });
     });
     liste.sort(function(a, b){ return b.z - a.z; });
@@ -428,7 +428,7 @@
     arc(hp, -tw - r, -ti + r, r, 0, -Q, 6);
     hp.push([-b2, -ti]);
     piece(.75); extruder(hp, [0, 0, EP], X, Y, HC - EP);
-    cour.coupe = HC;                                    // dessus du HEB : section coupée, en rouge
+    cour.coupe = HC;                                    // HEB : coupé par le plan, section en rouge
     // raidisseurs : plats de 14 mm de longueur L, coin chanfreiné contre le poteau, bout incliné ;
     // u part du poteau, v monte ; l'épaisseur suit du × Z, d'où les origines décalées de 7 mm
     function raidisseur(o, du, L, d, g){
@@ -594,7 +594,7 @@
             var st = etats[i];
             if (st.a <= .003 || (st.a >= .999) !== pleines) return;
             if (!refl && !pleines){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
-            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a); gl.uniform1f(u.uCoupe, m.coupe); gl.uniform1f(u.uZc, m.coupe ? zc : LOIN);
+            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a); gl.uniform1f(u.uCoupe, zc < HC ? m.coupe : 0); gl.uniform1f(u.uZc, m.coupe ? zc : LOIN);
             gl.drawArrays(gl.TRIANGLES, m.t0, m.nt);
             gl.disable(gl.BLEND);
           });
