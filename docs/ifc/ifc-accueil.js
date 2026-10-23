@@ -1,7 +1,8 @@
 // Scène d'ouverture de /ifc/ : un pied de poteau métallique (HEB, platine, raidisseurs, cordons de
 // soudure d'angle, tiges d'ancrage) en volumes ombrés, qui s'assemble pièce par pièce puis tourne lentement (un tour en 60 s).
 // Ensuite, en boucle, un groupe de pièces passe en or (sélection), se soulève et s'efface
-// (suppression), puis revient à sa place (annulation) : le geste de l'outil.
+// (suppression), puis revient à sa place (annulation) : le geste de l'outil. Un cycle sur quatre, des cotes
+// se posent une à une comme avec l'outil de mesure (carrés d'accroche, trait doré, longueur) puis s'effacent.
 // WebGL (profondeur exacte, acier ombré, congés du HEB, tiges lisses, ombre douce, reflet au sol, halo
 // doré, reflet qui glisse) ; sans WebGL, le même montage en canvas 2D, faces triées (peintre).
 // Glisser pour tourner. Les animations jouent même si le système demande moins de mouvement (choix de Tony).
@@ -100,7 +101,7 @@
   // points qui servent au cadrage (enveloppe du modèle)
   var sommets = [];
   pieces.forEach(function(pc){ pc.faces.forEach(function(f){ f.p.forEach(function(p){ sommets.push(p); }); }); });
-  var FIN_MONTAGE = 3.4, CYCLE = 7.5, ORDRE = ["ry", "b", "rx"], DEBUT_DEMO = 5;
+  var FIN_MONTAGE = 3.4, CYCLE = 7.5, ORDRE = ["cotes", "ry", "b", "rx"], DEBUT_DEMO = 5;
   var CENTRE = [0, 0, HC*.42], PHI = .3;
 
   // ================= Couleurs (selon le thème) =================
@@ -241,6 +242,65 @@
       ctx.restore();
     }
     peindre(faces(c, T, false), 1, true, Lr);
+    cotes(T, c);
+  }
+
+  // ================= Cotes : calque 2D au-dessus de la scène (WebGL ou canvas) =================
+  var cc = document.createElement("canvas"), cx = cc.getContext("2d");
+  cc.setAttribute("aria-hidden", "true");
+  cc.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+  cv.parentNode.appendChild(cc);
+  var MONO = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim() || "monospace";
+  // extrémités en mm, côté y < 0 ; tournées d'un quart de tour au besoin pour faire face à la caméra
+  var COTES = [
+    [[-260, -260, EP], [260, -260, EP]],                // largeur de la platine
+    [[150, -150, EP], [150, -150, HC]],                 // hauteur du poteau au-dessus de la platine
+    [[-150, -150, HC], [150, -150, HC]]                 // largeur du HEB
+  ];
+  var cycleCotes = -1, quart = 0;
+  function tourne(p, q){ var x = p[0], y = p[1]; for (var i = 0; i < q; i++){ var t = x; x = -y; y = t; } return [x, y, p[2]]; }
+  function cotes(T, c){
+    if (cc.width !== cv.width || cc.height !== cv.height){ cc.width = cv.width; cc.height = cv.height; }
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.clearRect(0, 0, W, H);
+    if (T <= DEBUT_DEMO) return;
+    var k = Math.floor((T - DEBUT_DEMO)/CYCLE), t = (T - DEBUT_DEMO) - k*CYCLE;
+    if (ORDRE[k % ORDRE.length] !== "cotes") return;
+    if (cycleCotes !== k){                               // côté le plus proche de la caméra, choisi au début du cycle
+      cycleCotes = k;
+      var best = Infinity;
+      for (var q = 0; q < 4; q++){
+        var m = tourne([0, -260, EP], q), z = dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw);
+        if (z < best){ best = z; quart = q; }
+      }
+    }
+    function ecran(p){ var r = proj(c, tourne(p, quart)); return [W/2 + r[0]*S, OY - r[1]*S]; }
+    function carre(P, a){
+      cx.globalAlpha = a;
+      cx.fillStyle = css(coul.or, .25); cx.strokeStyle = css(coul.or); cx.lineWidth = 2;
+      cx.fillRect(P[0] - 4, P[1] - 4, 8, 8); cx.strokeRect(P[0] - 4, P[1] - 4, 8, 8);
+    }
+    var fin = 1 - ease(clamp((t - 5.6)/1));
+    cx.font = "600 12px " + MONO; cx.textAlign = "center"; cx.textBaseline = "middle"; cx.lineJoin = "round";
+    COTES.forEach(function(ct, i){
+      var d = .3 + i*1.1;
+      if (t < d) return;
+      var A = ecran(ct[0]), B = ecran(ct[1]), u = ease(clamp((t - d - .25)/.6));
+      var P = [A[0] + (B[0] - A[0])*u, A[1] + (B[1] - A[1])*u];
+      carre(A, fin*clamp((t - d)/.25));
+      cx.globalAlpha = fin;
+      cx.strokeStyle = css(coul.or); cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(A[0], A[1]); cx.lineTo(P[0], P[1]); cx.stroke();
+      var b = fin*clamp((t - d - .85)/.3);
+      if (b <= 0) return;
+      carre(B, b);
+      var l = Math.round(Math.hypot(ct[1][0] - ct[0][0], ct[1][1] - ct[0][1], ct[1][2] - ct[0][2])) + " mm";
+      var M = [(A[0] + B[0])/2, (A[1] + B[1])/2];
+      cx.globalAlpha = b;
+      cx.strokeStyle = css(coul.fond); cx.lineWidth = 4; cx.strokeText(l, M[0], M[1]);
+      cx.fillStyle = css(coul.encre); cx.fillText(l, M[0], M[1]);
+    });
+    cx.globalAlpha = 1;
   }
 
   var dessinerScene = dessiner;
@@ -545,6 +605,7 @@
       });
       gl.depthMask(true);
       gl.disable(gl.BLEND);
+      cotes(T, c);
     }
     cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); });
     cv.addEventListener("webglcontextrestored", function(){ try { init(); } catch (x){} });
