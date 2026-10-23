@@ -291,6 +291,9 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .poignee{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;background:rgb(var(--or-rvb));border:2px solid var(--vue-fond);box-shadow:0 0 0 1px rgba(var(--or-rvb),.7),0 2px 8px rgba(0,0,0,.35);cursor:grab;touch-action:none;z-index:2}
 .poignee{transition:opacity .18s ease,box-shadow .18s ease}
 .poignee.loin{opacity:0;pointer-events:none}
+/* centre de rotation, pendant qu'on fait tourner la vue (placé par ifc-vue.js) */
+.pivot{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:#e0322b;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45),0 1px 6px rgba(0,0,0,.4);pointer-events:none;z-index:2;opacity:0;transition:opacity .25s ease}
+.pivot.montre{opacity:1;transition-duration:.08s}
 .poignee::after{content:"";position:absolute;inset:-10px;border-radius:50%}
 .poignee:hover{box-shadow:0 0 0 4px rgba(var(--or-rvb),.35),0 2px 8px rgba(0,0,0,.35)}
 .poignee.tiree{cursor:grabbing;box-shadow:0 0 0 6px rgba(var(--or-rvb),.3),0 2px 8px rgba(0,0,0,.35)}
@@ -647,7 +650,7 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=5"></script>
-<script src="/ifc/ifc-vue.js?v=24"></script>
+<script src="/ifc/ifc-vue.js?v=25"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
 <script src="/ifc/ifc-app.js?v=24"></script>
 <script src="/assets/menu.js?v=26"></script>

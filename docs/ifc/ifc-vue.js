@@ -1747,6 +1747,7 @@
       M.dessiner(c);
       placerPoignees(c);
       placerMesures(c);
+      placerPivot(c);
     }
 
     // ---------- Poignées de la boîte de coupe : une par face, à tirer pour l'étirer ou la réduire ----------
@@ -1825,6 +1826,19 @@
         b.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
         b.classList.toggle("loin", souris && !survol && !surPoignee && !tire);
       });
+    }
+
+    // ---------- Centre de rotation : point rouge affiché pendant qu'on fait tourner la vue ----------
+    var pivot = document.createElement("div"), enRotation = false;
+    pivot.className = "pivot";
+    pivot.setAttribute("aria-hidden", "true");
+    cv.parentNode.appendChild(pivot);
+    function placerPivot(c){
+      if (enRotation){
+        var p = ecran(c, c.centre);
+        pivot.style.transform = "translate(" + p[0].toFixed(1) + "px," + p[1].toFixed(1) + "px)";
+      }
+      pivot.classList.toggle("montre", enRotation);
     }
 
     // ---------- Mesure (deux clics) et coordonnées (un clic) : accrochage aux sommets, milieux et arêtes vives
@@ -2106,7 +2120,7 @@
           if (bouge){
             var dx = n.x - p.x, dy = n.y - p.y;
             if (e.shiftKey || (e.buttons & 6)){ px += dx; py += dy; }
-            else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); }
+            else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); enRotation = true; }
             vite = true; demander();
           }
           p.x = n.x; p.y = n.y;
@@ -2126,6 +2140,7 @@
         ptrs.delete(e.pointerId);
         if (ptrs.size) return;
         cv.classList.remove("tire");
+        if (enRotation){ enRotation = false; demander(); }
         if (vite){ vite = false; demander(); }
         if (e.type === "pointerup" && !bouge && !multi && mesure.actif && (e.button === 0 || e.pointerType !== "mouse")){
           var pm = local(e);
