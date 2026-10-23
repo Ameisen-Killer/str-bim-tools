@@ -2,7 +2,8 @@
 // soudure d'angle, tiges d'ancrage) en volumes ombrés, qui s'assemble pièce par pièce puis tourne lentement (un tour en 60 s).
 // Ensuite, en boucle, un groupe de pièces passe en or (sélection), se soulève et s'efface
 // (suppression), puis revient à sa place (annulation) : le geste de l'outil. Un cycle sur quatre, des cotes
-// se posent une à une comme avec l'outil de mesure (carrés d'accroche, trait doré, longueur) puis s'effacent.
+// se posent une à une comme avec l'outil de mesure (carrés d'accroche, trait doré, longueur) puis s'effacent ;
+// un autre, un plan de coupe descend le long du HEB puis remonte, la section rouge le suit.
 // WebGL (profondeur exacte, acier ombré, congés du HEB, tiges lisses, ombre douce, reflet au sol, halo
 // doré, reflet qui glisse) ; sans WebGL, le même montage en canvas 2D, faces triées (peintre).
 // Glisser pour tourner. Les animations jouent même si le système demande moins de mouvement (choix de Tony).
@@ -101,7 +102,7 @@
   // points qui servent au cadrage (enveloppe du modèle)
   var sommets = [];
   pieces.forEach(function(pc){ pc.faces.forEach(function(f){ f.p.forEach(function(p){ sommets.push(p); }); }); });
-  var FIN_MONTAGE = 3.4, CYCLE = 7.5, ORDRE = ["cotes", "ry", "b", "rx"], DEBUT_DEMO = 5;
+  var FIN_MONTAGE = 3.4, CYCLE = 7.5, ORDRE = ["coupe", "cotes", "ry", "b", "rx"], DEBUT_DEMO = 5;
   var CENTRE = [0, 0, HC*.42], PHI = .3;
 
   // ================= Couleurs (selon le thème) =================
@@ -168,20 +169,36 @@
     return st;
   }
 
+  // Plan de coupe horizontal du cycle « coupe » : { z : hauteur, a : opacité } ou null. Il apparaît au-dessus
+  // du poteau, descend jusqu'au-dessus des raidisseurs, marque une pause puis remonte.
+  var PLAN = 330;                                       // demi-côté du plan dessiné (mm)
+  function planCoupe(T){
+    if (T <= DEBUT_DEMO) return null;
+    var k = Math.floor((T - DEBUT_DEMO)/CYCLE), t = (T - DEBUT_DEMO) - k*CYCLE;
+    if (ORDRE[k % ORDRE.length] !== "coupe") return null;
+    var haut = HC + 80, bas = 420;
+    var z = t < .6 ? haut : t < 3.6 ? haut + (bas - haut)*ease((t - .6)/3) : t < 4.4 ? bas : t < 6.4 ? bas + (haut - bas)*ease((t - 4.4)/2) : haut;
+    return { z: z, a: clamp(t/.6)*(1 - clamp((t - 6.5)/.6)) };
+  }
+
   // ================= Dessin =================
   var LUM = norm([-.45, -.7, .8]);
   var ROUGE = [200, 46, 40];                            // section coupée, même rouge que la boîte de coupe de l'éditeur
   function faces(c, T, miroir){
-    var liste = [];
+    var liste = [], pl = planCoupe(T), zc = pl ? pl.z : Infinity;
     pieces.forEach(function(pc){
       var st = etatPiece(pc, T);
       if (st.a <= .003) return;
       pc.faces.forEach(function(f){
-        var sg = miroir ? -1 : 1;
-        var n = [f.n[0], f.n[1], f.n[2]*sg], m = [f.m[0], f.m[1], (f.m[2] + st.dz)*sg];
+        var sg = miroir ? -1 : 1, fp = f.p, fm = f.m;
+        if (pc.coupe && zc < HC){                         // HEB coupé : sommets ramenés sous le plan
+          fp = f.p.map(function(p){ return [p[0], p[1], Math.min(p[2], zc)]; });
+          fm = [0, 1, 2].map(function(k){ return fp.reduce(function(s, p){ return s + p[k]; }, 0)/fp.length; });
+        }
+        var n = [f.n[0], f.n[1], f.n[2]*sg], m = [fm[0], fm[1], (fm[2] + st.dz)*sg];
         var ve = [c.eye[0] - m[0], c.eye[1] - m[1], c.eye[2] - m[2]];
         if (dot(n, ve) <= 0) return;                      // face de dos
-        var pts = f.p.map(function(p){ var q = proj(c, [p[0], p[1], (p[2] + st.dz)*sg]); return [W/2 + q[0]*S, OY - q[1]*S]; });
+        var pts = fp.map(function(p){ var q = proj(c, [p[0], p[1], (p[2] + st.dz)*sg]); return [W/2 + q[0]*S, OY - q[1]*S]; });
         liste.push({ pts: pts, n: n, z: dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw), st: st, ve: norm(ve), coupe: pc.coupe && f.n[2] > .99 });
       });
     });
@@ -242,6 +259,17 @@
       ctx.restore();
     }
     peindre(faces(c, T, false), 1, true, Lr);
+    var pl = planCoupe(T);
+    if (pl && pl.a > 0){
+      ctx.beginPath();
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function(s, i){
+        var q = proj(c, [s[0]*PLAN, s[1]*PLAN, pl.z]), x = W/2 + q[0]*S, y = OY - q[1]*S;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = css(coul.or, .08*pl.a); ctx.fill();
+      ctx.strokeStyle = css(coul.or, .8*pl.a); ctx.lineWidth = 1.5; ctx.stroke();
+    }
     cotes(T, c);
   }
 
@@ -464,8 +492,8 @@
     // ---------- Shaders ----------
     var PREC = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
     var SRC = {
-      v: "attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform float uDz;uniform float uMir;uniform float uCoupe;varying vec3 vN;varying vec3 vW;varying float vCoupe;" +
-        "void main(){vec3 w=aP+vec3(0.0,0.0,uDz);w.z*=uMir;vW=w;vN=vec3(aN.xy,aN.z*uMir);" +
+      v: "attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform float uDz;uniform float uMir;uniform float uCoupe;uniform float uZc;varying vec3 vN;varying vec3 vW;varying float vCoupe;" +
+        "void main(){vec3 w=vec3(aP.xy,min(aP.z,uZc))+vec3(0.0,0.0,uDz);w.z*=uMir;vW=w;vN=vec3(aN.xy,aN.z*uMir);" +
         "vCoupe=(uCoupe>0.0&&aP.z>uCoupe-0.5&&aN.z>0.99)?1.0:0.0;gl_Position=uM*vec4(w,1.0);}",
       f: PREC + "uniform vec3 uEye;uniform vec3 uL;uniform vec3 uL2;uniform vec3 uBase;uniform vec3 uOr;uniform vec3 uFond;uniform vec3 uSpec;" +
         "uniform float uSel;uniform float uRefl;uniform float uA;uniform vec3 uRouge;varying vec3 vN;varying vec3 vW;varying float vCoupe;" +
@@ -478,7 +506,7 @@
         "c=mix(c,uOr*(0.62+0.55*lam)+uSpec*0.3*sp,uSel*0.62);" +
         "if(uRefl>0.0){float k=clamp(1.0+vW.z/650.0,0.0,1.0);gl_FragColor=vec4(mix(uFond,c,uRefl*k*k*uA),1.0);}" +
         "else gl_FragColor=vec4(c,uA);}",
-      vl: "attribute vec3 aP;uniform mat4 uM;uniform float uDz;void main(){gl_Position=uM*vec4(aP+vec3(0.0,0.0,uDz),1.0);}",
+      vl: "attribute vec3 aP;uniform mat4 uM;uniform float uDz;uniform float uZc;void main(){gl_Position=uM*vec4(vec3(aP.xy,min(aP.z,uZc))+vec3(0.0,0.0,uDz),1.0);}",
       fl: PREC + "uniform vec4 uC;void main(){gl_FragColor=uC;}",
       vs: "attribute vec3 aP;uniform mat4 uM;varying vec2 vXY;void main(){vXY=aP.xy;gl_Position=uM*vec4(aP,1.0);}",
       fs: PREC + "uniform vec3 uOr;uniform vec3 uOmbre;uniform float uHalo;uniform float uForce;varying vec2 vXY;" +
@@ -497,7 +525,7 @@
       for (var k = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); k < n; k++){ var nom = gl.getActiveUniform(p, k).name; u[nom] = gl.getUniformLocation(p, nom); }
       return { p: p, u: u };
     }
-    var PF, PL, PS, bufP, bufN, bufL, bufS;
+    var PF, PL, PS, bufP, bufN, bufL, bufS, bufQL, bufQT, LOIN = 1e5;
     function init(){
       PF = programme(SRC.v, SRC.f, ["aP", "aN"]); PL = programme(SRC.vl, SRC.fl, ["aP"]); PS = programme(SRC.vs, SRC.fs, ["aP"]);
       var P = [], N = [], L = [];
@@ -506,6 +534,9 @@
         m.l0 = L.length/3; L.push.apply(L, m.L); m.nl = m.L.length/3;
       });
       function buf(data){ var b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW); return b; }
+      var q = PLAN;                                     // plan de coupe à z = 0, déplacé par uDz
+      bufQL = buf([-q, -q, 0, q, -q, 0, q, -q, 0, q, q, 0, q, q, 0, -q, q, 0, -q, q, 0, -q, -q, 0]);
+      bufQT = buf([-q, -q, 0, q, -q, 0, q, q, 0, -q, -q, 0, q, q, 0, -q, q, 0]);
       bufP = buf(P); bufN = buf(N); bufL = buf(L); bufS = buf([-900, -900, 0, 900, -900, 0, 900, 900, 0, -900, -900, 0, 900, 900, 0, -900, 900, 0]);
     }
     try { init(); } catch (e){ if (window.console) console.warn("Scène WebGL indisponible :", e); return false; }
@@ -547,6 +578,7 @@
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
 
       var etats = mailles.map(function(m){ return etatPiece(m, T); });
+      var pl = planCoupe(T), zc = pl ? Math.min(pl.z, LOIN) : LOIN;   // le HEB est coupé à zc (sommets ramenés dessous)
       function faces(refl){
         gl.useProgram(PF.p);
         var u = PF.u;
@@ -562,7 +594,7 @@
             var st = etats[i];
             if (st.a <= .003 || (st.a >= .999) !== pleines) return;
             if (!refl && !pleines){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
-            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a); gl.uniform1f(u.uCoupe, m.coupe);
+            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a); gl.uniform1f(u.uCoupe, m.coupe); gl.uniform1f(u.uZc, m.coupe ? zc : LOIN);
             gl.drawArrays(gl.TRIANGLES, m.t0, m.nt);
             gl.disable(gl.BLEND);
           });
@@ -599,10 +631,21 @@
         if (st.a <= .003 || !m.nl) return;
         var g = Math.max(st.sel, st.lueur), k = cl ? .34 : .3;
         var col = melange(e, coul.or, g);
-        gl.uniform1f(PL.u.uDz, st.dz);
+        gl.uniform1f(PL.u.uDz, st.dz); gl.uniform1f(PL.u.uZc, m.coupe ? zc : LOIN);
         gl.uniform4f(PL.u.uC, col[0]/255, col[1]/255, col[2]/255, (k + (.85 - k)*g)*st.a);
         gl.drawArrays(gl.LINES, m.l0, m.nl);
       });
+      // plan de coupe : voile doré et contour, cachés derrière le poteau
+      if (pl && pl.a > 0){
+        var o = coul.or;
+        gl.uniform1f(PL.u.uDz, pl.z); gl.uniform1f(PL.u.uZc, LOIN);
+        attrib(0, bufQT, 3);
+        gl.uniform4f(PL.u.uC, o[0]/255, o[1]/255, o[2]/255, .1*pl.a);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        attrib(0, bufQL, 3);
+        gl.uniform4f(PL.u.uC, o[0]/255, o[1]/255, o[2]/255, .85*pl.a);
+        gl.drawArrays(gl.LINES, 0, 8);
+      }
       gl.depthMask(true);
       gl.disable(gl.BLEND);
       cotes(T, c);
