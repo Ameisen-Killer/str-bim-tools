@@ -73,6 +73,7 @@
   boite(-150, 150, -150, -131, EP, HC, .75);            // HEB 300 : ailes et âme
   boite(-150, 150, 131, 150, EP, HC, .85);
   boite(-5.5, 5.5, -131, 131, EP, HC, .8);
+  pieces.slice(1, 4).forEach(function(pc){ pc.coupe = true; });   // dessus du HEB : section coupée, en rouge
   // raidisseurs triangulaires, hors des ailes puis de part et d'autre de l'âme
   prisme([[-7, 150, EP], [-7, 248, EP], [-7, 150, EP + 250]], [14, 0, 0], 1.45, "ry");
   prisme([[-7, -150, EP], [-7, -248, EP], [-7, -150, EP + 250]], [14, 0, 0], 1.55, "ry");
@@ -168,6 +169,7 @@
 
   // ================= Dessin =================
   var LUM = norm([-.45, -.7, .8]);
+  var ROUGE = [200, 46, 40];                            // section coupée, même rouge que la boîte de coupe de l'éditeur
   function faces(c, T, miroir){
     var liste = [];
     pieces.forEach(function(pc){
@@ -179,7 +181,7 @@
         var ve = [c.eye[0] - m[0], c.eye[1] - m[1], c.eye[2] - m[2]];
         if (dot(n, ve) <= 0) return;                      // face de dos
         var pts = f.p.map(function(p){ var q = proj(c, [p[0], p[1], (p[2] + st.dz)*sg]); return [W/2 + q[0]*S, OY - q[1]*S]; });
-        liste.push({ pts: pts, n: n, z: dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw), st: st, ve: norm(ve) });
+        liste.push({ pts: pts, n: n, z: dot([m[0] - c.eye[0], m[1] - c.eye[1], m[2] - c.eye[2]], c.fw), st: st, ve: norm(ve), coupe: pc.coupe && f.n[2] > .99 });
       });
     });
     liste.sort(function(a, b){ return b.z - a.z; });
@@ -191,6 +193,7 @@
       var lam = Math.max(0, dot(F.n, LUM)), h = norm([Lr[0] + F.ve[0], Lr[1] + F.ve[1], Lr[2] + F.ve[2]]);
       var spec = Math.pow(Math.max(0, dot(F.n, h)), 22);
       var fond = cl ? melange([214,208,196], [255,254,250], .35 + .65*lam) : melange(f0, e, .05 + .15*lam);
+      if (F.coupe) fond = melange(ROUGE, [255, 255, 255], (cl ? .1 : 0) + .12*lam);
       fond = melange(fond, or, F.st.sel*(cl ? .55 : .42));
       fond = melange(fond, cl ? [255,255,255] : [255,236,200], spec*(cl ? .5 : .28));
       ctx.globalAlpha = alpha*F.st.a;
@@ -266,7 +269,7 @@
 
     // ---------- Géométrie ----------
     var mailles = [], cour = null;
-    function piece(d, groupe){ cour = { d: d, groupe: groupe || "", P: [], N: [], L: [] }; mailles.push(cour); }
+    function piece(d, groupe){ cour = { d: d, groupe: groupe || "", P: [], N: [], L: [], coupe: 0 }; mailles.push(cour); }
     function pt(o, du, dv, uv){ return [o[0] + uv[0]*du[0] + uv[1]*dv[0], o[1] + uv[0]*du[1] + uv[1]*dv[1], o[2] + uv[0]*du[2] + uv[1]*dv[2]]; }
     function add(a, b){ return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
     function sommet(p, n){ cour.P.push(p[0], p[1], p[2]); cour.N.push(n[0], n[1], n[2]); }
@@ -337,6 +340,7 @@
     arc(hp, -tw - r, -ti + r, r, 0, -Q, 6);
     hp.push([-b2, -ti]);
     piece(.75); extruder(hp, [0, 0, EP], X, Y, HC - EP);
+    cour.coupe = HC;                                    // dessus du HEB : section coupée, en rouge
     // raidisseurs : plats de 14 mm de longueur L, coin chanfreiné contre le poteau, bout incliné ;
     // u part du poteau, v monte ; l'épaisseur suit du × Z, d'où les origines décalées de 7 mm
     function raidisseur(o, du, L, d, g){
@@ -400,15 +404,17 @@
     // ---------- Shaders ----------
     var PREC = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
     var SRC = {
-      v: "attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform float uDz;uniform float uMir;varying vec3 vN;varying vec3 vW;" +
-        "void main(){vec3 w=aP+vec3(0.0,0.0,uDz);w.z*=uMir;vW=w;vN=vec3(aN.xy,aN.z*uMir);gl_Position=uM*vec4(w,1.0);}",
+      v: "attribute vec3 aP;attribute vec3 aN;uniform mat4 uM;uniform float uDz;uniform float uMir;uniform float uCoupe;varying vec3 vN;varying vec3 vW;varying float vCoupe;" +
+        "void main(){vec3 w=aP+vec3(0.0,0.0,uDz);w.z*=uMir;vW=w;vN=vec3(aN.xy,aN.z*uMir);" +
+        "vCoupe=(uCoupe>0.0&&aP.z>uCoupe-0.5&&aN.z>0.99)?1.0:0.0;gl_Position=uM*vec4(w,1.0);}",
       f: PREC + "uniform vec3 uEye;uniform vec3 uL;uniform vec3 uL2;uniform vec3 uBase;uniform vec3 uOr;uniform vec3 uFond;uniform vec3 uSpec;" +
-        "uniform float uSel;uniform float uRefl;uniform float uA;varying vec3 vN;varying vec3 vW;" +
+        "uniform float uSel;uniform float uRefl;uniform float uA;uniform vec3 uRouge;varying vec3 vN;varying vec3 vW;varying float vCoupe;" +
         "void main(){vec3 N=normalize(vN);vec3 V=normalize(uEye-vW);if(dot(N,V)<0.0)N=-N;" +
         "float lam=max(dot(N,uL),0.0);float hemi=0.55+0.45*N.z;" +
         "float sp=pow(max(dot(N,normalize(uL+V)),0.0),40.0);float sp2=pow(max(dot(N,normalize(uL2+V)),0.0),90.0);" +
         "float fr=pow(1.0-max(dot(N,V),0.0),4.0);" +
         "vec3 c=uBase*(0.42*hemi+0.62*lam)+uSpec*(0.32*sp+0.6*sp2+0.16*fr);" +
+        "if(vCoupe>0.5)c=uRouge*(0.78+0.3*lam)+uSpec*0.1*sp2;" +
         "c=mix(c,uOr*(0.62+0.55*lam)+uSpec*0.3*sp,uSel*0.62);" +
         "if(uRefl>0.0){float k=clamp(1.0+vW.z/650.0,0.0,1.0);gl_FragColor=vec4(mix(uFond,c,uRefl*k*k*uA),1.0);}" +
         "else gl_FragColor=vec4(c,uA);}",
@@ -487,6 +493,7 @@
         gl.uniformMatrix4fv(u.uM, false, M);
         gl.uniform3fv(u.uEye, c.eye); gl.uniform3fv(u.uL, LUM); gl.uniform3fv(u.uL2, Lr);
         gl.uniform3fv(u.uBase, base); gl.uniform3fv(u.uSpec, spec); gl.uniform3fv(u.uOr, or); gl.uniform3fv(u.uFond, fond);
+        gl.uniform3fv(u.uRouge, v3(ROUGE));
         gl.uniform1f(u.uMir, refl ? -1 : 1); gl.uniform1f(u.uRefl, refl ? .32 : 0);
         attrib(0, bufP, 3); attrib(1, bufN, 3);
         // pièces pleines d'abord, puis celles qui apparaissent ou s'effacent (transparentes)
@@ -495,7 +502,7 @@
             var st = etats[i];
             if (st.a <= .003 || (st.a >= .999) !== pleines) return;
             if (!refl && !pleines){ gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
-            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a);
+            gl.uniform1f(u.uDz, st.dz); gl.uniform1f(u.uSel, st.sel); gl.uniform1f(u.uA, st.a); gl.uniform1f(u.uCoupe, m.coupe);
             gl.drawArrays(gl.TRIANGLES, m.t0, m.nt);
             gl.disable(gl.BLEND);
           });
