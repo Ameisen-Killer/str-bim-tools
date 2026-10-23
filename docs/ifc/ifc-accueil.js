@@ -93,7 +93,7 @@
   // tiges d'ancrage : rondelle, écrou, bout de tige
   [[200, 200], [-200, 200], [-200, -200], [200, -200]].forEach(function(p, k){
     var d = 2.05 + k*.14;
-    boite(p[0] - 34, p[0] + 34, p[1] - 34, p[1] + 34, EP, EP + 8, d, "b");
+    cylindre(p[0], p[1], EP, EP + 8, 32, 24, d, "b");                      // rondelle ronde
     cylindre(p[0], p[1], EP + 8, EP + 34, 27, 6, d + .08, "b", Math.PI/6);
     cylindre(p[0], p[1], EP + 34, EP + 78, 12, 12, d + .16, "b");
   });
@@ -396,7 +396,7 @@
     // tiges d'ancrage : plaque de répartition, écrou six pans, tige ronde avec chanfrein
     [[200, 200], [-200, 200], [-200, -200], [200, -200]].forEach(function(p, k){
       var d = 2.05 + k*.14;
-      piece(d, "b"); extruder([[-34, -34], [34, -34], [34, 34], [-34, 34]], [p[0], p[1], EP], X, Y, 8);
+      piece(d, "b"); extruder(cercle(32, 48), [p[0], p[1], EP], X, Y, 8);     // rondelle ronde
       piece(d + .08, "b"); extruder(cercle(27, 6, Math.PI/6), [p[0], p[1], EP + 8], X, Y, 26);
       piece(d + .16, "b"); extruder(cercle(12, 28), [p[0], p[1], EP + 8], X, Y, 66); extruder(cercle(10, 28), [p[0], p[1], EP + 74], X, Y, 4);
     });
