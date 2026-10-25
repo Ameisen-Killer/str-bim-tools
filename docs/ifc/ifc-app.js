@@ -1035,9 +1035,16 @@
       " et " + pluriel(nbEnt, "entité") + " au total vont partir" + (plans.length > 1 ? " de " + pluriel(plans.length, "fichier") : " du fichier") +
       (nbMod ? " ; " + pluriel(nbMod, "relation") + " " + (nbMod > 1 ? "seront raccourcies" : "sera raccourcie") : "") + ".";
     confirmer(texte, function(){
+      var parts = plans.map(function(x){
+        // ouvertures supprimées : leurs hôtes sont à redessiner (relus aussi à l'annulation)
+        var ouv = [];
+        x.p.elements.forEach(function(id){ var i = IFC.infos(x.f.m, id); if (i && i.genre === "ouverture") ouv.push(id); });
+        return ouv.length ? { f: x.f, ch: x.p.changement, ids: ouv } : { f: x.f, ch: x.p.changement };
+      });
       plans.forEach(function(x){ IFC.appliquer(x.f.m, x.p.changement); });
+      relire(parts);
       var txt = "suppression de " + pluriel(nbEl, "élément");
-      histo.push({ parts: plans.map(function(x){ return { f: x.f, ch: x.p.changement }; }), txt: txt, e: nbEnt });
+      histo.push({ parts: parts, txt: txt, e: nbEnt });
       aRefaire = [];
       reconstruire();
       etat(pluriel(nbEl, "élément supprimé", "éléments supprimés") + ", " + pluriel(nbEnt, "entité retirée", "entités retirées") +

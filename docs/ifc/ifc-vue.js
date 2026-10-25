@@ -4,8 +4,9 @@
 //   IFCCARTESIANTRANSFORMATIONOPERATOR3D), IFCEXTRUDEDAREASOLID (profils paramétrés ou polylignes),
 //   surfaces à facettes, faces triangulées/polygonales IFC4, quelques primitives ; chaîne
 //   IFCLOCALPLACEMENT récursive. Le reste est compté dans « non lus » et affiché dans la vue.
-// - Découpes, pour tout type d'élément : demi-espaces (simples, bornés par un polygone, en boîte),
-//   différences entre solides et ouvertures (IFCRELVOIDSELEMENT), soustraites par arbre BSP.
+// - Découpes : IFCBOOLEANRESULT / IFCBOOLEANCLIPPINGRESULT (différence, intersection, imbriquées) avec un
+//   demi-espace plan, borné par un polygone ou par une boîte, ou un solide quelconque (arbre BSP maison) ;
+//   ouvertures (IFCRELVOIDSELEMENT) retirées de leur hôte. Cas non géré : l'opérande principal est dessiné.
 // - Projection orthographique, ombrage lambert, seules les arêtes vives sont tracées (pas les coutures
 //   entre facettes d'un rond). Sélection au clic : image d'identifiants hors écran en WebGL, test de
 //   point dans les polygones projetés en canvas 2D.
@@ -47,7 +48,7 @@
 
   // ================= Lecture de la géométrie =================
   function Contexte(m){
-    var G = { m: m, pts: new Map(), plac: new Map(), cache: new Map(), nonLus: {}, erreurs: 0, angle: 1, groupes: 0 };
+    var G = { m: m, pts: new Map(), plac: new Map(), cache: new Map(), nonLus: {}, erreurs: 0, angle: 1 };
     // unité d'angle du projet (degrés le plus souvent)
     m.ent.forEach(function(e){
       if (e.type !== "IFCCONVERSIONBASEDUNIT") return;
@@ -526,11 +527,10 @@
   }
 
   // ---------- Découpe par un demi-espace ----------
-  // IFCHALFSPACESOLID(IFCPLANE, AgreementFlag) sous la matrice M : plan { p, n } dans le monde, n tournée vers
-  // la matière du demi-espace (celle qu'une différence enlève). Vaut aussi pour les sous-types (bornés : voir bornes).
-  var DEMI_ESPACES = { IFCHALFSPACESOLID:1, IFCPOLYGONALBOUNDEDHALFSPACE:1, IFCBOXEDHALFSPACE:1 };
+  // IFCHALFSPACESOLID(IFCPLANE, AgreementFlag) sous la matrice M, ou l'un de ses sous-types bornés (même début) :
+  // plan { p, n } dans le monde, n tournée vers la matière du demi-espace (celle qu'une différence enlève)
   function demiEspace(G, hs, M){
-    if (!hs || !DEMI_ESPACES[hs.type]) return null;
+    if (!hs || !/^IFC(HALFSPACESOLID|POLYGONALBOUNDEDHALFSPACE|BOXEDHALFSPACE)$/.test(hs.type)) return null;
     var a = C(hs), pl = G.m.ent.get(R(a[0]));
     if (!pl || pl.type !== "IFCPLANE") return null;
     var P = mul(M, axe(G, C(pl)[0])), n = norm(cross([P[0], P[1], P[2]], [P[3], P[4], P[5]]));
@@ -650,229 +650,407 @@
     });
   }
 
-  // ---------- Soustraction de solides : arbre BSP (méthode de csg.js, Evan Wallace) ----------
-  // Polygones convexes { v: [[x,y,z]…], pl: { n, w }, g: n° de la face d'origine }. Les morceaux d'une même face
-  // d'origine gardent son numéro : leurs coutures ne sont pas tracées comme arêtes (voir aretesVives).
-  var EPS_BSP = 1e-6;
-  function planPoly(v){
+  // ---------- Opérations booléennes générales : arbres BSP ----------
+  // Différence et intersection de deux solides à facettes, sans bibliothèque : chaque solide est découpé par
+  // les plans de l'autre (arbre BSP, à la manière de csg.js d'Evan Wallace). Les polygones sont convexes et
+  // orientés vers l'extérieur ; coordonnées relatives au centre du premier solide, pour la précision.
+  var BSP_MAX = 30000;                 // au-delà (triangles d'un opérande), repli : l'opérande principal seul
+  // Polygone { v : sommets, n, w : plan n·x = w, g : face d'origine } ; plan par la méthode de Newell
+  function bspPoly(v, g){
     var nx = 0, ny = 0, nz = 0;
     for (var i = 0, j = v.length - 1; i < v.length; j = i++){
-      nx += (v[j][1] - v[i][1])*(v[j][2] + v[i][2]); ny += (v[j][2] - v[i][2])*(v[j][0] + v[i][0]); nz += (v[j][0] - v[i][0])*(v[j][1] + v[i][1]);
+      var a = v[j], b = v[i];
+      nx += (a[1] - b[1])*(a[2] + b[2]); ny += (a[2] - b[2])*(a[0] + b[0]); nz += (a[0] - b[0])*(a[1] + b[1]);
     }
-    var n = norm([nx, ny, nz]);
-    return n ? { n: n, w: dot(n, v[0]) } : null;
+    var l = Math.sqrt(nx*nx + ny*ny + nz*nz);
+    if (!(l > 0) || !isFinite(l)) return null;
+    var n = [nx/l, ny/l, nz/l];
+    return { v: v, n: n, w: dot(n, v[0]), g: g };
   }
-  function retourner(p){ return { v: p.v.slice().reverse(), pl: { n: [-p.pl.n[0], -p.pl.n[1], -p.pl.n[2]], w: -p.pl.w }, g: p.g }; }
-  function partager(pl, p, cf, cb, f, b){
-    var t = 0, ty = new Array(p.v.length), i;
-    for (i = 0; i < p.v.length; i++){
-      var d = dot(pl.n, p.v[i]) - pl.w, k = d < -EPS_BSP ? 2 : d > EPS_BSP ? 1 : 0;
-      t |= k; ty[i] = k;
+  function bspRetourne(p){ return { v: p.v.slice().reverse(), n: [-p.n[0], -p.n[1], -p.n[2]], w: -p.w, g: p.g }; }
+  // Range p par rapport au plan pl : coplanaire (même sens ou opposé), devant, derrière, ou coupé en deux
+  function bspPartager(pl, p, cf, cb, f, b, eps){
+    var n = p.v.length, ty = new Array(n), tout = 0, i;
+    for (i = 0; i < n; i++){
+      var d = dot(pl.n, p.v[i]) - pl.w, t = d < -eps ? 2 : d > eps ? 1 : 0;
+      ty[i] = t; tout |= t;
     }
-    if (t === 0) (dot(pl.n, p.pl.n) > 0 ? cf : cb).push(p);
-    else if (t === 1) f.push(p);
-    else if (t === 2) b.push(p);
-    else {
-      var fv = [], bv = [];
-      for (i = 0; i < p.v.length; i++){
-        var j = (i + 1) % p.v.length, ti = ty[i], tj = ty[j], vi = p.v[i], vj = p.v[j];
-        if (ti !== 2) fv.push(vi);
-        if (ti !== 1) bv.push(vi);
-        if ((ti | tj) === 3){
-          var s = (pl.w - dot(pl.n, vi))/dot(pl.n, [vj[0] - vi[0], vj[1] - vi[1], vj[2] - vi[2]]);
-          var x = [vi[0] + (vj[0] - vi[0])*s, vi[1] + (vj[1] - vi[1])*s, vi[2] + (vj[2] - vi[2])*s];
-          fv.push(x); bv.push(x);
+    if (tout === 0){ (dot(pl.n, p.n) > 0 ? cf : cb).push(p); return; }
+    if (tout === 1){ f.push(p); return; }
+    if (tout === 2){ b.push(p); return; }
+    var fv = [], bv = [];
+    for (i = 0; i < n; i++){
+      var j = (i + 1) % n, ti = ty[i], tj = ty[j], vi = p.v[i], vj = p.v[j];
+      if (ti !== 2) fv.push(vi);
+      if (ti !== 1) bv.push(vi);
+      if ((ti | tj) !== 3) continue;
+      // point de passage calculé toujours dans le même sens de l'arête : identique pour les deux polygones voisins
+      var u = vi, w = vj;
+      if (u[0] > w[0] || (u[0] === w[0] && (u[1] > w[1] || (u[1] === w[1] && u[2] > w[2])))){ u = vj; w = vi; }
+      var e = [w[0] - u[0], w[1] - u[1], w[2] - u[2]], t2 = (pl.w - dot(pl.n, u))/dot(pl.n, e);
+      t2 = Math.max(0, Math.min(1, t2));
+      var q = [u[0] + e[0]*t2, u[1] + e[1]*t2, u[2] + e[2]*t2];
+      fv.push(q); bv.push(q);
+    }
+    if (fv.length >= 3) f.push({ v: fv, n: p.n, w: p.w, g: p.g });
+    if (bv.length >= 3) b.push({ v: bv, n: p.n, w: p.w, g: p.g });
+  }
+  // Nœud { pl : plan, av : devant, ar : derrière, p : polygones posés sur le plan } ; parcours sans récursion
+  function bspNoeud(){ return { pl: null, av: null, ar: null, p: [] }; }
+  function bspConstruire(racine, polys, eps){
+    var pile = [racine, polys];
+    while (pile.length){
+      var ps = pile.pop(), nd = pile.pop();
+      if (!ps.length) continue;
+      if (!nd.pl) nd.pl = { n: ps[0].n, w: ps[0].w };
+      var f = [], b = [];
+      for (var i = 0; i < ps.length; i++) bspPartager(nd.pl, ps[i], nd.p, nd.p, f, b, eps);
+      if (f.length){ if (!nd.av) nd.av = bspNoeud(); pile.push(nd.av, f); }
+      if (b.length){ if (!nd.ar) nd.ar = bspNoeud(); pile.push(nd.ar, b); }
+    }
+  }
+  function bspNoeuds(racine){
+    var r = [], pile = [racine];
+    while (pile.length){ var n = pile.pop(); r.push(n); if (n.av) pile.push(n.av); if (n.ar) pile.push(n.ar); }
+    return r;
+  }
+  function bspInverser(racine){
+    bspNoeuds(racine).forEach(function(n){
+      n.p = n.p.map(bspRetourne);
+      if (n.pl) n.pl = { n: [-n.pl.n[0], -n.pl.n[1], -n.pl.n[2]], w: -n.pl.w };
+      var t = n.av; n.av = n.ar; n.ar = t;
+    });
+  }
+  // Polygones gardés hors du solide décrit par l'arbre
+  function bspDecouper(racine, polys, eps){
+    var res = [], pile = [racine, polys], k;
+    while (pile.length){
+      var ps = pile.pop(), nd = pile.pop();
+      if (!nd.pl){ for (k = 0; k < ps.length; k++) res.push(ps[k]); continue; }
+      var f = [], b = [];
+      for (var i = 0; i < ps.length; i++) bspPartager(nd.pl, ps[i], f, b, f, b, eps);
+      if (nd.av) pile.push(nd.av, f); else for (k = 0; k < f.length; k++) res.push(f[k]);
+      if (nd.ar) pile.push(nd.ar, b);
+    }
+    return res;
+  }
+  function bspCouperPar(a, b, eps){ bspNoeuds(a).forEach(function(n){ n.p = bspDecouper(b, n.p, eps); }); }
+  function bspTous(a){ var r = []; bspNoeuds(a).forEach(function(n){ for (var i = 0; i < n.p.length; i++) r.push(n.p[i]); }); return r; }
+  function bspOperation(op, A, B, eps){
+    var a = bspNoeud(), b = bspNoeud();
+    bspConstruire(a, A, eps); bspConstruire(b, B, eps);
+    bspInverser(a);
+    if (op === "DIFFERENCE"){
+      bspCouperPar(a, b, eps); bspCouperPar(b, a, eps); bspInverser(b); bspCouperPar(b, a, eps); bspInverser(b);
+    } else {
+      bspCouperPar(b, a, eps); bspInverser(b); bspCouperPar(a, b, eps); bspCouperPar(b, a, eps);
+    }
+    bspConstruire(a, bspTous(b), eps);
+    bspInverser(a);
+    return bspTous(a);
+  }
+  // Faces (monde) → triangles relatifs à o, orientés de façon cohérente (propagation d'un triangle à l'autre
+  // par les arêtes partagées) puis vers l'extérieur (volume signé de chaque morceau fermé)
+  function versPolys(faces, o, q, g0){
+    var tris = [];
+    faces.forEach(function(f, fi){
+      var ix = trianguler(f), P = [];
+      f.b.forEach(function(l){ for (var i = 0; i < l.length; i += 3) P.push([l[i] - o[0], l[i+1] - o[1], l[i+2] - o[2]]); });
+      for (var k = 0; k + 2 < ix.length; k += 3){
+        var p = bspPoly([P[ix[k]], P[ix[k+1]], P[ix[k+2]]], g0 + fi);
+        if (!p) continue;
+        tris.push(dot(p.n, f.n) < 0 ? bspRetourne(p) : p);
+      }
+    });
+    function cle(v){ return Math.round(v[0]/q) + "," + Math.round(v[1]/q) + "," + Math.round(v[2]/q); }
+    var K = tris.map(function(t){ return [cle(t.v[0]), cle(t.v[1]), cle(t.v[2])]; }), ar = new Map();
+    function arete(a, b){ return a < b ? a + "|" + b : b + "|" + a; }
+    tris.forEach(function(t, i){
+      for (var k = 0; k < 3; k++){
+        var a = K[i][k], b = K[i][(k + 1) % 3];
+        if (a === b) continue;
+        var c = arete(a, b), l = ar.get(c);
+        if (!l) ar.set(c, l = []);
+        l.push(i, a < b);
+      }
+    });
+    var etat = new Int8Array(tris.length);              // 0 : pas vu, 1 : gardé, 2 : retourné
+    for (var s = 0; s < tris.length; s++){
+      if (etat[s]) continue;
+      var comp = [s], file = [s], vol = 0;
+      etat[s] = 1;
+      while (file.length){
+        var i = file.pop(), inv = etat[i] === 2;
+        for (var k = 0; k < 3; k++){
+          var a = K[i][k], b = K[i][(k + 1) % 3];
+          if (a === b) continue;
+          var l = ar.get(arete(a, b));
+          if (l.length !== 4) continue;          // arête libre ou partagée par plus de deux triangles
+          var moi = l[0] === i ? 0 : 2, j = l[2 - moi], di = l[moi + 1], dj = l[3 - moi];
+          if (j === i || etat[j]) continue;
+          // le voisin doit parcourir l'arête commune dans l'autre sens
+          etat[j] = (dj !== !(di !== inv)) ? 2 : 1;
+          comp.push(j); file.push(j);
         }
       }
-      if (fv.length >= 3) f.push({ v: fv, pl: p.pl, g: p.g });
-      if (bv.length >= 3) b.push({ v: bv, pl: p.pl, g: p.g });
+      comp.forEach(function(t){
+        var v = tris[t].v, x = v[0], y = etat[t] === 2 ? v[2] : v[1], z = etat[t] === 2 ? v[1] : v[2];
+        vol += dot(x, cross(y, z));
+      });
+      if (vol < 0) comp.forEach(function(t){ etat[t] = 3 - etat[t]; });
     }
+    return tris.map(function(t, i){ return etat[i] === 2 ? bspRetourne(t) : t; });
   }
-  function Noeud(ps){ this.pl = null; this.av = null; this.ar = null; this.p = []; if (ps) this.construire(ps); }
-  Noeud.prototype = {
-    inverser: function(){
-      this.p = this.p.map(retourner);
-      if (this.pl) this.pl = { n: [-this.pl.n[0], -this.pl.n[1], -this.pl.n[2]], w: -this.pl.w };
-      if (this.av) this.av.inverser();
-      if (this.ar) this.ar.inverser();
-      var t = this.av; this.av = this.ar; this.ar = t;
-    },
-    rogner: function(ps){
-      if (!this.pl) return ps.slice();
-      var f = [], b = [];
-      for (var i = 0; i < ps.length; i++) partager(this.pl, ps[i], f, b, f, b);
-      if (this.av) f = this.av.rogner(f);
-      b = this.ar ? this.ar.rogner(b) : [];
-      return f.concat(b);
-    },
-    rognerPar: function(bsp){
-      this.p = bsp.rogner(this.p);
-      if (this.av) this.av.rognerPar(bsp);
-      if (this.ar) this.ar.rognerPar(bsp);
-    },
-    tous: function(){
-      var r = this.p.slice();
-      if (this.av) r = r.concat(this.av.tous());
-      if (this.ar) r = r.concat(this.ar.tous());
-      return r;
-    },
-    construire: function(ps){
-      if (!ps.length) return;
-      if (!this.pl) this.pl = ps[0].pl;
-      var f = [], b = [];
-      for (var i = 0; i < ps.length; i++) partager(this.pl, ps[i], this.p, this.p, f, b);
-      if (f.length){ if (!this.av) this.av = new Noeud(); this.av.construire(f); }
-      if (b.length){ if (!this.ar) this.ar = new Noeud(); this.ar.construire(b); }
-    }
-  };
-  function soustraire(A, B){
-    var a = new Noeud(A), b = new Noeud(B);
-    a.inverser(); a.rognerPar(b); b.rognerPar(a); b.inverser(); b.rognerPar(a); b.inverser();
-    a.construire(b.tous()); a.inverser();
-    return a.tous();
-  }
-  // Faces (monde) → polygones convexes relatifs à l'origine o, tournés vers l'extérieur ; null si le solide
-  // n'est pas fermé (une coque ouverte ne se soustrait pas)
-  function versPolys(G, faces, o, taille){
-    var q = taille*1e-6, aretes = new Map(), ps = [];
-    function cle(b, i){ return Math.round(b[i]/q) + "," + Math.round(b[i+1]/q) + "," + Math.round(b[i+2]/q); }
-    faces.forEach(function(f){
-      f.b.forEach(function(b){
-        var n = b.length/3;
-        for (var i = 0; i < n; i++){
-          var a = cle(b, 3*i), c = cle(b, 3*((i + 1) % n));
-          if (a === c) continue;
-          var k = a < c ? a + "|" + c : c + "|" + a;
-          aretes.set(k, (aretes.get(k) || 0) + 1);
+  // Polygones (relatifs à o) → faces monde. Les sommets des polygones voisins sont insérés sur les côtés qui
+  // les portent : sans jonction en T, le solide reste fermé (opérations suivantes) et les arêtes vives restent
+  // justes. Les morceaux d'une même face d'origine sont ensuite recousus en une face (avec ses trous).
+  function versFaces(polys, o, eps, out){
+    var tol = eps*10, tol2 = tol*tol, vus = new Set(), V = [];
+    polys.forEach(function(p){ p.v.forEach(function(v){
+      var c = Math.round(v[0]/tol) + "," + Math.round(v[1]/tol) + "," + Math.round(v[2]/tol);
+      if (!vus.has(c)){ vus.add(c); V.push(v); }
+    }); });
+    // sommets rangés selon l'axe le plus étendu : chaque côté ne regarde que ceux de sa tranche
+    var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    V.forEach(function(v){ for (var k = 0; k < 3; k++){ if (v[k] < mn[k]) mn[k] = v[k]; if (v[k] > mx[k]) mx[k] = v[k]; } });
+    var ax = 0;
+    for (var k = 1; k < 3; k++) if (mx[k] - mn[k] > mx[ax] - mn[ax]) ax = k;
+    V.sort(function(u, w){ return u[ax] - w[ax]; });
+    var X = V.map(function(v){ return v[ax]; });
+    function premier(x){ var lo = 0, hi = X.length; while (lo < hi){ var m = (lo + hi) >> 1; if (X[m] < x) lo = m + 1; else hi = m; } return lo; }
+    var groupes = new Map();
+    polys.forEach(function(p){
+      var r = [], n = p.v.length, i;
+      for (i = 0; i < n; i++){
+        var a = p.v[i], b = p.v[(i + 1) % n], e = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l2 = dot(e, e);
+        r.push(a);
+        if (l2 <= tol2) continue;
+        var ins = [], lim = tol/Math.sqrt(l2), x0 = Math.min(a[ax], b[ax]) - tol, x1 = Math.max(a[ax], b[ax]) + tol;
+        for (k = premier(x0); k < V.length && X[k] <= x1; k++){
+          var x = V[k], t = ((x[0] - a[0])*e[0] + (x[1] - a[1])*e[1] + (x[2] - a[2])*e[2])/l2;
+          if (t <= lim || t >= 1 - lim) continue;
+          var dx = a[0] + e[0]*t - x[0], dy = a[1] + e[1]*t - x[1], dz = a[2] + e[2]*t - x[2];
+          if (dx*dx + dy*dy + dz*dz <= tol2) ins.push([t, x]);
         }
-      });
-    });
-    var ouvert = false;
-    aretes.forEach(function(c){ if (c % 2) ouvert = true; });
-    if (ouvert) return null;
-    faces.forEach(function(f){
-      var g = f.g !== undefined ? f.g : ++G.groupes, loc = f.b.map(function(b){
-        var r = new Float64Array(b.length);
-        for (var i = 0; i < b.length; i += 3){ r[i] = b[i] - o[0]; r[i+1] = b[i+1] - o[1]; r[i+2] = b[i+2] - o[2]; }
-        return r;
-      });
-      var P = [];
-      loc.forEach(function(b){ for (var i = 0; i < b.length; i += 3) P.push([b[i], b[i+1], b[i+2]]); });
-      var convexe = loc.length === 1, m = P.length;
-      for (var i = 0; convexe && i < m; i++){
-        var A = P[i], B = P[(i + 1) % m], Cc = P[(i + 2) % m];
-        if (dot(cross([B[0]-A[0], B[1]-A[1], B[2]-A[2]], [Cc[0]-B[0], Cc[1]-B[1], Cc[2]-B[2]]), f.n) < -1e-12*taille*taille) convexe = false;
+        ins.sort(function(u, w){ return u[0] - w[0]; });
+        for (k = 0; k < ins.length; k++) if (!k || ins[k][0] - ins[k - 1][0] > lim) r.push(ins[k][1]);
       }
-      var morceaux = [];
-      if (convexe) morceaux.push(P);
-      else {
-        var ix = trianguler({ b: loc, n: f.n });
-        for (var k = 0; k + 2 < ix.length; k += 3) morceaux.push([P[ix[k]], P[ix[k+1]], P[ix[k+2]]]);
+      var gr = groupes.get(p.g);
+      if (!gr) groupes.set(p.g, gr = { n: p.n, l: [] });
+      gr.l.push(r);
+    });
+    function monde(r){
+      var f = new Float64Array(3*r.length);
+      for (var i = 0; i < r.length; i++){ f[3*i] = r[i][0] + o[0]; f[3*i+1] = r[i][1] + o[1]; f[3*i+2] = r[i][2] + o[2]; }
+      return f;
+    }
+    groupes.forEach(function(gr){
+      var faces = gr.l.length > 1 ? recoudre(gr.l, gr.n, tol) : null;
+      if (faces) faces.forEach(function(f){ ajouterFace(out, f.map(monde)); });
+      else gr.l.forEach(function(r){ ajouterFace(out, [monde(r)]); });
+    });
+  }
+  // Morceaux coplanaires (boucles orientées autour de n) → faces [contour, trous…] : contour de leur réunion,
+  // fait des côtés qui n'ont pas leur opposé. null si les contours ne se referment pas (on garde les morceaux).
+  function recoudre(boucles, n, tol){
+    var cles = new Map(), pts = [];
+    function id(v){
+      var c = Math.round(v[0]/tol) + "," + Math.round(v[1]/tol) + "," + Math.round(v[2]/tol), i = cles.get(c);
+      if (i === undefined){ i = pts.length; cles.set(c, i); pts.push(v); }
+      return i;
+    }
+    var net = new Map();
+    boucles.forEach(function(r){
+      var ix = r.map(id);
+      for (var i = 0; i < ix.length; i++){
+        var a = ix[i], b = ix[(i + 1) % ix.length];
+        if (a === b) continue;
+        var k = a + ">" + b, kr = b + ">" + a;
+        if (net.get(kr) > 0) net.set(kr, net.get(kr) - 1); else net.set(k, (net.get(k) || 0) + 1);
       }
-      morceaux.forEach(function(v){ var pl = planPoly(v); if (pl) ps.push({ v: v, pl: pl, g: g }); });
     });
-    // orientation : un point juste devant le polygone doit être hors du solide
-    var T = [];
-    ps.forEach(function(p){ for (var i = 1; i + 1 < p.v.length; i++) T.push(p.v[0][0], p.v[0][1], p.v[0][2], p.v[i][0], p.v[i][1], p.v[i][2], p.v[i+1][0], p.v[i+1][1], p.v[i+1][2]); });
-    var d = taille*1e-5;
-    return ps.map(function(p){
-      var c = [0, 0, 0], v = p.v.length > 3 ? p.v : p.v;
-      v.forEach(function(x){ c[0] += x[0]; c[1] += x[1]; c[2] += x[2]; });
-      c = [c[0]/v.length + p.pl.n[0]*d, c[1]/v.length + p.pl.n[1]*d, c[2]/v.length + p.pl.n[2]*d];
-      return dansSolide(T, c) ? retourner(p) : p;
+    var suiv = new Map(), nb = 0;
+    net.forEach(function(c, k){
+      if (c <= 0) return;
+      var j = k.indexOf(">"), a = +k.slice(0, j), b = +k.slice(j + 1);
+      for (var t = 0; t < c; t++){ var l = suiv.get(a); if (!l) suiv.set(a, l = []); l.push(b); nb++; }
     });
+    if (!nb) return null;
+    var u = ortho(Math.abs(n[0]) < .9 ? [1, 0, 0] : [0, 1, 0], n), w = cross(n, u), contours = [], trous = [], faits = 0;
+    while (faits < nb){
+      var a0 = -1;
+      suiv.forEach(function(l, a){ if (a0 < 0 && l.length) a0 = a; });
+      if (a0 < 0) break;
+      var ch = [a0], cur = a0;
+      for (var g = 0; g <= nb; g++){
+        var l = suiv.get(cur);
+        if (!l || !l.length) return null;            // contour ouvert
+        cur = l.pop(); faits++;
+        if (cur === a0) break;
+        ch.push(cur);
+      }
+      if (cur !== a0) return null;
+      if (ch.length < 3) continue;
+      var X = ch.map(function(i){ return dot(pts[i], u); }), Y = ch.map(function(i){ return dot(pts[i], w); }), A = 0;
+      for (var i = 0, j = X.length - 1; i < X.length; j = i++) A += (X[j] - X[i])*(Y[j] + Y[i]);
+      var b = { r: ch.map(function(i){ return pts[i]; }), X: X, Y: Y, aire: A/2 };
+      if (b.aire > 0) contours.push(b); else if (b.aire < 0) trous.push(b);
+    }
+    if (!contours.length) return null;
+    var faces = contours.map(function(c){ return [c.r]; });
+    trous.forEach(function(h){
+      var best = -1;
+      contours.forEach(function(c, k){
+        if (c.aire > -h.aire && dansPolygone(c.X.map(function(x, i){ return [x, c.Y[i]]; }), h.X[0], h.Y[0], 0) && (best < 0 || c.aire < contours[best].aire)) best = k;
+      });
+      if (best >= 0) faces[best].push(h.r);
+    });
+    return faces;
   }
   function boiteFaces(faces){
     var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
-    faces.forEach(function(f){ var b = f.b[0]; for (var i = 0; i < b.length; i += 3) for (var k = 0; k < 3; k++){ if (b[i+k] < mn[k]) mn[k] = b[i+k]; if (b[i+k] > mx[k]) mx[k] = b[i+k]; } });
-    return { min: mn, max: mx };
+    faces.forEach(function(f){ f.b.forEach(function(b){ for (var i = 0; i < b.length; i += 3) for (var k = 0; k < 3; k++){ if (b[i+k] < mn[k]) mn[k] = b[i+k]; if (b[i+k] > mx[k]) mx[k] = b[i+k]; } }); });
+    return isFinite(mn[0]) ? { min: mn, max: mx } : null;
   }
-  // Faces de A moins les solides de la liste Bs (chacun une liste de faces) ; null si le calcul n'est pas possible
-  function differenceFaces(G, A, Bs){
-    if (!A.length) return null;
-    var bA = boiteFaces(A), o = bA.min, taille = Math.hypot(bA.max[0] - o[0], bA.max[1] - o[1], bA.max[2] - o[2]) || 1;
-    var garde = EPS_BSP;
-    EPS_BSP = taille*1e-7;
-    try {
-      var P = versPolys(G, A, o, taille), fait = false;
-      if (!P) return null;
-      Bs.forEach(function(B){
-        if (!B || !B.length || P.length > 40000) return;
-        var bB = boiteFaces(B), m = taille*1e-6;
-        for (var k = 0; k < 3; k++) if (bB.max[k] < bA.min[k] - m || bB.min[k] > bA.max[k] + m) return;
-        var Q = versPolys(G, B, o, taille);
-        if (!Q) return;
-        P = soustraire(P, Q); fait = true;
-      });
-      if (!fait) return null;
-      var out = [];
-      P.forEach(function(p){
-        var b = new Float64Array(3*p.v.length);
-        p.v.forEach(function(x, i){ b[3*i] = x[0] + o[0]; b[3*i+1] = x[1] + o[1]; b[3*i+2] = x[2] + o[2]; });
-        var n0 = out.length;
-        ajouterFace(out, [b]);
-        if (out.length > n0) out[n0].g = p.g;
-      });
+  // A op B (faces monde), op "DIFFERENCE" ou "INTERSECTION". null si le calcul n'aboutit pas (repli de l'appelant).
+  function booleenFaces(op, A, B){
+    var bA = boiteFaces(A), bB = boiteFaces(B);
+    if (!bA || !bB) return null;
+    var taille = Math.hypot(bA.max[0] - bA.min[0], bA.max[1] - bA.min[1], bA.max[2] - bA.min[2]) || 1, eps = taille*1e-8;
+    for (var k = 0; k < 3; k++) if (bB.min[k] > bA.max[k] + eps || bB.max[k] < bA.min[k] - eps) return op === "DIFFERENCE" ? A : null;
+    var o = [(bA.min[0] + bA.max[0])/2, (bA.min[1] + bA.max[1])/2, (bA.min[2] + bA.max[2])/2];
+    var PA = versPolys(A, o, eps*10, 0), PB = versPolys(B, o, eps*10, A.length);
+    if (!PA.length || !PB.length || PA.length > BSP_MAX || PB.length > BSP_MAX) return null;
+    var R = bspOperation(op, PA, PB, eps);
+    if (!R.length) return null;          // plus rien : plutôt un échec qu'un élément entièrement évidé
+    var out = [];
+    versFaces(R, o, eps, out);
+    return out.length ? out : null;
+  }
+
+  // ---------- Demi-espaces bornés ----------
+  // Inverse d'une matrice affine : fonction monde → repère local
+  function versLocal(M){
+    var a = M[0], b = M[3], c = M[6], d = M[1], e = M[4], f = M[7], g = M[2], h = M[5], k = M[8];
+    var A = e*k - f*h, B = f*g - d*k, Cc = d*h - e*g, det = a*A + b*B + c*Cc;
+    if (!(Math.abs(det) > 1e-300)) return null;
+    var r = 1/det, i01 = (c*h - b*k)*r, i02 = (b*f - c*e)*r, i11 = (a*k - c*g)*r, i12 = (c*d - a*f)*r, i21 = (b*g - a*h)*r, i22 = (a*e - b*d)*r;
+    A *= r; B *= r; Cc *= r;
+    return function(p){
+      var x = p[0] - M[9], y = p[1] - M[10], z = p[2] - M[11];
+      return [A*x + i01*y + i02*z, B*x + i11*y + i12*z, Cc*x + i21*y + i22*z];
+    };
+  }
+  function sommetsFaces(faces, f){ faces.forEach(function(fa){ fa.b.forEach(function(b){ for (var i = 0; i < b.length; i += 3) f([b[i], b[i+1], b[i+2]]); }); }); }
+  // Point dans un polygone 2D, ou sur son bord à tol près
+  function dansPolygone(poly, x, y, tol){
+    var c = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++){
+      var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1], ex = xi - xj, ey = yi - yj, l2 = ex*ex + ey*ey;
+      var t = l2 > 0 ? Math.max(0, Math.min(1, ((x - xj)*ex + (y - yj)*ey)/l2)) : 0;
+      if (Math.hypot(xj + ex*t - x, yj + ey*t - y) <= tol) return true;
+      if ((yi > y) !== (yj > y) && x < (xj - xi)*(y - yi)/(yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  // Repère M2 = M décalé de z le long de son axe Z
+  function decaleZ(M, z){ var P = M.slice(); P[9] += M[6]*z; P[10] += M[7]*z; P[11] += M[8]*z; return P; }
+  // IFCPOLYGONALBOUNDEDHALFSPACE(BaseSurface, AgreementFlag, Position, PolygonalBoundary) : la matière retirée est
+  // celle du demi-espace à l'intérieur du prisme du polygone (plan XY de Position, prisme selon son Z).
+  // { plan } si le prisme contient tout l'élément A (la découpe par le plan suffit), sinon { solide } fini.
+  function demiEspacePolygone(G, hs, M, A){
+    var a = C(hs), pl = demiEspace(G, hs, M), c = courbe(G, R(a[3]));
+    if (!pl || !c || c.length < 3) return null;
+    var poly = c.map(function(p){ return [p[0], p[1]]; });
+    if (Math.hypot(poly[0][0] - poly[poly.length - 1][0], poly[0][1] - poly[poly.length - 1][1]) < 1e-9) poly.pop();
+    if (poly.length < 3) return null;
+    var P = mul(M, axe(G, a[2])), loc = versLocal(P), bA = boiteFaces(A);
+    if (!loc || !bA) return null;
+    var tol = 1e-6*(Math.hypot(bA.max[0] - bA.min[0], bA.max[1] - bA.min[1], bA.max[2] - bA.min[2]) || 1);
+    var tous = true, z0 = Infinity, z1 = -Infinity;
+    sommetsFaces(A, function(p){
+      var q = loc(p);
+      if (q[2] < z0) z0 = q[2];
+      if (q[2] > z1) z1 = q[2];
+      if (tous && !dansPolygone(poly, q[0], q[1], tol)) tous = false;
+    });
+    if (tous) return { plan: pl };
+    var marge = (z1 - z0)*.1 + tol*1e3, prisme = [], B = [], plat = [];
+    poly.forEach(function(p){ plat.push(p[0], p[1]); });
+    extruder([plat], decaleZ(P, z0 - marge), [0, 0, z1 - z0 + 2*marge], prisme);
+    couperDemiEspace(prisme, pl.p, [-pl.n[0], -pl.n[1], -pl.n[2]], B);    // garde le côté matière du demi-espace
+    return { solide: B };
+  }
+  // IFCBOXEDHALFSPACE(BaseSurface, AgreementFlag, Enclosure IFCBOUNDINGBOX) : demi-espace limité à sa boîte
+  function demiEspaceBoite(G, hs, M, A){
+    var a = C(hs), pl = demiEspace(G, hs, M), bx = G.m.ent.get(R(a[2]));
+    if (!pl) return null;
+    if (!bx || bx.type !== "IFCBOUNDINGBOX") return { plan: pl };
+    var ba = C(bx), co = point(G, R(ba[0])), dx = N(ba[1]), dy = N(ba[2]), dz = N(ba[3]);
+    if (!(dx > 0 && dy > 0 && dz > 0)) return { plan: pl };
+    var P = M.slice();
+    tp(M, co[0], co[1], co[2], P, 9);
+    var loc = versLocal(P), bA = boiteFaces(A);
+    if (!loc || !bA) return null;
+    var tol = 1e-6*(Math.hypot(bA.max[0] - bA.min[0], bA.max[1] - bA.min[1], bA.max[2] - bA.min[2]) || 1), tous = true;
+    sommetsFaces(A, function(p){
+      var q = loc(p);
+      if (tous && (q[0] < -tol || q[1] < -tol || q[2] < -tol || q[0] > dx + tol || q[1] > dy + tol || q[2] > dz + tol)) tous = false;
+    });
+    if (tous) return { plan: pl };
+    var boite = [], B = [];
+    extruder([[0, 0, dx, 0, dx, dy, 0, dy]], P, [0, 0, dz], boite);
+    couperDemiEspace(boite, pl.p, [-pl.n[0], -pl.n[1], -pl.n[2]], B);
+    return { solide: B };
+  }
+  // A op second opérande (id) : demi-espace plan, demi-espace borné (polygone ou boîte) ou solide quelconque.
+  // null : cas non géré, l'appelant garde le repli (premier opérande seul).
+  function booleen(G, op, A, idB, M, prof){
+    var eB = G.m.ent.get(idB);
+    if (!eB || !A.length || (op !== "DIFFERENCE" && op !== "INTERSECTION")) return null;
+    var pl = null, B = null, out = [];
+    if (eB.type === "IFCHALFSPACESOLID") pl = demiEspace(G, eB, M);
+    else if (eB.type === "IFCPOLYGONALBOUNDEDHALFSPACE" || eB.type === "IFCBOXEDHALFSPACE"){
+      var r = eB.type === "IFCBOXEDHALFSPACE" ? demiEspaceBoite(G, eB, M, A) : demiEspacePolygone(G, eB, M, A);
+      if (!r) return null;
+      pl = r.plan || null; B = r.solide || null;
+    } else { B = []; item(G, idB, M, B, prof + 1); }
+    if (pl){
+      couperDemiEspace(A, pl.p, op === "DIFFERENCE" ? pl.n : [-pl.n[0], -pl.n[1], -pl.n[2]], out);
       return out;
-    } catch (err){ return null; }
-    finally { EPS_BSP = garde; }
+    }
+    if (!B || !B.length) return null;
+    return booleenFaces(op, A, B);
   }
-  // IFCPOLYGONALBOUNDEDHALFSPACE(BaseSurface, AgreementFlag, Position, PolygonalBoundary) : prisme infini de
-  // contour PolygonalBoundary (plan XY de Position, sous M) le long de son axe Z. { pts (monde), d } ou null.
-  function bornes(G, hs, M){
-    var a = C(hs), c = courbe(G, R(a[3]));
-    if (!c || c.length < 3) return null;
-    var P = mul(M, axe(G, a[2])), d = norm([P[6], P[7], P[8]]);
-    if (!d) return null;
-    return { pts: c.map(function(p){ var w = [0, 0, 0]; tp(P, p[0], p[1], 0, w, 0); return w; }), d: d };
-  }
-  // Tous les sommets des faces sont-ils dans le prisme (bord compris) ?
-  function dansBornes(faces, bo){
-    var u = ortho(Math.abs(bo.d[0]) < .9 ? [1, 0, 0] : [0, 1, 0], bo.d), v = cross(bo.d, u);
-    var X = bo.pts.map(function(p){ return dot(p, u); }), Y = bo.pts.map(function(p){ return dot(p, v); }), n = X.length;
-    var bb = boiteFaces(faces), e = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2])*1e-6 + 1e-9;
-    function pres(x, y){
-      for (var i = 0, j = n - 1; i < n; j = i++){
-        var dx = X[i] - X[j], dy = Y[i] - Y[j], l2 = dx*dx + dy*dy, t = l2 > 0 ? Math.max(0, Math.min(1, ((x - X[j])*dx + (y - Y[j])*dy)/l2)) : 0;
-        if (Math.hypot(x - X[j] - t*dx, y - Y[j] - t*dy) <= e) return true;
+  // Ouvertures (IFCRELVOIDSELEMENT) retirées de l'élément hôte, chacune avec son propre placement. Une ouverture
+  // qu'on ne sait pas soustraire est laissée de côté : l'hôte reste plein à cet endroit.
+  function percer(G, id, faces){
+    var ouv = faces.length ? IFC.index(G.m).ouvertures.get(id) : null;
+    if (!ouv || !ouv.length) return faces;
+    if (!G.hotes) G.hotes = new Map();
+    // ouvertures rangées par lots sans chevauchement (boîtes disjointes) : un lot est retiré d'un seul coup
+    var lots = [], bH = boiteFaces(faces);
+    ouv.forEach(function(o){
+      G.hotes.set(o, id);
+      var g = geometrie(G, o);
+      if (!g || !bH) return;
+      for (var k = 0; k < 3; k++) if (g.min[k] > bH.max[k] || g.max[k] < bH.min[k]) return;    // hors de l'hôte
+      var lot = null;
+      for (var i = 0; i < lots.length && !lot; i++){
+        var L2 = lots[i];
+        if (L2.nb + g.faces.length > 4000) continue;
+        if (L2.g.every(function(h){ for (var k = 0; k < 3; k++) if (g.min[k] > h.max[k] || g.max[k] < h.min[k]) return true; return false; })) lot = L2;
       }
-      return false;
-    }
-    function dedans(x, y){
-      var c = false;
-      for (var i = 0, j = n - 1; i < n; j = i++) if ((Y[i] > y) !== (Y[j] > y) && x < (X[j] - X[i])*(y - Y[i])/(Y[j] - Y[i]) + X[i]) c = !c;
-      return c;
-    }
-    return faces.every(function(f){
-      var b = f.b[0];
-      for (var i = 0; i < b.length; i += 3){
-        var p = [b[i], b[i+1], b[i+2]], x = dot(p, u), y = dot(p, v);
-        if (!dedans(x, y) && !pres(x, y)) return false;
-      }
-      return true;
+      if (!lot) lots.push(lot = { g: [], nb: 0 });
+      lot.g.push(g); lot.nb += g.faces.length;
     });
-  }
-  // Faces du demi-espace borné (matière comprise dans le prisme) sur la hauteur des faces à découper
-  function solideBorne(faces, pl, bo){
-    var bb = boiteFaces(faces), t0 = Infinity, t1 = -Infinity;
-    for (var k = 0; k < 8; k++){
-      var t = dot([k & 1 ? bb.max[0] : bb.min[0], k & 2 ? bb.max[1] : bb.min[1], k & 4 ? bb.max[2] : bb.min[2]], bo.d);
-      if (t < t0) t0 = t; if (t > t1) t1 = t;
-    }
-    var m = (t1 - t0)*.1 + 1e-6, prisme = [], n = bo.pts.length, bas = new Float64Array(3*n), haut = new Float64Array(3*n);
-    t0 -= m; t1 += m;
-    bo.pts.forEach(function(p, i){
-      var t = dot(p, bo.d);
-      for (var k = 0; k < 3; k++){ bas[3*i+k] = p[k] + bo.d[k]*(t0 - t); haut[3*i+k] = p[k] + bo.d[k]*(t1 - t); }
+    lots.forEach(function(lot){
+      var B = [], r = null;
+      lot.g.forEach(function(g){ for (var i = 0; i < g.faces.length; i++) B.push(g.faces[i]); });
+      try { r = booleenFaces("DIFFERENCE", faces, B); } catch (x){ r = null; }
+      if (r) faces = r;
     });
-    ajouterFace(prisme, [bas]); ajouterFace(prisme, [haut]);
-    for (var i = 0; i < n; i++){
-      var j = (i + 1) % n;
-      ajouterFace(prisme, [new Float64Array([bas[3*i], bas[3*i+1], bas[3*i+2], bas[3*j], bas[3*j+1], bas[3*j+2], haut[3*j], haut[3*j+1], haut[3*j+2], haut[3*i], haut[3*i+1], haut[3*i+2]])]);
-    }
-    var r = [];
-    couperDemiEspace(prisme, pl.p, [-pl.n[0], -pl.n[1], -pl.n[2]], r);
-    return r;
+    return faces;
   }
 
   function item(G, id, M, out, prof){
@@ -901,32 +1079,15 @@
       case "IFCSWEPTDISKSOLID": case "IFCSWEPTDISKSOLIDPOLYGONAL":
         tube(G, a, M, out); break;
       case "IFCBOOLEANRESULT": case "IFCBOOLEANCLIPPINGRESULT": {
-        // différence avec un demi-espace plan : découpe calculée (face de fermeture comprise)
-        var hs = G.m.ent.get(R(a[2])), pl = a[0] && a[0].enu === "DIFFERENCE" ? demiEspace(G, hs, M) : null;
-        if (pl){
-          var avant = [];
-          item(G, R(a[1]), M, avant, prof + 1);
-          // demi-espace borné : si le solide déborde du prisme, on n'enlève que la matière prise dans le prisme
-          var bo = hs.type === "IFCPOLYGONALBOUNDEDHALFSPACE" ? bornes(G, hs, M) : null;
-          if (bo && avant.length && !dansBornes(avant, bo)){
-            var r = differenceFaces(G, avant, [solideBorne(avant, pl, bo)]);
-            if (r){ r.forEach(function(f){ out.push(f); }); break; }
-          }
-          couperDemiEspace(avant, pl.p, pl.n, out);
-          break;
-        }
-        // différence avec un autre solide : soustraction BSP (repli : l'opérande principal seul)
-        if (a[0] && a[0].enu === "DIFFERENCE"){
-          var A0 = [], B0 = [];
-          item(G, R(a[1]), M, A0, prof + 1);
-          item(G, R(a[2]), M, B0, prof + 1);
-          var r0 = B0.length ? differenceFaces(G, A0, [B0]) : null;
-          (r0 || A0).forEach(function(f){ out.push(f); });
-          break;
-        }
-        // aperçu : sinon on dessine l'opérande principal (les autres découpes ne sont pas calculées)
-        item(G, R(a[1]), M, out, prof + 1);
-        if (a[0] && a[0].enu === "UNION") item(G, R(a[2]), M, out, prof + 1);
+        // premier opérande (lui-même éventuellement booléen : découpes successives), puis différence ou
+        // intersection avec le second : demi-espace plan, demi-espace borné, ou solide quelconque (arbre BSP)
+        var avant = [], op = a[0] && a[0].enu, res = null, k;
+        item(G, R(a[1]), M, avant, prof + 1);
+        try { res = booleen(G, op, avant, R(a[2]), M, prof); } catch (x){ res = null; }
+        if (res){ for (k = 0; k < res.length; k++) out.push(res[k]); break; }
+        // repli (cas non géré) : l'opérande principal, et le second pour une union
+        for (k = 0; k < avant.length; k++) out.push(avant[k]);
+        if (op === "UNION") item(G, R(a[2]), M, out, prof + 1);
         break;
       }
       case "IFCCSGSOLID":
@@ -956,12 +1117,6 @@
     var choix = reps.filter(function(r){ return IFC.chaine(C(r)[1]).toLowerCase() === "body"; });
     return choix.length ? choix : reps.filter(function(r){ return TYPES_3D[IFC.chaine(C(r)[2])]; });
   }
-  // Ouvertures (IFCRELVOIDSELEMENT) soustraites du corps de l'élément, quel que soit son type
-  function percer(G, id, faces){
-    var ops = (IFC.index(G.m).ouvertures.get(id) || []).map(function(o){ var g = geometrie(G, o); return g ? g.faces : null; }).filter(Boolean);
-    if (!ops.length) return faces;
-    return differenceFaces(G, faces, ops) || faces;
-  }
   function geometrie(G, id){
     if (G.cache.has(id)) return G.cache.get(id);
     var res = null;
@@ -971,7 +1126,7 @@
         var choix = corps(G, pds);
         var M = placement(G, R(a[5])), faces = [];
         choix.forEach(function(r){ L(C(r)[3]).forEach(function(i){ item(G, i, M, faces, 0); }); });
-        if (faces.length) faces = percer(G, id, faces);
+        faces = percer(G, id, faces);
         if (faces.length){
           var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
           faces.forEach(function(f){
@@ -1011,35 +1166,9 @@
         }
       });
     });
-    // bord libre d'un morceau de face (soustraction) : pas une arête si un morceau de la même face le prolonge
-    var groupes = null, d = q*20;
-    function couvert(fi, bi, i){
-      var f = faces[fi], b = f.b[bi], m = b.length/3, j = (i + 1) % m;
-      if (!groupes){ groupes = new Map(); faces.forEach(function(x, k){ if (x.g === undefined) return; var l = groupes.get(x.g); if (!l) groupes.set(x.g, l = []); l.push(k); }); }
-      var autres = groupes.get(f.g) || [];
-      if (autres.length < 2) return false;
-      var M = [(b[3*i] + b[3*j])/2, (b[3*i+1] + b[3*j+1])/2, (b[3*i+2] + b[3*j+2])/2];
-      var w = norm(cross([b[3*j] - b[3*i], b[3*j+1] - b[3*i+1], b[3*j+2] - b[3*i+2]], f.n));
-      if (!w) return false;
-      var c = [0, 0, 0];
-      for (var k = 0; k < m; k++){ c[0] += b[3*k]; c[1] += b[3*k+1]; c[2] += b[3*k+2]; }
-      if (dot(w, [c[0]/m - M[0], c[1]/m - M[1], c[2]/m - M[2]]) > 0) w = [-w[0], -w[1], -w[2]];
-      var P = [M[0] + w[0]*d, M[1] + w[1]*d, M[2] + w[2]*d], ax = Math.abs(f.n[0]), ay = Math.abs(f.n[1]), az = Math.abs(f.n[2]);
-      var iu = az >= ax && az >= ay ? 0 : ax >= ay ? 1 : 2, iv = az >= ax && az >= ay ? 1 : ax >= ay ? 2 : 0, x = P[iu], y = P[iv];
-      return autres.some(function(k){
-        if (k === fi) return false;
-        var dd = false;
-        faces[k].b.forEach(function(l){
-          for (var s = 0, t = l.length/3 - 1; s < l.length/3; t = s++)
-            if ((l[3*s+iv] > y) !== (l[3*t+iv] > y) && x < (l[3*t+iu] - l[3*s+iu])*(y - l[3*s+iv])/(l[3*t+iv] - l[3*s+iv]) + l[3*s+iu]) dd = !dd;
-        });
-        return dd;
-      });
-    }
     var seg = [];
     tab.forEach(function(l){
       var vive = l.length !== 6;
-      if (vive && l.length === 3 && faces[l[0]].g !== undefined && couvert(l[0], l[1], l[2])) return;
       if (!vive) vive = Math.abs(dot(faces[l[0]].n, faces[l[3]].n)) < COS_VIF;
       if (!vive) return;
       for (var r = 0; r < l.length; r += 3) faces[l[r]].ar.push(l[r+1], l[r+2]);
@@ -1063,6 +1192,13 @@
     return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
   }
   function memePoint(X, Y, a, b){ return X[a] === X[b] && Y[a] === Y[b]; }
+  // q posé sur le segment ouvert ]a, b[ (un pont qui y passerait toucherait un autre contour)
+  function surSegment(X, Y, a, b, q){
+    var ex = X[b] - X[a], ey = Y[b] - Y[a], l2 = ex*ex + ey*ey, qx = X[q] - X[a], qy = Y[q] - Y[a];
+    if (!(l2 > 0) || Math.abs(ex*qy - ey*qx) > 1e-9*l2) return false;
+    var t = (ex*qx + ey*qy)/l2;
+    return t > 1e-12 && t < 1 - 1e-12;
+  }
   function ponts(ext, trous, X, Y){
     trous.sort(function(h, k){
       var mh = -Infinity, mk = -Infinity;
@@ -1090,6 +1226,18 @@
             u = hh[e]; v = hh[(e + 1) % hh.length];
             if (u === M || v === M) continue;
             if (croise(X, Y, M, P, u, v)) libre = false;
+          }
+        }
+        // ni par un sommet d'un autre contour (trous alignés sur une trame : cas courant)
+        for (e = 0; e < ext.length && libre; e++){
+          u = ext[e];
+          if (!memePoint(X, Y, u, P) && !memePoint(X, Y, u, M) && surSegment(X, Y, M, P, u)) libre = false;
+        }
+        for (t = ti; t < trous.length && libre; t++){
+          hh = trous[t];
+          for (e = 0; e < hh.length && libre; e++){
+            u = hh[e];
+            if (!memePoint(X, Y, u, P) && !memePoint(X, Y, u, M) && surSegment(X, Y, M, P, u)) libre = false;
           }
         }
         if (libre){ best = p; bestD = d; }
@@ -2568,7 +2716,12 @@
       // Coupe net les éléments à cheval [{ id, plans }] (découpes IFC) ; renvoie { changement, ids, nonCoupes }
       retailler: function(m, acheval){ var G = Gs.get(m); return G ? retaillerModele(G, acheval) : null; },
       // Géométrie d'éléments à relire (représentation changée) ; celle de web-ifc est à recalculer
-      oublier: function(m, ids){ var G = Gs.get(m); if (!G) return; ids.forEach(function(id){ G.cache.delete(id); }); G.externe = null; },
+      oublier: function(m, ids){
+        var G = Gs.get(m); if (!G) return;
+        // une ouverture qui part ou revient change aussi la géométrie de son hôte
+        ids.forEach(function(id){ G.cache.delete(id); if (G.hotes && G.hotes.has(id)) G.cache.delete(G.hotes.get(id)); });
+        G.externe = null;
+      },
       // Orientation de la boîte (radians autour de la verticale) ; la boîte en place tourne autour de son centre
       // en gardant ses dimensions. Sans argument : l'angle actuel.
       orienterCoupe: function(a){
