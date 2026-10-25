@@ -57,6 +57,9 @@
       var mw = m.ent.get(R(a[3])), f = mw ? N(C(mw)[0]) : NaN;
       G.angle = f > 0 ? f : Math.PI/180;
     });
+    // unités de longueur par mètre (finesse des arcs, tolérances)
+    var u = String(IFC.uniteLongueur ? IFC.uniteLongueur(m) : "").toUpperCase();
+    G.parM = /MILLI/.test(u) ? 1000 : /CENTI/.test(u) ? 100 : /DECI/.test(u) ? 10 : /INCH/.test(u) ? 39.37 : /FOOT|FEET/.test(u) ? 3.2808 : 1;
     return G;
   }
   function nonLu(G, t){ G.nonLus[t] = (G.nonLus[t] || 0) + 1; }
@@ -173,8 +176,12 @@
     }
     return pts;
   }
-  function arc(cx, cy, r1, r2, t1, t2, T, out){
-    var n = Math.max(4, Math.ceil(Math.abs(t2 - t1)/(2*Math.PI)*36));
+  // G donné : pas réglé pour que la corde ne s'écarte pas de plus de 2 mm de l'arc (entre 2° et 10°),
+  // sinon un grand mur courbe paraît fait de larges facettes
+  function arc(cx, cy, r1, r2, t1, t2, T, out, G){
+    var pas = Math.PI/18, r = Math.max(Math.abs(r1), Math.abs(r2));
+    if (G && r > 0) pas = Math.max(Math.PI/90, Math.min(pas, 2*Math.acos(Math.max(-1, 1 - .002*(G.parM || 1)/r))));
+    var n = Math.max(4, Math.ceil(Math.abs(t2 - t1)/pas));
     for (var i = 0; i <= n; i++){
       var t = t1 + (t2 - t1)*i/n, x = cx + r1*Math.cos(t), y = cy + r2*Math.sin(t);
       out.push(T ? [T[0]*x + T[3]*y + T[9], T[1]*x + T[4]*y + T[10], T[2]*x + T[5]*y + T[11]] : [x, y, 0]);
@@ -230,10 +237,10 @@
         });
         return sansDoublonFinal(out);
       case "IFCCIRCLE":
-        T = axe(G, a[0]); arc(0, 0, N(a[1]), N(a[1]), 0, 2*Math.PI, T, out); out.pop();
+        T = axe(G, a[0]); arc(0, 0, N(a[1]), N(a[1]), 0, 2*Math.PI, T, out, G); out.pop();
         return out;
       case "IFCELLIPSE":
-        T = axe(G, a[0]); arc(0, 0, N(a[1]), N(a[2]), 0, 2*Math.PI, T, out); out.pop();
+        T = axe(G, a[0]); arc(0, 0, N(a[1]), N(a[2]), 0, 2*Math.PI, T, out, G); out.pop();
         return out;
       case "IFCTRIMMEDCURVE": {
         var be = G.m.ent.get(R(a[0]));
@@ -267,7 +274,7 @@
           if (!isFinite(t1) || !isFinite(t2)) return null;
           if (sens){ while (t2 <= t1) t2 += 2*Math.PI; }
           else { while (t2 >= t1) t2 -= 2*Math.PI; }
-          arc(0, 0, r1, r2, t1, t2, T, out);
+          arc(0, 0, r1, r2, t1, t2, T, out, G);
           return out;
         }
         nonLu(G, be.type);
@@ -958,9 +965,27 @@
   // IFCPOLYGONALBOUNDEDHALFSPACE(BaseSurface, AgreementFlag, Position, PolygonalBoundary) : la matière retirée est
   // celle du demi-espace à l'intérieur du prisme du polygone (plan XY de Position, prisme selon son Z).
   // { plan } si le prisme contient tout l'élément A (la découpe par le plan suffit), sinon { solide } fini.
+  // Contour fait de segments qui se raccordent à 1 cm près ? Revit 2024 écrit pour les murs courbes des contours
+  // incohérents (centres et points convertis deux fois en pieds, rayons justes) : on coupe alors par le plan seul,
+  // ce qui redonne la forme de Revit.
+  function contourRaccorde(G, id){
+    var ce = G.m.ent.get(id);
+    if (!ce || !/^IFCCOMPOSITECURVE/.test(ce.type)) return true;
+    var tol = .01*(G.parM || 1), prec = null, prem = null, ok = true;
+    L(C(ce)[0]).forEach(function(s){
+      var se = G.m.ent.get(s), sc = se ? courbe(G, R(C(se)[2])) : null;
+      if (!sc || sc.length < 2){ ok = false; return; }
+      if (C(se)[1] && C(se)[1].enu === "F") sc = sc.slice().reverse();
+      if (prec && Math.hypot(sc[0][0] - prec[0], sc[0][1] - prec[1]) > tol) ok = false;
+      if (!prem) prem = sc[0];
+      prec = sc[sc.length - 1];
+    });
+    return ok && !(prem && prec && Math.hypot(prem[0] - prec[0], prem[1] - prec[1]) > tol);
+  }
   function demiEspacePolygone(G, hs, M, A){
     var a = C(hs), pl = demiEspace(G, hs, M), c = courbe(G, R(a[3]));
     if (!pl || !c || c.length < 3) return null;
+    if (!contourRaccorde(G, R(a[3]))) return { plan: pl };
     var poly = c.map(function(p){ return [p[0], p[1]]; });
     if (Math.hypot(poly[0][0] - poly[poly.length - 1][0], poly[0][1] - poly[poly.length - 1][1]) < 1e-9) poly.pop();
     if (poly.length < 3) return null;
