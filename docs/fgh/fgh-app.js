@@ -10,7 +10,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.0.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -39,6 +39,7 @@
   var modifs = new Map();                  // clé stable (ADN) → { k, cle, uid, eid, num, famille, niveau, v: { param: { ancien, nouveau } } }
   var sel = new Set(), actif = null;
   var voirStructure = true, filtre3d = true;
+  var angleBat = 0;                        // orientation du bâtiment (IFC géoréférencés : axes tournés)
 
   var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat });
   vue.formats({
@@ -192,7 +193,8 @@
     $("#accueil").hidden = fichiers.length > 0;
     $("#outils").hidden = !fichiers.length;
     afficher(true);
-    vue.recadrer();
+    angleBat = vue.angleDe(RES.length ? RES.map(function(r){ return r.cle; }) : null) || 0;
+    vue.orienter(angleBat - 0.65, 0.5);
     renduListe(); renduFiche(); renduModifs(); legende();
     fsDemarrer();
   }
@@ -298,14 +300,21 @@
 
   // Outils de la vue
   function boiteNiveau(i){
-    var n = niveaux[i], b = vue.boiteDe();
+    var n = niveaux[i], b = vue.boiteDe(null, angleBat);
     if (!n || !b) return;
     var marge = Math.max(0, parseFloat($("#c-marge").value) || 0), haut = niveaux[i + 1] ? niveaux[i + 1].z - marge : b.max[2] + 1;
-    vue.coupeBoite({ min: [b.min[0] - 1, b.min[1] - 1, n.z - marge], max: [b.max[0] + 1, b.max[1] + 1, Math.max(haut, n.z - marge + .1)] });
+    vue.coupeBoite({ min: [b.min[0] - 1, b.min[1] - 1, n.z - marge], max: [b.max[0] + 1, b.max[1] + 1, Math.max(haut, n.z - marge + .1)], a: angleBat });
     $("#c-niv").value = String(i);
     // la liste suit le niveau quand des réservations le portent
     if (Array.prototype.some.call($("#f-niv").options, function(o){ return o.value === n.nom; })){ $("#f-niv").value = n.nom; filtreChange(); }
     etat("Coupe sur " + n.nom + " : de " + (n.z - marge).toFixed(2) + " à " + haut.toFixed(2) + " m.");
+  }
+  // Boîte autour de réservations, parallèle à elles (et non aux axes du fichier, tournés par le géoréférencement)
+  function boiteAutour(cles){
+    var a = vue.angleDe(cles);
+    vue.orienterCoupe(a == null ? angleBat : a);
+    vue.coupe(cles);
+    $("#c-niv").value = "";
   }
   $("#c-niv").addEventListener("change", function(){ var v = this.value; if (v === "") vue.coupeBoite(null); else boiteNiveau(+v); });
   $("#c-marge").addEventListener("change", function(){ var v = $("#c-niv").value; if (v !== "") boiteNiveau(+v); });
@@ -319,15 +328,15 @@
     var b = e.target.closest("[data-c]");
     if (!b) return;
     var c = b.getAttribute("data-c"), v;
-    if (c === "iso") vue.orienter(-0.65, 0.5);
-    else if (c === "dessus") vue.orienter(0, 1.55);
+    if (c === "iso") vue.orienter(angleBat - 0.65, 0.5);
+    else if (c === "dessus") vue.orienter(angleBat, 1.55);
     else if (c === "cadrer") vue.recadrer();
     else if (c === "niv-bas" || c === "niv-haut"){
       v = $("#c-niv").value;
       var i = v === "" ? (c === "niv-bas" ? niveaux.length - 1 : 0) : +v + (c === "niv-bas" ? -1 : 1);
       if (i >= 0 && i < niveaux.length) boiteNiveau(i);
     }
-    else if (c === "boite-sel"){ if (!sel.size){ etat("Choisis d'abord une ou plusieurs réservations."); return; } vue.coupe(Array.from(sel)); $("#c-niv").value = ""; }
+    else if (c === "boite-sel"){ if (!sel.size){ etat("Choisis d'abord une ou plusieurs réservations."); return; } boiteAutour(Array.from(sel)); }
     else if (c === "sans-boite"){ vue.coupeBoite(null); $("#c-niv").value = ""; vue.recadrer(); }
     else if (c === "mesure" || c === "point") outil(c);
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
@@ -400,7 +409,7 @@
     var a = b.getAttribute("data-a"), cles = rs.map(function(r){ return r.cle; });
     if (a === "fermer"){ sel = new Set(); actif = null; vue.selection(sel, actif); renduListe(); renduFiche(); }
     else if (a === "centrer") vue.cadrer(cles);
-    else if (a === "boite"){ vue.coupe(cles); $("#c-niv").value = ""; }
+    else if (a === "boite") boiteAutour(cles);
     else if (a === "niveau"){ var i = rangNiveau(rs[0].niveau); if (i < niveaux.length) boiteNiveau(i); else etat("Niveau « " + rs[0].niveau + " » absent des étages IFC."); }
     else if (a === "com-multi"){ var t = $("#com-multi").value.trim(); if (!t) return; rs.forEach(function(r){ fixer(r, P_COM, t); }); apresModif(rs); }
   });

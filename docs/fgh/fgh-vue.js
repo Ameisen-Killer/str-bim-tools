@@ -2819,15 +2819,35 @@
         return G.externe.info;
       },
       aExterne: function(m){ var G = Gs.get(m); return !!(G && G.externe); },
-      // FGH : boîte de coupe droite posée par ses coordonnées { min:[x,y,z], max:[x,y,z] } (mètres) ; null l'enlève
+      // FGH : boîte de coupe posée par ses coordonnées { min:[u,v,z], max:[u,v,z], a } (mètres, repère tourné de a
+      // autour de la verticale, comme boiteDe) ; null l'enlève
       coupeBoite: function(b, recadrerVue){
-        coupe = b ? { min: b.min.slice(), max: b.max.slice(), a: 0 } : null; fige = false; cadreMasque = false;
+        coupe = b ? { min: b.min.slice(), max: b.max.slice(), a: b.a || 0 } : null; fige = false; cadreMasque = false;
+        if (coupe) angleCoupe = coupe.a;
         M.coupe(coupe);
         if (coupe && recadrerVue !== false) cadrerSur(coupe); else demander();
         return !!coupe;
       },
       // FGH : boîte englobante des éléments affichés (ou de certains) : { min, max } en mètres, ou null
-      boiteDe: function(cles){ var b = boiteDe(cles || null); return b ? { min: b.min, max: b.max } : null; },
+      boiteDe: function(cles, a){ var b = boiteDe(cles || null, a || 0); return b ? { min: b.min, max: b.max, a: b.a } : null; },
+      // FGH : orientation (radians, entre −45° et 45°) des éléments : celle de la plus grande face verticale de
+      // chacun, la médiane s'il y en a plusieurs ; null sans face verticale. Les IFC géoréférencés sont tournés.
+      angleDe: function(cles){
+        var S = cles ? new Set(cles) : null, as = [], q = Math.PI/2;
+        liste.forEach(function(it){
+          if (S && !S.has(it.id)) return;
+          var T = triangles(it.geo), best = 0, n = null;
+          for (var k = 0; k < T.length; k += 9){
+            var ux = T[k+3] - T[k], uy = T[k+4] - T[k+1], uz = T[k+5] - T[k+2], vx = T[k+6] - T[k], vy = T[k+7] - T[k+1], vz = T[k+8] - T[k+2];
+            var m = [uy*vz - uz*vy, uz*vx - ux*vz, ux*vy - uy*vx], a = Math.hypot(m[0], m[1], m[2]), h = Math.hypot(m[0], m[1]);
+            if (a && h/a > .9 && a > best){ best = a; n = m; }
+          }
+          if (n){ var g = Math.atan2(n[1], n[0]); as.push(g - q*Math.round(g/q)); }
+        });
+        if (!as.length) return null;
+        as.sort(function(x, y){ return x - y; });
+        return as[as.length >> 1];
+      },
       // FGH : teinte (0–360, ou null = neutre) de chaque élément affiché, sans recharger la géométrie
       recolorer: function(f){ liste.forEach(function(it){ it.h = f(it.id); }); M.teinter(liste, sel, actif, coul); demander(); },
       // FGH : origine (mètres) du placement d'une entité IFC (étage…), ou null
