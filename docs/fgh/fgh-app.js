@@ -10,7 +10,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.1.0";
+  var VERSION = "1.2.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
