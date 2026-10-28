@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.0";
+  var VERSION = "1.4.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -532,7 +532,8 @@
     heritage = [];
     try { (JSON.parse(lsGet(cleStockage(), "[]")) || []).forEach(function(m){ if (m && m.k && m.v && vives(m).length) heritage.push(m); }); } catch (e){}
     if (!heritage.length) lsDel(cleStockage());
-    if (FS.actif && FS.maquette === maquette.nom){
+    if (FS.actif && (!FS.maquette || FS.maquette === maquette.nom)){
+      FS.maquette = maquette.nom;
       // même maquette, nouvel export : la mémoire reste le reflet du fichier, relu tout de suite
       elaguer(); FS.lu = 0;
       var h = FS.h;
@@ -713,12 +714,12 @@
     cycle = suite.catch(function(){});
     return suite;
   }
-  function fsErreur(x){ if (x && x.name === "AbortError") return; FS.err = (x && x.message) || String(x); renduModifs(); }
+  function fsErreur(x){ if (x && x.name === "AbortError") return; FS.err = (x && x.message) || String(x); etat("⚠ " + FS.err); renduModifs(); }
   var TYPES_JSON = [{ description: "Validation des réservations FGH", accept: { "application/json": [".json"] } }];
   function fsNouveau(){ window.showSaveFilePicker({ suggestedName: nomFichier(), types: TYPES_JSON }).then(function(h){ return fsBrancher(h, true); }).catch(fsErreur); }
   function fsOuvrir(){
     if (typeof window.showOpenFilePicker === "function"){
-      window.showOpenFilePicker({ types: TYPES_JSON }).then(function(l){ return fsBrancher(l[0], true); }).catch(fsErreur);
+      window.showOpenFilePicker({ types: TYPES_JSON }).then(function(l){ return fsAutoriser(l[0]); }).catch(fsErreur);
       return;
     }
     var i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json";
@@ -727,6 +728,14 @@
       f.text().then(function(t){ apresChargement(chargerTexte(t), f.name); }).catch(fsErreur);
     };
     i.click();
+  }
+  // un fichier ouvert n'est autorisé qu'en lecture : l'écriture se demande tout de suite, pendant le clic,
+  // sinon la première écriture (sans clic) serait refusée et la page repasserait en lecture seule
+  function fsAutoriser(h){
+    return h.requestPermission({ mode: "readwrite" }).then(function(p){
+      if (p !== "granted") throw new Error("écriture dans « " + h.name + " » refusée : clique « Autoriser les modifications » quand Chrome le demande");
+      return fsBrancher(h, true);
+    });
   }
   function fsReprendre(){
     if (!FS.h) return;
@@ -831,6 +840,12 @@
     var fs = e.dataTransfer && e.dataTransfer.files;
     if (!fs || !fs.length) return;
     var json = Array.prototype.filter.call(fs, function(f){ return /\.json$/i.test(f.name); });
+    // Chrome / Edge : un JSON glissé seul se branche comme avec « Brancher un fichier… »
+    var it = e.dataTransfer.items && e.dataTransfer.items[0];
+    if (FS.ok && fs.length === 1 && json.length === 1 && it && it.getAsFileSystemHandle){
+      it.getAsFileSystemHandle().then(function(h){ return h && h.kind === "file" ? fsAutoriser(h) : null; }).catch(fsErreur);
+      return;
+    }
     json.forEach(function(f){ f.text().then(function(t){ apresChargement(chargerTexte(t), f.name); }).catch(fsErreur); });
     if (Array.prototype.some.call(fs, function(f){ return /\.ifc$/i.test(f.name); })) ouvrir(fs);
   });
