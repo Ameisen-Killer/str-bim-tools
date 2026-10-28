@@ -1051,7 +1051,7 @@
   // qu'on ne sait pas soustraire est laissée de côté : l'hôte reste plein à cet endroit.
   function percer(G, id, faces){
     var ouv = faces.length ? IFC.index(G.m).ouvertures.get(id) : null;
-    if (!ouv || !ouv.length) return faces;
+    if (!ouv || !ouv.length || dejaPerce(G, id)) return faces;
     if (!G.hotes) G.hotes = new Map();
     // ouvertures rangées par lots sans chevauchement (boîtes disjointes) : un lot est retiré d'un seul coup
     var lots = [], bH = boiteFaces(faces);
@@ -1076,6 +1076,18 @@
       if (r) faces = r;
     });
     return faces;
+  }
+
+  // Corps maillé (« Tessellation », vue de référence IFC4) : l'exporteur y a déjà découpé les ouvertures ; les
+  // retirer une seconde fois ne change rien à l'image mais coûte très cher (dalle de 600 faces, 80 trémies).
+  function dejaPerce(G, id){
+    try {
+      var pds = G.m.ent.get(R(C(G.m.ent.get(id))[6]));
+      return L(C(pds)[2]).some(function(r){
+        var a = C(G.m.ent.get(r));
+        return IFC.chaine(a[1]) === "Body" && IFC.chaine(a[2]) === "Tessellation";
+      });
+    } catch (x){ return false; }
   }
 
   function item(G, id, M, out, prof){
