@@ -10,7 +10,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.3.0";
+  var VERSION = "1.3.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -111,12 +111,20 @@
     });
     return out;
   }
-  // Structure : éléments construits en phase nouvelle (jeu STR_FGH_STR, Nouveau = 1) → Set d'ids
+  // Structure : éléments construits en phase nouvelle → Set d'ids. Jeu STR_FGH_STR (Nouveau = 1) de « Export IFC RES »,
+  // ou propriété Revit « Phase de création » / « Phase Created » = New Construction / Nouvelle construction (export natif)
+  var PHASE_NOM = /^phase (de cr[ée]ation|created)$/i, PHASE_NEUVE = /new construction|nouv/i;
   function neufsDe(m){
     var neufs = new Set(), psets = new Set();
     m.ent.forEach(function(e){
-      if (e.type !== "IFCPROPERTYSET" || IFC.chaine(C(e)[2]) !== PSET_STR) return;
-      L(C(e)[4]).forEach(function(r){ var x = m.ent.get(r); if (x && x.type === "IFCPROPERTYSINGLEVALUE" && IFC.chaine(C(x)[0]) === "Nouveau" && IFC.chaine(C(x)[2]) === "1") psets.add(e.id); });
+      if (e.type !== "IFCPROPERTYSET") return;
+      var nom = IFC.chaine(C(e)[2]);
+      L(C(e)[4]).forEach(function(r){
+        var x = m.ent.get(r);
+        if (!x || x.type !== "IFCPROPERTYSINGLEVALUE") return;
+        var n = IFC.chaine(C(x)[0]), v = IFC.chaine(C(x)[2]);
+        if (nom === PSET_STR ? n === "Nouveau" && v === "1" : PHASE_NOM.test(n) && PHASE_NEUVE.test(v)) psets.add(e.id);
+      });
     });
     if (psets.size) m.ent.forEach(function(e){
       if (e.type === "IFCRELDEFINESBYPROPERTIES" && psets.has(R(C(e)[5]))) L(C(e)[4]).forEach(function(id){ neufs.add(id); });
