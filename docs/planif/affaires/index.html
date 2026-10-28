@@ -19,6 +19,23 @@
 <link rel="stylesheet" href="/planif/assets/planif.css?v=107">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
+<style>
+/* Menu du clic droit sur un membre de l'équipe (responsable d'affaire, 28.10.2026) */
+.menu-resp{
+  position:fixed;z-index:200;min-width:220px;max-width:calc(100vw - 16px);
+  display:flex;flex-direction:column;padding:6px;
+  background:var(--noir-2);border:1px solid var(--ligne);border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,.14);animation:monte .2s cubic-bezier(.2,.7,.2,1);
+}
+.menu-resp-titre{padding:7px 12px 6px;font-size:11px;color:var(--texte-doux);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-resp button{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;border-radius:6px;
+  padding:10px 12px;margin:0;color:var(--texte);background:none;border:0;cursor:pointer;font:inherit;font-size:13px;
+}
+.menu-resp button:hover,.menu-resp button:focus-visible{background:rgba(var(--encre),.06);outline:none}
+.menu-resp .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
+.etiq[title]{cursor:context-menu}
+</style>
 </head>
 <body class="large">
 
@@ -69,7 +86,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/supabase.js?v=60"></script>
 <script src="/planif/assets/donnees.js?v=80"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
-<script src="/planif/assets/version.js?v=15"></script>
+<script src="/planif/assets/version.js?v=16"></script>
 <script src="/planif/assets/ui.js?v=118"></script>
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
@@ -233,7 +250,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var cherche = mots.length && UI.correspond([m.prenom + " " + m.nom], mots);
         var nom = cherche ? m.prenom + " " + m.nom : m.prenom + " " + m.nom.charAt(0) + ".";
         var resp = m.id === a.responsableId;
-        return el("span", { class: "etiq " + classe + (resp ? " resp" : ""), title: resp ? "Responsable d'affaire" : null }, [UI.surligne(nom, mots)]);
+        var n = el("span", { class: "etiq " + classe + (resp ? " resp" : ""),
+          title: resp ? "Responsable d'affaire · clic droit pour changer" : "Clic droit : désigner responsable" }, [UI.surligne(nom, mots)]);
+        n.addEventListener("contextmenu", function (e) { e.preventDefault(); menuResponsable(a, m, e.clientX, e.clientY); });
+        return n;
       }
       // Ingénieurs puis dessinateurs, par ordre alphabétique dans chaque groupe
       function tries(ids) { return ids.filter(function (x) { return x !== a.responsableId; }).map(D.membre).filter(Boolean).sort(D.compareMembres); }
@@ -415,6 +435,54 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         }
       ]
     });
+  }
+
+  /* ------------------------------------------------ responsable au clic droit */
+
+  /* Demande de Tony (28.10.2026) : clic droit sur un membre de l'équipe pour le
+     désigner responsable de l'affaire ; un seul responsable, l'ancien est remplacé. */
+  var menuResp = null;
+
+  function fermeMenuResp() {
+    if (menuResp && menuResp.parentNode) menuResp.parentNode.removeChild(menuResp);
+    menuResp = null;
+  }
+  document.addEventListener("click", function (e) { if (menuResp && !menuResp.contains(e.target)) fermeMenuResp(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermeMenuResp(); });
+  window.addEventListener("scroll", fermeMenuResp, true);
+  window.addEventListener("resize", fermeMenuResp);
+
+  function menuResponsable(a, m, x, y) {
+    fermeMenuResp();
+    var estResp = m.id === a.responsableId;
+    var ancien = a.responsableId && !estResp ? D.membre(a.responsableId) : null;
+    var nom = m.prenom + " " + m.nom;
+    var choix = estResp
+      ? { label: "Retirer " + nom + " comme responsable", resp: null, dit: "Plus de responsable désigné." }
+      : { label: "Désigner " + nom + " responsable", resp: m.id,
+          dit: nom + " est responsable de l'affaire" + (ancien ? " (à la place de " + ancien.prenom + " " + ancien.nom + ")." : ".") };
+    var bouton = el("button", { type: "button", role: "menuitem" }, [
+      el("span", { class: "coche", "aria-hidden": "true" }), el("span", { text: choix.label })
+    ]);
+    bouton.addEventListener("click", function () {
+      fermeMenuResp();
+      // Les champs de base seulement : ce que le formulaire ne porte pas (mandat, appel d'offres…) reste tel quel
+      D.majAffaire(a.id, {
+        code: a.code, nom: a.nom, note: a.note, teinte: a.teinte, statut: a.statut, echeance: a.echeance,
+        phase: a.phase, adresse: a.adresse, ingenieurs: a.ingenieurs, dessinateurs: a.dessinateurs,
+        responsableId: choix.resp
+      }).then(function () { dessine(); UI.toast(choix.dit); })
+        .catch(function (e) { UI.toast(e.message); });
+    });
+    menuResp = el("div", { class: "menu-resp", role: "menu" }, [
+      el("div", { class: "menu-resp-titre", text: D.libelleAffaire(a) }), bouton
+    ]);
+    document.body.appendChild(menuResp);
+    // Collé au pointeur, sans déborder de l'écran
+    var r = menuResp.getBoundingClientRect();
+    menuResp.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + "px";
+    menuResp.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + "px";
+    bouton.focus();
   }
 
   /** Le choix de la succursale ; absent quand le bureau n'a aucune succursale. */
