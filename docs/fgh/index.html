@@ -210,6 +210,12 @@ textarea.champ{resize:vertical;min-height:70px}
 .fs-etat.on{color:var(--vert)}
 .fs-etat.att{color:var(--orange)}
 .fs-err{color:var(--rouge);font-size:12px;margin-bottom:8px}
+fieldset.dec{border:0;margin:0;padding:0;min-width:0}
+fieldset.dec:disabled{opacity:.45}
+fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
+.ro{margin:10px 12px;padding:9px 11px;border:1px solid var(--orange);background:color-mix(in srgb,var(--orange) 10%,transparent);color:var(--texte);font-size:12.5px}
+.ro b{color:var(--orange);font-weight:500}
+.ro .actions{margin-top:8px}
 .ml{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 0;border-bottom:1px solid rgba(var(--encre),.06);font-size:12.5px;cursor:pointer}
 .ml:last-child{border-bottom:0}
 .ml .q{font-family:var(--mono)}
@@ -312,6 +318,6 @@ textarea.champ{resize:vertical;min-height:70px}
 
 <script src="/fgh/fgh-core.js?v=1"></script>
 <script src="/fgh/fgh-vue.js?v=6"></script>
-<script src="/fgh/fgh-app.js?v=6"></script>
+<script src="/fgh/fgh-app.js?v=7"></script>
 </body>
 </html>

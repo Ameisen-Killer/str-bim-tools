@@ -2,15 +2,16 @@
 // - Ouvre l'IFC des réservations (jeu de propriétés STR_FGH_RES ajouté par le bouton Revit « Export IFC RES »)
 //   et l'IFC light de la structure, superposés dans la même vue 3D (fgh-vue.js, copie de /ifc/).
 // - L'ingénieur change PVA_RES_VAL_Statut, PVA_RES_VAL_Date et PVA_RES_VAL_Commentaire ; chaque changement
-//   est gardé dans le navigateur et, sur Chrome / Edge, réécrit dans un fichier JSON choisi une fois
-//   (format STR_FGH_RES_VALIDATION), que le modeleur applique avec « Import Validation RES ».
+//   s'écrit aussitôt dans le fichier JSON branché (Chrome / Edge, format STR_FGH_RES_VALIDATION), que le
+//   modeleur applique avec « Import Validation RES ». Sans fichier branché, la page est en lecture seule :
+//   le navigateur ne garde aucune décision.
 // - Clé d'échange : l'ADN (CONTROL_NE_PAS_TOUCHER), comme l'outil « Sync Reservations » ; le UniqueId Revit
 //   voyage avec pour départager un ADN en double et repérer une demande resoumise.
 // Aucun envoi réseau : les fichiers ne quittent pas le poste.
 (function(){
   "use strict";
 
-  var VERSION = "1.3.1";
+  var VERSION = "1.4.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -28,6 +29,7 @@
   function pause(){ return new Promise(function(ok){ setTimeout(ok, 0); }); }
   function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e){ return d; } }
   function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e){} }
+  function lsDel(k){ try { localStorage.removeItem(k); } catch (e){} }
 
   $("#version").textContent = "v" + VERSION;
 
@@ -37,6 +39,7 @@
   var niveaux = [];                        // étages IFC { nom, z } triés par altitude
   var maquette = { nom: "", export_du: "" };
   var modifs = new Map();                  // clé stable (ADN) → { k, cle, uid, eid, num, famille, niveau, v: { param: { ancien, nouveau } } }
+  var heritage = [];                       // décisions gardées dans le navigateur par les versions < 1.4 : à reprendre ou jeter
   var sel = new Set(), actif = null;
   var voirStructure = true, filtre3d = true;
   var angleBat = 0;                        // orientation du bâtiment (IFC géoréférencés : axes tournés)
@@ -399,27 +402,41 @@
       '<button type="button" class="s-revoir" data-dec="A REVOIR" aria-pressed="' + (cl === "revoir") + '">À revoir</button></div>';
   }
   function choisis(){ return Array.from(sel).map(function(c){ return parCle.get(c); }).filter(Boolean); }
+  // sans fichier branché, la page ne fait que montrer : le fichier est la seule mémoire des décisions
+  function bandeauRO(){
+    if (FS.actif) return "";
+    var b = !FS.ok ? "" : FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + "</button>" :
+      '<button type="button" class="bt prim" data-m="fs-ouvrir">Brancher un fichier…</button><button type="button" class="bt" data-m="fs-nouveau">Nouveau fichier…</button>';
+    return '<div class="ro"><b>Lecture seule</b> · ' + (FS.ok ? "branche le fichier de validation pour décider." : "ce navigateur ne sait pas écrire dans un fichier : ouvre la page dans Chrome ou Edge pour décider.") +
+      (b ? '<div class="actions">' + b + "</div>" : "") + "</div>";
+  }
+  function verrouille(){
+    if (FS.actif) return false;
+    etat("Lecture seule : branche un fichier de validation (onglet Modifications) pour décider.");
+    renduFiche();
+    return true;
+  }
   function renduFiche(){
-    var f = $("#fiche"), rs = choisis();
+    var f = $("#fiche"), rs = choisis(), ro = FS.actif ? "" : " disabled";
     f.classList.toggle("vide", !rs.length);
-    if (!rs.length){ f.innerHTML = '<div class="vide-fiche">Clique une réservation dans la liste ou dans la vue 3D. Ctrl + clic pour en choisir plusieurs, Maj + clic pour une plage de la liste.</div>'; return; }
+    if (!rs.length){ f.innerHTML = bandeauRO() + '<div class="vide-fiche">Clique une réservation dans la liste ou dans la vue 3D. Ctrl + clic pour en choisir plusieurs, Maj + clic pour une plage de la liste.</div>'; return; }
     if (rs.length > 1){
       var cls = new Set(rs.map(function(r){ return classe(valeur(r, P_ST)); })), cl = cls.size === 1 ? Array.from(cls)[0] : "";
-      f.innerHTML = '<div class="tete"><h2>' + pluriel(rs.length, "réservation") + '</h2><div class="fam">' + esc(rs.slice(0, 12).map(function(r){ return r.num; }).join(", ") + (rs.length > 12 ? "…" : "")) + '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' +
-        '<div class="bloc"><h3>Décision pour toutes</h3>' + boutonsDecision(cl) +
-        '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div>' +
-        '<div class="actions"><button type="button" class="bt" data-a="com-multi">Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
+      f.innerHTML = '<div class="tete"><h2>' + pluriel(rs.length, "réservation") + '</h2><div class="fam">' + esc(rs.slice(0, 12).map(function(r){ return r.num; }).join(", ") + (rs.length > 12 ? "…" : "")) + '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() +
+        '<div class="bloc"><h3>Décision pour toutes</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(cl) +
+        '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' +
+        '<div class="actions"><button type="button" class="bt" data-a="com-multi"' + ro + '>Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
         '<p class="note">La date de validation est mise à aujourd\'hui à chaque décision.</p></div>';
       return;
     }
     var r = rs[0], p = r.p, st = valeur(r, P_ST), d = valeur(r, P_DATE);
     f.innerHTML = '<div class="tete"><h2>' + esc(r.num || "(sans N°)") + '</h2><div class="fam">' + esc([r.famille, r.type].filter(Boolean).join(" · ")) + "<br>" + esc(r.niveau) +
-      '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' +
-      '<div class="bloc"><h3>Validation</h3>' + boutonsDecision(classe(st)) +
+      '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() +
+      '<div class="bloc"><h3>Validation</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(classe(st)) +
       '<div class="fchamp"><label>Statut ' + marque(r, P_ST) + '</label><select class="champ" data-p="' + P_ST + '">' + optionsStatut(st) + "</select></div>" +
       '<div class="fchamp"><label>Date ' + marque(r, P_DATE) + '</label><input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '">' +
       (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") + "</div>" +
-      '<div class="fchamp"><label>Commentaire ' + marque(r, P_COM) + '</label><textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div>" +
+      '<div class="fchamp"><label>Commentaire ' + marque(r, P_COM) + '</label><textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
       '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' +
       '<div class="bloc"><h3>Demande</h3>' + dl([
         ["Demandeur", p["Demandeur"]], ["Date", p["Date demande"]], ["Commentaire", p["Commentaire demande"]],
@@ -429,9 +446,11 @@
       ]) + '<div class="adn" title="Clé d\'échange avec Revit (CONTROL_NE_PAS_TOUCHER)">' + esc(r.adn || "⚠ Sans ADN : retrouvée par son UniqueId seulement") + "</div></div>";
   }
   $("#fiche").addEventListener("click", function(e){
-    var b = e.target.closest("[data-dec],[data-a],[data-annuler]");
+    var b = e.target.closest("[data-dec],[data-a],[data-annuler],[data-m]");
     if (!b) return;
+    if (b.hasAttribute("data-m")){ actionFichier(b.getAttribute("data-m")); return; }
     var rs = choisis();
+    if ((b.hasAttribute("data-dec") || b.hasAttribute("data-annuler") || b.getAttribute("data-a") === "com-multi") && verrouille()) return;
     if (b.hasAttribute("data-dec")){ decider(rs, b.getAttribute("data-dec")); return; }
     if (b.hasAttribute("data-annuler")){ rs.forEach(function(r){ fixer(r, b.getAttribute("data-annuler"), null); }); apresModif(rs); return; }
     var a = b.getAttribute("data-a"), cles = rs.map(function(r){ return r.cle; });
@@ -445,7 +464,7 @@
     var c = e.target.closest("[data-p]");
     if (!c) return;
     var rs = choisis(), p = c.getAttribute("data-p");
-    if (rs.length !== 1) return;
+    if (rs.length !== 1 || verrouille()) return;
     if (p === P_ST){ decider(rs, c.value); return; }
     exigerAuteur();
     fixer(rs[0], p, p === P_DATE ? depuisIso(c.value) : c.value);
@@ -455,7 +474,7 @@
   var minutCom = 0;
   $("#fiche").addEventListener("input", function(e){
     var c = e.target;
-    if (c.getAttribute("data-p") !== P_COM) return;
+    if (c.getAttribute("data-p") !== P_COM || !FS.actif) return;
     var rs = choisis();
     clearTimeout(minutCom);
     minutCom = setTimeout(function(){ if (rs.length === 1){ fixer(rs[0], P_COM, c.value); apresModif(rs, true); } }, 400);
@@ -483,6 +502,7 @@
     if (n && n.trim()) lsSet("fgh.auteur", n.trim());
   }
   function decider(rs, statut){
+    if (verrouille()) return;
     exigerAuteur();
     var d = aujourdhui();
     rs.forEach(function(r){
@@ -502,21 +522,40 @@
   }
   function cleStockage(){ return "fgh.res.modifs|" + (maquette.nom || "?"); }
   function sauver(){
-    var l = Array.from(modifs.values());
-    lsSet(cleStockage(), JSON.stringify(l));
     $("#nb-mod").textContent = nbModifs();
     fsEcrire();
   }
   function nbModifs(){ var n = 0; modifs.forEach(function(m){ n += vives(m).length; }); return n; }
-  // Au chargement : modifications gardées dans le navigateur pour cette maquette ; celles que la maquette
-  // contient déjà (import fait par le modeleur, puis nouvel export) disparaissent d'elles-mêmes.
+  // Au chargement d'un IFC : aucune décision gardée par le navigateur, seul le fichier branché fait foi.
+  // Les décisions que la maquette contient déjà (import fait par le modeleur, puis nouvel export) disparaissent d'elles-mêmes.
   function chargerModifs(){
-    var l = []; try { l = JSON.parse(lsGet(cleStockage(), "[]")) || []; } catch (e){}
-    modifs = new Map();
-    l.forEach(function(m){ if (m && m.k && m.v) modifs.set(m.k, m); });
-    var n = elaguer();
+    heritage = [];
+    try { (JSON.parse(lsGet(cleStockage(), "[]")) || []).forEach(function(m){ if (m && m.k && m.v && vives(m).length) heritage.push(m); }); } catch (e){}
+    if (!heritage.length) lsDel(cleStockage());
+    if (FS.actif && FS.maquette === maquette.nom){
+      // même maquette, nouvel export : la mémoire reste le reflet du fichier, relu tout de suite
+      elaguer(); FS.lu = 0;
+      var h = FS.h;
+      cycle = cycle.then(function(){ return fsRelire(h); }).catch(function(){});
+    } else {
+      if (FS.actif) etat("Autre maquette ouverte : fichier de validation débranché.");
+      if (FS.actif || FS.minut) fsArreter(false);
+      else { modifs = new Map(); FS.h = null; FS.nom = ""; FS.nonEcrit = false; }
+    }
     $("#nb-mod").textContent = nbModifs();
-    if (n) etat(pluriel(n, "modification") + " déjà dans la maquette, retirée" + (n > 1 ? "s" : "") + " de la liste.");
+  }
+  // décisions des versions < 1.4 (gardées dans le navigateur) : versées une fois dans le fichier branché, ou jetées
+  function reprendreHeritage(){
+    if (verrouille() || !heritage.length) return;
+    var n = chargerTexte(JSON.stringify(docModifs(heritage)));
+    heritage = []; lsDel(cleStockage());
+    sauver();
+    apresChargement(n, "ce navigateur");
+  }
+  function jeterHeritage(){
+    if (!confirm("Jeter les " + pluriel(heritage.length, "réservation") + " décidées dans ce navigateur sans fichier ?")) return;
+    heritage = []; lsDel(cleStockage());
+    renduModifs();
   }
   function elaguer(){
     var parK = new Map(), n = 0;
@@ -527,13 +566,12 @@
       Object.keys(m.v).forEach(function(p){ if (vive(m.v[p]) && (r.ifc[p] || "") === m.v[p].nouveau){ delete m.v[p]; n++; } });
       if (!Object.keys(m.v).length) modifs.delete(k);
     });
-    if (n) lsSet(cleStockage(), JSON.stringify(Array.from(modifs.values())));
     return n;
   }
   function auteur(){ return lsGet("fgh.auteur", ""); }
-  function docModifs(){
+  function docModifs(liste){
     var out = [];
-    Array.from(modifs.values()).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }).forEach(function(m){
+    (liste || Array.from(modifs.values())).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }).forEach(function(m){
       PARAMS.forEach(function(p){
         var x = m.v[p];
         if (!x) return;
@@ -575,7 +613,6 @@
     FS.aEcrire = false;
     modifs.forEach(function(m, k){ Object.keys(m.v).forEach(function(p){ var q = dansFichier[k + "|" + p]; if (q === undefined || (m.v[p].quand || "") > q) FS.aEcrire = true; }); });
     elaguer();
-    lsSet(cleStockage(), JSON.stringify(Array.from(modifs.values())));
     return n;
   }
   function apresChargement(n, nom){
@@ -585,7 +622,7 @@
   }
 
   // Enregistrement continu (Chrome, Edge : File System Access), comme le rapport 3D CAN 241
-  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", quand: null, err: "", minut: 0, lu: 0, remplacees: [] };
+  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", maquette: "", quand: null, err: "", minut: 0, lu: 0, nonEcrit: false, remplacees: [] };
   function cleFs(){ return "fichier|" + (maquette.nom || "?"); }
   function idb(mode, fn){
     return new Promise(function(ok, ko){
@@ -604,8 +641,9 @@
   // Fichier partagé : avant chaque écriture, le fichier est relu et fusionné (un autre ingénieur a pu y écrire),
   // puis réécrit ; il est aussi relu toutes les 15 s pour montrer les décisions des autres.
   var cycle = Promise.resolve();
-  function fsRelire(){
-    return FS.h.getFile().then(function(f){
+  function fsRelire(h){
+    if (!h) return Promise.resolve(0);
+    return h.getFile().then(function(f){
       if (f.lastModified === FS.lu) return 0;
       return f.text().then(function(t){
         FS.lu = f.lastModified;
@@ -627,31 +665,53 @@
   function fsEcrire(){
     if (!FS.actif || !FS.h) return;
     clearTimeout(FS.minut);
-    FS.minut = setTimeout(function(){
-      cycle = cycle.then(function(){
-        return fsRelire().then(function(){
+    FS.minut = setTimeout(fsEcrireMaintenant, 300);
+  }
+  function fsEcrireMaintenant(){
+    clearTimeout(FS.minut); FS.minut = 0;
+    if (!FS.actif || !FS.h) return cycle;
+    var h = FS.h;
+    return cycle = cycle.then(function(){
+        return fsRelire(h).then(function(){
           var txt = JSON.stringify(docModifs(), null, 2);
-          return FS.h.createWritable().then(function(w){ return w.write(txt).then(function(){ return w.close(); }); });
-        }).then(function(){ return FS.h.getFile(); }).then(function(f){
-          FS.lu = f.lastModified; FS.quand = new Date(); FS.err = "";
+          return h.createWritable().then(function(w){ return w.write(txt).then(function(){ return w.close(); }); });
+        }).then(function(){ return h.getFile(); }).then(function(f){
+          FS.lu = f.lastModified; FS.quand = new Date(); FS.err = ""; FS.nonEcrit = false;
           var e = $("#fs-etat"); if (e) e.innerHTML = fsTexte();
         });
-      }).catch(function(x){ FS.actif = false; FS.err = "Écriture refusée (" + (x && x.message || x) + ")."; renduModifs(); });
-    }, 300);
+      }).catch(function(x){
+        // plus d'écriture possible : lecture seule tout de suite, les dernières décisions restent en mémoire pour « Reprendre »
+        FS.actif = false; FS.nonEcrit = true;
+        FS.err = "Écriture refusée (" + (x && x.message || x) + "). Tes dernières décisions ne sont pas dans le fichier : clique « Reprendre ».";
+        etat("⚠ " + FS.err);
+        renduModifs(); renduFiche();
+      });
   }
+  // avant de changer de fichier ou de le débrancher : écrire la dernière décision en attente dans l'ancien
+  function fsFinir(){ return FS.minut ? fsEcrireMaintenant() : cycle; }
   setInterval(function(){
     if (!FS.actif || !FS.h || document.hidden) return;
-    cycle = cycle.then(fsRelire).then(function(){ if (FS.aEcrire){ FS.aEcrire = false; fsEcrire(); } }).catch(function(){});
+    var h = FS.h;
+    cycle = cycle.then(function(){ return fsRelire(h); }).then(function(){ if (FS.actif && FS.aEcrire){ FS.aEcrire = false; fsEcrire(); } }).catch(function(){});
   }, 15000);
-  function fsBrancher(h, lire){
-    var suite = lire ? h.getFile().then(function(f){ return f.text(); }).then(function(t){ return t.trim() ? chargerTexte(t) : 0; }) : Promise.resolve(0);
-    return suite.then(function(n){
-      FS.h = h; FS.nom = h.name; FS.actif = true; FS.err = "";
+  // garder : fusionner avec les décisions en mémoire (reprise après une écriture refusée) ; sinon on part du seul fichier
+  function fsBrancher(h, lire, garder){
+    var suite = fsFinir();
+    FS.actif = false;
+    suite = suite.then(function(){
+      if (!garder) modifs = new Map();
+      return lire ? h.getFile().then(function(f){ return f.text(); }).then(function(t){ return t.trim() ? chargerTexte(t) : 0; }) : 0;
+    });
+    suite = suite.then(function(n){
+      FS.h = h; FS.nom = h.name; FS.maquette = maquette.nom; FS.actif = true; FS.err = "";
       if (window.indexedDB) idb("readwrite", function(st){ return st.put(h, cleFs()); }).catch(function(){});
       sauver();
       apresChargement(n, h.name);
+      renduFiche();
       etat("Validations enregistrées au fur et à mesure dans « " + h.name + " »" + (n ? " · " + pluriel(n, "modification") + " reprise" + (n > 1 ? "s" : "") : "") + ".");
     });
+    cycle = suite.catch(function(){});
+    return suite;
   }
   function fsErreur(x){ if (x && x.name === "AbortError") return; FS.err = (x && x.message) || String(x); renduModifs(); }
   var TYPES_JSON = [{ description: "Validation des réservations FGH", accept: { "application/json": [".json"] } }];
@@ -672,13 +732,20 @@
     if (!FS.h) return;
     FS.h.requestPermission({ mode: "readwrite" }).then(function(p){
       if (p !== "granted") throw new Error("accès au fichier refusé");
-      return fsBrancher(FS.h, true);
+      return fsBrancher(FS.h, true, FS.nonEcrit);
     }).catch(fsErreur);
   }
-  function fsArreter(){
-    FS.actif = false; FS.h = null; FS.nom = ""; FS.quand = null; FS.err = "";
-    if (window.indexedDB) idb("readwrite", function(st){ return st.delete(cleFs()); }).catch(function(){});
-    renduModifs();
+  // oublier : aussi le fichier retenu pour cette maquette ; la dernière décision en attente est d'abord écrite
+  function fsArreter(oublier){
+    var fin = fsFinir();
+    FS.actif = false;
+    if (oublier && window.indexedDB) idb("readwrite", function(st){ return st.delete(cleFs()); }).catch(function(){});
+    cycle = fin.then(function(){
+      FS.h = null; FS.nom = ""; FS.maquette = ""; FS.quand = null; FS.err = ""; FS.nonEcrit = false;
+      modifs = new Map();
+      $("#nb-mod").textContent = 0;
+      renduListe(); recolorer(); renduFiche(); renduModifs();
+    }).catch(function(){});
   }
   function fsDemarrer(){
     if (!FS.ok || !window.indexedDB || !maquette.nom || FS.actif) return;
@@ -687,25 +754,29 @@
       FS.h = h; FS.nom = h.name;
       return h.queryPermission({ mode: "readwrite" }).then(function(p){
         if (p === "granted") return fsBrancher(h, true);
-        renduModifs();
-        etat("Validations : clique « Reprendre » dans l'onglet Modifications pour continuer dans « " + h.name + " ».");
+        renduModifs(); renduFiche();
+        etat("Lecture seule : clique « Reprendre " + h.name + " » pour décider.");
       });
     }).catch(function(){});
   }
   function fsTexte(){
     if (FS.actif) return "✓ Enregistrement continu dans <b>" + esc(FS.nom) + "</b>" + (FS.quand ? " · écrit à " + heure(FS.quand) : "") + ". C'est ce fichier qu'on donne au modeleur. Plusieurs ingénieurs peuvent travailler dans le même fichier (dossier partagé) : il est relu toutes les 15 s.";
-    if (FS.h) return "Fichier <b>" + esc(FS.nom) + "</b> : clique « Reprendre » pour réautoriser l'accès et continuer à y enregistrer.";
-    if (!FS.ok) return "Ce navigateur ne sait pas enregistrer en continu (Chrome ou Edge le font) : télécharge le fichier pour le modeleur, et rouvre-le ici pour reprendre.";
-    return "Pour l'instant, tes décisions ne sont gardées que dans ce navigateur. Enregistre-les dans un fichier : chaque changement s'y écrira tout seul.";
+    if (FS.h) return "Lecture seule. Fichier <b>" + esc(FS.nom) + "</b> : clique « Reprendre » pour réautoriser l'accès et décider.";
+    if (!FS.ok) return "Lecture seule : ce navigateur ne sait pas écrire dans un fichier. Ouvre la page dans Chrome ou Edge pour décider ; ici tu peux seulement ouvrir un fichier pour le consulter.";
+    return "Lecture seule. Branche le fichier de validation (ou crée-le) pour décider : le fichier est la seule mémoire des décisions, chaque changement s'y écrit tout seul.";
   }
   function renduModifs(){
     var b = FS.actif ? '<button type="button" class="bt" data-m="fs-ouvrir">Autre fichier…</button><button type="button" class="bt" data-m="fs-stop">Arrêter</button>' :
       FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + '</button><button type="button" class="bt" data-m="fs-nouveau">Autre fichier…</button><button type="button" class="bt" data-m="fs-stop">Oublier</button>' :
-      (FS.ok ? '<button type="button" class="bt prim" data-m="fs-nouveau">Enregistrer dans un fichier…</button>' : "") + '<button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un fichier…</button>';
+      FS.ok ? '<button type="button" class="bt prim" data-m="fs-ouvrir">Brancher un fichier…</button><button type="button" class="bt" data-m="fs-nouveau">Nouveau fichier…</button>' :
+      '<button type="button" class="bt" data-m="fs-ouvrir">Consulter un fichier…</button>';
     var h = '<div class="carte"><h3>Fichier pour Revit</h3><div class="in"><div id="fs-etat" class="fs-etat' + (FS.actif ? " on" : FS.h ? " att" : "") + '">' + fsTexte() + "</div>" +
       (FS.err ? '<div class="fs-err">' + esc(FS.err) + "</div>" : "") + '<div class="actions">' + b + '<button type="button" class="bt" data-m="telecharger"' + (nbModifs() ? "" : " disabled") + ">Télécharger le JSON</button></div>" +
       '<div class="fchamp" style="margin:10px 0 0"><label>Ton nom (écrit dans le fichier)</label><input class="champ" id="auteur" value="' + esc(auteur()) + '" placeholder="Prénom Nom"></div>' +
       '<p class="note">Le modeleur applique ce fichier dans la maquette RES avec le bouton Revit « Import Validation RES » (dossier FGH), puis lance « Sync Reservations ».</p></div></div>';
+    if (heritage.length) h += '<div class="carte"><h3>Décisions restées dans ce navigateur</h3><div class="in"><p class="note" style="margin-top:0">' +
+      pluriel(heritage.length, "réservation") + " décidée" + (heritage.length > 1 ? "s" : "") + " sans fichier avec l'ancienne version de la page. Elles ne sont plus prises en compte : verse-les dans le fichier branché, ou jette-les.</p>" +
+      '<div class="actions"><button type="button" class="bt prim" data-m="heritage-ok"' + (FS.actif ? "" : " disabled") + '>Les mettre dans le fichier</button><button type="button" class="bt" data-m="heritage-non">Les jeter</button></div></div></div>';
     var L = Array.from(modifs.values()).filter(function(m){ return vives(m).length; }).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }), parK = new Map();
     RES.forEach(function(r){ parK.set(r.k, r); });
     if (!L.length) h += '<p class="note" style="padding:0 2px">Aucune décision pour l\'instant. Choisis une réservation et clique « Valider », « Refuser » ou « À revoir ».</p>';
@@ -714,29 +785,30 @@
         var r = parK.get(m.k);
         return '<div class="ml"' + (r ? ' data-cle="' + esc(r.cle) + '"' : "") + '><span class="q">' + esc(m.num || m.cle || m.k) + (r ? "" : ' <span title="Absente de l\'IFC ouvert">?</span>') + " · " + esc(m.niveau || "") + "</span>" +
           '<span class="d">' + vives(m).map(function(p){ var x = m.v[p]; return esc(LIB[p]) + " : " + esc(x.ancien || "vide") + " → <b>" + esc(x.nouveau || "vide") + "</b>" + (x.par ? ' <span class="par">· ' + esc(x.par) + "</span>" : ""); }).join("<br>") + "</span>" +
-          '<button type="button" class="x" data-retire="' + esc(m.k) + '" title="Retirer">×</button></div>';
-      }).join("") + '</div></div><div class="actions"><button type="button" class="bt" data-m="vider">Tout effacer</button></div>';
+          (FS.actif ? '<button type="button" class="x" data-retire="' + esc(m.k) + '" title="Retirer">×</button>' : "") + "</div>";
+      }).join("") + '</div></div><div class="actions"><button type="button" class="bt" data-m="vider"' + (FS.actif ? "" : " disabled") + ">Tout effacer</button></div>";
     }
     $("#modifs").innerHTML = h;
     $("#nb-mod").textContent = nbModifs();
   }
   $("#modifs").addEventListener("click", function(e){
     var x = e.target.closest("[data-retire]");
-    if (x){ e.stopPropagation(); retirer(modifs.get(x.getAttribute("data-retire")) || { v: {} }); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
+    if (x){ e.stopPropagation(); if (verrouille()) return; retirer(modifs.get(x.getAttribute("data-retire")) || { v: {} }); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
     var b = e.target.closest("[data-m]");
-    if (b){
-      var a = b.getAttribute("data-m");
-      if (a === "fs-nouveau") fsNouveau();
-      else if (a === "fs-ouvrir") fsOuvrir();
-      else if (a === "fs-reprendre") fsReprendre();
-      else if (a === "fs-stop") fsArreter();
-      else if (a === "telecharger") telecharger();
-      else if (a === "vider" && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?")){ modifs.forEach(retirer); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
-      return;
-    }
+    if (b){ actionFichier(b.getAttribute("data-m")); return; }
     var l = e.target.closest(".ml[data-cle]");
     if (l){ choisir(l.getAttribute("data-cle")); vue.cadrer([l.getAttribute("data-cle")]); }
   });
+  function actionFichier(a){
+      if (a === "fs-nouveau") fsNouveau();
+      else if (a === "fs-ouvrir") fsOuvrir();
+      else if (a === "fs-reprendre") fsReprendre();
+      else if (a === "fs-stop") fsArreter(true);
+      else if (a === "telecharger") telecharger();
+      else if (a === "heritage-ok") reprendreHeritage();
+      else if (a === "heritage-non") jeterHeritage();
+      else if (a === "vider" && !verrouille() && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?")){ modifs.forEach(retirer); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
+  }
   $("#modifs").addEventListener("change", function(e){ if (e.target.id === "auteur"){ lsSet("fgh.auteur", e.target.value.trim()); sauver(); } });
 
   // ================= Onglets, ouverture, thème =================
@@ -769,7 +841,7 @@
     lsSet("fgh.theme", c);
   });
   window.addEventListener("beforeunload", function(e){
-    if (nbModifs() && !FS.actif){ e.preventDefault(); e.returnValue = ""; }
+    if (FS.nonEcrit){ e.preventDefault(); e.returnValue = ""; }
   });
   renduModifs();
 })();
