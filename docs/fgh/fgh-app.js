@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.1";
+  var VERSION = "1.4.2";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -406,13 +406,13 @@
   function bandeauRO(){
     if (FS.actif) return "";
     var b = !FS.ok ? "" : FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + "</button>" :
-      '<button type="button" class="bt prim" data-m="fs-ouvrir">Brancher un fichier…</button><button type="button" class="bt" data-m="fs-nouveau">Nouveau fichier…</button>';
-    return '<div class="ro"><b>Lecture seule</b> · ' + (FS.ok ? "branche le fichier de validation pour décider." : "ce navigateur ne sait pas écrire dans un fichier : ouvre la page dans Chrome ou Edge pour décider.") +
+      '<button type="button" class="bt prim" data-m="fs-ouvrir">Ouvrir un JSON…</button><button type="button" class="bt prim" data-m="fs-nouveau">Créer un nouveau JSON…</button>';
+    return '<div class="ro"><b>Lecture seule</b> · ' + (FS.ok ? "ouvre le JSON de validation, ou crée-le, pour décider." : "ce navigateur ne sait pas écrire dans un fichier : ouvre la page dans Chrome ou Edge pour décider.") +
       (b ? '<div class="actions">' + b + "</div>" : "") + "</div>";
   }
   function verrouille(){
     if (FS.actif) return false;
-    etat("Lecture seule : branche un fichier de validation (onglet Modifications) pour décider.");
+    etat("Lecture seule : ouvre ou crée le JSON de validation pour décider.");
     renduFiche();
     return true;
   }
@@ -772,13 +772,13 @@
     if (FS.actif) return "✓ Enregistrement continu dans <b>" + esc(FS.nom) + "</b>" + (FS.quand ? " · écrit à " + heure(FS.quand) : "") + ". C'est ce fichier qu'on donne au modeleur. Plusieurs ingénieurs peuvent travailler dans le même fichier (dossier partagé) : il est relu toutes les 15 s.";
     if (FS.h) return "Lecture seule. Fichier <b>" + esc(FS.nom) + "</b> : clique « Reprendre » pour réautoriser l'accès et décider.";
     if (!FS.ok) return "Lecture seule : ce navigateur ne sait pas écrire dans un fichier. Ouvre la page dans Chrome ou Edge pour décider ; ici tu peux seulement ouvrir un fichier pour le consulter.";
-    return "Lecture seule. Branche le fichier de validation (ou crée-le) pour décider : le fichier est la seule mémoire des décisions, chaque changement s'y écrit tout seul.";
+    return "Lecture seule. Ouvre le JSON de validation, ou crée-le, pour décider : le fichier est la seule mémoire des décisions, chaque changement s'y écrit tout seul.";
   }
   function renduModifs(){
-    var b = FS.actif ? '<button type="button" class="bt" data-m="fs-ouvrir">Autre fichier…</button><button type="button" class="bt" data-m="fs-stop">Arrêter</button>' :
-      FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + '</button><button type="button" class="bt" data-m="fs-nouveau">Autre fichier…</button><button type="button" class="bt" data-m="fs-stop">Oublier</button>' :
-      FS.ok ? '<button type="button" class="bt prim" data-m="fs-ouvrir">Brancher un fichier…</button><button type="button" class="bt" data-m="fs-nouveau">Nouveau fichier…</button>' :
-      '<button type="button" class="bt" data-m="fs-ouvrir">Consulter un fichier…</button>';
+    var b = FS.actif ? '<button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un JSON…</button><button type="button" class="bt" data-m="fs-nouveau">Créer un nouveau JSON…</button><button type="button" class="bt" data-m="fs-stop">Arrêter</button>' :
+      FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + '</button><button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un JSON…</button><button type="button" class="bt" data-m="fs-nouveau">Créer un nouveau JSON…</button><button type="button" class="bt" data-m="fs-stop">Oublier</button>' :
+      FS.ok ? '<button type="button" class="bt prim" data-m="fs-ouvrir">Ouvrir un JSON…</button><button type="button" class="bt prim" data-m="fs-nouveau">Créer un nouveau JSON…</button>' :
+      '<button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un JSON (lecture seule)…</button>';
     var h = '<div class="carte"><h3>Fichier pour Revit</h3><div class="in"><div id="fs-etat" class="fs-etat' + (FS.actif ? " on" : FS.h ? " att" : "") + '">' + fsTexte() + "</div>" +
       (FS.err ? '<div class="fs-err">' + esc(FS.err) + "</div>" : "") + '<div class="actions">' + b + '<button type="button" class="bt" data-m="telecharger"' + (nbModifs() ? "" : " disabled") + ">Télécharger le JSON</button></div>" +
       '<div class="fchamp" style="margin:10px 0 0"><label>Ton nom (écrit dans le fichier)</label><input class="champ" id="auteur" value="' + esc(auteur()) + '" placeholder="Prénom Nom"></div>' +
@@ -840,7 +840,7 @@
     var fs = e.dataTransfer && e.dataTransfer.files;
     if (!fs || !fs.length) return;
     var json = Array.prototype.filter.call(fs, function(f){ return /\.json$/i.test(f.name); });
-    // Chrome / Edge : un JSON glissé seul se branche comme avec « Brancher un fichier… »
+    // Chrome / Edge : un JSON glissé seul se branche comme avec « Ouvrir un JSON… »
     var it = e.dataTransfer.items && e.dataTransfer.items[0];
     if (FS.ok && fs.length === 1 && json.length === 1 && it && it.getAsFileSystemHandle){
       it.getAsFileSystemHandle().then(function(h){ return h && h.kind === "file" ? fsAutoriser(h) : null; }).catch(fsErreur);
