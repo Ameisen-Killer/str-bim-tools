@@ -679,7 +679,12 @@
   }
   function bspRetourne(p){ return { v: p.v.slice().reverse(), n: [-p.n[0], -p.n[1], -p.n[2]], w: -p.w, g: p.g }; }
   // Range p par rapport au plan pl : coplanaire (même sens ou opposé), devant, derrière, ou coupé en deux
+  // Délai d'un calcul : passé ce temps, l'opération en cours abandonne (exception) et l'appelant garde l'élément
+  // non découpé plutôt que de figer la page
+  var BSP_FIN = 0, bspTours = 0;
+  function bspDelai(ms){ BSP_FIN = ms ? performance.now() + ms : 0; }
   function bspPartager(pl, p, cf, cb, f, b, eps){
+    if (BSP_FIN && !(++bspTours & 4095) && performance.now() > BSP_FIN) throw new Error("BSP : délai dépassé");
     var n = p.v.length, ty = new Array(n), tout = 0, i;
     for (i = 0; i < n; i++){
       var d = dot(pl.n, p.v[i]) - pl.w, t = d < -eps ? 2 : d > eps ? 1 : 0;
@@ -931,7 +936,10 @@
     var o = [(bA.min[0] + bA.max[0])/2, (bA.min[1] + bA.max[1])/2, (bA.min[2] + bA.max[2])/2];
     var PA = versPolys(A, o, eps*10, 0), PB = versPolys(B, o, eps*10, A.length);
     if (!PA.length || !PB.length || PA.length > BSP_MAX || PB.length > BSP_MAX) return null;
-    var R = bspOperation(op, PA, PB, eps);
+    var R;
+    bspDelai(1500);
+    try { R = bspOperation(op, PA, PB, eps); } catch (x){ R = []; }
+    bspDelai(0);
     if (!R.length) return null;          // plus rien : plutôt un échec qu'un élément entièrement évidé
     var out = [];
     versFaces(R, o, eps, out);
@@ -1062,6 +1070,9 @@
       G.hotes.set(o, id);
       var g = geometrie(G, o);
       if (!g || !bH) return;
+      // trous de boulons et autres ouvertures de moins de 5 cm : invisibles à l'échelle d'un bâtiment, mais chacun
+      // morcelle tout l'hôte dans l'arbre BSP (un HEB à 16 trous prenait plusieurs secondes)
+      if (Math.max(g.max[0] - g.min[0], g.max[1] - g.min[1], g.max[2] - g.min[2]) < .05*(G.parM || 1)) return;
       for (var k = 0; k < 3; k++) if (g.min[k] > bH.max[k] || g.max[k] < bH.min[k]) return;    // hors de l'hôte
       var lot = null;
       for (var i = 0; i < lots.length && !lot; i++){
@@ -1072,13 +1083,28 @@
       if (!lot) lots.push(lot = { g: [], nb: 0 });
       lot.g.push(g); lot.nb += g.faces.length;
     });
+    if (!lots.length) return faces;
+    // les lots s'enchaînent sur les polygones de l'arbre BSP, sans repasser par des faces : retrianguler l'hôte
+    // déjà percé entre deux lots produisait des milliers d'éclats (HEB à 16 trous de boulons : calcul sans fin)
+    var taille = Math.hypot(bH.max[0] - bH.min[0], bH.max[1] - bH.min[1], bH.max[2] - bH.min[2]) || 1, eps = taille*1e-8;
+    var o = [(bH.min[0] + bH.max[0])/2, (bH.min[1] + bH.max[1])/2, (bH.min[2] + bH.max[2])/2];
+    var PA = versPolys(faces, o, eps*10, 0), g0 = faces.length, perce = false;
+    if (!PA.length || PA.length > BSP_MAX) return faces;
+    bspDelai(1500);
     lots.forEach(function(lot){
       var B = [], r = null;
       lot.g.forEach(function(g){ for (var i = 0; i < g.faces.length; i++) B.push(g.faces[i]); });
-      try { r = booleenFaces("DIFFERENCE", faces, B); } catch (x){ r = null; }
-      if (r) faces = r;
+      var PB = versPolys(B, o, eps*10, g0);
+      g0 += B.length;
+      if (!PB.length || PB.length > BSP_MAX || PA.length > BSP_MAX) return;
+      try { r = bspOperation("DIFFERENCE", PA, PB, eps); } catch (x){ r = null; }
+      if (r && r.length){ PA = r; perce = true; }
     });
-    return faces;
+    bspDelai(0);
+    if (!perce) return faces;
+    var out = [];
+    versFaces(PA, o, eps, out);
+    return out.length ? out : faces;
   }
 
   // Corps maillé (« Tessellation », vue de référence IFC4) : l'exporteur y a déjà découpé les ouvertures ; les
