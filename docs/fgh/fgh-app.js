@@ -10,8 +10,8 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.2.0";
-  var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES";
+  var VERSION = "1.3.0";
+  var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
   var LIB = {}; LIB[P_ST] = "Statut"; LIB[P_DATE] = "Date"; LIB[P_COM] = "Commentaire";
@@ -111,6 +111,18 @@
     });
     return out;
   }
+  // Structure : éléments construits en phase nouvelle (jeu STR_FGH_STR, Nouveau = 1) → Set d'ids
+  function neufsDe(m){
+    var neufs = new Set(), psets = new Set();
+    m.ent.forEach(function(e){
+      if (e.type !== "IFCPROPERTYSET" || IFC.chaine(C(e)[2]) !== PSET_STR) return;
+      L(C(e)[4]).forEach(function(r){ var x = m.ent.get(r); if (x && x.type === "IFCPROPERTYSINGLEVALUE" && IFC.chaine(C(x)[0]) === "Nouveau" && IFC.chaine(C(x)[2]) === "1") psets.add(e.id); });
+    });
+    if (psets.size) m.ent.forEach(function(e){
+      if (e.type === "IFCRELDEFINESBYPROPERTIES" && psets.has(R(C(e)[5]))) L(C(e)[4]).forEach(function(id){ neufs.add(id); });
+    });
+    return neufs;
+  }
   function elementsDe(m){
     return IFC.arbre(m).map(function(x){ return x.id; }).filter(function(id){ var i = IFC.infos(m, id); return i && i.genre === "element"; });
   }
@@ -126,7 +138,7 @@
           progres("Analyse de " + nom + "…", 1);
           return pause().then(function(){
             var r = reservationsDe(m);
-            var fi = { uid: uidF++, m: m, nom: f.name, role: r ? "res" : "str", res: r };
+            var fi = { uid: uidF++, m: m, nom: f.name, role: r ? "res" : "str", res: r, neufs: r ? null : neufsDe(m) };
             fi.ids = r ? r.map(function(x){ return x.id; }) : elementsDe(m);
             nouveaux.push(fi);
           });
@@ -262,7 +274,7 @@
   // ================= Vue 3D =================
   function items(){
     var out = [];
-    if (voirStructure) fichiers.forEach(function(fi){ if (fi.role === "str") fi.ids.forEach(function(id){ out.push({ cle: "s" + fi.uid + ":" + id, m: fi.m, id: id, h: null }); }); });
+    if (voirStructure) fichiers.forEach(function(fi){ if (fi.role === "str") fi.ids.forEach(function(id){ out.push({ cle: "s" + fi.uid + ":" + id, m: fi.m, id: id, h: null, rose: fi.neufs.has(id) }); }); });
     (filtre3d ? filtrees() : RES).forEach(function(r){ out.push({ cle: r.cle, m: r.f.m, id: r.id, h: teinte(r) }); });
     return out;
   }
@@ -273,11 +285,14 @@
   }
   function recolorer(){ vue.recolorer(function(cle){ var r = parCle.get(cle); return r ? teinte(r) : null; }); legende(); }
   function legende(){
-    if (!RES.length){ $("#legende").hidden = true; return; }
+    var neufs = 0;
+    fichiers.forEach(function(fi){ if (fi.neufs) neufs += fi.neufs.size; });
+    if (!RES.length && !neufs){ $("#legende").hidden = true; return; }
     var n = {};
     RES.forEach(function(r){ var c = classe(valeur(r, P_ST)); n[c] = (n[c] || 0) + 1; });
     $("#legende").innerHTML = ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return n[c]; })
-      .map(function(c){ return '<span><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + " · " + n[c] + "</span>"; }).join("");
+      .map(function(c){ return '<span><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + " · " + n[c] + "</span>"; }).join("") +
+      (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "");
     $("#legende").hidden = false;
   }
   function cliqueVue(cle, e){
@@ -285,7 +300,7 @@
     if (cle && parCle.has(cle)){ choisir(cle, plus); var el = $('#liste [data-cle="' + cle + '"]'); if (el) el.scrollIntoView({ block: "nearest" }); return; }
     if (cle){
       var m = /^s(\d+):(\d+)$/.exec(cle), fi = m && fichiers.filter(function(x){ return x.uid === +m[1]; })[0], i = fi && IFC.infos(fi.m, +m[2]);
-      if (i) etat("Structure : " + [i.typeLib, i.nom, i.objectType].filter(Boolean).join(" · "));
+      if (i) etat("Structure : " + [i.typeLib, i.nom, i.objectType, fi.neufs && fi.neufs.has(+m[2]) ? "phase nouvelle" : ""].filter(Boolean).join(" · "));
     }
     if (!plus){ sel = new Set(); actif = null; vue.selection(sel, actif); renduListe(); renduFiche(); }
   }

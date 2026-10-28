@@ -1501,7 +1501,7 @@
         if (!pl) return;
         var t = it.h != null ? coul.pastel(it.h) : null;
         // contour doré seulement pour la sélection ; l'élément actif non sélectionné garde un contour neutre renforcé
-        var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : it.rgb || P1, l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
+        var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : it.rgb || (it.rose ? coul.rose : P1), l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
         for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
       });
@@ -2035,7 +2035,7 @@
         var nup = n[2]*cb + ny1*sb, ndp = ny1*cb - n[2]*sb;
         var lum = Math.abs(nx1*L[0] + nup*L[1] - ndp*L[2]);
         var choisi = sel.has(it.id), estActif = it.id === actif, pa = it.h != null ? coul.pastel(it.h) : null;
-        var fond = teinte(choisi ? OR : pa ? pa.piece : it.rgb || coul.piece, Math.round(lum*24));
+        var fond = teinte(choisi ? OR : pa ? pa.piece : it.rgb || (it.rose ? coul.rose : coul.piece), Math.round(lum*24));
         ctx.beginPath();
         for (var bj = 0; bj < F.q.length; bj++){
           var P = F.q[bj];
@@ -2209,6 +2209,8 @@
         cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190],
         coupeRGB: clair ? [204, 44, 38] : [196, 48, 42]
       };
+      // FGH : structure construite en phase nouvelle, pièce légèrement rosée
+      coul.rose = coul.piece.map(function(v, i){ return Math.round(v + ([232, 128, 160][i] - v)*.3); });
       // couleur d'une maquette (teinte 0–360) : remplissage très pastel, arêtes pastel un peu plus soutenues
       var cache = {};
       coul.pastel = function(h){
@@ -2725,7 +2727,7 @@
           var G = Gs.get(it.m), g = null, rgb = null;
           if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
           if (G && !g) g = geometrie(G, it.id);
-          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb, rose: !!it.rose }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
