@@ -1386,7 +1386,7 @@
       return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
         uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR") };
     }
-    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
+    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
@@ -1406,12 +1406,22 @@
       liste.forEach(function(it){ nv += triangles(it.geo).length/3; nl += aretesVives(it.geo).length/3; });
       var pos = new Float32Array(3*nv), nor = new Float32Array(3*nv), ids = new Uint8Array(3*nv), lpos = new Float32Array(3*nl);
       var v = 0, w = 0;
-      plages = [];
-      liste.forEach(function(it, e){
+      plages = new Array(liste.length);
+      boites = new Float32Array(6*liste.length);
+      // tampons rangés de bas en haut : une coupe par niveau retombe sur quelques morceaux contigus
+      var ordre = liste.map(function(it, e){
+        var T = it.geo.T, z = Infinity;
+        for (var k = 2; k < T.length; k += 3) if (T[k] < z) z = T[k];
+        return [e, z];
+      }).sort(function(a, b){ return a[1] - b[1]; });
+      ordre.forEach(function(oe){
+        var e = oe[0], it = liste[e];
         var T = it.geo.T, TF = it.geo.TF, A = it.geo.A, faces = it.geo.faces, v0 = v, w0 = w;
+        var bx = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
         var id = e + 1, r = id & 255, g = (id >> 8) & 255, bl = (id >> 16) & 255;
         for (var k = 0; k < T.length; k += 3, v++){
           pos[3*v] = T[k] - orig[0]; pos[3*v+1] = T[k+1] - orig[1]; pos[3*v+2] = T[k+2] - orig[2];
+          for (var q = 0; q < 3; q++){ if (T[k+q] < bx[q]) bx[q] = T[k+q]; if (T[k+q] > bx[3+q]) bx[3+q] = T[k+q]; }
           var n = faces[TF[(k/9) | 0]].n;
           nor[3*v] = n[0]; nor[3*v+1] = n[1]; nor[3*v+2] = n[2];
           ids[3*v] = r; ids[3*v+1] = g; ids[3*v+2] = bl;
@@ -1419,7 +1429,8 @@
         for (k = 0; k < A.length; k += 3, w++){
           lpos[3*w] = A[k] - orig[0]; lpos[3*w+1] = A[k+1] - orig[1]; lpos[3*w+2] = A[k+2] - orig[2];
         }
-        plages.push([v0, v, w0, w]);
+        plages[e] = [v0, v, w0, w];
+        boites.set(bx, 6*e);
       });
       nTri = nv; nLig = nl;
       remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
@@ -1431,6 +1442,39 @@
     function poserCoupe(b){
       coupe = b;
       if (b) remplir(B.cadre, new Float32Array(aretesBoite(b).map(function(v, k){ return v - origine[k % 3]; })));
+      morceaux = b ? garder(b) : null;
+    }
+    // Éléments dont l'enveloppe touche la boîte (dans son repère tourné) : seuls ceux-là partent à la carte
+    // graphique, en morceaux contigus des tampons ; les petits trous sont comblés (le nuanceur les coupe)
+    // pour ne pas multiplier les appels de dessin.
+    function garder(b){
+      if (!boites) return null;
+      var k = cs(b), ca = Math.abs(k[0]), sa = Math.abs(k[1]), eps = 1e-4, pris = [];
+      for (var e = 0; e < plages.length; e++){
+        var o = 6*e, hx = (boites[o+3] - boites[o])/2, hy = (boites[o+4] - boites[o+1])/2;
+        var l = versBoite(b, boites[o] + hx, boites[o+1] + hy), ru = ca*hx + sa*hy, rv = sa*hx + ca*hy;
+        if (l[0] + ru < b.min[0] - eps || l[0] - ru > b.max[0] + eps || l[1] + rv < b.min[1] - eps || l[1] - rv > b.max[1] + eps ||
+            boites[o+5] < b.min[2] - eps || boites[o+2] > b.max[2] + eps) continue;
+        pris.push(plages[e]);
+      }
+      pris.sort(function(x, y){ return x[0] - y[0]; });
+      var trou = 0, m;
+      do {
+        m = [];
+        pris.forEach(function(p){
+          var d = m[m.length - 1];
+          if (d && p[0] - d[1] <= trou && p[2] - d[3] <= trou*2){ d[1] = Math.max(d[1], p[1]); d[3] = Math.max(d[3], p[3]); }
+          else m.push([p[0], p[1], p[2], p[3]]);
+        });
+        trou = trou ? trou*4 : 600;
+      } while (m.length > 400);
+      return m;
+    }
+    function tracer(mode, lignes){
+      var n = lignes ? nLig : nTri;
+      if (!morceaux){ if (n) gl.drawArrays(mode, 0, n); return; }
+      var a = lignes ? 2 : 0;
+      for (var i = 0; i < morceaux.length; i++){ var p = morceaux[i]; if (p[a+1] > p[a]) gl.drawArrays(mode, p[a], p[a+1] - p[a]); }
     }
     function teinter(liste, sel, actif, coul){
       kad = coul.cadreRGBA; krouge = coul.coupeRGB;
@@ -1473,7 +1517,7 @@
       attrib(2, couleurBuf, 3, gl.UNSIGNED_BYTE, true);
       gl.enable(gl.POLYGON_OFFSET_FILL);
       gl.polygonOffset(1, 1);
-      if (nTri) gl.drawArrays(gl.TRIANGLES, 0, nTri);
+      tracer(gl.TRIANGLES, false);
       gl.disable(gl.POLYGON_OFFSET_FILL);
       return M;
     }
@@ -1486,7 +1530,7 @@
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
       var M = faces(c, P.faces, B.col);
-      if (nLig){
+      if (nLig && !c.vite){         // pendant un mouvement : sans les arêtes
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
         decoupe(P.lignes, true);
@@ -1496,11 +1540,11 @@
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.depthMask(false);
-        gl.drawArrays(gl.LINES, 0, nLig);
+        tracer(gl.LINES, true);
         gl.depthMask(true);
         gl.disable(gl.BLEND);
       }
-      if (coupe) remplirCoupes(c, M);
+      if (coupe && !c.vite) remplirCoupes(c, M);
       if (coupe && !c.sansCadre){
         // arêtes de la boîte de coupe, en or, visibles à travers les pièces
         gl.useProgram(P.lignes.p);
@@ -1539,7 +1583,7 @@
         gl.uniformMatrix4fv(P.id.uM, false, M);
         gl.uniform1f(P.id.uK, 1); gl.uniform3fv(P.id.uB0, b0); gl.uniform3fv(P.id.uB1, b1); gl.uniform2f(P.id.uR, kr[0], kr[1]);
         attrib(0, B.pos, 3, gl.FLOAT); gl.disableVertexAttribArray(1); attrib(2, B.ids, 3, gl.UNSIGNED_BYTE, true);
-        gl.drawArrays(gl.TRIANGLES, 0, nTri);
+        tracer(gl.TRIANGLES, false);
         // 2) rectangle de la face, en rouge uni, là où le pochoir est impair et devant la scène
         gl.colorMask(true, true, true, true); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
         gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
@@ -2126,7 +2170,7 @@
       return { geos: geos, teintes: teintes, info: { elements: geos.size, couleurs: teintes.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
-    var W = 0, H = 0, dpr = 1, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
+    var W = 0, H = 0, dpr = 1, kpx = 0, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -2169,7 +2213,7 @@
       if (!r.width || !r.height) return;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = r.width; H = r.height;
-      cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+      kpx = 0;
       rendre();
     }
     var ro = "ResizeObserver" in window ? new ResizeObserver(taille) : null;
@@ -2185,13 +2229,16 @@
         lx*sa + lu*(sb*ca) + lv*(-cb*ca),
         lu*cb + lv*sb
       ];
-      return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: dpr,
+      return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: kpx || dpr,
         centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque };
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
       attente = false;
       if (!W || !H) return;
+      // pendant un mouvement, le moteur WebGL dessine en résolution réduite ; image nette au lâcher
+      var k = vite && M.nom === "WebGL" ? Math.max(.6, dpr/2) : dpr;
+      if (k !== kpx){ kpx = k; cv.width = Math.round(W*k); cv.height = Math.round(H*k); }
       var c = camera();
       M.dessiner(c);
       placerPoignees(c);
@@ -2535,19 +2582,8 @@
       if (!p) return;
       centre = p; px = x - W/2; py = y - H/2;
     }
-    // Survol à la souris : flèche sur un objet, main sur le vide. L'objet n'est cherché que quand la souris
-    // marque une courte pause, pour ne pas refaire le rendu de sélection à chaque pixel.
-    var attenteSurvol = 0;
-    function survolObjet(e){
-      clearTimeout(attenteSurvol);
-      var p = local(e), ici = cv;
-      attenteSurvol = setTimeout(function(){
-        if (ici !== cv || ptrs.size || !W || !H) return;
-        var k = M.viser(camera(), p.x, p.y);
-        if (M.nom === "WebGL") demander();
-        cv.classList.toggle("sur-objet", k > 0 && !!liste[k - 1]);
-      }, 60);
-    }
+    // Pas de recherche de l'objet sous la souris au survol : sur de grosses maquettes, ce rendu de
+    // sélection à chaque pause de la souris freinait tout. L'objet n'est cherché qu'au clic.
     function brancher(){
       cv.addEventListener("pointerdown", function(e){
         try { cv.setPointerCapture(e.pointerId); } catch (x){}
@@ -2559,7 +2595,7 @@
       cv.addEventListener("pointermove", function(e){
         if (coupe && souris && e.pointerType === "mouse") survoler(pres(local(e).x, local(e).y));
         var p = ptrs.get(e.pointerId);
-        if (!p){ if (e.pointerType === "mouse"){ if (mesure.actif) survolMesure(e); else survolObjet(e); } return; }
+        if (!p){ if (e.pointerType === "mouse"){ if (mesure.actif) survolMesure(e); } return; }
         var n = local(e);
         if (ptrs.size === 1){
           if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
@@ -2611,7 +2647,6 @@
       }
       cv.addEventListener("pointerup", fin);
       cv.addEventListener("pointerleave", function(e){
-        clearTimeout(attenteSurvol); cv.classList.remove("sur-objet");
         clearTimeout(attenteMesure);
         if (mesure.survol){ mesure.survol = null; demander(); }
         var r = e.relatedTarget;
