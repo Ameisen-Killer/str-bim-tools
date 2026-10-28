@@ -10,7 +10,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.0.1";
+  var VERSION = "1.1.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -58,8 +58,12 @@
     if (u.indexOf("REVOIR") >= 0) return "revoir";
     return "autre";
   }
-  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; return x ? x.nouveau : (r.ifc[p] || ""); }
-  function modifie(r, p){ var m = modifs.get(r.k); return !!(m && (p ? m.v[p] : Object.keys(m.v).length)); }
+  // Entrée d'une modification : { ancien, nouveau, par, quand } ; retire : true = décision annulée, gardée pour que
+  // la fusion d'un fichier partagé ne la fasse pas revenir
+  function vive(x){ return !!x && !x.retire; }
+  function vives(m){ return m ? PARAMS.filter(function(p){ return vive(m.v[p]); }) : []; }
+  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; return vive(x) ? x.nouveau : (r.ifc[p] || ""); }
+  function modifie(r, p){ var m = modifs.get(r.k); return p ? !!(m && vive(m.v[p])) : vives(m).length > 0; }
   function teinte(r){ return TEINTE[classe(valeur(r, P_ST))]; }
   function aujourdhui(){ var d = new Date(); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear(); }
   function versIso(t){ var m = /^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/.exec(String(t || "").trim()); return m ? m[3] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) : ""; }
@@ -357,7 +361,8 @@
     return d.length ? "H " + (p["Hauteur"] || "?") + " × L " + (p["Longueur"] || "?") + " × P " + (p["Profondeur"] || "?") : "";
   }
   function marque(r, p){
-    return modifie(r, p) ? '<span class="mod">modifié (était « ' + esc(r.ifc[p] || "vide") + ' »)<button type="button" data-annuler="' + p + '" title="Revenir à la valeur de la maquette">↺</button></span>' : '<span class="p">' + p + "</span>";
+    var x = modifie(r, p) ? modifs.get(r.k).v[p] : null;
+    return x ? '<span class="mod">modifié' + (x.par ? " par " + esc(x.par) : "") + ' (était « ' + esc(r.ifc[p] || "vide") + ' »)<button type="button" data-annuler="' + p + '" title="Revenir à la valeur de la maquette">↺</button></span>' : '<span class="p">' + p + "</span>";
   }
   function optionsStatut(v){
     var l = STATUTS.slice();
@@ -419,6 +424,7 @@
     var rs = choisis(), p = c.getAttribute("data-p");
     if (rs.length !== 1) return;
     if (p === P_ST){ decider(rs, c.value); return; }
+    exigerAuteur();
     fixer(rs[0], p, p === P_DATE ? depuisIso(c.value) : c.value);
     apresModif(rs);
   });
@@ -436,14 +442,25 @@
   function fixer(r, p, v){
     var anc = r.ifc[p] || "", m = modifs.get(r.k);
     if (v === null || v === anc){
-      if (m){ delete m.v[p]; if (!Object.keys(m.v).length) modifs.delete(r.k); }
+      if (m && vive(m.v[p])) m.v[p] = { ancien: m.v[p].ancien, nouveau: "", retire: true, par: auteur(), quand: new Date().toISOString() };
       return;
     }
     if (!m) modifs.set(r.k, m = { k: r.k, v: {} });
     m.cle = r.adn; m.uid = r.uid; m.eid = r.eid; m.num = r.num; m.famille = r.famille; m.niveau = r.niveau;
-    m.v[p] = { ancien: m.v[p] ? m.v[p].ancien : anc, nouveau: v };
+    m.v[p] = { ancien: vive(m.v[p]) ? m.v[p].ancien : anc, nouveau: v, par: auteur(), quand: new Date().toISOString() };
+  }
+  function retirer(m){
+    var q = new Date().toISOString();
+    vives(m).forEach(function(p){ m.v[p] = { ancien: m.v[p].ancien, nouveau: "", retire: true, par: auteur(), quand: q }; });
+  }
+  // le nom signe chaque décision : indispensable quand plusieurs ingénieurs partagent le fichier
+  function exigerAuteur(){
+    if (auteur()) return;
+    var n = window.prompt("Ton nom (il signe tes décisions dans le fichier) :", "");
+    if (n && n.trim()) lsSet("fgh.auteur", n.trim());
   }
   function decider(rs, statut){
+    exigerAuteur();
     var d = aujourdhui();
     rs.forEach(function(r){
       fixer(r, P_ST, statut);
@@ -467,7 +484,7 @@
     $("#nb-mod").textContent = nbModifs();
     fsEcrire();
   }
-  function nbModifs(){ var n = 0; modifs.forEach(function(m){ n += Object.keys(m.v).length; }); return n; }
+  function nbModifs(){ var n = 0; modifs.forEach(function(m){ n += vives(m).length; }); return n; }
   // Au chargement : modifications gardées dans le navigateur pour cette maquette ; celles que la maquette
   // contient déjà (import fait par le modeleur, puis nouvel export) disparaissent d'elles-mêmes.
   function chargerModifs(){
@@ -484,7 +501,7 @@
     modifs.forEach(function(m, k){
       var r = parK.get(k);
       if (!r) return;
-      Object.keys(m.v).forEach(function(p){ if ((r.ifc[p] || "") === m.v[p].nouveau){ delete m.v[p]; n++; } });
+      Object.keys(m.v).forEach(function(p){ if (vive(m.v[p]) && (r.ifc[p] || "") === m.v[p].nouveau){ delete m.v[p]; n++; } });
       if (!Object.keys(m.v).length) modifs.delete(k);
     });
     if (n) lsSet(cleStockage(), JSON.stringify(Array.from(modifs.values())));
@@ -496,7 +513,10 @@
     Array.from(modifs.values()).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }).forEach(function(m){
       PARAMS.forEach(function(p){
         var x = m.v[p];
-        if (x) out.push({ cle: m.cle || "", unique_id: m.uid || "", element_id: m.eid || "", numero: m.num || "", famille: m.famille || "", niveau: m.niveau || "", parametre: p, ancien: x.ancien, nouveau: x.nouveau });
+        if (!x) return;
+        var e = { cle: m.cle || "", unique_id: m.uid || "", element_id: m.eid || "", numero: m.num || "", famille: m.famille || "", niveau: m.niveau || "", parametre: p, ancien: x.ancien, nouveau: x.nouveau, par: x.par || "", quand: x.quand || "" };
+        if (x.retire) e.retire = true;     // ignorée par Revit, garde l'annulation lors des fusions
+        out.push(e);
       });
     });
     return { format: FORMAT, version: 1, outil: "str-bim-tools.com/fgh", version_page: VERSION, date: new Date().toISOString(), auteur: auteur(),
@@ -508,19 +528,29 @@
     a.href = URL.createObjectURL(b); a.download = nomFichier();
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
-  // Fichier relu : réunion avec la mémoire du navigateur, qui gagne en cas de doublon
+  // Fichier relu (le sien, ou celui partagé avec d'autres ingénieurs) : fusion entrée par entrée, la décision
+  // la plus récente gagne. Renvoie le nombre d'entrées reprises du fichier ; FS.remplacees liste les décisions
+  // de cet utilisateur remplacées par celles d'un autre.
   function chargerTexte(txt){
-    var d = JSON.parse(txt || "{}"), n = 0;
+    var d = JSON.parse(txt || "{}"), n = 0, moi = auteur(), dansFichier = {};
+    FS.remplacees = [];
     if (d.format !== FORMAT) throw new Error("ce n'est pas un fichier de validation des réservations FGH");
     if (d.maquette && d.maquette.nom && !maquette.nom){ maquette.nom = d.maquette.nom; maquette.export_du = d.maquette.export_du || ""; }
     (d.modifications || []).forEach(function(x){
       if (!x || PARAMS.indexOf(x.parametre) < 0) return;
       var k = x.cle || ("uid:" + x.unique_id), m = modifs.get(k);
       if (!m) modifs.set(k, m = { k: k, cle: x.cle, uid: x.unique_id, eid: x.element_id, num: x.numero, famille: x.famille, niveau: x.niveau, v: {} });
-      if (m.v[x.parametre]) return;
-      m.v[x.parametre] = { ancien: x.ancien, nouveau: x.nouveau == null ? "" : String(x.nouveau) }; n++;
+      var loc = m.v[x.parametre], q = x.quand || "";
+      dansFichier[k + "|" + x.parametre] = q;
+      if (loc && (loc.quand || "") >= q) return;
+      if (vive(loc) && x.par && x.par !== moi && String(x.nouveau) !== loc.nouveau) FS.remplacees.push((m.num || k) + " : " + LIB[x.parametre] + " « " + (x.retire ? "annulé" : x.nouveau || "vide") + " » par " + x.par);
+      m.v[x.parametre] = { ancien: x.ancien, nouveau: x.nouveau == null ? "" : String(x.nouveau), par: x.par || "", quand: q };
+      if (x.retire) m.v[x.parametre].retire = true;
+      n++;
     });
-    if (d.auteur && !auteur()) lsSet("fgh.auteur", d.auteur);
+    // décisions d'ici absentes du fichier ou plus récentes que lui (deux écritures presque simultanées) : à réécrire
+    FS.aEcrire = false;
+    modifs.forEach(function(m, k){ Object.keys(m.v).forEach(function(p){ var q = dansFichier[k + "|" + p]; if (q === undefined || (m.v[p].quand || "") > q) FS.aEcrire = true; }); });
     elaguer();
     lsSet(cleStockage(), JSON.stringify(Array.from(modifs.values())));
     return n;
@@ -532,7 +562,7 @@
   }
 
   // Enregistrement continu (Chrome, Edge : File System Access), comme le rapport 3D CAN 241
-  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", quand: null, err: "", minut: 0 };
+  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", quand: null, err: "", minut: 0, lu: 0, remplacees: [] };
   function cleFs(){ return "fichier|" + (maquette.nom || "?"); }
   function idb(mode, fn){
     return new Promise(function(ok, ko){
@@ -548,16 +578,48 @@
     });
   }
   function heure(d){ return d ? ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2) : ""; }
+  // Fichier partagé : avant chaque écriture, le fichier est relu et fusionné (un autre ingénieur a pu y écrire),
+  // puis réécrit ; il est aussi relu toutes les 15 s pour montrer les décisions des autres.
+  var cycle = Promise.resolve();
+  function fsRelire(){
+    return FS.h.getFile().then(function(f){
+      if (f.lastModified === FS.lu) return 0;
+      return f.text().then(function(t){
+        FS.lu = f.lastModified;
+        if (!t.trim()) return 0;
+        var n = chargerTexte(t);
+        if (n) recus(n);
+        return n;
+      });
+    });
+  }
+  function recus(n){
+    $("#nb-mod").textContent = nbModifs();
+    renduListe(); recolorer(); renduModifs();
+    if (!document.activeElement || !document.activeElement.closest || !document.activeElement.closest("#fiche")) renduFiche();
+    var r = FS.remplacees || [];
+    etat(r.length ? "⚠ Décision plus récente d'un autre ingénieur : " + r.slice(0, 3).join(" ; ") + (r.length > 3 ? "…" : "") :
+      pluriel(n, "décision") + " reçue" + (n > 1 ? "s" : "") + " du fichier partagé.");
+  }
   function fsEcrire(){
     if (!FS.actif || !FS.h) return;
     clearTimeout(FS.minut);
     FS.minut = setTimeout(function(){
-      var txt = JSON.stringify(docModifs(), null, 2);
-      FS.h.createWritable().then(function(w){ return w.write(txt).then(function(){ return w.close(); }); })
-        .then(function(){ FS.quand = new Date(); FS.err = ""; var e = $("#fs-etat"); if (e) e.innerHTML = fsTexte(); })
-        .catch(function(x){ FS.actif = false; FS.err = "Écriture refusée (" + (x && x.message || x) + ")."; renduModifs(); });
+      cycle = cycle.then(function(){
+        return fsRelire().then(function(){
+          var txt = JSON.stringify(docModifs(), null, 2);
+          return FS.h.createWritable().then(function(w){ return w.write(txt).then(function(){ return w.close(); }); });
+        }).then(function(){ return FS.h.getFile(); }).then(function(f){
+          FS.lu = f.lastModified; FS.quand = new Date(); FS.err = "";
+          var e = $("#fs-etat"); if (e) e.innerHTML = fsTexte();
+        });
+      }).catch(function(x){ FS.actif = false; FS.err = "Écriture refusée (" + (x && x.message || x) + ")."; renduModifs(); });
     }, 300);
   }
+  setInterval(function(){
+    if (!FS.actif || !FS.h || document.hidden) return;
+    cycle = cycle.then(fsRelire).then(function(){ if (FS.aEcrire){ FS.aEcrire = false; fsEcrire(); } }).catch(function(){});
+  }, 15000);
   function fsBrancher(h, lire){
     var suite = lire ? h.getFile().then(function(f){ return f.text(); }).then(function(t){ return t.trim() ? chargerTexte(t) : 0; }) : Promise.resolve(0);
     return suite.then(function(n){
@@ -608,7 +670,7 @@
     }).catch(function(){});
   }
   function fsTexte(){
-    if (FS.actif) return "✓ Enregistrement continu dans <b>" + esc(FS.nom) + "</b>" + (FS.quand ? " · écrit à " + heure(FS.quand) : "") + ". C'est ce fichier qu'on donne au modeleur.";
+    if (FS.actif) return "✓ Enregistrement continu dans <b>" + esc(FS.nom) + "</b>" + (FS.quand ? " · écrit à " + heure(FS.quand) : "") + ". C'est ce fichier qu'on donne au modeleur. Plusieurs ingénieurs peuvent travailler dans le même fichier (dossier partagé) : il est relu toutes les 15 s.";
     if (FS.h) return "Fichier <b>" + esc(FS.nom) + "</b> : clique « Reprendre » pour réautoriser l'accès et continuer à y enregistrer.";
     if (!FS.ok) return "Ce navigateur ne sait pas enregistrer en continu (Chrome ou Edge le font) : télécharge le fichier pour le modeleur, et rouvre-le ici pour reprendre.";
     return "Pour l'instant, tes décisions ne sont gardées que dans ce navigateur. Enregistre-les dans un fichier : chaque changement s'y écrira tout seul.";
@@ -618,17 +680,17 @@
       FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + '</button><button type="button" class="bt" data-m="fs-nouveau">Autre fichier…</button><button type="button" class="bt" data-m="fs-stop">Oublier</button>' :
       (FS.ok ? '<button type="button" class="bt prim" data-m="fs-nouveau">Enregistrer dans un fichier…</button>' : "") + '<button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un fichier…</button>';
     var h = '<div class="carte"><h3>Fichier pour Revit</h3><div class="in"><div id="fs-etat" class="fs-etat' + (FS.actif ? " on" : FS.h ? " att" : "") + '">' + fsTexte() + "</div>" +
-      (FS.err ? '<div class="fs-err">' + esc(FS.err) + "</div>" : "") + '<div class="actions">' + b + '<button type="button" class="bt" data-m="telecharger"' + (modifs.size ? "" : " disabled") + ">Télécharger le JSON</button></div>" +
+      (FS.err ? '<div class="fs-err">' + esc(FS.err) + "</div>" : "") + '<div class="actions">' + b + '<button type="button" class="bt" data-m="telecharger"' + (nbModifs() ? "" : " disabled") + ">Télécharger le JSON</button></div>" +
       '<div class="fchamp" style="margin:10px 0 0"><label>Ton nom (écrit dans le fichier)</label><input class="champ" id="auteur" value="' + esc(auteur()) + '" placeholder="Prénom Nom"></div>' +
       '<p class="note">Le modeleur applique ce fichier dans la maquette RES avec le bouton Revit « Import Validation RES » (dossier FGH), puis lance « Sync Reservations ».</p></div></div>';
-    var L = Array.from(modifs.values()).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }), parK = new Map();
+    var L = Array.from(modifs.values()).filter(function(m){ return vives(m).length; }).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }), parK = new Map();
     RES.forEach(function(r){ parK.set(r.k, r); });
     if (!L.length) h += '<p class="note" style="padding:0 2px">Aucune décision pour l\'instant. Choisis une réservation et clique « Valider », « Refuser » ou « À revoir ».</p>';
     else {
       h += '<div class="carte"><h3>' + pluriel(L.length, "réservation") + " · " + pluriel(nbModifs(), "valeur") + '</h3><div class="in">' + L.map(function(m){
         var r = parK.get(m.k);
         return '<div class="ml"' + (r ? ' data-cle="' + esc(r.cle) + '"' : "") + '><span class="q">' + esc(m.num || m.cle || m.k) + (r ? "" : ' <span title="Absente de l\'IFC ouvert">?</span>') + " · " + esc(m.niveau || "") + "</span>" +
-          '<span class="d">' + PARAMS.filter(function(p){ return m.v[p]; }).map(function(p){ return esc(LIB[p]) + " : " + esc(m.v[p].ancien || "vide") + " → <b>" + esc(m.v[p].nouveau || "vide") + "</b>"; }).join("<br>") + "</span>" +
+          '<span class="d">' + vives(m).map(function(p){ var x = m.v[p]; return esc(LIB[p]) + " : " + esc(x.ancien || "vide") + " → <b>" + esc(x.nouveau || "vide") + "</b>" + (x.par ? ' <span class="par">· ' + esc(x.par) + "</span>" : ""); }).join("<br>") + "</span>" +
           '<button type="button" class="x" data-retire="' + esc(m.k) + '" title="Retirer">×</button></div>';
       }).join("") + '</div></div><div class="actions"><button type="button" class="bt" data-m="vider">Tout effacer</button></div>';
     }
@@ -637,7 +699,7 @@
   }
   $("#modifs").addEventListener("click", function(e){
     var x = e.target.closest("[data-retire]");
-    if (x){ e.stopPropagation(); modifs.delete(x.getAttribute("data-retire")); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
+    if (x){ e.stopPropagation(); retirer(modifs.get(x.getAttribute("data-retire")) || { v: {} }); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
     var b = e.target.closest("[data-m]");
     if (b){
       var a = b.getAttribute("data-m");
@@ -646,7 +708,7 @@
       else if (a === "fs-reprendre") fsReprendre();
       else if (a === "fs-stop") fsArreter();
       else if (a === "telecharger") telecharger();
-      else if (a === "vider" && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?")){ modifs = new Map(); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
+      else if (a === "vider" && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?")){ modifs.forEach(retirer); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
       return;
     }
     var l = e.target.closest(".ml[data-cle]");
@@ -684,7 +746,7 @@
     lsSet("fgh.theme", c);
   });
   window.addEventListener("beforeunload", function(e){
-    if (modifs.size && !FS.actif){ e.preventDefault(); e.returnValue = ""; }
+    if (nbModifs() && !FS.actif){ e.preventDefault(); e.returnValue = ""; }
   });
   renduModifs();
 })();
