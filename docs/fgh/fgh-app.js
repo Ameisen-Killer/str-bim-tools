@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.3";
+  var VERSION = "1.4.4";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -332,9 +332,9 @@
   function boiteNiveau(i){
     var n = niveaux[i], b = vue.boiteDe(null, angleBat);
     if (!n || !b) return;
-    // même marge sous le niveau et au-dessus du niveau suivant
-    var marge = Math.max(0, parseFloat($("#c-marge").value) || 0), haut = niveaux[i + 1] ? niveaux[i + 1].z + marge : b.max[2] + 1;
-    vue.coupeBoite({ min: [b.min[0] - 1, b.min[1] - 1, n.z - marge], max: [b.max[0] + 1, b.max[1] + 1, Math.max(haut, n.z - marge + .1)], a: angleBat });
+    // boîte centrée sur l'altitude du niveau Revit : la même distance dessous et dessus
+    var marge = Math.max(0.05, parseFloat($("#c-marge").value) || 0), haut = n.z + marge;
+    vue.coupeBoite({ min: [b.min[0] - 1, b.min[1] - 1, n.z - marge], max: [b.max[0] + 1, b.max[1] + 1, haut], a: angleBat });
     $("#c-niv").value = String(i);
     // la liste suit le niveau quand des réservations le portent
     if (Array.prototype.some.call($("#f-niv").options, function(o){ return o.value === n.nom; })){ $("#f-niv").value = n.nom; filtreChange(); }
