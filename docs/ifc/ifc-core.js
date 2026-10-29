@@ -730,6 +730,96 @@
     };
   }
 
+  // ================= Purge =================
+  // Entités qui n'existent que par une relation inverse (rien ne les désigne) : gardées tant qu'elles visent
+  // quelque chose de vivant (pour FAIBLES : par leurs références faibles).
+  var RACINES_INVERSES = /^IFC(STYLEDITEM|PRESENTATIONLAYERASSIGNMENT|PRESENTATIONLAYERWITHSTYLE|MATERIALDEFINITIONREPRESENTATION|SHAPEASPECT|MAPCONVERSION|MAPCONVERSIONSCALED|RIGIDOPERATION|INDEXED\w*MAP|TEXTURECOORDINATEGENERATOR|TEXTUREMAP|\w+RELATIONSHIP)$/;
+  var TYPES_GENERIQUES = /^IFCTYPE(OBJECT|PRODUCT|PROCESS|RESOURCE)$/;
+  // types d'objets (IFC2X3 : aussi IFCDOORSTYLE et IFCWINDOWSTYLE ; pas les styles de présentation)
+  function estType(e){ return !estRelation(e) && (/TYPE$/.test(e.type) || /^IFC(DOOR|WINDOW)STYLE$/.test(e.type) || TYPES_GENERIQUES.test(e.type)) && aGlobalId(e); }
+
+  // Plan de purge. opts : { types, relations, psets, niveaux } (catégories « inutilisés » cochées). Les orphelins
+  // (ce que plus rien ne relie au projet) partent toujours : marquage depuis les racines, puis balayage.
+  // Renvoie { cats : nombre par catégorie, nbOrphelins, nbEntites, nbModifiees, octets, changement } ; avec
+  // opts.compter, seulement { cats } (nombre d'éléments de chaque catégorie cochée).
+  function planPurge(m, opts){
+    opts = opts || {};
+    var I = index(m), D = new Set(), cats = { types: 0, relations: 0, psets: 0, niveaux: 0 };
+    function mettre(id, cat){ if (!D.has(id)){ D.add(id); cats[cat]++; } }
+    // 1) Inutilisés demandés
+    var utilises = new Set();
+    I.typeObjet.forEach(function(t, o){ if (m.ent.has(o)) utilises.add(t); });
+    m.ent.forEach(function(e){
+      if (opts.types && estType(e) && !utilises.has(e.id)) mettre(e.id, "types");
+      else if (opts.relations && estRelation(e) && e.type !== "IFCRELCONNECTSPATHELEMENTS" && bruts(e).some(function(r){ return r === "()"; })) mettre(e.id, "relations");
+      else if (opts.psets && ((e.type === "IFCPROPERTYSET" && bruts(e)[4] === "()") || (e.type === "IFCELEMENTQUANTITY" && bruts(e)[5] === "()"))) mettre(e.id, "psets");
+      else if (opts.niveaux && e.type === "IFCBUILDINGSTOREY" && !(I.contenu.get(e.id) || []).length && !(I.enfants.get(e.id) || []).length) mettre(e.id, "niveaux");
+    });
+    if (opts.compter) return { cats: cats };
+    // 2) Ce qui désigne un retiré est élagué ; relation (ou entité sans GlobalId) coupée : retirée à son tour
+    var mort = new Map(), remplace = new Map(), file = [];
+    D.forEach(function(id){ mort.set(id, m.ent.get(id)); file.push(id); });
+    if (file.length){
+      var vers = new Map();          // id → entités qui le désignent
+      m.ent.forEach(function(e){ for (var i = 0; i < e.refs.length; i++){ var l = vers.get(e.refs[i]); if (!l) vers.set(e.refs[i], l = []); l.push(e.id); } });
+      while (file.length){
+        (vers.get(file.pop()) || []).forEach(function(id){
+          if (mort.has(id)) return;
+          var e = m.ent.get(id), r = elaguer(remplace.get(id) || e, mort);
+          if (!r.change) return;
+          if (e.type === "(COMPLEXE)" || (r.coupe && (estRelation(e) || !aGlobalId(e)))){ remplace.delete(id); mort.set(id, e); file.push(id); }
+          else remplace.set(id, refaire(e, r.args));
+        });
+      }
+    }
+    // 3) Marquage depuis les racines (GlobalId hors jeux de propriétés, socle, entités complexes)
+    function cur(id){ return remplace.get(id) || m.ent.get(id); }
+    var vif = new Set(), pile = [];
+    function voir(id){ if (vif.has(id) || mort.has(id) || !m.ent.has(id)) return; vif.add(id); pile.push(id); }
+    function propager(){ while (pile.length){ var r = cur(pile.pop()).refs; for (var i = 0; i < r.length; i++) voir(r[i]); } }
+    var inverses = [];
+    m.ent.forEach(function(e){
+      if (mort.has(e.id)) return;
+      if (e.type === "(COMPLEXE)" || protege(e)) voir(e.id);
+      else if (RACINES_INVERSES.test(e.type)) inverses.push(e);
+    });
+    propager();
+    var change;
+    do {
+      change = false;
+      inverses = inverses.filter(function(w){
+        if (vif.has(w.id)) return false;
+        var c = cur(w.id), pos = FAIBLES[w.type], cibles = [];
+        if (pos){ var a = champs(c); pos.forEach(function(k){ toutesRefs(a[k], cibles); }); } else cibles = c.refs;
+        if (!cibles.some(function(id){ return vif.has(id); })) return true;
+        vif.add(w.id);
+        (pos ? refsFortes(c) : c.refs).forEach(voir);
+        propager();
+        change = true;
+        return false;
+      });
+    } while (change);
+    // 4) Balayage, puis références faibles vers ce qui part : élaguées
+    var retire = new Map(), nbOrphelins = 0;
+    mort.forEach(function(e, id){ retire.set(id, e); });
+    m.ent.forEach(function(e){ if (!vif.has(e.id) && !retire.has(e.id)){ retire.set(e.id, e); remplace.delete(e.id); nbOrphelins++; } });
+    vif.forEach(function(id){
+      var e = m.ent.get(id);
+      if (!FAIBLES[e.type] && !RACINES_INVERSES.test(e.type)) return;
+      var r = elaguer(cur(id), retire);
+      if (!r.change) return;
+      if (r.coupe && !aGlobalId(e)){ retire.set(id, e); remplace.delete(id); nbOrphelins++; }
+      else remplace.set(id, refaire(e, r.args));
+    });
+    var avant = [], apres = [], octets = 0;
+    retire.forEach(function(e){ avant.push(e); octets += e.src.length + 1 + m.eol.length; });
+    remplace.forEach(function(n, id){ var e = m.ent.get(id); avant.push(e); apres.push(n); octets += e.src.length - n.src.length; });
+    return {
+      cats: cats, nbOrphelins: nbOrphelins, nbEntites: retire.size, nbModifiees: remplace.size, octets: octets,
+      changement: { avant: avant, apres: apres, nbRetirees: retire.size }
+    };
+  }
+
   // Applique un changement (ou l'annule avec inverse = true).
   function appliquer(m, ch, inverse){
     var ote = inverse ? ch.apres : ch.avant, met = inverse ? ch.avant : ch.apres;
@@ -876,6 +966,7 @@
   }
 
   global.IFC = {
+    planPurge: planPurge,
     lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,

@@ -962,6 +962,7 @@
     activerCmd("rien", n > 0);
     activerCmd("fusionner", fichiers.length > 1);
     activerCmd("retailler", vue.aCoupe());
+    activerCmd("purger", fichiers.length > 0);
     activerCmd("effacer-mesures", vue.nbMesures() > 0);
     $("#cmd-mesurer").textContent = vue.outil() === "mesure" ? "Arrêter de mesurer" : "Mesurer";
     $("#cmd-coord").textContent = vue.outil() === "point" ? "Arrêter les coordonnées" : "Coordonnées d'un point";
@@ -1247,6 +1248,47 @@
     appliquerPrefs();
   });
 
+  // ================= Purge : orphelins toujours, inutilisés selon les cases cochées =================
+  var PURGE = ["types", "relations", "psets", "niveaux"];
+  function plansPurge(){
+    var opts = {};
+    PURGE.forEach(function(k){ opts[k] = $("#purge-" + k).checked; });
+    return fichiers.map(function(f){ return { f: f, p: IFC.planPurge(f.m, opts) }; });
+  }
+  function bilanPurge(){
+    var tout = { compter: true }, cats = { types: 0, relations: 0, psets: 0, niveaux: 0 }, n = 0, o = 0, orph = 0, mod = 0;
+    PURGE.forEach(function(k){ tout[k] = true; });
+    fichiers.forEach(function(f){ var c = IFC.planPurge(f.m, tout).cats; PURGE.forEach(function(k){ cats[k] += c[k]; }); });
+    PURGE.forEach(function(k){ $("#purge-n-" + k).textContent = fmtN(cats[k]); });
+    plansPurge().forEach(function(x){ n += x.p.nbEntites; o += x.p.octets; orph += x.p.nbOrphelins; mod += x.p.nbModifiees; });
+    $("#purge-bilan").textContent = n
+      ? pluriel(n, "entité") + " en moins, " + fmtTaille(Math.max(0, o)) + " de gagnés, dont " + pluriel(orph, "orpheline") +
+        (mod ? " ; " + pluriel(mod, "entité raccourcie", "entités raccourcies") : "") + "."
+      : "Rien à purger avec ces choix : le fichier est déjà propre.";
+    $("#purge-oui").disabled = !n;
+  }
+  function purger(){
+    var d = $("#purge");
+    if (!fichiers.length || typeof d.showModal !== "function") return;
+    $("#purge-bilan").textContent = "Calcul du bilan…";
+    $("#purge-oui").disabled = true;
+    d.returnValue = "";
+    d.showModal();
+    setTimeout(bilanPurge, 30);
+  }
+  PURGE.forEach(function(k){ $("#purge-" + k).addEventListener("change", function(){ setTimeout(bilanPurge, 0); }); });
+  $("#purge").addEventListener("close", function(){
+    if ($("#purge").returnValue !== "oui") return;
+    var plans = plansPurge().filter(function(x){ return x.p.nbEntites || x.p.nbModifiees; });
+    if (!plans.length) return;
+    var n = 0, o = 0;
+    plans.forEach(function(x){ IFC.appliquer(x.f.m, x.p.changement); n += x.p.nbEntites; o += x.p.octets; });
+    histo.push({ parts: plans.map(function(x){ return { f: x.f, ch: x.p.changement }; }), txt: "purge", e: n });
+    aRefaire = [];
+    reconstruire();
+    etat("Purge : " + pluriel(n, "entité retirée", "entités retirées") + ", " + fmtTaille(Math.max(0, o)) + " de gagnés. Ctrl+Z pour annuler.");
+  });
+
   // Outil de la vue : "mesure", "point" ou aucun (même commande : bascule)
   function outil(nom){
     var o = vue.outil(vue.outil() === nom ? null : nom);
@@ -1282,6 +1324,7 @@
     ajouter: function(){ remplacer = false; choisir(); },
     fusionner: fusionnerTout,
     retailler: retailler,
+    purger: purger,
     mesurer: function(){ outil("mesure"); },
     coordonnees: function(){ outil("point"); },
     "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures et coordonnées effacées."); maj(); },
@@ -1464,7 +1507,7 @@
 
   // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
-    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open || $("#preferences").open) return;
+    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open || $("#preferences").open || $("#purge").open) return;
     var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
     var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
     if (mod && k === "o") c = e.shiftKey ? "ajouter" : "ouvrir";
