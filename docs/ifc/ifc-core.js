@@ -738,13 +738,46 @@
   // types d'objets (IFC2X3 : aussi IFCDOORSTYLE et IFCWINDOWSTYLE ; pas les styles de présentation)
   function estType(e){ return !estRelation(e) && (/TYPE$/.test(e.type) || /^IFC(DOOR|WINDOW)STYLE$/.test(e.type) || TYPES_GENERIQUES.test(e.type)) && aGlobalId(e); }
 
-  // Plan de purge. opts : { types, relations, psets, niveaux } (catégories « inutilisés » cochées). Les orphelins
+  // Jeux de propriétés et de quantités, regroupés par nom : [{ nom, quantites, nb, octets }], du plus lourd au
+  // plus léger. octets : jeu, propriétés et quantités qu'il contient, relations qui ne servent qu'à lui (ordre
+  // de grandeur : une propriété partagée entre plusieurs jeux est comptée pour chacun).
+  function statsPsets(m){
+    var par = new Map(), eol = m.eol.length;
+    function lg(id){ var e = m.ent.get(id); return e ? e.src.length + 1 + eol : 0; }
+    m.ent.forEach(function(e){
+      var q = e.type === "IFCELEMENTQUANTITY";
+      if (e.type !== "IFCPROPERTYSET" && !q) return;
+      var a = champs(e), nom = chaine(a[2]) || "(sans nom)", cle = (q ? "Q|" : "P|") + nom, s = par.get(cle);
+      if (!s) par.set(cle, s = { nom: nom, quantites: q, nb: 0, octets: 0 });
+      s.nb++;
+      s.octets += e.src.length + 1 + eol;
+      refsListe(a[q ? 5 : 4]).forEach(function(id){
+        s.octets += lg(id);
+        var pe = m.ent.get(id);
+        if (pe && pe.type === "IFCCOMPLEXPROPERTY") refsListe(champs(pe)[3]).forEach(function(k){ s.octets += lg(k); });
+      });
+    });
+    // relations IFCRELDEFINESBYPROPERTIES : une par jeu le plus souvent
+    m.ent.forEach(function(e){
+      if (e.type !== "IFCRELDEFINESBYPROPERTIES") return;
+      var d = toutesRefs(champs(e)[5], []);
+      if (d.length !== 1) return;
+      var pe = m.ent.get(d[0]);
+      if (!pe) return;
+      var s = par.get((pe.type === "IFCELEMENTQUANTITY" ? "Q|" : "P|") + (chaine(champs(pe)[2]) || "(sans nom)"));
+      if (s) s.octets += e.src.length + 1 + eol;
+    });
+    return Array.from(par.values()).sort(function(x, y){ return y.octets - x.octets; });
+  }
+
+  // Plan de purge. opts : { types, relations, psets, niveaux } (catégories « inutilisés » cochées), et jeux :
+  // noms de jeux à retirer (« P|nom » ou « Q|nom » pour les quantités, voir statsPsets). Les orphelins
   // (ce que plus rien ne relie au projet) partent toujours : marquage depuis les racines, puis balayage.
   // Renvoie { cats : nombre par catégorie, nbOrphelins, nbEntites, nbModifiees, octets, changement } ; avec
   // opts.compter, seulement { cats } (nombre d'éléments de chaque catégorie cochée).
   function planPurge(m, opts){
     opts = opts || {};
-    var I = index(m), D = new Set(), cats = { types: 0, relations: 0, psets: 0, niveaux: 0 };
+    var I = index(m), D = new Set(), cats = { types: 0, relations: 0, psets: 0, niveaux: 0, jeux: 0 }, jeux = opts.jeux;
     function mettre(id, cat){ if (!D.has(id)){ D.add(id); cats[cat]++; } }
     // 1) Inutilisés demandés
     var utilises = new Set();
@@ -754,6 +787,8 @@
       else if (opts.relations && estRelation(e) && e.type !== "IFCRELCONNECTSPATHELEMENTS" && bruts(e).some(function(r){ return r === "()"; })) mettre(e.id, "relations");
       else if (opts.psets && ((e.type === "IFCPROPERTYSET" && bruts(e)[4] === "()") || (e.type === "IFCELEMENTQUANTITY" && bruts(e)[5] === "()"))) mettre(e.id, "psets");
       else if (opts.niveaux && e.type === "IFCBUILDINGSTOREY" && !(I.contenu.get(e.id) || []).length && !(I.enfants.get(e.id) || []).length) mettre(e.id, "niveaux");
+      else if (jeux && jeux.size && (e.type === "IFCPROPERTYSET" || e.type === "IFCELEMENTQUANTITY") &&
+        jeux.has((e.type === "IFCELEMENTQUANTITY" ? "Q|" : "P|") + (chaine(champs(e)[2]) || "(sans nom)"))) mettre(e.id, "jeux");
     });
     if (opts.compter) return { cats: cats };
     // 2) Ce qui désigne un retiré est élagué ; relation (ou entité sans GlobalId) coupée : retirée à son tour
@@ -966,7 +1001,7 @@
   }
 
   global.IFC = {
-    planPurge: planPurge,
+    planPurge: planPurge, statsPsets: statsPsets,
     lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,

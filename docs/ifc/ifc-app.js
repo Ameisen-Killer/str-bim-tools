@@ -98,15 +98,81 @@
   }
   function pause(ms){ return new Promise(function(ok){ setTimeout(ok, ms || 30); }); }   // laisse l'écran se rafraîchir
 
+  // ================= .ifczip : archive ZIP qui contient un .ifc (compression du navigateur, sans bibliothèque) =================
+  var zipPossible = typeof CompressionStream === "function" && typeof DecompressionStream === "function" && typeof Response === "function";
+  function flux(octets, t){ return new Response(new Blob([octets]).stream().pipeThrough(t)).arrayBuffer(); }
+  var TABLE_CRC = (function(){
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++){ var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(u){
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < u.length; i++) c = TABLE_CRC[(c ^ u[i]) & 255] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  // Archive d'un seul fichier (nom, octets) compressé en « deflate » : promesse d'un Blob
+  function zipper(nom, u){
+    return flux(u, new CompressionStream("deflate-raw")).then(function(cb){
+      var c = new Uint8Array(cb), n = new TextEncoder().encode(nom), crc = crc32(u), d = new Date();
+      var heure = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+      var jour = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+      function entete(sig, central){
+        var b = new ArrayBuffer((central ? 46 : 30) + n.length), v = new DataView(b), k = 0;
+        function m16(x){ v.setUint16(k, x, true); k += 2; }
+        function m32(x){ v.setUint32(k, x >>> 0, true); k += 4; }
+        m32(sig);
+        if (central) m16(20);                                  // version qui a écrit l'archive
+        m16(20); m16(0x0800); m16(8); m16(heure); m16(jour);  // version requise, noms en UTF-8, deflate, date
+        m32(crc); m32(c.length); m32(u.length); m16(n.length); m16(0);
+        if (central){ m16(0); m16(0); m16(0); m32(0); m32(0); } // commentaire, disque, attributs, position de l'entrée
+        new Uint8Array(b, k).set(n);
+        return new Uint8Array(b);
+      }
+      var loc = entete(0x04034b50, false), cen = entete(0x02014b50, true), fin = new DataView(new ArrayBuffer(22));
+      fin.setUint32(0, 0x06054b50, true); fin.setUint16(8, 1, true); fin.setUint16(10, 1, true);
+      fin.setUint32(12, cen.length, true); fin.setUint32(16, loc.length + c.length, true);
+      return new Blob([loc, c, cen, fin.buffer], { type: "application/zip" });
+    });
+  }
+  // Premier .ifc d'une archive ZIP : promesse de { buf, nom }
+  function dezipper(buf){
+    var v = new DataView(buf), u = new Uint8Array(buf), i = buf.byteLength - 22;
+    while (i >= 0 && v.getUint32(i, true) !== 0x06054b50) i--;
+    if (i < 0) return Promise.reject(Object.assign(new Error("archive ZIP illisible"), { ifc: true }));
+    var nb = v.getUint16(i + 10, true), p = v.getUint32(i + 16, true), dec = new TextDecoder();
+    for (var k = 0; k < nb && p + 46 <= buf.byteLength && v.getUint32(p, true) === 0x02014b50; k++){
+      var meth = v.getUint16(p + 10, true), taille = v.getUint32(p + 20, true), ln = v.getUint16(p + 28, true);
+      var nom = dec.decode(u.subarray(p + 46, p + 46 + ln)), loc = v.getUint32(p + 42, true);
+      p += 46 + ln + v.getUint16(p + 30, true) + v.getUint16(p + 32, true);
+      if (!/\.ifc$/i.test(nom) || /(^|\/)__MACOSX\//.test(nom)) continue;
+      var deb = loc + 30 + v.getUint16(loc + 26, true) + v.getUint16(loc + 28, true), donnees = u.subarray(deb, deb + taille);
+      nom = nom.split("/").pop();
+      if (meth === 0) return Promise.resolve({ buf: donnees.slice().buffer, nom: nom });
+      if (meth !== 8) return Promise.reject(Object.assign(new Error("archive compressée d'une façon que l'outil ne sait pas lire"), { ifc: true }));
+      if (!zipPossible) return Promise.reject(Object.assign(new Error("ce navigateur ne sait pas décompresser les .ifczip ; décompresse-le d'abord"), { ifc: true }));
+      return flux(donnees, new DecompressionStream("deflate-raw")).then(function(b){ return { buf: b, nom: nom }; });
+    }
+    return Promise.reject(Object.assign(new Error("l'archive ne contient pas de fichier .ifc"), { ifc: true }));
+  }
+  // Octets du .ifc d'un fichier choisi, décompressé au besoin : promesse de { buf, nom }
+  function octetsIfc(fic){
+    return lireFichier(fic).then(function(buf){
+      var u = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+      return u[0] === 0x50 && u[1] === 0x4B ? dezipper(buf) : { buf: buf, nom: fic.name };
+    });
+  }
+
   // Lecture d'un fichier : en arrière-plan dans un Web Worker (ifc-lecteur.js), la page reste vivante ;
   // progres(0–1). Sans worker possible, lecture d'un coup comme avant.
   var avecWorker = typeof Worker !== "undefined";
   function lireClassique(fic){
-    return lireFichier(fic).then(function(buf){ return pause().then(function(){ return IFC.lire(buf, fic.name); }); });
+    return octetsIfc(fic).then(function(x){ return pause().then(function(){ return IFC.lire(x.buf, x.nom); }); });
   }
   function lecture(fic, progres){
     if (!avecWorker) return lireClassique(fic);
-    return lireFichier(fic).then(function(buf){
+    return octetsIfc(fic).then(function(x){
+      var buf = x.buf;
       return new Promise(function(ok, ko){
         var w;
         try { w = new Worker("/ifc/ifc-lecteur.js?v=2"); }
@@ -117,7 +183,7 @@
           w.terminate();
           if (d.erreur){ var err = new Error(d.erreur); err.ifc = d.ifc; ko(err); return; }
           // la page reconstruit le texte et fige les entités par tranches
-          IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), fic.name, function(p, etape){
+          IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), x.nom, function(p, etape){
             progres(etape === "texte" ? .7 + .1*p : .8 + .2*p);
           }).then(ok, ko);
         };
@@ -1144,32 +1210,39 @@
     etat("Rétabli : " + h.txt + ".");
   }
 
-  function telecharger(f){
-    var m = f.m, oct = IFC.versOctets(IFC.ecrire(m)), nom = IFC.nomExport(m.nom);
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([oct], { type: "application/x-step" }));
-    a.download = nom;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-    f.propre = m.version;
-    return "« " + nom + " » : avant " + fmtN(m.nbOrigine) + " entités · " + fmtTaille(m.taille) +
-      ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length);
+  // Téléchargement de l'IFC du fichier, ou de son .ifczip : promesse du bilan (texte)
+  function telecharger(f, zip){
+    var m = f.m, version = m.version, oct = IFC.versOctets(IFC.ecrire(m)), nom = IFC.nomExport(m.nom);
+    var pret = zip ? zipper(nom, oct) : Promise.resolve(new Blob([oct], { type: "application/x-step" }));
+    return pret.then(function(blob){
+      var a = document.createElement("a"), nomFichier = zip ? nom.replace(/\.ifc$/i, "") + ".ifczip" : nom;
+      a.href = URL.createObjectURL(blob);
+      a.download = nomFichier;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      f.propre = version;
+      return "« " + nomFichier + " » : avant " + fmtN(m.nbOrigine) + " entités · " + fmtTaille(m.taille) +
+        ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length) + (zip ? ", compressé " + fmtTaille(blob.size) : "");
+    });
   }
   // Sans argument : le fichier ouvert s'il est seul, sinon tous les fichiers modifiés
-  function exporter(f){
-    var cibles = f ? [f] : fichiers.length === 1 ? fichiers.slice() : fichiers.filter(modifie);
+  function exporter(f, zip){
+    var cibles = f ? [f] : zip ? fichiers.slice() : fichiers.length === 1 ? fichiers.slice() : fichiers.filter(modifie);
     if (!cibles.length){ etat("Aucun fichier modifié. Pour exporter un fichier précis, utilise son bouton « Exporter » dans la liste."); return; }
-    var bilans = [];
-    // téléchargements espacés : certains navigateurs ignorent des clics trop rapprochés
+    if (zip && !zipPossible){ etat("Ce navigateur ne sait pas compresser : mets-le à jour, ou exporte l'IFC non compressé."); return; }
+    if (zip) etat("Compression en cours…");
+    var bilans = [], suite = Promise.resolve();
+    // téléchargements l'un après l'autre et espacés : certains navigateurs ignorent des clics trop rapprochés
     cibles.forEach(function(x, k){
-      setTimeout(function(){
-        bilans.push(telecharger(x));
-        if (bilans.length === cibles.length){
-          etat("Exporté" + (cibles.length > 1 ? "s" : "") + " : " + bilans.join(" ; ") + ".");
-          rendreListe(); maj();
-        }
-      }, k*400);
+      suite = suite.then(function(){ return k ? pause(400) : null; }).then(function(){ return telecharger(x, zip); }).then(function(b){ bilans.push(b); });
+    });
+    suite.then(function(){
+      etat("Exporté" + (cibles.length > 1 ? "s" : "") + " : " + bilans.join(" ; ") + ".");
+      rendreListe(); maj();
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Export impossible : " + (err && err.message || err) + ".");
     });
   }
 
@@ -1250,8 +1323,30 @@
 
   // ================= Purge : orphelins toujours, inutilisés selon les cases cochées =================
   var PURGE = ["types", "relations", "psets", "niveaux"];
+  // jeux de propriétés cochés dans la liste (clés « P|nom » ou « Q|nom »)
+  function jeuxCoches(){
+    var j = new Set();
+    [].forEach.call(document.querySelectorAll("#purge-jeux input:checked"), function(c){ j.add(c.getAttribute("data-jeu")); });
+    return j;
+  }
+  // Liste des jeux de propriétés de tous les fichiers ouverts, du plus lourd au plus léger
+  function listeJeux(){
+    var par = new Map();
+    fichiers.forEach(function(f){
+      IFC.statsPsets(f.m).forEach(function(x){
+        var k = (x.quantites ? "Q|" : "P|") + x.nom, s = par.get(k);
+        if (!s) par.set(k, s = { cle: k, nom: x.nom, quantites: x.quantites, nb: 0, octets: 0 });
+        s.nb += x.nb; s.octets += x.octets;
+      });
+    });
+    var l = Array.from(par.values()).sort(function(a, b){ return b.octets - a.octets; });
+    $("#purge-jeux").innerHTML = l.length ? l.map(function(x){
+      return '<label class="coche"><input type="checkbox" data-jeu="' + esc(x.cle) + '"><span title="' + esc(x.nom) + '">' + esc(x.nom) +
+        (x.quantites ? " <i>(quantités)</i>" : "") + "</span><b>" + fmtN(x.nb) + " · " + fmtTaille(x.octets) + "</b></label>";
+    }).join("") : '<p class="pref-note">Aucun jeu de propriétés.</p>';
+  }
   function plansPurge(){
-    var opts = {};
+    var opts = { jeux: jeuxCoches() };
     PURGE.forEach(function(k){ opts[k] = $("#purge-" + k).checked; });
     return fichiers.map(function(f){ return { f: f, p: IFC.planPurge(f.m, opts) }; });
   }
@@ -1260,9 +1355,10 @@
     PURGE.forEach(function(k){ tout[k] = true; });
     fichiers.forEach(function(f){ var c = IFC.planPurge(f.m, tout).cats; PURGE.forEach(function(k){ cats[k] += c[k]; }); });
     PURGE.forEach(function(k){ $("#purge-n-" + k).textContent = fmtN(cats[k]); });
-    plansPurge().forEach(function(x){ n += x.p.nbEntites; o += x.p.octets; orph += x.p.nbOrphelins; mod += x.p.nbModifiees; });
+    var jeux = 0;
+    plansPurge().forEach(function(x){ n += x.p.nbEntites; o += x.p.octets; orph += x.p.nbOrphelins; mod += x.p.nbModifiees; jeux += x.p.cats.jeux; });
     $("#purge-bilan").textContent = n
-      ? pluriel(n, "entité") + " en moins, " + fmtTaille(Math.max(0, o)) + " de gagnés, dont " + pluriel(orph, "orpheline") +
+      ? pluriel(n, "entité") + " en moins, " + fmtTaille(Math.max(0, o)) + " de gagnés" + (jeux ? " (" + pluriel(jeux, "jeu", "jeux") + " de propriétés retirés)" : "") + ", dont " + pluriel(orph, "orpheline") +
         (mod ? " ; " + pluriel(mod, "entité raccourcie", "entités raccourcies") : "") + "."
       : "Rien à purger avec ces choix : le fichier est déjà propre.";
     $("#purge-oui").disabled = !n;
@@ -1271,12 +1367,18 @@
     var d = $("#purge");
     if (!fichiers.length || typeof d.showModal !== "function") return;
     $("#purge-bilan").textContent = "Calcul du bilan…";
+    $("#purge-jeux").innerHTML = "";
     $("#purge-oui").disabled = true;
     d.returnValue = "";
     d.showModal();
-    setTimeout(bilanPurge, 30);
+    setTimeout(function(){ listeJeux(); bilanPurge(); }, 30);
   }
-  PURGE.forEach(function(k){ $("#purge-" + k).addEventListener("change", function(){ setTimeout(bilanPurge, 0); }); });
+  // une case cochée (catégorie ou jeu de propriétés) : bilan recalculé
+  $("#purge").addEventListener("change", function(e){ if (e.target.type === "checkbox"){ $("#purge-bilan").textContent = "Calcul du bilan…"; setTimeout(bilanPurge, 0); } });
+  $("#purge-aucun").addEventListener("click", function(){
+    [].forEach.call(document.querySelectorAll("#purge-jeux input:checked"), function(c){ c.checked = false; });
+    bilanPurge();
+  });
   $("#purge").addEventListener("close", function(){
     if ($("#purge").returnValue !== "oui") return;
     var plans = plansPurge().filter(function(x){ return x.p.nbEntites || x.p.nbModifiees; });
@@ -1330,6 +1432,7 @@
     "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures et coordonnées effacées."); maj(); },
     preferences: preferences,
     exporter: function(){ exporter(null); },
+    "exporter-zip": function(){ exporter(null, true); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
       if (fichiers.some(modifie) && !confirm("Les modifications non exportées seront perdues. Tout fermer ?")) return;

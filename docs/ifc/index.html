@@ -327,6 +327,11 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .prefs p.pref-note:empty{display:none}
 .prefs label.coche{grid-template-columns:auto 1fr auto;gap:10px;cursor:pointer}
 .prefs label.coche input{accent-color:var(--or);width:16px;height:16px;margin:0}
+.purge-titre{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
+.purge-titre .lien{background:none;border:0;padding:0;color:var(--texte-faible);font:inherit;letter-spacing:.08em;cursor:pointer;text-decoration:underline}
+.purge-jeux{max-height:min(34vh,260px);overflow:auto;margin-top:6px;padding:0 8px 6px;border:1px solid var(--ligne)}
+.purge-jeux label.coche span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.purge-jeux label.coche i{font-style:normal;color:var(--texte-faible)}
 .prefs label.coche b{font-family:var(--mono);font-weight:400;font-size:12.5px;color:var(--texte-faible)}
 .aide-table{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:6px;font-size:14px}
 .aide-table kbd{font-family:var(--mono);font-size:11.5px;color:var(--or);white-space:nowrap}
@@ -382,7 +387,7 @@ footer a:hover{color:var(--or)}
       <h1 class="rv" style="--d:.8s">IFC</h1>
       <p class="chapeau rv" style="--d:1s">Ouvre une maquette IFC, coche les éléments en trop, supprime-les proprement et récupère le fichier réécrit.</p>
       <div class="depot rv" style="--d:1.2s" id="depot">
-        <div class="depot-titre">Dépose un ou plusieurs fichiers .ifc ici</div>
+        <div class="depot-titre">Dépose un ou plusieurs fichiers .ifc (ou .ifczip) ici</div>
         <div class="actions">
           <button type="button" class="btn plein" id="choisir">Choisir des fichiers</button>
         </div>
@@ -391,7 +396,7 @@ footer a:hover{color:var(--or)}
       </div>
       <div class="erreur" id="erreur" role="alert" hidden></div>
     </div>
-    <input type="file" id="fichier" accept=".ifc,.IFC" multiple hidden>
+    <input type="file" id="fichier" accept=".ifc,.IFC,.ifczip,.IFCZIP,.zip" multiple hidden>
   </section>
 
   <!-- ===== Après chargement : éditeur ===== -->
@@ -409,6 +414,7 @@ footer a:hover{color:var(--or)}
             <button type="button" role="menuitem" data-cmd="purger"><span>Purger…</span><kbd></kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
+            <button type="button" role="menuitem" data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
             <div data-dyn="exports"></div>
             <hr>
             <button type="button" role="menuitem" data-cmd="fermer-tout"><span>Tout fermer</span><kbd></kbd></button>
@@ -613,6 +619,8 @@ footer a:hover{color:var(--or)}
     <label class="coche"><input type="checkbox" id="purge-relations" checked><span>Relations vides</span><b id="purge-n-relations"></b></label>
     <label class="coche"><input type="checkbox" id="purge-psets" checked><span>Jeux de propriétés vides</span><b id="purge-n-psets"></b></label>
     <label class="coche"><input type="checkbox" id="purge-niveaux"><span>Niveaux sans élément</span><b id="purge-n-niveaux"></b></label>
+    <div class="purge-titre"><span>Jeux de propriétés à retirer, du plus lourd au plus léger</span><button type="button" class="lien" id="purge-aucun">Tout décocher</button></div>
+    <div class="purge-jeux" id="purge-jeux"></div>
     <p class="pref-note" id="purge-bilan"></p>
     <div class="actions">
       <button type="submit" class="btn" value="non">Annuler</button>
@@ -668,10 +676,10 @@ footer a:hover{color:var(--or)}
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
-<script src="/ifc/ifc-core.js?v=6"></script>
+<script src="/ifc/ifc-core.js?v=7"></script>
 <script src="/ifc/ifc-vue.js?v=31"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=26"></script>
+<script src="/ifc/ifc-app.js?v=27"></script>
 <script src="/assets/menu.js?v=26"></script>
 </body>
 </html>
