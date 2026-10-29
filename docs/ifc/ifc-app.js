@@ -1355,13 +1355,18 @@
     PURGE.forEach(function(k){ tout[k] = true; });
     fichiers.forEach(function(f){ var c = IFC.planPurge(f.m, tout).cats; PURGE.forEach(function(k){ cats[k] += c[k]; }); });
     PURGE.forEach(function(k){ $("#purge-n-" + k).textContent = fmtN(cats[k]); });
-    var jeux = 0;
+    var jeux = 0, dbl = 0, od = 0;
     plansPurge().forEach(function(x){ n += x.p.nbEntites; o += x.p.octets; orph += x.p.nbOrphelins; mod += x.p.nbModifiees; jeux += x.p.cats.jeux; });
-    $("#purge-bilan").textContent = n
-      ? pluriel(n, "entité") + " en moins, " + fmtTaille(Math.max(0, o)) + " de gagnés" + (jeux ? " (" + pluriel(jeux, "jeu", "jeux") + " de propriétés retirés)" : "") + ", dont " + pluriel(orph, "orpheline") +
-        (mod ? " ; " + pluriel(mod, "entité raccourcie", "entités raccourcies") : "") + "."
+    // doublons : comptés sur le fichier tel qu'il est (la purge en retire parfois une partie avant)
+    fichiers.forEach(function(f){ var z = IFC.planFusion(f.m); dbl += z.nbFusions; od += z.octets; });
+    $("#purge-n-doublons").textContent = fmtN(dbl);
+    var fus = $("#purge-doublons").checked && dbl > 0;
+    $("#purge-bilan").textContent = n || fus
+      ? (n ? pluriel(n, "entité") + " en moins, " + fmtTaille(Math.max(0, o)) + " de gagnés" + (jeux ? " (" + pluriel(jeux, "jeu", "jeux") + " de propriétés retirés)" : "") + ", dont " + pluriel(orph, "orpheline") +
+          (mod ? " ; " + pluriel(mod, "entité raccourcie", "entités raccourcies") : "") + "." : "") +
+        (fus ? (n ? " " : "") + "Doublons : jusqu'à " + pluriel(dbl, "entité fusionnée", "entités fusionnées") + ", environ " + fmtTaille(od) + " de plus." : "")
       : "Rien à purger avec ces choix : le fichier est déjà propre.";
-    $("#purge-oui").disabled = !n;
+    $("#purge-oui").disabled = !(n || fus);
   }
   function purger(){
     var d = $("#purge");
@@ -1381,14 +1386,21 @@
   });
   $("#purge").addEventListener("close", function(){
     if ($("#purge").returnValue !== "oui") return;
-    var plans = plansPurge().filter(function(x){ return x.p.nbEntites || x.p.nbModifiees; });
-    if (!plans.length) return;
-    var n = 0, o = 0;
-    plans.forEach(function(x){ IFC.appliquer(x.f.m, x.p.changement); n += x.p.nbEntites; o += x.p.octets; });
-    histo.push({ parts: plans.map(function(x){ return { f: x.f, ch: x.p.changement }; }), txt: "purge", e: n });
+    var plans = plansPurge().filter(function(x){ return x.p.nbEntites || x.p.nbModifiees; }), parts = [], n = 0, o = 0, dbl = 0;
+    plans.forEach(function(x){ IFC.appliquer(x.f.m, x.p.changement); n += x.p.nbEntites; o += x.p.octets; parts.push({ f: x.f, ch: x.p.changement }); });
+    // doublons : après la purge, sur ce qui reste ; même annulation (Ctrl+Z défait les deux)
+    if ($("#purge-doublons").checked) fichiers.forEach(function(f){
+      var z = IFC.planFusion(f.m);
+      if (!z.nbFusions) return;
+      IFC.appliquer(f.m, z.changement); n += z.nbFusions; o += z.octets; dbl += z.nbFusions;
+      parts.push({ f: f, ch: z.changement });
+    });
+    if (!parts.length) return;
+    histo.push({ parts: parts, txt: "purge", e: n });
     aRefaire = [];
     reconstruire();
-    etat("Purge : " + pluriel(n, "entité retirée", "entités retirées") + ", " + fmtTaille(Math.max(0, o)) + " de gagnés. Ctrl+Z pour annuler.");
+    etat("Purge : " + pluriel(n, "entité retirée", "entités retirées") + (dbl ? " (dont " + fmtN(dbl) + " doublons fusionnés)" : "") + ", " +
+      fmtTaille(Math.max(0, o)) + " de gagnés. Ctrl+Z pour annuler.");
   });
 
   // Outil de la vue : "mesure", "point" ou aucun (même commande : bascule)

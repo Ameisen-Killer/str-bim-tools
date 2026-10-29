@@ -619,6 +619,7 @@ footer a:hover{color:var(--or)}
     <label class="coche"><input type="checkbox" id="purge-relations" checked><span>Relations vides</span><b id="purge-n-relations"></b></label>
     <label class="coche"><input type="checkbox" id="purge-psets" checked><span>Jeux de propriétés vides</span><b id="purge-n-psets"></b></label>
     <label class="coche"><input type="checkbox" id="purge-niveaux"><span>Niveaux sans élément</span><b id="purge-n-niveaux"></b></label>
+    <label class="coche" title="Points, directions, valeurs de propriétés, styles… strictement identiques, réécrits une seule fois. Jamais les objets (GlobalId), ni leurs placements et représentations."><input type="checkbox" id="purge-doublons" checked><span>Fusionner les doublons</span><b id="purge-n-doublons"></b></label>
     <div class="purge-titre"><span>Jeux de propriétés à retirer, du plus lourd au plus léger</span><button type="button" class="lien" id="purge-aucun">Tout décocher</button></div>
     <div class="purge-jeux" id="purge-jeux"></div>
     <p class="pref-note" id="purge-bilan"></p>
@@ -676,10 +677,10 @@ footer a:hover{color:var(--or)}
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
-<script src="/ifc/ifc-core.js?v=7"></script>
+<script src="/ifc/ifc-core.js?v=8"></script>
 <script src="/ifc/ifc-vue.js?v=31"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=27"></script>
+<script src="/ifc/ifc-app.js?v=28"></script>
 <script src="/assets/menu.js?v=26"></script>
 </body>
 </html>

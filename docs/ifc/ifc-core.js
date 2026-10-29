@@ -855,6 +855,57 @@
     };
   }
 
+  // ================= Fusion des doublons =================
+  // Entités strictement identiques (même type, mêmes valeurs au caractère près, mêmes références une fois
+  // celles-ci fusionnées) réécrites une seule fois. Jamais : objets à GlobalId, socle du fichier, entités
+  // complexes, placements et représentations des objets (chaque objet garde les siens).
+  var NON_FUSIONNABLES = { IFCLOCALPLACEMENT:1, IFCGRIDPLACEMENT:1, IFCLINEARPLACEMENT:1, IFCPRODUCTDEFINITIONSHAPE:1,
+    IFCSHAPEREPRESENTATION:1, IFCTOPOLOGYREPRESENTATION:1, IFCPRODUCTREPRESENTATION:1 };
+  function fusionnable(e){ return e.type !== "(COMPLEXE)" && !SOCLE[e.type] && !NON_FUSIONNABLES[e.type] && !aGlobalId(e); }
+  // Renvoie { nbFusions, octets, changement }.
+  function planFusion(m){
+    var canon = new Map(), etat = new Map(), vus = new Map(), nb = 0;
+    function c(id){ return canon.get(id) || id; }
+    // parcours en profondeur, les références avant l'entité qui les porte (sans récursion)
+    m.ordre.forEach(function(id0){
+      if (etat.has(id0)) return;
+      var e0 = m.ent.get(id0);
+      if (!e0 || !fusionnable(e0)) return;
+      var pile = [id0, 0];
+      etat.set(id0, 1);
+      while (pile.length){
+        var k = pile.pop(), id = pile.pop(), e = m.ent.get(id), r = e.refs, pousse = false;
+        for (; k < r.length; k++){
+          var f = r[k], ef;
+          if (etat.has(f)){ if (etat.get(f) === 1 && f !== id) etat.set(id, 3); continue; }   // boucle : pas de fusion
+          ef = m.ent.get(f);
+          if (!ef || !fusionnable(ef)) continue;
+          pile.push(id, k + 1, f, 0); etat.set(f, 1); pousse = true; break;
+        }
+        if (pousse) continue;
+        var bouclee = etat.get(id) === 3;
+        etat.set(id, 2);
+        if (bouclee) continue;
+        var sig = renumeroter(e.src.slice(e.src.indexOf("=") + 1), c), deja = vus.get(sig);
+        if (deja === undefined) vus.set(sig, id);
+        else { canon.set(id, deja); nb++; }
+      }
+    });
+    var avant = [], apres = [], octets = 0, eol = m.eol.length;
+    if (nb){
+      m.ent.forEach(function(e){
+        if (canon.has(e.id)){ avant.push(e); octets += e.src.length + 1 + eol; return; }
+        var touche = false;
+        for (var i = 0; i < e.refs.length; i++) if (canon.has(e.refs[i])){ touche = true; break; }
+        if (!touche) return;
+        var src = renumeroter(e.src, function(v){ return v === e.id ? v : c(v); });
+        var n = GEL({ id: e.id, type: e.type, src: src, refs: GEL(lireRefs(src, debutArgs(src) - 1)) });
+        avant.push(e); apres.push(n); octets += e.src.length - src.length;
+      });
+    }
+    return { nbFusions: nb, octets: octets, changement: { avant: avant, apres: apres, nbRetirees: nb } };
+  }
+
   // Applique un changement (ou l'annule avec inverse = true).
   function appliquer(m, ch, inverse){
     var ote = inverse ? ch.apres : ch.avant, met = inverse ? ch.avant : ch.apres;
@@ -1001,7 +1052,7 @@
   }
 
   global.IFC = {
-    planPurge: planPurge, statsPsets: statsPsets,
+    planPurge: planPurge, statsPsets: statsPsets, planFusion: planFusion,
     lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
