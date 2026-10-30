@@ -26,7 +26,38 @@
   function garder(cle, v){ try { localStorage.setItem(cle, v); } catch (e){} }
   var moteurVoulu = lire("ifc.moteur", ["webgl", "webgpu", "three", "canvas"]), geoVoulue = lire("ifc.geometrie", ["maison", "webifc"]);
   // WebGL et canvas démarrent tout de suite ; WebGPU et Three.js (ifc-moteurs.js) se chargent ensuite
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu, surMesure: function(t){ etat(t); } });
+  var cube = null;
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu, surMesure: function(t){ etat(t); },
+    surCamera: function(l, p){ if (cube) cube.camera(l, p); } });
+  // cube de navigation comme le ViewCube de Revit (ifc-cube.js) : faces dans le repère du projet, maison = vue 3D
+  // par défaut de Revit (coin haut, avant, droite), qui recadre tout
+  var PLONGEE_MAISON = Math.atan(Math.SQRT1_2), angleProjet = 0;
+  function vueMaison(){ vue.allerVers(angleProjet + Math.PI/4, PLONGEE_MAISON, null, true); }
+  cube = IFCCube.creer($("#cube"), vue, { maison: vueMaison });
+  // repère du projet : axe X du placement du bâtiment (sinon du site) ; nord = TrueNorth du contexte 'Model'
+  function repereProjet(){
+    for (var i = 0; i < fichiers.length; i++){
+      var m = fichiers[i].m, bat = 0, site = 0, ctx = null;
+      m.ent.forEach(function(e){
+        if (!bat && e.type === "IFCBUILDING") bat = e.id;
+        else if (!site && e.type === "IFCSITE") site = e.id;
+        else if (e.type === "IFCGEOMETRICREPRESENTATIONCONTEXT" && (!ctx || (IFC.chaine(IFC.champs(e)[1]) === "Model" && IFC.chaine(IFC.champs(ctx)[1]) !== "Model"))) ctx = e;
+      });
+      var a = bat ? vue.angleRepere(m, bat) : null;
+      if (a == null && site) a = vue.angleRepere(m, site);
+      if (a == null) continue;
+      var d = ctx && m.ent.get(IFC.idRef(IFC.champs(ctx)[5])), rr = d && d.type === "IFCDIRECTION" ? IFC.champs(d)[0] : null, nord = Math.PI/2;
+      if (Array.isArray(rr) && rr.length > 1){
+        var x = IFC.nombre(rr[0]), y = IFC.nombre(rr[1]);
+        if (isFinite(x) && isFinite(y) && (x || y)) nord = Math.atan2(y, x);
+      }
+      return { angle: a, nord: nord };
+    }
+    return { angle: 0, nord: Math.PI/2 };
+  }
+  function majRepere(){ var rp = repereProjet(); angleProjet = rp.angle; cube.repere(rp.angle, rp.nord); }
+  // lissage des bords : actif par défaut, choix gardé dans ce navigateur
+  vue.lissage(lire("ifc.lissage", ["1", "0"]) === "1");
 
   // Moteurs et géométries que ce navigateur ne peut pas faire tourner : clé → raison (montrée dans l'infobulle)
   var INDISPO = {};
@@ -321,7 +352,8 @@
     if (premier){ $("#recherche").value = ""; $("#filtre-type").value = ""; }
     reconstruire();
     vue.redessiner();
-    vue.recadrer();
+    majRepere();
+    if (premier) vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); else vue.recadrer();
     var ent = 0;
     modeles.forEach(function(m){ ent += m.nbOrigine; });
     var nom = modeles.length === 1 ? "« " + modeles[0].nom + " »" : pluriel(modeles.length, "fichier");
@@ -406,6 +438,7 @@
       return;
     }
     reconstruire();
+    majRepere();
     vue.recadrer();
     etat("« " + f.m.nom + " » fermé.");
   }
@@ -1020,6 +1053,7 @@
     activerCmd("zoomer", n > 0 || a);
     activerCmd("coupe", n > 0 || a);
     activerCmd("sans-coupe", vue.aCoupe());
+    $("#b-boite").setAttribute("aria-pressed", String(vue.aCoupe()));
     activerCmd("figer-coupe", vue.aCoupe());
     activerCmd("cadre-coupe", vue.aCoupe());
     activerCmd("equerre-coupe", !!vue.orienterCoupe());
@@ -1247,6 +1281,17 @@
   }
 
   $("#b-recadrer").addEventListener("click", function(){ vue.recadrer(); });
+  // « Boîte de coupe » : enfoncé tant qu'une boîte est posée, un clic l'enlève ; sinon boîte autour de la
+  // sélection, ou de tout ce qui est affiché
+  $("#b-boite").addEventListener("click", function(){
+    if (vue.aCoupe()){ sansCoupe(); vue.recadrer(); return; }
+    var c = choix.size ? Array.from(choix) : itemsVue().map(function(i){ return i.cle; });
+    if (c.length) couperCles(c);
+  });
+  $("#b-lissage").setAttribute("aria-pressed", String(vue.lissage()));
+  $("#b-lissage").addEventListener("click", function(){
+    var on = !vue.lissage(); vue.lissage(on); this.setAttribute("aria-pressed", String(on)); garder("ifc.lissage", on ? "1" : "0");
+  });
 
   // ================= Masquer / isoler dans la vue 3D =================
   function elementsDe(liste){

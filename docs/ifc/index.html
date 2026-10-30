@@ -297,6 +297,11 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .poignee:hover{box-shadow:0 0 0 4px rgba(var(--or-rvb),.35),0 2px 8px rgba(0,0,0,.35)}
 .poignee.tiree{cursor:grabbing;box-shadow:0 0 0 6px rgba(var(--or-rvb),.3),0 2px 8px rgba(0,0,0,.35)}
 .vue-outils .btn{background:rgba(var(--fond-rvb),.7)}
+.vue-outils .btn[aria-pressed="true"]{border-color:rgb(var(--or-rvb));color:rgb(var(--or-rvb));background:rgba(var(--or-rvb),.14)}
+/* cube de navigation (ifc-cube.js), sous les boutons de la vue */
+.p-vue canvas.cube{inset:auto;right:6px;top:50px;width:150px;height:150px;z-index:3;cursor:default;opacity:.85;transition:opacity .15s ease}
+.p-vue canvas.cube:hover{opacity:1}
+@media (max-width:760px){.p-vue canvas.cube{width:120px;height:120px}}
 .vue-aide{position:absolute;left:12px;bottom:10px;right:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
 .vue-info{position:absolute;left:12px;top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
 
@@ -568,9 +573,12 @@ footer a:hover{color:var(--or)}
 
       <div class="panneau p-vue montre" id="p-vue">
         <canvas id="vue" aria-label="Aperçu 3D de la maquette : glisser pour tourner, molette ou pincement pour zoomer"></canvas>
+        <canvas class="cube" id="cube" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
         <div class="vue-info" id="vue-info"></div>
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
+          <button type="button" class="btn petit" id="b-boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
+          <button type="button" class="btn petit" id="b-lissage" aria-pressed="true" title="Lisser les bords des pièces (plus lent sur un gros modèle)">Lissage</button>
         </div>
         <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner · Clic droit : menu</div>
       </div>
@@ -678,9 +686,10 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=9"></script>
-<script src="/ifc/ifc-vue.js?v=31"></script>
+<script src="/ifc/ifc-vue.js?v=32"></script>
+<script src="/ifc/ifc-cube.js?v=1"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=29"></script>
+<script src="/ifc/ifc-app.js?v=30"></script>
 <script src="/assets/menu.js?v=27"></script>
 </body>
 </html>

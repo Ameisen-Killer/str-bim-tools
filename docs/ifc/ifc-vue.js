@@ -1591,7 +1591,7 @@
         attrib(0, B.cadre, 3, gl.FLOAT);
         gl.disableVertexAttribArray(1);
         gl.disableVertexAttribArray(2);
-        gl.vertexAttrib4f(2, kad[0]/255, kad[1]/255, kad[2]/255, kad[3]/255);
+        gl.vertexAttrib4f(2, kad[0]/255, kad[1]/255, kad[2]/255, kad[3]/255*(c.cadreAlpha == null ? 1 : c.cadreAlpha));
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.disable(gl.DEPTH_TEST);
@@ -2092,7 +2092,8 @@
           var qx = A[u] - c0, qy = A[u+1] - c1, qz = A[u+2] - c2, xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
           ctx[(u/3) % 2 ? "lineTo" : "moveTo"](cx + xv*s, cy - (qz*cb + yv*sb)*s);
         }
-        ctx.setLineDash([5, 4]); ctx.strokeStyle = coul.cadre; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        ctx.save(); ctx.globalAlpha = c.cadreAlpha == null ? 1 : c.cadreAlpha;
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = coul.cadre; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
       }
       if (!liste.length){
         ctx.fillStyle = coul.texte; ctx.font = "11px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center";
@@ -2208,7 +2209,8 @@
       return { geos: geos, teintes: teintes, info: { elements: geos.size, couleurs: teintes.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
-    var W = 0, H = 0, dpr = 1, kpx = 0, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
+    var DEMI_PI = Math.PI/2, anim = null;       // plongée bornée à la verticale ; vue animée en cours (cube)
+    var W = 0, H = 0, dpr = 1, kpx = 0, lisse = false, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -2268,20 +2270,24 @@
         lu*cb + lv*sb
       ];
       return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: kpx || dpr,
-        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque };
+        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque,
+        // à la souris, la boîte s'atténue à 50 % hors survol et revient à 100 % au survol (avec les poignées)
+        cadreAlpha: souris && !survol && !surPoignee && !tire ? .5 : 1 };
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
       attente = false;
       if (!W || !H) return;
       // pendant un mouvement, le moteur WebGL dessine en résolution réduite ; image nette au lâcher
-      var k = vite && M.nom === "WebGL" ? Math.max(.6, dpr/2) : dpr;
+      // lissage : à l'arrêt, image calculée en double résolution puis réduite par le navigateur (bords nets sans escaliers)
+      var k = vite && M.nom === "WebGL" ? Math.max(.6, dpr/2) : lisse ? Math.max(dpr, Math.min(dpr*2, 4096/Math.max(W, H))) : dpr;
       if (k !== kpx){ kpx = k; cv.width = Math.round(W*k); cv.height = Math.round(H*k); }
       var c = camera();
       M.dessiner(c);
       placerPoignees(c);
       placerMesures(c);
       placerPivot(c);
+      if (rappels.surCamera) rappels.surCamera(yaw, pitch);
     }
 
     // ---------- Poignées de la boîte de coupe : une par face, à tirer pour l'étirer ou la réduire ----------
@@ -2316,7 +2322,7 @@
       }
       return dedans;
     }
-    function survoler(oui){ if (oui !== survol){ survol = oui; placerPoignees(camera()); } }
+    function survoler(oui){ if (oui !== survol){ survol = oui; placerPoignees(camera()); demander(); } }
     NOMS_FACES.forEach(function(nom, f){
       var b = document.createElement("div");
       b.className = "poignee"; b.hidden = true;
@@ -2348,7 +2354,7 @@
       b.addEventListener("pointerup", lache);
       b.addEventListener("pointercancel", lache);
       b.addEventListener("pointerenter", function(){ surPoignee = true; });
-      b.addEventListener("pointerleave", function(){ surPoignee = false; if (!tire) placerPoignees(camera()); });
+      b.addEventListener("pointerleave", function(){ surPoignee = false; if (!tire){ placerPoignees(camera()); demander(); } });
       cv.parentNode.appendChild(b);
       poignees.push(b);
     });
@@ -2540,17 +2546,50 @@
       return r;
     }
     function cadrerSur(b){
+      anim = null;
       centre = centreBoite(b);
       rayon = Math.max(1e-9, Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])/2);
       zoom = 1; px = 0; py = 0;
       demander();
     }
     function recadrer(){
+      anim = null;
       if (coupe){ cadrerSur(coupe); return; }
       var b = boite();
       if (b){ centre = b.c; rayon = b.r; } else { centre = [0,0,0]; rayon = 1; }
       zoom = 1; px = 0; py = 0;
       demander();
+    }
+
+    // ---------- Vue animée vers une orientation (cube de navigation), recadrée en arrivant ----------
+    // Le cadrage visé ne dépend pas de l'orientation : centre et taille de la boîte de coupe, sinon de tout.
+    // cadrer faux (clic sur le cube, comme Revit) : on garde le zoom et on tourne autour du point au centre de l'écran
+    function allerVers(l, p, duree, cadrer){
+      p = Math.max(-DEMI_PI, Math.min(DEMI_PI, p));
+      var s0 = Math.min(W, H)*.44/rayon*zoom, ca = Math.cos(yaw), sa = Math.sin(yaw), cb = Math.cos(pitch), sb = Math.sin(pitch);
+      var cible = !cadrer && W && H ? { c: [0, 1, 2].map(function(i){ return centre[i] + ([ca, sa, 0][i]*-px + [-sb*sa, sb*ca, cb][i]*py)/s0; }), r: rayon, garde: true } :
+        coupe ? { c: centreBoite(coupe), r: Math.max(1e-9, Math.hypot(coupe.max[0] - coupe.min[0], coupe.max[1] - coupe.min[1], coupe.max[2] - coupe.min[2])/2) } :
+        boite() || { c: centre.slice(), r: rayon };
+      if (cible.garde){ centre = cible.c.slice(); px = py = 0; }   // même image : le pivot passe au centre de l'écran
+      var dl = l - yaw;
+      dl -= 2*Math.PI*Math.round(dl/(2*Math.PI));           // par le plus court
+      var a = { l0: yaw, dl: dl, p0: pitch, p1: p, c0: centre.slice(), c1: cible.c, r1: cible.r,
+        e0: Math.log(zoom/rayon), e1: cible.garde ? Math.log(zoom/rayon) : -Math.log(cible.r), x0: px, y0: py, t0: 0, d: duree == null ? 900 : duree };
+      // pas de saut même avec « animations réduites » dans Windows : Tony veut voir le modèle tourner
+      anim = a;
+      function pas(t){
+        if (anim !== a) return;                              // interrompue (souris, molette, autre vue)
+        if (!a.t0) a.t0 = t;
+        var u = a.d ? Math.min(1, (t - a.t0)/a.d) : 1, k = u < .5 ? 4*u*u*u : 1 - Math.pow(2 - 2*u, 3)/2;
+        yaw = a.l0 + a.dl*k; pitch = a.p0 + (a.p1 - a.p0)*k;
+        centre = [0, 1, 2].map(function(i){ return a.c0[i] + (a.c1[i] - a.c0[i])*k; });
+        rayon = a.r1; zoom = Math.exp(a.e0 + (a.e1 - a.e0)*k)*a.r1;   // échelle interpolée en logarithme
+        px = a.x0*(1 - k); py = a.y0*(1 - k);
+        if (u < 1){ vite = true; requestAnimationFrame(pas); }
+        else { anim = null; vite = false; yaw -= 2*Math.PI*Math.round(yaw/(2*Math.PI)); }
+        demander();
+      }
+      requestAnimationFrame(pas);
     }
 
     // ---------- Souris, doigt, molette ----------
@@ -2624,6 +2663,7 @@
     // sélection à chaque pause de la souris freinait tout. L'objet n'est cherché qu'au clic.
     function brancher(){
       cv.addEventListener("pointerdown", function(e){
+        anim = null;
         try { cv.setPointerCapture(e.pointerId); } catch (x){}
         ptrs.set(e.pointerId, local(e));
         if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; doigt = e.pointerType !== "mouse"; }
@@ -2643,7 +2683,7 @@
           if (bouge){
             var dx = n.x - p.x, dy = n.y - p.y;
             if (e.shiftKey || (e.buttons & 6)){ px += dx; py += dy; }
-            else { yaw -= dx*.01; pitch = Math.max(-1.55, Math.min(1.55, pitch + dy*.01)); enRotation = true; }
+            else { yaw -= dx*.01; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, pitch + dy*.01)); enRotation = true; }
             vite = true; demander();
           }
           p.x = n.x; p.y = n.y;
@@ -2701,6 +2741,7 @@
       var minuterie = 0;
       cv.addEventListener("wheel", function(e){
         e.preventDefault();
+        anim = null;
         var p = local(e);
         // sens d'origine, juste avec une vraie souris (molette vers l'avant : on se rapproche)
         zoomAutour(Math.exp(-e.deltaY*(e.deltaMode === 1 ? .05 : .0015)), p.x, p.y);
@@ -2766,7 +2807,14 @@
       selection: function(s, a){ sel = s; actif = a || 0; M.teinter(liste, sel, actif, coul); demander(); },
       recadrer: recadrer,
       // vue type : lacet (autour de Z) et plongée en radians, puis recadrage
-      orienter: function(l, p){ yaw = l; pitch = Math.max(-1.55, Math.min(1.55, p)); recadrer(); },
+      orienter: function(l, p){ yaw = l; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, p)); recadrer(); },
+      // cube de navigation : orientation actuelle, vue animée vers une orientation, rotation libre au glisser
+      // (dl, dp en radians, image allégée jusqu'à finTourner), lissage des bords
+      angles: function(){ return { lacet: yaw, plongee: pitch }; },
+      allerVers: allerVers,
+      lissage: function(oui){ if (oui !== undefined){ lisse = !!oui; demander(); } return lisse; },
+      tourner: function(dl, dp){ anim = null; yaw += dl; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, pitch + dp)); enRotation = true; vite = true; demander(); },
+      finTourner: function(){ enRotation = false; vite = false; demander(); },
       redessiner: function(){ taille(); },
       // Zoom sur des éléments (clés), sans rien masquer
       cadrer: function(cles){ var b = boiteDe(cles); if (b) cadrerSur(b); return !!b; },
@@ -2875,7 +2923,17 @@
         G.externe = calibrer(G, carte, couleurs);
         return G.externe.info;
       },
-      aExterne: function(m){ var G = Gs.get(m); return !!(G && G.externe); }
+      aExterne: function(m){ var G = Gs.get(m); return !!(G && G.externe); },
+      // angle (radians autour de la verticale) de l'axe X du placement d'une entité IFC (bâtiment, site),
+      // c'est-à-dire du repère du projet Revit dans le repère du fichier ; null si illisible
+      angleRepere: function(m, id){
+        var G = Gs.get(m) || prets.get(m);
+        if (!G) return null;
+        try {
+          var e = G.m.ent.get(id), M0 = placement(G, R(C(e)[5]));
+          return Math.hypot(M0[0], M0[1]) > 1e-9 ? Math.atan2(M0[1], M0[0]) : null;
+        } catch (x){ return null; }
+      }
     };
   }
 
