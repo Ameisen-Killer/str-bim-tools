@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.4";
+  var VERSION = "1.4.5";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -41,7 +41,7 @@
   var modifs = new Map();                  // clé stable (ADN) → { k, cle, uid, eid, num, famille, niveau, v: { param: { ancien, nouveau } } }
   var heritage = [];                       // décisions gardées dans le navigateur par les versions < 1.4 : à reprendre ou jeter
   var sel = new Set(), actif = null;
-  var voirStructure = true, filtre3d = true;
+  var voirStructure = true, voirRes = true, filtre3d = true;
   var angleBat = 0;                        // orientation du bâtiment (IFC géoréférencés : axes tournés)
 
   var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat });
@@ -286,7 +286,7 @@
   function items(){
     var out = [];
     if (voirStructure) fichiers.forEach(function(fi){ if (fi.role === "str") fi.ids.forEach(function(id){ out.push({ cle: "s" + fi.uid + ":" + id, m: fi.m, id: id, h: null, rose: fi.neufs.has(id) }); }); });
-    (filtre3d ? filtrees() : RES).forEach(function(r){ out.push({ cle: r.cle, m: r.f.m, id: r.id, h: teinte(r) }); });
+    if (voirRes) (filtre3d ? filtrees() : RES).forEach(function(r){ out.push({ cle: r.cle, m: r.f.m, id: r.id, h: teinte(r) }); });
     return out;
   }
   function afficher(){
@@ -372,6 +372,7 @@
     else if (c === "mesure" || c === "point") outil(c);
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
     else if (c === "structure"){ voirStructure = !voirStructure; b.setAttribute("aria-pressed", String(voirStructure)); afficher(); }
+    else if (c === "res"){ voirRes = !voirRes; b.setAttribute("aria-pressed", String(voirRes)); afficher(); }
     else if (c === "filtre3d"){ filtre3d = !filtre3d; b.setAttribute("aria-pressed", String(filtre3d)); afficher(); }
   });
   document.addEventListener("keydown", function(e){
