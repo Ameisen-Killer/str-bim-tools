@@ -57,7 +57,7 @@
   // Cube de navigation (comme le ViewCube de Revit) à la place des boutons « 3D » et « Dessus ». Vue de
   // départ (maison) : celle de la vue 3D par défaut de Revit, depuis le coin haut, avant, droite du projet.
   var PLONGEE_MAISON = Math.atan(Math.SQRT1_2);
-  function vueMaison(){ vue.allerVers(angleProjet + Math.PI/4, PLONGEE_MAISON); }
+  function vueMaison(){ vue.allerVers(angleProjet + Math.PI/4, PLONGEE_MAISON, null, true); }   // la maison recadre tout, comme Revit
   cube = FGHCube.creer($("#cube"), vue, { maison: vueMaison });
   // le cube se range sous la barre d'outils, plus haute quand les boutons passent sur plusieurs lignes
   function placerCube(){ var o = $("#outils"); $("#cube").style.top = (o.hidden ? 10 : o.offsetTop + o.offsetHeight + 10) + "px"; }

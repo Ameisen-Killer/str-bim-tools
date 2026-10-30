@@ -2577,14 +2577,18 @@
 
     // ---------- FGH : vue animée vers une orientation (cube de navigation), recadrée en arrivant ----------
     // Le cadrage visé ne dépend pas de l'orientation : centre et taille de la boîte de coupe, sinon de tout.
-    function allerVers(l, p, duree){
+    // cadrer faux (clic sur le cube, comme Revit) : on garde le zoom et on tourne autour du point au centre de l'écran
+    function allerVers(l, p, duree, cadrer){
       p = Math.max(-DEMI_PI, Math.min(DEMI_PI, p));
-      var cible = coupe ? { c: centreBoite(coupe), r: Math.max(1e-9, Math.hypot(coupe.max[0] - coupe.min[0], coupe.max[1] - coupe.min[1], coupe.max[2] - coupe.min[2])/2) } :
+      var s0 = Math.min(W, H)*.44/rayon*zoom, ca = Math.cos(yaw), sa = Math.sin(yaw), cb = Math.cos(pitch), sb = Math.sin(pitch);
+      var cible = !cadrer && W && H ? { c: [0, 1, 2].map(function(i){ return centre[i] + ([ca, sa, 0][i]*-px + [-sb*sa, sb*ca, cb][i]*py)/s0; }), r: rayon, garde: true } :
+        coupe ? { c: centreBoite(coupe), r: Math.max(1e-9, Math.hypot(coupe.max[0] - coupe.min[0], coupe.max[1] - coupe.min[1], coupe.max[2] - coupe.min[2])/2) } :
         boite() || { c: centre.slice(), r: rayon };
+      if (cible.garde){ centre = cible.c.slice(); px = py = 0; }   // même image : le pivot passe au centre de l'écran
       var dl = l - yaw;
       dl -= 2*Math.PI*Math.round(dl/(2*Math.PI));           // par le plus court
       var a = { l0: yaw, dl: dl, p0: pitch, p1: p, c0: centre.slice(), c1: cible.c, r1: cible.r,
-        e0: Math.log(zoom/rayon), e1: -Math.log(cible.r), x0: px, y0: py, t0: 0, d: duree == null ? 900 : duree };
+        e0: Math.log(zoom/rayon), e1: cible.garde ? Math.log(zoom/rayon) : -Math.log(cible.r), x0: px, y0: py, t0: 0, d: duree == null ? 900 : duree };
       // pas de saut même avec « animations réduites » dans Windows : Tony veut voir le modèle tourner
       anim = a;
       function pas(t){
