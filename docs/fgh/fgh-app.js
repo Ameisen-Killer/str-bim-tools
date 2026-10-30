@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.7";
+  var VERSION = "1.4.8";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -222,7 +222,7 @@
     afficher(true);
     angleBat = vue.angleDe(RES.length ? RES.map(function(r){ return r.cle; }) : null) || 0;
     vue.orienter(angleBat - 0.65, 0.5);
-    renduListe(); renduFiche(); renduModifs(); legende(); titresBoutons();
+    renduListe(); renduFiche(); renduModifs(); legende(); titresBoutons(); majBoite();
     fsDemarrer();
   }
 
@@ -347,6 +347,7 @@
     // la liste suit le niveau quand des réservations le portent
     if (Array.prototype.some.call($("#f-niv").options, function(o){ return o.value === n.nom; })){ $("#f-niv").value = n.nom; filtreChange(); }
     etat("Coupe sur " + n.nom + " : de " + (n.z - marge).toFixed(2) + " à " + haut.toFixed(2) + " m.");
+    majBoite();
   }
   // Boîte autour de réservations, parallèle à elles (et non aux axes du fichier, tournés par le géoréférencement)
   function boiteAutour(cles){
@@ -354,8 +355,19 @@
     vue.orienterCoupe(a == null ? angleBat : a);
     vue.coupe(cles);
     $("#c-niv").value = "";
+    majBoite();
   }
-  $("#c-niv").addEventListener("change", function(){ var v = this.value; if (v === "") vue.coupeBoite(null); else boiteNiveau(+v); });
+  // boîte de coupe de l'ensemble des maquettes affichées
+  function boiteTout(){
+    var b = vue.boiteDe(null, angleBat);
+    if (!b) return;
+    vue.coupeBoite({ min: b.min.map(function(v){ return v - .5; }), max: b.max.map(function(v){ return v + .5; }), a: angleBat });
+    $("#c-niv").value = "";
+    majBoite();
+  }
+  // le bouton « Boîte de coupe » est enfoncé tant qu'une boîte est posée
+  function majBoite(){ var b = document.querySelector('[data-c="boite"]'); if (b) b.setAttribute("aria-pressed", String(vue.aCoupe())); }
+  $("#c-niv").addEventListener("change", function(){ var v = this.value; if (v === "") vue.coupeBoite(null); else boiteNiveau(+v); majBoite(); });
   $("#c-marge").addEventListener("input", function(){ var v = $("#c-niv").value; if (v !== "") boiteNiveau(+v); });
   function outil(nom){
     var cur = vue.outil(), nv = cur === nom ? null : nom;
@@ -375,8 +387,12 @@
       var i = v === "" ? (c === "niv-bas" ? niveaux.length - 1 : 0) : +v + (c === "niv-bas" ? -1 : 1);
       if (i >= 0 && i < niveaux.length) boiteNiveau(i);
     }
-    else if (c === "boite-sel"){ if (!sel.size){ etat("Choisis d'abord une ou plusieurs réservations."); return; } boiteAutour(Array.from(sel)); }
-    else if (c === "sans-boite"){ vue.coupeBoite(null); $("#c-niv").value = ""; vue.recadrer(); }
+    else if (c === "boite"){
+      if (vue.aCoupe()){ vue.coupeBoite(null); $("#c-niv").value = ""; vue.recadrer(); }
+      else if (sel.size) boiteAutour(Array.from(sel));
+      else boiteTout();
+      majBoite();
+    }
     else if (c === "mesure" || c === "point") outil(c);
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
     else if (c === "structure"){ voirStructure = !voirStructure; b.setAttribute("aria-pressed", String(voirStructure)); afficher(); }

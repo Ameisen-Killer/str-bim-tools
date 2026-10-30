@@ -282,8 +282,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
         <input class="bt mono" id="c-marge" type="number" step="0.05" min="0" value="0.50" title="Distance (m) gardée dessous et dessus du niveau Revit : hauteur de la boîte = 2 × cette valeur">
       </div>
       <div class="groupe">
-        <button type="button" class="bt" data-c="boite-sel" title="Boîte de coupe autour de la sélection">Boîte sélection</button>
-        <button type="button" class="bt" data-c="sans-boite" title="Enlever la boîte de coupe">Sans boîte</button>
+        <button type="button" class="bt" data-c="boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
       </div>
       <div class="groupe">
         <button type="button" class="bt" data-c="mesure" aria-pressed="false" title="Mesurer entre deux points (Échap pour sortir)">Mesure</button>
@@ -318,6 +317,6 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 
 <script src="/fgh/fgh-core.js?v=2"></script>
 <script src="/fgh/fgh-vue.js?v=6"></script>
-<script src="/fgh/fgh-app.js?v=15"></script>
+<script src="/fgh/fgh-app.js?v=16"></script>
 </body>
 </html>
