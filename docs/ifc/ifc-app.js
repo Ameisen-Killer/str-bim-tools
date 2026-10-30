@@ -773,6 +773,42 @@
     rendreListe(); majVue();
     etat("« " + f.m.nom + " » : " + nomTeinte(h) + ".");
   }
+  // ---------- Phases Revit : couleur de la phase existante et de la phase nouvelle construction, par maquette ----------
+  // Nouvelle construction : propriété « Phase de création » / « Phase Created » = New Construction / Nouvelle
+  // construction (export Revit), ou jeu STR_FGH_STR Nouveau = 1 (« Export IFC RES ») ; tout le reste est existant.
+  var PHASE_NOM = /^phase (de cr[ée]ation|created)$/i, PHASE_NEUVE = /new construction|nouv/i;
+  function neufsDe(m){
+    var neufs = new Set(), psets = new Set();
+    m.ent.forEach(function(e){
+      if (e.type !== "IFCPROPERTYSET") return;
+      var nom = IFC.chaine(IFC.champs(e)[2]);
+      IFC.refsListe(IFC.champs(e)[4]).forEach(function(r){
+        var x = m.ent.get(r);
+        if (!x || x.type !== "IFCPROPERTYSINGLEVALUE") return;
+        var n = IFC.chaine(IFC.champs(x)[0]), v = IFC.chaine(IFC.champs(x)[2]);
+        if (nom === "STR_FGH_STR" ? n === "Nouveau" && v === "1" : PHASE_NOM.test(n) && PHASE_NEUVE.test(v)) psets.add(e.id);
+      });
+    });
+    if (psets.size) m.ent.forEach(function(e){
+      if (e.type === "IFCRELDEFINESBYPROPERTIES" && psets.has(IFC.idRef(IFC.champs(e)[5]))) IFC.refsListe(IFC.champs(e)[4]).forEach(function(id){ neufs.add(id); });
+    });
+    return neufs;
+  }
+  function neufs(f){ if (!f.neufs) f.neufs = neufsDe(f.m); return f.neufs; }
+  // teinte d'un élément : celle de sa phase si elle est choisie, sinon celle de la maquette
+  function teinteElement(f, id){
+    var p = f.phases;
+    if (p){ var t = neufs(f).has(id) ? p.neuf : p.existant; if (t !== undefined) return t; }
+    return f.teinte;
+  }
+  var NOM_PHASE = { existant: "phase existante", neuf: "phase nouvelle construction" };
+  // h : teinte 0–360, null (couleur par défaut) ou undefined (comme la maquette)
+  function teinterPhase(f, quoi, h){
+    if (!f.phases) f.phases = {};
+    f.phases[quoi] = h;
+    majVue();
+    etat("« " + f.m.nom + " », " + NOM_PHASE[quoi] + " : " + (h === undefined ? "comme la maquette" : nomTeinte(h)) + ".");
+  }
 
   // ---------- Actions de vue sur des éléments : masquer, isoler, zoomer, boîte de coupe ----------
   function quoiDe(cles){
@@ -848,6 +884,16 @@
         return '<button type="button" role="menuitemradio" data-ctx="teinte" data-h="' + t[0] + '" aria-checked="' + (f.teinte === t[0]) + '" style="--t:' + pastille(t[0]) + '" title="' + t[1] + '" aria-label="' + t[1] + '"></button>';
       }).join("") +
       '<button type="button" role="menuitem" class="autre" data-ctx="autre" title="Autre couleur…" aria-label="Autre couleur"></button></div>');
+    // couleurs des phases, quand la maquette porte une phase nouvelle construction
+    if (neufs(f).size) ["existant", "neuf"].forEach(function(q){
+      var cur = f.phases ? f.phases[q] : undefined;
+      h.push('<div class="mb-sous">Phase ' + (q === "neuf" ? "nouvelle construction" : "existante") + '</div><div class="teintes">' +
+        '<button type="button" role="menuitemradio" class="defaut" data-ctx="teinte-phase" data-q="' + q + '" data-h="m" aria-checked="' + (cur === undefined) + '" title="Comme la maquette" aria-label="Comme la maquette"></button>' +
+        TEINTES.map(function(t){
+          return '<button type="button" role="menuitemradio" data-ctx="teinte-phase" data-q="' + q + '" data-h="' + t[0] + '" aria-checked="' + (cur === t[0]) + '" style="--t:' + pastille(t[0]) + '" title="' + t[1] + '" aria-label="' + t[1] + '"></button>';
+        }).join("") +
+        '<button type="button" role="menuitem" class="autre" data-ctx="autre-phase" data-q="' + q + '" title="Autre couleur…" aria-label="Autre couleur"></button></div>');
+    });
     if (!noeud) h.push("<hr>", bouton("voir", f.visible ? "Masquer dans la vue 3D" : "Afficher dans la vue 3D"), bouton("export", "Exporter ce fichier"), bouton("fermer", "Fermer ce fichier", "danger"));
     h.push("<hr>", bouton("tout-reduire", "Tout réduire"), bouton("tout-developper", "Tout développer"));
     montrerCtx(x, y, h, c);
@@ -932,9 +978,9 @@
       return;
     }
     var f = c.f, l = c.l, noeud = !l.fichier, sous = sousLignes(c.k);
-    if (a === "autre"){
+    if (a === "autre" || a === "autre-phase"){
       // sélecteur de couleur du système, ouvert à l'endroit du menu
-      cibleTeinte = f;
+      cibleTeinte = a === "autre" ? f : { f: f, q: b.getAttribute("data-q") };
       teinteLibre.style.left = ctx.style.left; teinteLibre.style.top = ctx.style.top;
       fermerCtx();
       try { teinteLibre.showPicker(); } catch (x){ teinteLibre.click(); }
@@ -951,6 +997,7 @@
       etat("« " + nomAff(l.i) + " »" + (l.enfants ? " et son contenu ajoutés" : " ajouté") + " à la sélection.");
     }
     else if (a === "teinte") teinter(f, b.getAttribute("data-h") === "" ? null : +b.getAttribute("data-h"));
+    else if (a === "teinte-phase") teinterPhase(f, b.getAttribute("data-q"), b.getAttribute("data-h") === "m" ? undefined : +b.getAttribute("data-h"));
     else if (a === "voir") basculerVisible(f);
     else if (a === "export") exporter(f);
     else if (a === "fermer") fermer(f);
@@ -972,6 +1019,7 @@
   function surTeinteLibre(){
     if (cibleTeinte === "fond") fondVue(teinteLibre.value);
     else if (cibleTeinte && fichiers.indexOf(cibleTeinte) >= 0) teinter(cibleTeinte, teinteDe(teinteLibre.value));
+    else if (cibleTeinte && cibleTeinte.q && fichiers.indexOf(cibleTeinte.f) >= 0) teinterPhase(cibleTeinte.f, cibleTeinte.q, teinteDe(teinteLibre.value));
   }
   // Fond de la vue 3D : couleur choisie (#rrvvbb, gardée pour les prochaines visites) ou "" pour suivre le thème
   var FONDS = [["#ffffff", "blanc"], ["#000000", "noir"], ["#26282c", "anthracite"], ["#7a7d82", "gris"], ["#d4d6d9", "gris clair"],
@@ -1300,7 +1348,7 @@
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
   function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: l.f.teinte }); });
+    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
     return items;
   }
   function majVue(){
