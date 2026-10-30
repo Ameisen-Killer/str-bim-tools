@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.5.3";
+  var VERSION = "1.6.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -59,6 +59,8 @@
   var PLONGEE_MAISON = Math.atan(Math.SQRT1_2);
   function vueMaison(){ vue.allerVers(angleProjet + Math.PI/4, PLONGEE_MAISON, null, true); }   // la maison recadre tout, comme Revit
   cube = FGHCube.creer($("#cube"), vue, { maison: vueMaison });
+  // lissage des bords : actif par défaut, choix gardé dans ce navigateur (simple préférence d'affichage)
+  vue.lissage(lsGet("fgh.lissage", "1") === "1"); $('[data-c="lissage"]').setAttribute("aria-pressed", String(vue.lissage()));
   // le cube se range sous la barre d'outils, plus haute quand les boutons passent sur plusieurs lignes
   function placerCube(){ var o = $("#outils"); $("#cube").style.top = (o.hidden ? 10 : o.offsetTop + o.offsetHeight + 10) + "px"; }
   if ("ResizeObserver" in window) new ResizeObserver(placerCube).observe($("#outils"));
@@ -439,6 +441,7 @@
     if (!b) return;
     var c = b.getAttribute("data-c"), v;
     if (c === "cadrer") vue.recadrer();
+    else if (c === "lissage"){ var on = !vue.lissage(); vue.lissage(on); b.setAttribute("aria-pressed", String(on)); lsSet("fgh.lissage", on ? "1" : "0"); }
     else if (c === "niv-bas" || c === "niv-haut"){
       v = $("#c-niv").value;
       var i = v === "" ? (c === "niv-bas" ? niveaux.length - 1 : 0) : +v + (c === "niv-bas" ? -1 : 1);

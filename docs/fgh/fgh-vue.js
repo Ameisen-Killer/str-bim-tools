@@ -2226,7 +2226,7 @@
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
     var DEMI_PI = Math.PI/2, anim = null;       // plongée bornée à la verticale ; vue animée en cours (cube)
-    var W = 0, H = 0, dpr = 1, kpx = 0, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
+    var W = 0, H = 0, dpr = 1, kpx = 0, lisse = false, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -2297,7 +2297,8 @@
       attente = false;
       if (!W || !H) return;
       // pendant un mouvement, le moteur WebGL dessine en résolution réduite ; image nette au lâcher
-      var k = vite && M.nom === "WebGL" ? Math.max(.6, dpr/2) : dpr;
+      // lissage : à l'arrêt, image calculée en double résolution puis réduite par le navigateur (bords nets sans escaliers)
+      var k = vite && M.nom === "WebGL" ? Math.max(.6, dpr/2) : lisse ? Math.max(dpr, Math.min(dpr*2, 4096/Math.max(W, H))) : dpr;
       if (k !== kpx){ kpx = k; cv.width = Math.round(W*k); cv.height = Math.round(H*k); }
       var c = camera();
       M.dessiner(c);
@@ -2829,6 +2830,7 @@
       // libre au glisser (dl, dp en radians, image allégée jusqu'à finTourner)
       angles: function(){ return { lacet: yaw, plongee: pitch }; },
       allerVers: allerVers,
+      lissage: function(oui){ if (oui !== undefined){ lisse = !!oui; demander(); } return lisse; },
       tourner: function(dl, dp){ anim = null; yaw += dl; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, pitch + dp)); enRotation = true; vite = true; demander(); },
       finTourner: function(){ enRotation = false; vite = false; demander(); },
       redessiner: function(){ taille(); },
