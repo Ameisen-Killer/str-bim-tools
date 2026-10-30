@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.6";
+  var VERSION = "1.4.7";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -222,10 +222,18 @@
     afficher(true);
     angleBat = vue.angleDe(RES.length ? RES.map(function(r){ return r.cle; }) : null) || 0;
     vue.orienter(angleBat - 0.65, 0.5);
-    renduListe(); renduFiche(); renduModifs(); legende();
+    renduListe(); renduFiche(); renduModifs(); legende(); titresBoutons();
     fsDemarrer();
   }
 
+  // infobulles des boutons Structure / Réservations : nom des fichiers ouverts
+  function titresBoutons(){
+    [["structure", "str", "la structure"], ["res", "res", "les réservations"]].forEach(function(x){
+      var noms = fichiers.filter(function(f){ return f.role === x[1]; }).map(function(f){ return f.nom; });
+      var b = document.querySelector('[data-c="' + x[0] + '"]');
+      if (b) b.title = "Afficher ou masquer " + x[2] + (noms.length ? " : " + noms.join(", ") : "");
+    });
+  }
   function rangNiveau(nom){ for (var i = 0; i < niveaux.length; i++) if (niveaux[i].nom === nom) return i; return 1e6; }
   function remplirNiveaux(){
     var noms = Array.from(new Set(RES.map(function(r){ return r.niveau; }))).sort(function(a, b){ return rangNiveau(a) - rangNiveau(b) || (a < b ? -1 : a > b ? 1 : 0); });
