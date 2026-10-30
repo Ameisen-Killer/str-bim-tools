@@ -1,9 +1,9 @@
 // Menu et pied de page communs à toutes les pages de str-bim-tools.com
 // - Pour ajouter une page au menu : l'ajouter à PAGES.
-// - À chaque publication : mettre MISE_A_JOUR à la date du jour (AAAA-MM-JJ).
+// - La date du pied de page suit seule chaque publication ; MISE_A_JOUR n'est qu'un plancher (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-10-22";
+  var MISE_A_JOUR = "2026-10-30";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
@@ -14,7 +14,13 @@
   ];
 
   // ---------- Pied de page : date de mise à jour ----------
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(MISE_A_JOUR);
+  // date de publication de la page (en-tête Last-Modified envoyé par GitHub Pages à chaque déploiement),
+  // MISE_A_JOUR servant de plancher si le navigateur ne la connaît pas
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(MISE_A_JOUR), pub = new Date(document.lastModified);
+  if (!isNaN(pub)){
+    var z = function(x){ return (x < 10 ? "0" : "") + x; }, iso = pub.getFullYear() + "-" + z(pub.getMonth() + 1) + "-" + z(pub.getDate());
+    if (!m || iso > MISE_A_JOUR) m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  }
   [].forEach.call(document.querySelectorAll("[data-maj]"), function(el){
     if (m) el.textContent = m[3] + "." + m[2] + "." + m[1];
   });
