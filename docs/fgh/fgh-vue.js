@@ -2289,8 +2289,8 @@
       ];
       return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: kpx || dpr,
         centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque,
-        // à la souris, la boîte s'atténue à 20 % hors survol et revient à 100 % au survol (avec les poignées)
-        cadreAlpha: souris && !survol && !surPoignee && !tire ? .2 : 1 };
+        // à la souris, la boîte s'atténue à 50 % hors survol et revient à 100 % au survol (avec les poignées)
+        cadreAlpha: souris && !survol && !surPoignee && !tire ? .5 : 1 };
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
