@@ -2832,10 +2832,11 @@
       // Zoom sur des éléments (clés), sans rien masquer
       cadrer: function(cles){ var b = boiteDe(cles); if (b) cadrerSur(b); return !!b; },
       // Boîte de coupe autour d'éléments (clés), avec une petite marge ; null l'enlève. Renvoie vrai si une boîte est posée.
-      coupe: function(cles){
+      // marge en mètres facultative (sinon une petite marge proportionnelle)
+      coupe: function(cles, marge){
         var b = cles ? boiteDe(cles, angleCoupe) : null;
         if (b){
-          var m = Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
+          var m = marge != null ? marge : Math.max(Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2])*.04, rayon*.002);
           b = { min: b.min.map(function(v){ return v - m; }), max: b.max.map(function(v){ return v + m; }), a: b.a };
         }
         coupe = b; fige = false; cadreMasque = false;

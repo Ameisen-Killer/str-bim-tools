@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.5.1";
+  var VERSION = "1.5.2";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -400,11 +400,11 @@
     etat("Coupe sur " + n.nom + " : de " + (n.z - marge).toFixed(2) + " à " + haut.toFixed(2) + " m.");
     majBoite();
   }
-  // Boîte autour de réservations, parallèle à elles (et non aux axes du fichier, tournés par le géoréférencement)
+  // Boîte autour de réservations, à 1 m tout autour (demande de Tony), parallèle à elles (et non aux axes du fichier, tournés par le géoréférencement)
   function boiteAutour(cles){
     var a = vue.angleDe(cles);
     vue.orienterCoupe(a == null ? angleBat : a);
-    vue.coupe(cles);
+    vue.coupe(cles, 1);
     $("#c-niv").value = "";
     majBoite();
   }
