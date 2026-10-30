@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.8.0";
+  var VERSION = "1.8.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -365,10 +365,11 @@
     fichiers.forEach(function(fi){ if (fi.neufs) neufs += fi.neufs.size; });
     if (!RES.length && !neufs){ $("#legende").hidden = true; return; }
     // avec une boîte de coupe, la légende ne compte que les réservations affichées qui la touchent
-    var n = {}, D = vue.dansCoupe();
-    RES.forEach(function(r){ if (D && !D.has(r.cle)) return; var c = classe(valeur(r, P_ST)); n[c] = (n[c] || 0) + 1; });
-    $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return n[c]; })
-      .map(function(c){ return '<label title="Décocher pour masquer ce statut dans la liste et la vue 3D"><input type="checkbox" data-st="' + c + '"' + (stMasques.has(c) ? "" : " checked") + '><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + " · " + n[c] + "</label>"; }).join("") +
+    // tous les statuts présents restent dans la légende, décochés compris (masqués : pas comptés dans la boîte)
+    var n = {}, tot = {}, D = vue.dansCoupe();
+    RES.forEach(function(r){ var c = classe(valeur(r, P_ST)); tot[c] = (tot[c] || 0) + 1; if (!D || D.has(r.cle)) n[c] = (n[c] || 0) + 1; });
+    $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return tot[c]; })
+      .map(function(c){ return '<label title="Décocher pour masquer ce statut dans la liste et la vue 3D"><input type="checkbox" data-st="' + c + '"' + (stMasques.has(c) ? "" : " checked") + '><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + (D && stMasques.has(c) ? "" : " · " + (n[c] || 0)) + "</label>"; }).join("") +
       (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "");
     $("#legende").hidden = false;
   }
