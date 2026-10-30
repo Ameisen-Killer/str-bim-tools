@@ -20,7 +20,7 @@
     { n: [-1, 0, 0], u: [0, -1, 0], v: [0, 0, 1], nom: "GAUCHE" }
   ];
   var BORD = .3;                              // largeur des bandes d'arête et des coins (côté du cube : 2)
-  var R1 = 1.48, R2 = 1.76;                   // boussole : rayons intérieur et extérieur, au pied du cube
+  var R1 = 1.95, R2 = 2.32;                   // boussole : rayons intérieur et extérieur, au pied du cube
   var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();   // comme la vue
   var POLICE = '"Inter Tight","Inter Tight repli",system-ui,-apple-system,"Segoe UI",sans-serif';
   var CARDINAUX = [{ l: "N", d: 0 }, { l: "E", d: -DEMI }, { l: "S", d: PI }, { l: "O", d: DEMI }];
@@ -83,7 +83,7 @@
       ctx.clearRect(0, 0, S, S);
       zones = [];
       var C = palette(), o = orientation(), ca = Math.cos(o.y), sa = Math.sin(o.y), cb = Math.cos(o.p), sb = Math.sin(o.p);
-      var h = S*.25, cx = S/2, cy = S/2 + S*.02;
+      var h = S*.19, cx = S/2, cy = S/2 + S*.02;
       var droite = [ca, sa, 0], haut = [-sb*sa, sb*ca, cb], oeil = [cb*sa, -cb*ca, sb];
       function ecran(P){ return [cx + h*dot(P, droite), cy - h*dot(P, haut)]; }
 
@@ -178,7 +178,7 @@
           ctx.fillStyle = survol && survol.type === "triangle" && survol.cle === t[0] ? C.or : C.outil; ctx.fill();
           zones.push({ type: "triangle", cle: t[0], rond: [(ax + bx)/2, (ay + by)/2, S*.065] });
         });
-        // en haut à droite, hors de la boussole (rayon extérieur 1,76 × h = 0,44 × S)
+        // en haut à droite, hors de la boussole (rayon extérieur 2,32 × h = 0,44 × S)
         if (face !== "cote") [["horaire", 1, cx + S*.433, cy - S*.25], ["antihoraire", -1, cx + S*.25, cy - S*.433]].forEach(function(f){
           var sv = survol && survol.type === "fleche" && survol.cle === f[0], r = S*.045, sens = f[1];
           ctx.save();
