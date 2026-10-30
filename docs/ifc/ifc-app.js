@@ -175,7 +175,7 @@
       var buf = x.buf;
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=2"); }
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=3"); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;

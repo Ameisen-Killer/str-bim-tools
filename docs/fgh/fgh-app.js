@@ -81,7 +81,7 @@
     return lireFichier(f).then(function(buf){
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/fgh/fgh-lecteur.js?v=1"); }
+        try { w = new Worker("/fgh/fgh-lecteur.js?v=2"); }
         catch (e){ avecWorker = false; lireClassique(f).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;

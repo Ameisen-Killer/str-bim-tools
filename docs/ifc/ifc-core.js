@@ -587,7 +587,8 @@
   var FAIBLES = { IFCSTYLEDITEM: [0], IFCPRESENTATIONLAYERASSIGNMENT: [2], IFCPRESENTATIONLAYERWITHSTYLE: [2], IFCMATERIALDEFINITIONREPRESENTATION: [3] };
   // Objets racines (GlobalId) qu'on peut quand même supprimer quand plus rien ne les référence.
   // (…PROPERTIES : jeux de propriétés prédéfinis de l'IFC2X3, même rôle qu'un IFCPROPERTYSET)
-  var RACINES_SUPPRIMABLES = /^(IFCPROPERTYSET|IFCELEMENTQUANTITY|IFC\w+PROPERTIES)$/;
+  // (pas IFCRELDEFINESBYPROPERTIES : la relation est une racine, c'est elle qui tient le jeu en vie)
+  var RACINES_SUPPRIMABLES = /^(IFCPROPERTYSET|IFCELEMENTQUANTITY|IFC(?!REL)\w+PROPERTIES)$/;
 
   var cacheFortes = new WeakMap();
   function refsFortes(e){

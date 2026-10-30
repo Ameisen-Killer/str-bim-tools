@@ -2,7 +2,7 @@
 // arrière-plan, pour que la page ne gèle pas sur les gros fichiers. Reçoit { buffer }, renvoie
 // { progres } de temps en temps, puis { resultat, buffer } (tableaux typés et octets transférés sans
 // copie) ou { erreur, ifc }. Aucune requête réseau : le fichier ne quitte pas le navigateur.
-importScripts("/ifc/ifc-core.js?v=3");
+importScripts("/ifc/ifc-core.js?v=9");
 
 onmessage = function(e){
   var buffer = e.data.buffer;

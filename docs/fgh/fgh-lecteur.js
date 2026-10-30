@@ -2,7 +2,7 @@
 // arrière-plan, pour que la page ne gèle pas sur les gros fichiers. Reçoit { buffer }, renvoie
 // { progres } de temps en temps, puis { resultat, buffer } (tableaux typés et octets transférés sans
 // copie) ou { erreur, ifc }. Aucune requête réseau : le fichier ne quitte pas le navigateur.
-importScripts("/fgh/fgh-core.js?v=1");
+importScripts("/fgh/fgh-core.js?v=2");
 
 onmessage = function(e){
   var buffer = e.data.buffer;
