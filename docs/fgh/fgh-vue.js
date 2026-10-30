@@ -2225,7 +2225,7 @@
       return { geos: geos, teintes: teintes, info: { elements: geos.size, couleurs: teintes.size, echelle: k, rotation: meilleur.r, ecart: meilleur.err, echantillons: echant.length } };
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
-    var DEMI_PI = Math.PI/2, anim = null;       // plongée bornée à la verticale ; vue animée en cours (cube)
+    var DEMI_PI = Math.PI/2, anim = null, sigCoupe = "";       // plongée bornée à la verticale ; vue animée en cours (cube)
     var W = 0, H = 0, dpr = 1, kpx = 0, lisse = false, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
@@ -2306,6 +2306,9 @@
       placerMesures(c);
       placerPivot(c);
       if (rappels.surCamera) rappels.surCamera(yaw, pitch);
+      // FGH : boîte de coupe changée (posée, enlevée, poignée lâchée) → l'appli recompte ce qu'elle contient
+      var sg = coupe ? coupe.min.join() + "|" + coupe.max.join() + "|" + coupe.a : "";
+      if (sg !== sigCoupe && !tire){ sigCoupe = sg; if (rappels.surCoupe) rappels.surCoupe(); }
     }
 
     // ---------- Poignées de la boîte de coupe : une par face, à tirer pour l'étirer ou la réduire ----------
@@ -2954,6 +2957,22 @@
       },
       // FGH : boîte englobante des éléments affichés (ou de certains) : { min, max } en mètres, ou null
       boiteDe: function(cles, a){ var b = boiteDe(cles || null, a || 0); return b ? { min: b.min, max: b.max, a: b.a } : null; },
+      // FGH : éléments affichés qui touchent la boîte de coupe (boîte englobante de chacun ramenée dans le repère
+      // de la boîte) → Set de clés ; null sans boîte
+      dansCoupe: function(){
+        if (!coupe) return null;
+        var D = new Set(), b = coupe;
+        liste.forEach(function(it){
+          var g = it.geo, u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+          if (g.min[2] > b.max[2] || g.max[2] < b.min[2]) return;
+          for (var i = 0; i < 4; i++){
+            var l = versBoite(b, i & 1 ? g.max[0] : g.min[0], i & 2 ? g.max[1] : g.min[1]);
+            if (l[0] < u0) u0 = l[0]; if (l[0] > u1) u1 = l[0]; if (l[1] < v0) v0 = l[1]; if (l[1] > v1) v1 = l[1];
+          }
+          if (u0 <= b.max[0] && u1 >= b.min[0] && v0 <= b.max[1] && v1 >= b.min[1]) D.add(it.id);
+        });
+        return D;
+      },
       // FGH : orientation (radians, entre −45° et 45°) des éléments : celle de la plus grande face verticale de
       // chacun, la médiane s'il y en a plusieurs ; null sans face verticale. Les IFC géoréférencés sont tournés.
       angleDe: function(cles){

@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.6.1";
+  var VERSION = "1.7.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -47,7 +47,7 @@
   var nivAuto = "";                        // niveau mis dans le filtre de la liste par la coupe par niveau
 
   var cube = null;
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); } });
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); }, surCoupe: function(){ legende(); } });
   vue.formats({
     longueur: function(v){ return (Math.round(v*1000)/1000).toFixed(3) + " m"; },
     point: function(p, zSeul){ return (zSeul ? ["Z"] : ["X", "Y", "Z"]).map(function(n){ return n + " " + p["XYZ".indexOf(n)].toFixed(3); }); }
@@ -353,6 +353,7 @@
   function afficher(){
     var b = vue.afficher(items());
     vue.selection(sel, actif);
+    if (vue.aCoupe()) legende();
     return b;
   }
   function recolorer(){ vue.recolorer(function(cle){ var r = parCle.get(cle); return r ? teinte(r) : null; }); legende(); }
@@ -360,9 +361,10 @@
     var neufs = 0;
     fichiers.forEach(function(fi){ if (fi.neufs) neufs += fi.neufs.size; });
     if (!RES.length && !neufs){ $("#legende").hidden = true; return; }
-    var n = {};
-    RES.forEach(function(r){ var c = classe(valeur(r, P_ST)); n[c] = (n[c] || 0) + 1; });
-    $("#legende").innerHTML = ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return n[c]; })
+    // avec une boîte de coupe, la légende ne compte que les réservations affichées qui la touchent
+    var n = {}, D = vue.dansCoupe();
+    RES.forEach(function(r){ if (D && !D.has(r.cle)) return; var c = classe(valeur(r, P_ST)); n[c] = (n[c] || 0) + 1; });
+    $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return n[c]; })
       .map(function(c){ return '<span><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + " · " + n[c] + "</span>"; }).join("") +
       (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "");
     $("#legende").hidden = false;
