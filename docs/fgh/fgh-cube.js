@@ -132,6 +132,17 @@
       }
       boussole(0);
 
+      // --- ombre douce du cube posée au sol, dans la boussole (visible depuis le dessus) ---
+      if (sb > .05){
+        var o0 = ecran([0, 0, -1]), ro = h*1.7, sombre = C.texte.indexOf("236") >= 0;
+        ctx.save();
+        ctx.translate(o0[0], o0[1]); ctx.scale(1, sb);
+        var g = ctx.createRadialGradient(0, 0, 0, 0, 0, ro), a = (sombre ? .55 : .32)*Math.min(1, sb*2);
+        g.addColorStop(0, "rgba(0,0,0," + a + ")"); g.addColorStop(.55, "rgba(0,0,0," + a*.45 + ")"); g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, ro, 0, TOUR); ctx.fill();
+        ctx.restore();
+      }
+
       // --- cube : faces tournées vers l'œil (convexe : elles ne se recouvrent pas) ---
       var fit = taillePolice();
       FACES.forEach(function(F){
