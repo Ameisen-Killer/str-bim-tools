@@ -2584,8 +2584,8 @@
       var dl = l - yaw;
       dl -= 2*Math.PI*Math.round(dl/(2*Math.PI));           // par le plus court
       var a = { l0: yaw, dl: dl, p0: pitch, p1: p, c0: centre.slice(), c1: cible.c, r1: cible.r,
-        e0: Math.log(zoom/rayon), e1: -Math.log(cible.r), x0: px, y0: py, t0: 0, d: duree == null ? 450 : duree };
-      if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) a.d = 0;
+        e0: Math.log(zoom/rayon), e1: -Math.log(cible.r), x0: px, y0: py, t0: 0, d: duree == null ? 900 : duree };
+      // pas de saut même avec « animations réduites » dans Windows : Tony veut voir le modèle tourner
       anim = a;
       function pas(t){
         if (anim !== a) return;                              // interrompue (souris, molette, autre vue)
