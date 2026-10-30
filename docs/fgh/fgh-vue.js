@@ -1607,7 +1607,7 @@
         attrib(0, B.cadre, 3, gl.FLOAT);
         gl.disableVertexAttribArray(1);
         gl.disableVertexAttribArray(2);
-        gl.vertexAttrib4f(2, kad[0]/255, kad[1]/255, kad[2]/255, kad[3]/255);
+        gl.vertexAttrib4f(2, kad[0]/255, kad[1]/255, kad[2]/255, kad[3]/255*(c.cadreAlpha == null ? 1 : c.cadreAlpha));
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.disable(gl.DEPTH_TEST);
@@ -2108,7 +2108,8 @@
           var qx = A[u] - c0, qy = A[u+1] - c1, qz = A[u+2] - c2, xv = ca*qx + sa*qy, yv = -sa*qx + ca*qy;
           ctx[(u/3) % 2 ? "lineTo" : "moveTo"](cx + xv*s, cy - (qz*cb + yv*sb)*s);
         }
-        ctx.setLineDash([5, 4]); ctx.strokeStyle = coul.cadre; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        ctx.save(); ctx.globalAlpha = c.cadreAlpha == null ? 1 : c.cadreAlpha;
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = coul.cadre; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
       }
       if (!liste.length){
         ctx.fillStyle = coul.texte; ctx.font = "11px 'IBM Plex Mono', ui-monospace, monospace"; ctx.textAlign = "center";
@@ -2287,7 +2288,9 @@
         lu*cb + lv*sb
       ];
       return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: kpx || dpr,
-        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque };
+        centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque,
+        // à la souris, la boîte s'atténue à 20 % hors survol et revient à 100 % au survol (avec les poignées)
+        cadreAlpha: souris && !survol && !surPoignee && !tire ? .2 : 1 };
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
@@ -2336,7 +2339,7 @@
       }
       return dedans;
     }
-    function survoler(oui){ if (oui !== survol){ survol = oui; placerPoignees(camera()); } }
+    function survoler(oui){ if (oui !== survol){ survol = oui; placerPoignees(camera()); demander(); } }
     NOMS_FACES.forEach(function(nom, f){
       var b = document.createElement("div");
       b.className = "poignee"; b.hidden = true;
@@ -2368,7 +2371,7 @@
       b.addEventListener("pointerup", lache);
       b.addEventListener("pointercancel", lache);
       b.addEventListener("pointerenter", function(){ surPoignee = true; });
-      b.addEventListener("pointerleave", function(){ surPoignee = false; if (!tire) placerPoignees(camera()); });
+      b.addEventListener("pointerleave", function(){ surPoignee = false; if (!tire){ placerPoignees(camera()); demander(); } });
       cv.parentNode.appendChild(b);
       poignees.push(b);
     });
