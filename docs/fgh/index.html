@@ -144,6 +144,10 @@ textarea.champ{resize:vertical;min-height:70px}
 .poignee.tiree{cursor:grabbing;box-shadow:0 0 0 6px rgba(var(--or-rvb),.3),0 2px 8px rgba(0,0,0,.35)}
 .pivot{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:#e0322b;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);pointer-events:none;z-index:2;opacity:0;transition:opacity .25s ease}
 .pivot.montre{opacity:1;transition-duration:.08s}
+/* cube de navigation (comme le ViewCube de Revit) : en haut à droite, sous la barre d'outils (top posé par le script) */
+.centre canvas.cube{inset:auto;right:6px;top:56px;width:150px;height:150px;z-index:6;cursor:default;opacity:.85;transition:opacity .15s ease}
+.centre canvas.cube:hover{opacity:1}
+@media (max-width:760px){.centre canvas.cube{width:120px;height:120px}}
 
 .outils{position:absolute;left:10px;right:10px;top:10px;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none}
 .outils>*{pointer-events:auto}
@@ -217,6 +221,9 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 .ro{margin:10px 12px;padding:9px 11px;border:1px solid var(--orange);background:color-mix(in srgb,var(--orange) 10%,transparent);color:var(--texte);font-size:12.5px}
 .ro b{color:var(--orange);font-weight:500}
 .ro .actions{margin-top:8px}
+.hs{margin:10px 12px 0;padding:8px 11px;border:1px dashed var(--orange);color:var(--texte-doux);font-size:12.5px}
+.hs b{color:var(--orange);font-weight:500}
+.res .sous .hs-l{color:var(--orange);font-weight:400}
 .ml{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 0;border-bottom:1px solid rgba(var(--encre),.06);font-size:12.5px;cursor:pointer}
 .ml:last-child{border-bottom:0}
 .ml .q{font-family:var(--mono)}
@@ -269,13 +276,12 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 
   <main class="centre" id="centre">
     <canvas id="vue" aria-label="Vue 3D : glisser pour tourner, molette ou pincement pour zoomer, clic pour choisir une réservation"></canvas>
+    <canvas class="cube" id="cube" hidden aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir la maquette de ce côté, glisser pour tourner"></canvas>
     <div class="outils" id="outils" hidden>
       <div class="groupe">
-        <button type="button" class="bt" data-c="iso" title="Vue 3D">3D</button>
-        <button type="button" class="bt" data-c="dessus" title="Vue de dessus">Dessus</button>
         <button type="button" class="bt" data-c="cadrer" title="Recadrer (double-clic)">⤢</button>
       </div>
-      <div class="groupe" title="Boîte de coupe par niveau : du niveau moins la marge jusqu'au niveau suivant moins la marge">
+      <div class="groupe" title="Boîte de coupe par niveau : centrée sur le niveau Revit, la distance choisie dessous et dessus">
         <button type="button" class="bt" data-c="niv-bas" title="Niveau en dessous">▼</button>
         <select class="bt" id="c-niv"></select>
         <button type="button" class="bt" data-c="niv-haut" title="Niveau au-dessus">▲</button>
@@ -316,7 +322,8 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <input type="file" id="fichier" accept=".ifc" multiple hidden>
 
 <script src="/fgh/fgh-core.js?v=2"></script>
-<script src="/fgh/fgh-vue.js?v=6"></script>
-<script src="/fgh/fgh-app.js?v=16"></script>
+<script src="/fgh/fgh-vue.js?v=7"></script>
+<script src="/fgh/fgh-cube.js?v=1"></script>
+<script src="/fgh/fgh-app.js?v=17"></script>
 </body>
 </html>

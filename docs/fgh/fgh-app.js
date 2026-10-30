@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.8";
+  var VERSION = "1.5.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -41,15 +41,49 @@
   var modifs = new Map();                  // clé stable (ADN) → { k, cle, uid, eid, num, famille, niveau, v: { param: { ancien, nouveau } } }
   var heritage = [];                       // décisions gardées dans le navigateur par les versions < 1.4 : à reprendre ou jeter
   var sel = new Set(), actif = null;
-  var voirStructure = true, voirRes = true, filtre3d = true;
+  var voirStructure = true, voirRes = true;
   var angleBat = 0;                        // orientation du bâtiment (IFC géoréférencés : axes tournés)
+  var angleProjet = 0;                     // axes du projet Revit dans le fichier : orientation du cube de navigation
+  var nivAuto = "";                        // niveau mis dans le filtre de la liste par la coupe par niveau
 
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat });
+  var cube = null;
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); } });
   vue.formats({
     longueur: function(v){ return (Math.round(v*1000)/1000).toFixed(3) + " m"; },
     point: function(p, zSeul){ return (zSeul ? ["Z"] : ["X", "Y", "Z"]).map(function(n){ return n + " " + p["XYZ".indexOf(n)].toFixed(3); }); }
   });
   function etat(t){ $("#etat").textContent = t || ""; }
+
+  // Cube de navigation (comme le ViewCube de Revit) à la place des boutons « 3D » et « Dessus ». Vue de
+  // départ (maison) : celle de la vue 3D par défaut de Revit, depuis le coin haut, avant, droite du projet.
+  var PLONGEE_MAISON = Math.atan(Math.SQRT1_2);
+  function vueMaison(){ vue.allerVers(angleProjet + Math.PI/4, PLONGEE_MAISON); }
+  cube = FGHCube.creer($("#cube"), vue, { maison: vueMaison });
+  // le cube se range sous la barre d'outils, plus haute quand les boutons passent sur plusieurs lignes
+  function placerCube(){ var o = $("#outils"); $("#cube").style.top = (o.hidden ? 10 : o.offsetTop + o.offsetHeight + 10) + "px"; }
+  if ("ResizeObserver" in window) new ResizeObserver(placerCube).observe($("#outils"));
+  // Repère du projet Revit : axe X du placement du bâtiment (sinon du site), la structure d'abord ; nord
+  // géographique : TrueNorth du contexte 3D du même fichier, +Y par défaut
+  function repereProjet(){
+    for (var i = 0; i < fichiers.length; i++){
+      var m = fichiers[i].m, bat = 0, site = 0, ctx = null;
+      m.ent.forEach(function(e){
+        if (!bat && e.type === "IFCBUILDING") bat = e.id;
+        else if (!site && e.type === "IFCSITE") site = e.id;
+        else if (e.type === "IFCGEOMETRICREPRESENTATIONCONTEXT" && (!ctx || (IFC.chaine(C(e)[1]) === "Model" && IFC.chaine(C(ctx)[1]) !== "Model"))) ctx = e;
+      });
+      var a = bat ? vue.angleRepere(m, bat) : null;
+      if (a == null && site) a = vue.angleRepere(m, site);
+      if (a == null) continue;
+      var d = ctx && m.ent.get(R(C(ctx)[5])), r = d && d.type === "IFCDIRECTION" ? C(d)[0] : null, nord = Math.PI/2;
+      if (Array.isArray(r) && r.length > 1){
+        var x = IFC.nombre(r[0]), y = IFC.nombre(r[1]);
+        if (isFinite(x) && isFinite(y) && (x || y)) nord = Math.atan2(y, x);
+      }
+      return { angle: a, nord: nord };
+    }
+    return { angle: angleBat, nord: Math.PI/2 };
+  }
 
   // ================= Statuts =================
   function classe(v){
@@ -138,7 +172,8 @@
     return IFC.arbre(m).map(function(x){ return x.id; }).filter(function(id){ var i = IFC.infos(m, id); return i && i.genre === "element"; });
   }
 
-  function ouvrir(liste){
+  // apres : appelé une fois les IFC affichés (JSON glissé avec eux et lu sans y écrire)
+  function ouvrir(liste, apres){
     liste = Array.prototype.filter.call(liste || [], function(f){ return /\.ifc$/i.test(f.name); });
     if (!liste.length){ etat("Choisis des fichiers .ifc."); return; }
     var suite = Promise.resolve(), nouveaux = [];
@@ -175,6 +210,7 @@
       var nRes = fichiers.filter(function(x){ return x.role === "res"; }).length;
       etat(fichiers.map(function(x){ return (x.role === "res" ? "Réservations : " : "Structure : ") + x.nom; }).join(" · ") +
         (nRes ? "" : " · Il manque l'IFC des réservations (…_RES.ifc, exporté par « Export IFC RES »)."));
+      if (apres) apres();
     }).catch(function(err){
       $("#chargement").hidden = true;
       etat("Lecture impossible : " + (err && err.message || err));
@@ -198,7 +234,11 @@
         };
         PARAMS.forEach(function(k){ r.ifc[k] = p[k] || ""; });
         r.k = r.adn || ("uid:" + r.uid);
-        r.txt = [r.num, r.famille, r.niveau, p["Demandeur"], p["Commentaire demande"], p["RES Responsable"], r.ifc[P_COM], r.adn].join(" ").toLowerCase();
+        // ignorée par « Sync Reservations », qui ne prend que les ADN « …_STATUT… » non mutualisés : la décision
+        // s'écrit dans la RES mais n'ira pas dans la STR (« Mutualise » : exports à partir de la 1.5.0)
+        r.horsSync = /^(oui|yes|true|1)$/i.test(String(p["Mutualise"] || "").trim()) ? "mutualisée (FGH_MUTUALISE)" :
+          r.adn.indexOf("_STATUT") < 0 ? (r.adn ? "ADN sans « _STATUT »" : "sans ADN") : "";
+        r.txt = [r.num, r.famille, r.niveau, p["Demandeur"], p["Commentaire demande"], p["RES Responsable"], r.ifc[P_COM], r.adn, r.horsSync ? "hors synchro" : ""].join(" ").toLowerCase();
         RES.push(r); parCle.set(r.cle, r);
         if (!maquette.nom && p["Maquette"]){ maquette.nom = p["Maquette"]; maquette.export_du = p["Export du"] || ""; }
       });
@@ -218,10 +258,15 @@
     sel = new Set(); actif = null;
     remplirNiveaux();
     $("#accueil").hidden = fichiers.length > 0;
-    $("#outils").hidden = !fichiers.length;
-    afficher(true);
+    $("#outils").hidden = $("#cube").hidden = !fichiers.length;
+    nivAuto = "";
+    afficher();
     angleBat = vue.angleDe(RES.length ? RES.map(function(r){ return r.cle; }) : null) || 0;
-    vue.orienter(angleBat - 0.65, 0.5);
+    var rp = repereProjet();
+    angleProjet = rp.angle;
+    cube.repere(angleProjet, rp.nord);
+    placerCube();
+    vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON);
     renduListe(); renduFiche(); renduModifs(); legende(); titresBoutons(); majBoite();
     fsDemarrer();
   }
@@ -254,12 +299,16 @@
     });
   }
   function trier(l){ return l.sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : a.num > b.num ? 1 : 0); }); }
+  var htmlLigne = new Map();               // dernier rendu de chaque ligne de la liste
   function ligneRes(r){
     var c = classe(valeur(r, P_ST)), st = valeur(r, P_ST);
-    return '<div class="res' + (sel.has(r.cle) ? " sel" : "") + '" data-cle="' + esc(r.cle) + '"><span class="pastille s-' + c + '"></span>' +
+    var h = '<div class="res' + (sel.has(r.cle) ? " sel" : "") + '" data-cle="' + esc(r.cle) + '"><span class="pastille s-' + c + '"></span>' +
       '<span class="num">' + esc(r.num || "(sans N°)") + (modifie(r) ? '<i title="Modifiée ici">●</i>' : "") + "</span>" +
       '<span class="st">' + esc(st || "En attente") + "</span>" +
-      '<span class="sous">' + esc([r.niveau, r.famille, r.p["Demandeur"]].filter(Boolean).join(" · ")) + "</span></div>";
+      '<span class="sous">' + (r.horsSync ? '<b class="hs-l" title="Ignorée par « Sync Reservations » : ' + esc(r.horsSync) + '">hors synchro</b> · ' : "") +
+      esc([r.niveau, r.famille, r.p["Demandeur"]].filter(Boolean).join(" · ")) + "</span></div>";
+    htmlLigne.set(r.cle, h);
+    return h;
   }
   var liste = [];
   function renduListe(){
@@ -269,20 +318,22 @@
     $("#liste").innerHTML = RES.length ? (liste.length ? liste.map(ligneRes).join("") : '<div class="vide-liste">Aucune réservation ne correspond au filtre.</div>') :
       '<div class="vide-liste">' + (fichiers.length ? "Aucune réservation : ouvre aussi l'IFC …_RES.ifc exporté par « Export IFC RES »." : "Ouvre les IFC pour voir les réservations.") + "</div>";
   }
+  // ligne remplacée seulement si elle change : un élément remplacé pendant un clic fait perdre ce clic
   function majLigne(r){
-    var el = $('#liste [data-cle="' + r.cle + '"]');
-    if (el) el.outerHTML = ligneRes(r);
+    var avant = htmlLigne.get(r.cle), h = ligneRes(r), el = $('#liste [data-cle="' + r.cle + '"]');
+    if (el && h !== avant) el.outerHTML = h;
   }
+  // la vue 3D suit la liste filtrée
   var minutFiltre = 0;
   function filtreChange(){
     renduListe();
     clearTimeout(minutFiltre);
-    if (filtre3d) minutFiltre = setTimeout(function(){ afficher(); }, 180);
+    minutFiltre = setTimeout(afficher, 180);
   }
   $("#f-txt").addEventListener("input", filtreChange);
-  $("#f-niv").addEventListener("change", filtreChange);
+  $("#f-niv").addEventListener("change", function(){ nivAuto = ""; filtreChange(); });
   $("#f-st").addEventListener("change", filtreChange);
-  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; filtreChange(); });
+  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; nivAuto = ""; filtreChange(); });
   $("#liste").addEventListener("click", function(e){
     var el = e.target.closest(".res");
     if (!el) return;
@@ -294,7 +345,7 @@
   function items(){
     var out = [];
     if (voirStructure) fichiers.forEach(function(fi){ if (fi.role === "str") fi.ids.forEach(function(id){ out.push({ cle: "s" + fi.uid + ":" + id, m: fi.m, id: id, h: null, rose: fi.neufs.has(id) }); }); });
-    if (voirRes) (filtre3d ? filtrees() : RES).forEach(function(r){ out.push({ cle: r.cle, m: r.f.m, id: r.id, h: teinte(r) }); });
+    if (voirRes) filtrees().forEach(function(r){ out.push({ cle: r.cle, m: r.f.m, id: r.id, h: teinte(r) }); });
     return out;
   }
   function afficher(){
@@ -344,8 +395,8 @@
     var marge = Math.max(0.05, parseFloat($("#c-marge").value) || 0), haut = n.z + marge;
     vue.coupeBoite({ min: [b.min[0] - 1, b.min[1] - 1, n.z - marge], max: [b.max[0] + 1, b.max[1] + 1, haut], a: angleBat });
     $("#c-niv").value = String(i);
-    // la liste suit le niveau quand des réservations le portent
-    if (Array.prototype.some.call($("#f-niv").options, function(o){ return o.value === n.nom; })){ $("#f-niv").value = n.nom; filtreChange(); }
+    // la liste suit le niveau quand des réservations le portent (et revient à tous les niveaux sans la coupe)
+    if (Array.prototype.some.call($("#f-niv").options, function(o){ return o.value === n.nom; })){ $("#f-niv").value = nivAuto = n.nom; filtreChange(); }
     etat("Coupe sur " + n.nom + " : de " + (n.z - marge).toFixed(2) + " à " + haut.toFixed(2) + " m.");
     majBoite();
   }
@@ -367,7 +418,15 @@
   }
   // le bouton « Boîte de coupe » est enfoncé tant qu'une boîte est posée
   function majBoite(){ var b = document.querySelector('[data-c="boite"]'); if (b) b.setAttribute("aria-pressed", String(vue.aCoupe())); }
-  $("#c-niv").addEventListener("change", function(){ var v = this.value; if (v === "") vue.coupeBoite(null); else boiteNiveau(+v); majBoite(); });
+  // boîte enlevée : la liste quitte le niveau que la coupe par niveau y avait mis, si on n'y a pas touché
+  function finCoupe(){
+    vue.coupeBoite(null);
+    $("#c-niv").value = "";
+    if (nivAuto && $("#f-niv").value === nivAuto){ $("#f-niv").value = ""; filtreChange(); }
+    nivAuto = "";
+    majBoite();
+  }
+  $("#c-niv").addEventListener("change", function(){ var v = this.value; if (v === "") finCoupe(); else boiteNiveau(+v); });
   $("#c-marge").addEventListener("input", function(){ var v = $("#c-niv").value; if (v !== "") boiteNiveau(+v); });
   function outil(nom){
     var cur = vue.outil(), nv = cur === nom ? null : nom;
@@ -379,19 +438,16 @@
     var b = e.target.closest("[data-c]");
     if (!b) return;
     var c = b.getAttribute("data-c"), v;
-    if (c === "iso") vue.orienter(angleBat - 0.65, 0.5);
-    else if (c === "dessus") vue.orienter(angleBat, 1.55);
-    else if (c === "cadrer") vue.recadrer();
+    if (c === "cadrer") vue.recadrer();
     else if (c === "niv-bas" || c === "niv-haut"){
       v = $("#c-niv").value;
       var i = v === "" ? (c === "niv-bas" ? niveaux.length - 1 : 0) : +v + (c === "niv-bas" ? -1 : 1);
       if (i >= 0 && i < niveaux.length) boiteNiveau(i);
     }
     else if (c === "boite"){
-      if (vue.aCoupe()){ vue.coupeBoite(null); $("#c-niv").value = ""; vue.recadrer(); }
+      if (vue.aCoupe()){ finCoupe(); vue.recadrer(); }
       else if (sel.size) boiteAutour(Array.from(sel));
       else boiteTout();
-      majBoite();
     }
     else if (c === "mesure" || c === "point") outil(c);
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
@@ -415,6 +471,8 @@
     var x = modifie(r, p) ? modifs.get(r.k).v[p] : null;
     return x ? '<span class="mod">modifié' + (x.par ? " par " + esc(x.par) : "") + ' (était « ' + esc(r.ifc[p] || "vide") + ' »)<button type="button" data-annuler="' + p + '" title="Revenir à la valeur de la maquette">↺</button></span>' : '<span class="p">' + p + "</span>";
   }
+  // étiquette d'un champ ; data-m garde son contenu pour ne la refaire que s'il change
+  function etiquette(r, p){ var h = esc(LIB[p]) + " " + marque(r, p); return '<label data-m="' + esc(h) + '">' + h + "</label>"; }
   function optionsStatut(v){
     var l = STATUTS.slice();
     if (v && !l.some(function(x){ return x[0] === v; })) l.push([v, v]);
@@ -441,13 +499,26 @@
     renduFiche();
     return true;
   }
+  // avant toute décision : fichier branché, et nom de l'auteur pour la signer
+  function pretADecider(){
+    if (verrouille()) return false;
+    exigerAuteur();
+    return true;
+  }
+  // réservations que « Sync Reservations » ne reportera pas dans la STR
+  function bandeauHorsSync(rs){
+    var hs = rs.filter(function(r){ return r.horsSync; });
+    if (!hs.length) return "";
+    return '<div class="hs">⚠ <b>Hors synchro</b> · ' + (rs.length === 1 ? esc(hs[0].horsSync) + " : « Sync Reservations » ignore cette réservation, la décision ne sera pas reportée dans la STR." :
+      pluriel(hs.length, "réservation") + " sur " + rs.length + " ignorée" + (hs.length > 1 ? "s" : "") + " par « Sync Reservations » : leur décision ne sera pas reportée dans la STR.") + "</div>";
+  }
   function renduFiche(){
     var f = $("#fiche"), rs = choisis(), ro = FS.actif ? "" : " disabled";
     f.classList.toggle("vide", !rs.length);
     if (!rs.length){ f.innerHTML = bandeauRO() + '<div class="vide-fiche">Clique une réservation dans la liste ou dans la vue 3D. Ctrl + clic pour en choisir plusieurs, Maj + clic pour une plage de la liste.</div>'; return; }
     if (rs.length > 1){
       var cls = new Set(rs.map(function(r){ return classe(valeur(r, P_ST)); })), cl = cls.size === 1 ? Array.from(cls)[0] : "";
-      f.innerHTML = '<div class="tete"><h2>' + pluriel(rs.length, "réservation") + '</h2><div class="fam">' + esc(rs.slice(0, 12).map(function(r){ return r.num; }).join(", ") + (rs.length > 12 ? "…" : "")) + '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() +
+      f.innerHTML = '<div class="tete"><h2>' + pluriel(rs.length, "réservation") + '</h2><div class="fam">' + esc(rs.slice(0, 12).map(function(r){ return r.num; }).join(", ") + (rs.length > 12 ? "…" : "")) + '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() + bandeauHorsSync(rs) +
         '<div class="bloc"><h3>Décision pour toutes</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(cl) +
         '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' +
         '<div class="actions"><button type="button" class="bt" data-a="com-multi"' + ro + '>Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
@@ -456,12 +527,12 @@
     }
     var r = rs[0], p = r.p, st = valeur(r, P_ST), d = valeur(r, P_DATE);
     f.innerHTML = '<div class="tete"><h2>' + esc(r.num || "(sans N°)") + '</h2><div class="fam">' + esc([r.famille, r.type].filter(Boolean).join(" · ")) + "<br>" + esc(r.niveau) +
-      '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() +
+      '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() + bandeauHorsSync(rs) +
       '<div class="bloc"><h3>Validation</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(classe(st)) +
-      '<div class="fchamp"><label>Statut ' + marque(r, P_ST) + '</label><select class="champ" data-p="' + P_ST + '">' + optionsStatut(st) + "</select></div>" +
-      '<div class="fchamp"><label>Date ' + marque(r, P_DATE) + '</label><input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '">' +
+      '<div class="fchamp">' + etiquette(r, P_ST) + '<select class="champ" data-p="' + P_ST + '">' + optionsStatut(st) + "</select></div>" +
+      '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '">' +
       (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") + "</div>" +
-      '<div class="fchamp"><label>Commentaire ' + marque(r, P_COM) + '</label><textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
+      '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
       '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' +
       '<div class="bloc"><h3>Demande</h3>' + dl([
         ["Demandeur", p["Demandeur"]], ["Date", p["Date demande"]], ["Commentaire", p["Commentaire demande"]],
@@ -475,7 +546,7 @@
     if (!b) return;
     if (b.hasAttribute("data-m")){ actionFichier(b.getAttribute("data-m")); return; }
     var rs = choisis();
-    if ((b.hasAttribute("data-dec") || b.hasAttribute("data-annuler") || b.getAttribute("data-a") === "com-multi") && verrouille()) return;
+    if ((b.hasAttribute("data-dec") || b.hasAttribute("data-annuler") || b.getAttribute("data-a") === "com-multi") && !pretADecider()) return;
     if (b.hasAttribute("data-dec")){ decider(rs, b.getAttribute("data-dec")); return; }
     if (b.hasAttribute("data-annuler")){ rs.forEach(function(r){ fixer(r, b.getAttribute("data-annuler"), null); }); apresModif(rs); return; }
     var a = b.getAttribute("data-a"), cles = rs.map(function(r){ return r.cle; });
@@ -485,24 +556,31 @@
     else if (a === "niveau"){ var i = rangNiveau(rs[0].niveau); if (i < niveaux.length) boiteNiveau(i); else etat("Niveau « " + rs[0].niveau + " » absent des étages IFC."); }
     else if (a === "com-multi"){ var t = $("#com-multi").value.trim(); if (!t) return; rs.forEach(function(r){ fixer(r, P_COM, t); }); apresModif(rs); }
   });
+  // Date et commentaire : enregistrés sans redessiner la fiche. Le commentaire est validé quand il perd le
+  // focus, c'est-à-dire pendant le clic suivant (« Valider »…) : refaire la fiche à ce moment ferait perdre ce clic.
   $("#fiche").addEventListener("change", function(e){
     var c = e.target.closest("[data-p]");
     if (!c) return;
     var rs = choisis(), p = c.getAttribute("data-p");
-    if (rs.length !== 1 || verrouille()) return;
+    if (rs.length !== 1) return;
     if (p === P_ST){ decider(rs, c.value); return; }
-    exigerAuteur();
+    if (!pretADecider()) return;
+    if (p === P_COM){ clearTimeout(minutCom); comEnAttente = null; }
     fixer(rs[0], p, p === P_DATE ? depuisIso(c.value) : c.value);
-    apresModif(rs);
+    apresModif(rs, true);
+    var ch = c.closest(".fchamp"), l = ch && ch.querySelector("label"), n = ch && ch.querySelector(".note"), h = esc(LIB[p]) + " " + marque(rs[0], p);
+    if (l && l.getAttribute("data-m") !== h){ l.innerHTML = h; l.setAttribute("data-m", h); }
+    if (n && p === P_DATE) n.remove();
   });
-  // le commentaire s'enregistre en cours de frappe, sans redessiner la fiche
-  var minutCom = 0;
+  // le commentaire s'enregistre aussi en cours de frappe
+  var minutCom = 0, comEnAttente = null;
   $("#fiche").addEventListener("input", function(e){
     var c = e.target;
     if (c.getAttribute("data-p") !== P_COM || !FS.actif) return;
     var rs = choisis();
     clearTimeout(minutCom);
-    minutCom = setTimeout(function(){ if (rs.length === 1){ fixer(rs[0], P_COM, c.value); apresModif(rs, true); } }, 400);
+    comEnAttente = function(){ comEnAttente = null; if (rs.length === 1){ fixer(rs[0], P_COM, c.value); apresModif(rs, true); } };
+    minutCom = setTimeout(comEnAttente, 400);
   });
 
   // ================= Modifications =================
@@ -527,8 +605,7 @@
     if (n && n.trim()) lsSet("fgh.auteur", n.trim());
   }
   function decider(rs, statut){
-    if (verrouille()) return;
-    exigerAuteur();
+    if (!pretADecider()) return;
     var d = aujourdhui();
     rs.forEach(function(r){
       fixer(r, P_ST, statut);
@@ -537,15 +614,28 @@
     });
     apresModif(rs);
   }
+  // sansFiche : date ou commentaire, la fiche reste en place et seul le filtre « Modifiées ici » peut changer
   function apresModif(rs, sansFiche){
     sauver();
     rs.forEach(majLigne);
     recolorer();
     if (!sansFiche) renduFiche();
     renduModifs();
-    if ($("#f-st").value) filtreChange();
+    var s = $("#f-st").value;
+    if (s && (!sansFiche || s === "modif")) filtreChange();
   }
   function cleStockage(){ return "fgh.res.modifs|" + (maquette.nom || "?"); }
+  // clés de ces décisions anciennes : la maquette ouverte, ou un nom voisin (copie locale, nom du central)
+  function clesHeritage(){
+    var out = [], ici = cleStockage();
+    try {
+      for (var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if (k && k.indexOf("fgh.res.modifs|") === 0 && (k === ici || (maquette.nom && memeMaquette(k.slice(15), maquette.nom)))) out.push(k);
+      }
+    } catch (e){}
+    return out;
+  }
   function sauver(){
     $("#nb-mod").textContent = nbModifs();
     fsEcrire();
@@ -553,16 +643,27 @@
   function nbModifs(){ var n = 0; modifs.forEach(function(m){ n += vives(m).length; }); return n; }
   // Au chargement d'un IFC : aucune décision gardée par le navigateur, seul le fichier branché fait foi.
   // Les décisions que la maquette contient déjà (import fait par le modeleur, puis nouvel export) disparaissent d'elles-mêmes.
+  // Même maquette ? Comme « Import Validation RES » : un nom contient l'autre, sans tenir compte de la casse
+  // (la copie locale d'une maquette partagée porte souvent en plus le nom de l'utilisateur)
+  function memeMaquette(a, b){
+    a = String(a || "").toLowerCase(); b = String(b || "").toLowerCase();
+    return !a || !b || a.indexOf(b) >= 0 || b.indexOf(a) >= 0;
+  }
   function chargerModifs(){
     heritage = [];
-    try { (JSON.parse(lsGet(cleStockage(), "[]")) || []).forEach(function(m){ if (m && m.k && m.v && vives(m).length) heritage.push(m); }); } catch (e){}
-    if (!heritage.length) lsDel(cleStockage());
-    if (FS.actif && (!FS.maquette || FS.maquette === maquette.nom)){
-      FS.maquette = maquette.nom;
+    var cles = clesHeritage();
+    cles.forEach(function(k){ try { (JSON.parse(lsGet(k, "[]")) || []).forEach(function(m){ if (m && m.k && m.v && vives(m).length) heritage.push(m); }); } catch (e){} });
+    if (!heritage.length) cles.forEach(lsDel);
+    if (FS.actif && memeMaquette(FS.maquette, maquette.nom)){
+      if (maquette.nom) FS.maquette = maquette.nom;
       // même maquette, nouvel export : la mémoire reste le reflet du fichier, relu tout de suite
       elaguer(); FS.lu = 0;
       var h = FS.h;
       cycle = cycle.then(function(){ return fsRelire(h); }).catch(function(){});
+    } else if (!FS.actif && FS.nonEcrit && FS.h && memeMaquette(FS.maquette, maquette.nom)){
+      // écriture refusée plus tôt : les décisions pas encore écrites restent en mémoire pour « Reprendre »
+      if (maquette.nom) FS.maquette = maquette.nom;
+      elaguer();
     } else {
       if (FS.actif) etat("Autre maquette ouverte : fichier de validation débranché.");
       if (FS.actif || FS.minut) fsArreter(false);
@@ -572,15 +673,15 @@
   }
   // décisions des versions < 1.4 (gardées dans le navigateur) : versées une fois dans le fichier branché, ou jetées
   function reprendreHeritage(){
-    if (verrouille() || !heritage.length) return;
+    if (!heritage.length || !pretADecider()) return;
     var n = chargerTexte(JSON.stringify(docModifs(heritage)));
-    heritage = []; lsDel(cleStockage());
+    heritage = []; clesHeritage().forEach(lsDel);
     sauver();
     apresChargement(n, "ce navigateur");
   }
   function jeterHeritage(){
     if (!confirm("Jeter les " + pluriel(heritage.length, "réservation") + " décidées dans ce navigateur sans fichier ?")) return;
-    heritage = []; lsDel(cleStockage());
+    heritage = []; clesHeritage().forEach(lsDel);
     renduModifs();
   }
   function elaguer(){
@@ -648,7 +749,8 @@
   }
 
   // Enregistrement continu (Chrome, Edge : File System Access), comme le rapport 3D CAN 241
-  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", maquette: "", quand: null, err: "", minut: 0, lu: 0, nonEcrit: false, remplacees: [] };
+  // ecriture : écritures en cours ; branche : choix ou autorisation d'un fichier en cours
+  var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", maquette: "", quand: null, err: "", minut: 0, lu: 0, nonEcrit: false, remplacees: [], ecriture: 0, branche: 0 };
   function cleFs(){ return "fichier|" + (maquette.nom || "?"); }
   function idb(mode, fn){
     return new Promise(function(ok, ko){
@@ -697,6 +799,7 @@
     clearTimeout(FS.minut); FS.minut = 0;
     if (!FS.actif || !FS.h) return cycle;
     var h = FS.h;
+    FS.ecriture++;
     return cycle = cycle.then(function(){
         return fsRelire(h).then(function(){
           var txt = JSON.stringify(docModifs(), null, 2);
@@ -711,7 +814,7 @@
         FS.err = "Écriture refusée (" + (x && x.message || x) + "). Tes dernières décisions ne sont pas dans le fichier : clique « Reprendre ».";
         etat("⚠ " + FS.err);
         renduModifs(); renduFiche();
-      });
+      }).then(function(){ FS.ecriture--; });
   }
   // avant de changer de fichier ou de le débrancher : écrire la dernière décision en attente dans l'ancien
   function fsFinir(){ return FS.minut ? fsEcrireMaintenant() : cycle; }
@@ -731,6 +834,8 @@
     suite = suite.then(function(n){
       FS.h = h; FS.nom = h.name; FS.maquette = maquette.nom; FS.actif = true; FS.err = "";
       if (window.indexedDB) idb("readwrite", function(st){ return st.put(h, cleFs()); }).catch(function(){});
+      // le nom qui signera les décisions est demandé maintenant, pas au milieu du premier clic « Valider »
+      exigerAuteur();
       sauver();
       apresChargement(n, h.name);
       renduFiche();
@@ -740,34 +845,43 @@
     return suite;
   }
   function fsErreur(x){ if (x && x.name === "AbortError") return; FS.err = (x && x.message) || String(x); etat("⚠ " + FS.err); renduModifs(); }
+  // Choix d'un fichier en cours (sélecteur, autorisation) : la reprise automatique du fichier retenu attend.
+  // Après une écriture refusée, les décisions pas encore écrites suivent dans le fichier choisi (garder).
+  function enBranchement(p){
+    FS.branche++;
+    return p.then(function(x){ FS.branche--; return x; }, function(x){ FS.branche--; throw x; });
+  }
   var TYPES_JSON = [{ description: "Validation des réservations FGH", accept: { "application/json": [".json"] } }];
-  function fsNouveau(){ window.showSaveFilePicker({ suggestedName: nomFichier(), types: TYPES_JSON }).then(function(h){ return fsBrancher(h, true); }).catch(fsErreur); }
+  function fsNouveau(){ enBranchement(window.showSaveFilePicker({ suggestedName: nomFichier(), types: TYPES_JSON }).then(function(h){ return fsBrancher(h, true, FS.nonEcrit); })).catch(fsErreur); }
   function fsOuvrir(){
     if (typeof window.showOpenFilePicker === "function"){
-      window.showOpenFilePicker({ types: TYPES_JSON }).then(function(l){ return fsAutoriser(l[0]); }).catch(fsErreur);
+      enBranchement(window.showOpenFilePicker({ types: TYPES_JSON }).then(function(l){ return fsAutoriser(l[0]); })).catch(fsErreur);
       return;
     }
     var i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json";
     i.onchange = function(){
       var f = i.files && i.files[0]; if (!f) return;
-      f.text().then(function(t){ apresChargement(chargerTexte(t), f.name); }).catch(fsErreur);
+      lireJson(f);
     };
     i.click();
   }
+  // JSON lu sans pouvoir y écrire (Firefox, Safari) : les décisions s'affichent, la page reste en lecture seule
+  function lireJson(f){ f.text().then(function(t){ apresChargement(chargerTexte(t), f.name); }).catch(fsErreur); }
   // un fichier ouvert n'est autorisé qu'en lecture : l'écriture se demande tout de suite, pendant le clic,
   // sinon la première écriture (sans clic) serait refusée et la page repasserait en lecture seule
   function fsAutoriser(h){
     return h.requestPermission({ mode: "readwrite" }).then(function(p){
       if (p !== "granted") throw new Error("écriture dans « " + h.name + " » refusée : clique « Autoriser les modifications » quand Chrome le demande");
-      return fsBrancher(h, true);
+      return fsBrancher(h, true, FS.nonEcrit);
     });
   }
   function fsReprendre(){
     if (!FS.h) return;
-    FS.h.requestPermission({ mode: "readwrite" }).then(function(p){
+    var h = FS.h;
+    enBranchement(h.requestPermission({ mode: "readwrite" }).then(function(p){
       if (p !== "granted") throw new Error("accès au fichier refusé");
-      return fsBrancher(FS.h, true, FS.nonEcrit);
-    }).catch(fsErreur);
+      return fsBrancher(h, true, FS.nonEcrit);
+    })).catch(fsErreur);
   }
   // oublier : aussi le fichier retenu pour cette maquette ; la dernière décision en attente est d'abord écrite
   function fsArreter(oublier){
@@ -782,12 +896,17 @@
     }).catch(function(){});
   }
   function fsDemarrer(){
-    if (!FS.ok || !window.indexedDB || !maquette.nom || FS.actif) return;
-    idb("readonly", function(st){ return st.get(cleFs()); }).then(function(h){
-      if (!h) return;
+    if (!FS.ok || !window.indexedDB || !maquette.nom || FS.actif || FS.branche) return;
+    idb("readonly", function(st){ return st.getAllKeys(); }).then(function(cles){
+      // le fichier retenu pour cette maquette, sinon pour un nom voisin (copie locale, nom du central)
+      cles = (cles || []).map(String);
+      var k = cles.indexOf(cleFs()) >= 0 ? cleFs() : cles.filter(function(c){ return c.indexOf("fichier|") === 0 && memeMaquette(c.slice(8), maquette.nom); })[0];
+      return k ? idb("readonly", function(st){ return st.get(k); }) : null;
+    }).then(function(h){
+      if (!h || FS.actif || FS.branche) return;
       FS.h = h; FS.nom = h.name;
       return h.queryPermission({ mode: "readwrite" }).then(function(p){
-        if (p === "granted") return fsBrancher(h, true);
+        if (p === "granted") return fsBrancher(h, true, FS.nonEcrit);
         renduModifs(); renduFiche();
         etat("Lecture seule : clique « Reprendre " + h.name + " » pour décider.");
       });
@@ -827,7 +946,7 @@
   }
   $("#modifs").addEventListener("click", function(e){
     var x = e.target.closest("[data-retire]");
-    if (x){ e.stopPropagation(); if (verrouille()) return; retirer(modifs.get(x.getAttribute("data-retire")) || { v: {} }); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
+    if (x){ e.stopPropagation(); if (!pretADecider()) return; retirer(modifs.get(x.getAttribute("data-retire")) || { v: {} }); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); return; }
     var b = e.target.closest("[data-m]");
     if (b){ actionFichier(b.getAttribute("data-m")); return; }
     var l = e.target.closest(".ml[data-cle]");
@@ -841,7 +960,7 @@
       else if (a === "telecharger") telecharger();
       else if (a === "heritage-ok") reprendreHeritage();
       else if (a === "heritage-non") jeterHeritage();
-      else if (a === "vider" && !verrouille() && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?")){ modifs.forEach(retirer); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
+      else if (a === "vider" && !verrouille() && confirm("Effacer toutes les décisions prises ici (" + pluriel(nbModifs(), "valeur") + ") ?") && pretADecider()){ modifs.forEach(retirer); sauver(); renduListe(); recolorer(); renduFiche(); renduModifs(); }
   }
   $("#modifs").addEventListener("change", function(e){ if (e.target.id === "auteur"){ lsSet("fgh.auteur", e.target.value.trim()); sauver(); } });
 
@@ -862,17 +981,22 @@
   ["dragenter", "dragover"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); centre.classList.add("survol"); }); });
   ["dragleave", "drop"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); if (t === "drop" || !e.relatedTarget) centre.classList.remove("survol"); }); });
   document.addEventListener("drop", function(e){
-    var fs = e.dataTransfer && e.dataTransfer.files;
+    var dt = e.dataTransfer, fs = dt && dt.files;
     if (!fs || !fs.length) return;
     var json = Array.prototype.filter.call(fs, function(f){ return /\.json$/i.test(f.name); });
-    // Chrome / Edge : un JSON glissé seul se branche comme avec « Ouvrir un JSON… »
-    var it = e.dataTransfer.items && e.dataTransfer.items[0];
-    if (FS.ok && fs.length === 1 && json.length === 1 && it && it.getAsFileSystemHandle){
-      it.getAsFileSystemHandle().then(function(h){ return h && h.kind === "file" ? fsAutoriser(h) : null; }).catch(fsErreur);
-      return;
+    var ifc = Array.prototype.some.call(fs, function(f){ return /\.ifc$/i.test(f.name); });
+    // Chrome / Edge : un JSON glissé, seul ou avec les IFC, se branche comme avec « Ouvrir un JSON… ». Sa
+    // poignée ne se demande que pendant le dépôt ; le branchement suit en même temps que la lecture des IFC.
+    var poignee = null;
+    if (FS.ok && json.length === 1 && dt.items) for (var i = 0; i < dt.items.length && !poignee; i++){
+      var it = dt.items[i], f = it.kind === "file" && it.getAsFileSystemHandle ? it.getAsFile() : null;
+      if (f && /\.json$/i.test(f.name)) poignee = it.getAsFileSystemHandle();
     }
-    json.forEach(function(f){ f.text().then(function(t){ apresChargement(chargerTexte(t), f.name); }).catch(fsErreur); });
-    if (Array.prototype.some.call(fs, function(f){ return /\.ifc$/i.test(f.name); })) ouvrir(fs);
+    if (poignee) enBranchement(poignee.then(function(h){ return h && h.kind === "file" ? fsAutoriser(h) : null; })).catch(fsErreur);
+    // sinon lu sans y écrire, après les IFC s'il y en a (leur chargement repart de la seule maquette)
+    var lire = poignee ? null : function(){ json.forEach(lireJson); };
+    if (ifc) ouvrir(fs, lire);
+    else if (lire) lire();
   });
   $("#btn-theme").addEventListener("click", function(){
     var c = document.documentElement.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
@@ -880,8 +1004,12 @@
     document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F0E8" : "#050505");
     lsSet("fgh.theme", c);
   });
+  // fermeture de la page : la dernière décision (commentaire en cours de frappe compris) part tout de suite
+  // dans le fichier, et le navigateur demande confirmation tant qu'elle n'y est pas
   window.addEventListener("beforeunload", function(e){
-    if (FS.nonEcrit){ e.preventDefault(); e.returnValue = ""; }
+    if (comEnAttente){ clearTimeout(minutCom); comEnAttente(); }
+    if (FS.minut) fsEcrireMaintenant();
+    if (FS.nonEcrit || FS.ecriture){ e.preventDefault(); e.returnValue = ""; }
   });
   renduModifs();
 })();
