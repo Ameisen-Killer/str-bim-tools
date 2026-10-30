@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.4.5";
+  var VERSION = "1.4.6";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -373,7 +373,6 @@
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
     else if (c === "structure"){ voirStructure = !voirStructure; b.setAttribute("aria-pressed", String(voirStructure)); afficher(); }
     else if (c === "res"){ voirRes = !voirRes; b.setAttribute("aria-pressed", String(voirRes)); afficher(); }
-    else if (c === "filtre3d"){ filtre3d = !filtre3d; b.setAttribute("aria-pressed", String(filtre3d)); afficher(); }
   });
   document.addEventListener("keydown", function(e){
     if (e.key !== "Escape" || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) return;
