@@ -102,57 +102,74 @@ const alea = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(grain
 const entre = (a, b) => a + Math.floor(alea() * (b - a + 1));
 const melange = l => { for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(alea() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } return l; };
 
-// Charge visée par personne : de 55 à 95 % de sa capacité, et trois personnes
+// Charge visée par personne : de 55 à 95 % de sa capacité (45 à 85 % pour les
+// ingénieurs, dont une part du temps n'est pas planifiée), et trois personnes
 // en surcharge (110 à 120 %) pour que la carte de charge montre ses alertes.
 melange(pers.slice()).forEach((p, k) => {
-  const taux = k < 3 ? 1.1 + alea() * 0.1 : 0.55 + alea() * 0.4;
+  const taux = k < 3 ? 1.1 + alea() * 0.1 : p.metier === "ingenieur" ? 0.45 + alea() * 0.4 : 0.55 + alea() * 0.4;
   p.cible = Number(p.capacite) * SEMAINES * taux;
 });
 
 /* ---------------------------------------------------------------- modèles */
+// [libellé, jours de calcul, jours de dessin, forme] — forme « r » : tâche qui
+// revient (séance, visite), datée dans son libellé ; « z » : plans qui peuvent
+// se répéter par bâtiment ; rien : une seule fois par affaire.
+const COMMUN = [
+  ["Séance de coordination avec l'architecte", 0.5, 0, "r"],
+  ["Réponses aux questions de l'entreprise", 1, 0],
+  ["Vérification au feu des éléments porteurs", 2, 0],
+  ["Calcul des ancrages et fixations", 1.5, 0]
+];
 const M = {
   etude: [
     ["Relevé de l'existant et visite des lieux", 1.5, 0.5],
     ["Hypothèses et descente de charges", 2.5, 0],
+    ["Étude de variantes structurelles", 3, 1],
     ["Prédimensionnement des dalles et des porteurs", 3, 0],
-    ["Plans de principe de la structure", 1, 3],
+    ["Prédimensionnement des fondations", 2, 0],
+    ["Plans de principe de la structure", 1, 3, "z"],
     ["Modèle BIM de structure, avant-projet", 0.5, 3],
     ["Étude parasismique selon SIA 261", 2.5, 0],
     ["Estimation des coûts du gros œuvre", 1.5, 0],
-    ["Rapport technique et convention d'utilisation", 2, 0],
-    ["Coordination avec l'architecte", 1, 0.5]
+    ["Rapport technique et convention d'utilisation", 2, 0]
   ],
   autorisation: [
-    ["Plans de structure pour la mise à l'enquête", 0.5, 2.5],
+    ["Plans de structure pour la mise à l'enquête", 0.5, 2.5, "z"],
     ["Justificatif parasismique pour l'autorisation", 2, 0],
-    ["Plans de soumission du gros œuvre", 0.5, 3],
+    ["Plans de soumission du gros œuvre", 0.5, 3, "z"],
     ["Métré béton, coffrage et armature (CAN 241)", 0.5, 3],
     ["Descriptif de soumission CAN 241", 2, 0.5],
-    ["Comparatif des offres du gros œuvre", 1.5, 0]
+    ["Analyse des offres et proposition d'adjudication", 1.5, 0],
+    ["Plan de contrôle et de surveillance", 1, 0]
   ],
   execution: [
-    ["Note de calcul d'exécution", 3, 0],
-    ["Plans de coffrage du radier", 0.5, 3],
-    ["Plans d'armature du radier", 1, 4],
-    ["Plans de coffrage des murs du sous-sol", 0.5, 3.5],
-    ["Plans d'armature des murs du sous-sol", 1, 4],
-    ["Réception d'armature sur chantier", 0.5, 0],
-    ["Plans de coffrage de la dalle sur rez", 0.5, 3],
-    ["Plans d'armature de la dalle sur rez", 1, 4],
-    ["Détails des réservations CVSE", 0.5, 2],
+    ["Note de calcul des fondations", 3, 0],
+    ["Plans de coffrage du radier", 0.5, 3, "z"],
+    ["Plans d'armature du radier", 1, 4, "z"],
+    ["Plans de coffrage des murs du sous-sol", 0.5, 3.5, "z"],
+    ["Plans d'armature des murs du sous-sol", 1, 4, "z"],
+    ["Modèle éléments finis des dalles", 3, 0],
+    ["Plans de coffrage de la dalle sur rez", 0.5, 3, "z"],
+    ["Plans d'armature de la dalle sur rez", 1, 4, "z"],
+    ["Dimensionnement des poteaux et des voiles", 2.5, 0],
+    ["Détails des réservations CVSE", 0.5, 2, "z"],
     ["Contrôle des plans d'entreprise", 1.5, 0],
-    ["Plans de coffrage des étages", 0.5, 4],
-    ["Plans d'armature des étages", 1, 4.5],
-    ["Listes de fers", 0, 1.5],
-    ["Séance de chantier et procès-verbal", 0.5, 0]
+    ["Plans de coffrage des étages", 0.5, 4, "z"],
+    ["Plans d'armature des étages", 1, 4.5, "z"],
+    ["Vérification des flèches et des vibrations", 1.5, 0],
+    ["Listes de fers", 0, 1.5, "z"],
+    ["Réception d'armature sur chantier", 0.5, 0, "r"],
+    ["Séance de chantier et procès-verbal", 0.5, 0, "r"]
   ],
   fin: [
-    ["Plans conformes à l'exécution", 0.5, 3],
+    ["Plans conformes à l'exécution", 0.5, 3, "z"],
     ["Dossier de l'ouvrage", 1.5, 1],
     ["Visite de réception de l'ouvrage", 0.5, 0],
+    ["Contrôle des défauts et suivi des réserves", 1, 0],
     ["Mise à jour de la maquette BIM finale", 0.5, 2]
   ]
 };
+for (const g of Object.keys(M)) M[g] = M[g].concat(COMMUN);
 const groupe = ph => ["21", "31", "32"].includes(ph) ? "etude" : ["33", "41"].includes(ph) ? "autorisation" : ph === "53" ? "fin" : "execution";
 const NOTES_ATTENTE = ["En attente des plans de l'architecte.", "En attente du rapport géotechnique.", "En attente de la validation du maître d'ouvrage."];
 
@@ -184,20 +201,24 @@ function choisis(liste, a, part) {
 const nouvelles = [];
 let aAffecter = 0, iAffaire = 0;
 const plein = l => l.every(p => p.charge >= p.cible * 0.95);
-const SECTEURS = ["", " — secteur B", " — secteur C", " — secteur D", " — secteur E"];
+const BATIMENTS = ["", " — bâtiment B", " — bâtiment C"];
+const dm = iso => iso.slice(8, 10) + "." + iso.slice(5, 7);
 // Tours successifs sur les affaires tant que l'équipe n'est pas chargée
-while (iAffaire < actives.length * 15 && !(plein(ing) && plein(des))) {
+while (iAffaire < actives.length * 12 && !(plein(ing) && plein(des))) {
   const a = actives[iAffaire++ % actives.length];
-  const mod = M[groupe(a.phase)];
-  const n = entre(2, 4), debut = entre(0, mod.length - 1), s0 = entre(1, 5 - Math.min(n, 4));
+  // Dessinateurs pleins : on ne propose plus que du calcul, et inversement
+  const mod = M[groupe(a.phase)].filter(m => plein(des) ? !m[2] : plein(ing) ? m[2] : true);
+  if (!mod.length) continue;
+  const n = entre(2, 3), debut = entre(0, mod.length - 1), s0 = entre(1, 5 - n);
   for (let k = 0; k < n; k++) {
-    const [base, ci0, cd0] = mod[(debut + k) % mod.length];
+    const [base, ci0, cd0, forme] = mod[(debut + k) % mod.length];
+    const semaine = Math.min(4, s0 + k), echeance = echeanceSemaine(semaine);
     const deja = ouvertes.get(a.id) || new Set();
-    const titre = base + (SECTEURS.find(x => !deja.has((base + x).toLowerCase())) ?? null);
-    if (titre.endsWith("null")) continue;
+    const titre = forme === "r" ? base + " du " + dm(echeance)
+      : [...(forme === "z" ? BATIMENTS : [""])].map(x => base + x).find(t => !deja.has(t.toLowerCase()));
+    if (!titre || deja.has(titre.toLowerCase())) continue;
     const f = [0.8, 1, 1, 1.25, 1.5][entre(0, 4)];
     const ci = ci0 ? arrondi(ci0 * f) : 0, cd = cd0 ? arrondi(cd0 * f) : 0;
-    const semaine = Math.min(4, s0 + k);
     let i = ci ? choisis(ing, a, ci) : null, d = cd ? choisis(des, a, cd) : null;
     // Quelques parts laissées « à affecter » pour la démonstration
     const laisse = aAffecter < 6 && alea() < 0.12;
@@ -215,7 +236,7 @@ while (iAffaire < actives.length * 15 && !(plein(ing) && plein(des))) {
     const r = alea();
     nouvelles.push({
       bureau_id: B, affaire_id: a.id, titre, note, charge_inge: ci, charge_dessin: cd,
-      echeance: echeanceSemaine(semaine), ingenieur_id: i ? i.id : null, dessinateur_id: d ? d.id : null,
+      echeance, ingenieur_id: i ? i.id : null, dessinateur_id: d ? d.id : null,
       statut, avancement, priorite: r < 0.1 ? 1 : r < 0.22 ? 2 : r < 0.35 ? 3 : 5, cree_le: MARQUE
     });
     (ouvertes.get(a.id) || ouvertes.set(a.id, new Set()).get(a.id)).add(titre.toLowerCase());
