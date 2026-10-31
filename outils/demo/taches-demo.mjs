@@ -156,19 +156,41 @@ const ETAPES = {
     ["Visite de réception de l'ouvrage", 1, 0]
   ]
 };
-// Travail d'ingénieur qui s'ajoute quand les étapes de calcul sont épuisées
-const APPOINT = [
-  ["Réponses aux questions de l'entreprise", 1.5],
-  ["Vérification au feu des éléments porteurs", 2],
-  ["Calcul des ancrages et fixations", 1.5],
-  ["Coordination CVSE et percements", 1.5],
-  ["Contrôle des plans de l'entreprise", 2],
-  ["Séance de coordination avec l'architecte et procès-verbal", 1],
-  ["Vérification des éléments préfabriqués", 2],
-  ["Contrôle du modèle BIM de coordination", 1.5],
-  ["Note de calcul des escaliers et paliers", 2],
-  ["Avenant au plan de contrôle", 1]
-];
+// Travail d'ingénieur qui s'ajoute quand les étapes de calcul sont épuisées,
+// selon la phase de l'affaire
+const APPOINT = {
+  etude: [
+    ["Séance de coordination avec l'architecte et procès-verbal", 1],
+    ["Variante de fondations sur pieux", 2],
+    ["Concept de protection incendie de la structure", 1.5],
+    ["Contrôle du modèle BIM de coordination", 1.5],
+    ["Étude des percements CVSE de principe", 1.5],
+    ["Note sur les charges de la toiture végétalisée", 1]
+  ],
+  autorisation: [
+    ["Séance de coordination avec l'architecte et procès-verbal", 1],
+    ["Réponses aux questions des soumissionnaires", 1.5],
+    ["Contrôle du modèle BIM de coordination", 1.5],
+    ["Vérification au feu des éléments porteurs", 2],
+    ["Mise à jour du devis général", 1.5]
+  ],
+  execution: [
+    ["Réponses aux questions de l'entreprise", 1.5],
+    ["Vérification au feu des éléments porteurs", 2],
+    ["Calcul des ancrages et fixations", 1.5],
+    ["Coordination CVSE et percements", 1.5],
+    ["Contrôle des plans de l'entreprise", 2],
+    ["Vérification des éléments préfabriqués", 2],
+    ["Note de calcul des escaliers et paliers", 2],
+    ["Avenant au plan de contrôle", 1]
+  ],
+  fin: [
+    ["Réponses aux questions de l'entreprise", 1],
+    ["Décompte des quantités exécutées", 2],
+    ["Séance de réception avec le maître d'ouvrage", 1],
+    ["Attestation de conformité de la structure", 1.5]
+  ]
+};
 const groupe = ph => ["21", "31", "32"].includes(ph) ? "etude" : ["33", "41"].includes(ph) ? "autorisation" : ph === "53" ? "fin" : "execution";
 const NOTES_ATTENTE = ["En attente des plans de l'architecte.", "En attente du rapport géotechnique.", "En attente de la validation du maître d'ouvrage."];
 
@@ -192,7 +214,7 @@ if (actives.length < 4) { console.error("Trop peu d'affaires actives hors appel 
 for (const a of actives) {
   a.groupe = groupe(a.phase);
   a.etapes = ETAPES[a.groupe].map(([titre, ci, cd]) => ({ titre, ci, cd }));
-  a.appoint = melange(APPOINT.slice());
+  a.appoint = melange(APPOINT[a.groupe].slice());
   a.role = "normale";
 }
 // Deux affaires qui démarrent, sans dessinateur ; trois ou quatre urgentes,
@@ -281,7 +303,7 @@ while (libre.size && garde++ < 5000) {
   for (const lot of [p.affaires.slice(0, 2), p.affaires.slice(2)]) {
     for (const af of lot) {
       const k = af.etapes.findIndex(e => p.metier === "dessinateur" ? e.cd > 0 : e.cd === 0);
-      if (k >= 0) { a = af; etape = af.etapes.splice(k, 1)[0]; break; }
+      if (k >= 0) { a = af; af._k = k; etape = af.etapes.splice(k, 1)[0]; break; }
     }
     if (!etape && p.metier === "ingenieur") {
       a = lot.find(af => af.appoint.length);
@@ -290,6 +312,17 @@ while (libre.size && garde++ < 5000) {
     if (etape) break;
   }
   if (!etape) { libre.delete(p); continue; }
+  // Un plan suppose le calcul qui le précède : les étapes de calcul laissées
+  // en amont dans la même affaire passent d'abord, à l'ingénieur le moins avancé
+  if (p.metier === "dessinateur") {
+    for (const amont of a.etapes.filter((e, j) => e.cd === 0 && j < a._k)) {
+      a.etapes.splice(a.etapes.indexOf(amont), 1);
+      const c = [chefDe.get(a.id), ...ing.filter(x => x.affaires[0] === a)].sort((x, y) => x.curseur - y.curseur)[0];
+      const ca = varie(amont.ci), d0 = c.curseur;
+      c.curseur += ca / c.rythme; c.charge += ca;
+      pose(a, amont.titre, ca, 0, c, null, d0, c.curseur, prioDe(a));
+    }
+  }
   const ci = varie(etape.ci), cd = varie(etape.cd);
   const mienne = p.metier === "dessinateur" ? cd : ci;
   const debut = p.curseur, fin = debut + mienne / p.rythme;
@@ -304,7 +337,8 @@ while (libre.size && garde++ < 5000) {
 }
 // Les affaires qui démarrent : l'ingénieur est trouvé, les dessinateurs pas encore
 for (const a of actives.filter(x => x.role === "a_staffer")) {
-  const c = ing.filter(p => p.profil === "peu").sort((x, y) => lien(y, a) - lien(x, a))[0] || ing[0];
+  const c = ing.filter(p => p.profil === "peu" && !p.demarre).sort((x, y) => lien(y, a) - lien(x, a))[0] || ing[0];
+  c.demarre = true;
   let t = 9;
   for (const e of a.etapes.slice(0, 4)) {
     const ci = varie(e.ci), cd = varie(e.cd);
