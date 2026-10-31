@@ -209,10 +209,12 @@ while (iAffaire < actives.length * 12 && !(plein(ing) && plein(des))) {
   // Dessinateurs pleins : on ne propose plus que du calcul, et inversement
   const mod = M[groupe(a.phase)].filter(m => plein(des) ? !m[2] : plein(ing) ? m[2] : true);
   if (!mod.length) continue;
-  const n = entre(2, 3), debut = entre(0, mod.length - 1), s0 = entre(1, 5 - n);
+  const n = entre(2, 3), debut = entre(0, mod.length - 1);
+  // Semaines d'échéance tirées parmi les quatre, dans l'ordre : charge égale d'une semaine à l'autre
+  const semaines = melange([1, 2, 3, 4]).slice(0, n).sort();
   for (let k = 0; k < n; k++) {
     const [base, ci0, cd0, forme] = mod[(debut + k) % mod.length];
-    const semaine = Math.min(4, s0 + k), echeance = echeanceSemaine(semaine);
+    const semaine = semaines[k], echeance = echeanceSemaine(semaine);
     const deja = ouvertes.get(a.id) || new Set();
     const titre = forme === "r" ? base + " du " + dm(echeance)
       : [...(forme === "z" ? BATIMENTS : [""])].map(x => base + x).find(t => !deja.has(t.toLowerCase()));
