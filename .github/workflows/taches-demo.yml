@@ -1,0 +1,37 @@
+# Tâches de démonstration du planificateur (31.10.2026) : lancée à la main.
+# outils/demo/taches-demo.mjs — essai (rien n'est écrit), injecte ou retire.
+# Secret requis : SUPABASE_SERVICE_ROLE_KEY.
+name: Tâches de démo
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "essai, injecte ou retire"
+        default: "essai"
+      bureau:
+        description: "Id du bureau (vide : le seul bureau réel)"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: taches-demo
+  cancel-in-progress: false
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tâches de démo
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MODE: ${{ github.event.inputs.mode }}
+          BUREAU: ${{ github.event.inputs.bureau }}
+        run: node outils/demo/taches-demo.mjs
