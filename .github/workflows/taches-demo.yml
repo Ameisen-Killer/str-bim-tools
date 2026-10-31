@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "essai, injecte ou retire"
+        description: "essai, injecte, remplace (vide TOUTES les tâches du bureau) ou retire"
         default: "essai"
       bureau:
         description: "Id du bureau (vide : le seul bureau réel)"
