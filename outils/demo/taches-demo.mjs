@@ -162,7 +162,12 @@ const APPOINT = [
   ["Vérification au feu des éléments porteurs", 2],
   ["Calcul des ancrages et fixations", 1.5],
   ["Coordination CVSE et percements", 1.5],
-  ["Contrôle des plans de l'entreprise", 2]
+  ["Contrôle des plans de l'entreprise", 2],
+  ["Séance de coordination avec l'architecte et procès-verbal", 1],
+  ["Vérification des éléments préfabriqués", 2],
+  ["Contrôle du modèle BIM de coordination", 1.5],
+  ["Note de calcul des escaliers et paliers", 2],
+  ["Avenant au plan de contrôle", 1]
 ];
 const groupe = ph => ["21", "31", "32"].includes(ph) ? "etude" : ["33", "41"].includes(ph) ? "autorisation" : ph === "53" ? "fin" : "execution";
 const NOTES_ATTENTE = ["En attente des plans de l'architecte.", "En attente du rapport géotechnique.", "En attente de la validation du maître d'ouvrage."];
@@ -202,7 +207,8 @@ const lien = (p, a) => (p.id === a.responsable_id ? 6 : 0) + ((equipe.get(a.id) 
   + (a.succursale && p.succursale === a.succursale ? 1.5 : 0) + ((a.secteurs || []).includes(p.discipline) ? 1 : 0);
 
 // Profils : l'équipe des affaires urgentes en surcharge, une dizaine de
-// personnes peu chargées, les autres entre 65 et 95 %.
+// personnes peu chargées, les autres entre 65 et 95 % (55 à 85 % pour les
+// ingénieurs, dont une part du temps n'est pas planifiée).
 const urgentes = suivies.filter(a => a.role === "urgente");
 for (const [liste, nbSur, nbPeu] of [[ing, Math.max(2, Math.round(ing.length * 0.1)), Math.max(2, Math.round(ing.length * 0.13))],
                                      [des, Math.max(2, Math.round(des.length * 0.12)), Math.max(2, Math.round(des.length * 0.13))]]) {
@@ -210,7 +216,9 @@ for (const [liste, nbSur, nbPeu] of [[ing, Math.max(2, Math.round(ing.length * 0
   tri.forEach((p, k) => {
     if (k < nbSur) { p.profil = "surcharge"; p.ratio = flottant(1.2, 1.4); }
     else if (k >= tri.length - nbPeu) { p.profil = "peu"; p.ratio = flottant(0.15, 0.4); }
-    else { p.profil = "normal"; p.ratio = flottant(0.65, 0.95); }
+    else { p.profil = "normal"; p.ratio = p.metier === "ingenieur" ? flottant(0.55, 0.85) : flottant(0.65, 0.95); }
+    // Jours de calendrier par jour de charge : le ratio, ramené au temps partiel
+    p.rythme = p.ratio * Number(p.capacite) / 5;
   });
 }
 
@@ -259,7 +267,7 @@ for (const a of suivies.filter(x => x.groupe === "execution")) {
   for (let s = 0; s < 4; s++) {
     pose(a, `Suivi de chantier et réception d'armature, semaine ${semaineIso(5 * s)}`, a.role === "urgente" ? 1.5 : 1, 0, c, null, 5 * s, 5 * s + 5, prioDe(a));
     c.charge += a.role === "urgente" ? 1.5 : 1;
-    c.curseur += (a.role === "urgente" ? 1.5 : 1) / c.ratio;   // son temps de chantier décale le reste
+    c.curseur += (a.role === "urgente" ? 1.5 : 1) / c.rythme;   // son temps de chantier décale le reste
   }
 }
 
@@ -284,24 +292,25 @@ while (libre.size && garde++ < 5000) {
   if (!etape) { libre.delete(p); continue; }
   const ci = varie(etape.ci), cd = varie(etape.cd);
   const mienne = p.metier === "dessinateur" ? cd : ci;
-  const debut = p.curseur, fin = debut + mienne / p.ratio;
+  const debut = p.curseur, fin = debut + mienne / p.rythme;
   p.curseur = fin; p.charge += mienne;
   let ingenieur = p.metier === "ingenieur" ? p : null;
   if (p.metier === "dessinateur" && ci) {
-    ingenieur = chefDe.get(a.id);
-    ingenieur.curseur += ci / ingenieur.ratio; ingenieur.charge += ci;
+    // Le calcul d'un plan revient à l'ingénieur de l'affaire le moins avancé
+    ingenieur = [chefDe.get(a.id), ...ing.filter(x => x.affaires[0] === a)].sort((x, y) => x.curseur - y.curseur)[0];
+    ingenieur.curseur += ci / ingenieur.rythme; ingenieur.charge += ci;
   }
   pose(a, etape.titre, ci, cd, ingenieur, p.metier === "dessinateur" ? p : null, debut, fin, prioDe(a));
 }
 // Les affaires qui démarrent : l'ingénieur est trouvé, les dessinateurs pas encore
 for (const a of actives.filter(x => x.role === "a_staffer")) {
   const c = ing.filter(p => p.profil === "peu").sort((x, y) => lien(y, a) - lien(x, a))[0] || ing[0];
-  let t = 10;
+  let t = 9;
   for (const e of a.etapes.slice(0, 4)) {
     const ci = varie(e.ci), cd = varie(e.cd);
-    const avecDessin = cd > 0;
-    t += Math.max(2, (avecDessin ? cd : ci) * 0.8);
-    pose(a, e.titre, ci, cd, ci ? c : null, null, t - 3, t, 3);
+    const avant = t;
+    t += Math.max(2, Math.max(ci, cd) * 1.2);
+    pose(a, e.titre, ci, cd, ci ? c : null, null, avant, t, 3);
     c.charge += ci;
   }
 }
