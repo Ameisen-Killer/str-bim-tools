@@ -302,7 +302,9 @@ while (libre.size && garde++ < 5000) {
   let a = null, etape = null;
   for (const lot of [p.affaires.slice(0, 2), p.affaires.slice(2)]) {
     for (const af of lot) {
-      const k = af.etapes.findIndex(e => p.metier === "dessinateur" ? e.cd > 0 : e.cd === 0);
+      // Un ingénieur ne prend pas d'avance sur un plan qui reste à dessiner
+      const k0 = af.etapes.findIndex(e => p.metier === "dessinateur" ? e.cd > 0 : e.cd === 0);
+      const k = p.metier === "ingenieur" && af.etapes.findIndex(e => e.cd > 0) > -1 && af.etapes.findIndex(e => e.cd > 0) < k0 ? -1 : k0;
       if (k >= 0) { a = af; af._k = k; etape = af.etapes.splice(k, 1)[0]; break; }
     }
     if (!etape && p.metier === "ingenieur") {
