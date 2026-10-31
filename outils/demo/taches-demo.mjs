@@ -3,8 +3,8 @@
 // Lancé à la main par .github/workflows/taches-demo.yml. Crée, dans un bureau
 // de la base, des tâches réalistes du lundi 2 au vendredi 27 novembre 2026 sur
 // ses affaires actives et ses ingénieurs et dessinateurs réels, pour une
-// présentation. Charge visée : environ 80 % de la capacité de chacun sur les
-// quatre semaines, tâches déjà prévues comprises.
+// présentation. Charge visée : de 55 à 95 % de la capacité de chacun sur les
+// quatre semaines, tâches déjà prévues comprises, trois personnes en surcharge.
 //
 // Variables : SUPABASE_SERVICE_ROLE_KEY (secret GitHub), BUREAU (id ou nom ;
 // vide = le seul bureau qui n'est ni de test ni fictif), MODE = essai
@@ -24,7 +24,7 @@ const CLE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const MODE = (process.env.MODE || "essai").trim();
 const BUREAU = (process.env.BUREAU || "").trim();
 const MARQUE = "2026-10-31T17:00:00.424242+00:00";
-const LUNDI = "2026-11-02", FIN = "2026-11-27", SEMAINES = 4, TAUX = 0.8;
+const LUNDI = "2026-11-02", FIN = "2026-11-27", SEMAINES = 4;
 const URL_BASE = ((readFileSync(path.join(racine, "docs/planif/assets/config.js"), "utf8")
   .match(/url:\s*"([^"]+)"/) || [])[1] || "").replace(/\/+$/, "");
 
@@ -83,7 +83,7 @@ const equipes = await tout(`affaire_membres?select=affaire_id,membre_id&bureau_i
 const taches = await tout(`taches?select=affaire_id,titre,charge_inge,charge_dessin,ingenieur_id,dessinateur_id,echeance,statut,fini_inge,fini_dessin&bureau_id=eq.${B}`);
 
 const pers = membres.filter(m => m.actif && (m.metier === "ingenieur" || m.metier === "dessinateur"))
-  .map(m => ({ ...m, cible: Number(m.capacite) * SEMAINES * TAUX, charge: 0 }));
+  .map(m => ({ ...m, cible: 0, charge: 0 }));
 const parId = new Map(pers.map(p => [p.id, p]));
 for (const t of taches) {
   if (t.statut === "termine" || t.echeance < LUNDI || t.echeance > FIN) continue;
@@ -101,6 +101,13 @@ const alea = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(grain
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const entre = (a, b) => a + Math.floor(alea() * (b - a + 1));
 const melange = l => { for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(alea() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } return l; };
+
+// Charge visée par personne : de 55 à 95 % de sa capacité, et trois personnes
+// en surcharge (110 à 120 %) pour que la carte de charge montre ses alertes.
+melange(pers.slice()).forEach((p, k) => {
+  const taux = k < 3 ? 1.1 + alea() * 0.1 : 0.55 + alea() * 0.4;
+  p.cible = Number(p.capacite) * SEMAINES * taux;
+});
 
 /* ---------------------------------------------------------------- modèles */
 const M = {
@@ -177,13 +184,17 @@ function choisis(liste, a, part) {
 const nouvelles = [];
 let aAffecter = 0, iAffaire = 0;
 const plein = l => l.every(p => p.charge >= p.cible * 0.95);
-while (iAffaire < actives.length && !(plein(ing) && plein(des))) {
-  const a = actives[iAffaire++];
+const SECTEURS = ["", " — secteur B", " — secteur C", " — secteur D", " — secteur E"];
+// Tours successifs sur les affaires tant que l'équipe n'est pas chargée
+while (iAffaire < actives.length * 15 && !(plein(ing) && plein(des))) {
+  const a = actives[iAffaire++ % actives.length];
   const mod = M[groupe(a.phase)];
   const n = entre(2, 4), debut = entre(0, mod.length - 1), s0 = entre(1, 5 - Math.min(n, 4));
   for (let k = 0; k < n; k++) {
-    const [titre, ci0, cd0] = mod[(debut + k) % mod.length];
-    if ((ouvertes.get(a.id) || new Set()).has(titre.toLowerCase())) continue;
+    const [base, ci0, cd0] = mod[(debut + k) % mod.length];
+    const deja = ouvertes.get(a.id) || new Set();
+    const titre = base + (SECTEURS.find(x => !deja.has((base + x).toLowerCase())) ?? null);
+    if (titre.endsWith("null")) continue;
     const f = [0.8, 1, 1, 1.25, 1.5][entre(0, 4)];
     const ci = ci0 ? arrondi(ci0 * f) : 0, cd = cd0 ? arrondi(cd0 * f) : 0;
     const semaine = Math.min(4, s0 + k);
@@ -220,7 +231,7 @@ for (let s = 1; s <= 4; s++) {
 }
 console.log("\nCharge sur les 4 semaines (jours prévus / capacité) :");
 for (const [nom, l] of [["Ingénieurs", ing], ["Dessinateurs", des]]) {
-  console.log(nom + " : " + l.map((p, k) => `${nom[0]}${k + 1} ${p.charge}/${p.cible / TAUX}`).join(" · "));
+  console.log(nom + " : " + l.map((p, k) => `${nom[0]}${k + 1} ${p.charge}/${Number(p.capacite) * SEMAINES}`).join(" · "));
 }
 console.log("\nDétail :");
 for (const t of nouvelles.sort((x, y) => x.echeance.localeCompare(y.echeance))) {
