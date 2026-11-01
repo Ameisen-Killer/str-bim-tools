@@ -1,7 +1,7 @@
 /* STR Bim Tools · visionneuse DXF : canvas 2D, calques, propriétés, mesure. Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "1.2.0";
+  var VERSION = "1.2.1";
   var $ = function(s){ return document.querySelector(s); };
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e){ return d; } }
@@ -476,10 +476,14 @@
     if (fmt === "dxf"){ telecharger(source.dxf, base() + ".dxf", "application/dxf"); etat("DXF enregistré : " + base() + ".dxf"); return; }
     if (source.dwg){ telecharger(source.dwg, base() + ".dwg", "application/acad"); etat("DWG enregistré tel qu'il a été ouvert : " + base() + ".dwg"); return; }
     $("#chargement").hidden = false;
-    convertir(source.dxf, "str_dxf_vers_dwg", "dxf", "dwg", "Conversion en DWG (AutoCAD 2000)…").then(function(buf){
+    // LibreDWG ne reprend rien d'un DXF R12 (pas de table des blocs) : le dessin affiché est d'abord réécrit en
+    // DXF AutoCAD 2000 complet (dxf-ecrivain.js), blocs éclatés, puis converti
+    var d = DXF.ecrire2000(S), t = d.texte, octets = new Uint8Array(t.length);
+    for (var i = 0; i < t.length; i++){ var c = t.charCodeAt(i); octets[i] = c < 256 ? c : 63; }
+    convertir(octets.buffer, "str_dxf_vers_dwg", "dxf", "dwg", "Conversion en DWG (AutoCAD 2000)…").then(function(buf){
       $("#chargement").hidden = true;
       telecharger(buf, base() + ".dwg", "application/acad");
-      etat("DWG enregistré (format AutoCAD 2000, écrit par LibreDWG) : " + base() + ".dwg. Vérifie-le dans AutoCAD avant de l'envoyer.");
+      etat("DWG enregistré (AutoCAD 2000, " + d.entites + " objets, blocs éclatés) : " + base() + ".dwg. Vérifie-le dans AutoCAD avant de l'envoyer.");
     }).catch(function(e){
       $("#chargement").hidden = true;
       etat("DWG impossible : " + (e && e.message || e) + ". Garde le DXF, ou ouvre-le dans AutoCAD et enregistre-le en DWG.");
