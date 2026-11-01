@@ -202,6 +202,8 @@ body.edition{overflow:hidden}
 .fichier-bilan{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fichier-bilan b{font-weight:400;color:var(--texte-doux)}
 .actions{display:flex;flex-wrap:wrap;gap:8px}
+.signature{margin-left:auto;font-size:12px;color:var(--texte-doux);white-space:nowrap}
+@media (max-width:899px){.signature{display:none}}
 .etat{flex:1 1 100%;min-height:1.4em;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--texte-doux)}
 .etat::before{content:"— ";color:var(--or)}
 .etat:empty::before{content:""}
@@ -598,6 +600,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <hr>
             <button type="button" role="menuitem" data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
             <button type="button" role="menuitem" data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="dxf-axes"><span>Exporter le plan des axes en DXF</span><kbd></kbd></button>
             <div data-dyn="exports"></div>
             <hr>
             <button type="button" role="menuitem" data-cmd="fermer-tout"><span>Tout fermer</span><kbd></kbd></button>
@@ -724,6 +727,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <span class="fichier-nom" id="f-nom">—</span>
         <span class="fichier-bilan" id="f-bilan"></span>
       </div>
+      <div class="signature">STR Bim Tools · <span id="version"></span> · Tony VARIN</div>
       <div class="etat" id="etat" role="status" aria-live="polite"></div>
     </div>
 
@@ -758,6 +762,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
           <button type="button" class="btn petit" id="b-boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
+          <button type="button" class="btn petit" id="b-dxf" title="Plan DXF des axes des murs, poteaux et ossatures et du contour des dalles, dans la boîte de coupe">DXF</button>
           <button type="button" class="btn petit" id="b-lissage" aria-pressed="true" title="Lisser les bords des pièces (plus lent sur un gros modèle)">Lissage</button>
         </div>
         <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner · Clic droit : menu</div>
@@ -866,10 +871,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=9"></script>
-<script src="/ifc/ifc-vue.js?v=33"></script>
+<script src="/ifc/ifc-vue.js?v=34"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=33"></script>
+<script src="/ifc/ifc-app.js?v=34"></script>
 <script src="/assets/menu.js?v=28"></script>
 </body>
 </html>
