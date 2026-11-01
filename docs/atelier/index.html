@@ -128,6 +128,34 @@ a{color:inherit;text-decoration:none}
 .profil small{display:block;color:var(--texte-faible);font-size:11px;line-height:14px}
 .pied .ver{color:var(--texte-faible);font-size:12px}
 
+/* ---------- Fenêtres des outils ---------- */
+.fenetres{position:fixed;inset:0 0 48px 0;z-index:10;pointer-events:none}
+.fenetre{position:absolute;display:flex;flex-direction:column;min-width:320px;min-height:220px;border-radius:12px;overflow:hidden;pointer-events:auto;
+  background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);-webkit-backdrop-filter:blur(60px);backdrop-filter:blur(60px);
+  transition:opacity .18s,transform .22s cubic-bezier(.2,.9,.3,1)}
+.fenetre.neuve{opacity:0;transform:scale(.94)}
+.fenetre.reduite{opacity:0;transform:translateY(40%) scale(.3);pointer-events:none}
+.fenetre.agrandie{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0}
+.fenetre:not(.active){box-shadow:0 8px 24px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.2)}
+.fenetre:not(.active) .titre{opacity:.6}
+.titre{flex:none;height:36px;display:flex;align-items:center;gap:8px;padding-left:12px;font-size:12px;line-height:16px;touch-action:none;cursor:default}
+.titre svg{width:18px;height:18px;flex:none}
+.titre .nom{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titre button,.titre a{flex:none;width:44px;height:36px;border:0;background:transparent;display:grid;place-items:center;color:var(--texte)}
+.titre button:hover,.titre a:hover{background:var(--controle-survol)}
+.titre .fermer:hover{background:#C42B1C;color:#fff}
+.titre button svg,.titre a svg{width:10px;height:10px}
+.fenetre iframe{flex:1;width:100%;border:0;background:#fff}
+.fenetre.bouge iframe,.fenetres.bouge iframe{pointer-events:none}
+.poignee{position:absolute;z-index:2}
+.poignee.d{top:36px;right:0;bottom:8px;width:6px;cursor:ew-resize}
+.poignee.b{left:0;right:8px;bottom:0;height:6px;cursor:ns-resize}
+.poignee.g{top:36px;left:0;bottom:8px;width:6px;cursor:ew-resize}
+.poignee.db{right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize}
+.fenetre.agrandie .poignee{display:none}
+.tache.ouverte::after{content:"";position:absolute;bottom:-6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--texte-doux)}
+.tache.devant::after{background:var(--accent);width:14px;margin-left:-7px;border-radius:3px}
+
 @media (max-width:640px){
   .bureau{grid-auto-flow:row;grid-template-columns:repeat(auto-fill,92px);grid-template-rows:none;grid-auto-rows:104px;justify-content:center;padding-top:24px}
   .gauche .long,.zone.horloge .date{display:none}
@@ -153,6 +181,8 @@ a{color:inherit;text-decoration:none}
   </div>
 </div>
 
+<div class="fenetres" id="fenetres"></div>
+
 <nav class="barre" aria-label="Barre des tâches">
   <div class="gauche"><b id="nom-barre">Atelier STR</b><span class="long">STR BIM Tools · Tony VARIN</span><span id="version"></span></div>
   <div class="centre" id="taches">
@@ -171,9 +201,8 @@ a{color:inherit;text-decoration:none}
 <script>
 (function(){
   "use strict";
-  // Nom provisoire : à remplacer ici quand Tony aura choisi (titre d'onglet compris)
   var NOM = "Atelier STR";
-  var VERSION = "1.4.0";
+  var VERSION = "1.5.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -215,11 +244,13 @@ a{color:inherit;text-decoration:none}
     el.lastChild.textContent = a.nom; el.dataset.desc = a.desc;
     el.setAttribute("aria-label", a.nom + " : " + a.desc);
     // Comme sous Windows : un clic sélectionne, un double-clic ouvre (un toucher suffit sur écran tactile)
+    // Ctrl, Maj ou clic du milieu : ouverture dans un onglet, comme un lien ordinaire
     el.addEventListener("click", function(e){
-      if (tactile || e.detail === 0) return;          // toucher ou Entrée au clavier : on ouvre
-      e.preventDefault(); choisir(el);
+      if (horsAtelier(e)) return;
+      e.preventDefault();
+      if (tactile || e.detail === 0) ouvrir(a); else choisir(el);   // toucher ou Entrée : on ouvre
     });
-    el.addEventListener("dblclick", function(){ location.href = a.href; });
+    el.addEventListener("dblclick", function(){ ouvrir(a); });
     el.addEventListener("mouseenter", function(){ bulle(el); });
     el.addEventListener("mouseleave", function(){ $("#bulle").hidden = true; });
     bureau.appendChild(el);
@@ -227,14 +258,135 @@ a{color:inherit;text-decoration:none}
     var ep = document.createElement("a");
     ep.className = "epingle"; ep.href = a.href; ep.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="m$1"').replace(/url\(#(\w+)\)/g, "url(#m$1)") + "<span></span><small></small>";
     ep.querySelector("span").textContent = a.nom; ep.querySelector("small").textContent = a.desc;
+    ep.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); menu(false); ouvrir(a); });
     $("#epingles").appendChild(ep);
 
     var t = document.createElement("a");
     t.className = "tache"; t.href = a.href; t.title = a.nom;
     t.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="t$1"').replace(/url\(#(\w+)\)/g, "url(#t$1)") + '<span class="etiquette"></span>';
-    t.querySelector(".etiquette").textContent = a.nom; t.removeAttribute("title");
+    t.querySelector(".etiquette").textContent = a.nom; t.removeAttribute("title"); t.dataset.app = a.id;
+    t.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); basculer(a); });
     $("#taches").appendChild(t);
   });
+
+  // ---------- Fenêtres : chaque outil s'ouvre dans l'atelier (une fenêtre par outil) ----------
+  var couche = $("#fenetres"), FEN = {}, zMax = 10, petit = function(){ return innerWidth <= 640; };
+  function horsAtelier(e){ return e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1; }
+  function lirePos(id){ try { return JSON.parse(localStorage.getItem("atelier.fenetre." + id)); } catch(e){ return null; } }
+  function ecrirePos(f){
+    try { localStorage.setItem("atelier.fenetre." + f.app.id, JSON.stringify({x:f.el.offsetLeft, y:f.el.offsetTop, l:f.el.offsetWidth, h:f.el.offsetHeight, max:f.el.classList.contains("agrandie")})); } catch(e){}
+  }
+  function cadre(f){   // garde la barre de titre à portée de main
+    var el = f.el, W = couche.clientWidth, H = couche.clientHeight;
+    if (el.classList.contains("agrandie")) return;
+    el.style.width = Math.min(el.offsetWidth, W) + "px"; el.style.height = Math.min(el.offsetHeight, H) + "px";
+    el.style.left = Math.max(Math.min(el.offsetLeft, W - 120), 120 - el.offsetWidth) + "px";
+    el.style.top = Math.max(Math.min(el.offsetTop, H - 36), 0) + "px";
+  }
+  var BTN = {
+    reduire:'<svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor"/></svg>',
+    agrandir:'<svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg>',
+    onglet:'<svg viewBox="0 0 10 10"><path d="M4 .5h5.5V6M9.5.5L4 6M7 9.5H.5V3" fill="none" stroke="currentColor"/></svg>',
+    fermer:'<svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor"/></svg>'
+  };
+  function ouvrir(a){
+    var f = FEN[a.id];
+    if (f){ f.el.classList.remove("reduite"); devant(f); return; }
+    var el = document.createElement("section");
+    el.className = "fenetre neuve"; el.setAttribute("aria-label", a.nom);
+    el.innerHTML = '<div class="titre">' + DESSINS[a.id].replace(/id="(\w+)"/g, 'id="f$1"').replace(/url\(#(\w+)\)/g, "url(#f$1)") +
+      '<span class="nom"></span>' +
+      '<a class="onglet" target="_blank" rel="noopener" title="Ouvrir dans un onglet">' + BTN.onglet + '</a>' +
+      '<button class="reduire" title="Réduire">' + BTN.reduire + '</button>' +
+      '<button class="agrandir" title="Agrandir">' + BTN.agrandir + '</button>' +
+      '<button class="fermer" title="Fermer">' + BTN.fermer + '</button></div>' +
+      '<iframe allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>' +
+      '<div class="poignee g"></div><div class="poignee d"></div><div class="poignee b"></div><div class="poignee db"></div>';
+    el.querySelector(".nom").textContent = a.nom + " · STR BIM Tools";
+    el.querySelector(".onglet").href = a.href;
+    var ifr = el.querySelector("iframe"); ifr.title = a.nom; ifr.src = a.href;
+    f = FEN[a.id] = {app:a, el:el, ifr:ifr};
+
+    // position : la dernière connue, sinon en cascade
+    var W = couche.clientWidth, H = couche.clientHeight, n = Object.keys(FEN).length - 1, p = lirePos(a.id);
+    if (!p) p = {l:Math.min(1100, W * .78), h:Math.min(760, H * .82)}, p.x = (W - p.l) / 2 + n * 28 - 40, p.y = Math.max(8, (H - p.h) / 2 + n * 28 - 40);
+    el.style.left = p.x + "px"; el.style.top = p.y + "px"; el.style.width = p.l + "px"; el.style.height = p.h + "px";
+    if (p.max || petit()) el.classList.add("agrandie");
+    couche.appendChild(el); cadre(f);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.remove("neuve"); }); });
+
+    el.addEventListener("pointerdown", function(){ devant(f); }, true);
+    el.querySelector(".reduire").addEventListener("click", function(){ reduire(f); });
+    el.querySelector(".agrandir").addEventListener("click", function(){ agrandir(f); });
+    el.querySelector(".fermer").addEventListener("click", function(){ fermer(f); });
+    var titre = el.querySelector(".titre");
+    titre.addEventListener("dblclick", function(e){ if (!e.target.closest("button,a")) agrandir(f); });
+    glisser(f, titre, "deplace");
+    [].forEach.call(el.querySelectorAll(".poignee"), function(h){ glisser(f, h, h.className.split(" ")[1]); });
+    devant(f);
+  }
+  function devant(f){
+    Object.keys(FEN).forEach(function(k){ FEN[k].el.classList.remove("active"); });
+    f.el.style.zIndex = ++zMax; f.el.classList.add("active");
+    dockEtat();
+  }
+  function reduire(f){ f.el.classList.add("reduite"); f.el.classList.remove("active"); dockEtat(); }
+  function agrandir(f){ if (petit()) return; f.el.classList.toggle("agrandie"); ecrirePos(f); }
+  function fermer(f){
+    f.el.classList.add("neuve");
+    setTimeout(function(){ f.el.remove(); }, 200);
+    delete FEN[f.app.id]; dockEtat();
+  }
+  // Clic sur le dock : ouvre, met devant, ou réduit la fenêtre déjà devant
+  function basculer(a){
+    var f = FEN[a.id];
+    if (f && f.el.classList.contains("active") && !f.el.classList.contains("reduite")) reduire(f);
+    else ouvrir(a);
+  }
+  function dockEtat(){
+    [].forEach.call(dock.querySelectorAll(".tache[data-app]"), function(t){
+      var f = FEN[t.dataset.app];
+      t.classList.toggle("ouverte", !!f);
+      t.classList.toggle("devant", !!f && f.el.classList.contains("active") && !f.el.classList.contains("reduite"));
+    });
+  }
+  // Déplacement et redimensionnement au pointeur (les iframes ne captent rien pendant le geste)
+  function glisser(f, poignee, mode){
+    poignee.addEventListener("pointerdown", function(e){
+      if (e.button !== 0 || e.target.closest("button,a")) return;
+      var el = f.el;
+      if (mode === "deplace" && el.classList.contains("agrandie")){
+        if (petit()) return;
+        // on « décroche » la fenêtre agrandie sous le pointeur
+        var ratio = e.clientX / couche.clientWidth;
+        el.classList.remove("agrandie");
+        el.style.left = (e.clientX - el.offsetWidth * ratio) + "px"; el.style.top = "0px";
+      }
+      var x0 = e.clientX, y0 = e.clientY, g0 = {x:el.offsetLeft, y:el.offsetTop, l:el.offsetWidth, h:el.offsetHeight};
+      poignee.setPointerCapture(e.pointerId); couche.classList.add("bouge"); el.style.transition = "none";
+      function bouge(ev){
+        var dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (mode === "deplace"){ el.style.left = (g0.x + dx) + "px"; el.style.top = Math.max(0, g0.y + dy) + "px"; return; }
+        if (/d/.test(mode)) el.style.width = Math.max(320, g0.l + dx) + "px";
+        if (/b/.test(mode)) el.style.height = Math.max(220, g0.h + dy) + "px";
+        if (mode === "g"){ var l = Math.max(320, g0.l - dx); el.style.width = l + "px"; el.style.left = (g0.x + g0.l - l) + "px"; }
+      }
+      function fin(){
+        poignee.removeEventListener("pointermove", bouge); poignee.removeEventListener("pointerup", fin); poignee.removeEventListener("pointercancel", fin);
+        couche.classList.remove("bouge"); el.style.transition = "";
+        cadre(f); ecrirePos(f);
+      }
+      poignee.addEventListener("pointermove", bouge); poignee.addEventListener("pointerup", fin); poignee.addEventListener("pointercancel", fin);
+    });
+  }
+  // Un clic dans un outil (iframe) ne remonte pas jusqu'ici : on le devine au changement de focus
+  addEventListener("blur", function(){
+    setTimeout(function(){
+      var act = document.activeElement;
+      Object.keys(FEN).forEach(function(k){ if (FEN[k].ifr === act) devant(FEN[k]); });
+    }, 0);
+  });
+  addEventListener("resize", function(){ Object.keys(FEN).forEach(function(k){ cadre(FEN[k]); }); });
 
   // ---------- Dock : grossissement au survol (souris seulement) ----------
   var dock = $("#taches");
