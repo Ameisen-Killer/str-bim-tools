@@ -3,10 +3,11 @@
 // - La date du pied de page suit seule chaque publication ; MISE_A_JOUR n'est qu'un plancher (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-10-30";
+  var MISE_A_JOUR = "2026-11-01";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
+    {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
     {href:"/a-propos/", nom:"À propos", desc:"de Tony Varin"},
     {href:"/bench/", nom:"Bench", desc:"Comparateur de postes de travail"},
     {href:"/ifc/", nom:"IFC", desc:"Éditeur de maquettes IFC"},
