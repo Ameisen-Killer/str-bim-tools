@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.4.0";
+  var VERSION = "2.5.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -85,6 +85,81 @@
       return { angle: a, nord: nord };
     }
     return { angle: angleBat, nord: Math.PI/2 };
+  }
+
+  // Origine du repère du projet Revit : placement du bâtiment (sinon du site), la structure d'abord ; [0, 0] à défaut
+  function origineProjet(){
+    for (var i = 0; i < fichiers.length; i++){
+      var m = fichiers[i].m, bat = 0, site = 0;
+      m.ent.forEach(function(e){ if (!bat && e.type === "IFCBUILDING") bat = e.id; else if (!site && e.type === "IFCSITE") site = e.id; });
+      var o = (bat && vue.origine(m, bat)) || (site && vue.origine(m, site));
+      if (o) return o;
+    }
+    return [0, 0, 0];
+  }
+
+  // ================= Export DXF (vue de dessus) =================
+  // Arêtes de ce qui est affiché, coupées par la boîte de coupe, à plat dans le repère du projet Revit (mètres).
+  // DXF R12 texte : lu par AutoCAD, Revit, BricsCAD, LibreCAD… Calques : structure et un par statut de réservation.
+  var CALQUES_DXF = [["STR_EXISTANT", 8], ["STR_NOUVEAU", 221], ["RES_EN_ATTENTE", 5], ["RES_VALIDEE", 3], ["RES_REFUSEE", 1], ["RES_A_REVOIR", 30], ["RES_AUTRE", 6], ["RES_NUMEROS", 7]];
+  var CALQUE_CLASSE = { attente: "RES_EN_ATTENTE", valide: "RES_VALIDEE", refuse: "RES_REFUSEE", revoir: "RES_A_REVOIR", autre: "RES_AUTRE" };
+  function asciiDxf(t){ return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "_"); }
+  function exporterDxf(){
+    if (!fichiers.length){ etat("Ouvre d'abord les IFC."); return; }
+    var S = vue.segmentsPlan();
+    if (!S.length){ etat("Rien à exporter : aucun élément affiché" + (vue.aCoupe() ? " dans la boîte de coupe." : ".")); return; }
+    var O = origineProjet(), c = Math.cos(-angleProjet), s = Math.sin(-angleProjet);
+    function P(x, y){ var dx = x - O[0], dy = y - O[1]; return [c*dx - s*dy, s*dx + c*dy]; }
+    var parUid = new Map(); fichiers.forEach(function(fi){ parUid.set(fi.uid, fi); });
+    var L = [], vus = new Set(), nl = 0, nr = 0, mn = [Infinity, Infinity], mx = [-Infinity, -Infinity];
+    function g(code, v){ L.push(String(code), String(v)); }
+    function nb(v){ return (Math.round(v*1e4)/1e4).toFixed(4); }
+    function etendue(p){ if (p[0] < mn[0]) mn[0] = p[0]; if (p[1] < mn[1]) mn[1] = p[1]; if (p[0] > mx[0]) mx[0] = p[0]; if (p[1] > mx[1]) mx[1] = p[1]; }
+    var corps = [];
+    function ligne(calque, a, b){
+      var k = calque + nb(a[0]) + nb(a[1]) + nb(b[0]) + nb(b[1]), k2 = calque + nb(b[0]) + nb(b[1]) + nb(a[0]) + nb(a[1]);
+      if (vus.has(k) || vus.has(k2)) return;
+      vus.add(k); nl++; etendue(a); etendue(b);
+      corps.push("0", "LINE", "8", calque, "10", nb(a[0]), "20", nb(a[1]), "30", "0.0", "11", nb(b[0]), "21", nb(b[1]), "31", "0.0");
+    }
+    S.forEach(function(e){
+      var calque, r = parCle.get(e.id);
+      if (r) calque = CALQUE_CLASSE[classe(valeur(r, P_ST))] || "RES_AUTRE";
+      else {
+        var m = /^s(\d+):(\d+)$/.exec(e.id), fi = m && parUid.get(+m[1]);
+        calque = fi && fi.neufs && fi.neufs.has(+m[2]) ? "STR_NOUVEAU" : "STR_EXISTANT";
+      }
+      for (var i = 0; i < e.s.length; i += 4) ligne(calque, P(e.s[i], e.s[i+1]), P(e.s[i+2], e.s[i+3]));
+      if (r && r.num){
+        // numéro au centre de la réservation (centre de sa boîte englobante)
+        var p = P((e.min[0] + e.max[0])/2, (e.min[1] + e.max[1])/2); nr++;
+        corps.push("0", "TEXT", "8", "RES_NUMEROS", "10", nb(p[0]), "20", nb(p[1]), "30", "0.0", "40", "0.15", "1", asciiDxf(r.num), "72", "1", "73", "2", "11", nb(p[0]), "21", nb(p[1]), "31", "0.0");
+      }
+    });
+    g(0, "SECTION"); g(2, "HEADER");
+    g(9, "$ACADVER"); g(1, "AC1009");
+    g(9, "$INSUNITS"); g(70, 6);
+    g(9, "$EXTMIN"); g(10, nb(mn[0])); g(20, nb(mn[1])); g(30, "0.0");
+    g(9, "$EXTMAX"); g(10, nb(mx[0])); g(20, nb(mx[1])); g(30, "0.0");
+    g(0, "ENDSEC");
+    g(0, "SECTION"); g(2, "TABLES");
+    g(0, "TABLE"); g(2, "LTYPE"); g(70, 1);
+    g(0, "LTYPE"); g(2, "CONTINUOUS"); g(70, 0); g(3, "Solid line"); g(72, 65); g(73, 0); g(40, "0.0");
+    g(0, "ENDTAB");
+    g(0, "TABLE"); g(2, "LAYER"); g(70, CALQUES_DXF.length);
+    CALQUES_DXF.forEach(function(k){ g(0, "LAYER"); g(2, k[0]); g(70, 0); g(62, k[1]); g(6, "CONTINUOUS"); });
+    g(0, "ENDTAB");
+    g(0, "ENDSEC");
+    g(0, "SECTION"); g(2, "ENTITIES");
+    L = L.concat(corps);
+    g(0, "ENDSEC"); g(0, "EOF");
+    var niv = $("#c-niv").value, nomNiv = vue.aCoupe() && niv !== "" && niveaux[+niv] ? "_" + niveaux[+niv].nom : "";
+    var nom = ("FGH_plan_" + (maquette.nom || "maquette") + nomNiv).replace(/[^\w\-]+/g, "_") + ".dxf";
+    var blob = new Blob([L.join("\r\n") + "\r\n"], { type: "application/dxf" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nom;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    etat("DXF « " + nom + " » : " + nl + " lignes, " + pluriel(nr, "numéro") + " de réservation" + (vue.aCoupe() ? ", dans la boîte de coupe." : " (sans boîte de coupe : tous les étages se superposent)."));
   }
 
   // ================= Statuts =================
@@ -492,6 +567,7 @@
       else if (sel.size) boiteAutour(Array.from(sel));
       else boiteTout();
     }
+    else if (c === "dxf") exporterDxf();
     else if (c === "mesure" || c === "point") outil(c);
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
     else if (c === "structure"){ voirStructure = !voirStructure; b.setAttribute("aria-pressed", String(voirStructure)); afficher(); }

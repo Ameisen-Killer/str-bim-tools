@@ -2973,6 +2973,28 @@
         });
         return D;
       },
+      // FGH : arêtes vives des éléments affichés, coupées par la boîte de coupe s'il y en a une, mises à plat (vue de
+      // dessus) : [{ id, s: [x1, y1, x2, y2, …] (mètres, repère du fichier), min, max }] — sert à l'export DXF
+      segmentsPlan: function(){
+        var out = [], b = coupe;
+        liste.forEach(function(it){
+          var g = it.geo;
+          if (!g.faces || (b && (g.min[2] > b.max[2] || g.max[2] < b.min[2]))) return;
+          var A = aretesVives(g), s = [];
+          for (var i = 0; i < A.length; i += 6){
+            var x1 = A[i], y1 = A[i+1], x2 = A[i+3], y2 = A[i+4];
+            if (b){
+              var r = couperSegment([A[i], A[i+1], A[i+2]], [A[i+3], A[i+4], A[i+5]], b);
+              if (!r) continue;
+              x1 = r[0]; y1 = r[1]; x2 = r[3]; y2 = r[4];
+            }
+            if (Math.abs(x2 - x1) + Math.abs(y2 - y1) < 1e-4) continue;   // arête verticale : un point sur le plan
+            s.push(x1, y1, x2, y2);
+          }
+          if (s.length) out.push({ id: it.id, s: s, min: g.min, max: g.max });
+        });
+        return out;
+      },
       // FGH : orientation (radians, entre −45° et 45°) des éléments : celle de la plus grande face verticale de
       // chacun, la médiane s'il y en a plusieurs ; null sans face verticale. Les IFC géoréférencés sont tournés.
       angleDe: function(cles){
