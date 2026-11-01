@@ -173,7 +173,7 @@ a{color:inherit;text-decoration:none}
   "use strict";
   // Nom provisoire : à remplacer ici quand Tony aura choisi (titre d'onglet compris)
   var NOM = "Atelier STR";
-  var VERSION = "1.3.0";
+  var VERSION = "1.4.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -189,10 +189,16 @@ a{color:inherit;text-decoration:none}
          '<rect x="12" y="34" width="24" height="9" rx="2" fill="url(#c2)"/><text x="24" y="41" text-anchor="middle" font-family="Segoe UI,system-ui,sans-serif" font-size="7" font-weight="700" fill="#fff">DXF</text></svg>'
   };
 
+  // Bench : écran avec barres de comparaison
+  DESSINS.bench = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="d1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A4A52"/><stop offset="1" stop-color="#1E1E24"/></linearGradient><linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C69CFF"/><stop offset="1" stop-color="#7B4BD8"/></linearGradient></defs>' +
+    '<rect x="4" y="7" width="40" height="28" rx="3" fill="url(#d1)"/><path d="M19 35h10l2 6H17z" fill="#8A8A94"/><rect x="14" y="41" width="20" height="2.5" rx="1.2" fill="#8A8A94"/>' +
+    '<rect x="10" y="22" width="5" height="9" rx="1" fill="url(#d2)"/><rect x="18" y="16" width="5" height="15" rx="1" fill="url(#d2)"/><rect x="26" y="19" width="5" height="12" rx="1" fill="url(#d2)"/><rect x="34" y="12" width="5" height="19" rx="1" fill="#6CCB5F"/></svg>';
+
   var APPS = [
     {id:"fgh", nom:"Validateur réservations", court:"Réservations", href:"/fgh/", desc:"Valide les réservations FGH sur la maquette IFC, sans Revit."},
     {id:"ifc", nom:"Visionneuse IFC", court:"IFC", href:"/ifc/", desc:"Ouvre, explore et modifie une maquette IFC dans le navigateur."},
-    {id:"dxf", nom:"Visionneuse DXF", court:"DXF / DWG", href:"/dxf/", desc:"Ouvre un plan DXF ou DWG : calques, propriétés, mesure."}
+    {id:"dxf", nom:"Visionneuse DXF", court:"DXF / DWG", href:"/dxf/", desc:"Ouvre un plan DXF ou DWG : calques, propriétés, mesure."},
+    {id:"bench", nom:"Bench", court:"Bench", href:"/bench/", desc:"Compare les processeurs et cartes graphiques des postes de travail."}
   ];
 
   var $ = function(s){ return document.querySelector(s); };
