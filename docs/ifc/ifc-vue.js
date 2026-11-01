@@ -1384,6 +1384,172 @@
     return geo.T;
   }
 
+  // ================= Plan DXF : axes des murs, poteaux, ossatures, contours des dalles =================
+  // Tout est rendu à plat (vue de dessus), en coordonnées du fichier ; l'appelant convertit en mètres.
+  // Axe : représentation « Axis » de l'élément (Revit l'écrit pour les murs et les poutres), sinon grand axe
+  // de la géométrie, passant au milieu de l'encombrement en travers.
+  function axeItem(G, id, M, out, prof){
+    var e = G.m.ent.get(id);
+    if (!e || prof > 8) return;
+    var a = C(e);
+    if (e.type === "IFCMAPPEDITEM"){
+      var src = G.m.ent.get(R(a[0]));
+      if (!src) return;
+      var sa = C(src), M2 = mul(mul(M, operateur(G, a[1])), axe(G, sa[0])), rep = G.m.ent.get(R(sa[1]));
+      if (rep) L(C(rep)[3]).forEach(function(i){ axeItem(G, i, M2, out, prof + 1); });
+      return;
+    }
+    if (e.type === "IFCGEOMETRICSET" || e.type === "IFCGEOMETRICCURVESET"){ L(a[0]).forEach(function(i){ axeItem(G, i, M, out, prof + 1); }); return; }
+    var c = courbe(G, id);
+    if (!c || c.length < 2) return;
+    if (e.type === "IFCCIRCLE" || e.type === "IFCELLIPSE") c.push(c[0]);
+    var p = [];
+    for (var k = 0; k < c.length; k++){ var q = [0, 0, 0]; tp(M, c[k][0], c[k][1], c[k][2], q, 0); p.push(q); }
+    out.push(p);
+  }
+  // Polylignes [[x, y, z]…] de la représentation « Axis » d'un élément ; [] s'il n'en a pas
+  function axeRepresente(G, id){
+    var out = [];
+    try {
+      var a = C(G.m.ent.get(id)), pds = G.m.ent.get(R(a[6]));
+      if (!pds) return out;
+      var M = placement(G, R(a[5]));
+      L(C(pds)[2]).forEach(function(r){
+        var re = G.m.ent.get(r);
+        if (re && IFC.chaine(C(re)[1]).toLowerCase() === "axis") L(C(re)[3]).forEach(function(i){ axeItem(G, i, M, out, 0); });
+      });
+    } catch (x){ return []; }
+    return out;
+  }
+  // Grand axe de la géométrie (analyse en composantes principales des sommets) : [[x1, y1, z1], [x2, y2, z2]].
+  // aPlat : à plat (murs), sinon en 3D (poteaux, poutres inclinées).
+  function axeGeometrie(geo, aPlat){
+    var P = [], n, i, k, c = [0, 0, 0];
+    geo.faces.forEach(function(f){ var b = f.b[0]; for (var j = 0; j < b.length; j += 3) P.push(b[j], b[j+1], aPlat ? 0 : b[j+2]); });
+    n = P.length/3;
+    if (n < 2) return null;
+    for (i = 0; i < P.length; i += 3) for (k = 0; k < 3; k++) c[k] += P[i+k]/n;
+    var S = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (i = 0; i < P.length; i += 3){
+      var d = [P[i] - c[0], P[i+1] - c[1], P[i+2] - c[2]];
+      for (var r = 0; r < 3; r++) for (k = 0; k < 3; k++) S[3*r + k] += d[r]*d[k];
+    }
+    var v = [.81, .53, aPlat ? 0 : .27];
+    for (var it = 0; it < 60; it++){
+      var w = [S[0]*v[0] + S[1]*v[1] + S[2]*v[2], S[3]*v[0] + S[4]*v[1] + S[5]*v[2], S[6]*v[0] + S[7]*v[1] + S[8]*v[2]];
+      w = norm(w);
+      if (!w) break;
+      v = w;
+    }
+    v = norm(v) || [1, 0, 0];
+    var u = ortho(Math.abs(v[2]) < .9 ? [0, 0, 1] : [1, 0, 0], v), t = cross(v, u), E = [v, u, t], lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (i = 0; i < P.length; i += 3){
+      var q = [P[i] - c[0], P[i+1] - c[1], P[i+2] - c[2]];
+      for (k = 0; k < 3; k++){ var s = dot(q, E[k]); if (s < lo[k]) lo[k] = s; if (s > hi[k]) hi[k] = s; }
+    }
+    function pt(sv){
+      var m1 = (lo[1] + hi[1])/2, m2 = (lo[2] + hi[2])/2;
+      return [0, 1, 2].map(function(a){ return c[a] + v[a]*sv + u[a]*m1 + t[a]*m2; });
+    }
+    return [pt(lo[0]), pt(hi[0])];
+  }
+  // Contours de la face supérieure d'une dalle, vue de dessus : boucles fermées rangées en contour (profondeur
+  // paire) et réservations (boucle dans une autre), plus les bouts qui ne se referment pas.
+  // q : tolérance de raccord (unités du fichier). → { contours: [[x, y]…]…, reservations: …, libres: … }
+  function contoursDessus(geo, q){
+    var vol = 0;
+    geo.faces.forEach(function(f){ var b = f.b[0]; vol += b[0]*f.n[0] + b[1]*f.n[1] + b[2]*f.n[2]; });
+    // bord de la surface du dessus : côtés des faces tournées vers le haut qui n'appartiennent qu'à une seule
+    // d'entre elles (les plis entre deux faces du dessus, dalle à pente, ne sont pas des contours)
+    var sg = vol < 0 ? -1 : 1, cotes = new Map(), segs = [], vus = new Set(), noeuds = new Map();
+    function cle(x, y){ return Math.round(x/q) + "," + Math.round(y/q); }
+    function cle3(b, i){ return Math.round(b[i]/q) + "," + Math.round(b[i+1]/q) + "," + Math.round(b[i+2]/q); }
+    geo.faces.forEach(function(f){
+      if (f.n[2]*sg < .3) return;
+      f.b.forEach(function(b){
+        var n = b.length/3;
+        for (var i = 0; i < n; i++){
+          var j = (i + 1) % n, ka = cle3(b, 3*i), kc = cle3(b, 3*j);
+          if (ka === kc) continue;
+          var k = ka < kc ? ka + "|" + kc : kc + "|" + ka, c = cotes.get(k);
+          if (c) c.n++; else cotes.set(k, { n: 1, b: b, i: i, j: j });
+        }
+      });
+    });
+    cotes.forEach(function(o){
+      if (o.n !== 1) return;
+      var b = o.b, a = [b[3*o.i], b[3*o.i+1]], c = [b[3*o.j], b[3*o.j+1]], ka = cle(a[0], a[1]), kc = cle(c[0], c[1]);
+      if (ka === kc) return;
+      var k = ka < kc ? ka + "|" + kc : kc + "|" + ka;
+      if (vus.has(k)) return;
+      vus.add(k);
+      var s = { a: a, c: c, ka: ka, kc: kc, pris: false };
+      segs.push(s);
+      [ka, kc].forEach(function(x){ var l = noeuds.get(x); if (!l) noeuds.set(x, l = []); l.push(s); });
+    });
+    var boucles = [], libres = [];
+    segs.forEach(function(s0){
+      if (s0.pris) return;
+      s0.pris = true;
+      var pts = [s0.a, s0.c], debut = s0.ka, ici = s0.kc, ferme = false;
+      for (var garde = 0; garde < 100000; garde++){
+        if (ici === debut){ ferme = true; break; }
+        var l = noeuds.get(ici), s = null;
+        for (var m = 0; l && m < l.length; m++) if (!l[m].pris){ s = l[m]; break; }
+        if (!s) break;
+        s.pris = true;
+        if (s.ka === ici){ pts.push(s.c); ici = s.kc; } else { pts.push(s.a); ici = s.ka; }
+      }
+      if (ferme && pts.length > 3){ pts.pop(); boucles.push(pts); }
+      else libres.push(pts);
+    });
+    function aireB(p){ var s = 0; for (var i = 0, j = p.length - 1; i < p.length; j = i++) s += (p[j][0] - p[i][0])*(p[j][1] + p[i][1]); return Math.abs(s/2); }
+    function dedans(p, x, y){
+      var r = false;
+      for (var i = 0, j = p.length - 1; i < p.length; j = i++)
+        if ((p[i][1] > y) !== (p[j][1] > y) && x < (p[j][0] - p[i][0])*(y - p[i][1])/(p[j][1] - p[i][1]) + p[i][0]) r = !r;
+      return r;
+    }
+    var A = boucles.map(aireB), res = { contours: [], reservations: [] };
+    boucles.forEach(function(p, i){
+      // point d'essai : milieu du premier côté (un sommet peut toucher le contour extérieur)
+      var x = (p[0][0] + p[1][0])/2, y = (p[0][1] + p[1][1])/2, prof = 0;
+      boucles.forEach(function(o, j){ if (j !== i && A[j] > A[i] && dedans(o, x, y)) prof++; });
+      (prof % 2 ? res.reservations : res.contours).push(p);
+    });
+    // bouts ouverts (marche dans le dessus) : réservation s'ils sont dans un contour fermé
+    res.libres = [];
+    libres.forEach(function(p){
+      var x = (p[0][0] + p[1][0])/2, y = (p[0][1] + p[1][1])/2, prof = 0;
+      boucles.forEach(function(o){ if (dedans(o, x, y)) prof++; });
+      (prof % 2 ? res.reservations : res.libres).push(p);
+    });
+    return res;
+  }
+  // Segment à plat coupé par la boîte (repère tourné de la boîte, en plan seulement) ; null s'il est dehors
+  function couperPlan(x1, y1, x2, y2, B){
+    if (!B) return [x1, y1, x2, y2];
+    var la = versBoite(B, x1, y1), lb = versBoite(B, x2, y2), t0 = 0, t1 = 1;
+    for (var ax = 0; ax < 2; ax++){
+      var d = lb[ax] - la[ax];
+      if (Math.abs(d) < 1e-12){ if (la[ax] < B.min[ax] || la[ax] > B.max[ax]) return null; continue; }
+      var u = (B.min[ax] - la[ax])/d, v = (B.max[ax] - la[ax])/d;
+      if (u > v){ var w = u; u = v; v = w; }
+      if (u > t0) t0 = u;
+      if (v < t1) t1 = v;
+      if (t0 > t1) return null;
+    }
+    return [x1 + t0*(x2 - x1), y1 + t0*(y2 - y1), x1 + t1*(x2 - x1), y1 + t1*(y2 - y1)];
+  }
+  // Genre d'un élément pour le plan : murs, dalles, poteaux, ossatures (poutres, membrures), sinon null
+  function genrePlan(t){
+    if (/^IFCWALL/.test(t)) return "murs";
+    if (/^IFCSLAB/.test(t)) return "dalles";
+    if (/^IFCCOLUMN/.test(t)) return "poteaux";
+    if (/^IFCBEAM/.test(t) || /^IFCMEMBER/.test(t)) return "ossatures";
+    return null;
+  }
+
   // ================= Moteur WebGL =================
   // Boîte de coupe dans les fragment shaders (coordonnées relatives à l'origine du tampon)
   var COUPE = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
@@ -2788,7 +2954,7 @@
           var G = Gs.get(it.m), g = null, rgb = null;
           if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
           if (G && !g) g = geometrie(G, it.id);
-          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb, m: it.m, e: it.id }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
@@ -2836,6 +3002,64 @@
       // Cadre de la boîte (arêtes et poignées) masqué ou affiché ; la coupe reste active
       cadre: function(oui){ if (oui !== undefined){ cadreMasque = !oui; demander(); } return !cadreMasque; },
       aCoupe: function(){ return !!coupe; },
+      // Plan DXF : éléments affichés (murs, dalles, poteaux, ossatures) qui touchent la boîte de coupe, ou tous
+      // sans boîte ; vue de dessus coupée par la boîte, en mètres dans le repère du fichier.
+      // → { murs, dalles, reservations, poteaux, ossatures : [x1, y1, x2, y2, …], points: [x, y, …] (poteaux
+      // verticaux), n: éléments retenus par genre, axesCalcules: axes tirés de la géométrie faute de « Axis » }
+      planDxf: function(){
+        var b = coupe, r = { murs: [], dalles: [], reservations: [], poteaux: [], ossatures: [], points: [], n: { murs: 0, dalles: 0, poteaux: 0, ossatures: 0 }, axesCalcules: 0 };
+        liste.forEach(function(it){
+          var G = Gs.get(it.m), g = it.geo, e = G && it.e && G.m.ent.get(it.e), genre = e && genrePlan(e.type);
+          if (!genre || !g || !g.faces) return;
+          if (b){
+            if (g.min[2] > b.max[2] || g.max[2] < b.min[2]) return;
+            var u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+            for (var i = 0; i < 4; i++){
+              var l = versBoite(b, i & 1 ? g.max[0] : g.min[0], i & 2 ? g.max[1] : g.min[1]);
+              if (l[0] < u0) u0 = l[0]; if (l[0] > u1) u1 = l[0]; if (l[1] < v0) v0 = l[1]; if (l[1] > v1) v1 = l[1];
+            }
+            if (u0 > b.max[0] || u1 < b.min[0] || v0 > b.max[1] || v1 < b.min[1]) return;
+          }
+          var pm = G.parM || 1, k = 1/pm, ok = false;
+          function seg(cal, p, q){
+            var s = couperPlan(p[0], p[1], q[0], q[1], b);
+            if (!s || Math.abs(s[2] - s[0]) + Math.abs(s[3] - s[1]) < 1e-4*pm) return;
+            r[cal].push(s[0]*k, s[1]*k, s[2]*k, s[3]*k); ok = true;
+          }
+          function poly(cal, p, ferme){
+            for (var j = 0; j + 1 < p.length; j++) seg(cal, p[j], p[j+1]);
+            if (ferme && p.length > 2) seg(cal, p[p.length - 1], p[0]);
+          }
+          if (genre === "dalles"){
+            var c = contoursDessus(g, .001*pm);
+            c.contours.forEach(function(p){ poly("dalles", p, true); });
+            c.reservations.forEach(function(p){ poly("reservations", p, true); });
+            c.libres.forEach(function(p){ poly("dalles", p, false); });
+          } else {
+            var ax = axeRepresente(G, it.e);
+            if (!ax.length){ var a2 = axeGeometrie(g, genre === "murs"); if (a2){ ax = [a2]; r.axesCalcules++; } }
+            var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, sx = 0, sy = 0, np = 0;
+            ax.forEach(function(p){ p.forEach(function(q){ x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); sx += q[0]; sy += q[1]; np++; }); });
+            if (genre === "poteaux" && np && Math.max(x1 - x0, y1 - y0) < .01*pm){
+              // poteau vertical : son axe n'est qu'un point en plan
+              var px = sx/np, py = sy/np, lb = b ? versBoite(b, px, py) : null;
+              if (!lb || (lb[0] >= b.min[0] && lb[0] <= b.max[0] && lb[1] >= b.min[1] && lb[1] <= b.max[1])){ r.points.push(px*k, py*k); ok = true; }
+            }
+            else ax.forEach(function(p){ poly(genre, p, false); });
+          }
+          if (ok) r.n[genre]++;
+        });
+        return r;
+      },
+      // origine (mètres) du placement d'une entité IFC (bâtiment, site), ou null
+      origine: function(m, id){
+        var G = Gs.get(m) || prets.get(m);
+        if (!G) return null;
+        try {
+          var e = G.m.ent.get(id), M0 = placement(G, R(C(e)[5])), k = 1/(G.parM || 1);
+          return [M0[9]*k, M0[10]*k, M0[11]*k];
+        } catch (x){ return null; }
+      },
       // Outil de mesure : mode actif ou non (sans argument : l'état) ; les mesures faites restent affichées
       // Outil de la vue : "mesure", "point" (coordonnées) ou null ; sans argument : l'outil en cours.
       // Les mesures et coordonnées relevées restent affichées.

@@ -16,6 +16,9 @@
     if (o < 1048576) return (o/1024).toFixed(1).replace(".", ",") + " Ko";
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
+  // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
+  var VERSION = "1.1.0";
+  (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
   // fichier ouvert : { uid, m (modèle IFC), propre (version exportée), visible, plie, teinte (0–360 ou null), taille: {v, t} }
@@ -1350,10 +1353,88 @@
     var c = choix.size ? Array.from(choix) : itemsVue().map(function(i){ return i.cle; });
     if (c.length) couperCles(c);
   });
+  $("#b-dxf").addEventListener("click", exporterDxfAxes);
   $("#b-lissage").setAttribute("aria-pressed", String(vue.lissage()));
   $("#b-lissage").addEventListener("click", function(){
     var on = !vue.lissage(); vue.lissage(on); this.setAttribute("aria-pressed", String(on)); garder("ifc.lissage", on ? "1" : "0");
   });
+
+  // ================= Export DXF : axes et contours, vue de dessus =================
+  // Murs (axe), poteaux (axe ; croix au point d'un poteau vertical), ossatures (axe des poutres et membrures),
+  // dalles (contour du dessus et réservations) : éléments affichés qui touchent la boîte de coupe, coupés par
+  // elle. DXF R12 texte en mètres, dans le repère du projet Revit (origine = placement du bâtiment, sinon du
+  // site ; axes = angleProjet), pour se superposer à un plan exporté de Revit.
+  var CALQUES_AXES = [["STR_MURS_AXES", 1, "AXE"], ["STR_DALLES_CONTOURS", 3, "CONTINUOUS"], ["STR_DALLES_RESERVATIONS", 30, "CONTINUOUS"],
+    ["STR_POTEAUX_AXES", 5, "AXE"], ["STR_OSSATURES_AXES", 6, "AXE"]];
+  function origineProjet(){
+    for (var i = 0; i < fichiers.length; i++){
+      if (!fichiers[i].visible) continue;
+      var m = fichiers[i].m, bat = 0, site = 0;
+      m.ent.forEach(function(e){ if (!bat && e.type === "IFCBUILDING") bat = e.id; else if (!site && e.type === "IFCSITE") site = e.id; });
+      var o = (bat && vue.origine(m, bat)) || (site && vue.origine(m, site));
+      if (o) return o;
+    }
+    return [0, 0, 0];
+  }
+  function exporterDxfAxes(){
+    if (!fichiers.length){ etat("Ouvre d'abord un IFC."); return; }
+    var P = vue.planDxf(), nt = P.n.murs + P.n.dalles + P.n.poteaux + P.n.ossatures;
+    if (!nt){ etat("Rien à exporter : aucun mur, dalle, poteau ni ossature affiché" + (vue.aCoupe() ? " dans la boîte de coupe." : ".")); return; }
+    var O = origineProjet(), c = Math.cos(-angleProjet), s = Math.sin(-angleProjet);
+    function T(x, y){ var dx = x - O[0], dy = y - O[1]; return [c*dx - s*dy, s*dx + c*dy]; }
+    var L = [], corps = [], vus = new Set(), nl = 0, mn = [Infinity, Infinity], mx = [-Infinity, -Infinity];
+    function g(code, v){ L.push(String(code), String(v)); }
+    function nb(v){ return (Math.round(v*1e4)/1e4).toFixed(4); }
+    function etendue(p){ if (p[0] < mn[0]) mn[0] = p[0]; if (p[1] < mn[1]) mn[1] = p[1]; if (p[0] > mx[0]) mx[0] = p[0]; if (p[1] > mx[1]) mx[1] = p[1]; }
+    function ligne(calque, a, b){
+      var k = calque + nb(a[0]) + nb(a[1]) + nb(b[0]) + nb(b[1]), k2 = calque + nb(b[0]) + nb(b[1]) + nb(a[0]) + nb(a[1]);
+      if (vus.has(k) || vus.has(k2)) return;
+      vus.add(k); nl++; etendue(a); etendue(b);
+      corps.push("0", "LINE", "8", calque, "10", nb(a[0]), "20", nb(a[1]), "30", "0.0", "11", nb(b[0]), "21", nb(b[1]), "31", "0.0");
+    }
+    [["murs", "STR_MURS_AXES"], ["dalles", "STR_DALLES_CONTOURS"], ["reservations", "STR_DALLES_RESERVATIONS"], ["poteaux", "STR_POTEAUX_AXES"], ["ossatures", "STR_OSSATURES_AXES"]].forEach(function(q){
+      var S = P[q[0]];
+      for (var i = 0; i < S.length; i += 4) ligne(q[1], T(S[i], S[i+1]), T(S[i+2], S[i+3]));
+    });
+    // poteau vertical : point et croix de 30 cm sur les axes du projet
+    for (var i = 0; i < P.points.length; i += 2){
+      var p = T(P.points[i], P.points[i+1]), d = .15;
+      etendue(p);
+      corps.push("0", "POINT", "8", "STR_POTEAUX_AXES", "10", nb(p[0]), "20", nb(p[1]), "30", "0.0");
+      ligne("STR_POTEAUX_AXES", [p[0] - d, p[1]], [p[0] + d, p[1]]);
+      ligne("STR_POTEAUX_AXES", [p[0], p[1] - d], [p[0], p[1] + d]);
+    }
+    g(0, "SECTION"); g(2, "HEADER");
+    g(9, "$ACADVER"); g(1, "AC1009");
+    g(9, "$INSUNITS"); g(70, 6);
+    g(9, "$LTSCALE"); g(40, "1.0");
+    g(9, "$EXTMIN"); g(10, nb(mn[0])); g(20, nb(mn[1])); g(30, "0.0");
+    g(9, "$EXTMAX"); g(10, nb(mx[0])); g(20, nb(mx[1])); g(30, "0.0");
+    g(0, "ENDSEC");
+    g(0, "SECTION"); g(2, "TABLES");
+    g(0, "TABLE"); g(2, "LTYPE"); g(70, 2);
+    g(0, "LTYPE"); g(2, "CONTINUOUS"); g(70, 0); g(3, "Solid line"); g(72, 65); g(73, 0); g(40, "0.0");
+    // axe : trait mixte (long 0,60 m, vide 0,10, point 0,02, vide 0,10)
+    g(0, "LTYPE"); g(2, "AXE"); g(70, 0); g(3, "Axe ____ . ____ . ____"); g(72, 65); g(73, 4); g(40, "0.82");
+    g(49, "0.60"); g(49, "-0.10"); g(49, "0.02"); g(49, "-0.10");
+    g(0, "ENDTAB");
+    g(0, "TABLE"); g(2, "LAYER"); g(70, CALQUES_AXES.length);
+    CALQUES_AXES.forEach(function(k){ g(0, "LAYER"); g(2, k[0]); g(70, 0); g(62, k[1]); g(6, k[2]); });
+    g(0, "ENDTAB");
+    g(0, "ENDSEC");
+    g(0, "SECTION"); g(2, "ENTITIES");
+    L = L.concat(corps);
+    g(0, "ENDSEC"); g(0, "EOF");
+    var f0 = fichiers.filter(function(f){ return f.visible; })[0] || fichiers[0];
+    var nom = ("Axes_" + f0.m.nom.replace(/\.ifc(zip)?$/i, "")).replace(/[^\w\-]+/g, "_") + ".dxf";
+    var blob = new Blob([L.join("\r\n") + "\r\n"], { type: "application/dxf" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nom;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    var bilan = [pluriel(P.n.murs, "mur"), pluriel(P.n.dalles, "dalle"), pluriel(P.n.poteaux, "poteau", "poteaux"), pluriel(P.n.ossatures, "ossature")].join(", ");
+    etat("DXF « " + nom + " » : " + bilan + " (" + pluriel(nl, "ligne") + ")" + (vue.aCoupe() ? ", dans la boîte de coupe." : " ; sans boîte de coupe, tous les étages se superposent.") +
+      (P.axesCalcules ? " " + pluriel(P.axesCalcules, "axe") + " sans représentation « Axis » dans l'IFC, déduit" + (P.axesCalcules > 1 ? "s" : "") + " de la forme." : ""));
+  }
 
   // ================= Masquer / isoler dans la vue 3D =================
   function elementsDe(liste){
@@ -1576,6 +1657,7 @@
     zoomer: function(){ zoomerCles(cibles()); },
     coupe: function(){ couperCles(cibles()); },
     "sans-coupe": sansCoupe,
+    "dxf-axes": exporterDxfAxes,
     "equerre-coupe": equerreCoupe,
     "cadre-coupe": function(){
       var v = vue.cadre(!vue.cadre());
