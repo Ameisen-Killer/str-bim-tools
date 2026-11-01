@@ -130,7 +130,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   .lst{max-height:60vh}
 }
 
-/* chevrons : réduire la liste (gauche) ou la fiche (droite), choix gardé dans ce navigateur */
+/* chevrons : réduire la liste (gauche) ou la fiche (droite), les deux fermés à l'ouverture ; au-dessus de l'accueil */
 .replier{position:absolute;top:50%;z-index:7;width:16px;height:48px;margin-top:-24px;padding:0;display:grid;place-items:center;border:1px solid var(--ligne);background:rgba(var(--fond-rvb),.78);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);color:var(--texte-doux);cursor:pointer;box-shadow:var(--ombre-legere);font-size:13px;line-height:1}
 .replier:hover{background:var(--couche-2,var(--noir-3));color:var(--texte);width:20px}
 .replier.g{left:0;border-left:0;border-radius:0 6px 6px 0}
@@ -139,6 +139,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app.sans-d{grid-template-columns:330px 1fr}.app.sans-d .fiche{display:none!important}
 .app.sans-g.sans-d{grid-template-columns:1fr}
 @media (max-width:1100px){.app.sans-g{grid-template-columns:1fr}.app.sans-d{grid-template-columns:300px 1fr}.app.sans-g.sans-d{grid-template-columns:1fr}}
+.centre .replier{z-index:9}
 @media (max-width:760px){.replier{display:none}}
 
 /* ---------- Filtres et liste ---------- */
@@ -393,6 +394,6 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <script src="/fgh/fgh-core.js?v=2"></script>
 <script src="/fgh/fgh-vue.js?v=15"></script>
 <script src="/fgh/fgh-cube.js?v=4"></script>
-<script src="/fgh/fgh-app.js?v=29"></script>
+<script src="/fgh/fgh-app.js?v=30"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.1.1";
+  var VERSION = "2.2.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -1022,10 +1022,9 @@
     b.textContent = (cote === "g") === oui ? "›" : "‹";
     b.title = (oui ? "Afficher " : "Réduire ") + quoi;
     b.setAttribute("aria-expanded", String(!oui));
-    lsSet("fgh.replie." + cote, oui ? "1" : "0");
   }
   ["g", "d"].forEach(function(c){
-    replier(c, lsGet("fgh.replie." + c, "0") === "1");
+    replier(c, true); // demande de Tony : les deux bandeaux fermés à l'ouverture de la page
     $("#rep-" + c).addEventListener("click", function(){ replier(c, !document.querySelector(".app").classList.contains("sans-" + c)); });
   });
   $("#btn-theme").addEventListener("click", function(){
