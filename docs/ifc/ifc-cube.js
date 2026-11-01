@@ -22,7 +22,7 @@
   var BORD = .3;                              // largeur des bandes d'arête et des coins (côté du cube : 2)
   var R1 = 1.95, R2 = 2.32;                   // boussole : rayons intérieur et extérieur, au pied du cube
   var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();   // comme la vue
-  var POLICE = '"Inter Tight","Inter Tight repli",system-ui,-apple-system,"Segoe UI",sans-serif';
+  var POLICE = '"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif';
   var CARDINAUX = [{ l: "N", d: 0 }, { l: "E", d: -DEMI }, { l: "S", d: PI }, { l: "O", d: DEMI }];
 
   function dot(a, b){ return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
@@ -54,13 +54,13 @@
     function palette(){
       var clair = document.documentElement.getAttribute("data-theme") === "clair";
       return clair ? {
-        face: [251, 250, 246], ombre: [.80, .20], arete: "rgba(22,19,15,.45)", texte: "rgb(74,66,54)",
-        or: "rgb(122,83,18)", orFond: "rgba(122,83,18,.26)", anneau: "rgba(22,19,15,.09)", anneauTrait: "rgba(22,19,15,.32)",
-        lettre: "rgb(74,66,54)", outil: "rgba(22,19,15,.55)"
+        face: [252, 252, 252], ombre: [.80, .20], arete: "rgba(0,0,0,.36)", texte: "rgb(60,60,60)",
+        or: "rgb(0,95,184)", orFond: "rgba(0,95,184,.20)", anneau: "rgba(0,0,0,.07)", anneauTrait: "rgba(0,0,0,.28)",
+        lettre: "rgb(60,60,60)", outil: "rgba(0,0,0,.55)"
       } : {
-        face: [74, 72, 66], ombre: [.70, .50], arete: "rgba(236,232,224,.42)", texte: "rgb(236,232,224)",
-        or: "rgb(240,200,120)", orFond: "rgba(214,168,92,.42)", anneau: "rgba(236,232,224,.10)", anneauTrait: "rgba(236,232,224,.34)",
-        lettre: "rgb(236,232,224)", outil: "rgba(236,232,224,.62)"
+        face: [70, 70, 70], ombre: [.70, .50], arete: "rgba(255,255,255,.36)", texte: "rgb(255,255,255)",
+        or: "rgb(96,205,255)", orFond: "rgba(96,205,255,.32)", anneau: "rgba(255,255,255,.09)", anneauTrait: "rgba(255,255,255,.30)",
+        lettre: "rgb(255,255,255)", outil: "rgba(255,255,255,.62)"
       };
     }
 

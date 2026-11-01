@@ -360,6 +360,174 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g) max(24px,env(safe-area-inset-bottom));border-top:1px solid var(--ligne);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-faible)}
 footer a{text-decoration:none}
 footer a:hover{color:var(--or)}
+
+/* ================= Éditeur : habillage inspiré de Windows 11 (Fluent), comme /fgh/ =================
+   Fond Mica, panneaux arrondis posés dessus, menus en flyouts acryliques, contrôles à 4 px, accent bleu
+   Windows, police Segoe UI Variable (celle de Windows). L'accueil garde la charte noir et or du site.
+   --vue-piece et --vue-arete restent ceux de la charte : l'aperçu 3D les lit une fois, avant l'éditeur. */
+:root:has(body.edition){
+  --encre:255,255,255;
+  --fond-rvb:44,44,44;
+  --or-rvb:96,205,255;
+  --or:#60CDFF;
+  --sur-accent:#000;
+  --noir:#202020;
+  --noir-2:#272727;
+  --noir-3:#2D2D2D;
+  --couche-2:#2D2D2D;
+  --controle:rgba(255,255,255,.061);
+  --controle-survol:rgba(255,255,255,.084);
+  --controle-appui:rgba(255,255,255,.033);
+  --bord-controle:rgba(255,255,255,.07);
+  --bord-bas:rgba(255,255,255,.035);
+  --ligne:rgba(255,255,255,.083);
+  --texte:#FFFFFF;
+  --texte-doux:rgba(255,255,255,.786);
+  --texte-faible:rgba(255,255,255,.545);
+  --rouge:#FF99A4;
+  --ombre:0 8px 16px rgba(0,0,0,.26),0 0 0 1px rgba(0,0,0,.2);
+  --ombre-legere:0 2px 4px rgba(0,0,0,.26);
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"IBM Plex Mono",ui-monospace,monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+  --titre:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+  --vue-fond:#1C1C1C;
+}
+:root[data-theme="clair"]:has(body.edition){
+  --encre:0,0,0;
+  --fond-rvb:251,251,251;
+  --or-rvb:0,95,184;
+  --or:#005FB8;
+  --sur-accent:#FFF;
+  --noir:#F3F3F3;
+  --noir-2:#F9F9F9;
+  --noir-3:#FFFFFF;
+  --couche-2:#FFFFFF;
+  --controle:rgba(255,255,255,.7);
+  --controle-survol:rgba(249,249,249,.5);
+  --controle-appui:rgba(249,249,249,.3);
+  --bord-controle:rgba(0,0,0,.0578);
+  --bord-bas:rgba(0,0,0,.1622);
+  --ligne:rgba(0,0,0,.0803);
+  --texte:#1B1B1B;
+  --texte-doux:rgba(0,0,0,.62);
+  --texte-faible:rgba(0,0,0,.45);
+  --rouge:#C42B1C;
+  --ombre:0 8px 16px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.06);
+  --ombre-legere:0 2px 4px rgba(0,0,0,.08);
+  --vue-fond:#EEF0F3;
+}
+body.edition{font-weight:400;font-size:14px;line-height:20px;background:var(--noir)}
+body.edition :focus-visible{outline:2px solid var(--texte);outline-offset:1px;border-radius:4px}
+body.edition ::selection{background:rgba(var(--or-rvb),.35)}
+
+/* barre de menus et barre de commandes, sur le Mica */
+body.edition .outils{padding:4px 12px 6px;gap:4px 16px;border-bottom:0;background:var(--noir)}
+body.edition .mb{margin-left:-4px;gap:2px}
+body.edition .mb-titre{padding:5px 10px;margin:2px 0;border-radius:4px;font-family:var(--sans);font-size:14px;letter-spacing:0;text-transform:none;color:var(--texte)}
+body.edition .mb-titre:hover,body.edition .mb-titre:focus-visible,body.edition .mb-titre[aria-expanded="true"]{color:var(--texte);background:var(--controle-survol)}
+body.edition .mb-liste,body.edition .ctx{padding:4px;background:rgba(var(--fond-rvb),.86);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre)}
+body.edition .mb-liste{top:calc(100% + 4px)}
+body.edition .mb-sm>.mb-sl{top:-5px}
+body.edition .mb-liste button{padding:6px 10px;border-radius:4px;font-size:14px;line-height:20px}
+body.edition .mb-liste button:hover:not(:disabled),body.edition .mb-liste button:focus-visible,
+body.edition .mb-sm:hover>.mb-sm-titre,body.edition .mb-sm:focus-within>.mb-sm-titre{background:var(--controle-survol);color:var(--texte)}
+body.edition .mb-liste button.danger{color:var(--rouge)}
+body.edition .mb-liste button.danger:hover:not(:disabled),body.edition .mb-liste button.danger:focus-visible{background:color-mix(in srgb,var(--rouge) 14%,transparent);color:var(--rouge)}
+body.edition .mb-liste kbd{font-family:var(--sans);font-size:12px;letter-spacing:0;color:var(--texte-faible)}
+body.edition .mb-liste hr{margin:4px -4px}
+body.edition .mb-liste [role="menuitemradio"][aria-checked="true"] span::before{color:var(--or)}
+body.edition .mb-sous{font-family:var(--sans);font-size:12px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--texte-faible);padding:8px 10px 2px}
+body.edition .ctx .ctx-titre{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--texte-doux);padding:6px 10px 4px}
+body.edition .teintes{padding:6px 10px 8px}
+body.edition .mb-liste .teintes button{padding:0;border-radius:50%}
+body.edition .mb-liste .teintes button[aria-checked="true"]{border-color:var(--or);box-shadow:0 0 0 2px rgba(var(--or-rvb),.4)}
+body.edition .infobulle{background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre);font-size:13px}
+body.edition .fichier{border-left:1px solid var(--ligne)}
+body.edition .fichier-nom{font-weight:600}
+body.edition .fichier-bilan{font-family:var(--sans);font-size:12px;letter-spacing:0}
+body.edition .etat{font-family:var(--sans);font-size:12px;letter-spacing:0}
+body.edition .etat::before{content:"";display:inline-block;width:6px;height:6px;margin:0 8px 1px 2px;border-radius:50%;background:var(--or);vertical-align:middle}
+body.edition .etat:empty::before{display:none}
+
+/* panneaux arrondis */
+body.edition .panneaux{gap:8px;padding:0 8px 8px}
+body.edition .panneau{background:var(--noir-2);border:1px solid var(--ligne);border-radius:8px;overflow:hidden}
+body.edition .p-liste,body.edition .p-props{border:1px solid var(--ligne)}
+body.edition .p-vue{background:var(--vue-fond)}
+body.edition .p-titre{font-family:var(--titre);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--texte);padding:12px 14px 8px}
+
+/* boutons et champs Fluent */
+body.edition .btn{min-height:32px;padding:5px 12px;border-radius:4px;background:var(--controle);border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);color:var(--texte);font-family:var(--sans);font-size:14px;letter-spacing:0;text-transform:none;line-height:20px}
+body.edition .btn:hover:not(:disabled),body.edition .btn:focus-visible{background:var(--controle-survol);border-color:var(--bord-controle);color:var(--texte)}
+body.edition .btn:active:not(:disabled){background:var(--controle-appui);color:var(--texte-doux)}
+body.edition .btn.plein{background:var(--or);border-color:rgba(var(--encre),.08);border-bottom-color:rgba(0,0,0,.4);color:var(--sur-accent);font-weight:600}
+body.edition .btn.plein:hover:not(:disabled),body.edition .btn.plein:focus-visible{background:var(--or);color:var(--sur-accent);filter:brightness(1.08)}
+body.edition .btn.danger{background:var(--rouge);border-color:rgba(var(--encre),.08);color:var(--sur-accent);font-weight:600}
+body.edition .btn.danger:hover:not(:disabled),body.edition .btn.danger:focus-visible{background:var(--rouge);color:var(--sur-accent);filter:brightness(1.08)}
+body.edition .btn.petit{min-height:28px;padding:3px 10px;font-size:13px}
+body.edition .champ{min-height:32px;padding:5px 10px;border-radius:4px;background:var(--controle);border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);font-size:14px}
+body.edition .champ:hover{background:var(--controle-survol)}
+body.edition .champ:focus{background:var(--couche-2);border-color:var(--bord-controle);border-bottom:2px solid var(--or);padding-bottom:4px}
+body.edition .champ::placeholder{color:var(--texte-faible)}
+body.edition select.champ option{background:var(--couche-2);color:var(--texte)}
+body.edition .filtres{padding:0 10px 10px;border-bottom:0}
+body.edition .compte{font-family:var(--sans);font-size:12px}
+
+/* arborescence */
+body.edition .liste{padding:0 4px 16px}
+body.edition .el{position:relative;margin:1px 0;border-left:0;border-radius:4px;padding-left:calc(10px + var(--niv,0)*14px)}
+body.edition .el:hover{background:var(--controle-survol)}
+body.edition .el.actif{background:var(--controle)}
+body.edition .el.actif::before{content:"";position:absolute;left:0;top:50%;height:16px;margin-top:-8px;width:3px;border-radius:2px;background:var(--or)}
+body.edition .el.choisi .el-nom{color:var(--texte);font-weight:600}
+body.edition .el-nom{font-size:14px;line-height:20px}
+body.edition .el-info{font-family:var(--sans);font-size:12px;letter-spacing:0}
+body.edition .el.cache .el-nom::after{font-family:var(--sans);font-size:12px}
+body.edition .fic{margin:6px 0 2px;border:1px solid var(--bord-controle);border-radius:4px;background:var(--controle)}
+body.edition .fic:first-child{margin-top:4px;border-top:1px solid var(--bord-controle)}
+body.edition .fic:hover{background:var(--controle-survol)}
+body.edition .fic .el-nom{font-weight:600}
+body.edition .fic-oeil,body.edition .fic-act button{border-radius:4px;font-family:var(--sans);letter-spacing:0}
+body.edition .fic-oeil:hover,body.edition .fic-act button:hover{background:var(--controle-survol);color:var(--texte)}
+
+/* vue 3D */
+body.edition .vue-outils{gap:2px;padding:4px;border-radius:8px;background:rgba(var(--fond-rvb),.72);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);box-shadow:var(--ombre-legere)}
+body.edition .vue-outils .btn{background:transparent;border-color:transparent}
+body.edition .vue-outils .btn:hover{background:var(--controle-survol)}
+body.edition .vue-outils .btn[aria-pressed="true"]{background:var(--or);border-color:transparent;color:var(--sur-accent)}
+body.edition .p-vue canvas.cube{top:56px}
+body.edition .vue-aide,body.edition .vue-info{font-family:var(--sans);font-size:12px;letter-spacing:0}
+body.edition .mesures text{font-family:var(--sans)}
+
+/* propriétés : cartes */
+body.edition .props{padding:0 10px 20px}
+body.edition .props h3{font-family:var(--titre);font-weight:600;font-size:20px;line-height:28px}
+body.edition .props .type{font-family:var(--sans);font-size:13px;letter-spacing:0}
+body.edition .props dl{font-size:13px}
+body.edition .pset{margin-top:8px;padding:10px 12px;border:1px solid var(--bord-controle);border-radius:8px;background:var(--controle)}
+body.edition .pset-nom{font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--texte)}
+
+/* boîtes de dialogue : ContentDialog */
+body.edition dialog{padding:0;border:1px solid var(--ligne);border-radius:8px;background:var(--couche-2);box-shadow:var(--ombre);overflow:hidden}
+body.edition dialog>form,body.edition dialog>div{padding:24px}
+body.edition dialog::backdrop{background:rgba(0,0,0,.3)}
+body.edition dialog h2{font-family:var(--titre);font-weight:600;font-size:20px;line-height:28px}
+body.edition dialog p{font-size:14px}
+body.edition dialog .actions{margin:24px -24px -24px;padding:20px 24px;background:var(--noir-2);border-top:1px solid var(--ligne)}
+body.edition dialog .actions .btn{flex:1;justify-content:center}
+body.edition .prefs legend,body.edition .purge-titre{font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--texte)}
+body.edition .purge-jeux{border-radius:4px}
+body.edition .prefs label.coche b{font-family:var(--sans)}
+body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 6px;border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);border-radius:4px;background:var(--controle);color:var(--texte)}
+
+/* smartphone : onglets façon sélecteur */
+@media (max-width:899px){
+  body.edition .onglets{gap:4px;padding:0 8px 6px;border-bottom:0;background:var(--noir)}
+  body.edition .onglets button{position:relative;border:0;border-radius:4px;font-family:var(--sans);font-size:14px;letter-spacing:0;text-transform:none}
+  body.edition .onglets button[aria-selected="true"]{color:var(--texte);font-weight:600}
+  body.edition .onglets button[aria-selected="true"]::after{content:"";position:absolute;left:50%;bottom:2px;width:16px;height:3px;margin-left:-8px;border-radius:2px;background:var(--or)}
+  body.edition .panneau{inset:0 8px 8px}
+}
 </style>
 <link rel="stylesheet" href="/assets/menu.css?v=5">
 </head>
@@ -686,8 +854,8 @@ footer a:hover{color:var(--or)}
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=9"></script>
-<script src="/ifc/ifc-vue.js?v=32"></script>
-<script src="/ifc/ifc-cube.js?v=1"></script>
+<script src="/ifc/ifc-vue.js?v=33"></script>
+<script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
 <script src="/ifc/ifc-app.js?v=31"></script>
 <script src="/assets/menu.js?v=28"></script>
