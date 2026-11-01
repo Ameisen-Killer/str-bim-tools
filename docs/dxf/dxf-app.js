@@ -1,7 +1,7 @@
 /* STR Bim Tools · visionneuse DXF : canvas 2D, calques, propriétés, mesure. Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "1.1.0";
+  var VERSION = "1.2.0";
   var $ = function(s){ return document.querySelector(s); };
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e){ return d; } }
@@ -402,10 +402,14 @@
     if (!dwg && !/\.dxf$/i.test(f.name)){ etat("Choisis un fichier .dxf ou .dwg."); return; }
     $("#chargement").hidden = false; $("#chargement-txt").textContent = "Lecture de « " + f.name + " »…";
     var t0 = performance.now();
+    var brut = null;
     f.arrayBuffer().then(function(buf){
       if (!dwg) return buf;
+      brut = buf.slice(0);
       return enDxf(buf, f.name);
     }).then(function(buf){
+      source = { nom: f.name, dxf: buf, dwg: brut };
+      $("#btn-dxf").hidden = $("#btn-dwg").hidden = false;
       $("#chargement-txt").textContent = "Lecture de « " + f.name + " »…";
       return new Promise(function(ok){ setTimeout(ok, 30); }).then(function(){ return DXF.lire(buf, f.name); });
     }).then(function(sc){
@@ -423,37 +427,67 @@
       if (window.console) console.error(err);
     });
   }
-  // DWG : LibreDWG (WebAssembly, GPL 3, ~11 Mo chargés au premier DWG) le convertit en DXF dans le navigateur,
-  // puis le lecteur DXF de la page le lit comme un DXF
+  // DWG : LibreDWG (WebAssembly, GPL 3, ~10 Mo chargés au premier usage), compilé pour la page avec l'écriture DWG
+  // (vendor/libredwg/str_dwg.c) : DWG → DXF pour l'ouvrir, DXF → DWG (AutoCAD 2000) pour l'enregistrer
   var libredwg = null;
   function chargerLibreDwg(){
     if (!libredwg){
-      $("#chargement-txt").textContent = "Chargement du lecteur DWG (environ 11 Mo, une seule fois)…";
-      libredwg = import("/dxf/vendor/libredwg/libredwg-web.js").then(function(m){ return m.default({}); });
+      $("#chargement-txt").textContent = "Chargement de LibreDWG (environ 10 Mo, une seule fois)…";
+      libredwg = import("/dxf/vendor/libredwg/str-dwg.js?v=1").then(function(m){ return m.default({}); });
       libredwg.catch(function(){ libredwg = null; });
     }
     return libredwg;
   }
-  function enDxf(buf, nom){
+  function convertir(buf, fonction, extEnt, extSor, message){
     return chargerLibreDwg().then(function(M){
-      $("#chargement-txt").textContent = "Conversion de « " + nom + " » en DXF…";
+      $("#chargement-txt").textContent = message;
       return new Promise(function(ok){ setTimeout(ok, 30); }).then(function(){
-        var ent = "entree.dwg", sor = "sortie.dxf", err, out = null;
+        var ent = "entree." + extEnt, sor = "sortie." + extSor, err, out = null;
         try {
           M.FS.writeFile(ent, new Uint8Array(buf));
-          err = M.dwg_write_dxf(ent, sor);
+          err = M.ccall(fonction, "number", ["string", "string"], [ent, sor]);
           if (M.FS.analyzePath(sor, false).exists) out = M.FS.readFile(sor);
         } finally {
           try { if (M.FS.analyzePath(ent, false).exists) M.FS.unlink(ent); } catch (e){}
           try { if (M.FS.analyzePath(sor, false).exists) M.FS.unlink(sor); } catch (e){}
         }
-        // code d'erreur LibreDWG : ≥ 128 = erreur bloquante ; en dessous, avertissements (le DXF est lisible)
-        if (!out || !out.length) throw new Error("ce DWG n'a pas pu être converti (code LibreDWG " + err + "). Enregistre-le en DXF depuis AutoCAD.");
-        if (err && window.console) console.warn("LibreDWG : conversion avec avertissements, code " + err);
+        // code d'erreur LibreDWG : ≥ 128 = erreur bloquante ; en dessous, simples avertissements
+        if (!out || !out.length || err >= 128) throw new Error("conversion refusée par LibreDWG (code " + err + ")");
+        if (err && window.console) console.warn("LibreDWG : " + fonction + " avec avertissements, code " + err);
         return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
       });
     });
   }
+  function enDxf(buf, nom){
+    return convertir(buf, "str_dwg_vers_dxf", "dwg", "dxf", "Conversion de « " + nom + " » en DXF…")
+      .catch(function(e){ throw new Error("ce DWG n'a pas pu être converti : " + e.message + ". Enregistre-le en DXF depuis AutoCAD."); });
+  }
+
+  // ================= Enregistrer en DXF ou en DWG =================
+  var source = null;   // { nom, dxf: ArrayBuffer (texte DXF), dwg: ArrayBuffer | null (fichier DWG ouvert) }
+  function telecharger(buf, nom, type){
+    var a = document.createElement("a"), u = URL.createObjectURL(new Blob([buf], { type: type }));
+    a.href = u; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(u); }, 4000);
+  }
+  function base(){ return source.nom.replace(/\.(dxf|dwg)$/i, ""); }
+  function enregistrer(fmt){
+    if (!source) return;
+    if (fmt === "dxf"){ telecharger(source.dxf, base() + ".dxf", "application/dxf"); etat("DXF enregistré : " + base() + ".dxf"); return; }
+    if (source.dwg){ telecharger(source.dwg, base() + ".dwg", "application/acad"); etat("DWG enregistré tel qu'il a été ouvert : " + base() + ".dwg"); return; }
+    $("#chargement").hidden = false;
+    convertir(source.dxf, "str_dxf_vers_dwg", "dxf", "dwg", "Conversion en DWG (AutoCAD 2000)…").then(function(buf){
+      $("#chargement").hidden = true;
+      telecharger(buf, base() + ".dwg", "application/acad");
+      etat("DWG enregistré (format AutoCAD 2000, écrit par LibreDWG) : " + base() + ".dwg. Vérifie-le dans AutoCAD avant de l'envoyer.");
+    }).catch(function(e){
+      $("#chargement").hidden = true;
+      etat("DWG impossible : " + (e && e.message || e) + ". Garde le DXF, ou ouvre-le dans AutoCAD et enregistre-le en DWG.");
+      if (window.console) console.error(e);
+    });
+  }
+  $("#btn-dxf").addEventListener("click", function(){ enregistrer("dxf"); });
+  $("#btn-dwg").addEventListener("click", function(){ enregistrer("dwg"); });
   $("#fichier").addEventListener("change", function(){ ouvrir(this.files[0]); this.value = ""; });
   function choisirFichier(){ $("#fichier").click(); }
   $("#btn-ouvrir").addEventListener("click", choisirFichier);

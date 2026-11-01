@@ -1,5 +1,19 @@
-LibreDWG compilé en WebAssembly : paquet npm @mlightcad/libredwg-web 0.8.1 (fichiers wasm/libredwg-web.js et
-wasm/libredwg-web.wasm, copiés sans modification).
-Licence : GNU GPL version 3 (https://www.gnu.org/licenses/gpl-3.0.html).
-Sources : https://github.com/mlightcad/libredwg-web et https://www.gnu.org/software/libredwg/
-Utilisé par la visionneuse /dxf/ pour convertir un DWG en DXF dans le navigateur.
+LibreDWG compilé en WebAssembly pour la visionneuse str-bim-tools.com/dxf (str-dwg.js + str-dwg.wasm).
+
+Licence : GNU GPL version 3 (https://www.gnu.org/licenses/gpl-3.0.html), comme LibreDWG.
+
+Sources correspondantes :
+- LibreDWG : https://github.com/mlightcad/libredwg-web, commit b5177613f2c735858a6d1cb1d1c7e238c397b88f
+  (fork de GNU LibreDWG, https://www.gnu.org/software/libredwg/), non modifié.
+- Fonctions ajoutées : str_dwg.c (dans ce dossier) : str_dwg_vers_dxf (DWG -> DXF) et str_dxf_vers_dwg
+  (DXF -> DWG AutoCAD 2000).
+
+Compilation (Emscripten 4.0.15) :
+  ./autogen.sh
+  mkdir build-wasm && cd build-wasm
+  emconfigure ../configure CFLAGS="-O2 -DNDEBUG" CC=emcc --enable-release --disable-docs --disable-python \
+    --disable-bindings --disable-shared --disable-json
+  emmake make -C src
+  emcc str_dwg.c src/.libs/libredwg.a -O2 -Isrc -I../src -I../include -o str-dwg.js -sALLOW_MEMORY_GROWTH=1 \
+    -sMAXIMUM_MEMORY=4GB -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createModule -sENVIRONMENT=web,worker \
+    -sEXPORTED_RUNTIME_METHODS=FS,ccall -sEXPORTED_FUNCTIONS=_str_dwg_vers_dxf,_str_dxf_vers_dwg,_malloc,_free

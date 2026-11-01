@@ -202,6 +202,8 @@ button,input,select,textarea{font:inherit;color:inherit}
   <span class="esp"></span>
   <span class="sig">Tony VARIN</span>
   <button type="button" id="btn-ouvrir" title="Ouvrir un DXF ou un DWG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
+  <button type="button" id="btn-dxf" hidden title="Enregistrer le dessin en DXF"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>DXF</span></button>
+  <button type="button" id="btn-dwg" hidden title="Enregistrer le dessin en DWG (AutoCAD 2000)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>DWG</span></button>
   <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
 </header>
 <div class="app">
@@ -232,7 +234,7 @@ button,input,select,textarea{font:inherit;color:inherit}
         <p>Ouvre un plan DXF ou DWG : calques, propriétés des objets, mesure avec accroche.</p>
         <button type="button" class="bt prim" id="btn-ouvrir2">Ouvrir un DXF ou un DWG…</button>
         <div class="zone">ou glisse le fichier ici</div>
-        <div class="pied">Le fichier est lu dans ton navigateur, il ne quitte pas ton poste. Les DWG sont convertis par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a> (GPL 3), environ 11 Mo chargés au premier DWG.</div>
+        <div class="pied">Le fichier est lu dans ton navigateur, il ne quitte pas ton poste. Les DWG sont convertis par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a> (GPL 3), environ 10 Mo chargés au premier DWG.</div>
       </div>
     </div>
     <div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div></div>
@@ -241,6 +243,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 </div>
 <input type="file" id="fichier" accept=".dxf,.dwg" hidden>
 <script src="/dxf/dxf-lecteur.js?v=1"></script>
-<script src="/dxf/dxf-app.js?v=2"></script>
+<script src="/dxf/dxf-app.js?v=3"></script>
 </body>
 </html>
