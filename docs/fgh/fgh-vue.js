@@ -2246,7 +2246,7 @@
         actif: "rgba(" + OR.join(",") + ",.95)", actifRGBA: clair ? [150, 104, 30, 255] : [240, 196, 112, 255],
         texte: "rgba(" + a.join(",") + ",.45)",
         areteActive: "rgba(" + a.join(",") + ",.85)", areteActiveRGBA: [a[0], a[1], a[2], 215],
-        cadre: clair ? "rgba(150,104,30,.8)" : "rgba(214,168,92,.75)", cadreRGBA: clair ? [150, 104, 30, 205] : [214, 168, 92, 190],
+        cadre: clair ? "rgba(0,95,184,.8)" : "rgba(96,205,255,.75)", cadreRGBA: clair ? [0, 95, 184, 205] : [96, 205, 255, 190],   // FGH : accent Windows 11
         coupeRGB: clair ? [204, 44, 38] : [196, 48, 42]
       };
       // FGH : structure construite en phase nouvelle, pièce légèrement rosée

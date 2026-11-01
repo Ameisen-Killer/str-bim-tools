@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "1.8.1";
+  var VERSION = "2.0.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -1016,7 +1016,7 @@
   $("#btn-theme").addEventListener("click", function(){
     var c = document.documentElement.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
     document.documentElement.setAttribute("data-theme", c);
-    document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F0E8" : "#050505");
+    document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
     lsSet("fgh.theme", c);
   });
   // fermeture de la page : la dernière décision (commentaire en cours de frappe compris) part tout de suite
