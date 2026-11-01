@@ -344,7 +344,8 @@
   function ouvrir(modeles, ms, refus){
     var premier = !fichiers.length;
     modeles.forEach(function(m){
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: false, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m) };
+      // arborescence réduite à l'ouverture (demande de Tony) : seule la ligne du fichier est affichée
+      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: true, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m) };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
