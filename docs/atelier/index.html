@@ -8,7 +8,8 @@
 <meta name="description" content="Page de démarrage des outils web STR Bim Tools : validateur de réservations, visionneuse IFC, visionneuse DXF.">
 <meta name="theme-color" content="#202020">
 <script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("atelier.theme")||"sombre";r.setAttribute("data-theme",c);}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M5 5h10v10H5zM17 5h10v10H17zM5 17h10v10H5zM17 17h10v10H17z' fill='none' stroke='%23D6A85C' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="icon" href="/atelier/atelier.ico?v=1">
+<link rel="apple-touch-icon" href="/atelier/atelier-180.png?v=1">
 <style>
 /* Habillage inspiré de Windows 11 (Fluent), le même que /fgh/, /ifc/ et /dxf/ */
 :root{
@@ -125,6 +126,8 @@ a{color:inherit;text-decoration:none}
 .demarrer .pied{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 32px;border-top:1px solid var(--ligne);background:var(--controle)}
 .profil{display:flex;align-items:center;gap:10px}
 .avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--sur-accent);font:600 12px/1 var(--titre)}
+.profil small a.raccourci{text-decoration:underline;text-underline-offset:2px}
+.profil small a.raccourci:hover{color:var(--accent)}
 .profil small{display:block;color:var(--texte-faible);font-size:11px;line-height:14px}
 .pied .ver{color:var(--texte-faible);font-size:12px}
 
@@ -190,7 +193,7 @@ a{color:inherit;text-decoration:none}
     <div class="epingles" id="epingles"></div>
   </div>
   <div class="pied">
-    <div class="profil"><span class="avatar">TV</span><div>Tony VARIN<small>STR BIM Tools</small></div></div>
+    <div class="profil"><span class="avatar">TV</span><div>Tony VARIN<small>STR BIM Tools · <a class="raccourci" href="/atelier/Creer-raccourci-Atelier-STR.cmd" download title="Fichier à lancer une fois : crée sur le bureau Windows un raccourci qui ouvre l'atelier en plein écran">Raccourci Windows</a></small></div></div>
     <div class="boutons"><span class="ver" id="ver-menu"></span><button class="alim" id="btn-alim" title="Éteindre l'atelier"></button></div>
   </div>
 </div>
@@ -223,7 +226,7 @@ a{color:inherit;text-decoration:none}
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.6.0";
+  var VERSION = "1.7.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
