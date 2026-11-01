@@ -128,6 +128,20 @@ a{color:inherit;text-decoration:none}
 .profil small{display:block;color:var(--texte-faible);font-size:11px;line-height:14px}
 .pied .ver{color:var(--texte-faible);font-size:12px}
 
+/* ---------- Extinction ---------- */
+.zone.eteindre:hover{background:#C42B1C;color:#fff}
+.eteint{position:fixed;inset:0;z-index:100;background:#000;color:rgba(255,255,255,.75);display:grid;place-items:center;text-align:center;opacity:0;transition:opacity .9s;pointer-events:none}
+.eteint.on{opacity:1;pointer-events:auto}
+.eteint p{margin:0 0 18px;font:300 15px/22px var(--titre);transition:opacity .6s}
+.eteint .actions{display:flex;gap:10px;justify-content:center;opacity:0;transition:opacity .6s .6s}
+.eteint.fini .actions{opacity:1}
+.eteint button,.eteint a{padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:13px;cursor:pointer}
+.eteint button:hover,.eteint a:hover{background:rgba(255,255,255,.16)}
+.pied .boutons{display:flex;align-items:center;gap:10px}
+.pied .alim{width:32px;height:32px;border:0;border-radius:6px;background:transparent;display:grid;place-items:center;cursor:default}
+.pied .alim:hover{background:var(--controle-survol)}
+.pied .alim svg,.zone.eteindre svg,.zone.plein svg{width:16px;height:16px}
+
 /* ---------- Fenêtres des outils ---------- */
 .fenetres{position:fixed;inset:0 0 48px 0;z-index:10;pointer-events:none}
 .fenetre{position:absolute;display:flex;flex-direction:column;min-width:320px;min-height:220px;border-radius:12px;overflow:hidden;pointer-events:auto;
@@ -177,7 +191,7 @@ a{color:inherit;text-decoration:none}
   </div>
   <div class="pied">
     <div class="profil"><span class="avatar">TV</span><div>Tony VARIN<small>STR BIM Tools</small></div></div>
-    <span class="ver" id="ver-menu"></span>
+    <div class="boutons"><span class="ver" id="ver-menu"></span><button class="alim" id="btn-alim" title="Éteindre l'atelier"></button></div>
   </div>
 </div>
 
@@ -192,17 +206,24 @@ a{color:inherit;text-decoration:none}
   </div>
   <div class="droite">
     <button class="zone theme" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+    <button class="zone theme plein" id="btn-plein" title="Plein écran (F11)"></button>
+    <button class="zone theme eteindre" id="btn-eteindre" title="Éteindre l'atelier"></button>
     <div class="zone horloge" aria-live="off"><span id="heure"></span><span class="date" id="date"></span></div>
   </div>
 </nav>
 
 <div class="bulle" id="bulle" hidden></div>
 
+<div class="eteint" id="eteint" hidden>
+  <div><p id="eteint-texte">Arrêt de l'atelier…</p>
+  <div class="actions"><button id="btn-rallumer">Rallumer l'atelier</button><a href="/">str-bim-tools.com</a></div></div>
+</div>
+
 <script>
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.5.0";
+  var VERSION = "1.6.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -445,6 +466,55 @@ a{color:inherit;text-decoration:none}
       ic[j].focus(); choisir(ic[j]);
     }
   });
+
+  // ---------- Plein écran ----------
+  var ICO_PLEIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+      ICO_SORTIR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1.5v4h-4M14.5 5.5h-4v-4M10.5 14.5v-4h4M1.5 10.5h4v4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+      ICO_ALIM = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M4.6 3.6a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+  var bPlein = $("#btn-plein"), fsOk = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  function pleinMaj(){
+    var on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    bPlein.innerHTML = on ? ICO_SORTIR : ICO_PLEIN;
+    bPlein.title = on ? "Quitter le plein écran" : "Plein écran";
+  }
+  if (!fsOk) bPlein.hidden = true;   // iPhone : pas de plein écran pour une page
+  pleinMaj();
+  bPlein.addEventListener("click", function(){
+    var d = document, r = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else (r.requestFullscreen || r.webkitRequestFullscreen).call(r);
+  });
+  document.addEventListener("fullscreenchange", pleinMaj);
+  document.addEventListener("webkitfullscreenchange", pleinMaj);
+
+  // ---------- Éteindre : ferme les fenêtres, sort du plein écran, puis ferme l'onglet ----------
+  // Un navigateur ne laisse fermer par script que l'onglet qu'un script a ouvert : sinon on reste sur un écran noir.
+  $("#btn-eteindre").innerHTML = ICO_ALIM; $("#btn-alim").innerHTML = ICO_ALIM;
+  var ecran = $("#eteint");
+  function eteindre(){
+    menu(false);
+    Object.keys(FEN).forEach(function(k){ fermer(FEN[k]); });
+    ecran.hidden = false; ecran.classList.remove("fini");
+    $("#eteint-texte").textContent = "Arrêt de l'atelier…";
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ ecran.classList.add("on"); }); });
+    setTimeout(function(){
+      var d = document;
+      if (d.fullscreenElement || d.webkitFullscreenElement) try { (d.exitFullscreen || d.webkitExitFullscreen).call(d); } catch(e){}
+      try { window.close(); } catch(e){}
+      // toujours là : le navigateur a refusé de fermer l'onglet
+      setTimeout(function(){
+        $("#eteint-texte").textContent = "L'atelier est éteint. Tu peux fermer cet onglet.";
+        ecran.classList.add("fini");
+      }, 300);
+    }, 1200);
+  }
+  function rallumer(){
+    ecran.classList.remove("on", "fini");
+    setTimeout(function(){ ecran.hidden = true; }, 900);
+  }
+  $("#btn-eteindre").addEventListener("click", eteindre);
+  $("#btn-alim").addEventListener("click", eteindre);
+  $("#btn-rallumer").addEventListener("click", rallumer);
 
   // ---------- Thème ----------
   $("#btn-theme").addEventListener("click", function(){
