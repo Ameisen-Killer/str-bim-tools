@@ -10,8 +10,6 @@
     {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
     {href:"/a-propos/", nom:"À propos", desc:"de Tony Varin"},
     {href:"/atelier/", nom:"Atelier", desc:"Tous les outils web, façon bureau"},
-    {href:"/bench/", nom:"Bench", desc:"Comparateur de postes de travail"},
-    {href:"/ifc/", nom:"IFC", desc:"Éditeur de maquettes IFC"},
     {href:"/mentions-legales/", nom:"Mentions légales", desc:"Éditeur, hébergeur, données"}
   ];
 
