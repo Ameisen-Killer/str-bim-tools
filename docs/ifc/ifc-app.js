@@ -1330,6 +1330,19 @@
   }
 
   $("#b-recadrer").addEventListener("click", function(){ vue.recadrer(); });
+  // chevrons de part et d'autre de la vue : réduire le panneau Éléments ou Propriétés
+  function replier(cote, oui){
+    var p = $(".panneaux"), b = $("#rep-" + cote), quoi = cote === "g" ? "les éléments" : "les propriétés";
+    p.classList.toggle("sans-" + cote, oui);
+    b.textContent = (cote === "g") === oui ? "›" : "‹";
+    b.title = (oui ? "Afficher " : "Réduire ") + quoi;
+    b.setAttribute("aria-expanded", String(!oui));
+    garder("ifc.replie." + cote, oui ? "1" : "0");
+  }
+  ["g", "d"].forEach(function(c){
+    replier(c, lire("ifc.replie." + c, ["0", "1"]) === "1");
+    $("#rep-" + c).addEventListener("click", function(){ replier(c, !$(".panneaux").classList.contains("sans-" + c)); });
+  });
   // « Boîte de coupe » : enfoncé tant qu'une boîte est posée, un clic l'enlève ; sinon boîte autour de la
   // sélection, ou de tout ce qui est affiché
   $("#b-boite").addEventListener("click", function(){

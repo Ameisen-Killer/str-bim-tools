@@ -361,6 +361,16 @@ footer{display:flex;justify-content:space-between;gap:16px;padding:24px var(--g)
 footer a{text-decoration:none}
 footer a:hover{color:var(--or)}
 
+/* chevrons : réduire le panneau Éléments (gauche) ou Propriétés (droite), choix gardé dans ce navigateur */
+.replier{position:absolute;top:50%;z-index:7;width:16px;height:48px;margin-top:-24px;padding:0;display:grid;place-items:center;border:1px solid var(--ligne);background:rgba(var(--fond-rvb),.78);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);color:var(--texte-doux);cursor:pointer;box-shadow:var(--ombre-legere);font-size:13px;line-height:1}
+.replier:hover{background:var(--couche-2,var(--noir-3));color:var(--texte);width:20px}
+.replier.g{left:0;border-left:0;border-radius:0 6px 6px 0}
+.replier.d{right:0;border-right:0;border-radius:6px 0 0 6px}
+.panneaux.sans-g{grid-template-columns:minmax(0,1fr) minmax(260px,340px)}.panneaux.sans-g .p-liste{display:none}
+.panneaux.sans-d{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}.panneaux.sans-d .p-props{display:none}
+.panneaux.sans-g.sans-d{grid-template-columns:minmax(0,1fr)}
+@media (max-width:899px){.replier{display:none}.panneaux.sans-g .p-liste,.panneaux.sans-d .p-props{display:flex}}
+
 /* ================= Éditeur : habillage inspiré de Windows 11 (Fluent), comme /fgh/ =================
    Fond Mica, panneaux arrondis posés dessus, menus en flyouts acryliques, contrôles à 4 px, accent bleu
    Windows, police Segoe UI Variable (celle de Windows). L'accueil garde la charte noir et or du site.
@@ -741,6 +751,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
       <div class="panneau p-vue montre" id="p-vue">
         <canvas id="vue" aria-label="Aperçu 3D de la maquette : glisser pour tourner, molette ou pincement pour zoomer"></canvas>
+        <button type="button" class="replier g" id="rep-g" title="Réduire les éléments">‹</button>
+        <button type="button" class="replier d" id="rep-d" title="Réduire les propriétés">›</button>
         <canvas class="cube" id="cube" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
         <div class="vue-info" id="vue-info"></div>
         <div class="vue-outils">
@@ -857,7 +869,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-vue.js?v=33"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=32"></script>
+<script src="/ifc/ifc-app.js?v=33"></script>
 <script src="/assets/menu.js?v=28"></script>
 </body>
 </html>

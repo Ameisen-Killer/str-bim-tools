@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.0.0";
+  var VERSION = "2.1.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -1012,6 +1012,19 @@
     var lire = poignee ? null : function(){ json.forEach(lireJson); };
     if (ifc) ouvrir(fs, lire);
     else if (lire) lire();
+  });
+  // chevrons de part et d'autre de la vue : réduire la liste ou la fiche
+  function replier(cote, oui){
+    var app = document.querySelector(".app"), b = $("#rep-" + cote), quoi = cote === "g" ? "la liste" : "la fiche";
+    app.classList.toggle("sans-" + cote, oui);
+    b.textContent = (cote === "g") === oui ? "›" : "‹";
+    b.title = (oui ? "Afficher " : "Réduire ") + quoi;
+    b.setAttribute("aria-expanded", String(!oui));
+    lsSet("fgh.replie." + cote, oui ? "1" : "0");
+  }
+  ["g", "d"].forEach(function(c){
+    replier(c, lsGet("fgh.replie." + c, "0") === "1");
+    $("#rep-" + c).addEventListener("click", function(){ replier(c, !document.querySelector(".app").classList.contains("sans-" + c)); });
   });
   $("#btn-theme").addEventListener("click", function(){
     var c = document.documentElement.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
