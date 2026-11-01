@@ -245,6 +245,16 @@ textarea.champ{height:auto;resize:vertical;min-height:72px;line-height:20px}
 .accueil .zone{margin-top:16px;padding:14px;border:1px dashed rgba(var(--encre),.25);border-radius:8px;color:var(--texte-faible);font-size:12px}
 .accueil.survol .boite,.centre.survol .accueil .boite{outline:2px solid var(--or);outline-offset:4px}
 .centre.survol .accueil .zone{border-color:var(--or);color:var(--or);background:rgba(var(--or-rvb),.08)}
+.chrono{position:absolute;left:12px;bottom:34px;z-index:6;max-width:min(560px,calc(100% - 24px));background:rgba(var(--fond-rvb),.86);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre);padding:8px 10px;font-size:12px}
+.chrono[hidden]{display:none}
+.chrono-tete{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:13px}.chrono-tete b{flex:1}
+.chrono .ferme{border:0;background:none;color:var(--texte-doux);cursor:pointer;padding:2px 6px;border-radius:4px}.chrono .ferme:hover{background:var(--controle)}
+.chrono table{border-collapse:collapse;width:100%}
+.chrono th{font-weight:600;color:var(--texte-doux);text-align:right;padding:2px 6px}.chrono th:first-child{text-align:left}
+.chrono td{padding:3px 6px;text-align:right;white-space:nowrap;border-top:1px solid var(--ligne);font-variant-numeric:tabular-nums}
+.chrono td:first-child{text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.chrono td small{display:block;color:var(--texte-faible);font-size:11px}
+.chrono-pied{margin-top:4px;padding-top:4px;border-top:1px solid var(--ligne);text-align:right}
 .chargement{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;min-width:320px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;padding:18px 20px;box-shadow:var(--ombre)}
 .chargement .barre-p{height:3px;border-radius:2px;background:rgba(var(--encre),.12);margin-top:12px;overflow:hidden}
 .chargement .barre-p i{display:block;height:100%;width:0;border-radius:2px;background:var(--or);transition:width .2s}
@@ -389,6 +399,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
         <div class="pied">Les fichiers restent sur ton poste · STR Bim Tools · Tony VARIN</div>
       </div>
     </div>
+    <div class="chrono" id="chrono" hidden></div>
     <div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div><div class="barre-p"><i id="prog"></i></div></div>
   </main>
 
@@ -399,6 +410,6 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <script src="/fgh/fgh-core.js?v=2"></script>
 <script src="/fgh/fgh-vue.js?v=15"></script>
 <script src="/fgh/fgh-cube.js?v=4"></script>
-<script src="/fgh/fgh-app.js?v=31"></script>
+<script src="/fgh/fgh-app.js?v=32"></script>
 </body>
 </html>

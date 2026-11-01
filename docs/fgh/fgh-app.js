@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.3.0";
+  var VERSION = "2.4.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -178,9 +178,11 @@
   function ouvrir(liste, apres){
     liste = Array.prototype.filter.call(liste || [], function(f){ return /\.ifc$/i.test(f.name); });
     if (!liste.length){ etat("Choisis des fichiers .ifc."); return; }
-    var suite = Promise.resolve(), nouveaux = [];
+    var suite = Promise.resolve(), nouveaux = [], t0 = performance.now(), tmp = {};
+    if ($("#chrono")) $("#chrono").hidden = true;
     liste.forEach(function(f, n){
       suite = suite.then(function(){
+        var tl = performance.now();
         var nom = "« " + f.name + " »" + (liste.length > 1 ? " (" + (n + 1) + "/" + liste.length + ")" : "");
         return lecture(f, function(p){ progres("Lecture de " + nom + "…", p); }).then(function(m){
           progres("Analyse de " + nom + "…", 1);
@@ -188,6 +190,7 @@
             var r = reservationsDe(m);
             var fi = { uid: uidF++, m: m, nom: f.name, role: r ? "res" : "str", res: r, neufs: r ? null : neufsDe(m) };
             fi.ids = r ? r.map(function(x){ return x.id; }) : elementsDe(m);
+            fi.chrono = { taille: f.size || 0, lecture: performance.now() - tl, geo: 0, n: fi.ids.length };
             nouveaux.push(fi);
           });
         });
@@ -203,22 +206,45 @@
       vue.modeles(fichiers.map(function(x){ return x.m; }));
       var s = Promise.resolve();
       fichiers.forEach(function(fi){
-        s = s.then(function(){ return vue.preparer(fi.m, fi.ids, function(p){ progres("Géométrie 3D de « " + fi.nom + " » : " + Math.round(100*p) + " %", p); }); });
+        s = s.then(function(){ tmp.g = performance.now(); return vue.preparer(fi.m, fi.ids, function(p){ progres("Géométrie 3D de « " + fi.nom + " » : " + Math.round(100*p) + " %", p); }); })
+          .then(function(){ if (fi.chrono && nouveaux.indexOf(fi) >= 0) fi.chrono.geo = performance.now() - tmp.g; });
       });
       return s;
     }).then(function(){
       $("#chargement").hidden = true;
+      var ta = performance.now();
       construire();
       var nRes = fichiers.filter(function(x){ return x.role === "res"; }).length;
       etat(fichiers.map(function(x){ return (x.role === "res" ? "Réservations : " : "Structure : ") + x.nom; }).join(" · ") +
         (nRes ? "" : " · Il manque l'IFC des réservations (…_RES.ifc, exporté par « Export IFC RES »)."));
       if (apres) apres();
+      // chronomètre de l'ouverture : synthèse une fois tout affiché (demande de Tony)
+      var fin = performance.now();
+      requestAnimationFrame(function(){ syntheseChrono(nouveaux, fin - ta, performance.now() - t0); });
     }).catch(function(err){
       $("#chargement").hidden = true;
       etat("Lecture impossible : " + (err && err.message || err));
       if (window.console) console.error(err);
     });
   }
+
+  // Synthèse des temps d'ouverture : lecture (fichier + analyse IFC), géométrie 3D, affichage
+  function duree(ms){ return ms < 1000 ? Math.round(ms) + " ms" : ms < 60000 ? (ms/1000).toFixed(1).replace(".", ",") + " s" : Math.floor(ms/60000) + " min " + String(Math.round(ms % 60000 / 1000)).padStart(2, "0") + " s"; }
+  function mo(o){ return o ? (o/1048576).toFixed(1).replace(".", ",") + " Mo" : ""; }
+  function syntheseChrono(nv, affichage, total){
+    var e = $("#chrono"); if (!e || !nv.length) return;
+    var lignes = nv.map(function(fi){
+      var c = fi.chrono;
+      return "<tr><td title=\"" + esc(fi.nom) + "\">" + esc(fi.nom) + "<small>" + (fi.role === "res" ? "Réservations" : "Structure") + " · " + mo(c.taille) + " · " + c.n + " élément" + (c.n > 1 ? "s" : "") + "</small></td>" +
+        "<td>" + duree(c.lecture) + "</td><td>" + duree(c.geo) + "</td><td><b>" + duree(c.lecture + c.geo) + "</b></td></tr>";
+    }).join("");
+    e.innerHTML = '<div class="chrono-tete"><b>Temps d\'ouverture</b><button type="button" class="ferme" title="Fermer">✕</button></div>' +
+      "<table><thead><tr><th>Maquette</th><th>Lecture</th><th>3D</th><th>Total</th></tr></thead><tbody>" + lignes + "</tbody></table>" +
+      '<div class="chrono-pied">Affichage : ' + duree(affichage) + " · <b>Total : " + duree(total) + "</b></div>";
+    e.hidden = false;
+    if (window.console) console.table(nv.map(function(fi){ return { maquette: fi.nom, taille: mo(fi.chrono.taille), elements: fi.chrono.n, lecture_ms: Math.round(fi.chrono.lecture), geometrie_ms: Math.round(fi.chrono.geo) }; }));
+  }
+  document.addEventListener("click", function(ev){ if (ev.target.closest && ev.target.closest("#chrono .ferme")) $("#chrono").hidden = true; });
 
   // ================= Construction des réservations et des niveaux =================
   function construire(){
