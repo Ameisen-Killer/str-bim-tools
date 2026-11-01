@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Atelier STR · STR Bim Tools</title>
+<meta name="description" content="Page de démarrage des outils web STR Bim Tools : validateur de réservations, visionneuse IFC, visionneuse DXF.">
+<meta name="theme-color" content="#202020">
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("atelier.theme")||"sombre";r.setAttribute("data-theme",c);}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M5 5h10v10H5zM17 5h10v10H17zM5 17h10v10H5zM17 17h10v10H17z' fill='none' stroke='%23D6A85C' stroke-width='1.6'/%3E%3C/svg%3E">
+<style>
+/* Habillage inspiré de Windows 11 (Fluent), le même que /fgh/, /ifc/ et /dxf/ */
+:root{
+  color-scheme:dark;
+  --accent:#60CDFF;
+  --sur-accent:#000;
+  --barre:rgba(32,32,32,.82);
+  --panneau:rgba(40,40,40,.9);
+  --controle:rgba(255,255,255,.061);
+  --controle-survol:rgba(255,255,255,.084);
+  --ligne:rgba(255,255,255,.083);
+  --texte:#FFFFFF;
+  --texte-doux:rgba(255,255,255,.786);
+  --texte-faible:rgba(255,255,255,.545);
+  --ombre:0 32px 64px rgba(0,0,0,.37),0 2px 21px rgba(0,0,0,.37),0 0 0 1px rgba(0,0,0,.3);
+  --selection:rgba(255,255,255,.12);
+  --selection-bord:rgba(255,255,255,.2);
+  --fond-1:#0B1A33;
+  --fond-2:#1D4E89;
+  --fond-3:#5FA8E8;
+  --fil:255,255,255;
+  --sans:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+  --titre:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+}
+:root[data-theme="clair"]{
+  color-scheme:light;
+  --accent:#005FB8;
+  --sur-accent:#FFF;
+  --barre:rgba(243,243,243,.85);
+  --panneau:rgba(243,243,243,.92);
+  --controle:rgba(0,0,0,.035);
+  --controle-survol:rgba(0,0,0,.06);
+  --ligne:rgba(0,0,0,.0803);
+  --texte:#1B1B1B;
+  --texte-doux:rgba(0,0,0,.62);
+  --texte-faible:rgba(0,0,0,.45);
+  --ombre:0 32px 64px rgba(0,0,0,.19),0 2px 21px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.06);
+  --selection:rgba(255,255,255,.35);
+  --selection-bord:rgba(255,255,255,.6);
+  --fond-1:#A9C8EE;
+  --fond-2:#D8E7F8;
+  --fond-3:#FFFFFF;
+  --fil:0,40,90;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;font-family:var(--sans);font-size:14px;line-height:20px;color:var(--texte);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(ellipse 70% 60% at 62% 58%,var(--fond-3) 0%,var(--fond-2) 38%,var(--fond-1) 100%) fixed;background-color:var(--fond-1)}
+button{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+[hidden]{display:none!important}
+
+/* ---------- Fond d'écran : ossature filaire qui respire ---------- */
+#fond{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* ---------- Icônes du bureau ---------- */
+.bureau{position:fixed;inset:0 0 48px 0;padding:12px 8px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,104px);grid-auto-columns:92px;gap:4px;align-content:start}
+.icone{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px 4px;border:1px solid transparent;border-radius:4px;color:#fff;text-align:center;cursor:default;outline:none;
+  text-shadow:0 1px 2px rgba(0,0,0,.6),0 0 6px rgba(0,0,0,.35);font-size:12px;line-height:16px;opacity:0;transform:translateY(6px);animation:apparait .45s cubic-bezier(.1,.9,.2,1) forwards}
+.icone:nth-child(2){animation-delay:.07s}.icone:nth-child(3){animation-delay:.14s}.icone:nth-child(4){animation-delay:.21s}
+@keyframes apparait{to{opacity:1;transform:none}}
+.icone svg{width:48px;height:48px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.icone:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.12)}
+.icone.choisie,.icone:focus-visible{background:var(--selection);border-color:var(--selection-bord)}
+:root[data-theme="clair"] .icone{color:#1B1B1B;text-shadow:0 0 6px rgba(255,255,255,.9)}
+
+/* ---------- Infobulle ---------- */
+.bulle{position:fixed;z-index:30;max-width:280px;padding:6px 9px;border-radius:4px;background:var(--panneau);color:var(--texte);border:1px solid var(--ligne);box-shadow:0 4px 8px rgba(0,0,0,.2);font-size:12px;line-height:16px;pointer-events:none;
+  -webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
+
+/* ---------- Barre des tâches ---------- */
+.barre{position:fixed;left:0;right:0;bottom:0;height:48px;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--barre);border-top:1px solid var(--ligne);
+  -webkit-backdrop-filter:blur(40px) saturate(1.4);backdrop-filter:blur(40px) saturate(1.4);padding-bottom:env(safe-area-inset-bottom)}
+.barre .centre{display:flex;gap:4px;align-items:center}
+.tache{position:relative;width:40px;height:40px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;cursor:default}
+.tache:hover,.tache[aria-expanded="true"]{background:var(--controle-survol)}
+.tache:active svg{transform:scale(.86)}
+.tache svg{width:24px;height:24px;transition:transform .1s}
+.droite{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;gap:2px}
+.zone{height:40px;padding:0 8px;border:0;border-radius:4px;background:transparent;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;font-size:12px;line-height:16px;cursor:default}
+.zone:hover{background:var(--controle-survol)}
+.zone.theme{flex-direction:row;align-items:center;width:40px;justify-content:center}
+.zone.theme svg{width:16px;height:16px}
+.gauche{position:absolute;left:12px;top:0;bottom:0;display:flex;align-items:center;gap:10px;font-size:12px;line-height:16px;color:var(--texte-doux)}
+.gauche b{font-family:var(--titre);font-weight:600;color:var(--texte)}
+
+/* ---------- Menu Démarrer ---------- */
+.demarrer{position:fixed;left:50%;bottom:58px;z-index:25;width:min(640px,calc(100vw - 16px));border-radius:8px;background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);
+  -webkit-backdrop-filter:blur(60px) saturate(1.5);backdrop-filter:blur(60px) saturate(1.5);transform:translate(-50%,0);transition:transform .2s cubic-bezier(.1,.9,.2,1),opacity .15s;overflow:hidden}
+.demarrer.ferme{transform:translate(-50%,24px);opacity:0;pointer-events:none}
+.demarrer .corps{padding:28px 32px 16px}
+.demarrer h2{margin:0 0 12px;font:600 14px/20px var(--titre)}
+.epingles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px}
+.epingle{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px 10px;border-radius:4px;text-align:center;font-size:12px;line-height:16px}
+.epingle:hover,.epingle:focus-visible{background:var(--controle-survol);outline:none}
+.epingle svg{width:36px;height:36px}
+.epingle small{color:var(--texte-faible);font-size:11px}
+.demarrer .pied{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 32px;border-top:1px solid var(--ligne);background:var(--controle)}
+.profil{display:flex;align-items:center;gap:10px}
+.avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--sur-accent);font:600 12px/1 var(--titre)}
+.profil small{display:block;color:var(--texte-faible);font-size:11px;line-height:14px}
+.pied .ver{color:var(--texte-faible);font-size:12px}
+
+@media (max-width:640px){
+  .bureau{grid-auto-flow:row;grid-template-columns:repeat(auto-fill,92px);grid-template-rows:none;grid-auto-rows:104px;justify-content:center;padding-top:24px}
+  .gauche .long,.zone.horloge .date{display:none}
+  .demarrer .corps{padding:20px 16px 12px}
+  .demarrer .pied{padding:12px 16px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="fond" aria-hidden="true"></canvas>
+
+<main class="bureau" id="bureau" aria-label="Bureau"></main>
+
+<div class="demarrer ferme" id="demarrer" role="dialog" aria-label="Démarrer" aria-hidden="true">
+  <div class="corps">
+    <h2>Épinglé</h2>
+    <div class="epingles" id="epingles"></div>
+  </div>
+  <div class="pied">
+    <div class="profil"><span class="avatar">TV</span><div>Tony VARIN<small>STR BIM Tools</small></div></div>
+    <span class="ver" id="ver-menu"></span>
+  </div>
+</div>
+
+<nav class="barre" aria-label="Barre des tâches">
+  <div class="gauche"><b id="nom-barre">Atelier STR</b><span class="long">STR BIM Tools · Tony VARIN</span><span id="version"></span></div>
+  <div class="centre" id="taches">
+    <button class="tache" id="btn-demarrer" aria-expanded="false" aria-controls="demarrer" title="Démarrer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3CCBF4"/><stop offset="1" stop-color="#0063B1"/></linearGradient></defs><path fill="url(#gd)" d="M2 2h9.5v9.5H2zM12.5 2H22v9.5h-9.5zM2 12.5h9.5V22H2zM12.5 12.5H22V22h-9.5z"/></svg>
+    </button>
+  </div>
+  <div class="droite">
+    <button class="zone theme" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+    <div class="zone horloge" aria-live="off"><span id="heure"></span><span class="date" id="date"></span></div>
+  </div>
+</nav>
+
+<div class="bulle" id="bulle" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+  // Nom provisoire : à remplacer ici quand Tony aura choisi (titre d'onglet compris)
+  var NOM = "Atelier STR";
+  var VERSION = "1.1.0";
+
+  // Icônes Fluent dessinées à la main (aucune bibliothèque)
+  var DESSINS = {
+    fgh: '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="a1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#E39B2E"/></linearGradient><linearGradient id="a2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5FD068"/><stop offset="1" stop-color="#0F7B0F"/></linearGradient></defs>' +
+         '<rect x="5" y="9" width="32" height="32" rx="3" fill="url(#a1)"/><rect x="11" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".9"/><rect x="22" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/><rect x="11" y="26" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/>' +
+         '<circle cx="35" cy="34" r="10" fill="url(#a2)"/><path d="M30.5 34.2l3 3 6-6.2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    ifc: '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="b1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7FD3FF"/><stop offset="1" stop-color="#1A73C9"/></linearGradient><linearGradient id="b2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3D9BE9"/><stop offset="1" stop-color="#0B4F94"/></linearGradient></defs>' +
+         '<path d="M24 4l18 10v20L24 44 6 34V14z" fill="url(#b2)"/><path d="M24 4l18 10-18 10L6 14z" fill="url(#b1)"/><path d="M24 24v20" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/><path d="M24 24l18-10M24 24L6 14" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/>' +
+         '<text x="24" y="38" text-anchor="middle" font-family="Segoe UI,system-ui,sans-serif" font-size="8" font-weight="700" fill="#fff">IFC</text></svg>',
+    dxf: '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="c1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DCE3EA"/></linearGradient><linearGradient id="c2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A80"/><stop offset="1" stop-color="#C42B1C"/></linearGradient></defs>' +
+         '<path d="M9 4h21l9 9v31H9z" fill="url(#c1)" stroke="#9AA7B4" stroke-width="1"/><path d="M30 4v9h9" fill="#C9D3DD"/>' +
+         '<path d="M14 18h20v14H14zM14 25h9v7M23 18v7" fill="none" stroke="#2F6496" stroke-width="1.4"/><circle cx="29" cy="25" r="2.2" fill="none" stroke="#2F6496" stroke-width="1.2"/>' +
+         '<rect x="12" y="34" width="24" height="9" rx="2" fill="url(#c2)"/><text x="24" y="41" text-anchor="middle" font-family="Segoe UI,system-ui,sans-serif" font-size="7" font-weight="700" fill="#fff">DXF</text></svg>'
+  };
+
+  var APPS = [
+    {id:"fgh", nom:"Validateur réservations", court:"Réservations", href:"/fgh/", desc:"Valide les réservations FGH sur la maquette IFC, sans Revit."},
+    {id:"ifc", nom:"Visionneuse IFC", court:"IFC", href:"/ifc/", desc:"Ouvre, explore et modifie une maquette IFC dans le navigateur."},
+    {id:"dxf", nom:"Visionneuse DXF", court:"DXF / DWG", href:"/dxf/", desc:"Ouvre un plan DXF ou DWG : calques, propriétés, mesure."}
+  ];
+
+  var $ = function(s){ return document.querySelector(s); };
+  document.title = NOM + " · STR Bim Tools";
+  $("#nom-barre").textContent = NOM;
+  $("#version").textContent = "v" + VERSION;
+  $("#ver-menu").textContent = NOM + " v" + VERSION;
+
+  // ---------- Icônes du bureau ----------
+  var bureau = $("#bureau"), tactile = window.matchMedia && matchMedia("(pointer:coarse)").matches;
+  APPS.forEach(function(a){
+    var el = document.createElement("a");
+    el.className = "icone"; el.href = a.href; el.innerHTML = DESSINS[a.id] + "<span></span>";
+    el.lastChild.textContent = a.nom; el.dataset.desc = a.desc;
+    el.setAttribute("aria-label", a.nom + " : " + a.desc);
+    // Comme sous Windows : un clic sélectionne, un double-clic ouvre (un toucher suffit sur écran tactile)
+    el.addEventListener("click", function(e){
+      if (tactile || e.detail === 0) return;          // toucher ou Entrée au clavier : on ouvre
+      e.preventDefault(); choisir(el);
+    });
+    el.addEventListener("dblclick", function(){ location.href = a.href; });
+    el.addEventListener("mouseenter", function(){ bulle(el); });
+    el.addEventListener("mouseleave", function(){ $("#bulle").hidden = true; });
+    bureau.appendChild(el);
+
+    var ep = document.createElement("a");
+    ep.className = "epingle"; ep.href = a.href; ep.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="m$1"').replace(/url\(#(\w+)\)/g, "url(#m$1)") + "<span></span><small></small>";
+    ep.querySelector("span").textContent = a.nom; ep.querySelector("small").textContent = a.desc;
+    $("#epingles").appendChild(ep);
+
+    var t = document.createElement("a");
+    t.className = "tache"; t.href = a.href; t.title = a.nom;
+    t.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="t$1"').replace(/url\(#(\w+)\)/g, "url(#t$1)");
+    $("#taches").appendChild(t);
+  });
+
+  function choisir(el){
+    [].forEach.call(document.querySelectorAll(".icone.choisie"), function(x){ x.classList.remove("choisie"); });
+    if (el) el.classList.add("choisie");
+  }
+  document.addEventListener("pointerdown", function(e){
+    if (!e.target.closest(".icone")) choisir(null);
+    if (!e.target.closest("#demarrer,#btn-demarrer")) menu(false);
+  });
+
+  var minuteur;
+  function bulle(el){
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function(){
+      if (!el.matches(":hover")) return;
+      var b = $("#bulle"), r = el.getBoundingClientRect();
+      b.textContent = el.dataset.desc; b.hidden = false;
+      b.style.left = Math.min(r.right + 6, innerWidth - b.offsetWidth - 8) + "px";
+      b.style.top = (r.top + 8) + "px";
+    }, 500);
+  }
+
+  // ---------- Menu Démarrer ----------
+  var dem = $("#demarrer"), btn = $("#btn-demarrer");
+  function menu(ouvrir){
+    if (ouvrir === undefined) ouvrir = dem.classList.contains("ferme");
+    dem.classList.toggle("ferme", !ouvrir);
+    dem.setAttribute("aria-hidden", ouvrir ? "false" : "true");
+    btn.setAttribute("aria-expanded", ouvrir ? "true" : "false");
+    if (ouvrir){ var p = dem.querySelector(".epingle"); if (p) p.focus({preventScroll:true}); }
+  }
+  btn.addEventListener("click", function(){ menu(); });
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape") menu(false);
+    if (e.key === "Meta" || (e.key === "s" && e.altKey)) { e.preventDefault(); menu(); }
+    // Flèches : passer d'une icône du bureau à l'autre
+    var ic = [].slice.call(document.querySelectorAll(".icone")), i = ic.indexOf(document.activeElement);
+    if (i >= 0 && /^Arrow/.test(e.key)){
+      e.preventDefault();
+      var j = /Down|Right/.test(e.key) ? Math.min(i + 1, ic.length - 1) : Math.max(i - 1, 0);
+      ic[j].focus(); choisir(ic[j]);
+    }
+  });
+
+  // ---------- Thème ----------
+  $("#btn-theme").addEventListener("click", function(){
+    var r = document.documentElement, c = r.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
+    r.setAttribute("data-theme", c);
+    try { localStorage.setItem("atelier.theme", c); } catch(e){}
+  });
+
+  // ---------- Horloge ----------
+  function horloge(){
+    var d = new Date(), z = function(x){ return (x < 10 ? "0" : "") + x; };
+    $("#heure").textContent = z(d.getHours()) + ":" + z(d.getMinutes());
+    $("#date").textContent = z(d.getDate()) + "." + z(d.getMonth() + 1) + "." + d.getFullYear();
+  }
+  horloge(); setInterval(horloge, 10000);
+
+  // ---------- Fond d'écran : ossature filaire (poteaux, dalles) qui tourne lentement ----------
+  var cv = $("#fond"), ctx = cv.getContext("2d"), L, H, dpr;
+  function taille(){ dpr = Math.min(window.devicePixelRatio || 1, 2); L = innerWidth; H = innerHeight; cv.width = L * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  taille(); addEventListener("resize", taille);
+  var segs = [], nx = 4, ny = 3, nz = 5, p = 1;
+  for (var k = 0; k <= nz; k++) for (var i = 0; i <= nx; i++) for (var j = 0; j <= ny; j++){
+    var a = [i - nx/2, k - nz/2, j - ny/2];
+    if (i < nx) segs.push([a, [a[0] + p, a[1], a[2]]]);
+    if (j < ny) segs.push([a, [a[0], a[1], a[2] + p]]);
+    if (k < nz) segs.push([a, [a[0], a[1] + p, a[2]]]);
+  }
+  var t0 = performance.now();
+  function dessine(t){
+    var ang = (t - t0) / 26000, c = Math.cos(ang), s = Math.sin(ang);
+    var ech = Math.min(L, H) / 11, cx = L * .62, cy = H * .5;
+    var fil = getComputedStyle(document.documentElement).getPropertyValue("--fil").trim();
+    ctx.clearRect(0, 0, L, H);
+    ctx.lineWidth = 1;
+    segs.forEach(function(sg){
+      var pr = sg.map(function(q){
+        var x = q[0]*c - q[2]*s, z = q[0]*s + q[2]*c, y = q[1];
+        var f = 7 / (7 + z * .6);
+        return [cx + x * ech * f, cy - y * ech * f + z * ech * .28, z];
+      });
+      var prof = (pr[0][2] + pr[1][2]) / 2;
+      ctx.strokeStyle = "rgba(" + fil + "," + (0.10 - prof * .02).toFixed(3) + ")";
+      ctx.beginPath(); ctx.moveTo(pr[0][0], pr[0][1]); ctx.lineTo(pr[1][0], pr[1][1]); ctx.stroke();
+    });
+    requestAnimationFrame(dessine);
+  }
+  requestAnimationFrame(dessine);
+})();
+</script>
+</body>
+</html>
