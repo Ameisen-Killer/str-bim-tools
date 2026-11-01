@@ -1,7 +1,7 @@
 /* STR Bim Tools · visionneuse DXF : canvas 2D, calques, propriétés, mesure. Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0";
   var $ = function(s){ return document.querySelector(s); };
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e){ return d; } }
@@ -340,7 +340,7 @@
       var ign = Object.keys(S.ignores);
       f.innerHTML = '<div class="tete"><h2>' + esc(S.nom) + '</h2><div class="sous">Clique un objet du dessin pour voir ses propriétés.</div></div>' +
         '<div class="carte"><h3>Fichier</h3><table class="tbl">' +
-        ligneProp("Version", esc((DXF.VERSIONS[S.version] || "") + (S.version ? " (" + S.version + ")" : "inconnue"))) +
+        ligneProp("Format", S.dwg ? "DWG (converti par LibreDWG)" : "DXF") + ligneProp("Version", esc((DXF.VERSIONS[S.version] || "") + (S.version ? " (" + S.version + ")" : "inconnue"))) +
         ligneProp("Unités", esc(DXF.UNITES[S.unites] || "non précisées")) +
         ligneProp("Étendue", isFinite(lx) ? '<span class="mono">' + nb(lx, 2) + " × " + nb(ly, 2) + "</span> " + esc(unite()) : "—") +
         ligneProp("Calques", S.calques.length) + ligneProp("Blocs", S.blocs) +
@@ -398,17 +398,22 @@
   function etat(t){ $("#etat").textContent = t || ""; }
   function ouvrir(f){
     if (!f) return;
-    if (/\.dwg$/i.test(f.name)){ etat("Les DWG ne s'ouvrent pas encore ici : enregistre-le en DXF depuis AutoCAD ou Revit."); return; }
-    if (!/\.dxf$/i.test(f.name)){ etat("Choisis un fichier .dxf."); return; }
+    var dwg = /\.dwg$/i.test(f.name);
+    if (!dwg && !/\.dxf$/i.test(f.name)){ etat("Choisis un fichier .dxf ou .dwg."); return; }
     $("#chargement").hidden = false; $("#chargement-txt").textContent = "Lecture de « " + f.name + " »…";
     var t0 = performance.now();
     f.arrayBuffer().then(function(buf){
+      if (!dwg) return buf;
+      return enDxf(buf, f.name);
+    }).then(function(buf){
+      $("#chargement-txt").textContent = "Lecture de « " + f.name + " »…";
       return new Promise(function(ok){ setTimeout(ok, 30); }).then(function(){ return DXF.lire(buf, f.name); });
     }).then(function(sc){
+      if (dwg) sc.dwg = true;
       S = sc; choisi = -1; cheminChoisi = null; mesure = [];
       construire();
       $("#accueil").hidden = true; $("#outils").hidden = false;
-      document.title = f.name + " · Visionneuse DXF · STR Bim Tools";
+      document.title = f.name + " · Visionneuse DXF · DWG";
       calques(); proprietes(); recadrer();
       $("#chargement").hidden = true;
       etat(f.name + " · " + S.ents.length + " objets · " + S.calques.length + " calques · ouvert en " + nb((performance.now() - t0)/1000, 2) + " s");
@@ -416,6 +421,37 @@
       $("#chargement").hidden = true;
       etat("Lecture impossible : " + (err && err.message || err));
       if (window.console) console.error(err);
+    });
+  }
+  // DWG : LibreDWG (WebAssembly, GPL 3, ~11 Mo chargés au premier DWG) le convertit en DXF dans le navigateur,
+  // puis le lecteur DXF de la page le lit comme un DXF
+  var libredwg = null;
+  function chargerLibreDwg(){
+    if (!libredwg){
+      $("#chargement-txt").textContent = "Chargement du lecteur DWG (environ 11 Mo, une seule fois)…";
+      libredwg = import("/dxf/vendor/libredwg/libredwg-web.js").then(function(m){ return m.default({}); });
+      libredwg.catch(function(){ libredwg = null; });
+    }
+    return libredwg;
+  }
+  function enDxf(buf, nom){
+    return chargerLibreDwg().then(function(M){
+      $("#chargement-txt").textContent = "Conversion de « " + nom + " » en DXF…";
+      return new Promise(function(ok){ setTimeout(ok, 30); }).then(function(){
+        var ent = "entree.dwg", sor = "sortie.dxf", err, out = null;
+        try {
+          M.FS.writeFile(ent, new Uint8Array(buf));
+          err = M.dwg_write_dxf(ent, sor);
+          if (M.FS.analyzePath(sor, false).exists) out = M.FS.readFile(sor);
+        } finally {
+          try { if (M.FS.analyzePath(ent, false).exists) M.FS.unlink(ent); } catch (e){}
+          try { if (M.FS.analyzePath(sor, false).exists) M.FS.unlink(sor); } catch (e){}
+        }
+        // code d'erreur LibreDWG : ≥ 128 = erreur bloquante ; en dessous, avertissements (le DXF est lisible)
+        if (!out || !out.length) throw new Error("ce DWG n'a pas pu être converti (code LibreDWG " + err + "). Enregistre-le en DXF depuis AutoCAD.");
+        if (err && window.console) console.warn("LibreDWG : conversion avec avertissements, code " + err);
+        return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+      });
     });
   }
   $("#fichier").addEventListener("change", function(){ ouvrir(this.files[0]); this.value = ""; });

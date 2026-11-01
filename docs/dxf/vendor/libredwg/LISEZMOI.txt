@@ -1,0 +1,5 @@
+LibreDWG compilé en WebAssembly : paquet npm @mlightcad/libredwg-web 0.8.1 (fichiers wasm/libredwg-web.js et
+wasm/libredwg-web.wasm, copiés sans modification).
+Licence : GNU GPL version 3 (https://www.gnu.org/licenses/gpl-3.0.html).
+Sources : https://github.com/mlightcad/libredwg-web et https://www.gnu.org/software/libredwg/
+Utilisé par la visionneuse /dxf/ pour convertir un DWG en DXF dans le navigateur.
