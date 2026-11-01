@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Bureau · Planification</title>
+<meta name="theme-color" content="#050505">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%23111'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23D6A85C' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<!--
+  Planificateur, version bureau (01.11.2026) — version parallèle de /planif/.
+  Même base, même connexion (session planif.session), mêmes droits : les
+  modules sont les pages de /planif/, ouvertes telles quelles dans des
+  fenêtres internes. Rien n'est modifié dans /planif/ : la barre du haut de
+  chaque page est seulement masquée dans la fenêtre (feuille injectée).
+-->
+<style>
+:root{
+  color-scheme:dark;
+  --or:#D6A85C;
+  --or-rvb:214,168,92;
+  --or-fonce:#A9782E;
+  --noir:#050505;
+  --barre:rgba(12,11,9,.82);
+  --tuile:linear-gradient(160deg,rgba(40,34,24,.92),rgba(12,11,9,.92));
+  --tuile-bord:rgba(214,168,92,.32);
+  --panneau:rgba(18,16,13,.94);
+  --controle:rgba(255,255,255,.04);
+  --controle-survol:rgba(214,168,92,.12);
+  --ligne:rgba(214,168,92,.18);
+  --texte:#EDE8DF;
+  --texte-doux:rgba(237,232,223,.78);
+  --texte-faible:rgba(237,232,223,.5);
+  --rouge:#E5484D;
+  --ombre:0 32px 64px rgba(0,0,0,.55),0 2px 21px rgba(0,0,0,.45),0 0 0 1px rgba(214,168,92,.14);
+  --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;overflow:hidden;font-family:var(--sans);font-size:14px;line-height:20px;color:var(--texte);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(ellipse 75% 65% at 60% 55%,#1C170F 0%,#0D0B08 45%,var(--noir) 100%) fixed;background-color:var(--noir)}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+[hidden]{display:none!important}
+
+/* ---------- Fond d'écran : ossature filaire en or qui tourne lentement ---------- */
+#fond{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* ---------- Bureau : icônes à gauche, carte « Aujourd'hui » à droite ---------- */
+.bureau{position:fixed;inset:0 0 56px 0}
+.icones{position:absolute;inset:0;padding:14px 10px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,108px);grid-auto-columns:96px;gap:4px;align-content:start}
+.icone{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 4px 4px;border:1px solid transparent;border-radius:6px;color:var(--texte);text-align:center;cursor:default;outline:none;
+  text-shadow:0 1px 3px rgba(0,0,0,.9);font-size:12px;line-height:15px;opacity:0;transform:translateY(6px);animation:apparait .45s cubic-bezier(.1,.9,.2,1) forwards;animation-delay:calc(var(--r,0) * 45ms)}
+@keyframes apparait{to{opacity:1;transform:none}}
+.tuile{position:relative;width:60px;height:60px;flex:none;border-radius:15px;display:grid;place-items:center;background:var(--tuile);border:1px solid var(--tuile-bord);color:var(--or);
+  box-shadow:0 4px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);transition:transform .18s cubic-bezier(.3,1.6,.5,1),box-shadow .2s,border-color .2s}
+.tuile svg{width:36px;height:36px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tuile svg .plein{fill:currentColor;stroke:none}
+.tuile svg .doux{opacity:.45}
+.icone:hover .tuile{transform:scale(1.06);border-color:rgba(var(--or-rvb),.7);box-shadow:0 4px 18px rgba(0,0,0,.5),0 0 18px rgba(var(--or-rvb),.18)}
+.icone:hover{background:rgba(var(--or-rvb),.07);border-color:rgba(var(--or-rvb),.14)}
+.icone.choisie,.icone:focus-visible{background:rgba(var(--or-rvb),.14);border-color:rgba(var(--or-rvb),.35)}
+.badge{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--rouge);color:#fff;font:600 11px/20px var(--sans);text-align:center;box-shadow:0 0 0 2px var(--noir);text-shadow:none}
+.badge.or{background:var(--or);color:#1B1406}
+
+/* Carte « Aujourd'hui » */
+.aujourdhui{position:absolute;top:16px;right:16px;width:320px;max-height:calc(100% - 32px);overflow:auto;border-radius:14px;padding:18px 18px 12px;background:rgba(14,12,10,.72);border:1px solid var(--ligne);box-shadow:0 10px 30px rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);opacity:0;transform:translateY(8px);animation:apparait .5s .25s cubic-bezier(.1,.9,.2,1) forwards;user-select:text;-webkit-user-select:text}
+.aujourdhui .jour{margin:0;color:var(--or);font-size:12px;letter-spacing:.04em}
+.aujourdhui h1{margin:2px 0 12px;font:300 24px/30px var(--sans)}
+.aujourdhui h1 b{font-weight:600}
+.aujourdhui h2{margin:14px 0 6px;font:600 12px/16px var(--sans);color:var(--texte-doux)}
+.signal{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;margin:0 0 6px;border:1px solid var(--ligne);border-radius:8px;background:var(--controle);text-align:left;cursor:pointer}
+.signal:hover{background:var(--controle-survol)}
+.signal b{min-width:24px;font-size:16px;color:var(--or)}
+.ligne-t{display:flex;align-items:center;gap:8px;width:100%;padding:6px 6px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:pointer;font-size:13px;line-height:17px}
+.ligne-t:hover{background:var(--controle-survol)}
+.ligne-t .point{width:8px;height:8px;border-radius:50%;flex:none;background:var(--texte-faible)}
+.ligne-t .point.orange{background:#F5A524}
+.ligne-t .point.rouge{background:var(--rouge)}
+.ligne-t .lib{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ligne-t .quand{flex:none;color:var(--texte-faible);font-size:12px}
+.ligne-t .quand.rouge{color:var(--rouge)}
+.vide-msg{margin:4px 6px;color:var(--texte-faible);font-size:13px}
+.aujourdhui .espace{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--ligne);color:var(--texte-faible);font-size:11px}
+
+/* ---------- Infobulle ---------- */
+.bulle{position:fixed;z-index:30;max-width:280px;padding:6px 9px;border-radius:6px;background:var(--panneau);color:var(--texte);border:1px solid var(--ligne);box-shadow:0 4px 10px rgba(0,0,0,.4);font-size:12px;line-height:16px;pointer-events:none}
+
+/* ---------- Dock ---------- */
+.barre{position:fixed;left:0;right:0;bottom:0;height:56px;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--barre);border-top:1px solid var(--ligne);
+  -webkit-backdrop-filter:blur(40px) saturate(1.3);backdrop-filter:blur(40px) saturate(1.3);padding-bottom:env(safe-area-inset-bottom)}
+.barre .centre{display:flex;gap:8px;align-items:flex-end;height:46px;padding:0 8px}
+.tache{--s:1;position:relative;flex:none;width:calc(40px * var(--s));height:calc(40px * var(--s));border:1px solid var(--tuile-bord);border-radius:calc(10px * var(--s));
+  background:var(--tuile);box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;cursor:default;padding:0;color:var(--or);
+  transition:width .14s ease-out,height .14s ease-out,border-radius .14s ease-out,transform .25s cubic-bezier(.3,1.6,.5,1)}
+.tache svg{width:62%;height:62%;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tache svg .plein{fill:currentColor;stroke:none}
+.tache svg .doux{opacity:.45}
+.tache:active{transform:scale(.9)}
+.tache .etiquette{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);white-space:nowrap;padding:4px 10px;border-radius:8px;color:var(--texte);
+  background:var(--panneau);border:1px solid var(--ligne);box-shadow:0 4px 12px rgba(0,0,0,.4);font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+.tache:hover .etiquette{opacity:1;transform:translateX(-50%)}
+.tache .badge{top:-5px;right:-6px;min-width:16px;height:16px;padding:0 4px;font-size:10px;line-height:16px}
+.tache.demarrer-ico{background:linear-gradient(160deg,#E7BE77,#A9782E);border-color:rgba(255,255,255,.25);color:#1B1406}
+.tache.demarrer-ico svg{stroke-width:7}
+.tache.ouverte::after{content:"";position:absolute;bottom:-6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--texte-doux)}
+.tache.devant::after{background:var(--or);width:14px;margin-left:-7px;border-radius:3px}
+.tache.sep{width:1px;height:28px;border:0;background:var(--ligne);box-shadow:none;margin:0 2px 6px;pointer-events:none}
+.gauche{position:absolute;left:14px;top:0;bottom:0;display:flex;align-items:center;gap:10px;font-size:12px;line-height:16px;color:var(--texte-doux)}
+.gauche b{font-weight:600;color:var(--or)}
+.droite{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;gap:2px}
+.zone{height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;font-size:12px;line-height:16px;cursor:default}
+.zone:hover{background:var(--controle-survol)}
+.zone.ico{flex-direction:row;align-items:center;width:40px;justify-content:center;padding:0}
+.zone.ico svg{width:16px;height:16px}
+
+/* ---------- Menu Démarrer ---------- */
+.demarrer{position:fixed;left:50%;bottom:66px;z-index:25;width:min(700px,calc(100vw - 16px));max-height:calc(100vh - 82px);display:flex;flex-direction:column;border-radius:12px;background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);
+  -webkit-backdrop-filter:blur(60px) saturate(1.3);backdrop-filter:blur(60px) saturate(1.3);transform:translate(-50%,0);transition:transform .2s cubic-bezier(.1,.9,.2,1),opacity .15s;overflow:hidden}
+.demarrer.ferme{transform:translate(-50%,24px);opacity:0;pointer-events:none}
+.demarrer .corps{padding:22px 28px 10px;overflow:auto}
+.demarrer h2{margin:10px 0 8px;font:600 12px/16px var(--sans);color:var(--or);letter-spacing:.04em}
+.demarrer h2:first-child{margin-top:0}
+.epingles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px}
+.epingle{display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;font-size:13px;line-height:17px}
+.epingle:hover,.epingle:focus-visible{background:var(--controle-survol);outline:none}
+.epingle .tuile{width:36px;height:36px;border-radius:9px}
+.epingle .tuile svg{width:22px;height:22px;stroke-width:2.6}
+.demarrer .pied{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 28px;border-top:1px solid var(--ligne);background:var(--controle)}
+.profil{display:flex;align-items:center;gap:10px;min-width:0}
+.avatar{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--or);color:#1B1406;font:600 12px/1 var(--sans);overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.profil small{display:block;color:var(--texte-faible);font-size:11px;line-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.pied .boutons{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pied .bouton{height:32px;padding:0 10px;border:1px solid var(--ligne);border-radius:6px;background:transparent;display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.pied .bouton:hover{background:var(--controle-survol)}
+.pied .bouton.quitter:hover{background:#7A1E1E;border-color:#7A1E1E}
+.pied select{height:32px;border:1px solid var(--ligne);border-radius:6px;background:#15130F;padding:0 6px;font-size:12px}
+.roles{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--texte-faible)}
+
+/* ---------- Fenêtres des modules ---------- */
+.fenetres{position:fixed;inset:0 0 56px 0;z-index:10;pointer-events:none}
+.fenetre{position:absolute;display:flex;flex-direction:column;min-width:340px;min-height:240px;border-radius:12px;overflow:hidden;pointer-events:auto;
+  background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);transition:opacity .18s,transform .22s cubic-bezier(.2,.9,.3,1)}
+.fenetre.neuve{opacity:0;transform:scale(.94)}
+.fenetre.reduite{opacity:0;transform:translateY(40%) scale(.3);pointer-events:none}
+.fenetre.agrandie{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0}
+.fenetre:not(.active){box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.4)}
+.fenetre:not(.active) .titre{opacity:.6}
+.titre{flex:none;height:38px;display:flex;align-items:center;gap:8px;padding-left:12px;font-size:12px;line-height:16px;touch-action:none;cursor:default;border-bottom:1px solid var(--ligne)}
+.titre .mini{width:20px;height:20px;flex:none;color:var(--or)}
+.titre .mini svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.titre .mini svg .plein{fill:currentColor;stroke:none}
+.titre .nom{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titre button,.titre a{flex:none;width:44px;height:38px;border:0;background:transparent;display:grid;place-items:center;color:var(--texte)}
+.titre button:hover,.titre a:hover{background:var(--controle-survol)}
+.titre .fermer:hover{background:#C42B1C;color:#fff}
+.titre button svg,.titre a svg{width:10px;height:10px}
+.fenetre .cadre{position:relative;flex:1;display:flex;background:#F6F2EA}
+.fenetre iframe{flex:1;width:100%;border:0;background:transparent;opacity:0;transition:opacity .2s}
+.fenetre iframe.pret{opacity:1}
+.fenetre .charge{position:absolute;inset:0;display:grid;place-items:center;color:#7A5A2B;font-size:13px;pointer-events:none}
+.fenetres.bouge iframe{pointer-events:none}
+.poignee{position:absolute;z-index:2}
+.poignee.d{top:38px;right:0;bottom:8px;width:6px;cursor:ew-resize}
+.poignee.b{left:0;right:8px;bottom:0;height:6px;cursor:ns-resize}
+.poignee.g{top:38px;left:0;bottom:8px;width:6px;cursor:ew-resize}
+.poignee.db{right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize}
+.fenetre.agrandie .poignee{display:none}
+
+/* ---------- Écran de connexion ---------- */
+.verrou{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(5,5,5,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);user-select:text;-webkit-user-select:text}
+.verrou .boite{width:min(380px,100%);text-align:center}
+.verrou .logo{width:72px;height:72px;margin:0 auto 14px}
+.verrou .heure{font:200 64px/1 var(--sans);letter-spacing:-.02em}
+.verrou .date{margin:6px 0 26px;color:var(--texte-doux)}
+.verrou form{display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:14px;background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);text-align:left}
+.verrou label{font-size:12px;color:var(--texte-doux)}
+.verrou input{width:100%;height:42px;margin-top:4px;padding:0 12px;border:1px solid var(--ligne);border-radius:8px;background:#0E0D0B;font-size:16px;outline:none}
+.verrou input:focus{border-color:var(--or)}
+.verrou .principal{height:42px;border:0;border-radius:8px;background:var(--or);color:#1B1406;font-weight:600;cursor:pointer}
+.verrou .principal:disabled{opacity:.6}
+.verrou .liens{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+.verrou .liens a,.verrou .liens button{border:0;background:none;padding:0;color:var(--or);cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:12px}
+.verrou .msg{margin:0;padding:8px 10px;border-radius:8px;background:rgba(229,72,77,.14);color:#FFB4B6;font-size:13px}
+.message-bureau{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:5;max-width:min(460px,calc(100vw - 32px));padding:14px 18px;border-radius:12px;background:var(--panneau);border:1px solid var(--ligne);text-align:center}
+
+@media (max-width:900px){
+  .aujourdhui{display:none}
+}
+@media (max-width:640px){
+  .bureau{overflow:auto;-webkit-overflow-scrolling:touch}
+  .icones{position:static;grid-auto-flow:row;grid-template-columns:repeat(auto-fill,88px);grid-template-rows:none;grid-auto-rows:104px;justify-content:center;padding-top:20px}
+  .icone{font-size:11px}
+  .aujourdhui{display:block;position:static;width:auto;max-height:none;margin:8px 16px 24px}
+  .gauche .long{display:none}
+  .gauche{display:none}
+  .barre .centre{gap:6px;max-width:calc(100vw - 70px);overflow-x:auto;overflow-y:visible;justify-content:flex-start;padding-top:8px;height:54px}
+  .zone.horloge .date,.zone.ico.plein{display:none}
+  .droite{right:2px}
+  .demarrer .corps{padding:18px 16px 10px}
+  .demarrer .pied{padding:12px 16px}
+  .epingles{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<canvas id="fond" aria-hidden="true"></canvas>
+
+<main class="bureau" id="bureau" aria-label="Bureau">
+  <div class="icones" id="icones"></div>
+  <aside class="aujourdhui" id="aujourdhui" aria-label="Aujourd'hui" hidden></aside>
+</main>
+
+<div class="demarrer ferme" id="demarrer" role="dialog" aria-label="Tous les modules" aria-hidden="true">
+  <div class="corps" id="menu-corps"></div>
+  <div class="pied">
+    <div class="profil"><span class="avatar" id="avatar">?</span><div><span id="moi-nom">—</span><small id="moi-mail"></small></div></div>
+    <div class="boutons" id="pied-boutons"></div>
+  </div>
+</div>
+
+<div class="fenetres" id="fenetres"></div>
+
+<nav class="barre" aria-label="Barre des modules">
+  <div class="gauche"><b>Planification</b><span class="long" id="espace"></span></div>
+  <div class="centre" id="dock">
+    <button class="tache demarrer-ico" id="btn-demarrer" aria-expanded="false" aria-controls="demarrer" aria-label="Tous les modules">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60"/></svg><span class="etiquette">Tous les modules</span>
+    </button>
+  </div>
+  <div class="droite">
+    <button class="zone ico plein" id="btn-plein" title="Plein écran"></button>
+    <div class="zone horloge" aria-live="off"><span id="heure"></span><span class="date" id="date"></span></div>
+  </div>
+</nav>
+
+<div class="bulle" id="bulle" hidden></div>
+
+<div class="verrou" id="verrou" hidden>
+  <div class="boite">
+    <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="18" fill="#111" stroke="rgba(214,168,92,.4)" stroke-width="1.5"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#D6A85C" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <div class="heure" id="v-heure"></div>
+    <div class="date" id="v-date"></div>
+    <form id="v-form" novalidate>
+      <p class="msg" id="v-msg" role="alert" hidden></p>
+      <label>Adresse e-mail<input id="v-email" type="email" autocomplete="username" inputmode="email" spellcheck="false"></label>
+      <label>Mot de passe<input id="v-mdp" type="password" autocomplete="current-password"></label>
+      <button class="principal" id="v-ok" type="submit">Se connecter</button>
+      <div class="liens"><a href="/planif/connexion/">Mot de passe oublié ou première connexion</a><button type="button" id="v-demo">Essayer la démo</button></div>
+    </form>
+  </div>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script>
+(function () {
+  "use strict";
+  var NOM = "Bureau", VERSION = "0.1.0";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
+  var avecBase = !!(SB && SB.configure);
+  var $ = function (s) { return document.querySelector(s); };
+
+  /* ---------- Icônes au trait (viewBox 48), tracées en or ---------- */
+  var ICO = {
+    communication: '<path d="M8 9h22a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H17l-6 5v-5H8a4 4 0 0 1-4-4V13a4 4 0 0 1 4-4z"/><path class="doux" d="M38 17h2a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4h-2v5l-6-5h-8a4 4 0 0 1-4-4v-1"/>',
+    taches: '<rect x="8" y="5" width="32" height="38" rx="4"/><path d="M15 17l3 3 5-6M15 31l3 3 5-6"/><path class="doux" d="M28 17h6M28 31h6"/>',
+    tableau: '<path d="M6 7v34h36"/><rect class="plein" x="12" y="11" width="16" height="5" rx="2.5"/><rect class="plein doux" x="19" y="20" width="18" height="5" rx="2.5"/><rect class="plein" x="14" y="29" width="10" height="5" rx="2.5"/><rect class="plein doux" x="27" y="29" width="12" height="5" rx="2.5"/>',
+    charge: '<rect class="plein doux" x="7" y="8" width="9" height="9" rx="2"/><rect class="plein" x="19.5" y="8" width="9" height="9" rx="2"/><rect class="plein doux" x="32" y="8" width="9" height="9" rx="2"/><rect class="plein" x="7" y="20" width="9" height="9" rx="2"/><rect class="plein doux" x="19.5" y="20" width="9" height="9" rx="2"/><rect x="32" y="20" width="9" height="9" rx="2"/><rect x="7" y="32" width="9" height="9" rx="2"/><rect class="plein" x="19.5" y="32" width="9" height="9" rx="2"/><rect class="plein" x="32" y="32" width="9" height="9" rx="2"/>',
+    affaires: '<path d="M5 13a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path class="doux" d="M5 20h38"/>',
+    carte: '<path d="M24 43s13-12.5 13-23a13 13 0 0 0-26 0c0 10.5 13 23 13 23z"/><circle cx="24" cy="20" r="5"/>',
+    equipe: '<circle cx="18" cy="16" r="6"/><path d="M6 40c0-7 5-12 12-12s12 5 12 12"/><circle class="doux" cx="33" cy="17" r="5"/><path class="doux" d="M32 27c6 0 10 4 10 11"/>',
+    absences: '<rect x="6" y="9" width="36" height="33" rx="4"/><path d="M6 18h36M16 5v8M32 5v8"/><path class="doux" d="M18 25l12 11M30 25L18 36"/>',
+    annuaire: '<path d="M11 5h25a3 3 0 0 1 3 3v32a3 3 0 0 1-3 3H11z"/><path class="doux" d="M7 13h7M7 24h7M7 35h7"/><circle cx="25" cy="20" r="5"/><path d="M17 35c1-5 4-7 8-7s7 2 8 7"/>',
+    veille: '<circle cx="24" cy="24" r="18"/><circle class="doux" cx="24" cy="24" r="10"/><path d="M24 24l12-12"/><circle class="plein" cx="31" cy="20" r="2.5"/>',
+    ao_publics: '<path d="M6 17L24 6l18 11M8 18h32M12 22v14M20 22v14M28 22v14M36 22v14M6 41h36"/>',
+    ao_prives: '<rect x="5" y="14" width="38" height="27" rx="4"/><path d="M17 14v-4a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v4"/><path class="doux" d="M5 25h38"/><path d="M21 23v5h6v-5"/>',
+    agenda_ao: '<rect x="5" y="9" width="30" height="28" rx="4"/><path d="M5 17h30M13 5v7M27 5v7"/><circle cx="35" cy="35" r="9" fill="#14110D"/><path d="M35 30v5l3 2"/>',
+    facturation: '<path d="M7 34a17 17 0 1 1 34 0"/><path class="doux" d="M12 34h3M33 34h3M24 17v3"/><path d="M24 34l8-10"/><circle class="plein" cx="24" cy="34" r="3"/><path d="M7 41h34"/>',
+    console: '<circle cx="24" cy="24" r="6"/><circle class="doux" cx="24" cy="24" r="14"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M9.9 9.9l4.2 4.2M33.9 33.9l4.2 4.2M9.9 38.1l4.2-4.2M33.9 14.1l4.2-4.2"/>',
+    profil: '<circle cx="24" cy="24" r="19"/><circle cx="24" cy="19" r="6"/><path d="M12 37c2-6 7-9 12-9s10 3 12 9"/>',
+    classique: '<rect x="6" y="11" width="30" height="31" rx="4"/><path d="M26 6h16v16M42 6L22 26"/>'
+  };
+  function svgIco(id) { return '<svg viewBox="0 0 48 48" aria-hidden="true">' + ICO[id] + "</svg>"; }
+
+  /* ---------- Les modules : les pages de /planif/, chacune avec la clé de son droit ---------- */
+  var APPS = [
+    { id: "communication", cle: "communication", groupe: "Communication", nom: "Communication", href: "/planif/communication/", desc: "Le bureau aujourd'hui, le tchat, l'agenda interne, les demandes de congé et les avis." },
+    { id: "absences", cle: "absences", groupe: "Communication", nom: "Absences et congés", href: "/planif/absences/", desc: "Qui est absent, quand : calendrier et périodes." },
+    { id: "equipe", cle: "equipe", groupe: "Communication", nom: "Équipe", href: "/planif/equipe/", desc: "Les membres du bureau, leurs métiers, capacités et jours travaillés." },
+    { id: "annuaire", cle: "annuaire", groupe: "Communication", nom: "Annuaire", href: "/planif/annuaire/", desc: "Le carnet d'adresses du bureau." },
+    { id: "taches", cle: "taches", groupe: "Tâches", nom: "Tâches", href: "/planif/taches/", desc: "La liste des tâches par semaine d'échéance." },
+    { id: "tableau", cle: "tableau", groupe: "Tâches", nom: "Tableau de bord", href: "/planif/planning/", desc: "Le planning de chacun, par glisser-déposer." },
+    { id: "affaires", cle: "affaires", groupe: "Tâches", nom: "Affaires", href: "/planif/affaires/", desc: "Les affaires, leurs équipes, mandats et avancement." },
+    { id: "charge", cle: "charge", groupe: "Tâches", nom: "Tableau de charge", href: "/planif/charge/", desc: "Une case par personne et par semaine : qui est libre, qui déborde." },
+    { id: "carte", cle: "affaires", groupe: "Tâches", nom: "Carte des affaires", href: "/planif/carte/", desc: "Les affaires sur la carte." },
+    { id: "veille", cle: "veille", groupe: "Inter-secteurs", nom: "Veille simap.ch", href: "/planif/inter-secteurs/", desc: "Les appels d'offres publiés chaque matin sur simap.ch." },
+    { id: "ao_publics", cle: "ao_publics", groupe: "Inter-secteurs", nom: "AO publics", href: "/planif/inter-secteurs/?vue=publics", desc: "Les appels d'offres publics suivis par le bureau." },
+    { id: "ao_prives", cle: "ao_prives", groupe: "Inter-secteurs", nom: "AO privés", href: "/planif/inter-secteurs/?vue=prives", desc: "Les appels d'offres privés." },
+    { id: "agenda_ao", cle: "agenda_ao", groupe: "Inter-secteurs", nom: "Agenda des AO", href: "/planif/inter-secteurs/?vue=agenda", desc: "Visites, questions, remises et ouvertures des appels d'offres." },
+    { id: "facturation", cle: "facturation", groupe: "Inter-secteurs", nom: "Facturation", href: "/planif/inter-secteurs/?vue=facturation", desc: "Avancement et facturation par phase et par secteur." },
+    { id: "console", cle: "console", groupe: "Administration", nom: "Console", href: "/planif/console/", desc: "Bureaux, accès, groupes et droits." },
+    { id: "profil", cle: null, groupe: "Administration", nom: "Mon profil", href: "/planif/profil/", desc: "Photo, téléphones, jours travaillés, mot de passe." }
+  ];
+  var EPINGLES = ["communication", "taches", "tableau", "charge", "affaires", "veille"];
+  var parId = {};
+  APPS.forEach(function (a) { parId[a.id] = a; });
+  var permises = [];
+
+  /* ---------- Horloge (dock et écran de connexion) ---------- */
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  function z(x) { return (x < 10 ? "0" : "") + x; }
+  function horloge() {
+    var d = new Date();
+    $("#heure").textContent = $("#v-heure").textContent = z(d.getHours()) + ":" + z(d.getMinutes());
+    $("#date").textContent = z(d.getDate()) + "." + z(d.getMonth() + 1) + "." + d.getFullYear();
+    var long = JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()];
+    $("#v-date").textContent = long.charAt(0).toUpperCase() + long.slice(1);
+  }
+  horloge(); setInterval(horloge, 10000);
+
+  /* ---------- Démarrage : connexion, puis données (profil et droits) ---------- */
+  function message(texte) {
+    var p = document.createElement("p");
+    p.className = "message-bureau"; p.setAttribute("role", "alert"); p.textContent = texte;
+    document.body.appendChild(p);
+  }
+  if (avecBase && !SB.connecte()) verrou();
+  else D.pret().then(demarre).catch(function (e) {
+    var m = (e && e.message) || "Chargement impossible.";
+    if (avecBase && /session|acc[eè]s refus/i.test(m)) SB.deconnexion().then(function () { verrou(m); });
+    else message(m);
+  });
+
+  /* ---------- Écran de connexion : même compte que /planif/ ---------- */
+  function adresseDe(saisie) { return saisie && saisie.indexOf("@") < 0 ? saisie.toLowerCase() + "@str-bim-tools.com" : saisie; }
+  function verrou(motif) {
+    var v = $("#verrou"), msg = $("#v-msg"), ok = $("#v-ok"), demo = $("#v-demo");
+    v.hidden = false;
+    function dis(t) { msg.textContent = t || ""; msg.hidden = !t; }
+    dis(motif);
+    if (!avecBase) return;
+    setTimeout(function () { $("#v-email").focus(); }, 50);
+    $("#v-form").onsubmit = function (e) {
+      e.preventDefault(); dis("");
+      var a = $("#v-email").value.trim(), m = $("#v-mdp").value;
+      if (!a) { dis("L'adresse e-mail est obligatoire."); return $("#v-email").focus(); }
+      if (!m) { dis("Le mot de passe est obligatoire."); return $("#v-mdp").focus(); }
+      ok.disabled = true; ok.textContent = "…";
+      SB.connexion(adresseDe(a), m).then(function () { location.reload(); })
+        .catch(function (err) { ok.disabled = false; ok.textContent = "Se connecter"; dis(err.message); });
+    };
+    demo.onclick = function () {
+      dis(""); demo.disabled = true;
+      SB.connexion(adresseDe("demo"), "demo").then(function () {
+        try { localStorage.setItem("planif.marque", "str"); localStorage.setItem("planif.marque:" + adresseDe("demo"), "str"); } catch (e) {}
+        location.reload();
+      }).catch(function (err) { demo.disabled = false; dis(err.message); });
+    };
+  }
+
+  function demarre() {
+    permises = APPS.filter(function (a) { return !a.cle || D.pagePermise(a.cle); });
+    icones(); menuDemarrer(); dock(); aujourdhui();
+    $("#espace").textContent = D.nomEspace() + " · " + NOM + " v" + VERSION;
+    document.title = NOM + " · " + (D.enDemo() ? "Espace démo" : "Planification");
+    D.surRechargement(function () { aujourdhui(); badges(); });
+    // Relecture discrète : toutes les deux minutes, onglet visible, et au retour sur l'onglet
+    var vu = Date.now();
+    setInterval(function () { if (!document.hidden) relit(); }, 120000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden && Date.now() - vu > 60000) relit(); });
+    function relit() { vu = Date.now(); if (D.recharge) D.recharge().catch(function () {}); }
+    // Adresse /planif2/?ouvre=taches : ouvre directement un module
+    var o = new URLSearchParams(location.search).get("ouvre");
+    if (o && parId[o] && permises.indexOf(parId[o]) >= 0) ouvrir(parId[o]);
+  }
+
+  /* ---------- Icônes du bureau ---------- */
+  var tactile = window.matchMedia && matchMedia("(pointer:coarse)").matches;
+  function horsBureau(e) { return e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1; }
+  function icones() {
+    var hote = $("#icones");
+    permises.forEach(function (a, i) {
+      if (a.id === "profil") return;
+      var el = document.createElement("a");
+      el.className = "icone"; el.href = a.href; el.dataset.app = a.id; el.style.setProperty("--r", i);
+      el.innerHTML = '<span class="tuile">' + svgIco(a.id) + "</span><span></span>";
+      el.lastChild.textContent = a.nom; el.dataset.desc = a.desc;
+      el.setAttribute("aria-label", a.nom + " : " + a.desc);
+      // Comme sous Windows : un clic choisit, un double-clic ouvre (un toucher suffit sur écran tactile)
+      el.addEventListener("click", function (e) {
+        if (horsBureau(e)) return;
+        e.preventDefault();
+        if (tactile || e.detail === 0) ouvrir(a); else choisir(el);
+      });
+      el.addEventListener("dblclick", function () { ouvrir(a); });
+      el.addEventListener("mouseenter", function () { bulle(el); });
+      el.addEventListener("mouseleave", function () { $("#bulle").hidden = true; });
+      hote.appendChild(el);
+    });
+    // La version actuelle, à côté, dans un onglet
+    var c = document.createElement("a");
+    c.className = "icone"; c.href = "/planif/"; c.target = "_blank"; c.rel = "noopener"; c.style.setProperty("--r", permises.length);
+    c.dataset.desc = "Ouvre la planification habituelle dans un nouvel onglet.";
+    c.innerHTML = '<span class="tuile">' + svgIco("classique") + "</span><span>Planification habituelle</span>";
+    c.addEventListener("mouseenter", function () { bulle(c); });
+    c.addEventListener("mouseleave", function () { $("#bulle").hidden = true; });
+    hote.appendChild(c);
+    badges();
+  }
+  function choisir(el) {
+    [].forEach.call(document.querySelectorAll(".icone.choisie"), function (x) { x.classList.remove("choisie"); });
+    if (el) el.classList.add("choisie");
+  }
+  var minuteur;
+  function bulle(el) {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function () {
+      if (!el.matches(":hover")) return;
+      var b = $("#bulle"), r = el.getBoundingClientRect();
+      b.textContent = el.dataset.desc; b.hidden = false;
+      b.style.left = Math.min(r.right + 6, innerWidth - b.offsetWidth - 8) + "px";
+      b.style.top = (r.top + 8) + "px";
+    }, 500);
+  }
+
+  /* Pastilles : congés à valider sur Communication, nouvelles publications sur la veille */
+  function compteurs() {
+    var n = {};
+    try { n.communication = D.congesAValider().length; } catch (e) {}
+    try { if (D.pagePermise("veille")) n.veille = D.veilleNouvelles().length; } catch (e) {}
+    return n;
+  }
+  function badges() {
+    var n = compteurs();
+    [].forEach.call(document.querySelectorAll(".icone[data-app] .tuile, .tache[data-app]"), function (t) {
+      var id = t.dataset.app || t.parentNode.dataset.app, v = n[id] || 0, b = t.querySelector(".badge");
+      if (!v) { if (b) b.remove(); return; }
+      if (!b) { b = document.createElement("span"); b.className = "badge" + (id === "veille" ? " or" : ""); t.appendChild(b); }
+      b.textContent = v > 99 ? "99+" : String(v);
+    });
+  }
+
+  /* ---------- Carte « Aujourd'hui » ---------- */
+  var JOURS_ABR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
+  function jj(iso) { var d = C.dt(iso); return d ? z(d.getDate()) + "." + z(d.getMonth() + 1) : "—"; }
+  function quand(iso) {
+    var n = C.diff(C.isoAuj(), iso);
+    if (n < 0) return "Retard · " + jj(iso);
+    if (n === 0) return "Aujourd'hui";
+    if (n === 1) return "Demain";
+    if (n < 7) return JOURS_ABR[C.dt(iso).getDay()] + " " + jj(iso);
+    return jj(iso);
+  }
+  function parUrgence(a, b) {
+    var ea = a.echeance || "9999", eb = b.echeance || "9999";
+    if (ea !== eb) return ea < eb ? -1 : 1;
+    return (a.priorite || 5) - (b.priorite || 5);
+  }
+  function aujourdhui() {
+    var h = $("#aujourdhui"), moi = D.monMembre();
+    h.hidden = false; h.textContent = "";
+    function el(tag, cls, txt) { var n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; h.appendChild(n); return n; }
+    var d = new Date(), j = JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()] + " " + d.getFullYear();
+    el("p", "jour", j.charAt(0).toUpperCase() + j.slice(1));
+    var t1 = el("h1", null, "Bonjour");
+    if (moi && moi.prenom) { t1.appendChild(document.createTextNode(" ")); var b = document.createElement("b"); b.textContent = moi.prenom; t1.appendChild(b); }
+
+    // Ce qui attend une action
+    var n = compteurs(), signaux = [];
+    if (n.communication) signaux.push([n.communication, n.communication > 1 ? "demandes de congé à valider" : "demande de congé à valider", "communication"]);
+    if (n.veille) signaux.push([n.veille, n.veille > 1 ? "nouvelles publications simap.ch" : "nouvelle publication simap.ch", "veille"]);
+    if (D.aDroit("taches_a_affecter")) {
+      var na = D.taches({ sansTerminees: true }).filter(function (t) { return Calc.nonAffectees(t).length; }).length;
+      if (na) signaux.push([na, na > 1 ? "tâches à affecter" : "tâche à affecter", "taches", "/planif/taches/?membre=a-affecter"]);
+    }
+    signaux.forEach(function (s) {
+      var bt = el("button", "signal"); bt.type = "button";
+      var nb = document.createElement("b"); nb.textContent = s[0]; bt.appendChild(nb);
+      bt.appendChild(document.createTextNode(s[1]));
+      bt.addEventListener("click", function () { ouvrir(parId[s[2]], s[3]); });
+    });
+
+    // Mes prochaines échéances
+    el("h2", null, "Mes prochaines échéances");
+    if (!moi) { el("p", "vide-msg", "Aucune fiche d'équipe n'est rattachée à ton adresse."); }
+    else {
+      var miennes = D.taches({ membreId: moi.id, sansTerminees: true }).filter(function (t) {
+        return t.echeance && ["ingenieur", "dessinateur"].some(function (r) {
+          var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
+        });
+      }).sort(parUrgence);
+      if (!miennes.length) el("p", "vide-msg", "Aucune tâche ouverte à ton nom.");
+      miennes.slice(0, 6).forEach(function (t) {
+        var ecart = C.diff(C.isoAuj(), t.echeance), u = ecart <= 0 ? "rouge" : ecart < 7 ? "orange" : "";
+        var af = D.affaire(t.affaireId);
+        var bt = el("button", "ligne-t"); bt.type = "button";
+        bt.innerHTML = '<span class="point ' + u + '"></span><span class="lib"></span><span class="quand' + (u === "rouge" ? " rouge" : "") + '"></span>';
+        bt.querySelector(".lib").textContent = (af ? (af.code || af.nom) + " – " : "") + t.titre;
+        bt.querySelector(".lib").title = (af ? (af.nom || af.code) + " – " : "") + t.titre;
+        bt.querySelector(".quand").textContent = quand(t.echeance);
+        bt.addEventListener("click", function () { ouvrir(parId.taches, "/planif/taches/?tache=" + encodeURIComponent(t.id)); });
+      });
+    }
+    el("p", "espace", D.nomEspace());
+  }
+
+  /* ---------- Menu Démarrer : les modules permis, groupés ---------- */
+  function initiales(m) {
+    var s = ((m && m.prenom || "").charAt(0) + (m && m.nom || "").charAt(0)).toUpperCase();
+    return s || "?";
+  }
+  function menuDemarrer() {
+    var corps = $("#menu-corps"), groupes = [];
+    permises.forEach(function (a) { if (groupes.indexOf(a.groupe) < 0) groupes.push(a.groupe); });
+    groupes.forEach(function (g) {
+      var h = document.createElement("h2"); h.textContent = g; corps.appendChild(h);
+      var grille = document.createElement("div"); grille.className = "epingles"; corps.appendChild(grille);
+      permises.filter(function (a) { return a.groupe === g; }).forEach(function (a) {
+        var ep = document.createElement("a");
+        ep.className = "epingle"; ep.href = a.href; ep.title = a.desc;
+        ep.innerHTML = '<span class="tuile">' + svgIco(a.id) + "</span><span></span>";
+        ep.lastChild.textContent = a.nom;
+        ep.addEventListener("click", function (e) { if (horsBureau(e)) return; e.preventDefault(); menu(false); ouvrir(a); });
+        grille.appendChild(ep);
+      });
+    });
+
+    // Le compte
+    var moi = D.monMembre(), mail = avecBase ? SB.email() : "";
+    $("#moi-nom").textContent = moi ? [moi.prenom, moi.nom].filter(Boolean).join(" ") : (mail || "Mode local");
+    $("#moi-mail").textContent = [mail, D.nomEspace()].filter(Boolean).join(" · ");
+    var av = $("#avatar");
+    if (moi && moi.photo) { av.textContent = ""; var img = document.createElement("img"); img.src = moi.photo; img.alt = ""; av.appendChild(img); }
+    else av.textContent = initiales(moi);
+
+    var bt = $("#pied-boutons");
+    // Démonstration (et super admin) : voir l'outil avec un autre rôle, comme dans /planif/
+    var roles = D.rolesDemo ? D.rolesDemo() : null;
+    if (roles && roles.length) {
+      var lab = document.createElement("label"); lab.className = "roles"; lab.textContent = D.titreRolesDemo();
+      var sel = document.createElement("select");
+      roles.forEach(function (r) { var o = document.createElement("option"); o.value = r.code; o.textContent = r.nom; o.selected = r.actif; sel.appendChild(o); });
+      sel.addEventListener("change", function () { D.choisitRoleDemo(sel.value); location.reload(); });
+      lab.appendChild(sel); bt.appendChild(lab);
+    }
+    function bouton(txt, cls, f) { var b = document.createElement("button"); b.type = "button"; b.className = "bouton" + (cls ? " " + cls : ""); b.textContent = txt; b.addEventListener("click", f); bt.appendChild(b); }
+    if (avecBase) bouton("Se déconnecter", "quitter", function () {
+      menu(false);
+      Object.keys(FEN).forEach(function (k) { fermer(FEN[k]); });
+      SB.deconnexion().then(function () { location.reload(); });
+    });
+  }
+  var dem = $("#demarrer"), btnDem = $("#btn-demarrer");
+  function menu(ouvre) {
+    if (ouvre === undefined) ouvre = dem.classList.contains("ferme");
+    dem.classList.toggle("ferme", !ouvre);
+    dem.setAttribute("aria-hidden", ouvre ? "false" : "true");
+    btnDem.setAttribute("aria-expanded", ouvre ? "true" : "false");
+    if (ouvre) { var p = dem.querySelector(".epingle"); if (p) p.focus({ preventScroll: true }); }
+  }
+  btnDem.addEventListener("click", function () { menu(); });
+  document.addEventListener("pointerdown", function (e) {
+    if (!e.target.closest(".icone")) choisir(null);
+    if (!e.target.closest("#demarrer,#btn-demarrer")) menu(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") menu(false);
+    var ic = [].slice.call(document.querySelectorAll(".icone")), i = ic.indexOf(document.activeElement);
+    if (i >= 0 && /^Arrow/.test(e.key)) {
+      e.preventDefault();
+      var j = /Down|Right/.test(e.key) ? Math.min(i + 1, ic.length - 1) : Math.max(i - 1, 0);
+      ic[j].focus(); choisir(ic[j]);
+    }
+  });
+
+  /* ---------- Dock : modules épinglés, puis les fenêtres ouvertes des autres ---------- */
+  var dockEl = $("#dock");
+  function dock() {
+    [].forEach.call(dockEl.querySelectorAll(".tache[data-app], .tache.sep"), function (t) { t.remove(); });
+    var ep = permises.filter(function (a) { return EPINGLES.indexOf(a.id) >= 0; });
+    var autres = Object.keys(FEN).map(function (k) { return FEN[k].app; }).filter(function (a) { return EPINGLES.indexOf(a.id) < 0; });
+    ep.forEach(ajoute);
+    if (autres.length) { var s = document.createElement("span"); s.className = "tache sep"; dockEl.appendChild(s); }
+    autres.forEach(ajoute);
+    function ajoute(a) {
+      var t = document.createElement("a");
+      t.className = "tache"; t.href = a.href; t.dataset.app = a.id;
+      t.innerHTML = svgIco(a.id) + '<span class="etiquette"></span>';
+      t.querySelector(".etiquette").textContent = a.nom;
+      t.addEventListener("click", function (e) { if (horsBureau(e)) return; e.preventDefault(); basculer(a); });
+      dockEl.appendChild(t);
+    }
+    dockEtat(); badges();
+  }
+  function dockEtat() {
+    [].forEach.call(dockEl.querySelectorAll(".tache[data-app]"), function (t) {
+      var f = FEN[t.dataset.app];
+      t.classList.toggle("ouverte", !!f);
+      t.classList.toggle("devant", !!f && f.el.classList.contains("active") && !f.el.classList.contains("reduite"));
+    });
+  }
+  // Grossissement au survol, façon dock iOS (souris seulement)
+  if (!tactile) {
+    dockEl.addEventListener("mousemove", function (e) {
+      [].forEach.call(dockEl.querySelectorAll(".tache:not(.sep)"), function (t) {
+        var r = t.getBoundingClientRect(), d = (e.clientX - (r.left + r.width / 2)) / 64;
+        t.style.setProperty("--s", (1 + .6 * Math.exp(-d * d)).toFixed(3));
+      });
+    });
+    dockEl.addEventListener("mouseleave", function () {
+      [].forEach.call(dockEl.querySelectorAll(".tache"), function (t) { t.style.setProperty("--s", 1); });
+    });
+  }
+
+  /* ---------- Fenêtres : chaque module dans la sienne ---------- */
+  /* La page de /planif/ s'ouvre telle quelle ; dans la fenêtre, sa barre du
+     haut est masquée (le bureau la remplace). La feuille est posée dès que le
+     document de la fenêtre existe, à chaque navigation. */
+  var CSS_DEDANS = "[data-chrome]{display:none!important}:root{--h-chrome:0px!important}";
+  var couche = $("#fenetres"), FEN = {}, zMax = 10;
+  function petit() { return innerWidth <= 640; }
+  function lirePos(id) { try { return JSON.parse(localStorage.getItem("planif2.fenetre." + id)); } catch (e) { return null; } }
+  function ecrirePos(f) {
+    try { localStorage.setItem("planif2.fenetre." + f.app.id, JSON.stringify({ x: f.el.offsetLeft, y: f.el.offsetTop, l: f.el.offsetWidth, h: f.el.offsetHeight, max: f.el.classList.contains("agrandie") })); } catch (e) {}
+  }
+  function cadre(f) {
+    var el = f.el, W = couche.clientWidth, H = couche.clientHeight;
+    if (el.classList.contains("agrandie")) return;
+    el.style.width = Math.min(el.offsetWidth, W) + "px"; el.style.height = Math.min(el.offsetHeight, H) + "px";
+    el.style.left = Math.max(Math.min(el.offsetLeft, W - 120), 120 - el.offsetWidth) + "px";
+    el.style.top = Math.max(Math.min(el.offsetTop, H - 38), 0) + "px";
+  }
+  var BTN = {
+    reduire: '<svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor"/></svg>',
+    agrandir: '<svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg>',
+    onglet: '<svg viewBox="0 0 10 10"><path d="M4 .5h5.5V6M9.5.5L4 6M7 9.5H.5V3" fill="none" stroke="currentColor"/></svg>',
+    fermer: '<svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor"/></svg>'
+  };
+  function habille(f) {
+    var doc;
+    try { doc = f.ifr.contentDocument; } catch (e) { return; }
+    if (!doc || !doc.documentElement) return;
+    var loc = "";
+    try { loc = f.ifr.contentWindow.location.pathname; } catch (e) {}
+    // La page renvoie à la connexion : la session est finie, le bureau la redemande
+    if (/^\/planif\/connexion\//.test(loc)) { Object.keys(FEN).forEach(function (k) { fermer(FEN[k]); }); verrou("Ta session a pris fin : reconnecte-toi."); return; }
+    if (!doc.getElementById("planif2-dedans")) {
+      var s = doc.createElement("style"); s.id = "planif2-dedans"; s.textContent = CSS_DEDANS;
+      (doc.head || doc.documentElement).appendChild(s);
+    }
+    if (!/^\/planif\//.test(loc)) return;          // encore la page vide du départ
+    if (doc.readyState !== "loading") f.ifr.classList.add("pret");
+    var t = (doc.title || "").replace(/\s*·\s*(Planification|Espace démo).*$/i, "");
+    if (t && t !== f.titre) { f.titre = t; f.el.querySelector(".nom").textContent = t; }
+    try { f.el.querySelector(".onglet").href = f.ifr.contentWindow.location.href; } catch (e) {}
+  }
+  function ouvrir(a, href) {
+    if (!a) return;
+    var f = FEN[a.id];
+    if (f) {
+      if (href) { f.ifr.classList.remove("pret"); f.ifr.src = href; }
+      f.el.classList.remove("reduite"); devant(f); return;
+    }
+    var el = document.createElement("section");
+    el.className = "fenetre neuve"; el.setAttribute("aria-label", a.nom);
+    el.innerHTML = '<div class="titre"><span class="mini">' + svgIco(a.id) + '</span><span class="nom"></span>' +
+      '<a class="onglet" target="_blank" rel="noopener" title="Ouvrir dans un onglet">' + BTN.onglet + "</a>" +
+      '<button class="reduire" title="Réduire">' + BTN.reduire + "</button>" +
+      '<button class="agrandir" title="Agrandir">' + BTN.agrandir + "</button>" +
+      '<button class="fermer" title="Fermer">' + BTN.fermer + "</button></div>" +
+      '<div class="cadre"><div class="charge">Ouverture…</div><iframe allow="fullscreen; clipboard-read; clipboard-write; geolocation" allowfullscreen></iframe></div>' +
+      '<div class="poignee g"></div><div class="poignee d"></div><div class="poignee b"></div><div class="poignee db"></div>';
+    el.querySelector(".nom").textContent = a.nom;
+    el.querySelector(".onglet").href = href || a.href;
+    var ifr = el.querySelector("iframe"); ifr.title = a.nom; ifr.src = href || a.href;
+    f = FEN[a.id] = { app: a, el: el, ifr: ifr, titre: a.nom };
+    f.minuterie = setInterval(function () { habille(f); }, 40);
+    ifr.addEventListener("load", function () { habille(f); });
+
+    var W = couche.clientWidth, H = couche.clientHeight, n = Object.keys(FEN).length - 1, p = lirePos(a.id);
+    if (!p) { p = { l: Math.min(1280, W * .84), h: Math.min(860, H * .9) }; p.x = (W - p.l) / 2 + n * 28 - 40; p.y = Math.max(8, (H - p.h) / 2 + n * 28 - 40); }
+    el.style.left = p.x + "px"; el.style.top = p.y + "px"; el.style.width = p.l + "px"; el.style.height = p.h + "px";
+    if (p.max || petit()) el.classList.add("agrandie");
+    couche.appendChild(el); cadre(f);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.remove("neuve"); }); });
+
+    el.addEventListener("pointerdown", function () { devant(f); }, true);
+    el.querySelector(".reduire").addEventListener("click", function () { reduire(f); });
+    el.querySelector(".agrandir").addEventListener("click", function () { agrandir(f); });
+    el.querySelector(".fermer").addEventListener("click", function () { fermer(f); });
+    var titre = el.querySelector(".titre");
+    titre.addEventListener("dblclick", function (e) { if (!e.target.closest("button,a")) agrandir(f); });
+    glisser(f, titre, "deplace");
+    [].forEach.call(el.querySelectorAll(".poignee"), function (h) { glisser(f, h, h.className.split(" ")[1]); });
+    dock(); devant(f);
+  }
+  function devant(f) {
+    Object.keys(FEN).forEach(function (k) { FEN[k].el.classList.remove("active"); });
+    f.el.style.zIndex = ++zMax; f.el.classList.add("active");
+    dockEtat();
+  }
+  function reduire(f) { f.el.classList.add("reduite"); f.el.classList.remove("active"); dockEtat(); }
+  function agrandir(f) { if (petit()) return; f.el.classList.toggle("agrandie"); ecrirePos(f); }
+  function fermer(f) {
+    clearInterval(f.minuterie);
+    f.el.classList.add("neuve");
+    setTimeout(function () { f.el.remove(); }, 200);
+    delete FEN[f.app.id]; dock();
+    // Ce qui a changé dans la fenêtre se voit sur le bureau
+    if (D.recharge && D.etat()) D.recharge().catch(function () {});
+  }
+  function basculer(a) {
+    var f = FEN[a.id];
+    if (f && f.el.classList.contains("active") && !f.el.classList.contains("reduite")) reduire(f);
+    else ouvrir(a);
+  }
+  function glisser(f, poignee, mode) {
+    poignee.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0 || e.target.closest("button,a")) return;
+      var el = f.el;
+      if (mode === "deplace" && el.classList.contains("agrandie")) {
+        if (petit()) return;
+        var ratio = e.clientX / couche.clientWidth;
+        el.classList.remove("agrandie");
+        el.style.left = (e.clientX - el.offsetWidth * ratio) + "px"; el.style.top = "0px";
+      }
+      var x0 = e.clientX, y0 = e.clientY, g0 = { x: el.offsetLeft, y: el.offsetTop, l: el.offsetWidth, h: el.offsetHeight };
+      poignee.setPointerCapture(e.pointerId); couche.classList.add("bouge"); el.style.transition = "none";
+      function bouge(ev) {
+        var dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (mode === "deplace") { el.style.left = (g0.x + dx) + "px"; el.style.top = Math.max(0, g0.y + dy) + "px"; return; }
+        if (/d/.test(mode)) el.style.width = Math.max(340, g0.l + dx) + "px";
+        if (/b/.test(mode)) el.style.height = Math.max(240, g0.h + dy) + "px";
+        if (mode === "g") { var l = Math.max(340, g0.l - dx); el.style.width = l + "px"; el.style.left = (g0.x + g0.l - l) + "px"; }
+      }
+      function fin() {
+        poignee.removeEventListener("pointermove", bouge); poignee.removeEventListener("pointerup", fin); poignee.removeEventListener("pointercancel", fin);
+        couche.classList.remove("bouge"); el.style.transition = "";
+        cadre(f); ecrirePos(f);
+      }
+      poignee.addEventListener("pointermove", bouge); poignee.addEventListener("pointerup", fin); poignee.addEventListener("pointercancel", fin);
+    });
+  }
+  // Un clic dans une fenêtre (iframe) ne remonte pas jusqu'ici : on le devine au changement de focus
+  addEventListener("blur", function () {
+    setTimeout(function () {
+      var act = document.activeElement;
+      Object.keys(FEN).forEach(function (k) { if (FEN[k].ifr === act) devant(FEN[k]); });
+    }, 0);
+  });
+  addEventListener("resize", function () { Object.keys(FEN).forEach(function (k) { cadre(FEN[k]); }); });
+
+  /* ---------- Plein écran ---------- */
+  var ICO_PLEIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+      ICO_SORTIR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1.5v4h-4M14.5 5.5h-4v-4M10.5 14.5v-4h4M1.5 10.5h4v4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+  var bPlein = $("#btn-plein"), fsOk = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  function pleinMaj() {
+    var on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    bPlein.innerHTML = on ? ICO_SORTIR : ICO_PLEIN;
+    bPlein.title = on ? "Quitter le plein écran" : "Plein écran";
+  }
+  if (!fsOk) bPlein.hidden = true;
+  pleinMaj();
+  bPlein.addEventListener("click", function () {
+    var d = document, r = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else (r.requestFullscreen || r.webkitRequestFullscreen).call(r);
+  });
+  document.addEventListener("fullscreenchange", pleinMaj);
+  document.addEventListener("webkitfullscreenchange", pleinMaj);
+
+  /* ---------- Fond d'écran : ossature filaire en or (poteaux, dalles) qui tourne ---------- */
+  var cv = $("#fond"), ctx = cv.getContext("2d"), L, H, dpr;
+  function taille() { dpr = Math.min(window.devicePixelRatio || 1, 2); L = innerWidth; H = innerHeight; cv.width = L * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  taille(); addEventListener("resize", taille);
+  var segs = [], nx = 4, ny = 3, nz = 5;
+  for (var k = 0; k <= nz; k++) for (var i = 0; i <= nx; i++) for (var j = 0; j <= ny; j++) {
+    var a = [i - nx / 2, k - nz / 2, j - ny / 2];
+    if (i < nx) segs.push([a, [a[0] + 1, a[1], a[2]]]);
+    if (j < ny) segs.push([a, [a[0], a[1], a[2] + 1]]);
+    if (k < nz) segs.push([a, [a[0], a[1] + 1, a[2]]]);
+  }
+  var t0 = performance.now();
+  function dessine(t) {
+    var ang = (t - t0) / 26000, c = Math.cos(ang), s = Math.sin(ang);
+    var ech = Math.min(L, H) / 11, cx = L * .55, cy = H * .5;
+    ctx.clearRect(0, 0, L, H);
+    ctx.lineWidth = 1;
+    segs.forEach(function (sg) {
+      var pr = sg.map(function (q) {
+        var x = q[0] * c - q[2] * s, zz = q[0] * s + q[2] * c, y = q[1];
+        var f = 7 / (7 + zz * .6);
+        return [cx + x * ech * f, cy - y * ech * f + zz * ech * .28, zz];
+      });
+      var prof = (pr[0][2] + pr[1][2]) / 2;
+      ctx.strokeStyle = "rgba(214,168,92," + (0.16 - prof * .03).toFixed(3) + ")";
+      ctx.beginPath(); ctx.moveTo(pr[0][0], pr[0][1]); ctx.lineTo(pr[1][0], pr[1][1]); ctx.stroke();
+    });
+    requestAnimationFrame(dessine);
+  }
+  requestAnimationFrame(dessine);
+})();
+</script>
+</body>
+</html>
