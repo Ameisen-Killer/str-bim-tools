@@ -100,6 +100,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .barre .titre b{font-weight:600}
 .barre .ver{padding:1px 8px;border-radius:10px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-doux);font-size:11px}
 .barre .esp{flex:1}
+.barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
+.barre .json::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
+.barre .json.on{color:var(--vert)}
+@media (max-width:760px){.barre .json{max-width:30vw}}
 .barre .sig{color:var(--texte-faible)}
 .barre button{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;background:transparent;cursor:pointer;color:var(--texte)}
 .barre button svg{width:16px;height:16px}
@@ -305,6 +309,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
   <a class="logo" href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M5 19h22v5H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 15h8v11h-8z" fill="none" stroke="var(--or)" stroke-width="1.8"/><path d="M19 8l3 3 6-6" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sous-titre">STR Bim Tools</span></a>
   <span class="titre">FGH · <b>Validation des réservations</b></span>
   <span class="ver" id="version"></span>
+  <span class="json" id="json-etat">Aucun JSON connecté</span>
   <span class="esp"></span>
   <span class="sig">Tony VARIN</span>
   <button type="button" id="btn-ouvrir" title="Ouvrir des IFC"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
@@ -394,6 +399,6 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <script src="/fgh/fgh-core.js?v=2"></script>
 <script src="/fgh/fgh-vue.js?v=15"></script>
 <script src="/fgh/fgh-cube.js?v=4"></script>
-<script src="/fgh/fgh-app.js?v=30"></script>
+<script src="/fgh/fgh-app.js?v=31"></script>
 </body>
 </html>

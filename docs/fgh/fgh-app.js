@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.2.0";
+  var VERSION = "2.3.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -767,6 +767,18 @@
 
   // Enregistrement continu (Chrome, Edge : File System Access), comme le rapport 3D CAN 241
   // ecriture : écritures en cours ; branche : choix ou autorisation d'un fichier en cours
+  // barre du haut : nom du JSON en vert quand il est connecté, sinon « Aucun JSON connecté » en rouge
+  var sigJson = null;
+  function majJson(){
+    var on = !!(FS.actif && FS.nom), sig = on ? FS.nom : "";
+    if (sig === sigJson) return;
+    sigJson = sig;
+    var e = $("#json-etat"); if (!e) return;
+    e.classList.toggle("on", on);
+    e.textContent = on ? FS.nom : "Aucun JSON connecté";
+    e.title = on ? "Fichier JSON connecté : " + FS.nom : "Aucun fichier JSON connecté : la page est en lecture seule";
+  }
+  setInterval(majJson, 500);
   var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", maquette: "", quand: null, err: "", minut: 0, lu: 0, nonEcrit: false, remplacees: [], ecriture: 0, branche: 0 };
   function cleFs(){ return "fichier|" + (maquette.nom || "?"); }
   function idb(mode, fn){
