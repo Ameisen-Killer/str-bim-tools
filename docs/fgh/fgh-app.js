@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.1.0";
+  var VERSION = "2.1.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -399,6 +399,8 @@
     vue.selection(sel, actif);
     Array.prototype.forEach.call(document.querySelectorAll("#liste .res"), function(el){ el.classList.toggle("sel", sel.has(el.getAttribute("data-cle"))); });
     renduFiche();
+    // fiche réduite par le chevron : elle se rouvre dès qu'une réservation est choisie
+    if (sel.size && document.querySelector(".app").classList.contains("sans-d")) replier("d", false);
   }
 
   // Outils de la vue
