@@ -23,6 +23,39 @@
    absences (planif.css .pl-groupe h3, habillage.css h3) — 14.10.2026 */
 :root[data-version="v2"] .tete-section h2.titre-metier{font-size:clamp(21px,2.4vw,28px);font-weight:650}
 @media print{:root[data-version="v2"] .tete-section h2.titre-metier{font-size:12pt}}
+/* Bandeau de gauche repliable (02.11.2026, demande de Tony, repris du bureau /planif2/) :
+   recherche, « Tous », « Administrateurs », chaque succursale et ses secteurs, puis les
+   rôles et l'affaire. Il remplace la ligne de filtres à cases. */
+.eq-page{display:grid;grid-template-columns:272px 28px minmax(0,1fr);align-items:start;margin-top:10px}
+.eq-page.replie{grid-template-columns:0 28px minmax(0,1fr)}
+.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
+  display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
+.eq-page.replie .eq-bandeau{visibility:hidden;padding:0;overflow:hidden}
+.eq-bandeau .recherche{margin:0}
+.eq-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
+  background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
+.eq-replier:hover{color:var(--or);border-color:var(--or-doux)}
+.eq-arbre{display:flex;flex-direction:column;gap:1px}
+.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
+.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:5px 9px;border:0;border-radius:7px;background:none;
+  font:inherit;font-size:13.5px;color:var(--texte);text-align:left;cursor:pointer}
+.eq-arbre button:hover{background:var(--ab-vert-pale)}
+.eq-arbre button[aria-current="true"]{background:var(--ab-vert-clair);font-weight:600}
+.eq-arbre button.niv1{padding-left:24px;font-size:13px;color:var(--texte-doux)}
+.eq-arbre button.niv0{font-weight:600}
+.eq-arbre button .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eq-arbre button .n{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:12px;color:var(--texte-faible)}
+.eq-affaire select{width:100%;min-height:34px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:13px;color:var(--texte)}
+.eq-contenu{min-width:0}
+.eq-contenu .section:first-child{margin-top:0}
+@media (max-width:760px){
+  .eq-page,.eq-page.replie{grid-template-columns:minmax(0,1fr)}
+  .eq-bandeau{position:static;max-height:none}
+  .eq-page.replie .eq-bandeau{display:none}
+  .eq-replier{position:static;width:100%;height:38px;margin:8px 0 10px;font-size:14px}
+}
+@media print{.eq-bandeau,.eq-replier{display:none}.eq-page{display:block}}
 </style>
 </head>
 <body class="large">
@@ -45,19 +78,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap" data-bandeau></div>
 
-  <div class="wrap">
-    <!-- Recherche et filtres restent sous les yeux quand la liste défile -->
-    <div class="tete-collante" style="margin-top:10px">
+  <!-- Bandeau de gauche repliable (02.11.2026) : recherche et équipes ; la liste à droite -->
+  <div class="wrap eq-page" id="eq-page">
+    <aside class="eq-bandeau" id="eq-bandeau" aria-label="Recherche et équipes">
       <div data-recherche></div>
-      <!-- Téléphone seulement : quatre listes sur deux rangées mangeraient le
-           tiers de l'écran une fois le bloc collé. Filtres rangés comme ceux
-           de la page Tâches (14.10.2026). -->
-      <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between">
-        <span>Filtres</span><span id="nb-filtres" class="or"></span>
-      </button>
-      <div class="grille-champs filtres-ligne" id="filtres"></div>
-    </div>
-    <div id="sections"></div>
+      <nav class="eq-arbre" id="eq-arbre"></nav>
+    </aside>
+    <button type="button" class="eq-replier" id="eq-replier" aria-controls="eq-bandeau" aria-expanded="true" title="Réduire le bandeau">‹</button>
+    <div class="eq-contenu"><div id="sections"></div></div>
   </div>
 </main>
 
@@ -68,7 +96,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/supabase.js?v=60"></script>
 <script src="/planif/assets/donnees.js?v=80"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
-<script src="/planif/assets/version.js?v=16"></script>
+<script src="/planif/assets/version.js?v=17"></script>
 <script src="/planif/assets/ui.js?v=118"></script>
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
@@ -109,17 +137,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (D.monMembre()) actions.push({ label: "Mes jours", or: !actions.length, icone: "ico-jours", action: function () { UI.joursTravailles(null, dessine); } });
     UI.chrome("equipe", actions);
     UI.pied();
-    // Collé sous la barre, le bloc de recherche se resserre (planif.css)
-    UI.colleSousBarre(document.querySelector(".tete-collante"));
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    document.getElementById("btn-filtres").addEventListener("click", function () {
-      var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
-      this.setAttribute("aria-expanded", String(ouvert));
-    });
+    bandeau();
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un nom, un métier, un statut, un téléphone, une absence…",
+      exemple: "Rechercher un nom, un métier, un téléphone…",
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) UI.absences(l[0].id, dessine); }
     });
@@ -132,8 +155,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var v = Array.isArray(lu[c[0]]) ? lu[c[0]] : (lu[c[1]] ? [lu[c[1]]] : []);
       filtres[c[0]] = v.map(String);
     });
+    // Le bandeau ne garde qu'un rôle et une affaire ; succursale et secteur s'y choisissent
+    filtres.groupes = filtres.groupes.slice(0, 1); filtres.affaires = filtres.affaires.slice(0, 1);
+    filtres.succursales = []; filtres.disciplines = [];
 
-    rendFiltres();
+    // À l'ouverture : sa succursale et son secteur (les administrateurs sur « Administrateurs »)
+    var moi = D.monMembre();
+    if (moi) cle = estAdmin(moi) ? "admin" : "d:" + (moi.succursale || "_") + "|" + (moi.discipline || "_");
+    if (cle !== "tous" && !D.membres({ tous: true }).some(dansCle)) cle = "tous";
+    if (new URLSearchParams(location.search).get("q")) cle = "tous";
     D.surRechargement(dessine);
     dessine();
 
@@ -150,42 +180,48 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     try { localStorage.setItem(CLE_FILTRES, JSON.stringify(filtres)); } catch (e) {}
   }
 
-  /* --------------------------------------------------------------- filtres
-     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale,
-     Discipline, Rôle (les groupes de la fiche « groupes ») et Affaire, tous
-     en menus à cases. */
+  /* --------------------------------------------------------------- bandeau
+     02.11.2026 (demande de Tony) : le bandeau de gauche du bureau /planif2/
+     remplace les menus à cases. Une entrée d'équipe à la fois (Tous,
+     Administrateurs, une succursale, un de ses secteurs), un rôle, une affaire. */
+  var cle = "tous";                  // tous | admin | s:<succursale> | d:<succursale>|<discipline>
+  var CLE_REPLIE = "planif.equipe.replie";
 
-  /** Dans une des succursales cochées (aucune cochée : tout passe). */
-  function dansSuccursales(x) {
-    return !filtres.succursales.length || (!!x && filtres.succursales.indexOf(x.succursale || "_") >= 0);
+  function sansAccents(x) { return String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  function estAdminDisc(code) { return /^administrateur/.test(sansAccents(code)) || /^administrateur/.test(sansAccents(D.DISCIPLINES[code])); }
+  function estAdmin(m) { return D.aStatut(m, "administrateur") || estAdminDisc(m.discipline); }
+  function dansCle(m) {
+    if (cle === "tous") return true;
+    if (cle === "admin") return estAdmin(m);
+    if (cle.indexOf("s:") === 0) return (m.succursale || "_") === cle.slice(2);
+    var p = cle.slice(2).split("|");
+    return (m.succursale || "_") === p[0] && (m.discipline || "_") === p[1] && !estAdmin(m);
+  }
+  function dansSuccursales(a) {        // affaires proposées : celles de la succursale choisie
+    var s = cle.indexOf("s:") === 0 ? cle.slice(2) : cle.indexOf("d:") === 0 ? cle.slice(2).split("|")[0] : null;
+    return !s || s === "_" || !a.succursale || a.succursale === s;
   }
 
-  /* Les succursales du bureau, plus « Non renseignée » (« _ », qu'aucun code
-     ne peut prendre) dès qu'une fiche n'en a pas. */
-  function optionsSuccursales() {
-    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
-    if (D.membres({ tous: true }).some(function (m) { return !m.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
-    return o;
+  function replie(oui) {
+    var page = document.getElementById("eq-page"), b = document.getElementById("eq-replier");
+    page.classList.toggle("replie", oui);
+    var mobile = innerWidth <= 760;
+    b.textContent = mobile ? (oui ? "Recherche et équipes ▾" : "Masquer ▴") : (oui ? "›" : "‹");
+    b.title = oui ? "Afficher le bandeau" : "Réduire le bandeau";
+    b.setAttribute("aria-expanded", String(!oui));
+    try { localStorage.setItem(CLE_REPLIE, oui ? "1" : ""); } catch (e) {}
+  }
+  function bandeau() {
+    var garde = null;
+    try { garde = localStorage.getItem(CLE_REPLIE); } catch (e) {}
+    replie(garde === null ? innerWidth <= 760 : garde === "1");
+    document.getElementById("eq-replier").addEventListener("click", function () {
+      replie(!document.getElementById("eq-page").classList.contains("replie"));
+    });
   }
 
-  /** Disciplines proposées : celles des succursales cochées (toutes si aucune, ou « Non renseignée »),
-   *  plus « Non renseignée » dès qu'une fiche n'en a pas. */
-  function optionsDisciplines() {
-    var codes = filtres.succursales, cles;
-    if (!codes.length || codes.indexOf("_") >= 0) cles = D.disciplinesDe("");
-    else {
-      var vu = {};
-      codes.forEach(function (c) { D.disciplinesDe(c).forEach(function (k) { vu[k] = true; }); });
-      cles = Object.keys(D.DISCIPLINES).filter(function (k) { return vu[k]; });
-    }
-    var o = cles.map(function (k) { return { valeur: k, label: D.DISCIPLINES[k] }; });
-    if (o.length && D.membres({ tous: true }).some(function (m) { return !m.discipline; })) o.push({ valeur: "_", label: "Non renseignée" });
-    return o;
-  }
-
-  /* Groupe (14.10.2026, demande de Tony, comme sur Absences et congés) : les
-     groupes du bureau sans les chefs de secteur et de projet, à leur place
-     les ingénieurs et les dessinateurs (« metier:… », le métier de la fiche). */
+  /* Rôles (14.10.2026, comme sur Absences et congés) : les groupes du bureau sans les
+     chefs de secteur et de projet, à leur place les ingénieurs et les dessinateurs. */
   var GROUPES_ECARTES = { chef_secteur: true, chef_projet: true };
   var METIERS_GROUPE = ["ingenieur", "dessinateur"];
   function optionsGroupes() {
@@ -197,70 +233,53 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     return g.indexOf("metier:") === 0 ? m.metier === g.slice(7) : D.aStatut(m, g);
   }
 
-  /** Les affaires des succursales cochées. */
-  function optionsAffaires() {
-    return D.affaires({ tous: true }).filter(dansSuccursales)
-      .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
-  }
-
-  // Les menus se refont quand une option paraît ou disparaît (« Non renseignée », un groupe, une affaire)
-  var empreinte = "";
-  function empreinteOptions() {
-    return [optionsSuccursales(), optionsDisciplines(), optionsGroupes(), optionsAffaires()].map(function (o) {
-      return o.map(function (x) { return x.valeur; }).join(",");
-    }).join("|");
-  }
-
-  /** Un menu à cases et son libellé, rangé comme une liste de la ligne de filtres. */
-  function champCases(libelle, cle, o, apres) {
-    o.surChange = function (v) { filtres[cle] = v; if (apres) apres(); memorise(); dessine(); };
-    o.valeurs = filtres[cle];
-    var f = UI.multiChoix(o);
-    filtres[cle] = f.valeurs();
-    var ch = el("div", { class: "champ champ-mc" }, [
-      el("label", { text: libelle, onclick: function () { f.noeud.querySelector("button").click(); } }),
-      f.noeud
+  function entree(hote, cleE, nom, n, niv, actif, choix) {
+    var b = el("button", { type: "button", class: "niv" + niv, "aria-current": String(actif) }, [
+      el("span", { class: "nom", text: nom }), n != null ? el("span", { class: "n", text: String(n) }) : null
     ]);
-    // Caché quand il n'offre qu'un choix (un bureau sans succursales ni disciplines n'affiche pas ces filtres)
-    if (o.options.length < 2) ch.style.display = "none";
-    return ch;
+    b.addEventListener("click", function () { choix(cleE); if (innerWidth <= 760) replie(true); });
+    hote.appendChild(b);
   }
-
-  function rendFiltres() {
-    var hote = UI.vide(document.getElementById("filtres"));
-
-    var chDisc, chAffaire;
-    var chSucc = champCases("Succursale", "succursales", {
-      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: optionsSuccursales()
-    }, function () {
-      // Les succursales changent : Discipline et Affaire ne gardent que ce qui en relève
-      var d = champDiscipline(), a = champAffaire();
-      hote.replaceChild(d, chDisc); chDisc = d;
-      hote.replaceChild(a, chAffaire); chAffaire = a;
-      empreinte = empreinteOptions();
+  function rendArbre() {
+    var hote = UI.vide(document.getElementById("eq-arbre"));
+    var tous = D.membres({ tous: true });
+    function compte(f) { return tous.filter(f).length; }
+    function choisit(k) { cle = k; memorise(); dessine(); }
+    entree(hote, "tous", "Tous", tous.length, 0, cle === "tous", choisit);
+    var nAdmin = compte(estAdmin);
+    if (nAdmin) entree(hote, "admin", "Administrateurs", nAdmin, 0, cle === "admin", choisit);
+    var succ = Object.keys(D.SUCCURSALES);
+    if (tous.some(function (m) { return !m.succursale; }) && succ.length) succ.push("_");
+    (succ.length ? succ : ["_"]).forEach(function (s) {
+      var dansS = function (m) { return (m.succursale || "_") === s && !estAdmin(m); };
+      if (succ.length) entree(hote, "s:" + s, s === "_" ? "Sans succursale" : D.SUCCURSALES[s], compte(function (m) { return (m.succursale || "_") === s; }), 0, cle === "s:" + s, choisit);
+      var discs = {};
+      tous.filter(dansS).forEach(function (m) { discs[m.discipline || "_"] = (discs[m.discipline || "_"] || 0) + 1; });
+      var ordre = Object.keys(D.DISCIPLINES);
+      Object.keys(discs).sort(function (a, b) { return (a === "_" ? 999 : ordre.indexOf(a)) - (b === "_" ? 999 : ordre.indexOf(b)); }).forEach(function (d) {
+        var k = "d:" + s + "|" + d;
+        entree(hote, k, d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], discs[d], succ.length ? 1 : 0, cle === k, choisit);
+      });
     });
-    chDisc = champDiscipline(); chAffaire = champAffaire();
-    // « Qui sont les chefs de projet ? » — la question se pose sans passer par la recherche
-    var chGroupe = champCases("Rôle", "groupes", {
-      libelle: "Filtrer : rôles", tous: "Tous les rôles", pluriel: "rôles", options: optionsGroupes()
-    });
-
-    hote.appendChild(chSucc); hote.appendChild(chDisc); hote.appendChild(chGroupe); hote.appendChild(chAffaire);
-    empreinte = empreinteOptions();
-    memorise();
-  }
-
-  function champDiscipline() {
-    return champCases("Discipline", "disciplines", {
-      libelle: "Filtrer : disciplines", tous: "Toutes les disciplines", pluriel: "disciplines", options: optionsDisciplines()
-    });
-  }
-
-  function champAffaire() {
-    return champCases("Affaire", "affaires", {
-      libelle: "Filtrer : affaires", tous: "Toutes les affaires", pluriel: "affaires", options: optionsAffaires(), large: true
-    });
+    // Rôle : un seul à la fois, « Tous les rôles » pour lever le filtre
+    var grs = optionsGroupes().filter(function (g) { return tous.some(function (m) { return dansGroupe(m, g.valeur); }); });
+    if (grs.length) {
+      hote.appendChild(el("p", { class: "titre-groupe", text: "Rôles" }));
+      function role(k) { filtres.groupes = k ? [k] : []; memorise(); dessine(); }
+      entree(hote, "", "Tous les rôles", null, 0, !filtres.groupes.length, role);
+      grs.forEach(function (g) { entree(hote, g.valeur, g.label, compte(function (m) { return dansGroupe(m, g.valeur); }), 1, filtres.groupes[0] === g.valeur, role); });
+    }
+    // Affaire : qui y est rattaché ou y porte une tâche
+    var aff = D.affaires({ tous: true }).filter(dansSuccursales);
+    if (filtres.affaires.length && !aff.some(function (a) { return a.id === filtres.affaires[0]; })) filtres.affaires = [];
+    if (aff.length) {
+      hote.appendChild(el("p", { class: "titre-groupe", text: "Affaire" }));
+      var sel = el("select", { "aria-label": "Filtrer par affaire" }, [el("option", { value: "", text: "Toutes les affaires" })]
+        .concat(aff.map(function (a) { return el("option", { value: a.id, text: D.libelleAffaire(a) }); })));
+      sel.value = filtres.affaires[0] || "";
+      sel.addEventListener("change", function () { filtres.affaires = sel.value ? [sel.value] : []; memorise(); dessine(); });
+      hote.appendChild(el("label", { class: "eq-affaire" }, [sel]));
+    }
   }
 
   /* ------------------------------------------------------------- affichage */
@@ -306,8 +325,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var dans = filtres.affaires.length ? membresAffaires(filtres.affaires) : null;
     return D.membres({ metier: metier == null ? null : metier, tous: true })
       .filter(function (m) {
-        if (!dansSuccursales(m)) return false;
-        if (filtres.disciplines.length && filtres.disciplines.indexOf(m.discipline || "_") < 0) return false;
+        if (!dansCle(m)) return false;
         if (filtres.groupes.length && !filtres.groupes.some(function (g) { return dansGroupe(m, g); })) return false;
         return (!dans || dans[m.id]) && UI.correspond(champsCherches(m), mots);
       });
@@ -343,11 +361,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     suivi.debut();
     if (barre) barre.compte(selection().length, selection(null, true).length);
 
-    // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    // Une option paraît ou disparaît (« Non renseignée », une affaire créée…) : les menus se refont
-    if (empreinte && empreinteOptions() !== empreinte) rendFiltres();
-    var actifs = [filtres.succursales.length, filtres.disciplines.length, filtres.groupes.length, filtres.affaires.length].filter(Boolean).length;
-    document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
+    rendArbre();
 
     var hote = UI.vide(document.getElementById("sections"));
     SECTIONS.forEach(function (s) {
@@ -370,7 +384,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function rendListe(s, membres, hote) {
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
-    var filtre = filtres.succursales.length || filtres.disciplines.length || filtres.groupes.length || filtres.affaires.length;
+    var filtre = cle !== "tous" || filtres.groupes.length || filtres.affaires.length;
 
     if (!membres.length) {
       hote.appendChild(q
