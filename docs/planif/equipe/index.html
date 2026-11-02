@@ -31,7 +31,9 @@
 .eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
   display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
 .eq-page.replie .eq-bandeau{visibility:hidden;padding:0;overflow:hidden}
-.eq-bandeau .recherche{margin:0}
+.eq-bandeau .recherche{margin:0;padding:2px 0 8px}
+.eq-bandeau .recherche-champ{font-size:16px;min-width:0}
+.eq-bandeau .recherche-touche{display:none}
 .eq-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
   background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
 .eq-replier:hover{color:var(--or);border-color:var(--or-doux)}
@@ -156,7 +158,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       filtres[c[0]] = v.map(String);
     });
     // Le bandeau ne garde qu'un rôle et une affaire ; succursale et secteur s'y choisissent
-    filtres.groupes = filtres.groupes.slice(0, 1); filtres.affaires = filtres.affaires.slice(0, 1);
+    filtres.groupes = []; filtres.affaires = filtres.affaires.slice(0, 1);
     filtres.succursales = []; filtres.disciplines = [];
 
     // À l'ouverture : sa succursale et son secteur (les administrateurs sur « Administrateurs »)
@@ -261,14 +263,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         entree(hote, k, d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], discs[d], succ.length ? 1 : 0, cle === k, choisit);
       });
     });
-    // Rôle : un seul à la fois, « Tous les rôles » pour lever le filtre
-    var grs = optionsGroupes().filter(function (g) { return tous.some(function (m) { return dansGroupe(m, g.valeur); }); });
-    if (grs.length) {
-      hote.appendChild(el("p", { class: "titre-groupe", text: "Rôles" }));
-      function role(k) { filtres.groupes = k ? [k] : []; memorise(); dessine(); }
-      entree(hote, "", "Tous les rôles", null, 0, !filtres.groupes.length, role);
-      grs.forEach(function (g) { entree(hote, g.valeur, g.label, compte(function (m) { return dansGroupe(m, g.valeur); }), 1, filtres.groupes[0] === g.valeur, role); });
-    }
     // Affaire : qui y est rattaché ou y porte une tâche
     var aff = D.affaires({ tous: true }).filter(dansSuccursales);
     if (filtres.affaires.length && !aff.some(function (a) { return a.id === filtres.affaires[0]; })) filtres.affaires = [];
@@ -366,7 +360,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hote = UI.vide(document.getElementById("sections"));
     SECTIONS.forEach(function (s) {
       var membres = selection(s.metier);
-      if (s.masqueSiVide && !membres.length) return;
+      // Une section sans personne ne s'affiche pas (02.11.2026, demande de Tony)
+      if (!membres.length) return;
       var liste = el("div", { class: "defile" });
       hote.appendChild(el("section", { class: "section" }, [
         el("div", { class: "tete-section" }, [
@@ -379,6 +374,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ]));
       rendListe(s, membres, liste);
     });
+    if (!hote.firstChild) {
+      var q = barre ? barre.valeur().trim() : "";
+      hote.appendChild(el("section", { class: "section" }, [el("div", { class: "vide",
+        text: q ? "Personne ne correspond à « " + q + " »." : "Personne dans cette équipe." })]));
+    }
   }
 
   function rendListe(s, membres, hote) {
