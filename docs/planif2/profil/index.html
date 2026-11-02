@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Mon profil · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+Bureau V2 — Mon profil (02.11.2026) : photo, téléphones, jours travaillés, mot de passe.
+Mêmes fonctions que /planif/profil/ (non modifiée) : D.regleProfil, D.regleJours, Sb.changeMotDePasse.
+-->
+<style>
+.pf{max-width:640px;display:flex;flex-direction:column;gap:14px}
+.pf-carte{padding:16px 18px;border-radius:10px;background:var(--carte);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.pf-carte h2{margin:0 0 12px;font-size:15px}
+.pf-id{display:flex;align-items:center;gap:16px}
+.pf-id .avatar{width:84px;height:84px;font-size:28px;flex:none}
+.pf-id .nom{font-size:18px;font-weight:600}
+.pf-id .det{font-size:13px;color:var(--doux);margin:2px 0 10px}
+.pf-note{margin:10px 0 0;font-size:12px;line-height:17px;color:var(--faible)}
+.semaine-j{display:flex;gap:6px;flex-wrap:wrap}
+.semaine-j button{width:62px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid var(--ligne);border-radius:9px;background:var(--m-clair);font:inherit;font-size:14px;font-weight:600;color:var(--texte);cursor:pointer}
+.semaine-j button small{font-size:10px;font-weight:400;color:var(--doux)}
+.semaine-j button.demi{background:linear-gradient(90deg,var(--m-clair) 50%,#fff 50%)}
+.semaine-j button.off{background:#fff;color:var(--faible)}
+.capa{margin:10px 0 0;font-size:13px;color:var(--doux)}
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Mon profil">
+    <div class="recherche"><input id="q" type="search" placeholder="Rechercher un réglage…" autocomplete="off" spellcheck="false" aria-label="Rechercher un réglage…"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Mon profil</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, SB = window.Sb, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var q = $("#q"), section = "identite";
+  var SECTIONS = [["identite", "Identité et photo"], ["telephones", "Téléphones"], ["jours", "Jours travaillés"], ["mdp", "Mot de passe"]];
+  M.bandeau();
+  q.addEventListener("input", arbre);
+  M.demarre(function () { arbre(); rend(); D.surRechargement(function () { if (!occupe) rend(); }); });
+  var occupe = false;
+
+  function arbre() {
+    var e = SECTIONS.filter(function (s) { return M.cherche(s[1], q.value); }).map(function (s) { return { cle: s[0], nom: s[1] }; });
+    M.arbre($("#arbre"), e, section, function (cle) { section = cle; arbre(); rend(); });
+  }
+  function carte(titre, enfants) { var c = el("section", "pf-carte"); c.appendChild(el("h2", null, titre)); enfants.forEach(function (n) { if (n) c.appendChild(n); }); return c; }
+  function note(t) { return el("p", "pf-note", t); }
+  function bouton(t, cls, f) { var b = el("button", "btn" + (cls ? " " + cls : ""), t); b.type = "button"; if (f) b.addEventListener("click", f); return b; }
+  function rend() {
+    var moi = D.monMembre(), hote = $("#liste"); hote.textContent = "";
+    $("#titre").textContent = "Mon profil";
+    $("#compte").textContent = moi ? moi.prenom + " " + moi.nom : (SB && SB.email ? SB.email() : "");
+    var pf = el("div", "pf"); hote.appendChild(pf);
+    if (!moi && section !== "mdp") { pf.appendChild(carte("Identité", [note("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil. Tu peux tout de même changer ton mot de passe.")])); return; }
+    ({ identite: identite, telephones: telephones, jours: jours, mdp: motDePasse })[section](pf, moi);
+  }
+
+  function identite(pf, moi) {
+    var bloquee = D.photoBloquee(), entree = el("input"); entree.type = "file"; entree.accept = "image/*"; entree.hidden = true;
+    var choisir = bouton(moi.photo ? "Changer la photo" : "Ajouter une photo", "principal", function () { entree.click(); }); choisir.disabled = bloquee;
+    var retirer = moi.photo ? bouton("Retirer", "", function () { enregistre(null, retirer); }) : null; if (retirer) retirer.disabled = bloquee;
+    entree.addEventListener("change", function () {
+      var f = entree.files && entree.files[0]; entree.value = ""; if (!f) return;
+      if (!/^image\//.test(f.type)) { M.annonce("Choisis une image (JPEG, PNG…)."); return; }
+      choisir.disabled = true;
+      reduit(f).then(function (url) { return enregistre(url, choisir); }).catch(function (e) { choisir.disabled = false; M.annonce(e.message || "Image illisible."); });
+    });
+    function enregistre(url, b) {
+      b.disabled = true; occupe = true;
+      return D.regleProfil(moi.id, { telInterne: moi.telInterne, telExterne: moi.telExterne, telNatel: moi.telNatel, photo: url })
+        .then(function () { occupe = false; M.annonce(url ? "Photo enregistrée." : "Photo retirée."); rend(); })
+        .catch(function (e) { occupe = false; b.disabled = false; M.annonce(e.message); });
+    }
+    var mail = SB && SB.email ? SB.email() : moi.email;
+    var id = el("div", "pf-id"); id.appendChild(M.avatar(moi));
+    var t = el("div"); t.appendChild(el("div", "nom", moi.prenom + " " + moi.nom));
+    t.appendChild(el("div", "det", [D.libelleMetier(moi.metier), moi.succursale ? D.SUCCURSALES[moi.succursale] : "", moi.discipline ? D.DISCIPLINES[moi.discipline] : "", mail].filter(Boolean).join(" · ")));
+    var bs = el("div", "actions"); bs.style.marginTop = "0"; bs.appendChild(choisir); if (retirer) bs.appendChild(retirer); bs.appendChild(entree); t.appendChild(bs);
+    id.appendChild(t);
+    pf.appendChild(carte("Identité", [id, note(bloquee ? "La photo ne se change pas dans la démonstration : elle est vue de tous les visiteurs." : "Une image carrée de préférence ; elle est recadrée au centre et réduite. Le nom, le métier et l'adresse se changent dans la console.")]));
+  }
+  function reduit(fichier) {
+    return new Promise(function (ok, ko) {
+      var l = new FileReader();
+      l.onerror = function () { ko(new Error("Image illisible.")); };
+      l.onload = function () {
+        var img = new Image();
+        img.onerror = function () { ko(new Error("Image illisible.")); };
+        img.onload = function () {
+          var cote = 160, c = document.createElement("canvas"); c.width = c.height = cote;
+          var g = c.getContext("2d"), m = Math.min(img.naturalWidth, img.naturalHeight);
+          g.fillStyle = "#fff"; g.fillRect(0, 0, cote, cote); g.imageSmoothingQuality = "high";
+          g.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, cote, cote);
+          var url = c.toDataURL("image/jpeg", 0.85); if (url.length > 120000) url = c.toDataURL("image/jpeg", 0.6);
+          ok(url);
+        };
+        img.src = l.result;
+      };
+      l.readAsDataURL(fichier);
+    });
+  }
+  function telephones(pf, moi) {
+    var ci = M.saisie(moi.telInterne, "tel", { placeholder: "ex. 214", maxlength: "40", autocomplete: "off" });
+    var ce = M.saisie(moi.telExterne, "tel", { placeholder: "ex. 022 869 41 14", maxlength: "40", autocomplete: "off" });
+    var cn = M.saisie(moi.telNatel, "tel", { placeholder: "ex. 079 123 45 67", maxlength: "40", autocomplete: "tel" });
+    var f = el("form", "formulaire");
+    f.appendChild(M.champ("Téléphone interne", ci)); f.appendChild(M.champ("Ligne directe", ce)); f.appendChild(M.champ("Natel", cn));
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1"; var ok = el("button", "btn principal", "Enregistrer"); ok.type = "submit"; act.appendChild(ok); f.appendChild(act);
+    f.addEventListener("submit", function (e) {
+      e.preventDefault(); ok.disabled = true; occupe = true;
+      D.regleProfil(moi.id, { telInterne: ci.value, telExterne: ce.value, telNatel: cn.value, photo: moi.photo })
+        .then(function () { occupe = false; ok.disabled = false; M.annonce("Téléphones enregistrés."); })
+        .catch(function (err) { occupe = false; ok.disabled = false; M.annonce(err.message); });
+    });
+    pf.appendChild(carte("Téléphones", [f]));
+  }
+  function jours(pf, moi) {
+    var j = (D.reprisJours(moi.jours) || [1, 1, 1, 1, 1]).slice();
+    var ETATS = { 1: ["", "plein", "jour plein"], 0.5: ["demi", "½ j", "demi-journée"], 0: ["off", "—", "non travaillé"] };
+    var rangee = el("div", "semaine-j"), capa = el("p", "capa");
+    function montre() { capa.textContent = "Capacité : " + C.fmtJours(D.capaciteApres(moi, j)) + " j par semaine — " + D.detailJours({ jours: j }).replace(/^./, function (c) { return c.toLowerCase(); }); }
+    D.JOURS_COURTS.forEach(function (court, i) {
+      var et = el("small"), b = el("button"); b.type = "button"; b.title = "Cliquer : plein → demi-journée → non travaillé";
+      b.appendChild(document.createTextNode(court)); b.appendChild(et);
+      function peint() { var e = ETATS[j[i]]; b.className = e[0]; et.textContent = e[1]; b.setAttribute("aria-label", D.JOURS_SEMAINE[i] + " : " + e[2]); }
+      peint();
+      b.addEventListener("click", function () { j[i] = j[i] === 1 ? 0.5 : j[i] > 0 ? 0 : 1; if (!j.some(function (x) { return x > 0; })) j[i] = 1; peint(); montre(); });
+      rangee.appendChild(b);
+    });
+    montre();
+    var ok = bouton("Enregistrer", "principal", function () {
+      ok.disabled = true; occupe = true;
+      D.regleJours(moi.id, j.slice()).then(function (apres) { occupe = false; ok.disabled = false; M.annonce("Tes jours sont enregistrés : " + C.fmtJours(apres.capacite) + " j par semaine."); })
+        .catch(function (e) { occupe = false; ok.disabled = false; M.annonce(e.message); });
+    });
+    var act = el("div", "actions"); act.appendChild(ok);
+    pf.appendChild(carte("Jours travaillés", [rangee, capa, note("Un clic par jour : plein, demi-journée, puis non travaillé. Aucune tâche ne se pose un jour non travaillé. Un changement de taux d'activité passe par l'administrateur."), act]));
+  }
+  function motDePasse(pf) {
+    if (!(SB && SB.configure)) { pf.appendChild(carte("Mot de passe", [note("Pas de mot de passe en mode local : les données restent dans ce navigateur.")])); return; }
+    if (/^demo@/i.test(SB.email() || "")) { pf.appendChild(carte("Mot de passe", [note("Le mot de passe de la démonstration ne se change pas : il est partagé par tous les visiteurs.")])); return; }
+    var a = M.saisie("", "password", { autocomplete: "current-password", required: "" }), n = M.saisie("", "password", { autocomplete: "new-password", required: "" }), n2 = M.saisie("", "password", { autocomplete: "new-password", required: "" });
+    var f = el("form", "formulaire"); f.setAttribute("autocomplete", "on");
+    var u = M.saisie(SB.email(), "email", { autocomplete: "username", readonly: "" }); u.hidden = true; f.appendChild(u);
+    f.appendChild(M.champ("Mot de passe actuel", a, true)); f.appendChild(M.champ("Nouveau mot de passe", n)); f.appendChild(M.champ("Confirme le nouveau", n2));
+    var err = el("p", "erreur"); err.hidden = true; f.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1"; var ok = el("button", "btn principal", "Changer le mot de passe"); ok.type = "submit"; act.appendChild(ok); f.appendChild(act);
+    f.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true;
+      function dit(t) { err.textContent = t; err.hidden = false; }
+      if (n.value.length < 6) return dit("Six caractères au minimum pour le nouveau mot de passe.");
+      if (n.value !== n2.value) return dit("Les deux saisies du nouveau mot de passe diffèrent.");
+      if (n.value === a.value) return dit("Choisis un mot de passe différent de l'actuel.");
+      ok.disabled = true;
+      SB.changeMotDePasse(a.value, n.value).then(function () { f.reset(); u.value = SB.email(); ok.disabled = false; M.annonce("Mot de passe changé."); })
+        .catch(function (x) { ok.disabled = false; dit(x.message); });
+    });
+    pf.appendChild(carte("Mot de passe", [f, note("Six caractères au minimum. Les autres appareils restent connectés.")]));
+  }
+})();
+
+</script>
+</body>
+</html>
