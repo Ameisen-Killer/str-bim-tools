@@ -68,6 +68,16 @@
 .eq-led.on{background:#3FB950;box-shadow:0 0 6px rgba(63,185,80,.7),inset 0 -1px 1px rgba(0,0,0,.15)}
 .eq-led.demi{background:linear-gradient(90deg,#3FB950 50%,#D9DBD5 50%);box-shadow:0 0 4px rgba(63,185,80,.45)}
 .eq-capa{margin-top:6px;font-size:12px;color:var(--texte-faible)}
+/* Mêmes colonnes d'une section à l'autre (02.11.2026) : largeurs fixées, plus calculées sur le contenu */
+.eq-contenu table.liste{table-layout:fixed;width:100%}
+.eq-contenu table.liste .c-nom{width:20%}
+.eq-contenu table.liste .c-metier{width:17%}
+.eq-contenu table.liste .c-tel{width:17%}
+.eq-contenu table.liste .c-pres{width:130px}
+.eq-contenu table.liste .c-charge{width:15%}
+.eq-contenu table.liste .c-abs{width:auto}
+.eq-contenu table.liste .c-act{width:90px}
+.eq-contenu table.liste td{overflow-wrap:anywhere}
 </style>
 </head>
 <body class="large">
@@ -476,13 +486,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     hote.appendChild(el("table", { class: "liste" }, [
       el("thead", {}, [el("tr", {}, [
-        el("th", { text: "Nom et rattachement" }),
-        el("th", { text: "Métier et statuts" }),
-        el("th", { text: "Téléphones" }),
-        el("th", { text: "Présence" }),
-        voitCharge ? el("th", { text: "Cette semaine" }) : null,
-        el("th", { text: "Absences" }),
-        el("th", { text: "" })
+        el("th", { class: "c-nom", text: "Nom et rattachement" }),
+        el("th", { class: "c-metier", text: "Métier et statuts" }),
+        el("th", { class: "c-tel", text: "Téléphones" }),
+        el("th", { class: "c-pres", text: "Présence" }),
+        voitCharge ? el("th", { class: "c-charge", text: "Cette semaine" }) : null,
+        el("th", { class: "c-abs", text: "Absences" }),
+        el("th", { class: "c-act", text: "" })
       ])]),
       corps
     ]));
