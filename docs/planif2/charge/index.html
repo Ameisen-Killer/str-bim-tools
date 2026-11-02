@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Tableau de charge · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+  Bureau (/planif2/) — module Tableau de charge, version 2 (02.11.2026). Même calcul que /planif/
+  (Calc.repartition, Calc.capaciteJour) : une case par personne et par semaine, en pourcentage.
+  Bandeau repliable : recherche, switch Tous / Ingénieurs / Dessinateurs, succursales et secteurs.
+-->
+<style>
+.tableau{overflow-x:auto;padding-bottom:6px}
+table.cc{border-collapse:separate;border-spacing:3px;min-width:100%}
+.cc th{font-size:11px;font-weight:600;color:var(--faible);text-align:center;padding:2px 0 4px;white-space:nowrap}
+.cc th.auj{color:var(--m-fort)}
+.cc th small{display:block;font-weight:400}
+.cc td.qui-c{position:sticky;left:0;z-index:1;background:var(--m-fond);padding:0 8px 0 0;min-width:220px;max-width:260px}
+.cc .pers{display:flex;align-items:center;gap:8px}
+.cc .pers .avatar{width:28px;height:28px;font-size:10px}
+.cc .pers b{display:block;font-size:13px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .pers small{display:block;font-size:11px;line-height:14px;color:var(--faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc td.c{min-width:54px;height:40px;border-radius:7px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:var(--doux);box-shadow:inset 0 0 0 1px var(--ligne);transition:transform .1s}
+.cc td.c:hover{transform:scale(1.06)}
+.cc td.p1{background:rgba(var(--m-fort-rvb),.10)}
+.cc td.p2{background:rgba(var(--m-fort-rvb),.25)}
+.cc td.p3{background:rgba(var(--m-fort-rvb),.45);color:#fff}
+.cc td.p4{background:rgba(var(--m-fort-rvb),.68);color:#fff}
+.cc td.p5{background:rgba(var(--m-fort-rvb),.9);color:#fff}
+.cc td.trop{background:var(--rouge);color:#fff}
+.cc td.ferme{background:repeating-linear-gradient(135deg,#ECEDEA 0 5px,#F6F7F4 5px 10px);color:var(--faible);font-weight:400}
+.cc td.vide0{color:#C9CCC4;font-weight:400}
+.cc tr.libres td.c{background:#FFF7E8;color:#B45309;box-shadow:inset 0 0 0 1px #F5D9A8}
+.cc tr.libres td.c.vide0{background:#fff;color:#C9CCC4;box-shadow:inset 0 0 0 1px var(--ligne)}
+.cc .libre-des{font-size:11px;color:var(--m-fort);font-weight:600}
+.nav-sem{display:flex;align-items:center;gap:4px}
+.nav-sem button{height:32px;min-width:32px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;background:var(--carte);cursor:pointer}
+.nav-sem button:hover{background:var(--m-pale)}
+.legende-cc{display:flex;flex-wrap:wrap;gap:12px;margin:12px 2px 0;font-size:12px;color:var(--faible)}
+.legende-cc span{display:inline-flex;align-items:center;gap:5px}
+.legende-cc i{width:16px;height:12px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Tableau de charge">
+    <div class="mode" role="radiogroup" aria-label="Métier">
+      <button type="button" role="radio" data-mode="tous" aria-checked="true">Tous</button>
+      <button type="button" role="radio" data-mode="ingenieur" aria-checked="false">Ingénieurs</button>
+      <button type="button" role="radio" data-mode="dessinateur" aria-checked="false">Dessin</button>
+    </div>
+    <div class="recherche"><input id="q" type="search" placeholder="Chercher une personne" autocomplete="off" spellcheck="false" aria-label="Chercher une personne"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Tableau de charge</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"><div class="nav-sem"><button type="button" id="prec" aria-label="Plus tôt">‹</button><button type="button" id="auj">Aujourd'hui</button><button type="button" id="suiv" aria-label="Plus tard">›</button></div></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var filtre = "tous", metier = "tous", q = $("#q");
+  var lundi = C.lundi(C.isoAuj()), NB = 10, SEUIL_LIBRE = 0.7;
+
+  M.bandeau(function () { liste(); });
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+  [].forEach.call(document.querySelectorAll(".mode button"), function (b) {
+    b.addEventListener("click", function () {
+      metier = b.dataset.mode;
+      [].forEach.call(document.querySelectorAll(".mode button"), function (x) { x.setAttribute("aria-checked", String(x === b)); });
+      arbre(); liste();
+    });
+  });
+  $("#prec").addEventListener("click", function () { lundi = C.ajoute(lundi, -7 * 4); liste(); });
+  $("#suiv").addEventListener("click", function () { lundi = C.ajoute(lundi, 7 * 4); liste(); });
+  $("#auj").addEventListener("click", function () { lundi = C.lundi(C.isoAuj()); liste(); });
+  addEventListener("resize", function () { if (D.etat()) liste(); });
+
+  M.demarre(function () {
+    var moi = D.monMembre();
+    if (moi && moi.succursale && moi.discipline && !/^administrat/.test(M.sansAccents(moi.discipline))) filtre = "d:" + moi.succursale + "|" + moi.discipline;
+    if (!planifies().some(dansFiltre)) filtre = "tous";
+    arbre(); liste();
+    D.surRechargement(function () { arbre(); liste(); });
+  });
+
+  function planifies() {
+    return D.membres({ planifies: true }).filter(function (m) { return metier === "tous" || D.cote(m.metier) === metier; });
+  }
+  function dansFiltre(m) {
+    if (filtre === "tous") return true;
+    if (filtre.indexOf("s:") === 0) return (m.succursale || "_") === filtre.slice(2);
+    var p = filtre.slice(2).split("|");
+    return (m.succursale || "_") === p[0] && (m.discipline || "_") === p[1];
+  }
+  function arbre() {
+    var l = planifies(), e = [{ cle: "tous", nom: "Toute l'équipe", n: l.length }], ordre = Object.keys(D.DISCIPLINES);
+    var codes = Object.keys(D.SUCCURSALES); if (l.some(function (m) { return !m.succursale; })) codes.push("_");
+    var t = false;
+    codes.forEach(function (s) {
+      var dela = l.filter(function (m) { return (m.succursale || "_") === s; });
+      if (!dela.length) return;
+      if (!t) { e.push({ titre: "Succursales" }); t = true; }
+      e.push({ cle: "s:" + s, nom: s === "_" ? "Sans succursale" : D.SUCCURSALES[s], n: dela.length });
+      var ds = [];
+      dela.forEach(function (m) { if (ds.indexOf(m.discipline || "_") < 0) ds.push(m.discipline || "_"); });
+      ds.sort(function (a, b) { return ordre.indexOf(a) - ordre.indexOf(b); }).forEach(function (d) {
+        e.push({ cle: "d:" + s + "|" + d, nom: d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], niv: 1,
+                 n: dela.filter(function (m) { return (m.discipline || "_") === d; }).length });
+      });
+    });
+    M.arbre($("#arbre"), e, filtre, function (c) { filtre = c; arbre(); liste(); });
+  }
+  function titreFiltre() {
+    if (filtre === "tous") return "Tableau de charge";
+    if (filtre.indexOf("s:") === 0) { var s = filtre.slice(2); return s === "_" ? "Sans succursale" : D.SUCCURSALES[s]; }
+    var p = filtre.slice(2).split("|");
+    return D.DISCIPLINES[p[1]] + " · " + (p[0] === "_" ? "sans succursale" : D.SUCCURSALES[p[0]]);
+  }
+  function palier(taux, cap, charge) {
+    if (cap <= 0) return charge > 0 ? "trop" : "ferme";
+    if (taux > 1.0001) return "trop";
+    if (!charge) return "vide0";
+    if (taux >= 0.9) return "p5"; if (taux >= 0.75) return "p4"; if (taux >= 0.5) return "p3"; if (taux > 0.25) return "p2"; return "p1";
+  }
+
+  var detail = {};
+  function liste() {
+    if (!D.etat()) return;
+    var w = $("#contenu").clientWidth - 44 - 240;
+    NB = Math.max(4, Math.min(16, Math.floor(w / 60)));
+    if (innerWidth <= 700) NB = 6;
+    var canton = D.canton(), sems = Calc.semaines(C.serie(lundi, NB * 7)).map(function (s) {
+      s.ouvres = s.jours.filter(function (j) { return C.rangJour(j) <= 5; }); return s;
+    });
+    var ouvertes = D.taches({ sansTerminees: true });
+    var tous = D.membres({ planifies: true });
+    var rep = Calc.repartition(ouvertes, tous, canton);
+    var membres = planifies().filter(dansFiltre).filter(function (m) { return M.cherche(m.prenom + " " + m.nom, q.value); });
+    $("#titre").textContent = titreFiltre();
+    $("#compte").textContent = membres.length + (membres.length > 1 ? " personnes" : " personne") + " · " + NB + " semaines";
+
+    var hote = $("#liste"); hote.textContent = ""; detail = {};
+    if (!membres.length) { hote.appendChild(el("p", "vide", "Personne ne correspond.")); return; }
+    var wrap = el("div", "tableau"), tb = el("table", "cc"), thead = el("tr"), lundiAuj = C.lundi(C.isoAuj());
+    thead.appendChild(el("th"));
+    sems.forEach(function (s) {
+      var th = el("th", s.jours[0] === lundiAuj ? "auj" : null, "S" + s.num);
+      th.appendChild(el("small", null, M.jj(s.jours[0]))); thead.appendChild(th);
+    });
+    tb.appendChild(thead);
+    membres.forEach(function (m) {
+      var r = rep[m.id] || {}, tr = el("tr"), td0 = el("td", "qui-c"), pers = el("div", "pers");
+      pers.appendChild(M.avatar(m));
+      var t = el("div"); t.style.minWidth = "0";
+      t.appendChild(el("b", null, m.prenom + " " + m.nom));
+      var sous = el("small", null, D.libelleMetier(m.metier) + (m.discipline ? " · " + D.DISCIPLINES[m.discipline] : ""));
+      t.appendChild(sous); pers.appendChild(t); td0.appendChild(pers); tr.appendChild(td0);
+      var libre = null;
+      sems.forEach(function (s, k) {
+        var charge = 0, cap = 0, parts = {};
+        s.jours.forEach(function (j) {
+          cap += Calc.capaciteJour(m, j, canton);
+          var cel = r[j]; if (!cel) return;
+          cel.parts.forEach(function (p) { charge += p.jours; var key = p.tacheId + "|" + p.role; parts[key] = (parts[key] || 0) + p.jours; });
+        });
+        var taux = cap > 0 ? charge / cap : (charge > 0 ? 99 : 0), pal = palier(taux, cap, charge);
+        if (libre === null && cap > 0 && taux < SEUIL_LIBRE) libre = k;
+        var td = el("td", "c " + pal, pal === "ferme" ? "—" : pal === "trop" ? (cap > 0 ? Math.round(taux * 100) + " %" : "!") : charge ? Math.round(taux * 100) + " %" : "0");
+        td.title = m.prenom + " · S" + s.num + " : " + M.fmtJ(charge) + " j sur " + M.fmtJ(cap) + " j disponibles";
+        detail[m.id + "|" + k] = { m: m, s: s, charge: charge, cap: cap, parts: parts };
+        td.addEventListener("click", function () { ouvreCase(m.id + "|" + k); });
+        tr.appendChild(td);
+      });
+      if (libre !== null && libre > 0) sous.textContent += " · libre dès S" + sems[libre].num;
+      tb.appendChild(tr);
+    });
+
+    // Charges sans personne (à affecter), à la semaine de leur échéance
+    var libres = sems.map(function () { return { charge: 0, parts: {} }; }), idx = {};
+    sems.forEach(function (s, k) { s.jours.forEach(function (j) { idx[j] = k; }); });
+    ouvertes.forEach(function (t) {
+      var fin = Calc.finEffective(t); if (!fin) return;
+      Calc.nonAffectees(t).forEach(function (na) {
+        var k = idx[fin] != null ? idx[fin] : null; if (k == null) return;
+        libres[k].charge += na.charge; libres[k].parts[t.id + "|" + na.role] = na.charge;
+      });
+    });
+    if (filtre === "tous" && libres.some(function (x) { return x.charge; })) {
+      var tr = el("tr", "libres"), td0 = el("td", "qui-c"), p = el("div", "pers");
+      var t = el("div"); t.appendChild(el("b", null, "À affecter")); t.appendChild(el("small", null, "jours sans personne, semaine d'échéance"));
+      p.appendChild(t); td0.appendChild(p); tr.appendChild(td0);
+      libres.forEach(function (x, k) {
+        var td = el("td", "c" + (x.charge ? "" : " vide0"), x.charge ? M.fmtJ(x.charge) + " j" : "·");
+        detail["_|" + k] = { m: null, s: sems[k], charge: x.charge, cap: 0, parts: x.parts };
+        if (x.charge) td.addEventListener("click", function () { ouvreCase("_|" + k); });
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    }
+    wrap.appendChild(tb); hote.appendChild(wrap);
+    var lg = el("div", "legende-cc");
+    [["rgba(var(--m-fort-rvb),.10)", "< 25 %"], ["rgba(var(--m-fort-rvb),.45)", "50 à 75 %"], ["rgba(var(--m-fort-rvb),.9)", "≥ 90 %"], ["var(--rouge)", "Surcharge"], ["#ECEDEA", "Aucun jour travaillé"]].forEach(function (x) {
+      var s = el("span"), i = el("i"); i.style.background = x[0]; s.appendChild(i); s.appendChild(document.createTextNode(x[1])); lg.appendChild(s);
+    });
+    hote.appendChild(lg);
+  }
+
+  function ouvreCase(k) {
+    var d = detail[k]; if (!d) return;
+    var corps = [], dl = el("dl", "champ");
+    function ch(a, b) { dl.appendChild(el("dt", null, a)); dl.appendChild(el("dd", null, b)); }
+    ch("Semaine", "S" + d.s.num + " · " + M.jj(d.s.jours[0]) + " – " + M.jj(d.s.jours[4]));
+    ch("Charge", M.fmtJ(d.charge) + " j");
+    if (d.m) { ch("Disponible", M.fmtJ(d.cap) + " j"); ch("Taux", d.cap > 0 ? Math.round(d.charge / d.cap * 100) + " %" : "—"); }
+    corps.push(dl);
+    var cles = Object.keys(d.parts);
+    corps.push(el("h3", null, cles.length ? "Tâches de la semaine" : "Aucune tâche cette semaine"));
+    var l = el("div", "liste-lignes");
+    cles.sort(function (a, b) { return d.parts[b] - d.parts[a]; }).forEach(function (key) {
+      var p = key.split("|"), t = D.tache(p[0]); if (!t) return;
+      var af = D.affaire(t.affaireId), a = M.lienModule("taches", "/planif2/taches/?tache=" + encodeURIComponent(t.id), "ligne-l");
+      var lib = el("span", "lib"); lib.appendChild(el("b", null, (af ? (af.code || af.nom) + " – " : "") + t.titre));
+      lib.appendChild(el("small", null, D.PARTS[p[1]].label + " · échéance " + M.quand(t.echeance)));
+      a.appendChild(lib); a.appendChild(el("span", "droite", M.fmtJ(d.parts[key]) + " j"));
+      l.appendChild(a);
+    });
+    corps.push(l);
+    M.panneau.ouvre([el("span", "surtitre", d.m ? D.libelleMetier(d.m.metier) : "À affecter"), el("h2", null, d.m ? d.m.prenom + " " + d.m.nom : "Charges sans personne")], corps);
+  }
+})();
+</script>
+</body>
+</html>

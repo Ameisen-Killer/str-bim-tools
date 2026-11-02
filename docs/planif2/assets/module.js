@@ -146,7 +146,20 @@
     return i;
   }
 
+  /** Ouvre un autre module dans sa fenêtre du bureau (sinon, à la place de la page). */
+  function ouvreModule(id, href) {
+    try { if (global.parent !== global && global.parent.Bureau) { global.parent.Bureau.ouvre(id, href); return; } } catch (e) {}
+    location.href = href;
+  }
+  /** Lien vers un autre module : un clic l'ouvre dans sa fenêtre du bureau. */
+  function lienModule(id, href, cls) {
+    var a = el("a", cls); a.href = href;
+    a.addEventListener("click", function (e) { if (e.ctrlKey || e.metaKey || e.shiftKey) return; e.preventDefault(); ouvreModule(id, href); });
+    return a;
+  }
+
   global.M = {
+    ouvreModule: ouvreModule, lienModule: lienModule,
     el: el, sansAccents: sansAccents, jj: jj, quand: quand, fmtJ: fmtJ, cherche: cherche, avatar: avatar,
     bandeau: bandeau, replie: replie, arbre: arbre,
     panneau: { ouvre: ouvre, ferme: ferme, ouvert: function () { return !!pan && pan.classList.contains("ouvert"); } },

@@ -351,7 +351,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.6.0";
+  var NOM = "Bureau", VERSION = "0.7.0";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
@@ -387,7 +387,7 @@ a{color:inherit;text-decoration:none}
     { id: "taches", cle: "taches", groupe: "Tâches", nom: "Tâches", href: "/planif2/taches/", desc: "La liste des tâches par semaine d'échéance." },
     { id: "tableau", cle: "tableau", groupe: "Tâches", nom: "Tableau de bord", href: "/planif/planning/", desc: "Le planning de chacun, par glisser-déposer." },
     { id: "affaires", cle: "affaires", groupe: "Tâches", nom: "Affaires", href: "/planif2/affaires/", desc: "Les affaires, leurs équipes, mandats et avancement." },
-    { id: "charge", cle: "charge", groupe: "Tâches", nom: "Tableau de charge", href: "/planif/charge/", desc: "Une case par personne et par semaine : qui est libre, qui déborde." },
+    { id: "charge", cle: "charge", groupe: "Tâches", nom: "Tableau de charge", href: "/planif2/charge/", desc: "Une case par personne et par semaine : qui est libre, qui déborde." },
     { id: "carte", cle: "affaires", groupe: "Tâches", nom: "Carte des affaires", href: "/planif/carte/", desc: "Les affaires sur la carte." },
     { id: "veille", cle: "veille", groupe: "Inter-secteurs", nom: "Veille simap.ch", href: "/planif/inter-secteurs/", desc: "Les appels d'offres publiés chaque matin sur simap.ch." },
     { id: "ao_publics", cle: "ao_publics", groupe: "Inter-secteurs", nom: "AO publics", href: "/planif/inter-secteurs/?vue=publics", desc: "Les appels d'offres publics suivis par le bureau." },
@@ -909,6 +909,9 @@ a{color:inherit;text-decoration:none}
     }, 0);
   });
   addEventListener("resize", function () { Object.keys(FEN).forEach(function (k) { cadre(FEN[k]); }); });
+
+  /* Les modules V2 ouvrent un autre module dans sa fenêtre (module.js, M.ouvreModule) */
+  window.Bureau = { ouvre: function (id, href) { var a = parId[id]; if (a && permises.indexOf(a) >= 0) ouvrir(a, href); } };
 
   /* ---------- Plein écran ---------- */
   var ICO_PLEIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
