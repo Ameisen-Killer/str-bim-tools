@@ -240,7 +240,7 @@
                                "page_facturation"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
-                                             "conges_secteur", "conges_tous", "tchat_moderer"] },
+                                             "membres_modifier", "conges_secteur", "conges_tous", "tchat_moderer"] },
     { titre: "Avancement et facturation", droits: ["avancement_secteur", "avancement_tous", "facturation_saisir"] },
     { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] }
   ];
@@ -293,6 +293,10 @@
     absences_autrui: {
       titre: "Poser les absences des autres",
       aide: "Et régler leurs jours travaillés, modifier tous les rendez-vous. Sans ce droit, chacun ne gère que ses propres absences, ses jours et ses rendez-vous."
+    },
+    membres_modifier: {
+      titre: "Modifier les fiches des membres",
+      aide: "Depuis la page Équipe : prénom, nom, métier, succursale, secteur, capacité et téléphones de chacun. Les groupes, l'accès et l'adresse restent à la console."
     },
     conges_secteur: {
       titre: "Valider les congés de son secteur",
@@ -1426,6 +1430,36 @@
         version++;
         var instantane = copie(etat);
         return enFile(function () { return ADAPTATEUR.regleProfil(idMembre, neuf); }, instantane)
+          .then(function () { return D.membre(idMembre) || m; });
+      });
+    },
+    /**
+     * Fiche d'un membre (02.11.2026) : prénom, nom, métier, succursale, secteur,
+     * capacité et téléphones, avec le droit « membres_modifier ». La base passe
+     * par sa fonction modifie_fiche, qui vérifie le droit. Promesse du membre à jour.
+     */
+    modifieFiche: function (idMembre, p) {
+      return Promise.resolve().then(function () {
+        var m = D.membre(idMembre); if (!m) throw erreur("Membre introuvable.");
+        if (!D.aDroit("membres_modifier")) throw erreur("Modifier une fiche demande le droit « Modifier les fiches des membres ».");
+        var neuf = {
+          prenom: texte(p.prenom), nom: texte(p.nom),
+          metier: METIERS[p.metier] ? p.metier : "",
+          succursale: SUCCURSALES[p.succursale] ? p.succursale : "",
+          discipline: DISCIPLINES[p.discipline] ? p.discipline : "",
+          capacite: Math.round(nombre(p.capacite, m.capacite) * 10) / 10,
+          telInterne: texte(p.telInterne).slice(0, 40), telExterne: texte(p.telExterne).slice(0, 40), telNatel: texte(p.telNatel).slice(0, 40)
+        };
+        if (!neuf.prenom) throw erreur("Le prénom est obligatoire.");
+        if (!neuf.nom) throw erreur("Le nom est obligatoire.");
+        if (!(neuf.capacite >= 0.5 && neuf.capacite <= 7)) throw erreur("La capacité doit être comprise entre 0,5 et 7 jours par semaine.");
+        var max = Array.isArray(m.jours) ? m.jours.reduce(function (s, x) { return s + x; }, 0) : 5;
+        if (neuf.capacite > max + 0.01) throw erreur("La capacité dépasse les jours travaillés (" + max + " j).");
+        Object.keys(neuf).forEach(function (k) { m[k] = neuf[k]; });
+        if (!ADAPTATEUR.modifieFiche) return sauve().then(function () { return m; });
+        version++;
+        var instantane = copie(etat);
+        return enFile(function () { return ADAPTATEUR.modifieFiche(idMembre, neuf); }, instantane)
           .then(function () { return D.membre(idMembre) || m; });
       });
     },

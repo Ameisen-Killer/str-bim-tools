@@ -564,7 +564,7 @@
   // Tables que touchent les fonctions de la base appelées d'ici ; absente : toutes
   var TABLES_RPC = {
     presence: [], mon_profil: [], choisit_bureau: [],
-    regle_jours: ["membres"], regle_profil: ["membres"], decide_conge: ["conges", "absences"]
+    regle_jours: ["membres"], regle_profil: ["membres"], modifie_fiche: ["membres"], decide_conge: ["conges", "absences"]
   };
   var brut = null, sales = {}, toutSale = false;
 
@@ -728,6 +728,12 @@
   function regleProfil(idMembre, p) {
     return rpc("regle_profil", { p_membre: idMembre, p_tel_interne: p.telInterne || "", p_tel_externe: p.telExterne || "",
                                  p_tel_natel: p.telNatel || "", p_photo: p.photo || "" });
+  }
+
+  /* Fiche d'un membre depuis la page Équipe (02.11.2026) : la fonction
+     modifie_fiche vérifie le droit « membres_modifier ». */
+  function modifieFiche(idMembre, p) {
+    return rpc("modifie_fiche", { p_membre: idMembre, p: p });
   }
 
   /* Changer son mot de passe : l'ancien est d'abord vérifié par une connexion
@@ -954,6 +960,7 @@
       profil: profil,
       regleJours: regleJours,
       regleProfil: regleProfil,
+      modifieFiche: modifieFiche,
       decideConge: function (id, accepte, reponse) {
         return rpc("decide_conge", { p_demande: id, p_accepte: accepte, p_reponse: reponse || "" });
       }
