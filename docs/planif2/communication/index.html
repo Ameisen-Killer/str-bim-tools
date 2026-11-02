@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Communication · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+Bureau V2 — Communication (02.11.2026) : le bureau aujourd'hui, tchat, agenda, congés, absences à venir.
+Mêmes données que /planif/communication/ (non modifiée). Tchat : table « messages », comme tchat.js.
+-->
+<style>
+.personne{display:flex;align-items:center;gap:10px}
+.personne .avatar{width:34px;height:34px;flex:none}
+.ligne-l .avatar{width:34px;height:34px;flex:none}
+.semaine-ag{display:grid;grid-template-columns:repeat(var(--n,5),minmax(150px,1fr));gap:8px;overflow-x:auto}
+.col{display:flex;flex-direction:column;gap:6px;min-height:200px;padding:8px;border-radius:9px;background:var(--m-voile)}
+.col.auj{background:var(--m-pale);box-shadow:inset 0 0 0 2px var(--m-clair)}
+.col.passe{opacity:.65}
+.col-tete{display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--doux)}
+.col-tete b{font-size:20px;color:var(--texte)}
+.rdv{display:flex;flex-direction:column;gap:2px;padding:7px 9px;border:0;border-radius:7px;background:var(--carte);text-align:left;font:inherit;color:inherit;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.rdv:hover{box-shadow:0 3px 10px rgba(0,0,0,.1)}
+.rdv .h{font-size:11px;font-weight:600;color:var(--m-fort)}
+.rdv b{font-size:13px;line-height:17px}
+.rdv small{font-size:11px;color:var(--faible)}
+.rdv.outlook{border-left:3px solid var(--bleu)}
+.ajout{margin-top:auto;height:28px;border:1px dashed var(--ligne);border-radius:7px;background:transparent;color:var(--faible);font-size:16px;cursor:pointer}
+.ajout:hover{background:#fff;color:var(--m-fort)}
+.gens{display:flex;gap:2px;margin-top:2px}
+.gens .avatar{width:20px;height:20px;font-size:9px}
+.nav-sem{display:inline-flex;gap:4px}
+.nav-sem .btn{padding:0 10px}
+/* Tchat */
+.tchat{display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:320px;border-radius:10px;background:var(--carte);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.fil{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.msg{display:flex;gap:8px;align-items:flex-end;max-width:80%}
+.msg .avatar{width:28px;height:28px;font-size:11px;flex:none}
+.msg .bulle{padding:7px 11px;border-radius:12px 12px 12px 3px;background:var(--m-voile);font-size:14px;line-height:19px;white-space:pre-wrap;word-break:break-word}
+.msg .qui{display:block;font-size:11px;color:var(--faible);margin-bottom:1px}
+.msg.moi{align-self:flex-end;flex-direction:row-reverse}
+.msg.moi .bulle{background:var(--m-clair);border-radius:12px 12px 3px 12px}
+.msg .suppr{border:0;background:none;color:var(--faible);cursor:pointer;font-size:14px;opacity:0}
+.msg:hover .suppr{opacity:1}
+.jour-sep{align-self:center;font-size:11px;color:var(--faible);padding:2px 10px;border-radius:10px;background:var(--m-voile)}
+.saisie{display:flex;gap:8px;padding:10px;border-top:1px solid var(--ligne)}
+.saisie textarea{flex:1;min-height:40px;max-height:140px;padding:9px 11px;border:1px solid var(--ligne);border-radius:9px;font:inherit;font-size:14px;resize:none;outline:none}
+.saisie textarea:focus{border-color:var(--m-fort)}
+.emojis{display:flex;flex-wrap:wrap;gap:2px;padding:6px 10px 0}
+.emojis button{border:0;background:none;font-size:17px;cursor:pointer;padding:2px 3px;border-radius:5px}
+.emojis button:hover{background:var(--m-voile)}
+.participants{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;padding:8px;border:1px solid var(--ligne);border-radius:8px;background:#fff}
+.participants .g{font-size:11px;font-weight:600;color:var(--faible);text-transform:uppercase;letter-spacing:.04em}
+.participants .cs{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--texte)}
+.participants label{display:inline-flex;align-items:center;gap:5px}
+.resume{grid-column:1 / -1;margin:0;font-size:12px;color:var(--doux)}
+@media (max-width:700px){.semaine-ag{grid-template-columns:1fr}.col{min-height:0}.msg{max-width:92%}}
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Communication">
+    <div class="recherche"><input id="q" type="search" placeholder="Rechercher une personne, un rendez-vous…" autocomplete="off" spellcheck="false" aria-label="Rechercher une personne, un rendez-vous…"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Communication</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var q = $("#q");
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var MOTIFS = ["Rendez-vous médical", "Chantier", "Séance à l'extérieur", "Formation", "Rendez-vous personnel", "Arrivée plus tard", "Départ plus tôt", "Télétravail"];
+  var EMOJIS = ["👍", "🙏", "😀", "😂", "😉", "🙂", "😅", "🤔", "👏", "🎉", "✅", "❌", "⚠️", "☕", "🔥", "❤️"];
+  var vue = { section: "jour", lundi: null, miens: false };
+  var p0 = new URLSearchParams(location.search).get("vue");
+  if (/^(jour|tchat|agenda|conges|absences)$/.test(p0 || "")) vue.section = p0;
+
+  M.bandeau();
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+
+  M.demarre(function () {
+    vue.lundi = C.lundi(auj());
+    tout();
+    D.surRechargement(function () { if (!M.panneau.ouvert()) tout(); });
+    setInterval(function () { if (!document.hidden && vue.section === "tchat") chargeTchat(false); }, 15000);
+    setInterval(function () { if (!document.hidden) nonLus().then(function () { arbre(); }); }, 60000);
+    nonLus().then(arbre);
+  });
+  function tout() { arbre(); outils(); liste(); }
+
+  function auj() { return C.isoAuj(); }
+  function deux(n) { return (n < 10 ? "0" : "") + n; }
+  function maintenant() { var d = new Date(); return C.iso(d) + "T" + deux(d.getHours()) + ":" + deux(d.getMinutes()); }
+  function maj(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function nom(m) { return m ? m.prenom + " " + m.nom : "—"; }
+  function jourCourt(iso) { var d = C.dt(iso); return d ? JOURS[d.getDay()].slice(0, 3) + ". " + M.jj(iso) : "—"; }
+  function heures(r) { return r.debut ? r.debut + (r.fin ? " – " + r.fin : "") : "Journée"; }
+  function bouton(txt, cls, f) { var b = el("button", "btn" + (cls ? " " + cls : ""), txt); b.type = "button"; b.addEventListener("click", f); return b; }
+  function select(valeur, options) {
+    var s = el("select");
+    options.forEach(function (o) {
+      if (o.groupe) { var g = el("optgroup"); g.label = o.groupe; o.options.forEach(function (x) { var y = el("option", null, x[1]); y.value = x[0]; g.appendChild(y); }); s.appendChild(g); return; }
+      var x = el("option", null, o[1]); x.value = o[0]; s.appendChild(x);
+    });
+    s.value = valeur == null ? "" : valeur; return s;
+  }
+  function optionsMembres() { return D.parMetier(D.membres({})).map(function (g) { return { groupe: g.titre, options: g.membres.map(function (m) { return [m.id, nom(m)]; }) }; }); }
+  function ouvreAbsences(m) { M.ouvreModule("absences", "/planif2/absences/?q=" + encodeURIComponent(nom(m))); }
+
+  /* ---------- Bandeau ---------- */
+  var nLus = 0;
+  function arbre() {
+    var a = auj();
+    var e = [
+      { cle: "jour", nom: "Le bureau aujourd'hui", n: quiManque(a).length || null },
+      { cle: "tchat", nom: "Tchat du bureau", n: nLus || null },
+      { cle: "agenda", nom: "Agenda du bureau", n: D.rendezVous({ depuis: a, jusqu: C.ajoute(C.lundi(a), 6) }).length || null },
+      { cle: "conges", nom: "Demandes de congé", n: D.congesAValider().length || null },
+      { cle: "absences", nom: "Absences à venir", n: absencesListe().length || null }
+    ];
+    M.arbre($("#arbre"), e, vue.section, function (cle) { vue.section = cle; M.panneau.ferme(); tout(); });
+  }
+  function outils() {
+    var o = $("#outils"); o.textContent = "";
+    var s = vue.section;
+    if (s === "jour") o.appendChild(bouton("Je m'absente", "principal", formAvis));
+    if (s === "agenda") {
+      var nav = el("span", "nav-sem");
+      nav.appendChild(bouton("‹", "", function () { vue.lundi = C.ajoute(vue.lundi, -7); liste(); }));
+      nav.appendChild(bouton("Cette semaine", "", function () { vue.lundi = C.lundi(auj()); liste(); }));
+      nav.appendChild(bouton("›", "", function () { vue.lundi = C.ajoute(vue.lundi, 7); liste(); }));
+      o.appendChild(nav);
+      var l = el("label", "bascule"), c = el("input"); c.type = "checkbox"; c.checked = vue.miens;
+      c.addEventListener("change", function () { vue.miens = c.checked; liste(); });
+      l.appendChild(c); l.appendChild(document.createTextNode(" Mes rendez-vous")); o.appendChild(l);
+      o.appendChild(bouton("+ Rendez-vous", "principal", function () { formRdv(null, {}); }));
+    }
+    if (s === "conges" || s === "absences") o.appendChild(bouton("Demander un congé", "principal", formConge));
+  }
+  function liste() {
+    if (!D.etat()) return;
+    var hote = $("#liste"); hote.textContent = "";
+    ({ jour: bureau, tchat: tchat, agenda: agenda, conges: conges, absences: absences })[vue.section](hote);
+  }
+
+  /* ---------- Le bureau aujourd'hui ---------- */
+  var GENRES = { avis: "Avis", absence: "Absence", off: "Jour off", demi: "½ journée" };
+  function periodeAvis(a) {
+    var j1 = a.debut.slice(0, 10), j2 = a.fin.slice(0, 10), h1 = a.debut.slice(11), h2 = a.fin.slice(11);
+    if (j1 === j2) return (j1 === auj() ? "" : jourCourt(j1) + " ") + h1 + " – " + h2;
+    return jourCourt(j1) + " " + h1 + " → " + jourCourt(j2) + " " + h2;
+  }
+  function quiManque(jour) {
+    var vus = {}, out = [], canton = D.canton();
+    function ajoute(m, genre, detail, avis) { if (!m || vus[m.id]) return; vus[m.id] = true; out.push({ membre: m, genre: genre, detail: detail, avis: avis || null }); }
+    if (jour === auj()) D.avis({ jusqu: jour }).forEach(function (x) { ajoute(D.membre(x.membreId), "avis", x.motif + " · " + periodeAvis(x), x); });
+    D.absences({ depuis: jour, jusqu: jour }).forEach(function (x) {
+      ajoute(x.membre, "absence", (x.absence.motif || "Absence") + (x.absence.fin > jour ? " · jusqu'au " + jourCourt(x.absence.fin) : ""));
+    });
+    if (C.estOuvre(jour, canton)) {
+      var nj = JOURS[C.dt(jour).getDay()];
+      D.membres({}).forEach(function (m) {
+        var p = Calc.poidsJour(m, jour);
+        if (p === 0) ajoute(m, "off", "Ne travaille pas le " + nj);
+        else if (p > 0 && p < 1) ajoute(m, "demi", "Demi-journée le " + nj);
+      });
+    }
+    return out;
+  }
+  function bureau(hote) {
+    var a = auj(), d = C.dt(a), ferie = C.ferie(a, D.canton());
+    $("#titre").textContent = maj(JOURS[d.getDay()]) + " " + d.getDate() + " " + C.MOIS[d.getMonth()] + (ferie ? " · " + ferie : "");
+    var manque = quiManque(a).filter(function (x) { return M.cherche(nom(x.membre) + " " + x.detail, q.value); });
+    $("#compte").textContent = manque.length ? manque.length + (manque.length > 1 ? " personnes manquent" : " personne manque") : "toute l'équipe est là";
+    var b1 = el("section", "bloc"); b1.appendChild(el("h2", null, "Qui manque"));
+    if (!manque.length) b1.appendChild(el("p", "vide-msg", "Toute l'équipe est là aujourd'hui."));
+    else {
+      var ll = el("div", "liste-lignes");
+      manque.forEach(function (x) {
+        var enCours = x.avis && x.avis.debut <= maintenant() && maintenant() < x.avis.fin;
+        var b = el("button", "ligne-l"); b.type = "button";
+        b.appendChild(M.avatar(x.membre));
+        var lib = el("span", "lib"); lib.appendChild(el("b", null, nom(x.membre))); lib.appendChild(el("small", null, x.detail)); b.appendChild(lib);
+        var dr = el("span", "droite");
+        dr.appendChild(el("span", "pastille " + (enCours ? "rouge" : x.genre === "absence" ? "orange" : x.genre === "avis" ? "bleu" : "gris"), enCours ? "En ce moment" : GENRES[x.genre]));
+        b.appendChild(dr);
+        b.addEventListener("click", function () { ouvreAbsences(x.membre); });
+        ll.appendChild(b);
+      });
+      b1.appendChild(ll);
+    }
+    hote.appendChild(b1);
+    var b2 = el("section", "bloc"); b2.appendChild(el("h2", null, "Rendez-vous du jour"));
+    var rdv = D.rendezVous({ depuis: a, jusqu: a });
+    if (!rdv.length) b2.appendChild(el("p", "vide-msg", "Aucun rendez-vous noté pour aujourd'hui."));
+    else { var l2 = el("div", "liste-lignes"); rdv.forEach(function (r) { l2.appendChild(ligneRdv(r)); }); b2.appendChild(l2); }
+    hote.appendChild(b2);
+  }
+  function ligneRdv(r) {
+    var b = el("button", "ligne-l"); b.type = "button";
+    var lib = el("span", "lib"); lib.appendChild(el("b", null, heures(r) + " · " + r.titre));
+    var gens = r.participants.map(function (i) { return D.membre(i); }).filter(Boolean);
+    lib.appendChild(el("small", null, [r.lieu, gens.map(nom).join(", ")].filter(Boolean).join(" · ") || "—"));
+    b.appendChild(lib);
+    b.addEventListener("click", function () { formRdv(r.id, {}); });
+    return b;
+  }
+
+  /* ---------- Agenda ---------- */
+  function carteRdv(r) {
+    var gens = r.participants.map(function (i) { return D.membre(i); }).filter(Boolean);
+    var b = el("button", "rdv" + (r.source === "outlook" ? " outlook" : "")); b.type = "button";
+    b.appendChild(el("span", "h", heures(r))); b.appendChild(el("b", null, r.titre));
+    if (r.lieu) b.appendChild(el("small", null, r.lieu));
+    if (gens.length) { var g = el("span", "gens"); gens.slice(0, 7).forEach(function (m) { g.appendChild(M.avatar(m)); }); if (gens.length > 7) g.appendChild(el("small", null, "+" + (gens.length - 7))); b.appendChild(g); }
+    b.title = r.titre + (r.note ? "\n" + r.note : "");
+    b.addEventListener("click", function () { formRdv(r.id, {}); });
+    return b;
+  }
+  function agenda(hote) {
+    var lundi = vue.lundi, s = C.semaineISO(lundi), moi = D.monMembre();
+    $("#titre").textContent = "Semaine " + s.num;
+    var l = D.rendezVous({ depuis: lundi, jusqu: C.ajoute(lundi, 6), membreId: vue.miens && moi ? moi.id : null })
+      .filter(function (r) { return M.cherche([r.titre, r.lieu, r.note, r.participants.map(function (i) { return D.nomMembre(i); }).join(" ")].join(" "), q.value); });
+    $("#compte").textContent = "du " + M.jj(lundi) + " au " + M.jj(C.ajoute(lundi, 4), true) + " · " + l.length + " rendez-vous";
+    var jours = C.serie(lundi, 5);
+    [C.ajoute(lundi, 5), C.ajoute(lundi, 6)].forEach(function (j) { if (l.some(function (r) { return r.jour === j; })) jours.push(j); });
+    var g = el("div", "semaine-ag"); g.style.setProperty("--n", String(jours.length));
+    jours.forEach(function (j) {
+      var d = C.dt(j), col = el("div", "col" + (j === auj() ? " auj" : "") + (j < auj() ? " passe" : ""));
+      var t = el("div", "col-tete"); t.appendChild(el("span", null, maj(JOURS[d.getDay()]).slice(0, 3) + ".")); t.appendChild(el("b", null, String(d.getDate()))); col.appendChild(t);
+      l.filter(function (r) { return r.jour === j; }).forEach(function (r) { col.appendChild(carteRdv(r)); });
+      var plus = el("button", "ajout", "+"); plus.type = "button"; plus.title = "Nouveau rendez-vous le " + M.jj(j);
+      plus.addEventListener("click", function () { formRdv(null, { jour: j }); });
+      col.appendChild(plus); g.appendChild(col);
+    });
+    hote.appendChild(g);
+  }
+  function formRdv(id, o) {
+    var r = id ? D.rdvParId(id) : null, moi = D.monMembre(), lecture = r && !D.peutRdv(r);
+    var f = {
+      titre: M.saisie(r ? r.titre : "", "text", { placeholder: "Séance de chantier, entretien, point projet…" }),
+      jour: M.saisie(r ? r.jour : (o.jour || auj()), "date"),
+      debut: M.saisie(r ? r.debut : "", "time", { step: "300" }), fin: M.saisie(r ? r.fin : "", "time", { step: "300" }),
+      lieu: M.saisie(r ? r.lieu : "", "text", { placeholder: "Salle de conférence, chantier, visio…" }),
+      note: M.saisie(r ? r.note : "", "textarea")
+    };
+    var choisis = r ? r.participants : (moi ? [moi.id] : []);
+    var part = el("div", "participants");
+    D.parMetier(D.membres({})).forEach(function (g) {
+      part.appendChild(el("div", "g", g.titre));
+      var cs = el("div", "cs");
+      g.membres.forEach(function (m) { var l = el("label"), i = el("input"); i.type = "checkbox"; i.value = m.id; i.checked = choisis.indexOf(m.id) >= 0; l.appendChild(i); l.appendChild(document.createTextNode(nom(m))); cs.appendChild(l); });
+      part.appendChild(cs);
+    });
+    var form = el("form", "formulaire");
+    if (lecture) form.appendChild(el("p", "bandeau-info large", "Ce rendez-vous se modifie par ses participants ou par la personne qui l'a noté."));
+    form.appendChild(M.champ("Intitulé", f.titre, true));
+    form.appendChild(M.champ("Date", f.jour, true));
+    form.appendChild(M.champ("Début", f.debut)); form.appendChild(M.champ("Fin", f.fin));
+    form.appendChild(el("p", "resume", "Sans heure de début, le rendez-vous occupe la journée."));
+    form.appendChild(M.champ("Lieu", f.lieu, true));
+    form.appendChild(M.champ("Participants", part, true));
+    form.appendChild(M.champ("Note", f.note, true));
+    if (lecture) [].forEach.call(form.querySelectorAll("input,textarea"), function (n) { n.disabled = true; });
+    var err = el("p", "erreur"); err.hidden = true; form.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    if (!lecture) { var ok = el("button", "btn principal", "Enregistrer"); ok.type = "submit"; act.appendChild(ok); }
+    act.appendChild(bouton("Fermer", "", function () { M.panneau.ferme(); }));
+    if (r && !lecture) act.appendChild(bouton("Supprimer", "rouge", function () {
+      D.suppRdv(r.id).then(function () { M.panneau.ferme(); M.annonce("Rendez-vous retiré.", true, tout); tout(); }).catch(function (e) { err.textContent = e.message; err.hidden = false; });
+    }));
+    form.appendChild(act);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); if (lecture) return; err.hidden = true;
+      var v = { titre: f.titre.value, jour: f.jour.value, debut: f.debut.value, fin: f.fin.value, lieu: f.lieu.value, note: f.note.value,
+                participants: [].map.call(part.querySelectorAll("input:checked"), function (i) { return i.value; }) };
+      (r ? D.majRdv(r.id, v) : D.ajouteRdv(v)).then(function () { M.panneau.ferme(); M.annonce(r ? "Rendez-vous modifié." : "Rendez-vous noté.", true, tout); tout(); })
+        .catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
+    });
+    M.panneau.ouvre([el("div", "surtitre", "Agenda du bureau"), el("h2", null, r ? r.titre : "Nouveau rendez-vous")], [form]);
+    if (!r) setTimeout(function () { f.titre.focus(); }, 250);
+  }
+
+  /* ---------- Congés ---------- */
+  function periode(c) { return c.debut === c.fin ? jourCourt(c.debut) : jourCourt(c.debut) + " → " + jourCourt(c.fin); }
+  function nJours(c) { var n = Calc.joursTravaillesEntre(D.membre(c.membreId), c.debut, c.fin, D.canton()); return C.fmtJours(n) + (n > 1 ? " jours" : " jour"); }
+  function pastilleConge(c) { return el("span", "pastille " + ({ acceptee: "", refusee: "rouge", en_attente: "orange", annulee: "gris" }[c.statut] || "gris"), D.STATUTS_CONGE[c.statut]); }
+  function conges(hote) {
+    var a = auj(), moi = D.monMembre(), aValider = D.congesAValider();
+    var miennes = moi ? D.conges({ membreId: moi.id, depuis: C.ajoute(a, -30) }).filter(function (c) { return c.statut !== "annulee"; }) : [];
+    var attente = D.aDroit("voir_conges_equipe") ? D.conges({ statut: "en_attente", depuis: a }).filter(function (c) { return (!moi || c.membreId !== moi.id) && aValider.indexOf(c) < 0; }) : [];
+    function ok(c) { return M.cherche([D.nomMembre(c.membreId), c.motif, c.commentaire].join(" "), q.value); }
+    aValider = aValider.filter(ok); miennes = miennes.filter(ok); attente = attente.filter(ok);
+    $("#titre").textContent = "Demandes de congé";
+    $("#compte").textContent = aValider.length ? aValider.length + " à valider" : "";
+    function bloc(titre, l, ligne) {
+      if (!l.length) return;
+      var b = el("section", "bloc"); b.appendChild(el("h2", null, titre));
+      var ll = el("div", "liste-lignes"); l.forEach(function (c) { ll.appendChild(ligne(c)); }); b.appendChild(ll); hote.appendChild(b);
+    }
+    function ligne(c, sousTxt) {
+      var m = D.membre(c.membreId), b = el("button", "ligne-l"); b.type = "button";
+      b.appendChild(M.avatar(m));
+      var lib = el("span", "lib"); lib.appendChild(el("b", null, nom(m) + " — " + c.motif)); lib.appendChild(el("small", null, sousTxt || (periode(c) + " · " + nJours(c)))); b.appendChild(lib);
+      var dr = el("span", "droite"); dr.appendChild(pastilleConge(c)); b.appendChild(dr);
+      b.addEventListener("click", function () { detailConge(c); });
+      return b;
+    }
+    bloc("À valider", aValider, function (c) { return ligne(c, periode(c) + " · " + nJours(c) + (c.commentaire ? " · « " + c.commentaire + " »" : "")); });
+    bloc("Mes demandes", miennes, function (c) { return ligne(c); });
+    bloc("Demandes de l'équipe en attente", attente, function (c) { return ligne(c); });
+    if (!hote.childNodes.length) hote.appendChild(el("p", "vide", "Aucune demande de congé en cours."));
+  }
+  function detailConge(c) {
+    var m = D.membre(c.membreId), moi = D.monMembre(), juge = c.validePar ? D.membre(c.validePar) : null;
+    var d = el("dl", "champ");
+    [["Pour", nom(m)], ["Type", c.motif], ["Période", periode(c)], ["Jours", nJours(c)], ["Statut", D.STATUTS_CONGE[c.statut]],
+     ["Commentaire", c.commentaire], ["Décision", juge ? (c.statut === "acceptee" ? "Acceptée" : "Refusée") + " par " + nom(juge) : ""], ["Réponse", c.reponse]]
+      .forEach(function (x) { if (!x[1]) return; d.appendChild(el("dt", null, x[0])); d.appendChild(el("dd", null, x[1])); });
+    var corps = [d], err = el("p", "erreur"); err.hidden = true;
+    var act = el("div", "actions");
+    if (c.statut === "en_attente" && D.peutValiderConge(c.membreId)) {
+      var rep = M.saisie("", "textarea", { placeholder: "Un mot (facultatif) ou le motif d'un refus" });
+      var f = el("div", "formulaire"); f.style.marginTop = "14px"; f.appendChild(M.champ("Réponse", rep, true)); corps.push(f);
+      act.appendChild(bouton("Accepter", "principal", function () { decide(true); }));
+      act.appendChild(bouton("Refuser", "rouge", function () { decide(false); }));
+      function decide(oui) {
+        D.decideConge(c.id, oui, rep.value || "").then(function () { M.panneau.ferme(); M.annonce(oui ? "Congé accepté, inscrit au planning." : "Congé refusé."); tout(); })
+          .catch(function (e) { err.textContent = e.message; err.hidden = false; });
+      }
+    }
+    if (c.statut === "en_attente" && moi && c.membreId === moi.id) act.appendChild(bouton("Annuler ma demande", "", function () {
+      D.annuleConge(c.id).then(function () { M.panneau.ferme(); M.annonce("Demande annulée."); tout(); }).catch(function (e) { err.textContent = e.message; err.hidden = false; });
+    }));
+    act.appendChild(bouton("Voir dans Absences", "", function () { ouvreAbsences(m); }));
+    corps.push(err); corps.push(act);
+    M.panneau.ouvre([el("div", "surtitre", "Demande de congé"), el("h2", null, nom(m) + " · " + c.motif)], corps);
+  }
+  function formConge() {
+    var moi = D.monMembre(), droit = D.aDroit("absences_autrui");
+    if (!moi && !droit) { M.annonce("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil."); return; }
+    var lundi = C.ajoute(C.lundi(auj()), 7);
+    var f = {
+      membreId: droit && D.membres({}).length > 1 ? select(moi ? moi.id : "", optionsMembres()) : null,
+      debut: M.saisie(lundi, "date"), fin: M.saisie(C.ajoute(lundi, 4), "date"),
+      motif: select("Vacances", D.MOTIFS_CONGE.map(function (x) { return [x, x]; })),
+      commentaire: M.saisie("", "textarea", { placeholder: "Remplacement prévu, urgences…" })
+    };
+    var form = el("form", "formulaire");
+    if (f.membreId) form.appendChild(M.champ("Pour", f.membreId, true));
+    form.appendChild(M.champ("Premier jour", f.debut)); form.appendChild(M.champ("Dernier jour", f.fin));
+    form.appendChild(M.champ("Type de congé", f.motif, true)); form.appendChild(M.champ("Commentaire (facultatif)", f.commentaire, true));
+    var resume = el("p", "resume"); form.appendChild(resume);
+    function calcule() {
+      var m = D.membre((f.membreId && f.membreId.value) || (moi && moi.id));
+      if (f.fin.value < f.debut.value) f.fin.value = f.debut.value;
+      if (!f.debut.value || !f.fin.value || !m) { resume.textContent = "Choisis le premier et le dernier jour."; return; }
+      var n = Calc.joursTravaillesEntre(m, f.debut.value, f.fin.value, D.canton());
+      resume.textContent = C.fmtJours(n) + (n > 1 ? " jours travaillés" : " jour travaillé") + " (fériés et jours non travaillés exclus). La demande part en validation chez le chef de secteur.";
+    }
+    form.addEventListener("change", calcule); calcule();
+    var err = el("p", "erreur"); err.hidden = true; form.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    var ok = el("button", "btn principal", "Envoyer la demande"); ok.type = "submit"; act.appendChild(ok);
+    act.appendChild(bouton("Annuler", "", function () { M.panneau.ferme(); }));
+    form.appendChild(act);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true;
+      var v = { debut: f.debut.value, fin: f.fin.value, motif: f.motif.value, commentaire: f.commentaire.value };
+      if (f.membreId) v.membreId = f.membreId.value;
+      D.demandeConge(v).then(function () { M.panneau.ferme(); M.annonce("Demande envoyée : elle attend la validation."); vue.section = "conges"; tout(); })
+        .catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
+    });
+    M.panneau.ouvre([el("div", "surtitre", "Congés"), el("h2", null, "Demander un congé")], [form]);
+  }
+  function formAvis() {
+    var moi = D.monMembre(), droit = D.aDroit("absences_autrui");
+    if (!moi && !droit) { M.annonce("Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil."); return; }
+    var d = new Date(), mn = d.getHours() * 60 + d.getMinutes();
+    var q0 = Math.max(8 * 60, Math.ceil(mn / 15) * 15), hm = function (x) { return deux(Math.floor(x / 60) % 24) + ":" + deux(x % 60); };
+    var f = {
+      membreId: droit && D.membres({}).length > 1 ? select(moi ? moi.id : "", optionsMembres()) : null,
+      jd: M.saisie(auj(), "date"), hd: M.saisie(hm(q0), "time", { step: "300" }),
+      jf: M.saisie(auj(), "date"), hf: M.saisie(hm(Math.max(q0 + 60, 17 * 60 + 30)), "time", { step: "300" }),
+      motif: M.saisie("", "text", { placeholder: "Rendez-vous médical, chantier, formation…", list: "v2-motifs" })
+    };
+    var dl = el("datalist"); dl.id = "v2-motifs"; MOTIFS.forEach(function (x) { var o = el("option"); o.value = x; dl.appendChild(o); });
+    var plan = el("input"); plan.type = "checkbox";
+    var form = el("form", "formulaire");
+    if (f.membreId) form.appendChild(M.champ("Pour", f.membreId, true));
+    form.appendChild(M.champ("Du", f.jd)); form.appendChild(M.champ("À partir de", f.hd));
+    form.appendChild(M.champ("Au", f.jf)); form.appendChild(M.champ("Jusqu'à", f.hf));
+    form.appendChild(M.champ("Motif", f.motif, true)); form.appendChild(dl);
+    var lp = el("label", "bascule"); lp.style.gridColumn = "1 / -1"; lp.appendChild(plan); lp.appendChild(document.createTextNode(" L'inscrire aussi au planning (jours entiers)")); form.appendChild(lp);
+    var err = el("p", "erreur"); err.hidden = true; form.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    var ok = el("button", "btn principal", "Prévenir le bureau"); ok.type = "submit"; act.appendChild(ok);
+    act.appendChild(bouton("Annuler", "", function () { M.panneau.ferme(); }));
+    form.appendChild(act);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true;
+      var v = { membreId: (f.membreId && f.membreId.value) || (moi && moi.id), debut: f.jd.value + "T" + f.hd.value, fin: (f.jf.value || f.jd.value) + "T" + f.hf.value, motif: f.motif.value.trim() };
+      D.ajouteAvis(v).then(function () {
+        if (!plan.checked) return "Bureau prévenu.";
+        return D.ajouteAbsence(v.membreId, { debut: v.debut.slice(0, 10), fin: v.fin.slice(0, 10), motif: v.motif || "Absence" })
+          .then(function () { return "Bureau prévenu, et absence inscrite au planning."; })
+          .catch(function (x) { return "Bureau prévenu. Planning inchangé : " + x.message; });
+      }).then(function (msg) { M.panneau.ferme(); M.annonce(msg); tout(); }).catch(function (x) { err.textContent = x.message; err.hidden = false; });
+    });
+    M.panneau.ouvre([el("div", "surtitre", "Prévenir le bureau"), el("h2", null, "Je m'absente")], [form]);
+  }
+
+  /* ---------- Absences à venir ---------- */
+  function absencesListe() {
+    var a = auj(), l = D.absences({ depuis: a, jusqu: C.ajoute(a, 28) });
+    if (!D.aDroit("voir_absences_avenir")) l = l.filter(function (x) { return x.absence.debut <= a; });
+    return l;
+  }
+  function absences(hote) {
+    var a = auj(), canton = D.canton();
+    var l = absencesListe().filter(function (x) { return M.cherche(nom(x.membre) + " " + (x.absence.motif || ""), q.value); });
+    $("#titre").textContent = D.aDroit("voir_absences_avenir") ? "Absences des quatre prochaines semaines" : "Absences en cours";
+    $("#compte").textContent = l.length + (l.length > 1 ? " absences" : " absence");
+    if (!l.length) { hote.appendChild(el("p", "vide", "Aucune absence.")); return; }
+    function groupe(titre, ls) {
+      if (!ls.length) return;
+      var b = el("section", "bloc"); b.appendChild(el("h2", null, titre));
+      var ll = el("div", "liste-lignes");
+      ls.forEach(function (x) {
+        var m = x.membre, ab = x.absence, fin = ab.fin || ab.debut;
+        var n = Calc.joursTravaillesEntre(m, ab.debut < a ? a : ab.debut, fin, canton);
+        var r = el("button", "ligne-l"); r.type = "button"; r.appendChild(M.avatar(m));
+        var lib = el("span", "lib"); lib.appendChild(el("b", null, nom(m))); lib.appendChild(el("small", null, ab.debut === fin ? jourCourt(ab.debut) : jourCourt(ab.debut) + " → " + jourCourt(fin))); r.appendChild(lib);
+        var dr = el("span", "droite"); dr.appendChild(el("span", "pastille gris", ab.motif || "Absence")); dr.appendChild(el("div", null, C.fmtJours(n) + (n > 1 ? " jours" : " jour"))); r.appendChild(dr);
+        r.addEventListener("click", function () { ouvreAbsences(m); });
+        ll.appendChild(r);
+      });
+      b.appendChild(ll); hote.appendChild(b);
+    }
+    groupe("En cours", l.filter(function (x) { return x.absence.debut <= a; }));
+    groupe("À venir", l.filter(function (x) { return x.absence.debut > a; }));
+  }
+
+  /* ---------- Tchat (même table « messages » que /planif/, même mémoire locale en démo) ---------- */
+  var msgs = [], fil = null, saisieTx = null;
+  function email() { return SB && SB.connecte && SB.connecte() ? SB.email() : ""; }
+  function enBase() { var p = D.profil ? D.profil() : null; return !!(SB && SB.configure && SB.connecte() && p && p.multi) && !/^demo@/i.test(email()); }
+  function monId() { var m = D.monMembre(); return m ? m.id : (enBase() ? "" : "local"); }
+  function cleLocale() { return "planif.tchat.local:" + (email() || "local"); }
+  function litLocal() { try { var l = JSON.parse(localStorage.getItem(cleLocale()) || "null"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+  function ecritLocal(l) { try { localStorage.setItem(cleLocale(), JSON.stringify(l.slice(-150))); } catch (e) {} }
+  function depuisBase(x) { return { id: String(x.id), auteurId: x.auteur_id ? String(x.auteur_id) : "", texte: String(x.texte || ""), creeLe: String(x.cree_le || "") }; }
+  function parDate(a, b) { return a.creeLe < b.creeLe ? -1 : a.creeLe > b.creeLe ? 1 : 0; }
+  function cleLu() { return "planif.tchat.lu:" + (email() || "local"); }
+  function dernierLu() { try { return localStorage.getItem(cleLu()) || ""; } catch (e) { return ""; } }
+  function marqueLu(t) { if (t && t > dernierLu()) { try { localStorage.setItem(cleLu(), t); } catch (e) {} } nLus = 0; }
+  function nonLus() {
+    var lu = dernierLu(), moi = monId();
+    if (!enBase()) { nLus = litLocal().filter(function (m) { return m.creeLe > lu && m.auteurId !== moi && !/^ex-/.test(m.id); }).length; return Promise.resolve(nLus); }
+    var f = "messages?select=id" + (lu ? "&cree_le=gt." + encodeURIComponent(lu) : "") + (moi ? "&auteur_id=neq." + encodeURIComponent(moi) : "");
+    return SB.requete(f, { avecTotal: true, plage: "0-0", prefer: "count=exact" }).then(function (r) {
+      nLus = r && r.total != null ? r.total : (r && r.lignes ? r.lignes.length : 0); return nLus;
+    }, function () { return nLus; });
+  }
+  function chargeTchat(defile) {
+    var p = enBase() ? SB.requete("messages?select=id,auteur_id,texte,cree_le&order=cree_le.desc&limit=150").then(function (r) { return (r || []).map(depuisBase); })
+                     : Promise.resolve(litLocal());
+    return p.then(function (l) {
+      var avant = msgs.length ? msgs[msgs.length - 1].id : null;
+      msgs = l.slice().sort(parDate);
+      var apres = msgs.length ? msgs[msgs.length - 1].id : null;
+      if (fil && (defile || avant !== apres)) dessineFil(true);
+    }).catch(function (e) { if (fil) { fil.textContent = ""; fil.appendChild(el("p", "vide", e.message)); } });
+  }
+  function dessineFil(bas) {
+    if (!fil) return;
+    var moi = monId(), mod = enBase() && D.aDroit("tchat_moderer");
+    fil.textContent = "";
+    var l = msgs.filter(function (m) { return M.cherche(m.texte + " " + D.nomMembre(m.auteurId), q.value); });
+    if (!l.length) fil.appendChild(el("p", "vide", msgs.length ? "Aucun message ne correspond." : "Aucun message pour l'instant. Écris le premier !"));
+    var jour = null;
+    l.forEach(function (m) {
+      var d = new Date(m.creeLe), j = C.iso(d);
+      if (j !== jour) { jour = j; fil.appendChild(el("div", "jour-sep", j === auj() ? "Aujourd'hui" : maj(JOURS[d.getDay()]) + " " + M.jj(j, true))); }
+      var a = D.membre(m.auteurId), lui = m.auteurId === moi;
+      var r = el("div", "msg" + (lui ? " moi" : ""));
+      r.appendChild(M.avatar(a));
+      var bu = el("div", "bulle");
+      bu.appendChild(el("span", "qui", (lui ? "Moi" : a ? nom(a) : "Ancien membre") + " · " + deux(d.getHours()) + ":" + deux(d.getMinutes())));
+      bu.appendChild(document.createTextNode(m.texte));
+      r.appendChild(bu);
+      if (lui || mod) {
+        var x = el("button", "suppr", "×"); x.type = "button"; x.title = "Retirer ce message";
+        x.addEventListener("click", function () {
+          if (!confirm("Retirer ce message ? Il disparaîtra pour tout le bureau.")) return;
+          var p = enBase() ? SB.requete("messages?id=eq." + encodeURIComponent(m.id), { methode: "DELETE" }) : Promise.resolve(ecritLocal(litLocal().filter(function (y) { return y.id !== m.id; })));
+          p.then(function () { msgs = msgs.filter(function (y) { return y.id !== m.id; }); dessineFil(false); M.annonce("Message retiré."); }).catch(function (e) { M.annonce(e.message); });
+        });
+        r.appendChild(x);
+      }
+      fil.appendChild(r);
+    });
+    if (bas) fil.scrollTop = fil.scrollHeight;
+    if (msgs.length) { marqueLu(msgs[msgs.length - 1].creeLe); arbre(); }
+  }
+  function envoie() {
+    var t = saisieTx.value.replace(/\s+$/, "").replace(/^\s*\n/, "");
+    if (!t.trim()) return;
+    if (t.length > 2000) { M.annonce("Message trop long (2000 caractères au plus)."); return; }
+    var moi = monId(), p;
+    if (!enBase()) { var m = { id: "l-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8), auteurId: moi, texte: t, creeLe: new Date().toISOString() }; var l = litLocal(); l.push(m); ecritLocal(l); p = Promise.resolve(m); }
+    else if (!moi) p = Promise.reject(new Error("Ton accès n'est rattaché à aucune fiche de l'équipe : demande-le à l'administrateur."));
+    else p = SB.requete("messages", { methode: "POST", prefer: "return=representation", corps: { texte: t } }).then(function (r) { return depuisBase((r && r[0]) || {}); });
+    saisieTx.disabled = true;
+    p.then(function (m) { if (m.id && !msgs.some(function (x) { return x.id === m.id; })) msgs.push(m); saisieTx.value = ""; dessineFil(true); })
+      .catch(function (e) { M.annonce(e.message); }).then(function () { saisieTx.disabled = false; saisieTx.focus(); });
+  }
+  function tchat(hote) {
+    $("#titre").textContent = "Tchat du bureau";
+    $("#compte").textContent = enBase() ? "tout le bureau lit, chacun écrit en son nom" : "démonstration : les messages restent dans ce navigateur";
+    var box = el("div", "tchat");
+    fil = el("div", "fil"); box.appendChild(fil);
+    var em = el("div", "emojis");
+    EMOJIS.forEach(function (x) { var b = el("button", null, x); b.type = "button"; b.addEventListener("click", function () {
+      var s = saisieTx.selectionStart || saisieTx.value.length; saisieTx.value = saisieTx.value.slice(0, s) + x + saisieTx.value.slice(saisieTx.selectionEnd || s); saisieTx.focus();
+    }); em.appendChild(b); });
+    box.appendChild(em);
+    var sz = el("div", "saisie");
+    saisieTx = el("textarea"); saisieTx.placeholder = "Écrire au bureau… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"; saisieTx.rows = 1;
+    saisieTx.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoie(); } });
+    sz.appendChild(saisieTx); sz.appendChild(bouton("Envoyer", "principal", envoie));
+    box.appendChild(sz); hote.appendChild(box);
+    if (msgs.length) dessineFil(true);
+    chargeTchat(true);
+    setTimeout(function () { if (saisieTx) saisieTx.focus(); }, 50);
+  }
+  window.addEventListener("planif:message", function () { if (vue.section === "tchat") chargeTchat(false); });
+})();
+
+</script>
+</body>
+</html>

@@ -152,6 +152,9 @@
     var moi = D.monMembre();
     if (moi) filtre = estAdmin(moi) ? "admin" : "d:" + (moi.succursale || "_") + "|" + (moi.discipline || "_");
     if (filtre !== "tous" && !D.membres().some(dansFiltre)) filtre = "tous";
+    // ?q= (lien depuis un autre module) : toute l'équipe, filtrée sur ce nom
+    var pq = new URLSearchParams(location.search).get("q");
+    if (pq && $("#q")) { $("#q").value = pq; filtre = "tous"; }
     arbre();
   }
 
