@@ -36,6 +36,42 @@
 .pl-zone.pose-absence .bt{cursor:pointer}
 @media (hover:none){.pl-nom .pose-plus{opacity:.8}}
 @media print{.pl-nom .pose-plus{display:none}}
+/* Bandeau de gauche repliable (02.11.2026, demande de Tony, repris du bureau /planif2/) :
+   recherche, « Tous », « Administrateurs », chaque succursale et ses secteurs, puis les
+   l'affaire. Il remplace la ligne de filtres à cases. */
+.eq-page{display:grid;grid-template-columns:272px 28px minmax(0,1fr);align-items:start;margin-top:10px}
+.eq-page.replie{grid-template-columns:0 28px minmax(0,1fr)}
+.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
+  display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
+.eq-page.replie .eq-bandeau{visibility:hidden;padding:0;overflow:hidden}
+.eq-bandeau .recherche{margin:0;padding:2px 0 8px}
+.eq-bandeau .recherche-champ{font-size:16px;min-width:0}
+.eq-bandeau .recherche-touche{display:none}
+.eq-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
+  background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
+.eq-replier:hover{color:var(--or);border-color:var(--or-doux)}
+.eq-arbre{display:flex;flex-direction:column;gap:1px}
+.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
+.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:5px 9px;border:0;border-radius:7px;background:none;
+  font:inherit;font-size:13.5px;color:var(--texte);text-align:left;cursor:pointer}
+.eq-arbre button:hover{background:var(--ab-vert-pale)}
+.eq-arbre button[aria-current="true"]{background:var(--ab-vert-clair);font-weight:600}
+.eq-arbre button.niv1{padding-left:24px;font-size:13px;color:var(--texte-doux)}
+.eq-arbre button.niv0{font-weight:600}
+.eq-arbre button .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eq-arbre button .n{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:12px;color:var(--texte-faible)}
+.eq-affaire select{width:100%;min-height:34px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:13px;color:var(--texte)}
+.eq-contenu{min-width:0}
+.eq-contenu .section:first-child{margin-top:0}
+@media (max-width:760px){
+  .eq-page,.eq-page.replie{grid-template-columns:minmax(0,1fr)}
+  .eq-bandeau{position:static;max-height:none}
+  .eq-page.replie .eq-bandeau{display:none}
+  .eq-replier{position:static;width:100%;height:38px;margin:8px 0 10px;font-size:14px}
+}
+@media print{.eq-bandeau,.eq-replier{display:none}.eq-page{display:block}}
+.eq-masque{display:flex;align-items:center;gap:8px;margin:10px 8px 0;font-size:13px;color:var(--texte-doux);cursor:pointer}
 </style>
 </head>
 <body class="large">
@@ -69,18 +105,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap" data-bandeau></div>
 
-  <div class="wrap">
+  <!-- Bandeau de gauche repliable (02.11.2026, comme la page Équipe) : recherche et équipes -->
+  <div class="wrap eq-page" id="eq-page">
+    <aside class="eq-bandeau" id="eq-bandeau" aria-label="Recherche et équipes">
+      <div data-recherche></div>
+      <nav class="eq-arbre" id="eq-arbre"></nav>
+    </aside>
+    <button type="button" class="eq-replier" id="eq-replier" aria-controls="eq-bandeau" aria-expanded="true" title="Réduire le bandeau">‹</button>
+    <div class="eq-contenu">
     <section class="section">
-      <!-- Recherche et filtres restent sous les yeux quand on descend ; l'en-tête
-           du planning se colle juste en dessous (--h-collee). Filtres rangés
-           comme ceux de la page Tâches (14.10.2026). -->
-      <div class="tete-collante">
-        <div data-recherche></div>
-        <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between">
-          <span>Filtres</span><span id="nb-filtres" class="or"></span>
-        </button>
-        <div class="grille-champs filtres-ligne" id="filtres"></div>
-      </div>
       <div class="plan-barre">
         <button class="btn" type="button" id="prec" aria-label="Mois précédent">◀<span class="txt"> Précédent</span></button>
         <button class="btn" type="button" id="auj">Ce mois</button>
@@ -128,6 +161,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       </div>
       <div class="defile" id="liste"></div>
     </section>
+    </div>
   </div>
 </main>
 
@@ -194,8 +228,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       { label: "Nouvelle absence", or: true, icone: "ico-absence", action: nouvelle }
     ]);
     UI.pied();
-    // Collée sous la barre, la recherche se resserre (planif.css)
-    UI.colleSousBarre(document.querySelector(".tete-collante"));
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
 
@@ -221,114 +253,134 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     document.getElementById("pdf").addEventListener("click", exportePdf);
-    document.getElementById("btn-filtres").addEventListener("click", function () {
-      var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
-      this.setAttribute("aria-expanded", String(ouvert));
-    });
+    bandeau();
 
     barreRecherche = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
-      exemple: "Rechercher un nom, un métier, une succursale, un motif d'absence…",
+      exemple: "Rechercher un nom, un motif…",
       surSaisie: rend,
       surEntree: function () { if (lignes.length === 1) UI.absences(lignes[0].id, rend); }
     });
 
     D.surRechargement(rend);
+    // À l'ouverture : sa succursale et son secteur (les administrateurs sur « Administrateurs »)
+    var moi = D.monMembre();
+    if (moi) cle = estAdmin(moi) ? "admin" : "d:" + (moi.succursale || "_") + "|" + (moi.discipline || "_");
+    if (cle !== "tous" && !D.membres().some(dansCle)) cle = "tous";
+    if (new URLSearchParams(location.search).get("q")) cle = "tous";
     // La personne visée ne doit pas être cachée par les filtres
     if (allerA && allerA.membre) {
       var visee = D.membre(allerA.membre);
-      if (visee && !dansMetiers(visee)) vue.metiers = [];
-      if (visee && !dansSuccursales(visee)) vue.succursales = [];
+      if (visee && !dansCle(visee)) cle = "tous";
+      if (visee && !dansAffaire(visee)) vue.affaires = [];
     }
-    rendFiltres();
     rend();
     if (allerA && allerA.membre) montreLigne(allerA.membre);
   }).catch(UI.echec);
 
-  /* --------------------------------------------------------------- filtres
-     Rangés comme ceux de la page Tâches (14.10.2026) : Succursale et Rôles
-     (les métiers et les administrateurs) en menus à cases, puis la case
+  /* --------------------------------------------------------------- bandeau
+     02.11.2026 (demande de Tony, comme la page Équipe) : le bandeau de gauche
+     remplace les menus à cases. Une entrée d'équipe à la fois (Tous,
+     Administrateurs, une succursale, un de ses secteurs), une affaire, et
      « Masquer qui n'a rien ». */
+  var cle = "tous";                  // tous | admin | s:<succursale> | d:<succursale>|<discipline>
+  var CLE_REPLIE = "planif.absences.replie";
+  if (!Array.isArray(vue.affaires)) vue.affaires = [];
+  delete vue.succursales; delete vue.metiers;
 
-  /** La personne est dans une des succursales cochées (aucune cochée : toutes passent). */
-  function dansSuccursales(m) {
-    return !vue.succursales.length || (!!m && vue.succursales.indexOf(m.succursale || "_") >= 0);
+  function sansAccents(x) { return String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  function estAdminDisc(code) { return /^administrateur/.test(sansAccents(code)) || /^administrateur/.test(sansAccents(D.DISCIPLINES[code])); }
+  function estAdmin(m) { return D.aStatut(m, "administrateur") || estAdminDisc(m.discipline); }
+  function dansCle(m) {
+    if (!m) return false;
+    if (cle === "tous") return true;
+    if (cle === "admin") return estAdmin(m);
+    if (cle.indexOf("s:") === 0) return (m.succursale || "_") === cle.slice(2);
+    var p = cle.slice(2).split("|");
+    return (m.succursale || "_") === p[0] && (m.discipline || "_") === p[1] && !estAdmin(m);
   }
-  function metierDe(m) { return D.METIERS[m.metier] ? m.metier : "_"; }
-  /** La personne a un des rôles cochés : son métier, ou un groupe « g:… » (aucun coché : tous passent). */
-  function dansMetiers(m) {
-    return !vue.metiers.length || (!!m && vue.metiers.some(function (v) {
-      return v.indexOf("g:") === 0 ? D.aStatut(m, v.slice(2)) : metierDe(m) === v;
-    }));
+  // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche
+  var cacheAff = { cle: "", dans: null };
+  function membresAffaire() {
+    if (!vue.affaires.length) return null;
+    var k = vue.affaires[0] + "|" + D.version();
+    if (cacheAff.cle === k) return cacheAff.dans;
+    var dans = Object.create(null), a = D.affaire(vue.affaires[0]);
+    if (a) {
+      a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
+      D.taches({ affaireId: a.id }).forEach(function (t) { if (t.ingenieurId) dans[t.ingenieurId] = true; if (t.dessinateurId) dans[t.dessinateurId] = true; });
+    }
+    cacheAff = { cle: k, dans: dans };
+    return dans;
+  }
+  function dansAffaire(m) { var d = membresAffaire(); return !d || (!!m && !!d[m.id]); }
+  function dansFiltres(m) { return dansCle(m) && dansAffaire(m); }
+  function succursaleCle() { return cle.indexOf("s:") === 0 ? cle.slice(2) : cle.indexOf("d:") === 0 ? cle.slice(2).split("|")[0] : null; }
+
+  function replie(oui) {
+    var page = document.getElementById("eq-page"), b = document.getElementById("eq-replier");
+    page.classList.toggle("replie", oui);
+    var mobile = innerWidth <= 760;
+    b.textContent = mobile ? (oui ? "Recherche et équipes ▾" : "Masquer ▴") : (oui ? "›" : "‹");
+    b.title = oui ? "Afficher le bandeau" : "Réduire le bandeau";
+    b.setAttribute("aria-expanded", String(!oui));
+    try { localStorage.setItem(CLE_REPLIE, oui ? "1" : ""); } catch (e) {}
+  }
+  function bandeau() {
+    var garde = null;
+    try { garde = localStorage.getItem(CLE_REPLIE); } catch (e) {}
+    replie(garde === null ? innerWidth <= 760 : garde === "1");
+    document.getElementById("eq-replier").addEventListener("click", function () {
+      replie(!document.getElementById("eq-page").classList.contains("replie"));
+      // Le calendrier change de largeur : on le redessine une fois la grille posée
+      setTimeout(function () { if (jours.length) rend(); }, 30);
+    });
   }
 
-  /* Les succursales du bureau, plus « Non renseignée » (« _ », qu'aucun code
-     ne peut prendre) dès qu'une personne n'en a pas. */
-  function optionsSuccursales() {
-    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
-    if (D.membres().some(function (m) { return !m.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
-    return o;
-  }
-  /* Rôles : les trois métiers, les administrateurs (le groupe), puis
-     « À désigner » dès qu'une personne n'a pas de métier. */
-  var GROUPES_ROLES = ["administrateur"];
-  function optionsMetiers() {
-    var o = Object.keys(D.METIERS).map(function (c) { return { valeur: c, label: D.TITRES_METIERS[c] }; });
-    GROUPES_ROLES.forEach(function (g) { if (D.STATUTS[g] !== undefined) o.push({ valeur: "g:" + g, label: D.STATUTS_PLURIEL[g] }); });
-    if (D.membres().some(function (m) { return metierDe(m) === "_"; })) o.push({ valeur: "_", label: D.TITRES_METIERS[""] });
-    return o;
-  }
-  function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
-  function nomMetier(c) {
-    return c.indexOf("g:") === 0 ? D.STATUTS_PLURIEL[c.slice(2)] || c.slice(2) : D.TITRES_METIERS[c === "_" ? "" : c] || c;
-  }
-  var nbOptions = "";
-  function compteOptions() {
-    return [optionsSuccursales(), optionsMetiers()].map(function (o) {
-      return o.map(function (x) { return x.valeur; }).join(",");
-    }).join("|");
-  }
-
-  /** Un menu à cases et son libellé, rangé comme une liste de la ligne de filtres. */
-  function champCases(libelle, o) {
-    var f = UI.multiChoix(o);
-    var ch = el("div", { class: "champ champ-mc" }, [
-      el("label", { text: libelle, onclick: function () { f.noeud.querySelector("button").click(); } }),
-      f.noeud
+  function entree(hote, cleE, nom, n, niv, actif, choix) {
+    var b = el("button", { type: "button", class: "niv" + niv, "aria-current": String(actif) }, [
+      el("span", { class: "nom", text: nom }), n != null ? el("span", { class: "n", text: String(n) }) : null
     ]);
-    // Caché quand il n'offre qu'un choix
-    if (o.options.length < 2) ch.style.display = "none";
-    return { champ: ch, menu: f };
+    b.addEventListener("click", function () { choix(cleE); if (innerWidth <= 760) replie(true); });
+    hote.appendChild(b);
   }
-
-  function rendFiltres() {
-    var hote = UI.vide(document.getElementById("filtres"));
-    nbOptions = compteOptions();
-
-    var succ = champCases("Succursale", {
-      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: optionsSuccursales(), valeurs: vue.succursales,
-      surChange: function (v) { vue.succursales = v; memorise(); rend(); }
+  function rendArbre() {
+    var hote = UI.vide(document.getElementById("eq-arbre"));
+    var toute = D.membres();                          // la structure ne bouge pas ; les nombres suivent l'affaire
+    var tous = toute.filter(dansAffaire);
+    function compte(f) { return tous.filter(f).length; }
+    function choisit(k) { cle = k; memorise(); rend(); }
+    entree(hote, "tous", "Tous", tous.length, 0, cle === "tous", choisit);
+    if (toute.some(estAdmin)) entree(hote, "admin", "Administrateurs", compte(estAdmin), 0, cle === "admin", choisit);
+    var succ = Object.keys(D.SUCCURSALES);
+    if (toute.some(function (m) { return !m.succursale; }) && succ.length) succ.push("_");
+    var ordre = Object.keys(D.DISCIPLINES);
+    (succ.length ? succ : ["_"]).forEach(function (s) {
+      var dansS = function (m) { return (m.succursale || "_") === s && !estAdmin(m); };
+      if (succ.length) entree(hote, "s:" + s, s === "_" ? "Sans succursale" : D.SUCCURSALES[s], compte(function (m) { return (m.succursale || "_") === s; }), 0, cle === "s:" + s, choisit);
+      var discs = {};
+      toute.filter(dansS).forEach(function (m) { discs[m.discipline || "_"] = 0; });
+      tous.filter(dansS).forEach(function (m) { discs[m.discipline || "_"]++; });
+      Object.keys(discs).sort(function (a, b) { return (a === "_" ? 999 : ordre.indexOf(a)) - (b === "_" ? 999 : ordre.indexOf(b)); }).forEach(function (d) {
+        var k = "d:" + s + "|" + d;
+        entree(hote, k, d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], discs[d], succ.length ? 1 : 0, cle === k, choisit);
+      });
     });
-    vue.succursales = succ.menu.valeurs();
-
-    var met = champCases("Rôles", {
-      libelle: "Filtrer : rôles", tous: "Toute l'équipe", pluriel: "rôles",
-      options: optionsMetiers(), valeurs: vue.metiers,
-      surChange: function (v) { vue.metiers = v; memorise(); rend(); }
-    });
-    vue.metiers = met.menu.valeurs();
-
-
+    var sc = succursaleCle();
+    var aff = D.affaires({ tous: true }).filter(function (a) { return !sc || sc === "_" || !a.succursale || a.succursale === sc; });
+    if (vue.affaires.length && !aff.some(function (a) { return a.id === vue.affaires[0]; })) vue.affaires = [];
+    if (aff.length) {
+      hote.appendChild(el("p", { class: "titre-groupe", text: "Affaire" }));
+      var sel = el("select", { "aria-label": "Filtrer par affaire" }, [el("option", { value: "", text: "Toutes les affaires" })]
+        .concat(aff.map(function (a) { return el("option", { value: a.id, text: D.libelleAffaire(a) }); })));
+      sel.value = vue.affaires[0] || "";
+      sel.addEventListener("change", function () { vue.affaires = sel.value ? [sel.value] : []; memorise(); rend(); });
+      hote.appendChild(el("label", { class: "eq-affaire" }, [sel]));
+    }
     var masque = el("input", { type: "checkbox" });
     masque.checked = !!vue.masque;
     masque.addEventListener("change", function () { vue.masque = masque.checked; memorise(); rend(); });
-
-    hote.appendChild(succ.champ); hote.appendChild(met.champ);
-    hote.appendChild(el("div", { class: "champ champ-vue" }, [
-      el("label", { class: "case", style: "white-space:nowrap", title: "Ne garder que les personnes absentes sur la période affichée" },
-        [masque, "Masquer qui n'a rien"])
-    ]));
+    hote.appendChild(el("label", { class: "eq-masque", title: "Ne garder que les personnes absentes sur la période affichée" }, [masque, "Masquer qui n'a rien"]));
   }
 
   /** Amène la ligne d'une personne sous les yeux et l'éclaire un moment. */
@@ -383,14 +435,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var premier = jours[0], dernier = jours[jours.length - 1];
 
     // Regroupés par métier, par ordre alphabétique dans chacun
-    // « Non renseignée », « À désigner » paraissent ou disparaissent avec la dernière personne concernée
-    if (nbOptions && compteOptions() !== nbOptions) rendFiltres();
-    var tous = [].concat.apply([], D.parMetier(D.membres().filter(function (m) { return dansSuccursales(m) && dansMetiers(m); }))
+    rendArbre();
+    var tous = [].concat.apply([], D.parMetier(D.membres().filter(dansFiltres))
       .map(function (g) { return g.membres; }));
-
-    // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [vue.succursales.length, vue.metiers.length, vue.masque].filter(Boolean).length;
-    document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
 
     /* La recherche retire des lignes du calendrier : tout ce qui suit — jauge
        du bas, liste des périodes — porte donc sur ce qui reste affiché,
@@ -425,7 +472,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // calendrier, lui, montre toujours les jours passés de la période affichée.
     var auj = C.isoAuj();
     var periodes = D.absences({ depuis: premier > auj ? premier : auj, jusqu: dernier })
-      .filter(function (p) { return dansSuccursales(p.membre) && dansMetiers(p.membre); });
+      .filter(function (p) { return dansFiltres(p.membre); });
     // Une période se retient sur son propre motif : chercher « vacances » ne
     // fait pas remonter la maladie de la même personne.
     if (mots.length) periodes = periodes.filter(function (p) {
@@ -461,11 +508,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     return m.length === 1 ? C.fmtMois(jours[0]) : C.fmtMois(jours[0]) + " → " + C.fmtMois(jours[jours.length - 1]);
   }
 
-  /** Les métiers retenus ; court : pour la case étroite de l'en-tête du calendrier. */
+  /** L'équipe choisie dans le bandeau (02.11.2026) ; court : pour la case étroite de l'en-tête du calendrier. */
   function libelleMetier(court) {
-    if (!vue.metiers.length) return "Toute l'équipe";
-    if (court && vue.metiers.length > 1) return vue.metiers.length + " rôles";
-    return vue.metiers.map(nomMetier).join(", ");
+    var t;
+    if (cle === "tous") t = "Toute l'équipe";
+    else if (cle === "admin") t = "Administrateurs";
+    else if (cle.indexOf("s:") === 0) t = cle.slice(2) === "_" ? "Sans succursale" : D.SUCCURSALES[cle.slice(2)];
+    else { var p = cle.slice(2).split("|"); t = (p[1] === "_" ? "Secteur non renseigné" : D.DISCIPLINES[p[1]]) + (court ? "" : " · " + (p[0] === "_" ? "sans succursale" : D.SUCCURSALES[p[0]])); }
+    var a = vue.affaires.length && D.affaire(vue.affaires[0]);
+    return t + (a && !court ? " · " + D.libelleAffaire(a) : "");
   }
 
   function rendPeriode(nbMembres) {
@@ -475,7 +526,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var cherche = barreRecherche && barreRecherche.valeur().trim();
     document.getElementById("imp-periode").textContent =
       libellePeriode() + "  ·  " + C.fmtCH(jours[0]) + " → " + C.fmtCH(jours[jours.length - 1]) + "  ·  " + libelleMetier() +
-      (vue.succursales.length ? "  ·  " + vue.succursales.map(nomSuccursale).join(", ") : "") +
       (cherche ? "  ·  « " + cherche + " »" : "");
     document.getElementById("imp-edition").textContent =
       nbMembres + (nbMembres > 1 ? " membres" : " membre") + "  ·  édité le " + C.fmtCH(C.isoAuj());
