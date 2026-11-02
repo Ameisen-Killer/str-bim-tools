@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 <link rel="stylesheet" href="/planif/assets/inter.css?v=6">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
 </head>
 <body class="large">
 
@@ -106,24 +107,24 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         <h1>Facturation</h1>
         <div class="ligne"><span id="fa-imp-filtres"></span><span id="fa-imp-edition"></span></div>
       </div>
-      <!-- Sur téléphone, la barre masque ses actions : l'export garde son bouton dans la page -->
-      <button class="btn seul-mobile" type="button" id="fa-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
-      <div class="tete-section">
-        <div>
+      <!-- Bandeau de gauche repliable (02.11.2026, assets/bandeau.js) : recherche, mes affaires,
+           succursales et secteurs du mandat, affaire, terminées. -->
+      <div class="bd-page" id="bd-page">
+        <aside class="bd-bandeau" id="bd-bandeau" aria-label="Recherche et filtres">
+          <div data-recherche></div>
+          <nav class="bd-arbre" id="bd-arbre"></nav>
+        </aside>
+        <button type="button" class="bd-replier" id="bd-replier" aria-controls="bd-bandeau" aria-expanded="true">‹</button>
+        <div class="bd-contenu">
+          <!-- Sur téléphone, la barre masque ses actions : l'export garde son bouton dans la page -->
+          <button class="btn seul-mobile" type="button" id="fa-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
           <p class="is-chapeau">L'avancement et la facturation de chaque phase du mandat, secteur par secteur. Un clic sur une affaire ouvre la saisie des pourcentages et leur historique.</p>
-        </div>
-        <div class="outils fa-outils">
-          <!-- Succursales, affaires, secteurs : menus à cases (UI.multiChoix, 13.10.2026) -->
-          <span id="f-fa-succursale"></span>
-          <span id="f-fa-affaire"></span>
-          <span id="f-fa-secteur"></span>
-          <label class="case"><input type="checkbox" id="f-terminees"> Voir les affaires terminées</label>
+          <div class="fa-legende" aria-hidden="true">
+            <span><i></i>Avancement</span><span><i class="fact"></i>Facturé</span><span><i class="alerte"></i>Facturé au-delà de l'avancement</span>
+          </div>
+          <div id="liste-facturation"></div>
         </div>
       </div>
-      <div class="fa-legende" aria-hidden="true">
-        <span><i></i>Avancement</span><span><i class="fact"></i>Facturé</span><span><i class="alerte"></i>Facturé au-delà de l'avancement</span>
-      </div>
-      <div id="liste-facturation"></div>
     </section>
   </div>
 </main>
@@ -140,6 +141,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/bandeau.js?v=1"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
@@ -180,7 +182,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
     document.getElementById("f-type").addEventListener("change", function () { filtres.type = this.value; rend(); });
     document.getElementById("f-passes").addEventListener("change", function () { filtres.passes = this.checked; rend(); });
-    document.getElementById("f-terminees").addEventListener("change", function () { filtres.terminees = this.checked; rend(); });
+    if (VUE.section === "facturation") {
+      Bandeau.monte({ cle: "planif.facturation.replie" });
+      barreFactu = UI.recherche({
+        hote: document.querySelector("#facturation [data-recherche]"),
+        exemple: "Rechercher une affaire, un responsable…",
+        surSaisie: rend
+      });
+    }
     document.getElementById("fa-pdf").addEventListener("click", exportePdf);
     if (VUE.type) document.getElementById("chapeau-ao").textContent = VUE.type === "public"
       ? "Les appels d'offres publics (marchés publics, souvent repris de la veille simap.ch) : remise, demandeur, honoraires offerts, résultat."
@@ -450,52 +459,85 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      Secteur par secteur (= discipline du mandat), les affaires dont une phase
      le concerne ; pour chaque phase, la jauge d'avancement et celle du
      facturé de ce secteur. Un clic ouvre la saisie (mandat.js). */
-  /* Succursales et affaires de la facturation (13.10.2026) : menus à cases,
-     retenus sur cet appareil. Le menu des affaires suit les succursales
-     cochées ; « Non renseignée » (« _ ») dès qu'une affaire au mandat n'a pas
-     de succursale. Un menu n'est refait que si ses choix changent : il reste
-     ouvert pendant qu'on coche. */
-  var CLE_FACTU = "planif.facturation.filtres";
-  var factu = { succursales: [], affaires: [], secteurs: [] };
-  try {
-    var lu = JSON.parse(localStorage.getItem(CLE_FACTU) || "{}") || {};
-    ["succursales", "affaires", "secteurs"].forEach(function (k) { if (Array.isArray(lu[k])) factu[k] = lu[k].map(String); });
-  } catch (e) {}
+  /* Le bandeau de gauche (02.11.2026, demande de Tony) : mes affaires, puis
+     chaque succursale et, dessous, les secteurs du mandat de ses affaires, avec
+     leur nombre d'affaires ; une affaire ; les terminées. Retenu sur cet appareil.
+     cle : tous | miennes | s:<succursale> | d:<succursale>|<secteur> (« _ » : non
+     renseignée, « * » : bureau sans succursale). */
+  var CLE_FACTU = "planif.facturation.vue";
+  var factu = { cle: "tous", affaire: "" };
+  try { Object.assign(factu, JSON.parse(localStorage.getItem(CLE_FACTU) || "{}") || {}); } catch (e) {}
   function retiensFactu() { try { localStorage.setItem(CLE_FACTU, JSON.stringify(factu)); } catch (e) {} }
-  var menusFactu = { succursales: { cle: null }, affaires: { cle: null }, secteurs: { cle: null } };
+  var barreFactu = null;
 
-  function menuFactu(nom, idHote, options, reglages) {
-    var m = menusFactu[nom], cle = JSON.stringify(options);
-    if (m.cle === cle) return;
-    m.cle = cle;
-    var f = m.menu = UI.multiChoix({ libelle: "Filtrer : " + reglages.pluriel, tous: reglages.tous, pluriel: reglages.pluriel,
-      options: options, valeurs: factu[nom], large: reglages.large,
-      surChange: function (v) { factu[nom] = v; retiensFactu(); rend(); } });
-    factu[nom] = f.valeurs();
-    var hote = UI.vide(document.getElementById(idHote));
-    hote.appendChild(f.noeud);
-    hote.style.display = options.length > 1 ? "" : "none";
+  function mienne(a) {
+    var moi = D.monMembre();
+    if (!moi) return false;
+    return a.responsableId === moi.id || a.ingenieurs.indexOf(moi.id) >= 0 || a.dessinateurs.indexOf(moi.id) >= 0;
+  }
+  function succCle(k) { return k.indexOf("s:") === 0 ? k.slice(2) : k.indexOf("d:") === 0 ? k.slice(2).split("|")[0] : null; }
+  function secteurCle(k) { return k.indexOf("d:") === 0 ? k.slice(2).split("|")[1] : null; }
+  function dansSuccursalesFactu(a, k) {
+    k = k == null ? factu.cle : k;
+    var sc = succCle(k);
+    return !sc || sc === "*" || (a.succursale || "_") === sc;
+  }
+  /** L'affaire est-elle sous la clé ? Un secteur : une phase du mandat le concerne. */
+  function dansCleFactu(a, k) {
+    if (k === "miennes") return mienne(a);
+    if (!dansSuccursalesFactu(a, k)) return false;
+    var sd = secteurCle(k);
+    return !sd || D.phasesMandat(a).some(function (p) { return p.disciplines.indexOf(sd) >= 0; });
   }
 
-  function dansSuccursalesFactu(a) {
-    return !factu.succursales.length || factu.succursales.indexOf(a.succursale || "_") >= 0;
+  function rendBandeauFactu(auMandat) {
+    var choisit = function (k) { factu.cle = k; retiensFactu(); rend(); };
+    var nombre = function (k) { return auMandat.filter(function (a) { return dansCleFactu(a, k); }).length; };
+    var hote = Bandeau.vide();
+    Bandeau.entree(hote, "tous", "Toutes les affaires", nombre("tous"), 0, factu.cle === "tous", choisit);
+    if (D.monMembre()) Bandeau.entree(hote, "miennes", "Mes affaires", nombre("miennes"), 0, factu.cle === "miennes", choisit);
+    Bandeau.titre(hote, "Secteurs");
+    var succ = Object.keys(D.SUCCURSALES);
+    if (succ.length && auMandat.some(function (a) { return !a.succursale; })) succ.push("_");
+    (succ.length ? succ : ["*"]).forEach(function (sc) {
+      var k = "s:" + sc;
+      if (sc !== "*") Bandeau.entree(hote, k, sc === "_" ? "Sans succursale" : D.SUCCURSALES[sc], nombre(k), 0, factu.cle === k, choisit);
+      var discs = {};
+      auMandat.forEach(function (a) {
+        if (!dansSuccursalesFactu(a, k)) return;
+        D.phasesMandat(a).forEach(function (p) { p.disciplines.forEach(function (d) { discs[d] = true; }); });
+      });
+      D.rangeDisciplines(Object.keys(discs)).forEach(function (d) {
+        var kd = "d:" + sc + "|" + d;
+        Bandeau.entree(hote, kd, nomSecteur(d), nombre(kd), sc === "*" ? 0 : 1, factu.cle === kd, choisit);
+      });
+    });
+    var opts = auMandat.filter(function (a) { return a.id === factu.affaire || dansCleFactu(a, factu.cle); })
+      .map(function (a) { return [a.id, D.libelleAffaire(a)]; });
+    Bandeau.liste(hote, "Affaire", [["", "Toutes les affaires"]].concat(opts), factu.affaire, function (v) { factu.affaire = v; retiensFactu(); rend(); });
+    Bandeau.caseACocher(hote, "Voir les affaires terminées", filtres.terminees, function (v) { filtres.terminees = v; rend(); });
   }
 
   function listeFacturation() {
     var hote = UI.vide(document.getElementById("liste-facturation"));
     var auMandat = D.affaires({ tous: filtres.terminees }).filter(function (a) { return D.phasesMandat(a).length; });
+    if (!/^(tous|miennes|s:|d:)/.test(factu.cle) || (factu.cle === "miennes" && !D.monMembre())) factu.cle = "tous";
+    if (factu.affaire && !auMandat.some(function (a) { return a.id === factu.affaire; })) factu.affaire = "";
+    rendBandeauFactu(auMandat);
+    var mots = barreFactu ? barreFactu.termes() : [];
 
-    var optSucc = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
-    if (auMandat.some(function (a) { return !a.succursale; })) optSucc.push({ valeur: "_", label: "Non renseignée" });
-    menuFactu("succursales", "f-fa-succursale", optSucc, { tous: "Toutes les succursales", pluriel: "succursales" });
-    var dansSucc = auMandat.filter(dansSuccursalesFactu);
-    menuFactu("affaires", "f-fa-affaire", dansSucc.map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }),
-      { tous: "Toutes les affaires", pluriel: "affaires", large: true });
-    var affaires = dansSucc.filter(function (a) { return !factu.affaires.length || factu.affaires.indexOf(a.id) >= 0; });
+    var dansCle = auMandat.filter(function (a) { return dansCleFactu(a, factu.cle) && (!factu.affaire || a.id === factu.affaire); });
+    var affaires = dansCle.filter(function (a) {
+      var r = a.responsableId ? D.membre(a.responsableId) : null;
+      return UI.correspond([a.code, a.nom, a.adresse, r ? r.prenom + " " + r.nom : ""], mots);
+    });
+    if (barreFactu) barreFactu.compte(affaires.length, dansCle.length);
+    var sdChoisi = secteurCle(factu.cle);
     var parSecteur = {};
     affaires.forEach(function (a) {
       D.phasesMandat(a).forEach(function (p) {
         p.disciplines.forEach(function (d) {
+          if (sdChoisi && d !== sdChoisi) return;
           var s = parSecteur[d] || (parSecteur[d] = {});
           (s[a.id] || (s[a.id] = { a: a, phases: [] })).phases.push(p.phase);
         });
@@ -503,17 +545,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
     var codes = D.rangeDisciplines(Object.keys(parSecteur));
 
-    // Le choix des secteurs suit les secteurs présents
-    menuFactu("secteurs", "f-fa-secteur", codes.map(function (c) { return { valeur: c, label: nomSecteur(c) }; }),
-      { tous: "Tous les secteurs", pluriel: "secteurs" });
-
     if (!codes.length && auMandat.length) {
-      hote.appendChild(el("p", { class: "vide", text: "Aucune affaire au mandat dans les succursales choisies." }));
+      hote.appendChild(el("p", { class: "vide", text: mots.length ? "Aucune affaire au mandat ne correspond à cette recherche." : "Aucune affaire au mandat ici." }));
     } else if (!codes.length) {
       hote.appendChild(el("p", { class: "vide", text: "Aucune affaire n'a encore de mandat décrit. Les phases SIA et leurs disciplines se cochent dans la fiche de l'affaire (page Affaires, « Modifier »)." }));
     }
     var affichees = {};                             // le compteur du titre : les affaires montrées
-    codes.filter(function (c) { return !factu.secteurs.length || factu.secteurs.indexOf(c) >= 0; }).forEach(function (code) {
+    codes.forEach(function (code) {
       Object.keys(parSecteur[code]).forEach(function (id) { affichees[id] = true; });
       var lignes = Object.keys(parSecteur[code]).map(function (k) { return parSecteur[code][k]; })
         .sort(function (x, y) { return (x.a.code || "~").localeCompare(y.a.code || "~", "fr", { numeric: true }) || x.a.nom.localeCompare(y.a.nom, "fr"); });
@@ -563,7 +601,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     // Les affaires en cours dont le mandat n'est pas encore décrit
-    var sans = D.affaires().filter(function (a) { return a.phase !== "AO" && !D.phasesMandat(a).length && dansSuccursalesFactu(a); });
+    var sans = factu.affaire || mots.length ? [] : D.affaires().filter(function (a) {
+      return a.phase !== "AO" && !D.phasesMandat(a).length && (factu.cle === "miennes" ? mienne(a) : dansSuccursalesFactu(a));
+    });
     if (sans.length) {
       var vers = D.pagePermise("affaires");
       hote.appendChild(el("details", { class: "fa-sans" }, [
@@ -576,10 +616,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ]));
     }
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi */
-    var restreint = ["succursales", "affaires", "secteurs"].map(function (k) {
-      var m = menusFactu[k].menu;
-      return m && factu[k].length ? m.texte() : "";
-    }).filter(Boolean);
+    var restreint = [];
+    if (factu.cle === "miennes") restreint.push("Mes affaires");
+    else if (factu.cle !== "tous") {
+      var sc = succCle(factu.cle), sd = secteurCle(factu.cle);
+      if (sc && sc !== "*") restreint.push(sc === "_" ? "Sans succursale" : D.SUCCURSALES[sc]);
+      if (sd) restreint.push(nomSecteur(sd));
+    }
+    if (factu.affaire) { var af = D.affaire(factu.affaire); if (af) restreint.push(D.libelleAffaire(af)); }
+    if (mots.length) restreint.push("« " + barreFactu.valeur().trim() + " »");
     if (filtres.terminees) restreint.push("Affaires terminées comprises");
     document.getElementById("fa-imp-filtres").textContent = restreint.length ? restreint.join("  ·  ") : "Toutes les affaires au mandat";
     document.getElementById("fa-imp-edition").textContent = "édité le " + C.fmtCH(C.isoAuj());
