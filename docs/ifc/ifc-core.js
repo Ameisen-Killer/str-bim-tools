@@ -375,6 +375,8 @@
   var PLACEMENTS = { IFCLOCALPLACEMENT:1, IFCGRIDPLACEMENT:1, IFCLINEARPLACEMENT:1 };
   // produits reconnus même sans placement ni représentation ($, $)
   var PRODUITS_NUS = { IFCELEMENTASSEMBLY:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1, IFCSPACE:1 };
+  // structure spatiale dont la forme n'est pas dessinée (volumes de pièces et de zones, qui cacheraient tout)
+  var VOLUMES_SPATIAUX = { IFCPROJECT:1, IFCSPACE:1, IFCSPATIALZONE:1 };
 
   // Élément produit reconnu par sa structure : GlobalId en 1er argument,
   // argument 6 = IFCLOCALPLACEMENT (ou $), argument 7 = IFCPRODUCTDEFINITIONSHAPE (ou $).
@@ -506,7 +508,10 @@
       tag: g === "element" || g === "ouverture" ? chaine(a[7]) : "",
       nomLong: g === "spatial" ? chaine(e.type === "IFCPROJECT" ? a[5] : a[7]) : "",
       materiau: materiaux(m, id).join(", "),
-      supprimable: !NON_SUPPRIMABLES[e.type]
+      supprimable: !NON_SUPPRIMABLES[e.type],
+      // dessiné en 3D : les éléments, et la forme portée par le site ou un bâtiment (terrain d'un logiciel de
+      // topographie en IFCFACEBASEDSURFACEMODEL sur IFCSITE, par exemple)
+      vue3D: g === "element" || (g === "spatial" && !VOLUMES_SPATIAUX[e.type] && !!idRef(a[6]))
     };
     m._inf.set(id, c);
     return c;

@@ -263,7 +263,7 @@
         var a = IFC.arbre(m);
         return parTranches(a.length, function(k){
           var i = IFC.infos(m, a[k].id);
-          if (i && i.genre === "element") ids.push(a[k].id);
+          if (i && i.vue3D) ids.push(a[k].id);
         }, function(p){ progresLecture("Liste des éléments de " + nom + " : " + Math.floor(100*p) + " %", p); });
       }).then(function(){
         return vue.preparer(m, ids, function(p){ progresLecture("Géométrie 3D de " + nom + " : " + pluriel(Math.round(p*ids.length), "élément") + " sur " + fmtN(ids.length), p); });
@@ -828,7 +828,7 @@
   function isolerCles(liste){
     var c = new Set(liste), n = 0;
     caches = new Set();
-    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && !c.has(l.cle)){ caches.add(l.cle); n++; } });
+    lignes.forEach(function(l){ if (l.i && l.i.vue3D && !c.has(l.cle)){ caches.add(l.cle); n++; } });
     majVue();
     etat(pluriel(c.size, "élément isolé", "éléments isolés") + ", " + fmtN(n) + " masqués.");
   }
@@ -1211,7 +1211,8 @@
     var plans = [], nbDehors = 0, nbAcheval = 0, nbDedans = 0;
     fichiers.forEach(function(f){
       if (!f.visible) return;
-      var m = f.m, ids = IFC.index(m).produits.filter(function(id){ return IFC.infos(m, id).genre !== "ouverture"; });
+      // le site et les bâtiments restent entiers (un terrain en surfaces ne se découpe pas en IFC)
+      var m = f.m, ids = IFC.index(m).produits.filter(function(id){ return IFC.infos(m, id).genre === "element"; });
       var c = vue.classerCoupe(m, ids);
       if (!c) return;
       var dehors = new Set(c.dehors), change = true;
@@ -1438,12 +1439,12 @@
 
   // ================= Masquer / isoler dans la vue 3D =================
   function elementsDe(liste){
-    return liste.filter(function(c){ var d = lireCle(c), i = d.f && IFC.infos(d.f.m, d.id); return i && i.genre === "element"; });
+    return liste.filter(function(c){ var d = lireCle(c), i = d.f && IFC.infos(d.f.m, d.id); return i && i.vue3D; });
   }
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
   function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.genre === "element" && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
+    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.vue3D && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
     return items;
   }
   function majVue(){
