@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/planif.css?v=107">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
 <style>
 /* Menu du clic droit sur un membre de l'équipe (responsable d'affaire, 28.10.2026) */
 .menu-resp{
@@ -57,25 +58,20 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap" data-bandeau></div>
 
-  <div class="wrap">
-    <section class="section">
-      <!-- Recherche et filtre restent sous les yeux quand la liste défile -->
-      <div class="tete-collante">
-        <div data-recherche></div>
-        <!-- La case est un filtre : sa place est sous la recherche, pas au-dessus -->
-        <div class="tete-section seule-action">
-          <div class="outils">
-            <a class="btn seul-mobile" href="/planif/carte/"><span class="ico-txt ico-carte" aria-hidden="true"></span>Carte des affaires</a>
-            <!-- Succursales : menu à cases (UI.multiChoix), plusieurs choix (13.10.2026) -->
-            <span id="f-succursale"></span>
-            <label class="case" style="text-transform:none;letter-spacing:.04em">
-              <input type="checkbox" id="voir-terminees"> Voir les affaires terminées
-            </label>
-          </div>
-        </div>
-      </div>
-      <div class="defile" id="liste"></div>
-    </section>
+  <!-- Bandeau de gauche repliable (02.11.2026, assets/bandeau.js) : recherche, mes affaires,
+       succursales et secteurs, terminées. -->
+  <div class="wrap bd-page" id="bd-page">
+    <aside class="bd-bandeau" id="bd-bandeau" aria-label="Recherche et filtres">
+      <div data-recherche></div>
+      <nav class="bd-arbre" id="bd-arbre"></nav>
+    </aside>
+    <button type="button" class="bd-replier" id="bd-replier" aria-controls="bd-bandeau" aria-expanded="true">‹</button>
+    <div class="bd-contenu">
+      <section class="section">
+        <a class="btn seul-mobile" href="/planif/carte/" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-carte" aria-hidden="true"></span>Carte des affaires</a>
+        <div class="defile" id="liste"></div>
+      </section>
+    </div>
   </div>
 </main>
 
@@ -91,6 +87,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/bandeau.js?v=1"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
@@ -98,8 +95,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var barre = null;                                 // recherche instantanée
-  var succursales = [];                             // codes cochés (« _ » : non renseignée) ; aucun : toutes
-  var fSucc = null, nbOptSucc = -1;
+  /* cle (bandeau de gauche, 02.11.2026) : miennes | tous | admin | s:<succursale> |
+     d:<succursale>|<secteur>, retenue sur cet appareil. */
+  var CLE_VUE = "planif.affaires.cle", cle = "tous", voirTerminees = false;
+  try { cle = localStorage.getItem(CLE_VUE) || "tous"; } catch (e) {}
   var suivi = UI.suiviApparitions();
 
   if (!UI.session()) return;
@@ -113,19 +112,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ? [versCarte, { label: "Nouvelle affaire", or: true, icone: "ico-ajout-affaire", action: function () { formulaire(null); } }]
       : [versCarte]);
     UI.pied();
-    // Collé sous la barre, le bloc de recherche se resserre (planif.css)
-    UI.colleSousBarre(document.querySelector(".tete-collante"));
+    Bandeau.monte({ cle: "planif.affaires.replie" });
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
-    document.getElementById("voir-terminees").addEventListener("change", dessine);
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
       exemple: "Rechercher une affaire, un numéro, une personne…",
       surSaisie: dessine,
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
-    succursales = succursalesRetenues();
-    rendSuccursales();
+    if (cle === "miennes" && !D.monMembre()) cle = "tous";
+    // ?q= (lien d'une autre page) : la recherche porte sur toutes les affaires
+    if (new URL(location.href).searchParams.get("q")) cle = "tous";
     D.surRechargement(dessine);
     dessine();
 
@@ -137,40 +135,50 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
     if (demandee) {
-      if (demandee.statut === "terminee") { document.getElementById("voir-terminees").checked = true; dessine(); }
+      if (demandee.statut === "terminee") { voirTerminees = true; dessine(); }
       formulaire(demandee.id);
     }
   }).catch(UI.echec);
 
-  /* Le choix des succursales : celles du bureau, plus « Non renseignée » (« _ »,
-     qu'aucun code ne peut prendre) dès qu'une affaire n'en a pas. Retenu sur
-     cet appareil (13.10.2026). */
-  var CLE_SUCC = "planif.affaires.succursales";
-  function optionsSuccursales() {
-    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
-    if (D.affaires({ tous: true }).some(function (a) { return !a.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
-    return o;
+  /* Les gens d'une affaire : son équipe, son responsable et qui y porte une tâche.
+     Recalculés quand les données changent. */
+  var gens = { v: null, par: null };
+  function gensDe(a) {
+    if (gens.v !== D.version()) {
+      gens = { v: D.version(), par: Object.create(null) };
+      D.taches({ sansTerminees: false }).forEach(function (t) {
+        var g = gens.par[t.affaireId] || (gens.par[t.affaireId] = Object.create(null));
+        if (t.ingenieurId) g[t.ingenieurId] = true;
+        if (t.dessinateurId) g[t.dessinateurId] = true;
+      });
+    }
+    var g = Object.assign(Object.create(null), gens.par[a.id] || {});
+    a.ingenieurs.concat(a.dessinateurs).forEach(function (id) { g[id] = true; });
+    if (a.responsableId) g[a.responsableId] = true;
+    return Object.keys(g);
   }
-  function retiensSuccursales(v) { try { localStorage.setItem(CLE_SUCC, JSON.stringify(v)); } catch (e) {} }
-  function succursalesRetenues() {
-    try { var v = JSON.parse(localStorage.getItem(CLE_SUCC) || "[]"); return Array.isArray(v) ? v.map(String) : []; }
-    catch (e) { return []; }
+  /** Une succursale : celle de l'affaire ; un secteur, les administrateurs : quelqu'un de l'affaire en est. */
+  function dansCle(a, k) {
+    if (!k || k === "tous") return true;
+    if (k === "miennes") { var moi = D.monMembre(); return !!moi && gensDe(a).indexOf(moi.id) >= 0; }
+    if (k.indexOf("s:") === 0) return (a.succursale || "_") === k.slice(2);
+    return gensDe(a).some(function (id) { return Bandeau.dansEquipe(D.membre(id), k); });
   }
-
-  /* Filtre Succursale (13.10.2026) : plusieurs choix, « toutes » par défaut ;
-     caché quand il n'offre qu'un choix. */
-  function rendSuccursales() {
-    var options = optionsSuccursales();
-    nbOptSucc = options.length;
-    fSucc = UI.multiChoix({
-      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: options, valeurs: succursales,
-      surChange: function (v) { succursales = v; retiensSuccursales(v); dessine(); }
-    });
-    succursales = fSucc.valeurs();
-    var hote = UI.vide(document.getElementById("f-succursale"));
-    hote.appendChild(fSucc.noeud);
-    hote.style.display = options.length > 1 ? "" : "none";
+  function choisit(k) {
+    cle = k;
+    try { localStorage.setItem(CLE_VUE, k); } catch (e) {}
+    dessine();
+  }
+  /* Le bandeau (02.11.2026, demande de Tony) : mes affaires, les succursales et
+     leurs secteurs avec leur nombre d'affaires, puis les terminées. */
+  function rendBandeau() {
+    var base = D.affaires({ tous: voirTerminees });
+    var nombre = function (k) { return base.filter(function (a) { return dansCle(a, k); }).length; };
+    var hote = Bandeau.vide();
+    if (D.monMembre()) Bandeau.entree(hote, "miennes", "Mes affaires", nombre("miennes"), 0, cle === "miennes", choisit);
+    Bandeau.titre(hote, "Équipes");
+    Bandeau.equipes(hote, { toute: D.membres(), nombre: nombre, actif: cle, choix: choisit, libelleTous: "Toutes les affaires" });
+    Bandeau.caseACocher(hote, "Voir les affaires terminées", voirTerminees, function (v) { voirTerminees = v; dessine(); });
   }
 
   /* ------------------------------------------------------------- affichage */
@@ -183,17 +191,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function selection(opts) {
     opts = opts || {};
-    var tous = opts.tous || document.getElementById("voir-terminees").checked;
+    var tous = opts.tous || voirTerminees;
     var mots = opts.sansTexte || !barre ? [] : barre.termes();
     return D.affaires({ tous: tous }).filter(function (a) {
-      if (succursales.length && succursales.indexOf(a.succursale || "_") < 0) return false;
+      if (!dansCle(a, cle)) return false;
       return UI.correspond(champsCherches(a), mots);
     });
   }
 
   function dessine() {
-    // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
-    if (fSucc && optionsSuccursales().length !== nbOptSucc) rendSuccursales();
+    rendBandeau();
     var affaires = selection();
     var mots = barre ? barre.termes() : [];
     var hote = document.getElementById("liste");
@@ -205,11 +212,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
     if (!affaires.length) {
       var q = barre ? barre.valeur().trim() : "";
-      if (!q && succursales.length) {
+      if (!q && cle !== "tous") {
         hote.appendChild(el("div", { class: "sans-resultat" }, [
-          el("p", { class: "q", text: "Aucune affaire dans " + (succursales.length > 1 ? "ces succursales" : "cette succursale") }),
-          el("button", { class: "btn btn-or", type: "button", text: "Toutes les succursales",
-            onclick: function () { succursales = []; fSucc.pose([]); retiensSuccursales([]); dessine(); } })
+          el("p", { class: "q", text: "Aucune affaire ici" }),
+          el("button", { class: "btn btn-or", type: "button", text: "Toutes les affaires",
+            onclick: function () { choisit("tous"); } })
         ]));
         return;
       }
@@ -218,13 +225,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         return;
       }
       var bloc = el("div", { class: "sans-resultat" }, [el("p", { class: "q" }, ["Rien pour « ", el("em", { text: q }), " »"])]);
-      var cachees = document.getElementById("voir-terminees").checked ? 0
+      var cachees = voirTerminees ? 0
         : selection({ tous: true }).filter(function (a) { return a.statut === "terminee"; }).length;
       if (cachees) {
         bloc.appendChild(el("p", { class: "aide", text: cachees + (cachees > 1 ? " affaires terminées correspondent." : " affaire terminée correspond.") }));
         bloc.appendChild(el("button", {
           class: "btn btn-or", type: "button", text: "Voir les affaires terminées",
-          onclick: function () { document.getElementById("voir-terminees").checked = true; dessine(); }
+          onclick: function () { voirTerminees = true; dessine(); }
         }));
       } else {
         bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le numéro, le libellé, l'adresse, la note, la phase, le statut et l'équipe." }));
