@@ -95,7 +95,6 @@
       b.querySelector(".nom").textContent = nom; b.querySelector(".n").textContent = n;
       b.addEventListener("click", function () {
         filtre = cle;
-        try { sessionStorage.setItem("planif2." + nomCle + ".filtre", cle); } catch (e) {}
         arbre(); surChange();
         if (innerWidth <= 700) replie(true);
       });
@@ -147,9 +146,11 @@
     q.addEventListener("input", function () { surChange(); });
     q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; surChange(); } });
   }
-  /** Après le chargement des données : reprend le filtre de l'onglet et dessine le bandeau. */
+  /** Après le chargement des données : on s'ouvre sur sa succursale et son secteur
+   *  (les administrateurs sur « Administrateurs », sans fiche sur « Tous »), puis le bandeau. */
   function pret() {
-    try { var f = sessionStorage.getItem("planif2." + nomCle + ".filtre"); if (f) filtre = f; } catch (e) {}
+    var moi = D.monMembre();
+    if (moi) filtre = estAdmin(moi) ? "admin" : "d:" + (moi.succursale || "_") + "|" + (moi.discipline || "_");
     if (filtre !== "tous" && !D.membres().some(dansFiltre)) filtre = "tous";
     arbre();
   }
