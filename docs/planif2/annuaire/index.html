@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Annuaire · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+  Bureau (/planif2/) — module Annuaire, version 2 (02.11.2026). Bandeau repliable : recherche,
+  toutes les fiches, rôles, cantons. Cartes ; détail, création, modification et suppression
+  dans le panneau (Donnees.ajouteContact / majContact / suppContact, comme /planif/).
+-->
+<style>
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Annuaire">
+    <div class="recherche"><input id="q" type="search" placeholder="Chercher une fiche" autocomplete="off" spellcheck="false" aria-label="Chercher une fiche"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Annuaire</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"><button type="button" class="btn principal" id="nouvelle">Nouvelle fiche</button></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var filtre = "tous";            // tous | r:<rôle> | c:<canton>
+  var q = $("#q");
+
+  M.bandeau();
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+  $("#nouvelle").addEventListener("click", function () { formulaire(null); });
+
+  M.demarre(function () {
+    var p = new URLSearchParams(location.search);
+    if (p.get("q")) q.value = p.get("q");
+    arbre(); liste();
+    D.surRechargement(function () { arbre(); liste(); });
+  });
+
+  function nom(c) { return [c.prenom, c.nom].filter(Boolean).join(" ") || c.societe; }
+  function role(c) { return (c.role || "").trim(); }
+  function dansFiltre(c) {
+    if (filtre === "tous") return true;
+    if (filtre.indexOf("r:") === 0) return (role(c) || "_") === filtre.slice(2);
+    return (c.canton || "_") === filtre.slice(2);
+  }
+  function texte(c) { return [c.prenom, c.nom, c.societe, c.role, c.email, c.telephone, c.natel, c.localite, c.npa, c.canton, c.adresse, c.observations].join(" "); }
+
+  function arbre() {
+    var l = D.contacts(), roles = {}, cantons = {};
+    l.forEach(function (c) { var r = role(c) || "_"; roles[r] = (roles[r] || 0) + 1; var k = c.canton || "_"; cantons[k] = (cantons[k] || 0) + 1; });
+    var e = [{ cle: "tous", nom: "Toutes les fiches", n: l.length }];
+    var rs = Object.keys(roles).sort(function (a, b) { return a === "_" ? 1 : b === "_" ? -1 : a.localeCompare(b, "fr"); });
+    if (rs.length > 1 || rs[0] !== "_") {
+      e.push({ titre: "Rôles" });
+      rs.forEach(function (r) { e.push({ cle: "r:" + r, nom: r === "_" ? "Rôle non renseigné" : r, n: roles[r] }); });
+    }
+    var cs = Object.keys(cantons).sort(function (a, b) { return a === "_" ? 1 : b === "_" ? -1 : a.localeCompare(b); });
+    if (cs.length > 1 || cs[0] !== "_") {
+      e.push({ titre: "Cantons" });
+      cs.forEach(function (c) { e.push({ cle: "c:" + c, nom: c === "_" ? "Canton non renseigné" : c, n: cantons[c] }); });
+    }
+    M.arbre($("#arbre"), e, filtre, function (cle) { filtre = cle; arbre(); liste(); });
+  }
+  function titreFiltre() {
+    if (filtre === "tous") return "Annuaire";
+    var v = filtre.slice(2);
+    if (filtre.indexOf("r:") === 0) return v === "_" ? "Rôle non renseigné" : v;
+    return v === "_" ? "Canton non renseigné" : "Canton " + v;
+  }
+
+  function liste() {
+    if (!D.etat()) return;
+    var l = D.contacts().filter(dansFiltre).filter(function (c) { return M.cherche(texte(c), q.value); });
+    $("#titre").textContent = titreFiltre();
+    $("#compte").textContent = l.length + (l.length > 1 ? " fiches" : " fiche");
+    var hote = $("#liste"); hote.textContent = "";
+    if (!l.length) { hote.appendChild(el("p", "vide", "Aucune fiche ne correspond.")); return; }
+    var g = el("div", "cartes");
+    l.forEach(function (c) {
+      var b = el("button", "carte"); b.type = "button";
+      var h = el("div", "haut"); h.appendChild(M.avatar(c));
+      var t = el("div"); t.style.minWidth = "0";
+      t.appendChild(el("b", "ligne-txt", nom(c)));
+      var sous = [c.nom || c.prenom ? c.societe : "", role(c)].filter(Boolean).join(" · ");
+      if (sous) t.appendChild(el("span", "sous ligne-txt", sous));
+      h.appendChild(t); b.appendChild(h);
+      var coord = [c.telephone, c.natel, c.email].filter(Boolean).join(" · ");
+      if (coord) b.appendChild(el("span", "faible ligne-txt", coord));
+      var lieu = [[c.npa, c.localite].filter(Boolean).join(" "), c.canton].filter(Boolean).join(" · ");
+      if (lieu) b.appendChild(el("span", "faible ligne-txt", lieu));
+      b.addEventListener("click", function () { detail(c.id); });
+      g.appendChild(b);
+    });
+    hote.appendChild(g);
+  }
+
+  function lien(href, texte, nouvel) { var a = el("a", null, texte); a.href = href; if (nouvel) { a.target = "_blank"; a.rel = "noopener"; } return a; }
+  function detail(id) {
+    var c = D.contact(id); if (!c) { M.panneau.ferme(); return; }
+    var dl = el("dl", "champ");
+    function ch(k, v) { if (!v) return; dl.appendChild(el("dt", null, k)); var dd = el("dd"); if (typeof v === "string") dd.textContent = v; else dd.appendChild(v); dl.appendChild(dd); }
+    ch("Société", c.nom || c.prenom ? c.societe : "");
+    ch("Rôle", c.role);
+    ch("Téléphone", c.telephone ? lien("tel:" + c.telephone.replace(/\s/g, ""), c.telephone) : "");
+    ch("Natel", c.natel ? lien("tel:" + c.natel.replace(/\s/g, ""), c.natel) : "");
+    ch("E-mail", c.email ? lien("mailto:" + c.email, c.email) : "");
+    ch("Site", c.site ? lien(D.urlSite(c), c.site, true) : "");
+    var adr = [c.adresse, [c.npa, c.localite].filter(Boolean).join(" "), [c.canton, c.pays].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
+    if (adr) {
+      var d = el("div"); d.appendChild(el("p", "note", adr));
+      d.appendChild(lien("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(adr.replace(/\n/g, ", ")), "Voir sur la carte", true));
+      ch("Adresse", d);
+    }
+    var corps = [dl];
+    if (c.observations) { corps.push(el("h3", null, "Observations")); corps.push(el("p", "note", c.observations)); }
+    var act = el("div", "actions");
+    var mo = el("button", "btn principal", "Modifier"); mo.type = "button"; mo.addEventListener("click", function () { formulaire(c); });
+    var su = el("button", "btn rouge", "Supprimer"); su.type = "button";
+    su.addEventListener("click", function () {
+      if (su.dataset.ok !== "1") { su.dataset.ok = "1"; su.textContent = "Confirmer la suppression"; return; }
+      su.disabled = true;
+      D.suppContact(c.id).then(function () { M.panneau.ferme(); arbre(); liste(); M.annonce("Fiche supprimée.", true, function () { arbre(); liste(); }); })
+        .catch(function (e) { su.disabled = false; M.annonce(e.message); });
+    });
+    act.appendChild(mo); act.appendChild(su); corps.push(act);
+    M.panneau.ouvre([el("span", "surtitre", "Annuaire"), el("h2", null, nom(c))], corps);
+  }
+
+  function formulaire(c) {
+    c = c || {};
+    var f = el("form", "formulaire"), champs = {};
+    function ajoute(cle, lib, type, large, attrs) { var i = M.saisie(c[cle], type, attrs); champs[cle] = i; f.appendChild(M.champ(lib, i, large)); }
+    ajoute("prenom", "Prénom"); ajoute("nom", "Nom");
+    ajoute("societe", "Société", "text", true); ajoute("role", "Rôle", "text", true, { placeholder: "Architecte, maître d'ouvrage, géomètre…" });
+    ajoute("telephone", "Téléphone", "tel"); ajoute("natel", "Natel", "tel");
+    ajoute("email", "E-mail", "email"); ajoute("site", "Site");
+    ajoute("adresse", "Adresse", "text", true); ajoute("npa", "NPA"); ajoute("localite", "Localité");
+    ajoute("canton", "Canton", "text", false, { maxlength: "3" }); ajoute("pays", "Pays");
+    ajoute("observations", "Observations", "textarea", true);
+    var err = el("p", "erreur"); err.hidden = true; f.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    var ok = el("button", "btn principal", c.id ? "Enregistrer" : "Créer la fiche"); ok.type = "submit";
+    var an = el("button", "btn", "Annuler"); an.type = "button"; an.addEventListener("click", function () { if (c.id) detail(c.id); else M.panneau.ferme(); });
+    act.appendChild(ok); act.appendChild(an); f.appendChild(act);
+    f.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true; ok.disabled = true;
+      var o = {}; Object.keys(champs).forEach(function (k) { o[k] = champs[k].value; });
+      (c.id ? D.majContact(c.id, o) : D.ajouteContact(o)).then(function (v) {
+        arbre(); liste(); detail(v.id); M.annonce(c.id ? "Fiche enregistrée." : "Fiche créée.");
+      }).catch(function (x) { ok.disabled = false; err.textContent = x.message; err.hidden = false; });
+    });
+    M.panneau.ouvre([el("span", "surtitre", "Annuaire"), el("h2", null, c.id ? "Modifier la fiche" : "Nouvelle fiche")], f);
+    setTimeout(function () { (champs.nom.value ? champs.telephone : champs.prenom).focus(); }, 250);
+  }
+})();
+</script>
+</body>
+</html>
