@@ -351,7 +351,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.7.0";
+  var NOM = "Bureau", VERSION = "0.8.0";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
@@ -389,10 +389,10 @@ a{color:inherit;text-decoration:none}
     { id: "affaires", cle: "affaires", groupe: "Tâches", nom: "Affaires", href: "/planif2/affaires/", desc: "Les affaires, leurs équipes, mandats et avancement." },
     { id: "charge", cle: "charge", groupe: "Tâches", nom: "Tableau de charge", href: "/planif2/charge/", desc: "Une case par personne et par semaine : qui est libre, qui déborde." },
     { id: "carte", cle: "affaires", groupe: "Tâches", nom: "Carte des affaires", href: "/planif/carte/", desc: "Les affaires sur la carte." },
-    { id: "veille", cle: "veille", groupe: "Inter-secteurs", nom: "Veille simap.ch", href: "/planif/inter-secteurs/", desc: "Les appels d'offres publiés chaque matin sur simap.ch." },
-    { id: "ao_publics", cle: "ao_publics", groupe: "Inter-secteurs", nom: "AO publics", href: "/planif/inter-secteurs/?vue=publics", desc: "Les appels d'offres publics suivis par le bureau." },
-    { id: "ao_prives", cle: "ao_prives", groupe: "Inter-secteurs", nom: "AO privés", href: "/planif/inter-secteurs/?vue=prives", desc: "Les appels d'offres privés." },
-    { id: "agenda_ao", cle: "agenda_ao", groupe: "Inter-secteurs", nom: "Agenda des AO", href: "/planif/inter-secteurs/?vue=agenda", desc: "Visites, questions, remises et ouvertures des appels d'offres." },
+    { id: "veille", cle: "veille", groupe: "Inter-secteurs", nom: "Veille simap.ch", href: "/planif2/inter/?vue=veille", desc: "Les appels d'offres publiés chaque matin sur simap.ch." },
+    { id: "ao_publics", cle: "ao_publics", groupe: "Inter-secteurs", nom: "AO publics", href: "/planif2/inter/?vue=publics", desc: "Les appels d'offres publics suivis par le bureau." },
+    { id: "ao_prives", cle: "ao_prives", groupe: "Inter-secteurs", nom: "AO privés", href: "/planif2/inter/?vue=prives", desc: "Les appels d'offres privés." },
+    { id: "agenda_ao", cle: "agenda_ao", groupe: "Inter-secteurs", nom: "Agenda des AO", href: "/planif2/inter/?vue=agenda", desc: "Visites, questions, remises et ouvertures des appels d'offres." },
     { id: "facturation", cle: "facturation", groupe: "Inter-secteurs", nom: "Facturation", href: "/planif/inter-secteurs/?vue=facturation", desc: "Avancement et facturation par phase et par secteur." },
     { id: "console", cle: "console", groupe: "Administration", nom: "Console", href: "/planif/console/", desc: "Bureaux, accès, groupes et droits." },
     { id: "profil", cle: null, groupe: "Administration", nom: "Mon profil", href: "/planif/profil/", desc: "Photo, téléphones, jours travaillés, mot de passe." }

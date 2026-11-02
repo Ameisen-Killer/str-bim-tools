@@ -176,6 +176,7 @@
     if (moi && moi.succursale && moi.discipline && !/^administrat/.test(sansAccents(moi.discipline))) filtre = "d:" + moi.succursale + "|" + moi.discipline;
     else if (moi && moi.succursale) filtre = "s:" + moi.succursale;
     if (!affaires().some(dansFiltre)) filtre = "toutes";
+    var pq = new URLSearchParams(location.search).get("q"); if (pq) { q.value = pq; filtre = "toutes"; }
     arbre(); liste();
     D.surRechargement(function () { arbre(); liste(); if (ouverte) detail(ouverte); });
   }).catch(function (e) {

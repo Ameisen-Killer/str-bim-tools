@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Inter-secteurs · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+Bureau V2 — Inter-secteurs (02.11.2026) : veille simap.ch, AO publics et privés, agenda des AO.
+Mêmes données que /planif/inter-secteurs/ (non modifiée). ?vue= veille | publics | prives | agenda.
+-->
+<style>
+.pub .tete-pub{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pub .titre-pub{font-size:15px;line-height:19px;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pub .bas{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px}
+.pub.ecartee{opacity:.6}
+.motif{font-size:11px;line-height:16px;padding:0 6px;border-radius:6px;background:#ECEDEA;color:var(--doux)}
+.rdv-jour{flex:none;width:58px;text-align:center;font-size:12px;line-height:15px;color:var(--doux)}
+.rdv-jour b{display:block;font-size:17px;line-height:20px;color:var(--texte)}
+.ligne-l.passe{opacity:.55}
+.ligne-l.teinte{padding-left:17px}
+.ligne-l.teinte::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teinte,var(--t1))}
+.mini-agenda{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.mini-agenda li.passe{color:var(--faible)}
+.mini-agenda button{border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.mini-agenda button:hover{text-decoration:underline}
+.desc{white-space:pre-wrap;font-size:13px;line-height:19px;margin:0;max-height:320px;overflow:auto}
+.cases{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.cases label{display:inline-flex;align-items:center;gap:6px}
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Inter-secteurs">
+    <div class="recherche"><input id="q" type="search" placeholder="Rechercher une publication, un AO…" autocomplete="off" spellcheck="false" aria-label="Rechercher une publication, un AO…"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Inter-secteurs</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var q = $("#q");
+  var PROCEDURES = { open: "Procédure ouverte", selective: "Procédure sélective", invitation: "Sur invitation", direct: "Gré à gré" };
+  var TYPES_PUB = { tender: "Appel d'offres", competition: "Concours", study_contract: "Mandat d'étude parallèle", advance_notice: "Avis préalable" };
+  var VUES = { "": "v:nouvelle", veille: "v:nouvelle", publics: "public:en_cours", prives: "prive:en_cours", agenda: "g:avenir" };
+  var CLE = { v: "veille", "public": "ao_publics", prive: "ao_prives", g: "agenda_ao" };
+  var filtre = VUES[new URLSearchParams(location.search).get("vue") || ""] || "v:nouvelle";
+
+  M.bandeau();
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+
+  M.demarre(function () {
+    if (!permis(filtre)) {
+      var premier = ["v:nouvelle", "public:en_cours", "prive:en_cours", "g:avenir"].filter(permis)[0];
+      if (premier) filtre = premier;
+    }
+    tout();
+    D.surRechargement(tout);
+  });
+  function tout() { arbre(); outils(); liste(); }
+
+  function auj() { return C.isoAuj(); }
+  function section(f) { return (f || filtre).split(":")[0]; }
+  function sous(f) { return (f || filtre).split(":")[1]; }
+  function permis(f) { return D.pagePermise(CLE[section(f)]); }
+  function peutCreer() { return D.aDroit("affaires_creer"); }
+  function deux(n) { return (n < 10 ? "0" : "") + n; }
+  function chf(n) { return n == null ? "—" : "CHF " + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "’"); }
+  function nomContact(c) {
+    if (!c) return "";
+    var nom = [c.prenom, c.nom].filter(Boolean).join(" ");
+    return c.societe ? c.societe + (nom ? " — " + nom : "") : nom;
+  }
+  function teinte(a) { return "var(--t" + ((a && a.teinte) || 1) + ")"; }
+  function aos() { return D.affaires({ tous: true }).filter(function (a) { return a.phase === "AO" || a.aoResultat; }); }
+  function enCours(a) { return !a.aoResultat || a.aoResultat === "en_cours"; }
+  function aosDe(type) { return aos().filter(function (a) { return !a.aoType || a.aoType === type; }); }
+  function resultatOk(a, r) {
+    if (r === "en_cours") return enCours(a);
+    if (r === "gagne") return a.aoResultat === "gagne";
+    if (r === "perdu") return a.aoResultat === "perdu" || a.aoResultat === "abandonne";
+    return true;
+  }
+  function remise(v) {
+    if (!v.delai) return { txt: "Remise non indiquée", cls: "gris" };
+    var d = new Date(v.delai), j = Math.ceil((d - new Date()) / 864e5);
+    var h = deux(d.getHours()) + ":" + deux(d.getMinutes());
+    var txt = "Remise " + M.jj(v.delai.slice(0, 10)) + " " + h + (j < 0 ? " · passée" : j === 0 ? " · aujourd'hui" : " · dans " + j + " j");
+    return { txt: txt, cls: j < 0 ? "gris" : j <= 7 ? "rouge" : j <= 14 ? "orange" : "" };
+  }
+  function pastilleResultat(a) {
+    var r = a.aoResultat || "en_cours";
+    return el("span", "pastille " + ({ gagne: "", perdu: "rouge", abandonne: "gris", en_cours: "bleu" }[r] || "gris"), D.RESULTATS_AO[r]);
+  }
+
+  /* ---------- Bandeau ---------- */
+  function arbre() {
+    var e = [];
+    if (permis("v:x")) {
+      e.push({ titre: "Veille simap.ch" });
+      e.push({ cle: "v:nouvelle", nom: "Nouvelles", n: D.veilleNouvelles().length });
+      e.push({ cle: "v:retenue", nom: "Devenues des AO", n: D.veille({ etat: "retenue" }).length });
+      e.push({ cle: "v:ecartee", nom: "Écartées", n: D.veille({ etat: "ecartee" }).length });
+      e.push({ cle: "v:tous", nom: "Toutes les publications", n: D.veille().length });
+    }
+    [["public", "AO publics"], ["prive", "AO privés"]].forEach(function (x) {
+      if (!permis(x[0] + ":x")) return;
+      var l = aosDe(x[0]);
+      e.push({ titre: x[1] });
+      e.push({ cle: x[0] + ":en_cours", nom: "En cours", n: l.filter(enCours).length });
+      e.push({ cle: x[0] + ":gagne", nom: "Gagnés", n: l.filter(function (a) { return resultatOk(a, "gagne"); }).length });
+      e.push({ cle: x[0] + ":perdu", nom: "Perdus ou abandonnés", n: l.filter(function (a) { return resultatOk(a, "perdu"); }).length });
+      e.push({ cle: x[0] + ":tous", nom: "Tous", n: l.length });
+    });
+    if (permis("g:x")) {
+      e.push({ titre: "Agenda des AO" });
+      e.push({ cle: "g:avenir", nom: "À venir", n: D.agenda({ depuis: auj() }).length });
+      e.push({ cle: "g:tous", nom: "Passés compris", n: D.agenda().length });
+    }
+    if (!e.length) e.push({ titre: "Aucune page de ce module ne t'est ouverte." });
+    M.arbre($("#arbre"), e, filtre, function (cle) { filtre = cle; M.panneau.ferme(); tout(); });
+  }
+
+  function outils() {
+    var o = $("#outils"); o.textContent = "";
+    var s = section();
+    if ((s === "v" || s === "public" || s === "prive") && peutCreer()) {
+      var b = el("button", "btn principal", "+ Nouvel appel d'offres"); b.type = "button";
+      b.addEventListener("click", function () { formAO(null, { aoType: s === "prive" ? "prive" : "public" }); });
+      o.appendChild(b);
+    }
+    if (s === "g") {
+      var r = el("button", "btn principal", "+ Ajouter un rendez-vous"); r.type = "button";
+      r.addEventListener("click", function () { formEvenement(null, {}); });
+      o.appendChild(r);
+    }
+  }
+
+  function liste() {
+    if (!D.etat()) return;
+    var hote = $("#liste"); hote.textContent = "";
+    if (!permis(filtre)) { $("#titre").textContent = "Inter-secteurs"; $("#compte").textContent = ""; hote.appendChild(el("p", "vide", "Cette page ne t'est pas ouverte.")); return; }
+    var s = section();
+    if (s === "v") listeVeille(hote);
+    else if (s === "g") listeAgenda(hote);
+    else listeAO(hote, s);
+  }
+
+  /* ---------- Veille ---------- */
+  function texteVeille(v) { return [v.titre, v.adjudicateur, v.lieu, v.canton, (v.motifs || []).join(" "), v.description].join(" "); }
+  function listeVeille(hote) {
+    var e = sous();
+    var l = e === "nouvelle" ? D.veilleNouvelles() : D.veille(e === "tous" ? {} : { etat: e });
+    l = l.filter(function (v) { return M.cherche(texteVeille(v), q.value); });
+    $("#titre").textContent = { nouvelle: "Nouvelles publications", retenue: "Devenues des AO", ecartee: "Publications écartées", tous: "Veille simap.ch" }[e];
+    $("#compte").textContent = l.length + (l.length > 1 ? " publications" : " publication");
+    if (!l.length) {
+      hote.appendChild(el("p", "vide", e === "nouvelle" ? "Aucune nouvelle publication. La veille se met à jour chaque matin de semaine." : "Aucune publication ici."));
+      return;
+    }
+    var g = el("div", "cartes");
+    l.forEach(function (v) {
+      var st = D.suiviVeille(v.id), r = remise(v);
+      var b = el("button", "carte pub" + (st ? " " + st.etat : "")); b.type = "button";
+      var t = el("div", "tete-pub");
+      t.appendChild(el("span", "pastille", v.canton || "—"));
+      t.appendChild(el("span", "sous", [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(" · ")));
+      if (st) t.appendChild(el("span", "pastille " + (st.etat === "retenue" ? "bleu" : "gris"), st.etat === "retenue" ? "AO créé" : "Écartée"));
+      b.appendChild(t);
+      b.appendChild(el("span", "titre-pub", v.titre));
+      var adj = [v.adjudicateur, v.lieu].filter(Boolean).join(" · ");
+      if (adj) b.appendChild(el("span", "faible ligne-txt", adj));
+      var bas = el("div", "bas");
+      bas.appendChild(el("span", "pastille " + r.cls, r.txt));
+      (v.motifs || []).slice(0, 3).forEach(function (m) { bas.appendChild(el("span", "motif", m)); });
+      b.appendChild(bas);
+      if (v.publieLe) b.appendChild(el("span", "faible", "Publié le " + M.jj(v.publieLe.slice(0, 10), true)));
+      b.addEventListener("click", function () { detailVeille(v); });
+      g.appendChild(b);
+    });
+    hote.appendChild(g);
+  }
+  function dl(lignes) {
+    var d = el("dl", "champ");
+    lignes.forEach(function (x) {
+      if (x[1] == null || x[1] === "") return;
+      d.appendChild(el("dt", null, x[0]));
+      var dd = el("dd"); if (typeof x[1] === "string") dd.textContent = x[1]; else dd.appendChild(x[1]);
+      d.appendChild(dd);
+    });
+    return d;
+  }
+  function bouton(txt, cls, f) { var b = el("button", "btn" + (cls ? " " + cls : ""), txt); b.type = "button"; b.addEventListener("click", f); return b; }
+  function detailVeille(v) {
+    var st = D.suiviVeille(v.id), r = remise(v), aff = st && st.affaireId ? D.affaire(st.affaireId) : null;
+    var lien = el("a", null, "Voir sur simap.ch ↗"); lien.href = v.lien; lien.target = "_blank"; lien.rel = "noopener noreferrer";
+    var corps = [dl([
+      ["Canton", v.canton], ["Adjudicateur", v.adjudicateur], ["Lieu", v.lieu],
+      ["Publication", [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(" · ")],
+      ["Publié le", v.publieLe ? M.jj(v.publieLe.slice(0, 10), true) : ""], ["Remise", r.txt.replace(/^Remise /, "")],
+      ["Motifs", (v.motifs || []).join(", ")], ["Annonce", v.lien ? lien : ""],
+      ["Suivi", st ? (st.etat === "retenue" ? "Appel d'offres créé" + (aff ? " : " + D.libelleAffaire(aff) : "") : "Écartée") + (st.par && D.membre(st.par) ? " par " + D.nomMembre(st.par) : "") : "Nouvelle"]
+    ])];
+    if (v.description) { corps.push(el("h3", null, "Description")); corps.push(el("p", "desc", v.description)); }
+    var act = el("div", "actions");
+    if (st) {
+      if (aff) act.appendChild(bouton("Ouvrir " + (aff.code || "l'AO"), "principal", function () { detailAO(aff.id); }));
+      act.appendChild(bouton(st.etat === "retenue" ? "Remettre en veille" : "Rétablir", "", function () { marque(v, null); }));
+    } else {
+      if (peutCreer()) act.appendChild(bouton("Créer l'AO", "principal", function () { creeDepuisVeille(v); }));
+      act.appendChild(bouton("Écarter", "", function () { marque(v, "ecartee"); }));
+    }
+    corps.push(act);
+    M.panneau.ouvre([el("div", "surtitre", "Veille simap.ch"), el("h2", null, v.titre)], corps);
+  }
+  function marque(v, e) {
+    D.marqueVeille(v.id, e).then(function () {
+      M.panneau.ferme(); M.annonce(e === "ecartee" ? "Publication écartée." : "Publication remise en veille."); tout();
+    }).catch(function (err) { M.annonce(err.message); });
+  }
+  function plie(s) { return M.sansAccents(s).replace(/\s+/g, " ").trim(); }
+  function demandeurPour(v) {
+    var adj = plie(String(v.adjudicateur || "").split("(")[0]);
+    if (!adj) return "";
+    var c = D.contacts().filter(function (c) { var soc = plie(c.societe); return soc.length > 3 && (adj.indexOf(soc) >= 0 || soc.indexOf(adj) >= 0); })[0];
+    return c ? c.id : "";
+  }
+  function creeDepuisVeille(v) {
+    var note = [v.adjudicateur && "Adjudicateur : " + v.adjudicateur, v.lieu && "Lieu : " + v.lieu,
+      [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(", "),
+      "simap.ch : " + v.lien, v.description && v.description.slice(0, 1200)].filter(Boolean).join("\n");
+    formAO(null, { nom: String(v.titre || "").slice(0, 200), echeance: v.delai ? v.delai.slice(0, 10) : "", aoType: "public",
+                   demandeurId: demandeurPour(v), note: note, veilleId: v.id });
+  }
+
+  /* ---------- Appels d'offres ---------- */
+  function prochainRdv(a) { return D.agenda({ affaireId: a.id, depuis: auj() })[0] || null; }
+  function texteAO(a) { var c = a.demandeurId && D.contact(a.demandeurId); return [a.code, a.nom, a.note, nomContact(c)].join(" "); }
+  function listeAO(hote, type) {
+    var r = sous();
+    var l = aosDe(type).filter(function (a) { return resultatOk(a, r); }).filter(function (a) { return M.cherche(texteAO(a), q.value); });
+    l.sort(function (x, y) { return (x.echeance || "9999") < (y.echeance || "9999") ? -1 : (x.echeance || "9999") > (y.echeance || "9999") ? 1 : 0; });
+    $("#titre").textContent = (type === "prive" ? "AO privés" : "AO publics") + " · " + { en_cours: "en cours", gagne: "gagnés", perdu: "perdus ou abandonnés", tous: "tous" }[r];
+    $("#compte").textContent = l.length + " AO";
+    if (!l.length) {
+      hote.appendChild(el("p", "vide", "Aucun appel d'offres ici." + (peutCreer() && r === "en_cours" ? " « Nouvel appel d'offres », en haut, en ouvre un." : "")));
+      return;
+    }
+    var g = el("div", "cartes");
+    l.forEach(function (a) {
+      var b = el("button", "carte teinte"); b.type = "button"; b.style.setProperty("--teinte", teinte(a));
+      var h = el("div", "haut");
+      var t = el("div"); t.style.minWidth = "0"; t.style.flex = "1";
+      if (a.code) { var c = el("span", "sous", a.code); c.style.color = teinte(a); c.style.fontWeight = "700"; t.appendChild(c); }
+      t.appendChild(el("b", "ligne-txt", a.nom));
+      h.appendChild(t); h.appendChild(pastilleResultat(a));
+      if (!a.aoType) h.appendChild(el("span", "pastille orange", "Type ?"));
+      b.appendChild(h);
+      var dem = a.demandeurId && D.contact(a.demandeurId);
+      if (dem) b.appendChild(el("span", "sous ligne-txt", nomContact(dem)));
+      var bas = el("div", "bas"); bas.style.display = "flex"; bas.style.gap = "6px"; bas.style.flexWrap = "wrap";
+      if (a.echeance) {
+        var n = C.diff(auj(), a.echeance);
+        bas.appendChild(el("span", "pastille " + (!enCours(a) || n < 0 ? "gris" : n <= 7 ? "rouge" : n <= 14 ? "orange" : ""), "Remise " + M.quand(a.echeance)));
+      }
+      if (a.aoMontant != null) bas.appendChild(el("span", "pastille gris", chf(a.aoMontant)));
+      b.appendChild(bas);
+      var p = prochainRdv(a);
+      if (p) b.appendChild(el("span", "faible ligne-txt", "Prochain : " + M.quand(p.jour) + (p.heure ? " " + p.heure : "") + " · " + (p.titre || D.GENRES_AGENDA[p.genre])));
+      b.addEventListener("click", function () { detailAO(a.id); });
+      g.appendChild(b);
+    });
+    hote.appendChild(g);
+  }
+  function teteAO(a, surtitre) {
+    var s = el("div", "surtitre", surtitre + (a.code ? " · " + a.code : ""));
+    return [s, el("h2", null, a.nom)];
+  }
+  function detailAO(id) {
+    var a = D.affaire(id); if (!a) { M.panneau.ferme(); return; }
+    var dem = a.demandeurId && D.contact(a.demandeurId);
+    var lienDem = dem ? M.lienModule("annuaire", "/planif2/annuaire/?q=" + encodeURIComponent(dem.societe || dem.nom || "")) : null;
+    if (lienDem) lienDem.textContent = nomContact(dem);
+    var secteurs = (a.secteurs || []).map(function (c) { return D.DISCIPLINES[c] || c; }).join(", ");
+    var corps = [dl([
+      ["Type", a.aoType ? D.TYPES_AO[a.aoType] : "Non classé"],
+      ["Résultat", D.RESULTATS_AO[a.aoResultat || "en_cours"]],
+      ["Remise", a.echeance ? M.jj(a.echeance, true) + " (" + M.quand(a.echeance) + ")" : ""],
+      ["Demandeur", lienDem], ["Honoraires", a.aoMontant != null ? chf(a.aoMontant) : ""],
+      ["Secteurs", secteurs]
+    ])];
+    if (a.note) { corps.push(el("h3", null, "Note")); corps.push(el("p", "desc", a.note)); }
+    corps.push(el("h3", null, "Agenda"));
+    var rdv = D.agenda({ affaireId: a.id });
+    if (rdv.length) {
+      var ul = el("ul", "mini-agenda");
+      rdv.forEach(function (r) {
+        var li = el("li", r.jour < auj() ? "passe" : "");
+        var b = el("button", null, M.jj(r.jour, true) + (r.heure ? " " + r.heure : "") + " · " + (r.titre || D.GENRES_AGENDA[r.genre]) + " (" + D.GENRES_AGENDA[r.genre] + ")");
+        b.type = "button"; b.addEventListener("click", function () { formEvenement(r.id, {}); });
+        li.appendChild(b); ul.appendChild(li);
+      });
+      corps.push(ul);
+    } else corps.push(el("p", "vide-msg", "Aucun rendez-vous noté."));
+    var act = el("div", "actions");
+    if (peutCreer()) act.appendChild(bouton("Modifier", "principal", function () { formAO(a.id); }));
+    act.appendChild(bouton("+ Rendez-vous", "", function () { formEvenement(null, { affaireId: a.id }); }));
+    if (D.pagePermise("affaires")) act.appendChild(bouton("Voir dans Affaires", "", function () { M.ouvreModule("affaires", "/planif2/affaires/?q=" + encodeURIComponent(a.code || a.nom)); }));
+    corps.push(act);
+    M.panneau.ouvre(teteAO(a, "Appel d'offres"), corps, teinte(a));
+  }
+
+  function codeSuivant() {
+    var an = C.dt(auj()).getFullYear(), pris = {};
+    D.affaires({ tous: true }).forEach(function (a) { if (a.code) pris[a.code.toLowerCase()] = true; });
+    for (var i = 1; i < 1000; i++) { var c = "AO-" + an + "-" + deux(i); if (!pris[c.toLowerCase()]) return c; }
+    return "AO-" + an;
+  }
+  function select(valeur, options) {
+    var s = el("select");
+    options.forEach(function (o) { var x = el("option", null, o[1]); x.value = o[0]; s.appendChild(x); });
+    s.value = valeur == null ? "" : valeur;
+    return s;
+  }
+  function base(a) {
+    return { code: a.code, nom: a.nom, note: a.note, teinte: a.teinte, statut: a.statut, echeance: a.echeance,
+             phase: a.phase, adresse: a.adresse, ingenieurs: a.ingenieurs, dessinateurs: a.dessinateurs };
+  }
+  function formAO(id, pre) {
+    pre = pre || {};
+    var a = id ? D.affaire(id) : null;
+    if (!peutCreer()) { M.annonce("Ouvrir ou modifier un appel d'offres demande le droit d'ouvrir une affaire."); return; }
+    var contacts = D.contacts();
+    var f = {
+      code: M.saisie(a ? a.code : codeSuivant()),
+      aoType: select(a ? (a.aoType || "") : (pre.aoType || "public"), [["", "—"], ["public", "Public"], ["prive", "Privé"]]),
+      nom: M.saisie(a ? a.nom : (pre.nom || ""), "text", { placeholder: "Halle des Sablières — ingénieur civil" }),
+      demandeurId: select(a ? (a.demandeurId || "") : (pre.demandeurId || ""),
+        [["", contacts.length ? "— Choisir une fiche de l'annuaire —" : "— L'annuaire est vide —"]].concat(contacts.map(function (c) { return [c.id, nomContact(c)]; }))),
+      echeance: M.saisie(a ? (a.echeance || "") : (pre.echeance || ""), "date"),
+      aoMontant: M.saisie(a && a.aoMontant != null ? a.aoMontant : "", "text", { inputmode: "numeric", placeholder: "45000" }),
+      aoResultat: select(a ? (a.aoResultat || "en_cours") : "en_cours", Object.keys(D.RESULTATS_AO).map(function (k) { return [k, D.RESULTATS_AO[k]]; })),
+      note: M.saisie(a ? a.note : (pre.note || ""), "textarea", { placeholder: "Critères d'adjudication, documents à fournir, partenaires…" })
+    };
+    var choisis = a ? (a.secteurs || []) : [];
+    var cases = el("div", "cases");
+    Object.keys(D.DISCIPLINES).forEach(function (c) {
+      var l = el("label"), i = el("input"); i.type = "checkbox"; i.value = c; i.checked = choisis.indexOf(c) >= 0;
+      l.appendChild(i); l.appendChild(document.createTextNode(D.DISCIPLINES[c])); cases.appendChild(l);
+    });
+    var form = el("form", "formulaire");
+    form.appendChild(M.champ("Numéro", f.code)); form.appendChild(M.champ("Type", f.aoType));
+    form.appendChild(M.champ("Objet de l'appel d'offres", f.nom, true));
+    form.appendChild(M.champ("Demandeur (annuaire)", f.demandeurId, true));
+    form.appendChild(M.champ("Remise de l'offre", f.echeance)); form.appendChild(M.champ("Honoraires offerts (CHF)", f.aoMontant));
+    form.appendChild(M.champ("Résultat", f.aoResultat));
+    if (Object.keys(D.DISCIPLINES).length) form.appendChild(M.champ("Secteurs concernés", cases, true));
+    form.appendChild(M.champ("Note", f.note, true));
+    var err = el("p", "erreur"); err.hidden = true; form.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    var ok = el("button", "btn principal", "Enregistrer"); ok.type = "submit"; act.appendChild(ok);
+    act.appendChild(bouton("Annuler", "", function () { if (a) detailAO(a.id); else M.panneau.ferme(); }));
+    if (a) act.appendChild(bouton("Supprimer", "rouge", function () {
+      if (!confirm("Supprimer « " + D.libelleAffaire(a) + " » ? Ses tâches et son agenda disparaissent aussi.")) return;
+      D.suppAffaire(a.id).then(function () { M.panneau.ferme(); M.annonce("Appel d'offres supprimé.", true, tout); tout(); })
+        .catch(function (e) { err.textContent = e.message; err.hidden = false; });
+    }));
+    form.appendChild(act);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true; ok.disabled = true;
+      var o = a ? base(a) : { teinte: (D.affaires({ tous: true }).length % 8) + 1, statut: "active", phase: "AO", adresse: "", ingenieurs: [], dessinateurs: [] };
+      o.code = f.code.value; o.nom = f.nom.value; o.note = f.note.value; o.echeance = f.echeance.value || null;
+      o.aoType = f.aoType.value; o.demandeurId = f.demandeurId.value; o.aoMontant = f.aoMontant.value; o.aoResultat = f.aoResultat.value;
+      o.secteurs = [].map.call(cases.querySelectorAll("input:checked"), function (i) { return i.value; });
+      if (o.aoResultat === "perdu" || o.aoResultat === "abandonne") o.statut = "terminee";
+      else if (o.statut === "terminee") o.statut = "active";
+      var p = a ? D.majAffaire(a.id, o) : D.ajouteAffaire(o);
+      if (!a && pre.veilleId) p = p.then(function (cree) { return D.marqueVeille(pre.veilleId, "retenue", cree && cree.id).then(function () { return cree; }); });
+      p.then(function (res) {
+        M.annonce(a ? "Appel d'offres modifié." : "Appel d'offres ouvert.", true, tout); tout();
+        var idv = a ? a.id : res && res.id; if (idv) detailAO(idv); else M.panneau.ferme();
+      }).catch(function (e2) { ok.disabled = false; err.textContent = e2.message; err.hidden = false; });
+    });
+    M.panneau.ouvre(a ? teteAO(a, "Modifier l'appel d'offres") : [el("div", "surtitre", "Nouvel appel d'offres"), el("h2", null, pre.nom || "Appel d'offres")], [form], a ? teinte(a) : null);
+    setTimeout(function () { f.nom.focus(); }, 250);
+  }
+
+  /* ---------- Agenda ---------- */
+  function listeAgenda(hote) {
+    var tous = sous() === "tous";
+    var l = D.agenda(tous ? {} : { depuis: auj() }).filter(function (r) {
+      var a = D.affaire(r.affaireId); return M.cherche([r.titre, r.lieu, r.note, D.GENRES_AGENDA[r.genre], a && a.code, a && a.nom].join(" "), q.value);
+    });
+    if (tous) l = l.slice().reverse();
+    $("#titre").textContent = tous ? "Agenda des AO" : "Agenda des AO · à venir";
+    $("#compte").textContent = l.length + " rendez-vous";
+    if (!l.length) { hote.appendChild(el("p", "vide", "Aucun rendez-vous" + (tous ? "." : " à venir."))); return; }
+    var mois = null, bloc = null, ll = null;
+    l.forEach(function (r) {
+      var d = C.dt(r.jour), m = d.toLocaleDateString("fr-CH", { month: "long", year: "numeric" });
+      if (m !== mois) {
+        mois = m; bloc = el("section", "bloc"); bloc.appendChild(el("h2", null, m.charAt(0).toUpperCase() + m.slice(1)));
+        ll = el("div", "liste-lignes"); bloc.appendChild(ll); hote.appendChild(bloc);
+      }
+      var a = D.affaire(r.affaireId);
+      var b = el("button", "ligne-l teinte" + (r.jour < auj() ? " passe" : "")); b.type = "button"; b.style.setProperty("--teinte", teinte(a));
+      var j = el("span", "rdv-jour"); j.appendChild(el("b", null, String(d.getDate())));
+      j.appendChild(document.createTextNode(d.toLocaleDateString("fr-CH", { weekday: "short" })));
+      b.appendChild(j);
+      var lib = el("span", "lib");
+      lib.appendChild(el("b", null, (r.heure ? r.heure + " · " : "") + (r.titre || D.GENRES_AGENDA[r.genre])));
+      lib.appendChild(el("small", null, [a ? D.libelleAffaire(a) : "", r.lieu].filter(Boolean).join(" · ")));
+      b.appendChild(lib);
+      var dr = el("span", "droite"); dr.appendChild(el("span", "pastille " + (r.genre === "remise" ? "rouge" : r.genre === "visite" ? "orange" : "gris"), D.GENRES_AGENDA[r.genre]));
+      b.appendChild(dr);
+      b.addEventListener("click", function () { formEvenement(r.id, {}); });
+      ll.appendChild(b);
+    });
+  }
+  function formEvenement(id, o) {
+    var r = id ? D.evenement(id) : null;
+    var liste = aos().filter(function (a) { return enCours(a) || (r && a.id === r.affaireId) || a.id === o.affaireId; });
+    if (!liste.length) { M.annonce("Ouvre d'abord un appel d'offres : un rendez-vous s'y rattache toujours."); return; }
+    var f = {
+      affaireId: select(r ? r.affaireId : (o.affaireId || liste[0].id), liste.map(function (a) { return [a.id, D.libelleAffaire(a)]; })),
+      genre: select(r ? r.genre : "visite", Object.keys(D.GENRES_AGENDA).map(function (k) { return [k, D.GENRES_AGENDA[k]]; })),
+      titre: M.saisie(r ? r.titre : ""), jour: M.saisie(r ? r.jour : auj(), "date"),
+      heure: M.saisie(r ? r.heure : "", "time", { step: "300" }), lieu: M.saisie(r ? r.lieu : "", "text", { placeholder: "Sur place, salle de conférence…" }),
+      note: M.saisie(r ? r.note : "", "textarea")
+    };
+    f.titre.placeholder = D.GENRES_AGENDA[f.genre.value];
+    f.genre.addEventListener("change", function () { f.titre.placeholder = D.GENRES_AGENDA[f.genre.value]; });
+    var form = el("form", "formulaire");
+    form.appendChild(M.champ("Appel d'offres", f.affaireId, true));
+    form.appendChild(M.champ("Type de rendez-vous", f.genre)); form.appendChild(M.champ("Intitulé", f.titre));
+    form.appendChild(M.champ("Date", f.jour)); form.appendChild(M.champ("Heure", f.heure));
+    form.appendChild(M.champ("Lieu", f.lieu, true)); form.appendChild(M.champ("Note", f.note, true));
+    var err = el("p", "erreur"); err.hidden = true; form.appendChild(err);
+    var act = el("div", "actions"); act.style.gridColumn = "1 / -1";
+    var ok = el("button", "btn principal", "Enregistrer"); ok.type = "submit"; act.appendChild(ok);
+    act.appendChild(bouton("Fermer", "", function () { M.panneau.ferme(); }));
+    if (r) act.appendChild(bouton("Supprimer", "rouge", function () {
+      D.suppEvenement(r.id).then(function () { M.panneau.ferme(); M.annonce("Rendez-vous retiré.", true, tout); tout(); })
+        .catch(function (e) { err.textContent = e.message; err.hidden = false; });
+    }));
+    form.appendChild(act);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); err.hidden = true; ok.disabled = true;
+      var v = { affaireId: f.affaireId.value, genre: f.genre.value, titre: f.titre.value.trim() || D.GENRES_AGENDA[f.genre.value],
+                jour: f.jour.value, heure: f.heure.value, lieu: f.lieu.value, note: f.note.value };
+      (r ? D.majEvenement(r.id, v) : D.ajouteEvenement(v)).then(function () {
+        M.panneau.ferme(); M.annonce(r ? "Rendez-vous modifié." : "Rendez-vous ajouté.", true, tout); tout();
+      }).catch(function (e2) { ok.disabled = false; err.textContent = e2.message; err.hidden = false; });
+    });
+    var a = D.affaire(f.affaireId.value);
+    M.panneau.ouvre([el("div", "surtitre", r ? "Rendez-vous" : "Nouveau rendez-vous"), el("h2", null, r ? (r.titre || D.GENRES_AGENDA[r.genre]) : "Agenda des AO")], [form], a ? teinte(a) : null);
+  }
+})();
+
+</script>
+</body>
+</html>
