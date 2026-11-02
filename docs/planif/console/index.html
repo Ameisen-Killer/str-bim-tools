@@ -415,9 +415,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Qui se connecte, quand, combien de temps : une page à part
     hotes.menu.appendChild(el("a", { class: "console-page", href: "/planif/console/activite/" },
       [el("span", { text: "Activité" }), el("span", { "aria-hidden": "true", text: "→" })]));
-    // Les statistiques du site vitrine : page cachée, accès direct d'ici
-    hotes.menu.appendChild(el("a", { class: "console-page suite", href: "/stats/" },
-      [el("span", { text: "Stats du site" }), el("span", { "aria-hidden": "true", text: "→" })]));
   }
 
   /** Affiche une section. depuisAdresse : l'adresse a déjà la bonne valeur. */
