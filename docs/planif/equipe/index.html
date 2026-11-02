@@ -244,19 +244,23 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }
   function rendArbre() {
     var hote = UI.vide(document.getElementById("eq-arbre"));
-    var tous = D.membres({ tous: true });
+    // Une affaire choisie : les nombres ne comptent que les personnes qui y sont (02.11.2026)
+    var dansAff = filtres.affaires.length ? membresAffaires(filtres.affaires) : null;
+    var tous = D.membres({ tous: true }).filter(function (m) { return !dansAff || dansAff[m.id]; });
     function compte(f) { return tous.filter(f).length; }
     function choisit(k) { cle = k; memorise(); dessine(); }
     entree(hote, "tous", "Tous", tous.length, 0, cle === "tous", choisit);
     var nAdmin = compte(estAdmin);
-    if (nAdmin) entree(hote, "admin", "Administrateurs", nAdmin, 0, cle === "admin", choisit);
+    var toute = D.membres({ tous: true });            // la structure du bandeau ne bouge pas ; seuls les nombres suivent l'affaire
+    if (toute.some(estAdmin)) entree(hote, "admin", "Administrateurs", nAdmin, 0, cle === "admin", choisit);
     var succ = Object.keys(D.SUCCURSALES);
-    if (tous.some(function (m) { return !m.succursale; }) && succ.length) succ.push("_");
+    if (toute.some(function (m) { return !m.succursale; }) && succ.length) succ.push("_");
     (succ.length ? succ : ["_"]).forEach(function (s) {
       var dansS = function (m) { return (m.succursale || "_") === s && !estAdmin(m); };
       if (succ.length) entree(hote, "s:" + s, s === "_" ? "Sans succursale" : D.SUCCURSALES[s], compte(function (m) { return (m.succursale || "_") === s; }), 0, cle === "s:" + s, choisit);
       var discs = {};
-      tous.filter(dansS).forEach(function (m) { discs[m.discipline || "_"] = (discs[m.discipline || "_"] || 0) + 1; });
+      toute.filter(dansS).forEach(function (m) { discs[m.discipline || "_"] = 0; });
+      tous.filter(dansS).forEach(function (m) { discs[m.discipline || "_"]++; });
       var ordre = Object.keys(D.DISCIPLINES);
       Object.keys(discs).sort(function (a, b) { return (a === "_" ? 999 : ordre.indexOf(a)) - (b === "_" ? 999 : ordre.indexOf(b)); }).forEach(function (d) {
         var k = "d:" + s + "|" + d;
