@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Affaires · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<!--
+  Bureau (/planif2/) — module Affaires, version 2 (02.11.2026).
+  Même philosophie que l'Équipe et les Absences : bandeau à gauche repliable
+  (recherche, Toutes, Mes affaires, succursales et leurs secteurs), ouvert sur
+  la succursale et le secteur de la personne connectée. À droite, une carte
+  par affaire (numéro, nom, phase, responsable, équipe, tâches ouvertes,
+  avancement) ; un clic ouvre son détail. Lecture seule ; /planif/ inchangé.
+-->
+<style>
+:root{
+  --t1:var(--m-fort);--t2:#2B5A8A;--t3:#1F7A70;--t4:#B0561A;--t5:#5E4FA0;--t6:#475B66;--t7:#7A6A12;--t8:#9C3F55;
+  --rouge:#C4372D;--orange:#C2700A;--bleu:#2B5A8A;
+}
+.outils{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px}
+.bascule{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--doux);cursor:pointer}
+.bascule input{width:16px;height:16px;accent-color:var(--m-fort)}
+
+.affaires{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+.affaire{position:relative;display:flex;flex-direction:column;gap:8px;padding:12px 14px 12px 18px;border:0;border-radius:8px;background:var(--carte);text-align:left;cursor:pointer;overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 1px rgba(0,0,0,.03);transition:box-shadow .15s,transform .15s}
+.affaire:hover{box-shadow:0 4px 14px rgba(0,0,0,.09);transform:translateY(-1px)}
+.affaire::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teinte,var(--t1))}
+.af-haut{display:flex;align-items:baseline;gap:8px}
+.af-code{font-weight:700;font-size:13px;color:var(--teinte,var(--t1));white-space:nowrap}
+.af-nom{flex:1;min-width:0;font-weight:600;font-size:15px;line-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pastille{flex:none;padding:1px 8px;border-radius:10px;background:var(--m-pale);color:var(--m-fort);font-size:11px;line-height:18px;font-weight:600;white-space:nowrap}
+.pastille.suspendue{background:#FFF4E0;color:var(--orange)}
+.pastille.terminee{background:#ECEDEA;color:var(--doux)}
+.af-infos{font-size:12px;line-height:16px;color:var(--doux)}
+.af-infos span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.af-bas{display:flex;align-items:center;gap:10px}
+.trombi{display:flex}
+.trombi .avatar{width:26px;height:26px;font-size:10px;margin-left:-6px;box-shadow:0 0 0 2px #fff}
+.trombi .avatar:first-child{margin-left:0}
+.trombi .plus{background:#ECEDEA;color:var(--doux)}
+.af-chiffres{margin-left:auto;text-align:right;font-size:12px;line-height:15px;color:var(--doux)}
+.af-chiffres b{color:var(--texte)}
+.af-chiffres .rouge{color:var(--rouge);font-weight:600}
+.jauge{height:6px;border-radius:3px;background:#ECEDEA;overflow:hidden}
+.jauge i{display:block;height:100%;background:var(--m-vif);border-radius:3px}
+.jauge.fact i{background:var(--bleu)}
+.jauges{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 8px;font-size:11px;color:var(--faible)}
+
+/* Détail d'une affaire : panneau à droite */
+.voile{position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.18)}
+.detail{position:fixed;top:0;right:0;bottom:0;z-index:9;width:min(480px,100%);display:flex;flex-direction:column;background:var(--carte);box-shadow:-8px 0 30px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .22s cubic-bezier(.2,.9,.3,1)}
+.detail.ouvert{transform:none}
+.detail header{position:relative;padding:18px 48px 14px 22px;border-bottom:1px solid var(--ligne)}
+.detail header::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teinte,var(--t1))}
+.detail h2{margin:2px 0 4px;font-size:19px;line-height:24px}
+.detail .fermer{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:7px;background:transparent;font-size:18px;cursor:pointer;color:var(--doux)}
+.detail .fermer:hover{background:var(--m-voile)}
+.detail .corps{flex:1;overflow:auto;padding:12px 22px 24px}
+.detail h3{margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faible)}
+.champ{display:grid;grid-template-columns:120px 1fr;gap:4px 10px;font-size:13px;line-height:18px}
+.champ dt{color:var(--faible)}
+.champ dd{margin:0}
+.gens{display:flex;flex-direction:column;gap:6px}
+.gens .p{display:flex;align-items:center;gap:8px;font-size:13px}
+.gens .avatar{width:28px;height:28px;font-size:11px}
+.gens small{color:var(--faible)}
+.t{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--ligne);font-size:13px;line-height:17px}
+.t .point{width:8px;height:8px;border-radius:50%;flex:none;background:#C9CCC4}
+.t .point.orange{background:#F5A524}.t .point.rouge{background:#E5484D}
+.t .lib{flex:1;min-width:0}
+.t .lib small{display:block;color:var(--faible);font-size:12px}
+.t .quand{flex:none;font-size:12px;color:var(--doux)}
+.t .quand.rouge{color:var(--rouge);font-weight:600}
+.phases{display:grid;grid-template-columns:40px 1fr 38px;align-items:center;gap:5px 8px;font-size:12px}
+.phases .jauge{height:7px}
+.vide-msg{margin:4px 0;color:var(--faible);font-size:13px}
+
+@media (max-width:700px){
+  .affaires{grid-template-columns:1fr}
+  .outils{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Affaires">
+    <div class="recherche"><input id="q" type="search" placeholder="Chercher une affaire" autocomplete="off" spellcheck="false" aria-label="Chercher une affaire"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Affaires</h1><span class="compte" id="compte"></span>
+      <div class="outils">
+        <label class="bascule"><input type="checkbox" id="terminees">Voir les terminées</label>
+      </div>
+    </div>
+    <div class="affaires" id="liste"></div>
+  </main>
+</div>
+
+<div class="voile" id="voile" hidden></div>
+<aside class="detail" id="detail" aria-label="Détail de l'affaire" aria-hidden="true">
+  <header><button type="button" class="fermer" id="fermer" aria-label="Fermer">×</button><div id="d-tete"></div></header>
+  <div class="corps" id="d-corps"></div>
+</aside>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
+  var $ = function (s) { return document.querySelector(s); };
+  var filtre = "toutes";            // toutes | miennes | s:<succursale> | d:<succursale>|<discipline>
+  var JOURS_ABR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
+  var STATUTS = { active: "Active", suspendue: "Suspendue", terminee: "Terminée" };
+
+  function el(tag, cls, txt) { var n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; }
+  function sansAccents(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  function deux(n) { return (n < 10 ? "0" : "") + n; }
+  function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + "." + deux(d.getMonth() + 1) + "." + String(d.getFullYear()).slice(2) : "—"; }
+  function quand(iso) {
+    var n = C.diff(C.isoAuj(), iso), d = C.dt(iso);
+    if (n < 0) return "Retard · " + jj(iso);
+    if (n === 0) return "Aujourd'hui";
+    if (n === 1) return "Demain";
+    if (n < 7) return JOURS_ABR[d.getDay()] + " " + jj(iso);
+    return jj(iso);
+  }
+  function urgence(iso) { var n = C.diff(C.isoAuj(), iso); return n <= 0 ? "rouge" : n < 7 ? "orange" : ""; }
+  function fmtJ(x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); }
+
+  /* ---------- Bandeau repliable (même réglage que l'Équipe et les Absences) ---------- */
+  var page = $("#page"), btn = $("#replier");
+  function replie(oui) {
+    page.classList.toggle("replie", oui);
+    btn.textContent = oui ? "›" : "‹";
+    btn.title = oui ? "Afficher le bandeau" : "Réduire le bandeau";
+    btn.setAttribute("aria-expanded", String(!oui));
+    try { localStorage.setItem("planif2.equipes.replie", oui ? "1" : ""); } catch (e) {}
+  }
+  var garde = null;
+  try { garde = localStorage.getItem("planif2.equipes.replie"); } catch (e) {}
+  replie(garde === null ? innerWidth <= 700 : garde === "1");
+  btn.addEventListener("click", function () { replie(!page.classList.contains("replie")); });
+
+  var cTerm = $("#terminees");
+  try { cTerm.checked = localStorage.getItem("planif2.affaires.terminees") === "1"; } catch (e) {}
+  cTerm.addEventListener("change", function () {
+    try { localStorage.setItem("planif2.affaires.terminees", cTerm.checked ? "1" : ""); } catch (e) {}
+    arbre(); liste();
+  });
+  var q = $("#q");
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+
+  if (SB && SB.configure && !SB.connecte()) { $("#liste").innerHTML = '<p class="vide">Connexion requise.</p>'; return; }
+  D.pret().then(function () {
+    var moi = D.monMembre();
+    if (moi && moi.succursale && moi.discipline && !/^administrat/.test(sansAccents(moi.discipline))) filtre = "d:" + moi.succursale + "|" + moi.discipline;
+    else if (moi && moi.succursale) filtre = "s:" + moi.succursale;
+    if (!affaires().some(dansFiltre)) filtre = "toutes";
+    arbre(); liste();
+    D.surRechargement(function () { arbre(); liste(); if (ouverte) detail(ouverte); });
+  }).catch(function (e) {
+    var p = el("p", "vide", (e && e.message) || "Chargement impossible.");
+    $("#liste").appendChild(p);
+  });
+
+  /* ---------- Qui est sur l'affaire, et dans quels secteurs ---------- */
+  function equipe(a) {
+    var ids = [];
+    function ajoute(i) { if (i && ids.indexOf(i) < 0 && D.membre(i)) ids.push(i); }
+    ajoute(a.responsableId);
+    (a.ingenieurs || []).forEach(ajoute);
+    (a.dessinateurs || []).forEach(ajoute);
+    D.taches({ affaireId: a.id, sansTerminees: true }).forEach(function (t) { ajoute(t.ingenieurId); ajoute(t.dessinateurId); });
+    return ids.map(D.membre);
+  }
+  /* Secteurs d'une affaire : ceux déclarés sur elle, et ceux des personnes de son équipe et de ses tâches ouvertes */
+  function secteurs(a) {
+    var l = (a.secteurs || []).slice();
+    equipe(a).forEach(function (m) { if (m.discipline && l.indexOf(m.discipline) < 0 && !/^administrat/.test(sansAccents(m.discipline))) l.push(m.discipline); });
+    var ordre = Object.keys(D.DISCIPLINES);
+    return l.filter(function (d) { return D.DISCIPLINES[d]; }).sort(function (x, y) { return ordre.indexOf(x) - ordre.indexOf(y); });
+  }
+  function affaires() { return D.affaires({ tous: cTerm.checked }); }
+  function estMienne(a) {
+    var moi = D.monMembre();
+    return !!moi && (a.responsableId === moi.id || equipe(a).some(function (m) { return m.id === moi.id; }));
+  }
+  function dansFiltre(a) {
+    if (filtre === "toutes") return true;
+    if (filtre === "miennes") return estMienne(a);
+    if (filtre.indexOf("s:") === 0) return (a.succursale || "_") === filtre.slice(2);
+    var p = filtre.slice(2).split("|");
+    return (a.succursale || "_") === p[0] && secteurs(a).indexOf(p[1]) >= 0;
+  }
+  function responsable(a) { var m = a.responsableId && D.membre(a.responsableId); return m ? m.prenom + " " + m.nom : ""; }
+  function cherche(a) {
+    var mots = sansAccents(q.value).split(/\s+/).filter(Boolean);
+    if (!mots.length) return true;
+    var t = sansAccents([a.code, a.nom, a.adresse, a.note, responsable(a), D.SUCCURSALES[a.succursale]].concat(
+      equipe(a).map(function (m) { return m.prenom + " " + m.nom; })).join(" "));
+    return mots.every(function (w) { return t.indexOf(w) >= 0; });
+  }
+
+  /* ---------- Bandeau : Toutes, Mes affaires, puis succursales et leurs secteurs ---------- */
+  function arbre() {
+    var hote = $("#arbre"), l = affaires();
+    hote.textContent = "";
+    function entree(cle, nom, n, niv) {
+      var b = el("button", "entree niv" + niv); b.type = "button";
+      b.setAttribute("aria-current", String(filtre === cle));
+      b.appendChild(el("span", "nom", nom)); b.appendChild(el("span", "n", n));
+      b.addEventListener("click", function () { filtre = cle; arbre(); liste(); if (innerWidth <= 700) replie(true); });
+      hote.appendChild(b);
+    }
+    entree("toutes", "Toutes", l.length, 0);
+    if (D.monMembre()) entree("miennes", "Mes affaires", l.filter(estMienne).length, 0);
+    var codes = Object.keys(D.SUCCURSALES);
+    if (l.some(function (a) { return !a.succursale; })) codes.push("_");
+    var titre = false, ordre = Object.keys(D.DISCIPLINES);
+    codes.forEach(function (s) {
+      var dela = l.filter(function (a) { return (a.succursale || "_") === s; });
+      if (!dela.length) return;
+      if (!titre) { hote.appendChild(el("p", "titre-groupe", "Succursales")); titre = true; }
+      entree("s:" + s, s === "_" ? "Succursale non renseignée" : D.SUCCURSALES[s], dela.length, 0);
+      var parSect = {};
+      dela.forEach(function (a) { secteurs(a).forEach(function (d) { parSect[d] = (parSect[d] || 0) + 1; }); });
+      Object.keys(parSect).sort(function (x, y) { return ordre.indexOf(x) - ordre.indexOf(y); }).forEach(function (d) {
+        entree("d:" + s + "|" + d, D.DISCIPLINES[d], parSect[d], 1);
+      });
+    });
+  }
+  function titreFiltre() {
+    if (filtre === "toutes") return "Toutes les affaires";
+    if (filtre === "miennes") return "Mes affaires";
+    if (filtre.indexOf("s:") === 0) { var s = filtre.slice(2); return s === "_" ? "Succursale non renseignée" : D.SUCCURSALES[s]; }
+    var p = filtre.slice(2).split("|");
+    return D.DISCIPLINES[p[1]] + " · " + (p[0] === "_" ? "succursale non renseignée" : D.SUCCURSALES[p[0]]);
+  }
+
+  /* ---------- Avancement du mandat : moyenne des phases au mandat ---------- */
+  function moyenneMandat(a, genre) {
+    var ph = Object.keys(a.mandat || {});
+    if (!ph.length) return null;
+    var v = ph.map(function (p) { return D.valeurPhase(a, p, genre); }).filter(function (x) { return x != null; });
+    return v.length ? Math.round(v.reduce(function (s, x) { return s + x; }, 0) / v.length) : null;
+  }
+  function avatar(m) {
+    var av = el("span", "avatar");
+    if (m.photo) { var img = el("img"); img.src = m.photo; img.alt = ""; av.appendChild(img); }
+    else av.textContent = ((m.prenom || "").charAt(0) + (m.nom || "").charAt(0)).toUpperCase() || "?";
+    av.title = m.prenom + " " + m.nom;
+    return av;
+  }
+
+  /* ---------- Les cartes ---------- */
+  function liste() {
+    if (!D.etat()) return;
+    var l = affaires().filter(dansFiltre).filter(cherche), hote = $("#liste");
+    $("#titre").textContent = titreFiltre();
+    $("#compte").textContent = l.length + (l.length > 1 ? " affaires" : " affaire");
+    hote.textContent = "";
+    if (!l.length) { hote.appendChild(el("p", "vide", "Aucune affaire ne correspond.")); return; }
+    var voitFact = D.voitFacturation && D.voitFacturation();
+    l.forEach(function (a) {
+      var c = el("button", "affaire"); c.type = "button";
+      c.style.setProperty("--teinte", "var(--t" + (a.teinte || 1) + ")");
+      var haut = el("div", "af-haut");
+      haut.appendChild(el("span", "af-code", a.code || "—"));
+      haut.appendChild(el("span", "af-nom", a.nom));
+      if (a.statut !== "active") haut.appendChild(el("span", "pastille " + a.statut, STATUTS[a.statut]));
+      else if (a.phase) haut.appendChild(el("span", "pastille", a.phase === "AO" ? "AO" : "Phase " + a.phase));
+      c.appendChild(haut);
+
+      var infos = el("div", "af-infos");
+      var r = responsable(a);
+      if (r) infos.appendChild(el("span", null, "Responsable : " + r));
+      var lieu = [a.succursale ? D.SUCCURSALES[a.succursale] : "", secteurs(a).map(function (d) { return D.DISCIPLINES[d]; }).join(", ")].filter(Boolean).join(" · ");
+      if (lieu) infos.appendChild(el("span", null, lieu));
+      if (a.adresse) infos.appendChild(el("span", null, a.adresse));
+      c.appendChild(infos);
+
+      var av = moyenneMandat(a, "avancement"), fa = voitFact ? moyenneMandat(a, "facturation") : null;
+      if (av != null) {
+        var j = el("div", "jauges");
+        j.appendChild(el("span", null, "Avancement"));
+        var g = el("div", "jauge"); var i = el("i"); i.style.width = av + "%"; g.appendChild(i); j.appendChild(g);
+        j.appendChild(el("span", null, av + " %"));
+        if (fa != null) {
+          j.appendChild(el("span", null, "Facturé"));
+          var g2 = el("div", "jauge fact"); var i2 = el("i"); i2.style.width = fa + "%"; g2.appendChild(i2); j.appendChild(g2);
+          j.appendChild(el("span", null, fa + " %"));
+        }
+        c.appendChild(j);
+      }
+
+      var bas = el("div", "af-bas"), tr = el("div", "trombi"), eq = equipe(a);
+      eq.slice(0, 6).forEach(function (m) { tr.appendChild(avatar(m)); });
+      if (eq.length > 6) tr.appendChild(el("span", "avatar plus", "+" + (eq.length - 6)));
+      bas.appendChild(tr);
+      var ouv = D.taches({ affaireId: a.id, sansTerminees: true });
+      var reste = ouv.reduce(function (s, t) { return s + Calc.chargeOuverte(t); }, 0);
+      var proch = ouv.filter(function (t) { return t.echeance; })[0];
+      var ch = el("div", "af-chiffres");
+      ch.appendChild(el("div", null, ouv.length ? ouv.length + (ouv.length > 1 ? " tâches ouvertes · " : " tâche ouverte · ") + fmtJ(reste) + " j" : "Aucune tâche ouverte"));
+      if (proch) { var pr = el("div", urgence(proch.echeance) === "rouge" ? "rouge" : null, "Prochaine : " + quand(proch.echeance)); ch.appendChild(pr); }
+      bas.appendChild(ch);
+      c.appendChild(bas);
+      c.addEventListener("click", function () { detail(a.id); });
+      hote.appendChild(c);
+    });
+  }
+
+  /* ---------- Détail ---------- */
+  var ouverte = null, panneau = $("#detail"), voile = $("#voile");
+  function ferme() { ouverte = null; panneau.classList.remove("ouvert"); panneau.setAttribute("aria-hidden", "true"); voile.hidden = true; }
+  $("#fermer").addEventListener("click", ferme);
+  voile.addEventListener("click", ferme);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && ouverte) ferme(); });
+
+  function detail(id) {
+    var a = D.affaire(id);
+    if (!a) { ferme(); return; }
+    ouverte = id;
+    panneau.style.setProperty("--teinte", "var(--t" + (a.teinte || 1) + ")");
+    var tete = $("#d-tete"); tete.textContent = "";
+    tete.appendChild(el("span", "af-code", a.code || "—"));
+    tete.appendChild(el("h2", null, a.nom));
+    var corps = $("#d-corps"); corps.textContent = "";
+
+    var dl = el("dl", "champ");
+    function ligne(k, v) { if (!v) return; dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); }
+    ligne("Statut", STATUTS[a.statut]);
+    ligne("Phase", a.phase ? D.libellePhase(a.phase) : "");
+    ligne("Responsable", responsable(a));
+    ligne("Succursale", D.SUCCURSALES[a.succursale]);
+    ligne("Secteurs", secteurs(a).map(function (d) { return D.DISCIPLINES[d]; }).join(", "));
+    ligne("Adresse", a.adresse);
+    ligne("Échéance", a.echeance ? jj(a.echeance) : "");
+    ligne("Note", a.note);
+    corps.appendChild(dl);
+
+    // Mandat : avancement (et facturation si permise) par phase
+    var phases = Object.keys(a.mandat || {}).sort();
+    if (phases.length) {
+      var voitFact = D.voitFacturation && D.voitFacturation();
+      corps.appendChild(el("h3", null, voitFact ? "Avancement et facturation" : "Avancement"));
+      var g = el("div", "phases");
+      phases.forEach(function (p) {
+        [["avancement", ""]].concat(voitFact ? [["facturation", " fact"]] : []).forEach(function (x, k) {
+          var v = D.valeurPhase(a, p, x[0]) || 0;
+          g.appendChild(el("span", null, k ? "" : p));
+          var j = el("div", "jauge" + x[1]); var i = el("i"); i.style.width = v + "%"; j.appendChild(i); g.appendChild(j);
+          g.appendChild(el("span", null, v + " %"));
+        });
+      });
+      corps.appendChild(g);
+    }
+
+    var eq = equipe(a);
+    corps.appendChild(el("h3", null, "Équipe (" + eq.length + ")"));
+    var gens = el("div", "gens");
+    eq.forEach(function (m) {
+      var p = el("div", "p"); p.appendChild(avatar(m));
+      var t = el("span", null, m.prenom + " " + m.nom + " ");
+      t.appendChild(el("small", null, (m.id === a.responsableId ? "Responsable · " : "") + D.libelleMetier(m.metier)));
+      p.appendChild(t); gens.appendChild(p);
+    });
+    if (!eq.length) gens.appendChild(el("p", "vide-msg", "Personne pour l'instant."));
+    corps.appendChild(gens);
+
+    var ouv = D.taches({ affaireId: a.id, sansTerminees: true });
+    corps.appendChild(el("h3", null, "Tâches ouvertes (" + ouv.length + ")"));
+    if (!ouv.length) corps.appendChild(el("p", "vide-msg", "Aucune tâche ouverte."));
+    ouv.forEach(function (t) {
+      var r = el("div", "t"), u = t.echeance ? urgence(t.echeance) : "";
+      r.appendChild(el("span", "point " + u));
+      var lib = el("span", "lib", t.titre);
+      var qui = Calc.affectations(t).filter(function (x) { return !x.fini; }).map(function (x) {
+        return (D.PARTS[x.role] ? D.PARTS[x.role].label + " " : "") + D.nomMembre(x.membreId) + " · " + fmtJ(x.charge) + " j";
+      });
+      var attend = Calc.nonAffectees(t).map(function (x) { return D.PARTS[x.role].label + " à affecter · " + fmtJ(x.charge) + " j"; });
+      lib.appendChild(el("small", null, qui.concat(attend).join(" · ")));
+      r.appendChild(lib);
+      if (t.echeance) r.appendChild(el("span", "quand" + (u === "rouge" ? " rouge" : ""), quand(t.echeance)));
+      corps.appendChild(r);
+    });
+
+    voile.hidden = false;
+    panneau.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(function () { panneau.classList.add("ouvert"); });
+  }
+})();
+</script>
+</body>
+</html>
