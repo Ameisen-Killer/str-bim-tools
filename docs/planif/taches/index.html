@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=107">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
 <style>
 .imp-periode{display:none}
@@ -114,29 +115,24 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap" data-bandeau></div>
 
-  <div class="wrap">
+  <!-- Bandeau de gauche repliable (02.11.2026, assets/bandeau.js) : recherche, rangement,
+       mes tâches, à affecter, équipes, affaire, statut ; la liste à droite -->
+  <div class="wrap bd-page" id="bd-page">
+    <aside class="bd-bandeau" id="bd-bandeau" aria-label="Recherche et filtres">
+      <div data-recherche></div>
+      <div id="bd-mode"></div>
+      <nav class="bd-arbre" id="bd-arbre"></nav>
+    </aside>
+    <button type="button" class="bd-replier" id="bd-replier" aria-controls="bd-bandeau" aria-expanded="true">‹</button>
+    <div class="bd-contenu">
     <section class="section">
-      <!-- Recherche et filtres restent sous les yeux quand la liste défile :
-           par quoi on restreint la liste ne doit pas partir avec elle. -->
-      <div class="tete-collante">
-        <div data-recherche></div>
-        <button class="btn seul-mobile" type="button" id="btn-filtres" aria-controls="filtres" aria-expanded="false" style="width:100%;justify-content:space-between">
-          <span>Filtres</span><span id="nb-filtres" class="or"></span>
-        </button>
-        <div class="grille-champs filtres-ligne" id="filtres"></div>
-        <!-- Deux rangements, toujours par semaine (13.10.2026, demande de Tony) ;
-             rendFiltres les range juste à gauche de « Masquer les terminées » -->
-        <div class="vue-taches" role="group" aria-label="Rangement de la liste">
-          <button class="btn" type="button" data-vue="echeance" aria-pressed="true">Par échéance</button>
-          <button class="btn" type="button" data-vue="affaire" aria-pressed="false">Par affaire</button>
-        </div>
-      </div>
       <!-- Téléphone seulement : la barre du haut y cache ses actions -->
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-bottom:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
       <!-- Une affaire filtrée qui a un mandat : son avancement, à saisir d'ici (13.10.2026) -->
       <div id="mandat-affaire"></div>
       <div class="defile" id="liste"></div>
     </section>
+    </div>
   </div>
 </main>
 
@@ -152,6 +148,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/bandeau.js?v=1"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
@@ -175,9 +172,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   D.pret().then(function () {
     var p = new URLSearchParams(location.search);
     if (p.get("affaire")) filtres.affaire = p.get("affaire");
-    // Les succursales retenues, sauf si le lien vise une affaire qui n'y est pas
-    filtres.succursales = succursalesRetenues();
-    if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.succursales = [];
     if (p.get("membre")) filtres.membre = p.get("membre");
     if (p.get("vue") === "affaire" || p.get("vue") === "echeance") vue = p.get("vue");
     // Ouverte depuis le menu, sans consigne : chacun voit d'abord ses propres tâches.
@@ -195,15 +189,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       { label: "Nouvelle tâche", or: true, icone: "ico-ajout-tache", action: function () { formulaire(null); } }
     ]);
     UI.pied();
-    // Collé sous la barre, le bloc recherche + filtres se resserre (planif.css)
-    UI.colleSousBarre(document.querySelector(".tete-collante"));
     UI.bandeauDemo(document.querySelector("[data-bandeau]"));
     document.querySelector(".entete").classList.add("vu");
     document.getElementById("btn-pdf").addEventListener("click", exportePdf);
-    document.getElementById("btn-filtres").addEventListener("click", function () {
-      var ouvert = document.getElementById("filtres").classList.toggle("ouvert");
-      this.setAttribute("aria-expanded", String(ouvert));
-    });
+    Bandeau.monte({ cle: "planif.taches.replie" });
 
     barre = UI.recherche({
       hote: document.querySelector("[data-recherche]"),
@@ -212,15 +201,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       surEntree: function () { var l = selection(); if (l.length === 1) formulaire(l[0].id); }
     });
 
-    rendFiltres();
-    [].forEach.call(document.querySelectorAll(".vue-taches [data-vue]"), function (b) {
-      b.addEventListener("click", function () {
-        if (vue === b.getAttribute("data-vue")) return;
-        vue = b.getAttribute("data-vue");
-        try { localStorage.setItem("planif.taches.vue", vue); } catch (e) {}
-        dessine();
-      });
-    });
+    // Le filtre de personne devient une entrée du bandeau
+    var moiT = D.monMembre();
+    if (filtres.membre === "a-affecter") cle = "a_affecter";
+    else if (filtres.membre && moiT && filtres.membre === moiT.id) cle = "miennes";
+    else if (filtres.membre && D.membre(filtres.membre)) cle = "m:" + filtres.membre;
+    else cle = "tous";
     D.surRechargement(dessine);
     dessine();
 
@@ -254,106 +240,53 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     ]));
   }
 
-  /* --------------------------------------------------------------- filtres */
-
-  /** L'affaire est dans une des succursales cochées (aucune cochée : toutes passent). */
-  function dansSuccursales(a) {
-    return !filtres.succursales.length || (!!a && filtres.succursales.indexOf(a.succursale || "_") >= 0);
+  /* --------------------------------------------------------------- bandeau
+     02.11.2026 (demande de Tony) : le bandeau de gauche remplace la ligne de
+     filtres. Une entrée à la fois : mes tâches, à affecter, toute l'équipe, une
+     personne (lien ?membre=), les administrateurs, une succursale ou un de ses
+     secteurs (les personnes de la tâche) ; puis l'affaire, le statut, les terminées. */
+  var cle = "tous", memoNombres = { cle: "", n: {} };
+  function gensDe(t) { return [t.ingenieurId, t.dessinateurId].map(function (i) { return i && D.membre(i); }).filter(Boolean); }
+  function dansCle(t, k) {
+    if (k === "tous" || k === "miennes" || k === "a_affecter" || k.indexOf("m:") === 0) return true;
+    var g = gensDe(t);
+    if (g.some(function (m) { return Bandeau.dansEquipe(m, k); })) return true;
+    if (k.indexOf("s:") === 0 && !g.length) { var a = D.affaire(t.affaireId); return !!a && (a.succursale || "_") === k.slice(2); }
+    return false;
   }
-
-  /* Le choix des succursales : celles du bureau, plus « Non renseignée » (« _ »,
-     qu'aucun code ne peut prendre) dès qu'une affaire n'en a pas. Retenu sur
-     cet appareil (13.10.2026). */
-  var CLE_SUCC = "planif.taches.succursales";
-  function optionsSuccursales() {
-    var o = Object.keys(D.SUCCURSALES).map(function (c) { return { valeur: c, label: D.SUCCURSALES[c] }; });
-    if (D.affaires({ tous: true }).some(function (a) { return !a.succursale; })) o.push({ valeur: "_", label: "Non renseignée" });
-    return o;
+  function membreDe(k) {
+    var moi = D.monMembre();
+    if (k === "miennes") return moi ? moi.id : "";
+    if (k === "a_affecter") return "a-affecter";
+    if (k.indexOf("m:") === 0) return k.slice(2);
+    return "";
   }
-  function nomSuccursale(c) { return c === "_" ? "Non renseignée" : D.SUCCURSALES[c] || c; }
-  function retiensSuccursales(v) { try { localStorage.setItem(CLE_SUCC, JSON.stringify(v)); } catch (e) {} }
-  function succursalesRetenues() {
-    try { var v = JSON.parse(localStorage.getItem(CLE_SUCC) || "[]"); return Array.isArray(v) ? v.map(String) : []; }
-    catch (e) { return []; }
+  function dansSuccursales(a) {        // affaires proposées : celles de la succursale choisie
+    var sc = Bandeau.succursaleDe(cle);
+    return !sc || sc === "_" || !a || !a.succursale || a.succursale === sc;
   }
-  var nbOptSucc = -1;
-
-  // Le sélecteur de rangement, sorti une fois de la page : un nouveau rendu des filtres le reprend
-  var blocVue = null;
-
   function rendFiltres() {
-    var hote = document.getElementById("filtres");
-    blocVue = blocVue || document.querySelector(".vue-taches");
-    UI.vide(hote);
-
-    /* Succursales : menu à cases avant l'affaire ; caché quand il n'offre qu'un choix */
-    var options = optionsSuccursales();
-    nbOptSucc = options.length;
-    var fSucc = UI.multiChoix({
-      libelle: "Filtrer : succursales", tous: "Toutes les succursales", pluriel: "succursales",
-      options: options,
-      valeurs: filtres.succursales,
-      surChange: function (v) {
-        filtres.succursales = v;
-        retiensSuccursales(v);
-        // L'affaire choisie sort des succursales cochées : le filtre Affaire revient à « Toutes »
-        if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.affaire = "";
-        var neuf = champAffaire();
-        hote.replaceChild(neuf, chAffaire);
-        chAffaire = neuf;
-        dessine();
-      }
+    var hm = UI.vide(document.getElementById("bd-mode"));
+    Bandeau.mode(hm, [["echeance", "Par échéance"], ["affaire", "Par affaire"]], vue, function (v) {
+      vue = v; try { localStorage.setItem("planif.taches.vue", vue); } catch (e) {} dessine();
     });
-    filtres.succursales = fSucc.valeurs();
-    var chSucc = el("div", { class: "champ champ-mc" }, [
-      el("label", { text: "Succursale", onclick: function () { fSucc.noeud.querySelector("button").click(); } }),
-      fSucc.noeud
-    ]);
-    if (options.length < 2) chSucc.style.display = "none";
-
-    var chAffaire = champAffaire();
-    var chMembre = UI.champ({
-      nom: "f-membre", label: "Membre", type: "select", valeur: filtres.membre,
-      options: [{ valeur: "", label: "Toute l'équipe" }, { valeur: "a-affecter", label: "À affecter (sans personne)" }]
-        .concat(UI.optionsParMetier(D.membres({ tous: true })))
-    });
-    var chStatut = UI.champ({
-      nom: "f-statut", label: "Statut", type: "select", valeur: filtres.statut,
-      options: [{ valeur: "", label: "Tous les statuts" }].concat(
-        Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; }))
-    });
-    hote.appendChild(chSucc); hote.appendChild(chAffaire); hote.appendChild(chMembre);
-    hote.appendChild(chStatut);
-
-    var masque = el("input", { type: "checkbox" });
-    masque.checked = filtres.masqueTerminees;
-    masque.addEventListener("change", function () { filtres.masqueTerminees = masque.checked; dessine(); });
-    hote.appendChild(el("div", { class: "champ champ-vue" }, [
-      blocVue,
-      el("label", {
-        class: "case", style: "white-space:nowrap",
-        title: "Les tâches terminées, et celles dont la part de la personne regardée est rendue"
-      }, [masque, "Masquer les terminées"])
-    ]));
-
-    // Une recherche dans les deux longues listes (13.10.2026)
-    UI.listeCherchable(chMembre.querySelector("select"));
-    chMembre.querySelector("select").addEventListener("change", function () { filtres.membre = this.value; dessine(); });
-    chStatut.querySelector("select").addEventListener("change", function () { filtres.statut = this.value; dessine(); });
-  }
-
-  /** Le menu Affaire : seulement les affaires des succursales cochées. */
-  function champAffaire() {
-    var ch = UI.champ({
-      nom: "f-affaire", label: "Affaire", type: "select", valeur: filtres.affaire,
-      options: [{ valeur: "", label: "Toutes les affaires" }].concat(
-        D.affaires({ tous: true }).filter(dansSuccursales)
-          .map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }))
-    });
-    var sel = ch.querySelector("select");
-    UI.listeCherchable(sel, { large: true });
-    sel.addEventListener("change", function () { filtres.affaire = this.value; dessine(); });
-    return ch;
+    var hote = Bandeau.vide(), moi = D.monMembre();
+    function choisit(k) { cle = k; filtres.membre = membreDe(k); if (filtres.affaire && !dansSuccursales(D.affaire(filtres.affaire))) filtres.affaire = ""; dessine(); }
+    // Les nombres ne dépendent pas de la recherche : calculés une fois par état des filtres
+    var empreinte = [D.version(), filtres.affaire, filtres.statut, filtres.masqueTerminees, filtres.membre].join("|");
+    if (memoNombres.cle !== empreinte) memoNombres = { cle: empreinte, n: {} };
+    function nombre(k) { return k in memoNombres.n ? memoNombres.n[k] : (memoNombres.n[k] = selection({ sansTexte: true, cle: k }).length); }
+    if (moi) Bandeau.entree(hote, "miennes", "Mes tâches", nombre("miennes"), 0, cle === "miennes", choisit);
+    Bandeau.entree(hote, "a_affecter", "À affecter", nombre("a_affecter"), 0, cle === "a_affecter", choisit);
+    if (cle.indexOf("m:") === 0) Bandeau.entree(hote, cle, "Tâches de " + D.nomMembre(cle.slice(2)), nombre(cle), 0, true, choisit);
+    Bandeau.titre(hote, "Équipes");
+    Bandeau.equipes(hote, { toute: D.membres({ planifies: true }), nombre: nombre, actif: cle, choix: choisit, libelleTous: "Toutes les tâches" });
+    Bandeau.liste(hote, "Affaire", [["", "Toutes les affaires"]].concat(D.affaires({ tous: true }).filter(dansSuccursales).map(function (a) { return [a.id, D.libelleAffaire(a)]; })),
+      filtres.affaire, function (v) { filtres.affaire = v; dessine(); });
+    Bandeau.liste(hote, "Statut", [["", "Tous les statuts"]].concat(Object.keys(D.STATUTS_TACHE).map(function (k) { return [k, D.STATUTS_TACHE[k]]; })),
+      filtres.statut, function (v) { filtres.statut = v; dessine(); });
+    Bandeau.caseACocher(hote, "Masquer les terminées", filtres.masqueTerminees, function (v) { filtres.masqueTerminees = v; dessine(); },
+      "Les tâches terminées, et celles dont la part de la personne regardée est rendue");
   }
 
   /** Tout ce qui, dans une tâche, peut être cherché. */
@@ -391,14 +324,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /**
    * opts.sansTexte : ignore la recherche (pour le total du compteur)
    * opts.terminees : force l'inclusion des tâches terminées et des parts rendues
+   * opts.cle : une autre entrée du bandeau que celle choisie (ses nombres)
    */
   function selection(opts) {
     opts = opts || {};
+    var k = opts.cle || cle, membre = opts.cle ? membreDe(k) : filtres.membre;
     var mots = opts.sansTexte || !barre ? [] : barre.termes();
-    var sansPersonne = filtres.membre === "a-affecter";   // tâches dont une charge attend encore quelqu'un
-    return D.taches({ affaireId: filtres.affaire || null, membreId: sansPersonne ? null : (filtres.membre || null) })
+    var sansPersonne = membre === "a-affecter";   // tâches dont une charge attend encore quelqu'un
+    return D.taches({ affaireId: filtres.affaire || null, membreId: sansPersonne ? null : (membre || null) })
       .filter(function (t) {
-        if (filtres.succursales.length && !dansSuccursales(D.affaire(t.affaireId))) return false;
+        if (!dansCle(t, k)) return false;
         if (sansPersonne && !Calc.nonAffectees(t).length) return false;
         if (filtres.masqueTerminees && !opts.terminees && rendu(t)) return false;
         if (filtres.statut && t.statut !== filtres.statut) return false;
@@ -411,14 +346,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var affichage = null;                             // paquets en cours, à arrêter au prochain rendu
 
   function dessine() {
-    // « Non renseignée » paraît ou disparaît avec la dernière affaire sans succursale
-    if (nbOptSucc >= 0 && optionsSuccursales().length !== nbOptSucc) rendFiltres();
     var taches = selection();
     var mots = barre ? barre.termes() : [];
     var parAffaire = vue === "affaire";
-    [].forEach.call(document.querySelectorAll(".vue-taches [data-vue]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.getAttribute("data-vue") === vue));
-    });
     var hote = document.getElementById("liste");
     if (affichage) affichage.fin();
     // Les lignes glissent vers leur nouvelle place (UI.joue, en fin de rendu)
@@ -428,9 +358,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     suivi.debut();
     if (barre) barre.compte(taches.length, selection({ sansTexte: true }).length);
 
-    // Nombre de filtres actifs, rappelé sur le bouton qui les replie (téléphone)
-    var actifs = [filtres.succursales.length, filtres.affaire, filtres.membre, filtres.statut].filter(Boolean).length;
-    document.getElementById("nb-filtres").textContent = actifs ? actifs + (actifs > 1 ? " actifs" : " actif") : "";
+    rendFiltres();
+    var actifs = [cle !== "tous", filtres.affaire, filtres.statut].filter(Boolean).length;
 
     var charge = taches.reduce(function (s, t) { return s + Calc.chargeTotale(t); }, 0);
     UI.defileTexte(document.getElementById("titre-liste"),
@@ -439,7 +368,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     /* En-tête du papier : sans lui, le PDF sortirait filtré sans dire sur quoi.
        Tout ce qui restreint la liste y figure, la recherche comprise. */
     var restreint = [];
-    if (filtres.succursales.length) restreint.push(filtres.succursales.map(nomSuccursale).join(", "));
+    if (/^(admin|s:|d:)/.test(cle)) restreint.push(Bandeau.titreCle(cle));
     if (filtres.affaire) { var af = D.affaire(filtres.affaire); if (af) restreint.push(D.libelleAffaire(af)); }
     if (filtres.membre) restreint.push(filtres.membre === "a-affecter" ? "À affecter" : D.nomMembre(filtres.membre));
     if (filtres.statut) restreint.push(D.STATUTS_TACHE[filtres.statut]);
@@ -897,13 +826,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       bloc.appendChild(el("p", { class: "aide", text: terminees + (terminees > 1 ? " tâches correspondent, terminées ou déjà rendues de ton côté." : " tâche correspond, terminée ou déjà rendue de ton côté.") }));
       bloc.appendChild(el("button", {
         class: "btn btn-or", type: "button", text: "Afficher les terminées",
-        onclick: function () { filtres.masqueTerminees = false; rendFiltres(); dessine(); }
+        onclick: function () { filtres.masqueTerminees = false; dessine(); }
       }));
     } else if (filtresActifs) {
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur les tâches filtrées." }));
       bloc.appendChild(el("button", {
         class: "btn btn-or", type: "button", text: "Retirer les filtres",
-        onclick: function () { filtres.succursales = []; retiensSuccursales([]); filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; rendFiltres(); dessine(); }
+        onclick: function () { cle = "tous"; filtres.affaire = ""; filtres.membre = ""; filtres.statut = ""; dessine(); }
       }));
     } else {
       bloc.appendChild(el("p", { class: "aide", text: "La recherche porte sur le libellé, la note, l'affaire, les personnes et le statut." }));

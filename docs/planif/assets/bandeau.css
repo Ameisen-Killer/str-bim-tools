@@ -1,0 +1,40 @@
+/* Bandeau de gauche repliable des pages de la planification (02.11.2026, demande de Tony,
+   repris du bureau /planif2/) : recherche, équipes (Tous, Administrateurs, succursales et
+   secteurs), puis les réglages de la page. Mêmes règles que la page Équipe (eq-…). */
+.bd-page{display:grid;grid-template-columns:272px 28px minmax(0,1fr);align-items:start;margin-top:10px}
+.bd-page.replie{grid-template-columns:0 28px minmax(0,1fr)}
+.bd-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
+  display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
+.bd-page.replie .bd-bandeau{visibility:hidden;padding:0;overflow:hidden}
+.bd-bandeau .recherche{margin:0;padding:2px 0 8px}
+.bd-bandeau .recherche-champ{font-size:16px;min-width:0}
+.bd-bandeau .recherche-touche{display:none}
+.bd-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
+  background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
+.bd-replier:hover{color:var(--or);border-color:var(--or-doux)}
+.bd-arbre{display:flex;flex-direction:column;gap:1px}
+.bd-arbre .titre-groupe{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
+.bd-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:5px 9px;border:0;border-radius:7px;background:none;
+  font:inherit;font-size:13.5px;color:var(--texte);text-align:left;cursor:pointer}
+.bd-arbre button:hover{background:var(--ab-vert-pale)}
+.bd-arbre button[aria-current="true"]{background:var(--ab-vert-clair);font-weight:600}
+.bd-arbre button.niv1{padding-left:24px;font-size:13px;color:var(--texte-doux)}
+.bd-arbre button.niv0{font-weight:600}
+.bd-arbre button .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-arbre button .n{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.bd-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:12px;color:var(--texte-faible)}
+.bd-affaire select{width:100%;min-height:34px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:13px;color:var(--texte)}
+.bd-contenu{min-width:0}
+.bd-contenu .section:first-child{margin-top:0}
+@media (max-width:760px){
+  .bd-page,.bd-page.replie{grid-template-columns:minmax(0,1fr)}
+  .bd-bandeau{position:static;max-height:none}
+  .bd-page.replie .bd-bandeau{display:none}
+  .bd-replier{position:static;width:100%;height:38px;margin:8px 0 10px;font-size:14px}
+}
+@media print{.bd-bandeau,.bd-replier{display:none}.bd-page{display:block}}
+.bd-bandeau .bd-case{display:flex;align-items:center;gap:8px;margin:8px 8px 0;font-size:13px;color:var(--texte-doux);cursor:pointer}
+.bd-bandeau .bd-mode{display:flex;padding:3px;border-radius:9px;background:rgba(var(--encre),.05);border:1px solid var(--ligne-faible)}
+.bd-bandeau .bd-mode button{flex:1;min-height:30px;border:0;border-radius:7px;background:transparent;font:inherit;font-size:13px;color:var(--texte-doux);cursor:pointer}
+.bd-bandeau .bd-mode button[aria-pressed="true"]{background:#fff;color:var(--texte);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.bd-contenu>.section:first-child{margin-top:0}
