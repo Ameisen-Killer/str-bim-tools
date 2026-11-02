@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Tableau de bord · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+Bureau V2 — Tableau de bord (02.11.2026) : planning par personne, barres des tâches, glisser pour décaler (Donnees.decalePart).
+Mêmes données que /planif/planning/ (non modifiée). Bandeau d'équipe commun (equipes.js).
+-->
+<style>
+.gantt{position:relative;overflow:auto;max-height:calc(100vh - 118px);border-radius:10px;background:var(--carte);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.g-grille{display:grid;grid-template-columns:190px var(--larg);min-width:max-content}
+.g-tete{position:sticky;top:0;z-index:3;background:var(--carte)}
+.g-coin{position:sticky;left:0;z-index:4;background:var(--carte);border-bottom:1px solid var(--ligne);border-right:1px solid var(--ligne);padding:6px 10px;font-size:11px;color:var(--faible);display:flex;align-items:flex-end}
+.g-jours{display:flex;flex-direction:column;border-bottom:1px solid var(--ligne)}
+.g-sems,.g-js{display:flex}
+.g-sem{flex:none;font-size:11px;font-weight:600;color:var(--doux);padding:4px 6px;border-left:1px solid var(--ligne);white-space:nowrap;overflow:hidden}
+.g-j{flex:none;width:var(--dw);text-align:center;font-size:10px;line-height:13px;color:var(--faible);padding:2px 0 4px}
+.g-j b{display:block;font-size:12px;color:var(--texte);font-weight:600}
+.g-j.we b,.g-j.ch b{color:var(--faible);font-weight:400}
+.g-j.auj{background:var(--m-clair);border-radius:6px 6px 0 0}
+.g-nom{position:sticky;left:0;z-index:2;background:var(--carte);border-right:1px solid var(--ligne);border-bottom:1px solid var(--ligne);padding:6px 10px;display:flex;align-items:center;gap:8px;min-height:40px}
+.g-nom .avatar{width:26px;height:26px;font-size:10px;flex:none}
+.g-nom b{display:block;font-size:13px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-nom small{display:block;font-size:11px;line-height:14px;color:var(--faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-nom.libre b{color:var(--rouge)}
+.g-piste{position:relative;border-bottom:1px solid var(--ligne);background-image:var(--fond);background-size:100% 100%}
+.barre{position:absolute;height:22px;border-radius:5px;background:var(--teinte,var(--t1));color:#fff;font-size:11px;line-height:22px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);user-select:none;touch-action:none}
+.barre.dessin{background:repeating-linear-gradient(135deg,var(--teinte,var(--t1)) 0 8px,color-mix(in srgb,var(--teinte,var(--t1)) 80%,#fff) 8px 16px)}
+.barre.fini{opacity:.4}
+.barre.reportee{outline:2px solid var(--rouge);outline-offset:-2px}
+.barre.libre{background:#fff;color:var(--rouge);border:1.5px dashed var(--rouge);line-height:19px}
+.barre.glisse{opacity:.85;box-shadow:0 6px 18px rgba(0,0,0,.25);z-index:5;cursor:grabbing}
+.barre:hover{filter:brightness(1.08)}
+.g-auj{position:absolute;top:0;bottom:0;width:2px;background:var(--rouge);opacity:.5;pointer-events:none;z-index:1}
+.legende{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 2px 0;font-size:11px;color:var(--faible)}
+.legende i{display:inline-block;width:18px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px;background:var(--t2)}
+.legende i.d{background:repeating-linear-gradient(135deg,var(--t2) 0 4px,#9ab 4px 8px)}
+.legende i.r{background:#fff;outline:2px solid var(--rouge);outline-offset:-2px}
+.legende i.l{background:#fff;border:1.5px dashed var(--rouge)}
+.nav-sem{display:inline-flex;gap:4px}
+.nav-sem .btn{padding:0 10px}
+.outils select{height:34px;border:1px solid var(--ligne);border-radius:8px;background:var(--carte);font:inherit;font-size:13px;padding:0 8px}
+.decale{display:flex;flex-wrap:wrap;gap:6px}
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Tableau de bord">
+    <div class="recherche"><input id="q" type="search" placeholder="Rechercher une personne…" autocomplete="off" spellcheck="false" aria-label="Rechercher une personne…"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Tableau de bord</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script src="/planif2/assets/equipes.js?v=3"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var DW = 34;
+  var vue = { debut: null, semaines: 4, occupes: false, role: "" };
+  try { var g = JSON.parse(localStorage.getItem("planif2.tableau") || "{}"); if (g.semaines) vue.semaines = g.semaines; vue.occupes = !!g.occupes; vue.role = g.role || ""; } catch (e) {}
+  function retiens() { try { localStorage.setItem("planif2.tableau", JSON.stringify({ semaines: vue.semaines, occupes: vue.occupes, role: vue.role })); } catch (e) {} }
+
+  Equipes.monte({ nom: "tableau", surChange: function () { rend(); } });
+  outils();
+
+  M.demarre(function () {
+    vue.debut = C.lundi(C.isoAuj());
+    Equipes.pret();
+    rend();
+    D.surRechargement(function () { cache.cle = null; Equipes.arbre(); if (!glisse) rend(); });
+  });
+
+  function auj() { return C.isoAuj(); }
+  function teinte(a) { return "var(--t" + ((a && a.teinte) || 1) + ")"; }
+  function bouton(txt, cls, f) { var b = el("button", "btn" + (cls ? " " + cls : ""), txt); b.type = "button"; b.addEventListener("click", f); return b; }
+  function select(v, opts, f) { var s = el("select"); opts.forEach(function (o) { var x = el("option", null, o[1]); x.value = o[0]; s.appendChild(x); }); s.value = v; s.addEventListener("change", function () { f(s.value); }); return s; }
+
+  function outils() {
+    var o = $("#outils"); o.textContent = "";
+    var nav = el("span", "nav-sem");
+    nav.appendChild(bouton("‹", "", function () { vue.debut = C.ajoute(vue.debut, -7); rend(); }));
+    nav.appendChild(bouton("Aujourd'hui", "", function () { vue.debut = C.lundi(auj()); rend(); }));
+    nav.appendChild(bouton("›", "", function () { vue.debut = C.ajoute(vue.debut, 7); rend(); }));
+    o.appendChild(nav);
+    o.appendChild(select(String(vue.semaines), [["2", "2 semaines"], ["4", "4 semaines"], ["6", "6 semaines"], ["8", "8 semaines"], ["12", "12 semaines"]], function (v) { vue.semaines = parseInt(v, 10); retiens(); rend(); }));
+    o.appendChild(select(vue.role, [["", "Calcul et dessin"], ["ingenieur", "Calcul seulement"], ["dessinateur", "Dessin seulement"]], function (v) { vue.role = v; retiens(); rend(); }));
+    var l = el("label", "bascule"), c = el("input"); c.type = "checkbox"; c.checked = vue.occupes;
+    c.addEventListener("change", function () { vue.occupes = c.checked; retiens(); rend(); });
+    l.appendChild(c); l.appendChild(document.createTextNode(" Seulement les occupés")); o.appendChild(l);
+  }
+
+  /* Toutes les barres, calculées une fois par version des données (comme /planif/planning/) */
+  var cache = { cle: null, aff: [], libres: [] };
+  function barres() {
+    var canton = D.canton(), cle = D.version() + "|" + canton + "|" + auj();
+    if (cache.cle === cle) return cache;
+    var aff = [], libres = [];
+    D.taches({ sansTerminees: false }).forEach(function (t) {
+      if (!Calc.finEffective(t)) return;
+      Calc.affectations(t).forEach(function (af) {
+        var fin = Calc.finPart(t, af.role, canton);
+        var b = { tache: t, role: af.role, charge: af.charge, membreId: af.membreId, fini: af.fini || t.statut === "termine", fin: fin, debut: Calc.debutAffectation(t, af, canton) };
+        if (!b.fini) { var f = Calc.fenetre(af.charge, fin, D.membre(af.membreId), canton); if (f.reportee) { b.debut = f.debut; b.fin = f.fin; b.reportee = true; } }
+        aff.push(b);
+      });
+      if (t.statut === "termine") return;
+      Calc.nonAffectees(t).forEach(function (na) {
+        var f = Calc.fenetre(na.charge, Calc.finPart(t, na.role, canton), null, canton);
+        libres.push({ tache: t, role: na.role, charge: na.charge, membreId: null, debut: f.debut, fin: f.fin, reportee: f.reportee, libre: true });
+      });
+    });
+    cache = { cle: cle, aff: aff, libres: libres };
+    return cache;
+  }
+
+  var glisse = null;
+  function rend() {
+    if (!D.etat() || !vue.debut) return;
+    var canton = D.canton(), n = vue.semaines * 7, jours = C.serie(vue.debut, n), premier = jours[0], dernier = jours[n - 1];
+    var planifies = {}; D.membres({ planifies: true }).forEach(function (m) { planifies[m.id] = true; });
+    var gens = Equipes.membres().filter(function (m) { return planifies[m.id] && (!vue.role || D.cote(m.metier) === vue.role); });
+    var B = barres(), parM = {};
+    function visible(b) { return b.debut && b.fin && !(b.fin < premier || b.debut > dernier) && (!vue.role || b.role === vue.role); }
+    B.aff.forEach(function (b) { if (visible(b)) (parM[b.membreId] || (parM[b.membreId] = [])).push(b); });
+    if (vue.occupes) gens = gens.filter(function (m) { return parM[m.id] && parM[m.id].length; });
+    var ORDRE = { ingenieur: 0, dessinateur: 1 };
+    gens.sort(function (x, y) { var a = ORDRE[D.cote(x.metier)], b = ORDRE[D.cote(y.metier)]; return (a == null ? 9 : a) - (b == null ? 9 : b) || x.prenom.localeCompare(y.prenom, "fr") || x.nom.localeCompare(y.nom, "fr"); });
+    var libres = B.libres.filter(visible);
+
+    $("#titre").textContent = "Tableau de bord · " + Equipes.titre();
+    var s0 = C.semaineISO(premier), s1 = C.semaineISO(dernier);
+    $("#compte").textContent = "S" + s0.num + "–S" + s1.num + " · " + gens.length + (gens.length > 1 ? " personnes" : " personne");
+
+    var hote = $("#liste"), ancien = hote.querySelector(".gantt"), sx = ancien ? ancien.scrollLeft : null, sy = ancien ? ancien.scrollTop : 0;
+    hote.textContent = "";
+    var box = el("div", "gantt"), gr = el("div", "g-grille");
+    gr.style.setProperty("--larg", (n * DW) + "px"); gr.style.setProperty("--dw", DW + "px");
+    // Fond : week-ends et jours chômés grisés
+    var stops = [];
+    jours.forEach(function (j, i) { if (C.chome(j, canton)) stops.push("linear-gradient(90deg,transparent " + (i * DW) + "px,rgba(0,0,0,.04) " + (i * DW) + "px,rgba(0,0,0,.04) " + ((i + 1) * DW) + "px,transparent " + ((i + 1) * DW) + "px)"); });
+    for (var w = 1; w < vue.semaines; w++) stops.push("linear-gradient(90deg,transparent " + (w * 7 * DW - 1) + "px,var(--ligne) " + (w * 7 * DW - 1) + "px,var(--ligne) " + (w * 7 * DW) + "px,transparent " + (w * 7 * DW) + "px)");
+    var fond = stops.join(",") || "none";
+    // En-tête
+    var coin = el("div", "g-coin g-tete", "Personne"); gr.appendChild(coin);
+    var tj = el("div", "g-jours g-tete"), ts = el("div", "g-sems"), tjs = el("div", "g-js");
+    for (var k = 0; k < vue.semaines; k++) { var lu = jours[k * 7], sm = el("div", "g-sem", "S" + C.semaineISO(lu).num + " · " + M.jj(lu)); sm.style.width = (7 * DW) + "px"; ts.appendChild(sm); }
+    jours.forEach(function (j) {
+      var d = C.dt(j), c = el("div", "g-j" + (d.getDay() % 6 === 0 ? " we" : C.chome(j, canton) ? " ch" : "") + (j === auj() ? " auj" : ""));
+      c.appendChild(el("b", null, String(d.getDate()))); c.appendChild(document.createTextNode("dlmmjvs".charAt(d.getDay()).toUpperCase()));
+      if (C.ferie(j, canton)) c.title = C.ferie(j, canton);
+      tjs.appendChild(c);
+    });
+    tj.appendChild(ts); tj.appendChild(tjs); gr.appendChild(tj);
+    var iAuj = C.diff(premier, auj());
+
+    function ligne(nomCell, liste) {
+      gr.appendChild(nomCell);
+      var piste = el("div", "g-piste"); piste.style.setProperty("--fond", fond);
+      // Rangées sans chevauchement
+      liste.sort(function (a, b) { return a.debut < b.debut ? -1 : a.debut > b.debut ? 1 : 0; });
+      var fins = [];
+      liste.forEach(function (b) {
+        var r = 0; while (fins[r] && fins[r] >= b.debut) r++; fins[r] = b.fin;
+        var i0 = Math.max(0, C.diff(premier, b.debut)), i1 = Math.min(n - 1, C.diff(premier, b.fin));
+        var a = D.affaire(b.tache.affaireId);
+        var x = el("div", "barre" + (b.role === "dessinateur" ? " dessin" : "") + (b.fini ? " fini" : "") + (b.reportee ? " reportee" : "") + (b.libre ? " libre" : ""));
+        x.style.left = (i0 * DW + 2) + "px"; x.style.width = Math.max(DW - 4, (i1 - i0 + 1) * DW - 4) + "px"; x.style.top = (6 + r * 26) + "px";
+        x.style.setProperty("--teinte", teinte(a));
+        x.textContent = (a && a.code ? a.code + " · " : "") + b.tache.titre;
+        x.title = (a ? D.libelleAffaire(a) + "\n" : "") + b.tache.titre + "\n" + D.PARTS[b.role].label + " · " + M.fmtJ(b.charge) + " j · " + M.jj(b.debut) + " → " + M.jj(b.fin) + (b.reportee ? "\nEn retard : reportée à partir d'aujourd'hui" : "");
+        x.addEventListener("pointerdown", function (e) { saisit(e, x, b); });
+        piste.appendChild(x);
+      });
+      piste.style.height = Math.max(40, 12 + fins.length * 26) + "px";
+      if (iAuj >= 0 && iAuj < n) { var t = el("div", "g-auj"); t.style.left = (iAuj * DW + DW / 2) + "px"; piste.appendChild(t); }
+      gr.appendChild(piste);
+    }
+    if (libres.length) {
+      var nl = el("div", "g-nom libre"), tl = el("div"); tl.appendChild(el("b", null, "À affecter")); tl.appendChild(el("small", null, libres.length + (libres.length > 1 ? " charges sans personne" : " charge sans personne"))); nl.appendChild(tl);
+      ligne(nl, libres);
+    }
+    gens.forEach(function (m) {
+      var nc = el("div", "g-nom"); nc.appendChild(M.avatar(m));
+      var t = el("div"); t.style.minWidth = "0"; t.appendChild(el("b", null, m.prenom + " " + m.nom)); t.appendChild(el("small", null, m.metier ? D.libelleMetier(m.metier) : ""));
+      nc.appendChild(t);
+      ligne(nc, (parM[m.id] || []).slice());
+    });
+    box.appendChild(gr); hote.appendChild(box);
+    if (!gens.length && !libres.length) hote.appendChild(el("p", "vide", "Personne à planifier dans ce filtre."));
+    var lg = el("div", "legende");
+    [["", "Calcul"], ["d", "Dessin"], ["r", "En retard, reportée dès aujourd'hui"], ["l", "À affecter"]].forEach(function (x) { var s = el("span"); s.appendChild(el("i", x[0])); s.appendChild(document.createTextNode(x[1])); lg.appendChild(s); });
+    lg.appendChild(el("span", null, "Glisser une barre décale sa part ; un clic ouvre la tâche."));
+    hote.appendChild(lg);
+    if (sx != null) { box.scrollLeft = sx; box.scrollTop = sy; }
+    else if (iAuj > 3) box.scrollLeft = Math.max(0, (iAuj - 2) * DW);
+  }
+
+  /* ---------- Glisser-déposer : D.decalePart, comme /planif/planning/ ---------- */
+  function saisit(e, x, b) {
+    if (e.button !== 0) return;
+    var peut = !b.fini && !b.libre && D.peutEcrireTache(b.tache) && D.decalePart;
+    var x0 = e.clientX, gauche = parseFloat(x.style.left), bouge = false;
+    x.setPointerCapture(e.pointerId);
+    function move(ev) {
+      var dx = ev.clientX - x0;
+      if (!bouge && Math.abs(dx) < 5) return;
+      if (!peut) return;
+      bouge = true; glisse = b; x.classList.add("glisse");
+      x.style.left = (gauche + Math.round(dx / DW) * DW) + "px";
+    }
+    function up(ev) {
+      x.removeEventListener("pointermove", move); x.removeEventListener("pointerup", up); x.removeEventListener("pointercancel", up);
+      var j = Math.round((ev.clientX - x0) / DW);
+      glisse = null;
+      if (!bouge) { detail(b); return; }
+      x.classList.remove("glisse");
+      if (!j) { x.style.left = gauche + "px"; return; }
+      decale(b, j);
+    }
+    x.addEventListener("pointermove", move); x.addEventListener("pointerup", up); x.addEventListener("pointercancel", up);
+  }
+  function decale(b, j) {
+    D.decalePart(b.tache.id, b.role, j).then(function () {
+      cache.cle = null; rend();
+      M.annonce(D.PARTS[b.role].label + " de « " + b.tache.titre + " » décalé de " + (j > 0 ? "+" : "") + j + " j.", true, function () { cache.cle = null; rend(); });
+      if (M.panneau.ouvert()) detail(b);
+    }).catch(function (err) { cache.cle = null; rend(); M.annonce(err.message); });
+  }
+
+  /* ---------- Détail d'une barre ---------- */
+  function detail(b) {
+    var t = D.tache(b.tache.id); if (!t) { M.panneau.ferme(); return; }
+    var a = D.affaire(t.affaireId), peut = D.peutEcrireTache(t);
+    var d = el("dl", "champ");
+    function ligneDl(k, v) { if (v == null || v === "") return; d.appendChild(el("dt", null, k)); var dd = el("dd"); if (typeof v === "string") dd.textContent = v; else dd.appendChild(v); d.appendChild(dd); }
+    ligneDl("Affaire", a ? D.libelleAffaire(a) : "");
+    ligneDl("Échéance", t.echeance ? M.jj(t.echeance, true) + " (" + M.quand(t.echeance) + ")" : "");
+    ligneDl("Part affichée", D.PARTS[b.role].label + " · " + M.fmtJ(b.charge) + " j · " + M.jj(b.debut) + " → " + M.jj(b.fin) + (b.reportee ? " · en retard" : ""));
+    Object.keys(D.PARTS).forEach(function (r) {
+      var P = D.PARTS[r], ch = t[P.charge]; if (!ch) return;
+      ligneDl(P.label, (t[P.membre] ? D.nomMembre(t[P.membre]) : "à affecter") + " · " + M.fmtJ(ch) + " j" + (t[P.fini] ? " · terminé" : ""));
+    });
+    if (t.note) ligneDl("Note", t.note);
+    var corps = [d];
+    var err = el("p", "erreur"); err.hidden = true;
+    if (peut && t.statut !== "termine") {
+      corps.push(el("h3", null, "Décaler la part " + D.PARTS[b.role].label.toLowerCase()));
+      var dc = el("div", "decale");
+      [[-7, "−1 sem."], [-1, "−1 j"], [1, "+1 j"], [7, "+1 sem."]].forEach(function (x) { dc.appendChild(bouton(x[1], "", function () { decale(b, x[0]); })); });
+      corps.push(dc);
+      corps.push(el("h3", null, "Qui fait la part " + D.PARTS[b.role].label.toLowerCase()));
+      var P = D.PARTS[b.role], cote = b.role;
+      var opts = [["", "— À affecter —"]].concat(D.membres({ planifies: true }).filter(function (m) { return D.cote(m.metier) === cote || m.id === t[P.membre]; }).map(function (m) { return [m.id, m.prenom + " " + m.nom]; }));
+      var s = select(t[P.membre] || "", opts, function (v) {
+        var ch = {}; ch[P.membre] = v || null;
+        D.retoucheTache(t.id, ch).then(function () { cache.cle = null; rend(); M.annonce("Part " + P.label.toLowerCase() + " réaffectée.", true, function () { cache.cle = null; rend(); }); })
+          .catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
+      });
+      var f = el("div", "formulaire"); f.appendChild(M.champ("Personne", s, true)); corps.push(f);
+    }
+    corps.push(err);
+    var act = el("div", "actions");
+    act.appendChild(bouton("Ouvrir dans Tâches", "", function () { M.ouvreModule("taches", "/planif2/taches/"); }));
+    if (a && D.pagePermise("affaires")) act.appendChild(bouton("Voir l'affaire", "", function () { M.ouvreModule("affaires", "/planif2/affaires/?q=" + encodeURIComponent(a.code || a.nom)); }));
+    corps.push(act);
+    M.panneau.ouvre([el("div", "surtitre", a ? (a.code || "Tâche") : "Tâche"), el("h2", null, t.titre)], corps, teinte(a));
+  }
+})();
+
+</script>
+</body>
+</html>
