@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Tâches · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<!--
+  Bureau (/planif2/) — module Tâches, version 2 (02.11.2026).
+  Même philosophie que l'Équipe, les Absences et les Affaires : bandeau à
+  gauche repliable (recherche, Mes tâches, À affecter, Toutes, puis les
+  succursales et leurs secteurs — les tâches de leurs gens), liste par
+  semaine d'échéance. Chaque tâche a sa case à cocher (gris, orange dans la
+  semaine, rouge à échéance) : cocher termine SA part, comme le pouce de
+  l'accueil de /planif/ ; sans part sur la tâche, avec le droit d'écrire les
+  tâches des autres, on la termine en entier. Un clic ouvre son détail.
+  ?tache=<id> ouvre directement une tâche. /planif/ inchangé.
+-->
+<style>
+:root{--t1:var(--m-fort);--t2:#2B5A8A;--t3:#1F7A70;--t4:#B0561A;--t5:#5E4FA0;--t6:#475B66;--t7:#7A6A12;--t8:#9C3F55;--rouge:#C4372D;--orange:#E08A00}
+.outils{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px}
+.bascule{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--doux);cursor:pointer}
+.bascule input{width:16px;height:16px;accent-color:var(--m-fort)}
+
+.semaine-bloc{margin:0 0 16px}
+.semaine-bloc h2{display:flex;align-items:baseline;gap:10px;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--doux)}
+.semaine-bloc h2 small{font-weight:400;color:var(--faible)}
+.semaine-bloc h2.retard{color:var(--rouge)}
+.taches{display:flex;flex-direction:column;gap:5px}
+.tache{position:relative;display:flex;align-items:center;gap:6px;padding:6px 12px 6px 10px;border-radius:8px;background:var(--carte);box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 1px rgba(0,0,0,.03);overflow:hidden}
+.tache::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teinte,var(--t1))}
+.tache .corps-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 0;border:0;background:transparent;text-align:left;cursor:pointer;color:inherit}
+.tache .lib{flex:1;min-width:0}
+.tache .lib b{display:block;font-size:14px;line-height:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tache .lib b .code{color:var(--teinte,var(--t1));margin-right:6px}
+.tache .lib small{display:block;font-size:12px;line-height:16px;color:var(--faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tache .quand{flex:none;text-align:right;font-size:12px;line-height:16px;color:var(--doux)}
+.tache .quand.rouge{color:var(--rouge);font-weight:600}
+.prio{flex:none;padding:0 6px;border-radius:9px;font-size:11px;line-height:17px;font-weight:700;background:#ECEDEA;color:var(--doux)}
+.prio.p1{background:#FDE2E0;color:var(--rouge)}.prio.p2{background:#FFEBD2;color:#B45309}.prio.p3{background:var(--m-pale);color:var(--m-fort)}
+.etiq{display:inline-block;margin-right:6px}
+.etiq.finie{text-decoration:line-through}
+.etiq.attend{color:#B45309}
+.tache.finie .lib b{text-decoration:line-through;color:var(--faible)}
+.tache.finie{opacity:.7}
+
+/* Case à cocher : terminer sa part */
+.coche{flex:none;width:32px;height:32px;padding:0;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;border-radius:7px;--c:#9A9E95}
+.coche:hover{background:var(--m-voile)}
+.coche:disabled{cursor:default;opacity:.35}
+.coche:disabled:hover{background:transparent}
+.coche.orange{--c:var(--orange)}
+.coche.rouge{--c:var(--rouge)}
+.coche span{width:18px;height:18px;border:2px solid var(--c);border-radius:5px;display:grid;place-items:center;transition:background .15s,transform .15s}
+.coche span::after{content:"";width:9px;height:4px;margin-top:-2px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) scale(0);transition:transform .15s}
+.coche:not(:disabled):hover span{transform:scale(1.08)}
+.coche.cochee span{background:var(--c)}
+.coche.cochee span::after{transform:rotate(-45deg) scale(1)}
+
+/* Détail : panneau à droite */
+.voile{position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.18)}
+.detail{position:fixed;top:0;right:0;bottom:0;z-index:9;width:min(460px,100%);display:flex;flex-direction:column;background:var(--carte);box-shadow:-8px 0 30px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .22s cubic-bezier(.2,.9,.3,1)}
+.detail.ouvert{transform:none}
+.detail header{position:relative;padding:18px 48px 14px 22px;border-bottom:1px solid var(--ligne)}
+.detail header::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teinte,var(--t1))}
+.detail h2{margin:2px 0 0;font-size:18px;line-height:23px}
+.detail .code{font-size:13px;font-weight:700;color:var(--teinte,var(--t1))}
+.detail .fermer{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:7px;background:transparent;font-size:18px;cursor:pointer;color:var(--doux)}
+.detail .fermer:hover{background:var(--m-voile)}
+.detail .corps{flex:1;overflow:auto;padding:12px 22px 24px}
+.detail h3{margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faible)}
+.champ{display:grid;grid-template-columns:110px 1fr;gap:5px 10px;font-size:13px;line-height:18px;margin:0}
+.champ dt{color:var(--faible)}
+.champ dd{margin:0}
+.part{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--ligne);font-size:13px}
+.part .avatar{width:30px;height:30px;font-size:11px}
+.part .q{flex:1}
+.part small{display:block;color:var(--faible)}
+.jauge{height:7px;border-radius:4px;background:#ECEDEA;overflow:hidden}
+.jauge i{display:block;height:100%;background:var(--m-vif)}
+.note{white-space:pre-wrap;font-size:13px;line-height:19px;margin:0;color:var(--texte)}
+.annonce{position:fixed;left:50%;bottom:20px;z-index:20;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:9px 14px;border-radius:10px;background:#22261E;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:13px;max-width:calc(100vw - 32px)}
+.annonce button{border:0;background:none;padding:0;color:var(--m-logo);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+
+@media (max-width:700px){
+  .outils{margin-left:0;width:100%}
+  .tache .corps-t{flex-wrap:wrap;gap:2px 10px}
+  .tache .quand{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Tâches">
+    <div class="recherche"><input id="q" type="search" placeholder="Chercher une tâche" autocomplete="off" spellcheck="false" aria-label="Chercher une tâche"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Tâches</h1><span class="compte" id="compte"></span>
+      <div class="outils"><label class="bascule"><input type="checkbox" id="terminees">Voir les terminées</label></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<div class="voile" id="voile" hidden></div>
+<aside class="detail" id="detail" aria-label="Détail de la tâche" aria-hidden="true">
+  <header><button type="button" class="fermer" id="fermer" aria-label="Fermer">×</button><div id="d-tete"></div></header>
+  <div class="corps" id="d-corps"></div>
+</aside>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
+  var $ = function (s) { return document.querySelector(s); };
+  var filtre = "miennes";           // miennes | a_affecter | toutes | s:<succursale> | d:<succursale>|<discipline>
+  var JOURS_ABR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
+  var STATUTS = { a_faire: "À faire", en_cours: "En cours", attente: "En attente", termine: "Terminé" };
+  var ROLES = ["ingenieur", "dessinateur"];
+
+  function el(tag, cls, txt) { var n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; }
+  function sansAccents(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  function deux(n) { return (n < 10 ? "0" : "") + n; }
+  function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + "." + deux(d.getMonth() + 1) : "—"; }
+  function quand(iso) {
+    var n = C.diff(C.isoAuj(), iso), d = C.dt(iso);
+    if (n < 0) return "Retard · " + jj(iso);
+    if (n === 0) return "Aujourd'hui";
+    if (n === 1) return "Demain";
+    if (n < 7) return JOURS_ABR[d.getDay()] + " " + jj(iso);
+    return jj(iso);
+  }
+  function urgence(t) { if (!t.echeance || t.statut === "termine") return ""; var n = C.diff(C.isoAuj(), t.echeance); return n <= 0 ? "rouge" : n < 7 ? "orange" : ""; }
+  function fmtJ(x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); }
+  function estAdminDisc(code) { return /^administrat/.test(sansAccents(code)); }
+
+  /* ---------- Bandeau repliable (même réglage que les autres modules) ---------- */
+  var page = $("#page"), btn = $("#replier");
+  function replie(oui) {
+    page.classList.toggle("replie", oui);
+    btn.textContent = oui ? "›" : "‹";
+    btn.title = oui ? "Afficher le bandeau" : "Réduire le bandeau";
+    btn.setAttribute("aria-expanded", String(!oui));
+    try { localStorage.setItem("planif2.equipes.replie", oui ? "1" : ""); } catch (e) {}
+  }
+  var garde = null;
+  try { garde = localStorage.getItem("planif2.equipes.replie"); } catch (e) {}
+  replie(garde === null ? innerWidth <= 700 : garde === "1");
+  btn.addEventListener("click", function () { replie(!page.classList.contains("replie")); });
+
+  var cTerm = $("#terminees");
+  try { cTerm.checked = localStorage.getItem("planif2.taches.terminees") === "1"; } catch (e) {}
+  cTerm.addEventListener("change", function () {
+    try { localStorage.setItem("planif2.taches.terminees", cTerm.checked ? "1" : ""); } catch (e) {}
+    arbre(); liste();
+  });
+  var q = $("#q");
+  q.addEventListener("input", liste);
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+
+  if (SB && SB.configure && !SB.connecte()) { $("#liste").innerHTML = '<p class="vide">Connexion requise.</p>'; return; }
+  D.pret().then(function () {
+    if (!D.monMembre()) filtre = "toutes";
+    var p = new URLSearchParams(location.search);
+    if (p.get("membre") === "a-affecter") filtre = "a_affecter";
+    arbre(); liste();
+    D.surRechargement(function () { arbre(); liste(); if (ouverte) detail(ouverte); });
+    if (p.get("tache")) detail(p.get("tache"));
+  }).catch(function (e) { $("#liste").appendChild(el("p", "vide", (e && e.message) || "Chargement impossible.")); });
+
+  /* ---------- Qui porte quoi ---------- */
+  function gens(t) {
+    return ROLES.map(function (r) { var P = D.PARTS[r]; return t[P.charge] > 0 && t[P.membre] ? D.membre(t[P.membre]) : null; }).filter(Boolean);
+  }
+  function mesRoles(t, moi) {
+    return moi ? ROLES.filter(function (r) { var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0; }) : [];
+  }
+  function taches() { return D.taches({ sansTerminees: !cTerm.checked }); }
+  function dansFiltre(t) {
+    var moi = D.monMembre();
+    if (filtre === "toutes") return true;
+    if (filtre === "miennes") return mesRoles(t, moi).length > 0;
+    if (filtre === "a_affecter") return t.statut !== "termine" && Calc.nonAffectees(t).length > 0;
+    var g = gens(t), af = D.affaire(t.affaireId);
+    if (filtre.indexOf("s:") === 0) {
+      var s = filtre.slice(2);
+      return g.some(function (m) { return (m.succursale || "_") === s; }) || (!g.length && af && (af.succursale || "_") === s);
+    }
+    var p = filtre.slice(2).split("|");
+    return g.some(function (m) { return (m.succursale || "_") === p[0] && m.discipline === p[1]; });
+  }
+  function cherche(t) {
+    var mots = sansAccents(q.value).split(/\s+/).filter(Boolean);
+    if (!mots.length) return true;
+    var af = D.affaire(t.affaireId);
+    var s = sansAccents([t.titre, t.note, af && af.code, af && af.nom].concat(gens(t).map(function (m) { return m.prenom + " " + m.nom; })).join(" "));
+    return mots.every(function (w) { return s.indexOf(w) >= 0; });
+  }
+
+  /* ---------- Bandeau : Mes tâches, À affecter, Toutes, puis succursales et secteurs ---------- */
+  function arbre() {
+    var hote = $("#arbre"), l = taches(), moi = D.monMembre();
+    hote.textContent = "";
+    function entree(cle, nom, n, niv) {
+      var b = el("button", "entree niv" + niv); b.type = "button";
+      b.setAttribute("aria-current", String(filtre === cle));
+      b.appendChild(el("span", "nom", nom)); b.appendChild(el("span", "n", n));
+      b.addEventListener("click", function () { filtre = cle; arbre(); liste(); if (innerWidth <= 700) replie(true); });
+      hote.appendChild(b);
+    }
+    if (moi) entree("miennes", "Mes tâches", l.filter(function (t) { return mesRoles(t, moi).length; }).length, 0);
+    var aff = l.filter(function (t) { return t.statut !== "termine" && Calc.nonAffectees(t).length; }).length;
+    entree("a_affecter", "À affecter", aff, 0);
+    entree("toutes", "Toutes", l.length, 0);
+
+    var codes = Object.keys(D.SUCCURSALES), ordre = Object.keys(D.DISCIPLINES), titre = false;
+    codes.forEach(function (s) {
+      var garde = filtre; filtre = "s:" + s;
+      var dela = l.filter(dansFiltre);
+      filtre = garde;
+      if (!dela.length) return;
+      if (!titre) { hote.appendChild(el("p", "titre-groupe", "Succursales")); titre = true; }
+      entree("s:" + s, D.SUCCURSALES[s], dela.length, 0);
+      var parSect = {};
+      dela.forEach(function (t) {
+        var vu = {};
+        gens(t).forEach(function (m) { if ((m.succursale || "_") === s && m.discipline && !estAdminDisc(m.discipline) && !vu[m.discipline]) { vu[m.discipline] = 1; parSect[m.discipline] = (parSect[m.discipline] || 0) + 1; } });
+      });
+      Object.keys(parSect).sort(function (x, y) { return ordre.indexOf(x) - ordre.indexOf(y); }).forEach(function (d) {
+        entree("d:" + s + "|" + d, D.DISCIPLINES[d], parSect[d], 1);
+      });
+    });
+  }
+  function titreFiltre() {
+    if (filtre === "miennes") return "Mes tâches";
+    if (filtre === "a_affecter") return "À affecter";
+    if (filtre === "toutes") return "Toutes les tâches";
+    if (filtre.indexOf("s:") === 0) return D.SUCCURSALES[filtre.slice(2)];
+    var p = filtre.slice(2).split("|");
+    return D.DISCIPLINES[p[1]] + " · " + D.SUCCURSALES[p[0]];
+  }
+
+  /* ---------- Cocher ---------- */
+  /* Ce que la case ferme : ma part si j'en ai une ; sinon toute la tâche, si j'ai le droit d'écrire les tâches des autres. */
+  function cible(t) {
+    var moi = D.monMembre(), r = mesRoles(t, moi);
+    if (r.length) return { roles: r, mien: true };
+    if (D.peutEcrireTache(t)) return { roles: ROLES.filter(function (x) { return t[D.PARTS[x].charge] > 0; }), mien: false };
+    return null;
+  }
+  function estCochee(t) {
+    var c = cible(t);
+    if (t.statut === "termine") return true;
+    return !!c && c.roles.length > 0 && c.roles.every(function (r) { return t[D.PARTS[r].fini]; });
+  }
+  function coche(t) {
+    var b = el("button", "coche " + urgence(t)); b.type = "button";
+    b.appendChild(el("span"));
+    var c = cible(t), fait = estCochee(t);
+    if (fait) b.classList.add("cochee");
+    if (!c || !c.roles.length) { b.disabled = true; b.title = "Cette tâche n'est pas à ton nom"; return b; }
+    var quoi = c.mien ? (c.roles.length === 1 ? "le " + D.PARTS[c.roles[0]].label.toLowerCase() : "ma part") : "la tâche";
+    b.title = (fait ? "Rouvrir " : "Terminer ") + quoi;
+    b.setAttribute("aria-label", b.title + " de « " + t.titre + " »");
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (b.disabled) return;
+      b.disabled = true; b.classList.toggle("cochee", !fait);
+      var champs = {};
+      c.roles.forEach(function (r) { champs[D.PARTS[r].fini] = !fait; });
+      if (fait && t.statut === "termine") champs.statut = "en_cours";
+      D.retoucheTache(t.id, champs).then(function () {
+        var apres = D.tache(t.id);
+        annonce(fait ? "Tâche rouverte." :
+          (c.mien ? (c.roles.length === 1 ? D.PARTS[c.roles[0]].label + " terminé." : "Ta part est terminée.") : "Tâche terminée.") +
+          (c.mien && apres && apres.statut === "termine" ? " Tâche terminée." : ""), true);
+        setTimeout(function () { arbre(); liste(); if (ouverte) detail(ouverte); }, 500);
+      }).catch(function (err) { b.disabled = false; b.classList.toggle("cochee", fait); annonce(err.message); });
+    });
+    return b;
+  }
+  var boiteAnnonce = null, minuterie = 0;
+  function annonce(texte, annulable) {
+    if (!boiteAnnonce) { boiteAnnonce = el("div", "annonce"); boiteAnnonce.setAttribute("role", "status"); document.body.appendChild(boiteAnnonce); }
+    boiteAnnonce.textContent = texte; boiteAnnonce.hidden = false;
+    if (annulable && D.annule) {
+      var a = el("button", null, "Annuler"); a.type = "button";
+      a.addEventListener("click", function () {
+        D.annule().then(function (lib) { arbre(); liste(); if (ouverte) detail(ouverte); annonce(lib ? "Annulé." : "Rien à annuler."); })
+          .catch(function (err) { annonce(err.message); });
+      });
+      boiteAnnonce.appendChild(a);
+    }
+    clearTimeout(minuterie);
+    minuterie = setTimeout(function () { boiteAnnonce.hidden = true; }, 6000);
+  }
+
+  /* ---------- La liste, par semaine d'échéance ---------- */
+  function etiquettes(t) {
+    var f = document.createDocumentFragment();
+    ROLES.forEach(function (r) {
+      var P = D.PARTS[r]; if (!(t[P.charge] > 0)) return;
+      var nom = t[P.membre] ? D.nomMembre(t[P.membre]) : "à affecter";
+      f.appendChild(el("span", "etiq" + (t[P.fini] ? " finie" : !t[P.membre] ? " attend" : ""), P.label + " " + nom + " · " + fmtJ(t[P.charge]) + " j"));
+    });
+    return f;
+  }
+  function liste() {
+    if (!D.etat()) return;
+    var l = taches().filter(dansFiltre).filter(cherche), hote = $("#liste");
+    var jours = l.reduce(function (s, t) { return s + Calc.chargeOuverte(t); }, 0);
+    $("#titre").textContent = titreFiltre();
+    $("#compte").textContent = l.length + (l.length > 1 ? " tâches" : " tâche") + " · " + fmtJ(jours) + " j à faire";
+    hote.textContent = "";
+    if (!l.length) { hote.appendChild(el("p", "vide", "Aucune tâche ne correspond.")); return; }
+
+    // Groupes : en retard, puis une semaine par lundi d'échéance, puis sans échéance
+    var auj = C.isoAuj(), lundiAuj = C.lundi(auj), groupes = {}, ordre = [];
+    l.forEach(function (t) {
+      var k = !t.echeance ? "zzz" : (t.echeance < auj && t.statut !== "termine") ? "000" : C.lundi(t.echeance);
+      if (!groupes[k]) { groupes[k] = []; ordre.push(k); }
+      groupes[k].push(t);
+    });
+    ordre.sort();
+    ordre.forEach(function (k) {
+      var bloc = el("section", "semaine-bloc"), h = el("h2");
+      if (k === "000") { h.className = "retard"; h.textContent = "En retard"; }
+      else if (k === "zzz") h.textContent = "Sans échéance";
+      else {
+        var n = C.diff(lundiAuj, k) / 7;
+        h.textContent = n === 0 ? "Cette semaine" : n === 1 ? "Semaine prochaine" : "Semaine " + C.semaineISO(k).num;
+        h.appendChild(el("small", null, jj(k) + " – " + jj(C.ajoute(k, 4))));
+      }
+      var somme = groupes[k].reduce(function (s, t) { return s + Calc.chargeOuverte(t); }, 0);
+      h.appendChild(el("small", null, groupes[k].length + (groupes[k].length > 1 ? " tâches · " : " tâche · ") + fmtJ(somme) + " j"));
+      bloc.appendChild(h);
+      var ul = el("div", "taches");
+      groupes[k].sort(function (a, b) {
+        if ((a.echeance || "") !== (b.echeance || "")) return (a.echeance || "9") < (b.echeance || "9") ? -1 : 1;
+        return (a.priorite || 5) - (b.priorite || 5);
+      }).forEach(function (t) { ul.appendChild(ligne(t)); });
+      bloc.appendChild(ul);
+      hote.appendChild(bloc);
+    });
+  }
+  function ligne(t) {
+    var af = D.affaire(t.affaireId), u = urgence(t);
+    var r = el("article", "tache" + (estCochee(t) ? " finie" : ""));
+    r.style.setProperty("--teinte", "var(--t" + ((af && af.teinte) || 1) + ")");
+    r.appendChild(coche(t));
+    var corps = el("button", "corps-t"); corps.type = "button";
+    if (t.priorite < 5) corps.appendChild(el("span", "prio p" + t.priorite, "P" + t.priorite));
+    var lib = el("span", "lib"), b = el("b");
+    if (af) b.appendChild(el("span", "code", af.code || af.nom));
+    b.appendChild(document.createTextNode(t.titre));
+    lib.appendChild(b);
+    var s = el("small"); s.appendChild(etiquettes(t)); lib.appendChild(s);
+    corps.appendChild(lib);
+    var qd = el("span", "quand" + (u === "rouge" ? " rouge" : ""));
+    qd.appendChild(el("span", null, t.echeance ? quand(t.echeance) : "—"));
+    qd.appendChild(el("br"));
+    qd.appendChild(el("span", null, STATUTS[t.statut] + (t.avancement ? " · " + t.avancement + " %" : "")));
+    corps.appendChild(qd);
+    corps.addEventListener("click", function () { detail(t.id); });
+    r.appendChild(corps);
+    return r;
+  }
+
+  /* ---------- Détail ---------- */
+  var ouverte = null, panneau = $("#detail"), voile = $("#voile");
+  function ferme() { ouverte = null; panneau.classList.remove("ouvert"); panneau.setAttribute("aria-hidden", "true"); voile.hidden = true; }
+  $("#fermer").addEventListener("click", ferme);
+  voile.addEventListener("click", ferme);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && ouverte) ferme(); });
+  function avatar(m) {
+    var av = el("span", "avatar");
+    if (m && m.photo) { var img = el("img"); img.src = m.photo; img.alt = ""; av.appendChild(img); }
+    else av.textContent = m ? ((m.prenom || "").charAt(0) + (m.nom || "").charAt(0)).toUpperCase() : "?";
+    return av;
+  }
+  function detail(id) {
+    var t = D.tache(id);
+    if (!t) { ferme(); return; }
+    ouverte = id;
+    var af = D.affaire(t.affaireId);
+    panneau.style.setProperty("--teinte", "var(--t" + ((af && af.teinte) || 1) + ")");
+    var tete = $("#d-tete"); tete.textContent = "";
+    if (af) tete.appendChild(el("span", "code", D.libelleAffaire(af)));
+    tete.appendChild(el("h2", null, t.titre));
+    var corps = $("#d-corps"); corps.textContent = "";
+
+    var dl = el("dl", "champ");
+    function champ(k, v) { if (v == null || v === "") return; dl.appendChild(el("dt", null, k)); var dd = el("dd"); if (typeof v === "string") dd.textContent = v; else dd.appendChild(v); dl.appendChild(dd); }
+    champ("Échéance", t.echeance ? quand(t.echeance) : "—");
+    var deb = null; try { deb = Calc.debutEffectif(t, D.canton()); } catch (e) {}
+    champ("Début calculé", deb ? jj(deb) : "");
+    champ("Statut", STATUTS[t.statut]);
+    champ("Priorité", t.priorite < 5 ? "P" + t.priorite : "Normale");
+    var j = el("div", "jauge"), i = el("i"); i.style.width = (t.avancement || 0) + "%"; j.appendChild(i);
+    var av = el("div"); av.appendChild(el("span", null, (t.avancement || 0) + " %")); av.appendChild(j);
+    champ("Avancement", av);
+    corps.appendChild(dl);
+
+    corps.appendChild(el("h3", null, "Parts"));
+    ROLES.forEach(function (r) {
+      var P = D.PARTS[r]; if (!(t[P.charge] > 0)) return;
+      var m = t[P.membre] ? D.membre(t[P.membre]) : null;
+      var p = el("div", "part"); p.appendChild(avatar(m));
+      var qq = el("div", "q", P.label + " · " + fmtJ(t[P.charge]) + " j");
+      qq.appendChild(el("small", null, (m ? m.prenom + " " + m.nom : "À affecter") + (t[P.fini] ? " · terminé" : "")));
+      p.appendChild(qq);
+      corps.appendChild(p);
+    });
+    if (t.note) { corps.appendChild(el("h3", null, "Note")); corps.appendChild(el("p", "note", t.note)); }
+
+    voile.hidden = false;
+    panneau.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(function () { panneau.classList.add("ouvert"); });
+  }
+})();
+</script>
+</body>
+</html>
