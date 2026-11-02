@@ -339,7 +339,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.3.1";
+  var NOM = "Bureau", VERSION = "0.4.0";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
@@ -369,7 +369,7 @@ a{color:inherit;text-decoration:none}
   /* ---------- Les modules : les pages de /planif/, chacune avec la clé de son droit ---------- */
   var APPS = [
     { id: "communication", cle: "communication", groupe: "Communication", nom: "Communication", href: "/planif/communication/", desc: "Le bureau aujourd'hui, le tchat, l'agenda interne, les demandes de congé et les avis." },
-    { id: "absences", cle: "absences", groupe: "Communication", nom: "Absences et congés", href: "/planif/absences/", desc: "Qui est absent, quand : calendrier et périodes." },
+    { id: "absences", cle: "absences", groupe: "Communication", nom: "Absences", href: "/planif2/absences/", desc: "Qui est absent, quand : les équipes et leurs absences, semaine par semaine." },
     { id: "equipe", cle: "equipe", groupe: "Communication", nom: "Équipe", href: "/planif2/equipe/", desc: "Les équipes par succursale et secteur, et qui est là cette semaine." },
     { id: "annuaire", cle: "annuaire", groupe: "Communication", nom: "Annuaire", href: "/planif/annuaire/", desc: "Le carnet d'adresses du bureau." },
     { id: "taches", cle: "taches", groupe: "Tâches", nom: "Tâches", href: "/planif/taches/", desc: "La liste des tâches par semaine d'échéance." },

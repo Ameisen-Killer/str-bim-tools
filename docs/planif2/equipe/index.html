@@ -21,91 +21,7 @@
   initiale du jour et une LED, verte si la personne est là, éteinte sinon.
   Lecture seule ; mêmes données que /planif/ (donnees.js, non modifié).
 -->
-<style>
-:root{
-  --texte:#22261E;
-  --doux:#5E6358;
-  --faible:#8C9086;
-  --ligne:rgba(0,0,0,.08);
-  --carte:#FFFFFF;
-  --led-on:#3FB950;
-  --led-demi:#A7DDAF;
-  --led-off:#D9DBD5;
-  --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --bandeau:272px;
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;font-family:var(--sans);font-size:14px;line-height:20px;color:var(--texte);background:var(--m-fond);-webkit-font-smoothing:antialiased;overflow:hidden}
-button,input{font:inherit;color:inherit}
-[hidden]{display:none!important}
-
-.page{position:relative;display:flex;height:100%}
-
-/* ---------- Bandeau ---------- */
-.bandeau{flex:none;width:var(--bandeau);height:100%;display:flex;flex-direction:column;background:var(--carte);border-right:1px solid var(--ligne);transition:margin-left .22s cubic-bezier(.2,.9,.3,1)}
-.page.replie .bandeau{margin-left:calc(-1 * var(--bandeau))}
-.recherche{padding:14px 14px 10px}
-.recherche input{width:100%;height:38px;padding:0 12px 0 34px;border:1px solid var(--ligne);border-radius:8px;background:var(--m-voile) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%238C9086' stroke-width='1.5'/%3E%3Cpath d='M10.5 10.5L14 14' stroke='%238C9086' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 11px 50%/15px no-repeat;font-size:14px;outline:none}
-.recherche input:focus{border-color:var(--m-fort);background-color:#fff}
-.arbre{flex:1;overflow:auto;padding:4px 8px 16px}
-.entree{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:6px 10px;border:0;border-radius:7px;background:transparent;text-align:left;cursor:pointer;color:var(--texte)}
-.entree:hover{background:var(--m-voile)}
-.entree[aria-current="true"]{background:var(--m-clair);font-weight:600}
-.entree .n{margin-left:auto;font-size:12px;color:var(--faible);font-weight:400}
-.entree.niv0{font-weight:600}
-.entree.niv1{padding-left:26px;font-size:13px}
-.titre-groupe{margin:14px 10px 4px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faible)}
-.sep{height:1px;margin:8px 10px;background:var(--ligne)}
-
-/* Chevron : replier le bandeau, comme dans la visionneuse IFC */
-.replier{position:absolute;top:50%;left:var(--bandeau);z-index:5;width:16px;height:48px;margin-top:-24px;padding:0;display:grid;place-items:center;border:1px solid var(--ligne);border-left:0;border-radius:0 6px 6px 0;
-  background:rgba(255,255,255,.9);color:var(--doux);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:13px;line-height:1;transition:left .22s cubic-bezier(.2,.9,.3,1),width .12s}
-.replier:hover{width:20px;color:var(--texte)}
-.page.replie .replier{left:0}
-
-/* ---------- Liste ---------- */
-.contenu{flex:1;min-width:0;height:100%;overflow:auto;padding:18px 22px 28px}
-.tete{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin:0 0 14px}
-.tete h1{margin:0;font-size:22px;line-height:28px;font-weight:700;color:var(--m-titre)}
-.tete .compte{color:var(--faible);font-size:13px}
-.semaine-nav{margin-left:auto;display:flex;align-items:center;gap:4px}
-.semaine-nav button{height:32px;min-width:32px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;background:var(--carte);cursor:pointer}
-.semaine-nav button:hover{background:var(--m-pale)}
-.semaine-nav span{min-width:150px;text-align:center;font-size:13px;color:var(--doux)}
-
-.membres{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
-.membre{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:8px;background:var(--carte);box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 1px rgba(0,0,0,.03)}
-.avatar{width:42px;height:42px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--m-clair);color:var(--m-encre);font-weight:600;font-size:14px;overflow:hidden}
-.avatar img{width:100%;height:100%;object-fit:cover}
-.qui{flex:1;min-width:0}
-.qui b{display:block;font-size:15px;line-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.qui .fonction{display:block;font-size:12px;line-height:16px;color:var(--m-fort);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.qui .lieu{display:block;font-size:12px;line-height:16px;color:var(--faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* La semaine : initiale du jour, LED dessous */
-.semaine{position:relative;z-index:0;flex:none;display:flex;gap:6px}
-.jour{display:flex;flex-direction:column;align-items:center;gap:4px;width:16px}
-.jour i{font-style:normal;font-size:11px;line-height:12px;font-weight:600;color:var(--doux)}
-.jour.auj i{color:var(--m-fort)}
-.jour.auj{position:relative}
-.jour.auj::before{content:"";position:absolute;inset:-4px -2px;border-radius:6px;background:var(--m-pale);z-index:-1}
-.led{width:10px;height:10px;border-radius:50%;background:var(--led-off);box-shadow:inset 0 1px 1px rgba(0,0,0,.12)}
-.led.on{background:var(--led-on);box-shadow:0 0 6px rgba(63,185,80,.7),inset 0 -1px 1px rgba(0,0,0,.15)}
-.led.demi{background:linear-gradient(90deg,var(--led-on) 50%,var(--led-off) 50%);box-shadow:0 0 4px rgba(63,185,80,.45)}
-
-.vide{margin:30px 0;color:var(--faible);text-align:center}
-.legende{display:flex;gap:16px;margin:16px 2px 0;font-size:12px;color:var(--faible)}
-.legende span{display:inline-flex;align-items:center;gap:6px}
-
-@media (max-width:700px){
-  .bandeau{position:absolute;inset:0 auto 0 0;z-index:4;box-shadow:4px 0 24px rgba(0,0,0,.12)}
-  .contenu{padding:14px 12px 24px}
-  .membres{grid-template-columns:1fr}
-  .semaine-nav{margin-left:0;width:100%;justify-content:space-between}
-  .tete h1{padding-left:14px}
-}
-</style>
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
 </head>
 <body>
 <div class="page" id="page">
@@ -135,168 +51,49 @@ button,input{font:inherit;color:inherit}
 <script src="/planif/assets/supabase.js?v=60"></script>
 <script src="/planif/assets/donnees.js?v=80"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/equipes.js?v=1"></script>
 <script>
 (function () {
   "use strict";
-  var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
+  var D = window.Donnees, C = window.Cal, SB = window.Sb, E = window.Equipes;
   var $ = function (s) { return document.querySelector(s); };
   var JOURS = ["L", "M", "M", "J", "V"];
   var NOMS_JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"];
-
-  var filtre = { cle: "tous" };            // tous | admin | s:<succursale> | d:<succursale>|<discipline>
   var lundi = C.lundi(C.isoAuj());
 
-  /* ---------- Bandeau repliable (choix gardé sur l'appareil) ---------- */
-  var page = $("#page"), btn = $("#replier");
-  function replie(oui) {
-    page.classList.toggle("replie", oui);
-    btn.textContent = oui ? "›" : "‹";
-    btn.title = oui ? "Afficher le bandeau" : "Réduire le bandeau";
-    btn.setAttribute("aria-expanded", String(!oui));
-    try { localStorage.setItem("planif2.equipe.replie", oui ? "1" : ""); } catch (e) {}
-  }
-  var garde = null;
-  try { garde = localStorage.getItem("planif2.equipe.replie"); } catch (e) {}
-  replie(garde === null ? innerWidth <= 700 : garde === "1");
-  btn.addEventListener("click", function () { replie(!page.classList.contains("replie")); });
-
+  E.monte({ nom: "equipe", surChange: liste });
   if (SB && SB.configure && !SB.connecte()) { $("#membres").innerHTML = '<p class="vide">Connexion requise.</p>'; return; }
   D.pret().then(function () {
-    arbre(); liste();
-    D.surRechargement(function () { arbre(); liste(); });
+    E.pret(); liste();
+    D.surRechargement(function () { E.arbre(); liste(); });
   }).catch(function (e) {
     var p = document.createElement("p"); p.className = "vide"; p.textContent = (e && e.message) || "Chargement impossible.";
     $("#membres").appendChild(p);
   });
 
-  /* ---------- Qui est où ---------- */
-  function sansAccents(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
-  // Secteur administratif : les administrateurs, rangés à part (pas dans les secteurs des succursales)
-  function estAdminDisc(code) { return /^administrateur/.test(sansAccents(code)) || /^administrateur/.test(sansAccents(D.DISCIPLINES[code])); }
-  function estAdmin(m) { return D.aStatut(m, "administrateur") || estAdminDisc(m.discipline); }
-  function membres() { return D.membres(); }                  // actifs, triés par prénom puis nom
-  function dansFiltre(m) {
-    var c = filtre.cle;
-    if (c === "tous") return true;
-    if (c === "admin") return estAdmin(m);
-    if (c.indexOf("s:") === 0) return (m.succursale || "_") === c.slice(2);
-    if (c.indexOf("d:") === 0) {
-      var p = c.slice(2).split("|");
-      return (m.succursale || "_") === p[0] && (m.discipline || "_") === p[1] && !estAdmin(m);
-    }
-    return true;
-  }
-
-  /* ---------- Le bandeau : Tous, Administrateurs, puis succursales et leurs secteurs ---------- */
-  function arbre() {
-    var hote = $("#arbre"), l = membres();
-    hote.textContent = "";
-    function entree(cle, nom, n, niv) {
-      var b = document.createElement("button");
-      b.type = "button"; b.className = "entree niv" + niv;
-      b.setAttribute("aria-current", String(filtre.cle === cle));
-      b.innerHTML = '<span class="nom"></span><span class="n"></span>';
-      b.querySelector(".nom").textContent = nom; b.querySelector(".n").textContent = n;
-      b.addEventListener("click", function () {
-        filtre.cle = cle; arbre(); liste();
-        if (innerWidth <= 700) replie(true);
-      });
-      hote.appendChild(b);
-    }
-    entree("tous", "Tous", l.length, 0);
-    var admins = l.filter(estAdmin);
-    if (admins.length) entree("admin", "Administrateurs", admins.length, 0);
-
-    // Succursales dans l'ordre de la console, puis « Sans succursale » s'il en faut
-    var codes = Object.keys(D.SUCCURSALES);
-    if (l.some(function (m) { return !m.succursale; })) codes.push("_");
-    var ordreDisc = Object.keys(D.DISCIPLINES);
-    var titre = false;
-    codes.forEach(function (s) {
-      var dela = l.filter(function (m) { return (m.succursale || "_") === s; });
-      if (!dela.length) return;
-      if (!titre) { var t = document.createElement("p"); t.className = "titre-groupe"; t.textContent = "Succursales"; hote.appendChild(t); titre = true; }
-      entree("s:" + s, s === "_" ? "Sans succursale" : D.SUCCURSALES[s], dela.length, 0);
-      var discs = [];
-      dela.forEach(function (m) { if (!estAdmin(m) && discs.indexOf(m.discipline || "_") < 0) discs.push(m.discipline || "_"); });
-      discs.sort(function (a, b) {
-        var ia = ordreDisc.indexOf(a), ib = ordreDisc.indexOf(b);
-        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
-      });
-      discs.forEach(function (d) {
-        var n = dela.filter(function (m) { return !estAdmin(m) && (m.discipline || "_") === d; }).length;
-        entree("d:" + s + "|" + d, d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], n, 1);
-      });
-    });
-  }
-
-  /* ---------- La liste ---------- */
-  var q = $("#q");
-  q.addEventListener("input", liste);
-  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
-
-  function titreFiltre() {
-    var c = filtre.cle;
-    if (c === "tous") return "Tous";
-    if (c === "admin") return "Administrateurs";
-    if (c.indexOf("s:") === 0) { var s = c.slice(2); return s === "_" ? "Sans succursale" : D.SUCCURSALES[s]; }
-    var p = c.slice(2).split("|");
-    return (p[1] === "_" ? "Secteur non renseigné" : D.DISCIPLINES[p[1]]) + " · " + (p[0] === "_" ? "sans succursale" : D.SUCCURSALES[p[0]]);
-  }
-  function fonction(m) {
-    var f = [m.metier ? D.libelleMetier(m.metier) : ""].concat((D.statutsDe(m) || []).map(D.libelleStatut));
-    return f.filter(Boolean).join(" · ") || "Fonction non renseignée";
-  }
-  function lieu(m) {
-    return [m.succursale ? D.SUCCURSALES[m.succursale] : "Sans succursale",
-            m.discipline ? D.DISCIPLINES[m.discipline] : "Secteur non renseigné"].join(" · ");
-  }
-  function cherche(m) {
-    var mots = sansAccents(q.value).split(/\s+/).filter(Boolean);
-    if (!mots.length) return true;
-    var t = sansAccents([m.prenom, m.nom, m.email, fonction(m), lieu(m)].join(" "));
-    return mots.every(function (w) { return t.indexOf(w) >= 0; });
-  }
-  /** 1 présent, 0.5 demi-journée, 0 absent, chômé ou jour non travaillé */
-  function presence(m, jour) {
-    var canton = D.canton ? D.canton() : undefined;
-    if (C.chome(jour, canton)) return 0;
-    if (Calc.absenceLe(m, jour)) return 0;
-    return Calc.poidsJour(m, jour) || 0;
-  }
-  function deux(n) { return (n < 10 ? "0" : "") + n; }
-  function jj(iso) { var d = C.dt(iso); return deux(d.getDate()) + "." + deux(d.getMonth() + 1); }
-
   function liste() {
-    var hote = $("#membres"), l = membres().filter(dansFiltre).filter(cherche);
+    if (!D.etat()) return;
+    var hote = $("#membres"), l = E.membres();
     var auj = C.isoAuj(), jours = [0, 1, 2, 3, 4].map(function (i) { return C.ajoute(lundi, i); });
-    $("#titre").textContent = titreFiltre();
+    $("#titre").textContent = E.titre();
     $("#compte").textContent = l.length + (l.length > 1 ? " personnes" : " personne");
-    $("#sem").textContent = "Semaine " + C.semaineISO(lundi).num + " · " + jj(jours[0]) + " – " + jj(jours[4]);
+    $("#sem").textContent = "Semaine " + C.semaineISO(lundi).num + " · " + E.jj(jours[0]) + " – " + E.jj(jours[4]);
     $("#cette").hidden = lundi === C.lundi(auj);
     hote.textContent = "";
     if (!l.length) { var p = document.createElement("p"); p.className = "vide"; p.textContent = "Personne ne correspond."; hote.appendChild(p); return; }
     l.forEach(function (m) {
       var c = document.createElement("article"); c.className = "membre";
-      var av = document.createElement("span"); av.className = "avatar";
-      if (m.photo) { var img = document.createElement("img"); img.src = m.photo; img.alt = ""; av.appendChild(img); }
-      else av.textContent = ((m.prenom || "").charAt(0) + (m.nom || "").charAt(0)).toUpperCase() || "?";
-      var qui = document.createElement("div"); qui.className = "qui";
-      qui.innerHTML = "<b></b><span class=\"fonction\"></span><span class=\"lieu\"></span>";
-      qui.querySelector("b").textContent = m.prenom + " " + m.nom;
-      qui.querySelector(".fonction").textContent = fonction(m);
-      qui.querySelector(".lieu").textContent = lieu(m);
       var sem = document.createElement("div"); sem.className = "semaine";
       jours.forEach(function (j, i) {
-        var p = presence(m, j), a = Calc.absenceLe(m, j), ch = C.chome(j, D.canton ? D.canton() : undefined);
+        var x = E.presence(m, j), p = x.p;
         var d = document.createElement("span"); d.className = "jour" + (j === auj ? " auj" : "");
-        d.title = NOMS_JOURS[i] + " " + jj(j) + " : " + (ch ? ch : a ? "absent" + (a.motif ? " (" + a.motif + ")" : "") :
+        d.title = NOMS_JOURS[i] + " " + E.jj(j) + " : " + (x.chome ? x.chome : x.absence ? "absent" + (x.absence.motif ? " (" + x.absence.motif + ")" : "") :
           p >= 1 ? "présent" : p > 0 ? "demi-journée" : "ne travaille pas ce jour");
         d.innerHTML = "<i></i><span class=\"led" + (p >= 1 ? " on" : p > 0 ? " demi" : "") + "\"></span>";
         d.querySelector("i").textContent = JOURS[i];
         sem.appendChild(d);
       });
-      c.appendChild(av); c.appendChild(qui); c.appendChild(sem);
+      c.appendChild(E.avatar(m)); c.appendChild(E.qui(m)); c.appendChild(sem);
       hote.appendChild(c);
     });
   }
