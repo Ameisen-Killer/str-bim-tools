@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/planif.css?v=107">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
 </head>
 <body class="large">
 
@@ -48,7 +49,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   <div class="wrap" data-bandeau></div>
 
-  <div class="wrap">
+  <!-- Bandeau de gauche repliable (02.11.2026, assets/bandeau.js) : recherche, fonction,
+       équipes, affaire comptée. -->
+  <div class="wrap bd-page" id="bd-page">
+    <aside class="bd-bandeau" id="bd-bandeau" aria-label="Recherche et filtres">
+      <div data-recherche></div>
+      <div id="bd-mode"></div>
+      <nav class="bd-arbre" id="bd-arbre"></nav>
+    </aside>
+    <button type="button" class="bd-replier" id="bd-replier" aria-controls="bd-bandeau" aria-expanded="true">‹</button>
+    <div class="bd-contenu">
     <section class="section">
       <div class="plan-barre">
         <button class="btn" type="button" id="prec" aria-label="Semaine précédente">◀<span class="txt"> Précédente</span></button>
@@ -62,11 +72,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           <option value="16">16 semaines</option>
           <option value="26">26 semaines</option>
         </select>
-        <!-- Succursales, secteurs, fonctions : menus à cases (UI.multiChoix), plusieurs choix (13.10.2026) -->
-        <span id="f-succursale"></span>
-        <span id="f-secteur"></span>
-        <span id="f-metier"></span>
-        <span id="f-affaire"></span>
       </div>
 
       <div class="cles" id="cles"></div>
@@ -77,6 +82,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
       <div class="legende-plan legende-carte" id="legende"></div>
     </section>
+    </div>
   </div>
 </main>
 
@@ -92,6 +98,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
+<script src="/planif/assets/bandeau.js?v=1"></script>
 <script>
 /* Carte de charge (27.09.2026)
    ---------------------------------------------------------------------------
@@ -122,7 +129,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, el = UI.el;
 
   var CLE_VUE = "planif.carte";
-  var vue = { debut: null, semaines: 12, metiers: [], succursales: [], secteurs: [], affaires: [] };
+  // cle (bandeau de gauche, 02.11.2026) : tous | admin | s:<succursale> | d:<succursale>|<secteur>
+  var vue = { debut: null, semaines: 12, metiers: [], cle: "tous", affaires: [] };
   var memorise0 = null;
   try { memorise0 = localStorage.getItem(CLE_VUE); Object.assign(vue, JSON.parse(memorise0 || "{}")); } catch (e) {}
   if (!memorise0 && window.innerWidth < 760) vue.semaines = 8;
@@ -132,8 +140,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   if (typeof vue.affaire === "string") vue.affaires = vue.affaire ? [vue.affaire] : [];
   delete vue.affaire;
   if (!Array.isArray(vue.affaires)) vue.affaires = [];
-  ["metiers", "succursales", "secteurs"].forEach(function (k) { if (!Array.isArray(vue[k])) vue[k] = []; });
-  var filtres = {};
+  if (!Array.isArray(vue.metiers) || vue.metiers.length > 1) vue.metiers = [];
+  if (vue.affaires.length > 1) vue.affaires = vue.affaires.slice(0, 1);
+  if (typeof vue.cle !== "string" || !vue.cle) vue.cle = "tous";
+  delete vue.succursales; delete vue.secteurs;
+  var barre = null;                    // recherche du bandeau
   vue.semaines = [8, 12, 16, 26].indexOf(+vue.semaines) >= 0 ? +vue.semaines : 12;
   vue.debut = C.lundi(vue.debut || C.isoAuj());
   // Une vue mémorisée qui a vieilli repart de la semaine en cours
@@ -162,43 +173,34 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var hz = document.getElementById("horizon");
     hz.value = String(vue.semaines);
     hz.addEventListener("change", function () { vue.semaines = +hz.value; memorise(); rend(); });
-    /* Succursales, secteurs et fonctions : plusieurs choix, « tout » par
-       défaut ; un menu sans choix possible (une seule succursale) disparaît. */
-    function filtreCases(id, cle, tous, pluriel, liste) {
-      var options = Object.keys(liste).map(function (c) { return { valeur: c, label: liste[c] }; });
-      var f = UI.multiChoix({ libelle: "Filtrer : " + pluriel, tous: tous, pluriel: pluriel, options: options, valeurs: vue[cle],
-        surChange: function (v) { vue[cle] = v; memorise(); rend(); } });
-      vue[cle] = f.valeurs();
-      var hote = document.getElementById(id);
-      UI.vide(hote).appendChild(f.noeud);
-      hote.style.display = options.length > 1 ? "" : "none";
-      return f;
-    }
-    filtres.succursales = filtreCases("f-succursale", "succursales", "Toutes les succursales", "succursales", D.SUCCURSALES);
-    filtres.secteurs = filtreCases("f-secteur", "secteurs", "Tous les secteurs", "secteurs", D.DISCIPLINES);
-    filtres.metiers = filtreCases("f-metier", "metiers", "Fonction", "fonctions", { ingenieur: "Ingénieurs", dessinateur: "Dessinateurs" });
+    Bandeau.monte({ cle: "planif.charge.replie" });
+    barre = UI.recherche({
+      hote: document.querySelector("[data-recherche]"),
+      exemple: "Rechercher une personne…",
+      surSaisie: rend
+    });
 
-    remplitAffaires();
-
-
-    D.surRechargement(function () { remplitAffaires(); rend(); });
+    D.surRechargement(rend);
     rend();
   }).catch(UI.echec);
 
-  /* Les affaires comptées (13.10.2026 : plusieurs, menu à cases large, une
-     ligne par affaire) : seule leur part de charge est comptée. */
-  var listeAffaires = null;
-  function remplitAffaires() {
-    // Relecture de la base : le menu n'est refait que si la liste des affaires a changé
-    var ids = D.affaires({}).map(function (a) { return a.id + a.code + a.nom; }).join("|");
-    if (ids === listeAffaires) return;
-    listeAffaires = ids;
-    filtres.affaires = UI.multiChoix({ libelle: "Ne compter que certaines affaires", tous: "Toutes les affaires", pluriel: "affaires",
-      large: true, valeurs: vue.affaires,
-      options: D.affaires({}).map(function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; }),
-      surChange: function (v) { vue.affaires = v; memorise(); rend(); } });
-    vue.affaires = filtres.affaires.valeurs();
-    UI.vide(document.getElementById("f-affaire")).appendChild(filtres.affaires.noeud);
+  /* Le bandeau (02.11.2026, demande de Tony) : la fonction, les équipes avec leur
+     nombre de personnes, l'affaire comptée (seule sa part de charge compte). */
+  function rendBandeau(base) {
+    var hm = UI.vide(document.getElementById("bd-mode"));
+    Bandeau.mode(hm, [["", "Tous"], ["ingenieur", "Ingénieurs"], ["dessinateur", "Dessinateurs"]], vue.metiers[0] || "", function (v) {
+      vue.metiers = v ? [v] : []; memorise(); rend();
+    });
+    var hote = Bandeau.vide();
+    Bandeau.equipes(hote, { toute: D.membres({ planifies: true }), actif: vue.cle,
+      nombre: function (k) { return base.filter(function (m) { return Bandeau.dansEquipe(m, k); }).length; },
+      choix: function (k) { vue.cle = k; memorise(); rend(); } });
+    var sc = Bandeau.succursaleDe(vue.cle);
+    var opts = D.affaires({}).filter(function (a) { return vue.affaires[0] === a.id || !sc || (a.succursale || "_") === sc; })
+      .map(function (a) { return [a.id, D.libelleAffaire(a)]; });
+    Bandeau.liste(hote, "Ne compter qu'une affaire", [["", "Toutes les affaires"]].concat(opts), vue.affaires[0] || "", function (v) {
+      vue.affaires = v ? [v] : []; memorise(); rend();
+    });
   }
 
   function decale(n) { vue.debut = C.ajoute(vue.debut, 7 * n); memorise(); rend(); }
@@ -233,9 +235,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
 
     var membres = tous.filter(function (m) {
-      return (!vue.metiers.length || vue.metiers.indexOf(D.cote(m.metier)) >= 0)
-        && (!vue.succursales.length || vue.succursales.indexOf(m.succursale) >= 0)
-        && (!vue.secteurs.length || vue.secteurs.indexOf(m.discipline) >= 0);
+      return !vue.metiers.length || vue.metiers.indexOf(D.cote(m.metier)) >= 0;
     });
     // Affaire choisie : son équipe, et qui y porte une part ouverte
     if (vue.affaires.length) {
@@ -251,6 +251,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       });
       membres = membres.filter(function (m) { return garde[m.id]; });
     }
+    rendBandeau(membres);
+    membres = membres.filter(function (m) { return Bandeau.dansEquipe(m, vue.cle); });
+    var mots = barre ? barre.termes() : [], avant = membres.length;
+    if (mots.length) membres = membres.filter(function (m) {
+      return UI.correspond([m.prenom + " " + m.nom, D.libelleMetier(m.metier), D.SUCCURSALES[m.succursale], D.DISCIPLINES[m.discipline]], mots);
+    });
+    if (barre) barre.compte(membres.length, avant);
     var ORDRE = { ingenieur: 0, dessinateur: 1 };
     function rang(m) { var c = D.cote(m.metier); return c in ORDRE ? ORDRE[c] : 9; }   // 0 est un rang : pas de « || »
     membres = membres.map(function (m, i) { return { m: m, i: i }; })
@@ -338,7 +345,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       lignes.length + (lignes.length > 1 ? " personnes" : " personne") + " · " + sems.length + " semaines");
     document.getElementById("imp-periode").textContent = p.textContent +
       (vue.affaires.length ? "  ·  " + vue.affaires.map(function (id) { var a = D.affaire(id); return a ? a.code : ""; }).filter(Boolean).join(", ") + " seulement" : "") +
-      ["succursales", "secteurs", "metiers"].map(function (k) { return filtres[k] && filtres[k].texte() ? "  ·  " + filtres[k].texte() : ""; }).join("");
+      (vue.cle !== "tous" ? "  ·  " + Bandeau.titreCle(vue.cle) : "") +
+      (vue.metiers.length ? "  ·  " + (vue.metiers[0] === "ingenieur" ? "Ingénieurs" : "Dessinateurs") : "");
     document.getElementById("imp-edition").textContent = "édité le " + C.fmtCH(C.isoAuj());
 
     rendCles(totaux);
