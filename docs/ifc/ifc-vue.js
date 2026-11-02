@@ -1230,9 +1230,14 @@
       });
     });
     var seg = [];
+    // fermé : chaque arête sert un nombre pair de fois (un terrain ou une surface ouverte a des bords libres)
+    geo.ferme = true;
     tab.forEach(function(l){
-      var vive = l.length !== 6;
-      if (!vive) vive = Math.abs(dot(faces[l[0]].n, faces[l[3]].n)) < COS_VIF;
+      if ((l.length/3) % 2) geo.ferme = false;
+      // bord libre, ou faces qui ne sont pas toutes dans le même plan (une surface sans épaisseur, dessus et
+      // dessous confondus, partage chaque arête entre quatre faces sans pour autant faire un angle)
+      var vive = l.length < 6;
+      for (var r0 = 3; !vive && r0 < l.length; r0 += 3) vive = Math.abs(dot(faces[l[0]].n, faces[l[r0]].n)) < COS_VIF;
       if (!vive) return;
       for (var r = 0; r < l.length; r += 3) faces[l[r]].ar.push(l[r+1], l[r+2]);
       var b = faces[l[0]].b[l[1]], i = l[2], j = (i + 1) % (b.length/3);
@@ -1590,7 +1595,7 @@
       return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
         uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR") };
     }
-    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
+    var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, fermes = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
@@ -1637,6 +1642,14 @@
         boites.set(bx, 6*e);
       });
       nTri = nv; nLig = nl;
+      // plages des solides fermés, seules prises par le remplissage rouge des coupes (une surface ouverte
+      // fausserait la parité et peindrait tout en rouge)
+      fermes = [];
+      ordre.forEach(function(oe){
+        var pl = plages[oe[0]], d = fermes[fermes.length - 1];
+        if (!liste[oe[0]].geo.ferme || pl[1] === pl[0]) return;
+        if (d && d[1] === pl[0]) d[1] = pl[1]; else fermes.push([pl[0], pl[1]]);
+      });
       remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
       remplir(B.col, new Uint8Array(3*nv), gl.DYNAMIC_DRAW);
       remplir(B.lcol, new Uint8Array(4*nl), gl.DYNAMIC_DRAW);
@@ -1679,6 +1692,15 @@
       if (!morceaux){ if (n) gl.drawArrays(mode, 0, n); return; }
       var a = lignes ? 2 : 0;
       for (var i = 0; i < morceaux.length; i++){ var p = morceaux[i]; if (p[a+1] > p[a]) gl.drawArrays(mode, p[a], p[a+1] - p[a]); }
+    }
+    // triangles des solides fermés, limités aux morceaux retenus par la boîte de coupe
+    function tracerFermes(){
+      var src = morceaux || [[0, nTri]], a = 0, b = 0;
+      while (a < src.length && b < fermes.length){
+        var lo = Math.max(src[a][0], fermes[b][0]), hi = Math.min(src[a][1], fermes[b][1]);
+        if (hi > lo) gl.drawArrays(gl.TRIANGLES, lo, hi - lo);
+        if (src[a][1] < fermes[b][1]) a++; else b++;
+      }
     }
     function teinter(liste, sel, actif, coul){
       kad = coul.cadreRGBA; krouge = coul.coupeRGB;
@@ -1787,7 +1809,7 @@
         gl.uniformMatrix4fv(P.id.uM, false, M);
         gl.uniform1f(P.id.uK, 1); gl.uniform3fv(P.id.uB0, b0); gl.uniform3fv(P.id.uB1, b1); gl.uniform2f(P.id.uR, kr[0], kr[1]);
         attrib(0, B.pos, 3, gl.FLOAT); gl.disableVertexAttribArray(1); attrib(2, B.ids, 3, gl.UNSIGNED_BYTE, true);
-        tracer(gl.TRIANGLES, false);
+        tracerFermes();
         // 2) rectangle de la face, en rouge uni, là où le pochoir est impair et devant la scène
         gl.colorMask(true, true, true, true); gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
         gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);

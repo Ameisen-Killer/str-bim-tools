@@ -691,6 +691,8 @@
     // déplie le fichier et les parents si besoin, pour retrouver l'élément dans la liste
     if (deplierVers(c)) rendreListe();
     if (choix.has(c)) activer(c, true);
+    // site ou bâtiment (terrain) : pas de sélection pour suppression, mais on l'active pour voir ses propriétés
+    else if (!i.supprimable && actif !== c){ activer(c, true); etat("« " + nomAff(i) + " » : structure spatiale, non supprimable."); }
     else oublierActif();
   }
   // Un élément désélectionné ne reste pas affiché dans Propriétés
@@ -1138,7 +1140,10 @@
     }
     $("#f-bilan").innerHTML = "Avant <b>" + fmtN(avant) + "</b> entités · " + fmtTaille(oAvant) +
       " → maintenant <b>" + fmtN(apres) + "</b> entités · " + fmtTaille(oApres);
-    vue.selection(choix, actif);
+    // l'élément actif non supprimable (terrain du site) est surligné comme une sélection
+    var vus = choix;
+    if (actif && !choix.has(actif) && !supprimable(actif)){ vus = new Set(choix); vus.add(actif); }
+    vue.selection(vus, actif);
     if (cleProps() !== dernierProps) afficherProps();
   }
 
