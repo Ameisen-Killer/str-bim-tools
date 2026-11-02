@@ -88,9 +88,21 @@ a{color:inherit;text-decoration:none}
 .signal b{min-width:24px;font-size:16px;color:var(--or)}
 .ligne-t{display:flex;align-items:center;gap:8px;width:100%;padding:6px 6px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:pointer;font-size:13px;line-height:17px}
 .ligne-t:hover{background:var(--controle-survol)}
-.ligne-t .point{width:8px;height:8px;border-radius:50%;flex:none;background:var(--texte-faible)}
-.ligne-t .point.orange{background:#F5A524}
-.ligne-t .point.rouge{background:var(--rouge)}
+/* Case à cocher : terminer sa part de la tâche (gris, orange dans la semaine, rouge à échéance) */
+.ligne-c{display:flex;align-items:center;gap:2px}
+.ligne-c .ligne-t{flex:1;min-width:0}
+.coche{flex:none;width:30px;height:30px;padding:0;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;border-radius:6px;--c:var(--texte-faible)}
+.coche:hover{background:var(--controle-survol)}
+.coche.orange{--c:#F5A524}
+.coche.rouge{--c:var(--rouge)}
+.coche span{width:16px;height:16px;border:2px solid var(--c);border-radius:4px;display:grid;place-items:center;transition:background .15s,transform .15s}
+.coche span::after{content:"";width:8px;height:4px;margin-top:-2px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) scale(0);transition:transform .15s}
+.coche:hover span{transform:scale(1.08)}
+.coche.cochee span{background:var(--c)}
+.coche.cochee span::after{transform:rotate(-45deg) scale(1)}
+.ligne-c.finie .lib{text-decoration:line-through;color:var(--texte-faible)}
+.annonce{position:fixed;left:50%;bottom:72px;z-index:40;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:9px 14px;border-radius:10px;background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);font-size:13px;max-width:calc(100vw - 32px)}
+.annonce button{border:0;background:none;padding:0;color:var(--or);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .ligne-t .lib{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ligne-t .quand{flex:none;color:var(--texte-faible);font-size:12px}
 .ligne-t .quand.rouge{color:var(--rouge)}
@@ -339,7 +351,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.5.0";
+  var NOM = "Bureau", VERSION = "0.5.1";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
@@ -593,8 +605,10 @@ a{color:inherit;text-decoration:none}
       miennes.slice(0, 6).forEach(function (t) {
         var ecart = C.diff(C.isoAuj(), t.echeance), u = ecart <= 0 ? "rouge" : ecart < 7 ? "orange" : "";
         var af = D.affaire(t.affaireId);
-        var bt = el("button", "ligne-t"); bt.type = "button";
-        bt.innerHTML = '<span class="point ' + u + '"></span><span class="lib"></span><span class="quand' + (u === "rouge" ? " rouge" : "") + '"></span>';
+        var rangee = el("div", "ligne-c");
+        rangee.appendChild(coche(t, moi, u));
+        var bt = document.createElement("button"); bt.className = "ligne-t"; bt.type = "button"; rangee.appendChild(bt);
+        bt.innerHTML = '<span class="lib"></span><span class="quand' + (u === "rouge" ? " rouge" : "") + '"></span>';
         bt.querySelector(".lib").textContent = (af ? (af.code || af.nom) + " – " : "") + t.titre;
         bt.querySelector(".lib").title = (af ? (af.nom || af.code) + " – " : "") + t.titre;
         bt.querySelector(".quand").textContent = quand(t.echeance);
@@ -602,6 +616,52 @@ a{color:inherit;text-decoration:none}
       });
     }
     el("p", "espace", D.nomEspace());
+  }
+
+  /* Cocher : termine SA part de la tâche (le calcul s'il en est l'ingénieur, le
+     dessin s'il en est le dessinateur, les deux s'il porte tout) — même règle et
+     même écriture que le pouce de l'accueil de /planif/ (Donnees.retoucheTache),
+     avec « Annuler » (Donnees.annule). */
+  function coche(t, moi, u) {
+    var roles = ["ingenieur", "dessinateur"].filter(function (r) {
+      var P = D.PARTS[r]; return t[P.membre] === moi.id && t[P.charge] > 0 && !t[P.fini];
+    });
+    var quoi = roles.length === 1 ? "le " + D.PARTS[roles[0]].label.toLowerCase() : "ma part";
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "coche " + u; b.innerHTML = "<span></span>";
+    b.title = "Terminer " + quoi;
+    b.setAttribute("aria-label", "Terminer " + quoi + " de « " + t.titre + " »");
+    b.addEventListener("click", function () {
+      if (b.disabled) return;
+      b.disabled = true; b.classList.add("cochee"); b.parentNode.classList.add("finie");
+      var champs = {};
+      roles.forEach(function (r) { champs[D.PARTS[r].fini] = true; });
+      D.retoucheTache(t.id, champs).then(function () {
+        var apres = D.tache(t.id);
+        annonce((roles.length === 1 ? D.PARTS[roles[0]].label + " terminé." : "Ta part est terminée.") +
+                (apres && apres.statut === "termine" ? " Tâche terminée." : ""), true);
+        setTimeout(aujourdhui, 700);
+      }).catch(function (err) {
+        b.disabled = false; b.classList.remove("cochee"); b.parentNode.classList.remove("finie");
+        annonce(err.message);
+      });
+    });
+    return b;
+  }
+  var boiteAnnonce = null, minuterieAnnonce = 0;
+  function annonce(texte, annulable) {
+    if (!boiteAnnonce) { boiteAnnonce = document.createElement("div"); boiteAnnonce.className = "annonce"; boiteAnnonce.setAttribute("role", "status"); document.body.appendChild(boiteAnnonce); }
+    boiteAnnonce.textContent = texte; boiteAnnonce.hidden = false;
+    if (annulable && D.annule) {
+      var a = document.createElement("button"); a.type = "button"; a.textContent = "Annuler";
+      a.addEventListener("click", function () {
+        D.annule().then(function (lib) { aujourdhui(); badges(); annonce(lib ? "Annulé." : "Rien à annuler."); })
+          .catch(function (err) { annonce(err.message); });
+      });
+      boiteAnnonce.appendChild(a);
+    }
+    clearTimeout(minuterieAnnonce);
+    minuterieAnnonce = setTimeout(function () { boiteAnnonce.hidden = true; }, 6000);
   }
 
   /* ---------- Menu Démarrer : les modules permis, groupés ---------- */
