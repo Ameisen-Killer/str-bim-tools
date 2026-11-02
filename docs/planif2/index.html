@@ -7,6 +7,13 @@
 <title>Bureau · Planification</title>
 <meta name="theme-color" content="#050505">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%23111'/%3E%3Cpath d='M28 82V27h24v55M52 82V46h21v36M20 82h60' fill='none' stroke='%23D6A85C' stroke-width='6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+/* Marque de l'espace, comme dans /planif/ : « ab » pour le bureau qui a la sienne
+   (charte verte et logo du bureau), « str » sinon — et toujours en démonstration.
+   Reprise du dernier passage de ce compte avant le premier rendu ; confirmée
+   ensuite par Donnees.marque(). */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);if(m==="ab"){var i=document.querySelector("link[rel=icon]");if(i)i.href="/planif/assets/logo-ab-marque.svg?v=1";}})();
+</script>
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <!--
@@ -34,6 +41,9 @@
   --texte-doux:rgba(237,232,223,.78);
   --texte-faible:rgba(237,232,223,.5);
   --rouge:#E5484D;
+  --fil-rvb:214,168,92;
+  --tuile-fond:#14110D;
+  --ombre-texte:0 1px 3px rgba(0,0,0,.9);
   --ombre:0 32px 64px rgba(0,0,0,.55),0 2px 21px rgba(0,0,0,.45),0 0 0 1px rgba(214,168,92,.14);
   --sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
@@ -52,13 +62,14 @@ a{color:inherit;text-decoration:none}
 .bureau{position:fixed;inset:0 0 56px 0}
 .icones{position:absolute;inset:0;padding:14px 10px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,108px);grid-auto-columns:96px;gap:4px;align-content:start}
 .icone{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 4px 4px;border:1px solid transparent;border-radius:6px;color:var(--texte);text-align:center;cursor:default;outline:none;
-  text-shadow:0 1px 3px rgba(0,0,0,.9);font-size:12px;line-height:15px;opacity:0;transform:translateY(6px);animation:apparait .45s cubic-bezier(.1,.9,.2,1) forwards;animation-delay:calc(var(--r,0) * 45ms)}
+  text-shadow:var(--ombre-texte);font-size:12px;line-height:15px;opacity:0;transform:translateY(6px);animation:apparait .45s cubic-bezier(.1,.9,.2,1) forwards;animation-delay:calc(var(--r,0) * 45ms)}
 @keyframes apparait{to{opacity:1;transform:none}}
 .tuile{position:relative;width:60px;height:60px;flex:none;border-radius:15px;display:grid;place-items:center;background:var(--tuile);border:1px solid var(--tuile-bord);color:var(--or);
   box-shadow:0 4px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);transition:transform .18s cubic-bezier(.3,1.6,.5,1),box-shadow .2s,border-color .2s}
 .tuile svg{width:36px;height:36px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .tuile svg .plein{fill:currentColor;stroke:none}
 .tuile svg .doux{opacity:.45}
+.tuile svg .fond,.tache svg .fond,.titre svg .fond{fill:var(--tuile-fond)}
 .icone:hover .tuile{transform:scale(1.06);border-color:rgba(var(--or-rvb),.7);box-shadow:0 4px 18px rgba(0,0,0,.5),0 0 18px rgba(var(--or-rvb),.18)}
 .icone:hover{background:rgba(var(--or-rvb),.07);border-color:rgba(var(--or-rvb),.14)}
 .icone.choisie,.icone:focus-visible{background:rgba(var(--or-rvb),.14);border-color:rgba(var(--or-rvb),.35)}
@@ -188,10 +199,70 @@ a{color:inherit;text-decoration:none}
 .verrou .msg{margin:0;padding:8px 10px;border-radius:8px;background:rgba(229,72,77,.14);color:#FFB4B6;font-size:13px}
 .message-bureau{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:5;max-width:min(460px,calc(100vw - 32px));padding:14px 18px;border-radius:12px;background:var(--panneau);border:1px solid var(--ligne);text-align:center}
 
+/* ---------- Charte du bureau (marque « ab ») : celle de /planif/ pour ce bureau ----------
+   Fond clair #F4F5F2, cartes blanches arrondies à ombre douce, accent vert,
+   boutons principaux en vert clair à texte foncé, logo du bureau. Jamais en démonstration. */
+.logo-ab{display:none}
+/* Le logo officiel du bureau au centre du bureau, sous les icônes */
+.logo-centre{position:fixed;left:50%;top:calc(50% - 28px);transform:translate(-50%,-50%);height:min(42vh,380px);width:auto;max-width:60vw;pointer-events:none;
+  filter:drop-shadow(0 6px 24px rgba(0,0,0,.08));opacity:0;animation:logoVient .8s .1s ease-out forwards}
+@keyframes logoVient{to{opacity:1}}
+:root[data-marque="ab"] .logo-ab{display:block}
+:root[data-marque="ab"] .logo-str{display:none}
+:root[data-marque="ab"]{
+  color-scheme:light;
+  --or:#4D7A1C;
+  --or-rvb:77,122,28;
+  --or-fonce:#3B5E15;
+  --noir:#F4F5F2;
+  --barre:rgba(255,255,255,.86);
+  --tuile:#FFFFFF;
+  --tuile-bord:rgba(0,0,0,.07);
+  --tuile-fond:#FFFFFF;
+  --panneau:rgba(255,255,255,.97);
+  --controle:#F6FAEE;
+  --controle-survol:#EEF5DE;
+  --ligne:rgba(0,0,0,.09);
+  --texte:#1F2419;
+  --texte-doux:rgba(31,36,25,.72);
+  --texte-faible:rgba(31,36,25,.5);
+  --fil-rvb:93,145,38;
+  --ombre-texte:none;
+  --ombre:0 24px 56px rgba(0,0,0,.14),0 2px 12px rgba(0,0,0,.08),0 0 0 1px rgba(0,0,0,.05);
+}
+:root[data-marque="ab"] body{background:radial-gradient(ellipse 75% 65% at 60% 55%,#FFFFFF 0%,#F4F5F2 55%,#E9EDE2 100%) fixed;background-color:#F4F5F2}
+:root[data-marque="ab"] .tuile{box-shadow:0 2px 10px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-marque="ab"] .tuile svg .doux,:root[data-marque="ab"] .tache svg .doux{opacity:1;stroke:#7DB843}
+:root[data-marque="ab"] .tuile svg .plein.doux,:root[data-marque="ab"] .tache svg .plein.doux{fill:#CAE09B}
+:root[data-marque="ab"] .icone:hover .tuile{border-color:#7DB843;box-shadow:0 4px 16px rgba(77,122,28,.18)}
+:root[data-marque="ab"] .icone:hover{background:rgba(77,122,28,.06);border-color:rgba(77,122,28,.12)}
+:root[data-marque="ab"] .icone.choisie,:root[data-marque="ab"] .icone:focus-visible{background:#EEF5DE;border-color:#CAE09B}
+:root[data-marque="ab"] .badge{box-shadow:0 0 0 2px #fff}
+:root[data-marque="ab"] .badge.or,:root[data-marque="ab"] .avatar,:root[data-marque="ab"] .verrou .principal{background:#D5E8AC;color:#1F2419}
+:root[data-marque="ab"] .verrou .principal:hover{background:#CAE09B}
+:root[data-marque="ab"] .aujourdhui{background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.08);-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-marque="ab"] .aujourdhui .jour{color:#5F9126}
+:root[data-marque="ab"] .aujourdhui h1 b{color:#4D7A1C}
+:root[data-marque="ab"] .tache{box-shadow:0 1px 6px rgba(0,0,0,.1)}
+:root[data-marque="ab"] .tache.demarrer-ico{background:#fff;border-color:rgba(0,0,0,.08);padding:0;overflow:hidden}
+:root[data-marque="ab"] .tache.demarrer-ico .logo-ab{width:100%;height:100%;object-fit:cover}
+:root[data-marque="ab"] .gauche b{color:#4D7A1C}
+:root[data-marque="ab"] .pied select,:root[data-marque="ab"] .verrou input{background:#fff}
+:root[data-marque="ab"] .pied .bouton.quitter:hover{background:#C42B1C;border-color:#C42B1C;color:#fff}
+:root[data-marque="ab"] .verrou{background:rgba(244,245,242,.6)}
+:root[data-marque="ab"] .verrou .logo{width:auto;height:96px}
+:root[data-marque="ab"] .verrou .heure{color:#4D7A1C}
+:root[data-marque="ab"] .verrou .liens a,:root[data-marque="ab"] .verrou .liens button{color:#4D7A1C}
+:root[data-marque="ab"] .verrou .msg{background:#FDECEC;color:#A4262C}
+:root[data-marque="ab"] .fenetre .cadre{background:#F4F5F2}
+:root[data-marque="ab"] .fenetre .charge{color:#4D7A1C}
+:root[data-marque="ab"] .bulle{box-shadow:0 4px 12px rgba(0,0,0,.12)}
+
 @media (max-width:900px){
   .aujourdhui{display:none}
 }
 @media (max-width:640px){
+  .logo-centre{top:auto;bottom:76px;transform:translateX(-50%);height:120px;opacity:.35!important;animation:none}
   .bureau{overflow:auto;-webkit-overflow-scrolling:touch}
   .icones{position:static;grid-auto-flow:row;grid-template-columns:repeat(auto-fill,88px);grid-template-rows:none;grid-auto-rows:104px;justify-content:center;padding-top:20px}
   .icone{font-size:11px}
@@ -210,6 +281,7 @@ a{color:inherit;text-decoration:none}
 <body>
 
 <canvas id="fond" aria-hidden="true"></canvas>
+<img class="logo-ab logo-centre" src="/planif/assets/logo-ab.svg?v=1" alt="">
 
 <main class="bureau" id="bureau" aria-label="Bureau">
   <div class="icones" id="icones"></div>
@@ -230,7 +302,7 @@ a{color:inherit;text-decoration:none}
   <div class="gauche"><b>Planification</b><span class="long" id="espace"></span></div>
   <div class="centre" id="dock">
     <button class="tache demarrer-ico" id="btn-demarrer" aria-expanded="false" aria-controls="demarrer" aria-label="Tous les modules">
-      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60"/></svg><span class="etiquette">Tous les modules</span>
+      <svg class="logo-str" viewBox="0 0 100 100" aria-hidden="true"><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60"/></svg><img class="logo-ab" src="/planif/assets/logo-ab-marque.svg?v=1" alt=""><span class="etiquette">Tous les modules</span>
     </button>
   </div>
   <div class="droite">
@@ -243,7 +315,8 @@ a{color:inherit;text-decoration:none}
 
 <div class="verrou" id="verrou" hidden>
   <div class="boite">
-    <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="18" fill="#111" stroke="rgba(214,168,92,.4)" stroke-width="1.5"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#D6A85C" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <img class="logo logo-ab" src="/planif/assets/logo-ab-marque.svg?v=1" alt="">
+    <svg class="logo logo-str" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="18" fill="#111" stroke="rgba(214,168,92,.4)" stroke-width="1.5"/><path d="M28 82V27h24v55M52 82V46h21v36M20 82h60" fill="none" stroke="#D6A85C" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/></svg>
     <div class="heure" id="v-heure"></div>
     <div class="date" id="v-date"></div>
     <form id="v-form" novalidate>
@@ -264,7 +337,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.1.0";
+  var NOM = "Bureau", VERSION = "0.2.0";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
@@ -283,7 +356,7 @@ a{color:inherit;text-decoration:none}
     veille: '<circle cx="24" cy="24" r="18"/><circle class="doux" cx="24" cy="24" r="10"/><path d="M24 24l12-12"/><circle class="plein" cx="31" cy="20" r="2.5"/>',
     ao_publics: '<path d="M6 17L24 6l18 11M8 18h32M12 22v14M20 22v14M28 22v14M36 22v14M6 41h36"/>',
     ao_prives: '<rect x="5" y="14" width="38" height="27" rx="4"/><path d="M17 14v-4a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v4"/><path class="doux" d="M5 25h38"/><path d="M21 23v5h6v-5"/>',
-    agenda_ao: '<rect x="5" y="9" width="30" height="28" rx="4"/><path d="M5 17h30M13 5v7M27 5v7"/><circle cx="35" cy="35" r="9" fill="#14110D"/><path d="M35 30v5l3 2"/>',
+    agenda_ao: '<rect x="5" y="9" width="30" height="28" rx="4"/><path d="M5 17h30M13 5v7M27 5v7"/><circle class="fond" cx="35" cy="35" r="9"/><path d="M35 30v5l3 2"/>',
     facturation: '<path d="M7 34a17 17 0 1 1 34 0"/><path class="doux" d="M12 34h3M33 34h3M24 17v3"/><path d="M24 34l8-10"/><circle class="plein" cx="24" cy="34" r="3"/><path d="M7 41h34"/>',
     console: '<circle cx="24" cy="24" r="6"/><circle class="doux" cx="24" cy="24" r="14"/><path d="M24 4v6M24 38v6M4 24h6M38 24h6M9.9 9.9l4.2 4.2M33.9 33.9l4.2 4.2M9.9 38.1l4.2-4.2M33.9 14.1l4.2-4.2"/>',
     profil: '<circle cx="24" cy="24" r="19"/><circle cx="24" cy="19" r="6"/><path d="M12 37c2-6 7-9 12-9s10 3 12 9"/>',
@@ -369,6 +442,7 @@ a{color:inherit;text-decoration:none}
   }
 
   function demarre() {
+    appliqueMarque();
     permises = APPS.filter(function (a) { return !a.cle || D.pagePermise(a.cle); });
     icones(); menuDemarrer(); dock(); aujourdhui();
     $("#espace").textContent = D.nomEspace() + " · " + NOM + " v" + VERSION;
@@ -382,6 +456,20 @@ a{color:inherit;text-decoration:none}
     // Adresse /planif2/?ouvre=taches : ouvre directement un module
     var o = new URLSearchParams(location.search).get("ouvre");
     if (o && parId[o] && permises.indexOf(parId[o]) >= 0) ouvrir(parId[o]);
+  }
+
+  /* La marque confirmée par le profil (Donnees.marque : jamais « ab » en démo), retenue pour ce compte comme /planif/ le fait */
+  function appliqueMarque() {
+    var m = D.marque ? D.marque() : "str", r = document.documentElement;
+    r.setAttribute("data-marque", m);
+    try {
+      var mail = avecBase && SB.connecte() ? SB.email() : "";
+      if (mail) localStorage.setItem("planif.marque:" + mail, m);
+      localStorage.setItem("planif.marque", m);
+    } catch (e) {}
+    var i = document.querySelector("link[rel=icon]");
+    if (i && m === "ab") i.href = "/planif/assets/logo-ab-marque.svg?v=1";
+    document.querySelector('meta[name="theme-color"]').content = m === "ab" ? "#F4F5F2" : "#050505";
   }
 
   /* ---------- Icônes du bureau ---------- */
@@ -794,6 +882,7 @@ a{color:inherit;text-decoration:none}
   function dessine(t) {
     var ang = (t - t0) / 26000, c = Math.cos(ang), s = Math.sin(ang);
     var ech = Math.min(L, H) / 11, cx = L * .55, cy = H * .5;
+    var fil = getComputedStyle(document.documentElement).getPropertyValue("--fil-rvb").trim() || "214,168,92";
     ctx.clearRect(0, 0, L, H);
     ctx.lineWidth = 1;
     segs.forEach(function (sg) {
@@ -803,7 +892,7 @@ a{color:inherit;text-decoration:none}
         return [cx + x * ech * f, cy - y * ech * f + zz * ech * .28, zz];
       });
       var prof = (pr[0][2] + pr[1][2]) / 2;
-      ctx.strokeStyle = "rgba(214,168,92," + (0.16 - prof * .03).toFixed(3) + ")";
+      ctx.strokeStyle = "rgba(" + fil + "," + (0.16 - prof * .03).toFixed(3) + ")";
       ctx.beginPath(); ctx.moveTo(pr[0][0], pr[0][1]); ctx.lineTo(pr[1][0], pr[1][1]); ctx.stroke();
     });
     requestAnimationFrame(dessine);
