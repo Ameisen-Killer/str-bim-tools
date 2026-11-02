@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Carte des affaires · Planification</title>
+<meta name="theme-color" content="#F6F2EA">
+<script>
+/* Marque de l'espace, reprise comme dans /planif/ (vert du bureau « ab », sable sinon) */
+(function(){var r=document.documentElement,m="str";try{var s=JSON.parse(localStorage.getItem("planif.session")||"null");m=(s&&s.email?localStorage.getItem("planif.marque:"+s.email):localStorage.getItem("planif.marque"))||"str";if(m==="str"&&s&&s.email&&localStorage.getItem("planif.teinte:"+s.email)==="vert")r.setAttribute("data-teinte","vert");}catch(e){}if(m!=="ab")m="str";r.setAttribute("data-marque",m);})();
+</script>
+<link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<link rel="stylesheet" href="/planif/assets/marque.css?v=3">
+<link rel="stylesheet" href="/planif2/assets/equipes.css?v=1">
+<link rel="stylesheet" href="/planif2/assets/module.css?v=1">
+<!--
+Bureau V2 — Carte des affaires (02.11.2026) : fond swisstopo, adresses geo.admin.ch (cache planif.geo partagé avec /planif/carte/, non modifiée).
+-->
+<style>
+.carte-aff{position:relative;height:calc(100vh - 110px);min-height:380px;overflow:hidden;border-radius:10px;background:#E8E8E3;box-shadow:0 1px 3px rgba(0,0,0,.08);touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.carte-aff.glisse{cursor:grabbing}
+.ca-scene{position:absolute;inset:0;transform-origin:0 0}
+.ca-tuiles{position:absolute;inset:0}
+.ca-tuiles img{position:absolute;width:256px;height:256px;max-width:none;pointer-events:none}
+.carte-aff[data-fond="plan"] .ca-tuiles{filter:grayscale(1) contrast(.7) brightness(1.08);opacity:.72}
+.carte-aff[data-fond="couleur"] .ca-tuiles{filter:saturate(.7) contrast(.85);opacity:.85}
+.carte-aff[data-fond="photo"] .ca-tuiles{filter:saturate(.8) brightness(.9)}
+.ca-point{position:absolute;left:0;top:0;display:flex;align-items:center;gap:7px;padding:0;border:0;background:none;color:var(--texte);cursor:pointer;transform:translate(-11px,-11px);white-space:nowrap;z-index:1}
+.ca-point i{width:16px;height:16px;flex:none;transform:rotate(45deg);margin:2px;background:var(--tt);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);transition:transform .15s}
+.ca-point b{font-size:11px;font-weight:700;line-height:1;padding:4px 6px;border-radius:5px;background:#fff;color:var(--tt);box-shadow:0 1px 5px rgba(0,0,0,.25)}
+.ca-point:hover,.ca-point.choisi{z-index:2}
+.ca-point:hover i,.ca-point.choisi i{transform:rotate(45deg) scale(1.3)}
+.ca-point.choisi b{background:var(--tt);color:#fff}
+.ca-outils{position:absolute;right:10px;top:10px;z-index:4;display:flex;flex-direction:column;gap:6px}
+.ca-outils button{width:34px;height:34px;display:grid;place-items:center;font-size:18px;border:1px solid var(--ligne);border-radius:8px;background:rgba(255,255,255,.92);color:var(--texte);cursor:pointer}
+.ca-outils button:hover{background:#fff;color:var(--m-fort)}
+.ca-fonds{position:absolute;left:10px;bottom:10px;z-index:4;display:flex;padding:3px;border-radius:9px;background:rgba(255,255,255,.92);border:1px solid var(--ligne)}
+.ca-fonds button{padding:5px 11px;border:0;border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--doux)}
+.ca-fonds button[aria-pressed="true"]{background:var(--m-clair);color:var(--texte);font-weight:600}
+.ca-credit{position:absolute;right:0;bottom:0;z-index:4;padding:3px 7px;font-size:10px;color:var(--doux);background:rgba(255,255,255,.8);border-top-left-radius:6px}
+.ca-credit a{color:inherit}
+.ca-etat{position:absolute;left:10px;top:10px;z-index:4;padding:6px 10px;border-radius:7px;font-size:12px;color:var(--doux);background:rgba(255,255,255,.92);border:1px solid var(--ligne)}
+.ca-etat:empty{display:none}
+
+</style>
+</head>
+<body>
+<div class="page" id="page">
+  <aside class="bandeau" id="bandeau" aria-label="Carte des affaires">
+    <div class="recherche"><input id="q" type="search" placeholder="Rechercher une affaire, une adresse…" autocomplete="off" spellcheck="false" aria-label="Rechercher une affaire, une adresse…"></div>
+    <nav class="arbre" id="arbre"></nav>
+  </aside>
+  <button type="button" class="replier" id="replier" title="Réduire le bandeau" aria-controls="bandeau" aria-expanded="true">‹</button>
+
+  <main class="contenu" id="contenu">
+    <div class="tete">
+      <h1 id="titre">Carte des affaires</h1><span class="compte" id="compte"></span>
+      <div class="outils" id="outils"><label class="bascule"><input type="checkbox" id="terminees"> Affaires terminées</label></div>
+    </div>
+    <div id="liste"></div>
+  </main>
+</div>
+
+<script src="/planif/assets/calendrier.js?v=7"></script>
+<script src="/planif/assets/config.js?v=1"></script>
+<script src="/planif/assets/supabase.js?v=60"></script>
+<script src="/planif/assets/donnees.js?v=80"></script>
+<script src="/planif/assets/calculs.js?v=16"></script>
+<script src="/planif2/assets/module.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.Donnees, el = M.el, $ = function (s) { return document.querySelector(s); };
+  var q = $("#q"), cTerm = $("#terminees");
+  var filtre = "toutes";            // toutes | miennes | s:<succursale> | sans | introuvables
+  var TUILE = 256, ZMIN = 6, ZMAX = 18, WMTS = "https://wmts.geo.admin.ch/1.0.0/";
+  var FONDS = [{ cle: "plan", nom: "Plan", couche: "ch.swisstopo.pixelkarte-grau" }, { cle: "couleur", nom: "Couleur", couche: "ch.swisstopo.pixelkarte-farbe" }, { cle: "photo", nom: "Photo", couche: "ch.swisstopo.swissimage" }];
+  var fond = FONDS[0];
+  try { fond = FONDS.filter(function (f) { return f.cle === localStorage.getItem("planif.carte.fond"); })[0] || FONDS[0]; } catch (e) {}
+  var RECHERCHE = "https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&limit=1&sr=4326&searchText=";
+  var CLE_GEO = "planif.geo", OUBLI = 7 * 864e5;
+
+  M.bandeau(function () { dessine(); });
+  q.addEventListener("input", function () { liste(); });
+  q.addEventListener("keydown", function (e) { if (e.key === "Escape") { q.value = ""; liste(); } });
+  cTerm.addEventListener("change", function () { tout(); });
+
+  /* ---------- Carte (comme /planif/carte/ : tuiles swisstopo, adresses geo.admin.ch) ---------- */
+  var carte = el("div", "carte-aff"), scene = el("div", "ca-scene"), tuiles = el("div", "ca-tuiles"), hotePoints = el("div");
+  var etat = el("div", "ca-etat"); etat.setAttribute("role", "status");
+  scene.appendChild(tuiles); scene.appendChild(hotePoints); carte.appendChild(scene); carte.appendChild(etat);
+  var outilsC = el("div", "ca-outils");
+  [["+", "Zoomer", function () { zoome(1); }], ["−", "Dézoomer", function () { zoome(-1); }], ["⌖", "Voir toutes les affaires", function () { cadre(); }]].forEach(function (x) {
+    var b = el("button", null, x[0]); b.type = "button"; b.title = x[1]; b.setAttribute("aria-label", x[1]);
+    b.addEventListener("pointerdown", function (e) { e.stopPropagation(); }); b.addEventListener("click", x[2]); outilsC.appendChild(b);
+  });
+  carte.appendChild(outilsC);
+  var hFonds = el("div", "ca-fonds"); carte.appendChild(hFonds);
+  var credit = el("div", "ca-credit"); credit.innerHTML = 'Carte © <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener noreferrer">swisstopo</a> · adresses geo.admin.ch'; carte.appendChild(credit);
+
+  var vue = { z: 8, cx: 0, cy: 0 }, L = 0, H = 0;
+  var affaires = [], positions = {}, choisi = null, dejaCadre = false;
+  function monde(lat, lon, z) { var n = TUILE * Math.pow(2, z), s = Math.sin(lat * Math.PI / 180); return [(lon + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n]; }
+  function centreSur(lat, lon, z) { vue.z = z; var p = monde(lat, lon, z); vue.cx = p[0]; vue.cy = p[1]; }
+  centreSur(46.8, 8.23, 8);
+
+  var cache = {};
+  try { cache = JSON.parse(localStorage.getItem(CLE_GEO) || "{}") || {}; } catch (e) { cache = {}; }
+  function garde() { try { localStorage.setItem(CLE_GEO, JSON.stringify(cache)); } catch (e) {} }
+  function cleAdresse(a) { return a.toLowerCase().replace(/[\s,]+/g, " ").trim(); }
+  function cherche(texte, origines) {
+    return fetch(RECHERCHE + encodeURIComponent(texte) + (origines ? "&origins=" + origines : ""))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) { var r = j && j.results && j.results[0], at = r && r.attrs; return at && isFinite(at.lat) && isFinite(at.lon) ? { lat: +at.lat, lon: +at.lon } : null; });
+  }
+  function localise(adresse) {
+    var k = cleAdresse(adresse), c = cache[k];
+    if (c && (c.lat != null || Date.now() - c.t < OUBLI)) return Promise.resolve(c.lat != null ? c : null);
+    var texte = adresse.replace(/,/g, " ");
+    return cherche(texte, "address").then(function (p) { return p || cherche(texte, "zipcode,gg25"); })
+      .then(function (p) { cache[k] = p ? { lat: p.lat, lon: p.lon, t: Date.now() } : { lat: null, t: Date.now() }; garde(); return p; });
+  }
+  function localiseTout() {
+    var file = D.affaires({ tous: true }).filter(function (a) { return a.adresse && positions[a.id] === undefined; });
+    var n = 0, total = file.length, panne = false;
+    if (!total) return Promise.resolve();
+    function suivant() {
+      var a = file.shift(); if (!a) return Promise.resolve();
+      return localise(a.adresse).then(function (p) { positions[a.id] = p || false; }, function () { panne = true; })
+        .then(function () { n++; etat.textContent = n < total ? "Localisation des adresses… " + n + " / " + total : ""; dessinePoints(); return suivant(); });
+    }
+    etat.textContent = "Localisation des adresses… 0 / " + total;
+    return Promise.all([suivant(), suivant(), suivant()]).then(function () { etat.textContent = panne ? "Service des adresses injoignable : réessaie plus tard." : ""; arbre(); });
+  }
+  function mesure() { var r = carte.getBoundingClientRect(); L = r.width; H = r.height; }
+  function dessineTuiles() {
+    var n = Math.pow(2, vue.z), x0 = vue.cx - L / 2, y0 = vue.cy - H / 2;
+    var tx0 = Math.floor(x0 / TUILE), tx1 = Math.floor((x0 + L) / TUILE), ty0 = Math.max(0, Math.floor(y0 / TUILE)), ty1 = Math.min(n - 1, Math.floor((y0 + H) / TUILE));
+    var voulues = {};
+    for (var ty = ty0; ty <= ty1; ty++) for (var tx = tx0; tx <= tx1; tx++) {
+      var x = ((tx % n) + n) % n, cle = vue.z + "/" + x + "/" + ty;
+      voulues[cle] = true;
+      var img = tuiles.querySelector('img[data-t="' + cle + '"]');
+      if (!img) { img = el("img"); img.alt = ""; img.draggable = false; img.setAttribute("data-t", cle); img.src = WMTS + fond.couche + "/default/current/3857/" + cle + ".jpeg"; img.onerror = function () { this.style.visibility = "hidden"; }; tuiles.appendChild(img); }
+      img.style.transform = "translate(" + Math.round(tx * TUILE - x0) + "px," + Math.round(ty * TUILE - y0) + "px)";
+    }
+    [].slice.call(tuiles.children).forEach(function (img) { if (!voulues[img.getAttribute("data-t")]) img.remove(); });
+  }
+  function ecran(p) { var w = monde(p.lat, p.lon, vue.z); return [w[0] - (vue.cx - L / 2), w[1] - (vue.cy - H / 2)]; }
+  function dessinePoints() {
+    hotePoints.textContent = "";
+    affaires.forEach(function (a) {
+      var p = positions[a.id]; if (!p) return;
+      var e = ecran(p);
+      if (e[0] < -80 || e[1] < -40 || e[0] > L + 80 || e[1] > H + 40) return;
+      var b = el("button", "ca-point" + (choisi === a.id ? " choisi" : "")); b.type = "button";
+      b.style.setProperty("--tt", teinte(a)); b.style.left = Math.round(e[0]) + "px"; b.style.top = Math.round(e[1]) + "px";
+      b.setAttribute("aria-label", D.libelleAffaire(a) + " — " + a.adresse); b.title = D.libelleAffaire(a);
+      b.appendChild(el("i")); b.appendChild(el("b", null, a.code || a.nom));
+      b.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); detail(a.id); });
+      hotePoints.appendChild(b);
+    });
+  }
+  function dessine() { if (!carte.isConnected) return; mesure(); dessineTuiles(); dessinePoints(); }
+  function zoome(dz, px, py) {
+    var z = Math.max(ZMIN, Math.min(ZMAX, vue.z + dz)); if (z === vue.z) return;
+    if (px == null) { px = L / 2; py = H / 2; }
+    var k = Math.pow(2, z - vue.z), dx = px - L / 2, dy = py - H / 2;
+    vue.cx = (vue.cx + dx) * k - dx; vue.cy = (vue.cy + dy) * k - dy; vue.z = z; dessine();
+  }
+  function cadre(seul) {
+    var pts = (seul ? [seul] : affaires).map(function (a) { return positions[a.id]; }).filter(Boolean);
+    if (!pts.length) return;
+    mesure();
+    var la0 = 90, la1 = -90, lo0 = 180, lo1 = -180;
+    pts.forEach(function (p) { la0 = Math.min(la0, p.lat); la1 = Math.max(la1, p.lat); lo0 = Math.min(lo0, p.lon); lo1 = Math.max(lo1, p.lon); });
+    var z = 15;
+    while (z > ZMIN) { var a = monde(la1, lo0, z), b = monde(la0, lo1, z); if (b[0] - a[0] <= L - 120 && b[1] - a[1] <= H - 120) break; z--; }
+    centreSur((la0 + la1) / 2, (lo0 + lo1) / 2, z); dessine();
+  }
+  function dessineFonds() {
+    hFonds.textContent = ""; carte.setAttribute("data-fond", fond.cle);
+    FONDS.forEach(function (f) {
+      var b = el("button", null, f.nom); b.type = "button"; b.setAttribute("aria-pressed", f === fond ? "true" : "false");
+      b.addEventListener("pointerdown", function (e) { e.stopPropagation(); });
+      b.addEventListener("click", function () { if (f === fond) return; fond = f; try { localStorage.setItem("planif.carte.fond", f.cle); } catch (e) {} tuiles.textContent = ""; dessineFonds(); dessine(); });
+      hFonds.appendChild(b);
+    });
+  }
+  dessineFonds();
+  var roue = 0, derniereRoue = 0;
+  carte.addEventListener("wheel", function (e) {
+    e.preventDefault(); var r = carte.getBoundingClientRect(); roue += e.deltaY;
+    if (Math.abs(roue) < 60 && Date.now() - derniereRoue < 300) return;
+    if (Date.now() - derniereRoue < 180) return;
+    derniereRoue = Date.now(); zoome(roue < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); roue = 0;
+  }, { passive: false });
+  carte.addEventListener("dblclick", function (e) { var r = carte.getBoundingClientRect(); zoome(e.shiftKey ? -1 : 1, e.clientX - r.left, e.clientY - r.top); });
+  var doigts = {}, glisse = null, pince = null;
+  function nb() { return Object.keys(doigts).length; }
+  function ecart() { var p = Object.keys(doigts).map(function (k) { return doigts[k]; }); return { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }; }
+  carte.addEventListener("pointerdown", function (e) {
+    if (e.button) return;
+    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    try { carte.setPointerCapture(e.pointerId); } catch (err) {}
+    if (nb() === 1) { glisse = { x: e.clientX, y: e.clientY, cx: vue.cx, cy: vue.cy }; carte.classList.add("glisse"); }
+    else if (nb() === 2) { glisse = null; pince = ecart(); pince.cx = vue.cx; pince.cy = vue.cy; }
+  });
+  carte.addEventListener("pointermove", function (e) {
+    if (!doigts[e.pointerId]) return;
+    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (glisse) { vue.cx = glisse.cx - (e.clientX - glisse.x); vue.cy = glisse.cy - (e.clientY - glisse.y); dessine(); }
+    else if (pince && nb() === 2) {
+      var m = ecart(), r = carte.getBoundingClientRect(), k = m.d / Math.max(1, pince.d);
+      scene.style.transform = "translate(" + (m.x - r.left - (pince.x - r.left) * k) + "px," + (m.y - r.top - (pince.y - r.top) * k) + "px) scale(" + k + ")";
+      pince.k = k; pince.m = m;
+    }
+  });
+  function leve(e) {
+    if (!doigts[e.pointerId]) return;
+    delete doigts[e.pointerId];
+    if (pince && nb() < 2) {
+      scene.style.transform = "";
+      if (pince.k) { var r = carte.getBoundingClientRect(); vue.cx = pince.cx + (pince.x - pince.m.x); vue.cy = pince.cy + (pince.y - pince.m.y); zoome(Math.round(Math.log(pince.k) / Math.LN2), pince.m.x - r.left, pince.m.y - r.top); dessine(); }
+      pince = null; glisse = null; doigts = {};
+    }
+    if (!nb()) { glisse = null; carte.classList.remove("glisse"); }
+  }
+  carte.addEventListener("pointerup", leve); carte.addEventListener("pointercancel", leve);
+  window.addEventListener("resize", dessine);
+
+  /* ---------- Filtres ---------- */
+  function teinte(a) { return "var(--t" + ((a && a.teinte) || 1) + ")"; }
+  function toutes() { return D.affaires({ tous: cTerm.checked }); }
+  function estMienne(a) {
+    var moi = D.monMembre(); if (!moi) return false;
+    if (a.responsableId === moi.id || a.ingenieurs.indexOf(moi.id) >= 0 || a.dessinateurs.indexOf(moi.id) >= 0) return true;
+    return D.taches({ affaireId: a.id, sansTerminees: true }).some(function (t) { return t.ingenieurId === moi.id || t.dessinateurId === moi.id; });
+  }
+  function dansFiltre(a) {
+    if (filtre === "miennes") return estMienne(a);
+    if (filtre.indexOf("s:") === 0) return (a.succursale || "_") === filtre.slice(2);
+    return true;
+  }
+  function texte(a) { return [a.code, a.nom, a.adresse, a.phase ? D.libellePhase(a.phase) : ""].join(" "); }
+
+  M.demarre(function () {
+    var moi = D.monMembre();
+    if (moi && moi.succursale && toutes().some(function (a) { return a.adresse && a.succursale === moi.succursale; })) filtre = "s:" + moi.succursale;
+    tout();
+    D.surRechargement(function () { positions = {}; tout(); });
+  });
+  function tout() { arbre(); liste(); localiseTout().then(function () { liste(); if (!dejaCadre) { dejaCadre = true; cadre(); } }); }
+
+  function arbre() {
+    var l = toutes(), situees = l.filter(function (a) { return a.adresse; });
+    var e = [{ cle: "toutes", nom: "Toutes les affaires", n: situees.length }];
+    if (D.monMembre()) e.push({ cle: "miennes", nom: "Mes affaires", n: situees.filter(estMienne).length });
+    var succ = Object.keys(D.SUCCURSALES);
+    if (succ.length) {
+      e.push({ titre: "Succursales" });
+      succ.forEach(function (s) { e.push({ cle: "s:" + s, nom: D.SUCCURSALES[s], n: situees.filter(function (a) { return a.succursale === s; }).length }); });
+      var ns = situees.filter(function (a) { return !a.succursale; }).length;
+      if (ns) e.push({ cle: "s:_", nom: "Non renseignée", n: ns });
+    }
+    var sans = l.filter(function (a) { return !a.adresse; }).length, intr = situees.filter(function (a) { return positions[a.id] === false; }).length;
+    if (sans || intr) {
+      e.push({ titre: "Hors de la carte" });
+      if (sans) e.push({ cle: "sans", nom: "Sans adresse", n: sans });
+      if (intr) e.push({ cle: "introuvables", nom: "Adresse introuvable", n: intr });
+    }
+    M.arbre($("#arbre"), e, filtre, function (cle) { var avant = filtre; filtre = cle; arbre(); liste(); if (avant !== cle && cle !== "sans" && cle !== "introuvables") cadre(); });
+  }
+
+  function liste() {
+    if (!D.etat()) return;
+    var hote = $("#liste");
+    if (filtre === "sans" || filtre === "introuvables") {
+      hote.textContent = "";
+      var l = toutes().filter(function (a) { return filtre === "sans" ? !a.adresse : a.adresse && positions[a.id] === false; }).filter(function (a) { return M.cherche(texte(a), q.value); });
+      $("#titre").textContent = filtre === "sans" ? "Affaires sans adresse" : "Adresse introuvable";
+      $("#compte").textContent = l.length + (l.length > 1 ? " affaires" : " affaire");
+      hote.appendChild(el("p", "bandeau-info", "L'adresse se complète dans la fiche de l'affaire. Un clic ouvre la page Affaires sur celle-ci."));
+      var ll = el("div", "liste-lignes");
+      l.forEach(function (a) {
+        var b = el("button", "ligne-l"); b.type = "button";
+        var lib = el("span", "lib"); lib.appendChild(el("b", null, D.libelleAffaire(a))); lib.appendChild(el("small", null, a.adresse || "Pas d'adresse")); b.appendChild(lib);
+        b.addEventListener("click", function () { M.ouvreModule("affaires", "/planif2/affaires/?q=" + encodeURIComponent(a.code || a.nom)); });
+        ll.appendChild(b);
+      });
+      hote.appendChild(ll);
+      return;
+    }
+    if (!carte.isConnected) { hote.textContent = ""; hote.appendChild(carte); }
+    affaires = toutes().filter(function (a) { return a.adresse; }).filter(dansFiltre).filter(function (a) { return M.cherche(texte(a), q.value); });
+    $("#titre").textContent = filtre === "toutes" ? "Carte des affaires" : filtre === "miennes" ? "Mes affaires" : filtre === "s:_" ? "Succursale non renseignée" : D.SUCCURSALES[filtre.slice(2)] || "Carte";
+    var placees = affaires.filter(function (a) { return positions[a.id]; }).length;
+    $("#compte").textContent = placees + (placees > 1 ? " affaires situées" : " affaire située");
+    dessine();
+    if (q.value && affaires.length === 1 && positions[affaires[0].id]) cadre(affaires[0]);
+  }
+
+  function detail(id) {
+    var a = D.affaire(id); if (!a) return;
+    choisi = id; dessinePoints();
+    var n = D.taches({ affaireId: a.id, sansTerminees: true }).length, r = a.responsableId && D.membre(a.responsableId);
+    var d = el("dl", "champ");
+    [["Adresse", a.adresse], ["Phase", a.phase ? D.libellePhase(a.phase) : ""], ["Statut", D.STATUTS_AFFAIRE[a.statut]], ["Succursale", a.succursale ? D.SUCCURSALES[a.succursale] : ""],
+     ["Responsable", r ? r.prenom + " " + r.nom : ""], ["Tâches ouvertes", String(n)], ["Échéance", a.echeance ? M.jj(a.echeance, true) : ""]]
+      .forEach(function (x) { if (!x[1]) return; d.appendChild(el("dt", null, x[0])); d.appendChild(el("dd", null, x[1])); });
+    var act = el("div", "actions");
+    var gm = el("a", "btn principal", "Google Maps ↗"); gm.href = D.lienCarte(a); gm.target = "_blank"; gm.rel = "noopener noreferrer"; act.appendChild(gm);
+    var z = el("button", "btn", "Centrer"); z.type = "button"; z.addEventListener("click", function () { if (positions[a.id]) { centreSur(positions[a.id].lat, positions[a.id].lon, Math.max(vue.z, 15)); dessine(); } }); act.appendChild(z);
+    if (D.pagePermise("affaires")) { var v = el("button", "btn", "Voir dans Affaires"); v.type = "button"; v.addEventListener("click", function () { M.ouvreModule("affaires", "/planif2/affaires/?q=" + encodeURIComponent(a.code || a.nom)); }); act.appendChild(v); }
+    var tk = el("button", "btn", "Tâches"); tk.type = "button"; tk.addEventListener("click", function () { M.ouvreModule("taches", "/planif2/taches/"); }); act.appendChild(tk);
+    M.panneau.ouvre([el("div", "surtitre", a.code || "Affaire"), el("h2", null, a.nom)], [d, act], teinte(a), function () { choisi = null; dessinePoints(); });
+  }
+})();
+
+</script>
+</body>
+</html>
