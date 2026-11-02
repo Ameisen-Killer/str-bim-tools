@@ -31,6 +31,12 @@
 .bascule{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--doux);cursor:pointer}
 .bascule input{width:16px;height:16px;accent-color:var(--m-fort)}
 
+/* Switch du haut du bandeau : chronologique ou par affaire */
+.mode{position:relative;display:flex;margin:14px 14px 0;padding:3px;border-radius:9px;background:var(--m-voile);border:1px solid var(--ligne)}
+.mode button{flex:1;height:32px;border:0;border-radius:7px;background:transparent;font-size:13px;color:var(--doux);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+.mode button[aria-checked="true"]{background:#fff;color:var(--texte);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.semaine-bloc h2 .code-af{color:var(--teinte,var(--t1));font-weight:700}
+.semaine-bloc h2 .nom-af{color:var(--texte)}
 .semaine-bloc{margin:0 0 16px}
 .semaine-bloc h2{display:flex;align-items:baseline;gap:10px;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--doux)}
 .semaine-bloc h2 small{font-weight:400;color:var(--faible)}
@@ -101,6 +107,10 @@
 <body>
 <div class="page" id="page">
   <aside class="bandeau" id="bandeau" aria-label="Tâches">
+    <div class="mode" role="radiogroup" aria-label="Classement">
+      <button type="button" role="radio" data-mode="chrono" aria-checked="true">Chronologique</button>
+      <button type="button" role="radio" data-mode="affaire" aria-checked="false">Par affaire</button>
+    </div>
     <div class="recherche"><input id="q" type="search" placeholder="Chercher une tâche" autocomplete="off" spellcheck="false" aria-label="Chercher une tâche"></div>
     <nav class="arbre" id="arbre"></nav>
   </aside>
@@ -165,6 +175,21 @@
   try { garde = localStorage.getItem("planif2.equipes.replie"); } catch (e) {}
   replie(garde === null ? innerWidth <= 700 : garde === "1");
   btn.addEventListener("click", function () { replie(!page.classList.contains("replie")); });
+
+  /* Classement : chronologique (par semaine d'échéance) ou par affaire, retenu sur l'appareil */
+  var mode = "chrono";
+  try { mode = localStorage.getItem("planif2.taches.mode") === "affaire" ? "affaire" : "chrono"; } catch (e) {}
+  function poseMode() {
+    [].forEach.call(document.querySelectorAll(".mode button"), function (b) { b.setAttribute("aria-checked", String(b.dataset.mode === mode)); });
+  }
+  poseMode();
+  [].forEach.call(document.querySelectorAll(".mode button"), function (b) {
+    b.addEventListener("click", function () {
+      mode = b.dataset.mode; poseMode();
+      try { localStorage.setItem("planif2.taches.mode", mode); } catch (e) {}
+      liste();
+    });
+  });
 
   var cTerm = $("#terminees");
   try { cTerm.checked = localStorage.getItem("planif2.taches.terminees") === "1"; } catch (e) {}
@@ -332,6 +357,7 @@
     hote.textContent = "";
     if (!l.length) { hote.appendChild(el("p", "vide", "Aucune tâche ne correspond.")); return; }
 
+    if (mode === "affaire") return parAffaire(l, hote);
     // Groupes : en retard, puis une semaine par lundi d'échéance, puis sans échéance
     var auj = C.isoAuj(), lundiAuj = C.lundi(auj), groupes = {}, ordre = [];
     l.forEach(function (t) {
@@ -351,6 +377,38 @@
       }
       var somme = groupes[k].reduce(function (s, t) { return s + Calc.chargeOuverte(t); }, 0);
       h.appendChild(el("small", null, groupes[k].length + (groupes[k].length > 1 ? " tâches · " : " tâche · ") + fmtJ(somme) + " j"));
+      bloc.appendChild(h);
+      var ul = el("div", "taches");
+      groupes[k].sort(function (a, b) {
+        if ((a.echeance || "") !== (b.echeance || "")) return (a.echeance || "9") < (b.echeance || "9") ? -1 : 1;
+        return (a.priorite || 5) - (b.priorite || 5);
+      }).forEach(function (t) { ul.appendChild(ligne(t)); });
+      bloc.appendChild(ul);
+      hote.appendChild(bloc);
+    });
+  }
+  /* Mode par affaire : un bloc par affaire, par numéro ; ses tâches par échéance */
+  function parAffaire(l, hote) {
+    var groupes = {}, ordre = [];
+    l.forEach(function (t) {
+      var k = t.affaireId || "_";
+      if (!groupes[k]) { groupes[k] = []; ordre.push(k); }
+      groupes[k].push(t);
+    });
+    ordre.sort(function (x, y) {
+      var a = D.affaire(x), b = D.affaire(y);
+      if (!a) return 1; if (!b) return -1;
+      return (a.code || "").localeCompare(b.code || "", "fr", { numeric: true });
+    });
+    ordre.forEach(function (k) {
+      var af = D.affaire(k), bloc = el("section", "semaine-bloc"), h = el("h2");
+      bloc.style.setProperty("--teinte", "var(--t" + ((af && af.teinte) || 1) + ")");
+      if (af) { h.appendChild(el("span", "code-af", af.code || "")); h.appendChild(el("span", "nom-af", af.nom)); }
+      else h.appendChild(el("span", "nom-af", "Sans affaire"));
+      var somme = groupes[k].reduce(function (s, t) { return s + Calc.chargeOuverte(t); }, 0);
+      var retard = groupes[k].filter(function (t) { return urgence(t) === "rouge"; }).length;
+      h.appendChild(el("small", null, groupes[k].length + (groupes[k].length > 1 ? " tâches · " : " tâche · ") + fmtJ(somme) + " j" +
+        (retard ? " · " + retard + " à échéance ou en retard" : "")));
       bloc.appendChild(h);
       var ul = el("div", "taches");
       groupes[k].sort(function (a, b) {
