@@ -58,6 +58,16 @@
   .eq-replier{position:static;width:100%;height:38px;margin:8px 0 10px;font-size:14px}
 }
 @media print{.eq-bandeau,.eq-replier{display:none}.eq-page{display:block}}
+/* Présence de la semaine (02.11.2026, repris du bureau /planif2/) : l'initiale du jour, une LED dessous */
+.eq-sem{position:relative;z-index:0;display:flex;gap:6px}
+.eq-jour{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:16px}
+.eq-jour i{font-style:normal;font-size:11px;line-height:12px;font-weight:600;color:var(--texte-faible)}
+.eq-jour.auj i{color:var(--or)}
+.eq-jour.auj::before{content:"";position:absolute;inset:-4px -2px;border-radius:6px;background:var(--ab-vert-pale);z-index:-1}
+.eq-led{width:10px;height:10px;border-radius:50%;background:#D9DBD5;box-shadow:inset 0 1px 1px rgba(0,0,0,.12)}
+.eq-led.on{background:#3FB950;box-shadow:0 0 6px rgba(63,185,80,.7),inset 0 -1px 1px rgba(0,0,0,.15)}
+.eq-led.demi{background:linear-gradient(90deg,#3FB950 50%,#D9DBD5 50%);box-shadow:0 0 4px rgba(63,185,80,.45)}
+.eq-capa{margin-top:6px;font-size:12px;color:var(--texte-faible)}
 </style>
 </head>
 <body class="large">
@@ -385,6 +395,22 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
   }
 
+  /* La semaine en cours, du lundi au vendredi : LED allumée présent, à moitié
+     pour une demi-journée, éteinte absent, jour non travaillé ou chômé. */
+  var JOURS_LED = ["L", "M", "M", "J", "V"], NOMS_LED = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
+  function presenceSemaine(m) {
+    var auj = C.isoAuj(), canton = D.canton();
+    return el("div", { class: "eq-sem" }, C.serie(C.lundi(auj), 5).map(function (j, i) {
+      var ch = C.chome(j, canton), a = ch ? null : Calc.absenceLe(m, j);
+      var p = ch || a ? 0 : (Calc.poidsJour(m, j) || 0);
+      return el("span", { class: "eq-jour" + (j === auj ? " auj" : ""),
+        title: NOMS_LED[i] + " " + C.fmtCourt(j) + " : " + (ch ? ch : a ? "absent" + (a.motif ? " (" + a.motif + ")" : "") :
+          p >= 1 ? "présent" : p > 0 ? "demi-journée" : "ne travaille pas ce jour") }, [
+        el("i", { text: JOURS_LED[i] }), el("span", { class: "eq-led" + (p >= 1 ? " on" : p > 0 ? " demi" : "") })
+      ]);
+    }));
+  }
+
   function rendListe(s, membres, hote) {
     var mots = barre ? barre.termes() : [];
     var q = barre ? barre.valeur().trim() : "";
@@ -428,10 +454,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             : null
         ]),
         el("td", {}, [telephones(m, mots)]),
-        el("td", { class: "num", title: D.detailJours(m) }, [
-          C.fmtJours(m.capacite) + " j/sem.",
-          D.libelleJours(m) ? el("div", { class: "secondaire", text: D.libelleJours(m) }) : null
-        ]),
+        el("td", { title: D.detailJours(m) }, [presenceSemaine(m), el("div", { class: "eq-capa num", text: C.fmtJours(m.capacite) + " j/sem." })]),
         !voitCharge ? null : el("td", {}, planifie ? [
           el("div", { class: "num", text: C.fmtJours(b.charge) + " / " + C.fmtJours(b.capacite) + " j" }),
           el("div", { class: "jauge" }, [el("i", { style: "width:" + Math.min(100, pourcent) + "%;" + (b.charge > b.capacite + 0.05 ? "background:var(--alerte)" : "") })])
@@ -456,7 +479,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("th", { text: "Nom et rattachement" }),
         el("th", { text: "Métier et statuts" }),
         el("th", { text: "Téléphones" }),
-        el("th", { text: "Capacité" }),
+        el("th", { text: "Présence" }),
         voitCharge ? el("th", { text: "Cette semaine" }) : null,
         el("th", { text: "Absences" }),
         el("th", { text: "" })
