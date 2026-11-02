@@ -171,9 +171,10 @@ a{color:inherit;text-decoration:none}
 .titre .fermer:hover{background:#C42B1C;color:#fff}
 .titre button svg,.titre a svg{width:10px;height:10px}
 .fenetre .cadre{position:relative;flex:1;display:flex;background:#F6F2EA}
-.fenetre iframe{flex:1;width:100%;border:0;background:transparent;opacity:0;transition:opacity .2s}
+.fenetre iframe{position:relative;z-index:1;flex:1;width:100%;border:0;background:transparent;opacity:0;transition:opacity .2s}
 .fenetre iframe.pret{opacity:1}
-.fenetre .charge{position:absolute;inset:0;display:grid;place-items:center;color:#7A5A2B;font-size:13px;pointer-events:none}
+.fenetre iframe.pret + .charge,.fenetre .cadre:has(iframe.pret) .charge{display:none}
+.fenetre .charge{position:absolute;inset:0;z-index:0;display:grid;place-items:center;color:#7A5A2B;font-size:13px;pointer-events:none}
 .fenetres.bouge iframe{pointer-events:none}
 .poignee{position:absolute;z-index:2}
 .poignee.d{top:38px;right:0;bottom:8px;width:6px;cursor:ew-resize}
@@ -338,7 +339,7 @@ a{color:inherit;text-decoration:none}
 <script>
 (function () {
   "use strict";
-  var NOM = "Bureau", VERSION = "0.3.0";
+  var NOM = "Bureau", VERSION = "0.3.1";
   var D = window.Donnees, C = window.Cal, Calc = window.Calc, SB = window.Sb;
   var avecBase = !!(SB && SB.configure);
   var $ = function (s) { return document.querySelector(s); };
