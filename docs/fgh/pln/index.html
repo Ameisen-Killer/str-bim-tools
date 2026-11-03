@@ -134,6 +134,17 @@ tbody tr.choisie{background:var(--choisie)}
 td.code{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--texte-doux)}
 td.code b{color:var(--texte);font-weight:600}
 td.ind{font-family:var(--mono);font-weight:600;color:var(--or);white-space:nowrap}
+td.code .pile,td.code .pile-vide,td.code .filet{display:inline-flex;vertical-align:-3px;width:20px;height:20px;margin:-2px 6px -2px -4px}
+td.code .pile{align-items:center;justify-content:center;padding:0;border:0;border-radius:4px;background:none;color:var(--or);cursor:pointer}
+td.code .pile:hover{background:var(--controle-survol)}
+td.code .pile svg{width:14px;height:14px;transition:transform .15s}
+td.code .pile[aria-expanded="true"] svg{transform:rotate(90deg)}
+td.code .filet{border-left:1px solid var(--ligne);border-bottom:1px solid var(--ligne);width:10px;height:10px;margin:-4px 16px 2px 5px}
+.nb-ind{margin-left:6px;padding:0 5px;border-radius:8px;background:rgba(var(--or-rvb),.14);font-size:10px;line-height:14px;font-weight:600;vertical-align:1px}
+tr.empile td{border-bottom-color:transparent}
+tr.empile:has(+ tr:not(.ancien)) td{border-bottom-color:var(--ligne)}
+tr.ancien td{color:var(--texte-faible);background:rgba(var(--encre),.018);padding-top:4px;padding-bottom:4px;font-size:12.5px}
+tr.ancien td.code b,tr.ancien td.ind{color:var(--texte-doux)}
 td.titre{min-width:260px}
 td.titre small{display:block;color:var(--texte-faible);font-size:12px}
 td.nw{white-space:nowrap;color:var(--texte-doux)}
@@ -250,7 +261,7 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
     </div>
     <footer>
       <button type="button" class="bt danger" id="fp-suppr"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 9h5.8l.6-9" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Supprimer</button>
-      <button type="button" class="bt cadre" id="fp-indice" title="Passe à l'indice suivant, daté d'aujourd'hui">Indice suivant</button>
+      <button type="button" class="bt cadre" id="fp-indice" title="Ajoute l'indice suivant, daté d'aujourd'hui ; celui-ci reste dans l'historique">Nouvel indice</button>
       <span class="esp"></span>
       <button type="button" class="bt cadre" data-ferme>Annuler</button>
       <button type="submit" class="bt plein" id="fp-ok">Enregistrer</button>
@@ -265,7 +276,7 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
     <div class="corps">
       <div class="bilan" id="fi-bilan"></div>
       <div id="fi-detail"></div>
-      <p class="muet">Les plans nouveaux sont ajoutés, ceux dont l'indice a avancé sont mis à jour (indice, titre, date, auteur). Rien n'est supprimé : les plans absents de l'export restent dans la liste, ainsi que les plans créés à la main. Statut et remarque ne sont jamais touchés.</p>
+      <p class="muet">Chaque indice de l'export devient une ligne : les nouveaux indices s'empilent sur leur plan (le dernier reste affiché, la flèche montre les précédents). Un indice déjà connu n'est corrigé que si son titre, sa date ou son auteur ont changé. Rien n'est supprimé, et statut, remarque et contrôle ne sont jamais touchés.</p>
     </div>
     <footer><span class="esp"></span><button type="button" class="bt cadre" data-ferme>Annuler</button><button type="button" class="bt plein" id="fi-ok">Appliquer</button></footer>
   </div>
@@ -277,6 +288,6 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=2"></script>
+<script src="/fgh/pln/pln.js?v=3"></script>
 </body>
 </html>

@@ -90,10 +90,21 @@
   }
 
   // ------------------------------------------------------------------ zones
+  // Un plan (livrable type-niveau-zone-n°) = un groupe ; chaque indice est une ligne de la table.
+  // Le dernier indice est affiché, les précédents sont empilés dessous et se déplient.
+  var GROUPES = [], OUVERTS = {};
+  function regroupe() {
+    var m = {};
+    PLANS.forEach(function (p) { var k = cle(p); (m[k] = m[k] || []).push(p); });
+    GROUPES = Object.keys(m).map(function (k) {
+      var r = m[k].sort(function (a, b) { return cmpInd(b.indice, a.indice) || String(b.date_indice || "").localeCompare(String(a.date_indice || "")); });
+      return { cle: k, rows: r, d: r[0] };
+    });
+  }
   function zonesInfos() {
     var z = {};
-    PLANS.forEach(function (p) {
-      var k = p.zone || "?"; z[k] = z[k] || { n: 0, noyaux: {}, niv: {} };
+    GROUPES.forEach(function (g) {
+      var p = g.d, k = p.zone || "?"; z[k] = z[k] || { n: 0, noyaux: {}, niv: {} };
       z[k].n++; z[k].niv[p.niveau] = (z[k].niv[p.niveau] || 0) + 1;
       var m, re = /noyau\s+([A-Z])\b/gi; while ((m = re.exec(p.titre || ""))) z[k].noyaux[m[1].toUpperCase()] = 1;
     });
@@ -107,7 +118,7 @@
   }
   function dessineZones() {
     var Z = zonesInfos(), cles = Object.keys(Z).sort(function (a, b) { return (a === "TTZ") - (b === "TTZ") || a.localeCompare(b); });
-    var h = '<button type="button" class="zone" data-z="" aria-current="' + (!ZONE) + '"><span class="nom"><b>Toutes les zones</b></span><span class="n">' + PLANS.length + "</span></button><div class=\"sep-zones\"></div>";
+    var h = '<button type="button" class="zone" data-z="" aria-current="' + (!ZONE) + '"><span class="nom"><b>Toutes les zones</b></span><span class="n">' + GROUPES.length + "</span></button><div class=\"sep-zones\"></div>";
     cles.forEach(function (k) {
       var i = Z[k], st = sousTitreZone(k, i), ici = ZONE === k;
       h += '<button type="button" class="zone" data-z="' + esc(k) + '" aria-current="' + (ici && !NIVEAU) + '"><span class="nom"><b>Zone ' + esc(k) + "</b>" + (st ? "<small>" + esc(st) + "</small>" : "") + '</span><span class="n">' + i.n + "</span></button>";
@@ -118,8 +129,8 @@
       }
     });
     $("#liste-zones").innerHTML = h;
-    var manuels = PLANS.filter(function (p) { return p.source === "manuel"; }).length;
-    $("#pied-zones").textContent = PLANS.length + " plans" + (manuels ? " · " + manuels + " créés à la main" : "");
+    var manuels = GROUPES.filter(function (g) { return g.rows.some(function (p) { return p.source === "manuel"; }); }).length;
+    $("#pied-zones").textContent = GROUPES.length + " plans · " + PLANS.length + " indices" + (manuels ? " · " + manuels + " avec saisie manuelle" : "");
   }
   $("#liste-zones").addEventListener("click", function (e) {
     var b = e.target.closest(".zone"); if (!b) return;
@@ -139,28 +150,33 @@
   if (matchMedia("(max-width:760px)").matches) document.documentElement.classList.add("sans-zones");
 
   // ------------------------------------------------------------------ liste
+  function texteRecherche(p) {
+    return [code(p), p.titre, "ind " + p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé n°" + p.controle_n : "", niveauNom(p.niveau), TYPES[p.type]].join(" ");
+  }
   function filtres() {
     var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean), types = Object.keys(TYPESEL);
-    return PLANS.filter(function (p) {
+    return GROUPES.filter(function (g) {
+      var p = g.d;
       if (ZONE && p.zone !== ZONE) return false;
       if (NIVEAU && p.niveau !== NIVEAU) return false;
       if (types.length && !TYPESEL[p.type]) return false;
       if (!mots.length) return true;
-      var t = plie([code(p), p.titre, p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé n°" + p.controle_n : "", niveauNom(p.niveau), TYPES[p.type]].join(" "));
+      var t = plie(g.rows.map(texteRecherche).join(" "));
       return mots.every(function (m) { return t.indexOf(m) >= 0; });
     });
   }
   function trie(l) {
     var c = TRI.col, s = TRI.sens;
     var v = c === "code" ? function (p) { return code(p); } : c === "date" ? function (p) { return p.date_indice || ""; } : function (p) { return p[c] || ""; };
-    return l.sort(function (a, b) {
+    return l.sort(function (x, y) {
+      var a = x.d, b = y.d;
       var r = c === "indice" ? cmpInd(a.indice, b.indice) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
       return r * s || code(a).localeCompare(code(b));
     });
   }
   function dessineTypes() {
-    var base = PLANS.filter(function (p) { return (!ZONE || p.zone === ZONE) && (!NIVEAU || p.niveau === NIVEAU); }), c = {};
-    base.forEach(function (p) { c[p.type] = (c[p.type] || 0) + 1; });
+    var c = {};
+    GROUPES.forEach(function (g) { var p = g.d; if ((!ZONE || p.zone === ZONE) && (!NIVEAU || p.niveau === NIVEAU)) c[p.type] = (c[p.type] || 0) + 1; });
     $("#types").innerHTML = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (t) {
       return '<button type="button" data-t="' + esc(t) + '" aria-pressed="' + !!TYPESEL[t] + '" title="' + esc(TYPES[t] || t) + '">' + esc(t) + "<i>" + c[t] + "</i></button>";
     }).join("");
@@ -174,9 +190,23 @@
     $("#corps").innerHTML = ""; var v = $("#vide"); v.hidden = false;
     v.innerHTML = "<b>" + esc(m) + "</b>";
   }
+  function ligne(p, i, j, g) {
+    var ancien = j > 0, n = g.rows.length, ouvert = !!OUVERTS[g.cle];
+    var pile = ancien ? '<span class="filet" aria-hidden="true"></span>' : n > 1
+      ? '<button type="button" class="pile" data-pile="' + i + '" aria-expanded="' + ouvert + '" title="' + (ouvert ? "Masquer" : "Voir") + " les " + (n - 1) + ' indice(s) précédent(s)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+      : '<span class="pile-vide"></span>';
+    return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
+      '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
+      '<td class="ind">' + esc(p.indice) + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
+      (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + "</td>" +
+      '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
+      (p.controle_n ? '<span class="pastille ctrl" title="Contrôle d\'armatures avant bétonnage' + (p.controle_par ? " par " + esc(p.controle_par) : "") + '">✓ ctrl n°' + esc(p.controle_n) + (p.date_controle ? " · " + esc(dateFr(p.date_controle).slice(0, 5)) : "") + "</span> " : "") +
+      (p.source === "manuel" ? '<span class="pastille manuel" title="Saisi à la main dans cet outil">manuel</span>' : "") + "</td></tr>";
+  }
   function dessineListe() {
     VUE = trie(filtres());
-    $("#compte").textContent = VUE.length + " / " + PLANS.length + " plans";
+    var nInd = 0; VUE.forEach(function (g) { nInd += g.rows.length; });
+    $("#compte").textContent = VUE.length + " / " + GROUPES.length + " plans · " + nInd + " indices";
     document.querySelectorAll("thead th").forEach(function (th) {
       if (th.dataset.tri === TRI.col) th.setAttribute("aria-sort", TRI.sens > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort");
     });
@@ -191,15 +221,18 @@
     v.hidden = !!VUE.length; if (!VUE.length) v.innerHTML = "<b>Aucun plan</b>Change la zone, les types ou la recherche.";
     var h = [];
     for (var i = 0; i < VUE.length; i++) {
-      var p = VUE[i];
-      h.push('<tr data-i="' + i + '"' + (EDITE && EDITE.id === p.id ? ' class="choisie"' : "") + '><td class="code">' + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
-        '<td class="ind">' + esc(p.indice) + '</td><td class="titre">' + esc(p.titre || "—") + "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small></td>" +
-        '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") + (p.controle_n ? '<span class="pastille ctrl" title="Contrôle d\'armatures avant bétonnage' + (p.controle_par ? " par " + esc(p.controle_par) : "") + '">✓ ctrl n°' + esc(p.controle_n) + (p.date_controle ? " · " + esc(dateFr(p.date_controle).slice(0, 5)) : "") + "</span> " : "") + (p.source === "manuel" ? '<span class="pastille manuel" title="Créé à la main dans cet outil">manuel</span>' : "") + "</td></tr>");
+      var g = VUE[i];
+      h.push(ligne(g.d, i, 0, g));
+      if (OUVERTS[g.cle]) for (var j = 1; j < g.rows.length; j++) h.push(ligne(g.rows[j], i, j, g));
     }
     $("#corps").innerHTML = h.join("");
   }
-  function dessine() { dessineZones(); dessineTypes(); dessineListe(); listes(); }
-  $("#corps").addEventListener("click", function (e) { var tr = e.target.closest("tr"); if (tr) ouvre(VUE[+tr.dataset.i]); });
+  function dessine() { regroupe(); dessineZones(); dessineTypes(); dessineListe(); listes(); }
+  $("#corps").addEventListener("click", function (e) {
+    var b = e.target.closest(".pile");
+    if (b) { var g = VUE[+b.dataset.pile]; if (OUVERTS[g.cle]) delete OUVERTS[g.cle]; else OUVERTS[g.cle] = 1; dessineListe(); return; }
+    var tr = e.target.closest("tr"); if (tr) ouvre(VUE[+tr.dataset.i].rows[+tr.dataset.j]);
+  });
   document.querySelector("thead").addEventListener("click", function (e) {
     var th = e.target.closest("th"); if (!th) return;
     TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : 1 }; dessineListe();
@@ -227,7 +260,7 @@
     EDITE = p || null;
     var d = p || { projet: "FGH", discipline: "STR", emetteur: "ABI", phase: "51", type: Object.keys(TYPESEL)[0] || "PLA", niveau: NIVEAU || "", zone: ZONE || "", numero: "", indice: "00", titre: "", date_indice: aujourdhui(), auteur: lsGet("fgh.nom") || "", statut: "", remarque: "", controle_n: "", date_controle: "", controle_par: "" };
     CHAMPS.forEach(function (k) { F.elements[k].value = d[k] == null ? "" : d[k]; });
-    $("#fp-titre").textContent = p ? "Modifier le plan" : "Nouveau plan";
+    $("#fp-titre").textContent = p ? "Modifier l'indice " + p.indice : "Nouveau plan";
     $("#fp-suppr").hidden = !p; $("#fp-indice").hidden = !p;
     $("#fp-trace").textContent = p ? "Créé le " + horo(p.cree_le) + " · modifié le " + horo(p.modifie_le) + (p.modifie_par ? " par " + p.modifie_par : "") + (p.source === "kairnial" ? " · importé de Kairnial" : " · créé à la main") : "";
     majCode(); $("#f-plan").hidden = false; dessineListe();
@@ -242,10 +275,12 @@
   }
   function majCode() {
     var o = lit(); $("#fp-code").textContent = code(o) + (o.indice ? " · ind. " + o.indice : "");
-    var doublon = PLANS.filter(function (p) { return cle(p) === cle(o) && (!EDITE || p.id !== EDITE.id); })[0];
+    var meme = PLANS.filter(function (p) { return cle(p) === cle(o) && (!EDITE || p.id !== EDITE.id); });
+    var doublon = meme.filter(function (p) { return cmpInd(p.indice, o.indice) === 0; })[0];
     var a = $("#fp-alerte");
-    a.hidden = !doublon || !o.numero;
-    if (doublon) a.textContent = "Ce code existe déjà : « " + (doublon.titre || "sans titre") + " », ind. " + doublon.indice + ". Vérifie le numéro.";
+    a.hidden = !o.numero || (!doublon && (EDITE || !meme.length));
+    if (doublon) a.textContent = "L'indice " + o.indice + " de ce plan existe déjà : « " + (doublon.titre || "sans titre") + " ». Change l'indice ou le numéro.";
+    else if (!EDITE && meme.length) a.textContent = "Ce plan existe déjà (" + meme.length + " indice(s), dernier : " + meme.map(function (p) { return p.indice; }).sort(cmpInd).pop() + ") : la fiche sera ajoutée comme nouvel indice.";
   }
   F.addEventListener("input", majCode);
   F.addEventListener("submit", function (e) {
@@ -259,23 +294,31 @@
     req.then(function (l) {
       var r = l && l[0]; if (!r) throw new Error("La base n'a rien renvoyé.");
       if (EDITE) { var i = PLANS.indexOf(EDITE); PLANS[i] = r; } else PLANS.push(r);
-      toast(EDITE ? "Plan enregistré" : "Plan créé : " + code(r));
+      if (!EDITE) OUVERTS[cle(r)] = OUVERTS[cle(r)] || 0;
+      toast(EDITE ? "Indice " + r.indice + " enregistré" : "Ajouté : " + code(r) + " ind. " + r.indice);
       $("#f-plan").hidden = true; EDITE = null; dessine();
     }).catch(function (err) { toast(err.message, 5000); }).then(function () { b.disabled = false; });
   });
   $("#fp-suppr").addEventListener("click", function () {
-    if (!EDITE || !confirm("Supprimer le plan " + code(EDITE) + " ind. " + EDITE.indice + " de la liste ?\nCette suppression vaut pour tout le monde.")) return;
+    if (!EDITE || !confirm("Supprimer l'indice " + EDITE.indice + " du plan " + code(EDITE) + " ?\nLes autres indices du plan restent. Cette suppression vaut pour tout le monde.")) return;
     var p = EDITE;
     appel(TABLE + "?id=eq." + encodeURIComponent(p.id), { methode: "DELETE" }).then(function () {
-      PLANS = PLANS.filter(function (x) { return x !== p; }); $("#f-plan").hidden = true; EDITE = null; dessine(); toast("Plan supprimé");
+      PLANS = PLANS.filter(function (x) { return x !== p; }); $("#f-plan").hidden = true; EDITE = null; dessine(); toast("Indice supprimé");
     }).catch(function (err) { toast(err.message, 5000); });
   });
+  // Nouvel indice : une nouvelle ligne, copiée de l'indice le plus avancé du plan ; l'ancien reste empilé dessous
   $("#fp-indice").addEventListener("click", function () {
-    var i = F.elements.indice, n = numInd(i.value);
-    i.value = n < 0 ? "00" : (n + 1 < 10 ? "0" : "") + (n + 1);
+    if (!EDITE) return;
+    var g = GROUPES.filter(function (x) { return x.cle === cle(EDITE); })[0], der = g ? g.d : EDITE, n = numInd(der.indice);
+    EDITE = null;
+    CHAMPS.forEach(function (k) { F.elements[k].value = der[k] == null ? "" : der[k]; });
+    F.elements.indice.value = n < 0 ? "00" : (n + 1 < 10 ? "0" : "") + (n + 1);
     F.elements.date_indice.value = aujourdhui();
     if (lsGet("fgh.nom")) F.elements.auteur.value = lsGet("fgh.nom");
-    majCode(); toast("Indice " + i.value + " : vérifie puis enregistre");
+    ["controle_n", "date_controle", "controle_par"].forEach(function (k) { F.elements[k].value = ""; });
+    $("#fp-titre").textContent = "Nouvel indice " + F.elements.indice.value;
+    $("#fp-suppr").hidden = true; $("#fp-indice").hidden = true; $("#fp-trace").textContent = "L'indice " + der.indice + " restera dans l'historique du plan.";
+    majCode(); F.elements.titre.focus();
   });
   $("#btn-nouveau").addEventListener("click", function () { ouvre(null); });
   function nom() {
@@ -321,8 +364,8 @@
           niveau: g("niveau") || "000", zone: (g("zone") || "TTZ").toUpperCase(), numero: g("numero"), indice: g("indice") || "00", titre: titreDoc(g("titre")).slice(0, 300),
           date_indice: dateIso(L[C.date]), auteur: g("auteur").slice(0, 100) };
         nb++;
-        var k = cle(p), d = garde[k];
-        if (!d || cmpInd(p.indice, d.indice) > 0 || (cmpInd(p.indice, d.indice) === 0 && (p.date_indice || "") > (d.date_indice || ""))) garde[k] = p;
+        var k = cle(p) + "#" + numInd(p.indice), d = garde[k];
+        if (!d || (p.date_indice || "") > (d.date_indice || "")) garde[k] = p;
       }
     });
     return { plans: garde, lignes: nb };
@@ -333,24 +376,29 @@
       var wb = XLSX.read(buf, { type: "array", cellDates: true });
       var R = litExport(wb), keys = Object.keys(R.plans);
       if (!keys.length) throw new Error("Aucun plan trouvé : est-ce bien l'export « Tableau de suivi » de Kairnial ?");
-      var parCle = {}; PLANS.forEach(function (p) { parCle[cle(p)] = p; });
-      var nouveaux = [], majs = [], egaux = 0, enAvance = 0;
+      var parInd = {}, plansConnus = {}, plansExport = {};
+      PLANS.forEach(function (p) { parInd[cle(p) + "#" + numInd(p.indice)] = p; plansConnus[cle(p)] = 1; });
+      var nouveaux = [], majs = [], egaux = 0, avances = [];
       keys.forEach(function (k) {
-        var n = R.plans[k], a = parCle[k];
-        if (!a) { nouveaux.push(Object.assign({ source: "kairnial", statut: "", remarque: "", controle_n: "", date_controle: null, controle_par: "" }, n)); return; }
-        var c = cmpInd(n.indice, a.indice);
-        if (c > 0 || (c === 0 && (n.titre !== a.titre || (n.date_indice || null) !== (a.date_indice || null)))) {
-          majs.push({ avant: a, apres: Object.assign({}, a, { indice: n.indice, titre: n.titre, date_indice: n.date_indice, auteur: n.auteur || a.auteur }) });
-        } else if (c < 0) enAvance++; else egaux++;
+        var n = R.plans[k], a = parInd[k]; plansExport[cle(n)] = 1;
+        if (!a) {
+          nouveaux.push(Object.assign({ source: "kairnial", statut: "", remarque: "", controle_n: "", date_controle: null, controle_par: "" }, n));
+          if (plansConnus[cle(n)]) avances.push(n);
+          return;
+        }
+        if (n.titre !== a.titre || (n.date_indice || null) !== (a.date_indice || null) || (n.auteur && n.auteur !== a.auteur)) {
+          majs.push({ avant: a, apres: Object.assign({}, a, { titre: n.titre, date_indice: n.date_indice, auteur: n.auteur || a.auteur }) });
+        } else egaux++;
       });
-      var absents = PLANS.filter(function (p) { return !R.plans[cle(p)]; }).length;
+      var nPlans = Object.keys(plansExport).length, nouveauxPlans = Object.keys(plansExport).filter(function (k) { return !plansConnus[k]; }).length;
+      var absents = GROUPES.filter(function (g) { return !plansExport[g.cle]; }).length;
       IMPORT = { nouveaux: nouveaux, majs: majs };
-      $("#fi-fichier").textContent = f.name + " · " + R.lignes + " lignes lues, " + keys.length + " plans au dernier indice";
-      $("#fi-bilan").innerHTML = [[nouveaux.length, "nouveaux plans"], [majs.length, "mis à jour"], [egaux, "déjà à jour"], [absents + enAvance, "gardés tels quels"]]
+      $("#fi-fichier").textContent = f.name + " · " + R.lignes + " lignes lues : " + nPlans + " plans, " + keys.length + " indices";
+      $("#fi-bilan").innerHTML = [[nouveauxPlans, "nouveaux plans"], [nouveaux.length, "indices ajoutés"], [majs.length, "indices corrigés"], [egaux, "indices déjà à jour"]]
         .map(function (x) { return "<div><b>" + x[0] + "</b><span>" + x[1] + "</span></div>"; }).join("");
-      var det = majs.slice(0, 200).map(function (m) { return "<div>" + esc(code(m.avant)) + " : ind. " + esc(m.avant.indice) + " → <em>" + esc(m.apres.indice) + "</em></div>"; }).join("");
-      $("#fi-detail").innerHTML = (majs.length ? '<p class="muet">Indices qui avancent :</p><div class="detail">' + det + (majs.length > 200 ? "<div>… et " + (majs.length - 200) + " autres</div>" : "") + "</div>" : "") +
-        (absents + enAvance ? '<p class="muet">' + absents + " plan(s) de la liste absents de l'export" + (enAvance ? ", " + enAvance + " avec un indice plus avancé que Kairnial" : "") + " : rien n'y est changé.</p>" : "");
+      var det = avances.slice(0, 200).map(function (n) { return "<div>" + esc(code(n)) + " : nouvel indice <em>" + esc(n.indice) + "</em></div>"; }).join("");
+      $("#fi-detail").innerHTML = (avances.length ? '<p class="muet">Nouveaux indices sur des plans déjà dans la liste :</p><div class="detail">' + det + (avances.length > 200 ? "<div>… et " + (avances.length - 200) + " autres</div>" : "") + "</div>" : "") +
+        (absents ? '<p class="muet">' + absents + " plan(s) de la liste absents de l'export : rien n'y est changé.</p>" : "");
       $("#fi-ok").disabled = !nouveaux.length && !majs.length;
       $("#fi-ok").textContent = nouveaux.length || majs.length ? "Appliquer" : "Rien à faire";
       $("#f-import").hidden = false;
@@ -372,11 +420,12 @@
         return req.then(function () { fait += (lot.ins || lot.maj).length; occupe(true, "Enregistrement… " + fait + " / " + (N.length + M.length)); });
       });
     }, Promise.resolve()).then(function () {
-      $("#f-import").hidden = true; toast(N.length + " plans ajoutés, " + M.length + " mis à jour", 4000); IMPORT = null; return recharge(true);
+      $("#f-import").hidden = true; toast(N.length + " indices ajoutés, " + M.length + " corrigés", 4000); IMPORT = null; return recharge(true);
     }).catch(function (e) { toast(e.message + (fait ? " (" + fait + " déjà enregistrés)" : ""), 6000); recharge(true); }).then(function () { occupe(false); });
   });
 
   // ------------------------------------------------------------------ exports
+  function LV() { return VUE.map(function (g) { return g.d; }); }
   function libelleVue() {
     var b = [];
     if (ZONE) b.push("Zone " + ZONE + (NIVEAU ? " · " + niveauNom(NIVEAU) : ""));
@@ -421,7 +470,7 @@
         y += 5;
       }
       entete();
-      VUE.forEach(function (p, i) {
+      LV().forEach(function (p, i) {
         d.setFont("helvetica", "normal"); d.setFontSize(7.5);
         var lignes = d.splitTextToSize(p.titre || "—", cols[2][1] - 3).slice(0, 3), h = Math.max(1, lignes.length) * 3.4 + 1.6;
         if (y + h > 200) { d.addPage(); entete(); }
@@ -459,7 +508,7 @@
       var H = ws.getRow(6); H.values = tetes; H.height = 20;
       H.eachCell(function (cell) { cell.font = { bold: true, name: "Arial", size: 9, color: { argb: "FF283C0F" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCAE09B" } };
         cell.alignment = { vertical: "middle" }; cell.border = { bottom: { style: "thin", color: { argb: "FF87868B" } } }; });
-      VUE.forEach(function (p, i) {
+      LV().forEach(function (p, i) {
         var row = ws.addRow([p.projet, p.discipline, p.emetteur, p.phase, p.type, p.niveau, p.zone, p.numero, code(p), p.indice, p.titre, niveauNom(p.niveau),
           p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, p.remarque, p.controle_n, p.date_controle ? new Date(p.date_controle + "T12:00:00") : null, p.controle_par]);
         row.font = { name: "Arial", size: 9 }; row.alignment = { vertical: "top", wrapText: false };
@@ -469,6 +518,21 @@
       ws.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6 + VUE.length, column: tetes.length } };
       ws.views = [{ state: "frozen", ySplit: 6 }];
       ws.pageSetup.printTitlesRow = "6:6";
+      // Historique : tous les indices des plans exportés, du plus récent au plus ancien
+      var wh = wb.addWorksheet("Historique des indices", { pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+      wh.columns = [{ width: 34 }, { width: 7 }, { width: 70 }, { width: 12 }, { width: 20 }, { width: 16 }, { width: 11 }, { width: 13 }];
+      var hh = wh.addRow(["Code", "Indice", "Titre", "Date indice", "Auteur", "Statut", "Contrôle n°", "Date contrôle"]);
+      hh.eachCell(function (cell) { cell.font = { bold: true, name: "Arial", size: 9, color: { argb: "FF283C0F" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCAE09B" } }; });
+      VUE.forEach(function (g, gi) {
+        g.rows.forEach(function (p, j) {
+          var rw = wh.addRow([code(p), p.indice, p.titre, p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, p.controle_n, p.date_controle ? new Date(p.date_controle + "T12:00:00") : null]);
+          rw.font = { name: "Arial", size: 9, bold: j === 0, color: j ? { argb: "FF6F6F6F" } : undefined };
+          rw.getCell(4).numFmt = "dd.mm.yyyy"; rw.getCell(8).numFmt = "dd.mm.yyyy";
+          if (gi % 2) rw.eachCell({ includeEmpty: true }, function (cell) { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F8F2" } }; });
+        });
+      });
+      wh.autoFilter = { from: { row: 1, column: 1 }, to: { row: wh.rowCount, column: 8 } };
+      wh.views = [{ state: "frozen", ySplit: 1 }];
       return wb.xlsx.writeBuffer();
     }).then(function (buf) {
       telecharge(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier("xlsx"));
