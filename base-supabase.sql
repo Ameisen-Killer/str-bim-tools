@@ -23,7 +23,8 @@
 --  membres y est en lecture seule.
 --  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
 --  qui permet de publier cette clé dans un dépôt public. Seule exception, voulue :
---  l'outil Visas (/visas/), ouvert sans connexion — voir la section « Visas ».
+--  les outils Visas (/fgh/vis/) et Plans FGH (/fgh/pln/), ouverts sans connexion —
+--  voir les sections « Visas » et « Plans FGH ».
 --
 --  Après exécution, dans le tableau de bord Supabase (voir reglages-supabase.md) :
 --    - Authentication > Auth Hooks : « Before User Created », fonction
@@ -2843,6 +2844,61 @@ create policy "visas : modification" on public.visas_notes for update to anon, a
 create policy "visas : retrait"      on public.visas_notes for delete to anon, authenticated using (true);
 
 
+-- ============================================================ Plans FGH ==
+-- L'outil /fgh/pln/ : la liste des plans du chantier Fairmont (03.11.2026).
+-- Comme Visas, ouvert SANS CONNEXION à toute personne qui a l'adresse : le rôle
+-- anon (la clé publiable seule) lit, crée, modifie et supprime des plans.
+-- Une ligne = un livrable à son indice en cours. Les champs suivent le code
+-- Kairnial FGH-STR-ABI-51-<type>-<niveau>-<zone>-<n°> ; les bornes limitent ce
+-- qu'un inconnu peut y glisser. La base pose elle-même l'heure de modification.
+create table if not exists public.fgh_plans (
+  id          uuid primary key default gen_random_uuid(),
+  projet      text not null default 'FGH' check (char_length(projet) between 1 and 10),
+  discipline  text not null default 'STR' check (char_length(discipline) between 1 and 10),
+  emetteur    text not null default 'ABI' check (char_length(emetteur) between 1 and 10),
+  phase       text not null default '51'  check (char_length(phase) between 1 and 10),
+  type        text not null check (char_length(type) between 1 and 10),
+  niveau      text not null default '000' check (char_length(niveau) between 1 and 10),
+  zone        text not null default 'TTZ' check (char_length(zone) between 1 and 10),
+  numero      text not null check (char_length(numero) between 1 and 10),
+  indice      text not null default '00' check (char_length(indice) <= 10),
+  titre       text not null default '' check (char_length(titre) <= 300),
+  date_indice date,
+  auteur      text not null default '' check (char_length(auteur) <= 100),
+  statut      text not null default '' check (char_length(statut) <= 40),
+  remarque    text not null default '' check (char_length(remarque) <= 2000),
+  source      text not null default 'manuel' check (source in ('manuel', 'kairnial')),
+  cree_le     timestamptz not null default now(),
+  modifie_le  timestamptz not null default now(),
+  modifie_par text not null default '' check (char_length(modifie_par) <= 100)
+);
+create index if not exists fgh_plans_code on public.fgh_plans (type, niveau, zone, numero);
+
+create or replace function public.fgh_plans_horodate()
+returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.modifie_le := now();
+  if tg_op = 'INSERT' then new.cree_le := now(); end if;
+  return new;
+end $$;
+revoke all on function public.fgh_plans_horodate() from public, anon, authenticated;
+drop trigger if exists fgh_plans_horodate on public.fgh_plans;
+create trigger fgh_plans_horodate before insert or update on public.fgh_plans
+  for each row execute function public.fgh_plans_horodate();
+
+alter table public.fgh_plans enable row level security;
+revoke all on public.fgh_plans from anon, authenticated;
+grant select, insert, update, delete on public.fgh_plans to anon, authenticated;
+drop policy if exists "fgh plans : lecture"      on public.fgh_plans;
+drop policy if exists "fgh plans : création"     on public.fgh_plans;
+drop policy if exists "fgh plans : modification" on public.fgh_plans;
+drop policy if exists "fgh plans : suppression"  on public.fgh_plans;
+create policy "fgh plans : lecture"      on public.fgh_plans for select to anon, authenticated using (true);
+create policy "fgh plans : création"     on public.fgh_plans for insert to anon, authenticated with check (true);
+create policy "fgh plans : modification" on public.fgh_plans for update to anon, authenticated using (true) with check (true);
+create policy "fgh plans : suppression"  on public.fgh_plans for delete to anon, authenticated using (true);
+
 -- ==================================================== mises à jour en direct ==
 -- Les pages ouvertes se mettent à jour quand un collègue enregistre
 -- (docs/planif/assets/direct.js) : le service Realtime ne diffuse que les
@@ -2870,5 +2926,5 @@ commit;
 notify pgrst, 'reload schema';
 
 -- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports, visas_coches et visas_notes, ouvertes)
+--   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports, visas_coches, visas_notes et fgh_plans, ouvertes)
 --   écriture -> 401 « new row violates row-level security policy »

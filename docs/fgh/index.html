@@ -83,7 +83,7 @@ main{position:relative;z-index:3;max-width:1040px;margin:-84px auto 0;padding:0 
   text-decoration:none;color:inherit;background:rgba(var(--couche-rvb),.68);border:1px solid var(--bord-verre);
   -webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);box-shadow:var(--ombre);
   transition:transform .35s cubic-bezier(.2,.7,.2,1),border-color .35s;animation:monte .9s cubic-bezier(.2,.7,.2,1) backwards}
-.outil:nth-child(1){animation-delay:.35s}.outil:nth-child(2){animation-delay:.5s}.outil:nth-child(3){animation-delay:.65s}
+.outil:nth-child(1){animation-delay:.35s}.outil:nth-child(2){animation-delay:.5s}.outil:nth-child(3){animation-delay:.65s}.outil:nth-child(4){animation-delay:.8s}
 @keyframes monte{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
 /* halo qui suit le pointeur */
 .outil::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .35s;
@@ -153,6 +153,14 @@ main{position:relative;z-index:3;max-width:1040px;margin:-84px auto 0;padding:0 
       </div>
       <div><h2>Visas</h2><p>Analyse de l'export « Tableau de suivi » de la GED Kairnial : statuts des visas, retards, plans à traiter.</p></div>
       <div class="bas"><span>Poste de travail · Kairnial</span><span class="esp"></span><span class="ouvrir">Ouvrir<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+    </a>
+    <a class="outil" href="/fgh/pln/">
+      <div class="haut">
+        <svg class="ico" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#CAE09B"/><stop offset="1" stop-color="#5F9126"/></linearGradient></defs><rect x="4" y="6" width="40" height="36" rx="3" fill="#ECECE8"/><rect x="4" y="6" width="11" height="36" rx="3" fill="url(#p1)"/><path d="M7.5 13h4M7.5 19h4M7.5 25h4" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M19 14h20M19 21h20M19 28h20M19 35h14" stroke="#87868B" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span class="code">PLN</span>
+      </div>
+      <div><h2>Liste des plans</h2><p>Tous les plans par grande zone et niveau, mis à jour depuis Kairnial : création, modification, exports PDF et Excel.</p></div>
+      <div class="bas"><span>Poste et téléphone · partagé</span><span class="esp"></span><span class="ouvrir">Ouvrir<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     </a>
   </div>
   <p class="pied"><span>Pages réservées au chantier, hors menu du site.</span><a href="/">str-bim-tools.com</a></p>
