@@ -1,5 +1,5 @@
 // Service worker : l'appli s'ouvre sans réseau (cache), mise à jour en arrière-plan.
-const CACHE='controle-armature-v14';
+const CACHE='controle-armature-v15';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png',
   './vendor/jspdf-2.5.1.umd.min.js','./vendor/jszip-3.10.1.min.js','./vendor/xlsx-0.18.5.full.min.js',
   '/assets/polices/polices.css'];
@@ -10,6 +10,10 @@ self.addEventListener('fetch',e=>{
   if(e.request.method==='GET'&&u.hostname==='cdn.jsdelivr.net'){ // bibliothèque Whisper : en cache pour le hors-ligne
     e.respondWith(caches.open(CACHE).then(c=>c.match(e.request).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok)c.put(e.request,r.clone());return r;}))));return;}
   if(e.request.method!=='GET'||u.origin!==location.origin)return; // Graph / login Microsoft : jamais en cache
+  if(e.request.mode==='navigate'){ // page : réseau d'abord (dernière version tout de suite), cache si hors ligne ou trop lent
+    e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>{
+      const net=fetch(e.request).then(r=>{if(r.ok)caches.open(CACHE).then(c=>c.put(e.request,r.clone()));return r;});
+      if(!hit)return net;return Promise.race([net.catch(()=>hit),new Promise(ok=>setTimeout(()=>ok(hit),3500))]);}));return;}
   e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(hit=>{
     const net=fetch(e.request).then(r=>{if(r.ok)caches.open(CACHE).then(c=>c.put(e.request,r.clone()));return r;}).catch(()=>hit);
     return hit||net;

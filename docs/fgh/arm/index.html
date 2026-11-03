@@ -125,6 +125,15 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 .mh{display:flex;align-items:center;gap:12px;margin-bottom:12px}.mh h2{flex:1;margin:0;font-size:22px}
 #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1d1d1b;color:#fff;padding:10px 16px;font-size:14px;z-index:90;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 #toast.on{opacity:.95}
+.filtres{margin:0 0 10px}
+.filtres input[type=search]{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);font:500 16px Inter,sans-serif;padding:10px 12px;margin-bottom:8px;outline:none}
+.filtres .chips{margin:0 0 8px}
+.fl-per{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
+.fl-per label{display:flex;align-items:center;gap:6px}.fl-per input{border:1px solid var(--line);background:var(--card);color:var(--ink);font:500 14px Inter,sans-serif;padding:6px 8px}
+.fl-per .muted{flex:1;min-width:80px}
+.mini{display:none}
+@media (min-width:1000px){.mini{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}.mini span{width:56px;height:56px;background:#333 center/cover no-repeat;position:relative}
+  .mini span.r{outline:2px solid var(--ko);outline-offset:-2px}.mini em{font-style:normal;font-size:12px;color:var(--mut);align-self:center;margin-left:4px}}
 #busy{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:95;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
 /* ordinateur : le mobile reste tel quel en dessous de 1000 px */
 @media (min-width:1000px){
@@ -182,6 +191,11 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   <button class="big" id="bNew">+ Nouveau contrôle<small id="nNext"></small></button>
   <div class="h" style="display:flex;align-items:center"><span style="flex:1">Mes contrôles</span><button class="btn s w" id="bSel" style="text-transform:none;letter-spacing:0">Sélectionner</button></div>
   <div id="selBar" class="hidden" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="btn s w" id="selSigned">Signés non envoyés</button><button class="btn s w" id="selNone">Aucun</button><button class="btn s" id="selMail">✉️ Envoyer par mail (<span id="selN">0</span>)</button></div>
+  <div class="filtres" id="filtres">
+    <input id="fQ" type="search" placeholder="Rechercher : n°, description, localisation, plan, entreprise…" autocomplete="off">
+    <div class="chips" id="fSt"><button data-v="">Tous</button><button data-v="wip">En cours</button><button data-v="ko">Reprises</button><button data-v="ok">Validés</button><button data-v="att">À sauvegarder</button></div>
+    <div class="fl-per"><label>Du <input id="fDe" type="date"></label><label>au <input id="fA" type="date"></label><button class="btn s w" id="fRaz">Effacer</button><span class="muted" id="fN"></span><button class="btn s" id="fPdf">📄 Télécharger les PDF</button></div>
+  </div>
   <div id="list"></div>
   <p class="muted" id="syEtat" style="text-align:center;font-size:12px;margin:14px 0 4px"></p>
   <div class="data" id="dataLine"></div>
@@ -339,10 +353,8 @@ const colIdx=L=>{L=String(L||'').toUpperCase().trim();let n=0;for(const ch of L)
 function connCard(key,title,desc,data,info){
   const c=S.conn[key];const ok=!!data;
   return `<div class="conn"><div class="hd"><span class="dot ${ok?'ok':'ko'}"></span><div class="t"><b>${title}</b><div class="muted">${ok?info:desc}</div></div></div>
-  <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Lien OneDrive / SharePoint du fichier (actualisation automatique en ligne)</span><input data-link="${key}" value="${esc((S.links||{})[key]||'')}" placeholder="https://…sharepoint.com/…"></label>
-  <div class="acts"><label class="btn s">${ok?'Actualiser depuis un fichier':'Connecter un fichier'}<input type="file" data-load="${key}" accept=".xlsx,.xlsm,.xls" hidden></label>${(S.links||{})[key]?`<button class="btn s" data-dl="${key}">Actualiser en ligne</button>`:''}${ok?`<button class="btn s w" data-unl="${key}">Déconnecter</button>`:''}</div>
+  <div class="acts"><label class="btn s">${ok?'Actualiser depuis un fichier':'Connecter un fichier'}<input type="file" data-load="${key}" accept=".xlsx,.xlsm,.xls" hidden></label>${ok?`<button class="btn s w" data-unl="${key}">Déconnecter</button>`:''}</div>
   <details><summary>Réglages du connecteur</summary>
-   <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Chemin Windows du fichier (pour la synchronisation)</span><input data-path="${key}" value="${esc(key==='index'?(S.pCtrl?S.pCtrl+'\\'+S.fIndex:''):S.pPlans)}" placeholder="C:\\Users\\…\\fichier.xlsx"></label>
    <div class="grid"><div><label>Feuille</label><input data-cs="${key}" data-f="sheet" value="${esc(c.sheet)}"></div><div><label>1re ligne de données</label><input data-cs="${key}" data-f="firstRow" inputmode="numeric" value="${c.firstRow}"></div>
    ${Object.entries(c.cols).map(([k,v])=>`<div><label>Col. ${CONN_LBL[k]||k}</label><input data-cc="${key}" data-f="${k}" value="${esc(v)}"></div>`).join('')}</div>
    <button class="btn s w" style="margin-top:8px" data-reset="${key}">Valeurs par défaut (Fairmont)</button></details></div>`;
@@ -440,7 +452,7 @@ async function plnMark(c,quiet){if(!c||!c.marquer_plans)return;const L=(c.plans|
 async function depuisPLN(){const m=/^#(pln|ctrl)=(.+)$/.exec(location.hash);if(!m)return;history.replaceState(null,'',location.pathname+location.search);
   if(String(S.numero)!=='6848'){const p=PROJECTS.find(x=>String(x.numero)==='6848');if(p)await setProject(p.id);}
   if(m[1]==='ctrl'){const n=decodeURIComponent(m[2]),c=projCtrls().find(x=>String(x.numero)===n);
-    if(c)return openCtrl(c.id,true);return toast('Le contrôle n°'+n+' n\'est pas sur cet appareil (il a été saisi sur un autre).',5000);}
+    if(c)return openCtrl(c.id,true);return toast('Le contrôle n°'+n+' n\'est pas encore arrivé sur cet appareil : vérifie qu\'il a été sauvegardé en ligne sur le téléphone.',5000);}
   let d;try{d=JSON.parse(decodeURIComponent(m[2]));}catch(e){return;}
   if(!PLANS||PLANS.src!=='pln'||Date.now()-(PLANS.ts||0)>60000)await loadPLN(true);
   const rows=PLANS&&PLANS.src==='pln'?PLANS.rows:[],T=String(d.type||'').toUpperCase();
@@ -499,13 +511,14 @@ async function syPush(){if(SYB||!navigator.onLine)return;const keys=Object.keys(
   finally{SYB=false;await DB.kvSet('sync:file',SYQ);syEtat();if(Object.keys(SYQ).length&&!SYERR)setTimeout(syPush,500);}}
 // fiches reçues (rapide, à l'ouverture) puis photos (en arrière-plan)
 async function syPullC(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGet('sync:marques')||{};let n=0,depuis=M.c||'1970-01-01T00:00:00Z';
+  let bloque=false;
   for(;;){const L=await plnFetch('fgh_controles?select=*&modifie_le=gte.'+encodeURIComponent(depuis)+'&order=modifie_le&limit=500');
-    for(const r of L||[]){depuis=r.modifie_le;if(SYQ['ctrl:'+r.id])continue;const loc=CTRLS.find(x=>x.id===r.id);if(loc&&loc===CUR)continue;
+    for(const r of L||[]){if(!bloque)depuis=r.modifie_le;if(SYQ['ctrl:'+r.id])continue;const loc=CTRLS.find(x=>x.id===r.id);if(loc&&loc===CUR){if((loc._maj||0)<r.maj)bloque=true;continue;}
       if(r.supprime){if(loc){for(const ph of await DB.byCtrl(r.id))await DB_del('photos',ph.id);await DB_del('ctrl',r.id);CTRLS=CTRLS.filter(x=>x!==loc);n++;}continue;}
       if(loc&&(loc._maj||0)>=r.maj)continue;
       const P=PROJECTS.find(p=>String(p.numero)===String(r.projet))||S,c=Object.assign({},r.data||{},{id:r.id,projectId:P.id,_maj:r.maj});
       if(loc){Object.keys(loc).forEach(k=>delete loc[k]);Object.assign(loc,c);await DB_put('ctrl',loc);}else{CTRLS.push(c);await DB_put('ctrl',c);}n++;}
-    if(!L||L.length<500)break;}
+    if(!L||L.length<500||bloque)break;}
   M.c=depuis;await DB.kvSet('sync:marques',M);return n;}
 async function syPullP(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGet('sync:marques')||{};let n=0,depuis=M.p||'1970-01-01T00:00:00Z';
   for(;;){const L=await plnFetch('fgh_controles_photos?select=*&modifie_le=gte.'+encodeURIComponent(depuis)+'&order=modifie_le&limit=200');
@@ -593,7 +606,9 @@ const TRAIT=[['nattes','Nattes isolantes'],['cure','Traitement de cure'],['autre
 const CHECKS=[['recouvrement','Recouvrement des aciers'],['disposition_nappes','Disposition des nappes'],['ecartement_nappes','Écartement des nappes'],['poinconnement_dispo','Poinçonnement : disposition des pièces']];
 const baseName=c=>`n°${c.numero||'?'}_${c.date||today()} - ${c.description||'sans description'}`;
 const photoName=(c,i)=>safe(`n°${c.numero||'X'}_${c.date||today()}_${pad(i+1)}`)+'.jpg';
-let saveT=null;function save(){if(!CUR)return;const c=CUR;clearTimeout(saveT);saveT=setTimeout(()=>DB.put('ctrl',c),250);}
+const snap=c=>JSON.stringify(c,(k,v)=>k==='_maj'?undefined:v);let SNAP='';
+function putCur(c){const j=snap(c);if(c===CUR&&j===SNAP)return Promise.resolve();if(c===CUR)SNAP=j;return DB.put('ctrl',c);}
+let saveT=null;function save(){if(!CUR)return;const c=CUR;clearTimeout(saveT);saveT=setTimeout(()=>putCur(c),250);}
 function newCtrl(){const last=[...projCtrls()].sort((a,b)=>b.created-a.created)[0]||{};
   const c={id:uid(),projectId:S.id,created:Date.now(),numero:String(nextNumero()),date:today(),description:'',projet:S.projet,auteur:S.auteur,lieu:S.lieu,date_signature:today(),
     entreprise_informee_le:fridayBefore(),traitement:[],plans:[],reprises:[],marquer_plans:!!(PLANS&&PLANS.src==='pln')};
@@ -602,13 +617,42 @@ function newCtrl(){const last=[...projCtrls()].sort((a,b)=>b.created-a.created)[
   return c;}
 
 const renderHomeList=()=>renderHome();
+/* filtres de la liste (recherche, état, période) et PDF en lot */
+let FILT=Object.assign({q:'',st:'',de:'',a:''},lsGet('ca-filt',{})),FILT_L=[];
+const etatC=c=>c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';
+function filtreCtrls(L){const q=norm(FILT.q).split(/\s+/).filter(Boolean);
+  return L.filter(c=>{if(FILT.st==='att'){if(!syEnAttente(c))return false;}else if(FILT.st&&etatC(c)!==FILT.st)return false;
+    const d=isoFr(c.date)||'';if(FILT.de&&(!d||d<FILT.de))return false;if(FILT.a&&(!d||d>FILT.a))return false;
+    if(!q.length)return true;const h=norm(['n°'+c.numero,c.numero,c.description,c.localisation,c.type_element,c.ouvrage,c.plan_coffrage,c.plan_armatures,c.listes,c.entreprise,c.contremaitre,c.auteur,c.date].join(' '));
+    return q.every(k=>h.includes(k));});}
+const filtSave=()=>{lsSet('ca-filt',FILT);renderHome();};
+$('#fQ').value=FILT.q;$('#fDe').value=FILT.de;$('#fA').value=FILT.a;
+$('#fQ').oninput=()=>{FILT.q=$('#fQ').value;clearTimeout(filtSave.t);filtSave.t=setTimeout(filtSave,150);};
+$('#fSt').onclick=e=>{const b=e.target.closest('button');if(!b)return;FILT.st=FILT.st===b.dataset.v?'':b.dataset.v;filtSave();};
+$('#fDe').onchange=()=>{FILT.de=$('#fDe').value;filtSave();};$('#fA').onchange=()=>{FILT.a=$('#fA').value;filtSave();};
+$('#fRaz').onclick=()=>{FILT={q:'',st:'',de:'',a:''};$('#fQ').value='';$('#fDe').value='';$('#fA').value='';filtSave();};
+$('#fPdf').onclick=async()=>{const L=[...FILT_L].sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0));if(!L.length)return;
+  if(L.length>1&&!confirm(L.length+' fiche(s) PDF avec leurs photos, réunies dans un fichier .zip. Continuer ?'))return;
+  try{if(L.length===1){busy(true,'Création du PDF…');download(await pdfFor(L[0],true),safe(baseName(L[0]))+'.pdf');}
+    else{const z=new JSZip();for(const [i,c] of L.entries()){busy(true,'Création des PDF… '+(i+1)+' / '+L.length);z.file(safe(baseName(c))+'.pdf',await pdfFor(c,true));}
+      busy(true,'Assemblage du .zip…');const per=[FILT.de&&frIso(FILT.de),FILT.a&&frIso(FILT.a)].filter(Boolean).join(' au ');
+      download(await z.generateAsync({type:'blob',compression:'STORE'}),safe('Controles armature '+(S.numero||'')+(per?' du '+per:'')+' ('+L.length+' fiches)')+'.zip');}}
+  catch(e){alert(e.message);}busy(false);};
+// vignettes des photos sous chaque fiche (ordinateur seulement)
+let MINI_N=0;
+async function miniatures(L){if(!(window.matchMedia&&matchMedia('(min-width:1000px)').matches))return;const n=++MINI_N;
+  for(const c of L){if(n!==MINI_N)return;const el=document.querySelector('[data-mini="'+c.id+'"]');if(!el)continue;const P=(await DB.byCtrl(c.id)).filter(p=>p.orig||p.annot).sort((a,b)=>a.ord-b.ord);if(!P.length)continue;
+    el.innerHTML=P.slice(0,8).map(p=>`<span class="${p.statut==='reprise'?'r':''}" style="background-image:url(${thumbURL(p)})" title="${esc(p.comment||'')}"></span>`).join('')+(P.length>8?`<em>+${P.length-8}</em>`:'');}}
 function renderHome(){if(!S)return;
   $('#nNext').textContent='n° '+nextNumero();
-  const L=[...projCtrls()].sort((a,b)=>b.created-a.created);
+  const TOUS=projCtrls(),L=filtreCtrls(TOUS).sort((a,b)=>b.created-a.created);FILT_L=L;
+  $('#fN').textContent=L.length===TOUS.length?L.length+' fiche(s)':L.length+' / '+TOUS.length+' fiche(s)';$('#fPdf').disabled=!L.length;
+  $$('#fSt button').forEach(b=>b.classList.toggle('on',b.dataset.v===FILT.st));
   $('#list').innerHTML=L.length?L.map(c=>{const d=c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';const st=idxState(c);
     return `<div class="it" data-open="${c.id}">${SEL?`<input type="checkbox" data-sel="${c.id}" ${SEL.has(c.id)?'checked':''} style="width:22px;height:22px;flex:0 0 auto">`:''}<span class="dot ${d}"></span><div class="t"><div><b>n°${esc(c.numero)}</b> ${esc(c.description||'sans description')}</div>
-    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'reprises':'en cours'}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · validé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div></div><span class="chev">›</span></div>`;}).join('')
-    :'<div class="it" style="cursor:default"><div class="t s muted">Aucun contrôle pour l\'instant.</div></div>';
+    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'reprises':'en cours'}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · terminé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div><div class="mini" data-mini="${c.id}"></div></div><span class="chev">›</span></div>`;}).join('')
+    :`<div class="it" style="cursor:default"><div class="t s muted">${TOUS.length?'Aucune fiche ne correspond aux filtres.':'Aucun contrôle pour l\'instant.'}</div></div>`;
+  miniatures(L);
   $$('[data-open]').forEach(el=>el.onclick=e=>{if(SEL){const id=el.dataset.open;SEL.has(id)?SEL.delete(id):SEL.add(id);renderHome();return;}openCtrl(el.dataset.open,true);});
   $('#selBar').classList.toggle('hidden',!SEL);$('#bSel').textContent=SEL?'Terminer':'Sélectionner';if(SEL)$('#selN').textContent=SEL.size;
   renderSendLine();
@@ -620,10 +664,10 @@ function closeModal(id){$('#'+id).classList.add('hidden');}
 $$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
 $('#bNew').onclick=async()=>{
   const c=newCtrl();CTRLS.push(c);await DB.put('ctrl',c);openCtrl(c.id,false);};
-async function openCtrl(id,existing){CUR=CTRLS.find(c=>c.id===id);PHOTOS=(await DB.byCtrl(id)).sort((a,b)=>a.ord-b.ord);
+async function openCtrl(id,existing){CUR=CTRLS.find(c=>c.id===id);SNAP=snap(CUR);PHOTOS=(await DB.byCtrl(id)).sort((a,b)=>a.ord-b.ord);
   $('#vHome').classList.add('hidden');$('#vWiz').classList.remove('hidden');$('#bBack').classList.remove('hidden');
   STEP=0;renderStep(false);window.scrollTo(0,0);if(existing)setTimeout(()=>goSec(STEPS.length-1),60);}
-function goHome(){if(CUR){remember(CUR);DB.put('ctrl',CUR);}CUR=null;$('#vWiz').classList.add('hidden');$('#vHome').classList.remove('hidden');$('#bBack').classList.add('hidden');
+function goHome(){if(CUR){clearTimeout(saveT);remember(CUR);putCur(CUR);}CUR=null;setTimeout(()=>sySync(true),300);$('#vWiz').classList.add('hidden');$('#vHome').classList.remove('hidden');$('#bBack').classList.add('hidden');
   $('#hTitle').textContent='Contrôle armature';renderHome();window.scrollTo(0,0);}
 $('#bBack').onclick=goHome;
 
@@ -790,7 +834,7 @@ function openMail(L){MAILSEL=L;const uns=L.filter(c=>!c.sig_ctrl||!c.conclusion)
   const all=L.every(c=>c.conclusion==='ok'),any=L.some(c=>c.conclusion==='pas_ok');
   $('#mlSubj').value=`${S.numero||''} ${S.nom||''} – Contrôle${L.length>1?'s':''} avant bétonnage n°${L.map(c=>c.numero).join(', ')}${L.length===1?' – '+L[0].description:''} – ${any?'Reprises':all?'Validation':'Contrôle'}`.trim();
   $('#mlBody').value=mailBody(L);$('#mlPh').checked=false;
-  $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${navigator.onLine?'Envoi direct depuis contact@str-bim-tools.com, la fiche PDF en pièce jointe.':'Hors ligne : le mail s\'ouvre dans l\'appli Mail du téléphone avec la fiche jointe.'}</div>`;
+  $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${MAIL_DIRECT&&navigator.onLine?'Envoi direct depuis contact@str-bim-tools.com, la fiche PDF en pièce jointe.':'Le mail s\'ouvre dans ton appli de messagerie avec la fiche jointe (sur ordinateur : PDF téléchargé à joindre).'}</div>`;
   openModal('mMail');}
 // envoi par la fonction Supabase « fgh-arm-mail » (Resend) : PDF déposés dans le seau fgh-arm (m/…), joints puis effacés par la fonction
 async function mailEnLigne(to,subj,body,files){busy(true,'Envoi du mail…');const dossier='m/'+uid()+uid(),pj=[];
@@ -803,12 +847,13 @@ async function mailEnLigne(to,subj,body,files){busy(true,'Envoi du mail…');con
   lsSet('ca-mailme',to.join('\n'));}
 function syEnAttente(c){if(!c)return 0;let n=SYQ['ctrl:'+c.id]?1:0;(typeof PHOTOS!=='undefined'&&CUR===c?PHOTOS:[]).forEach(p=>{if(SYQ['photos:'+p.id])n++;});return n;}
 async function pdfFor(c,withPhotos){const sc=CUR,sp=PHOTOS;CUR=c;PHOTOS=(await DB.byCtrl(c.id)).sort((a,b)=>a.ord-b.ord);try{return await makePDF({noPhotos:!withPhotos});}finally{CUR=sc;PHOTOS=sp;}}
+const MAIL_DIRECT=false; // passer à true quand la fonction fgh-arm-mail sera déployée
 const b64=blob=>blobToDataURL(blob).then(u=>u.split(',')[1]);
 $('#mlSend').onclick=async()=>{const L=MAILSEL;const to=$('#mlTo').value.split(/[\n;,]+/).map(x=>x.trim()).filter(Boolean);const subj=$('#mlSubj').value,body=$('#mlBody').value,wp=$('#mlPh').checked;
   busy(true,'Préparation des PDF…');
   try{const files=[];for(const c of L){files.push(new File([await pdfFor(c,wp)],safe(baseName(c))+'.pdf',{type:'application/pdf'}));}
     let parti=false;
-    if(navigator.onLine&&to.length){try{await mailEnLigne(to,subj,body,files);parti=true;}catch(e){console.warn(e);busy(false);if(!confirm(e.message+'\n\nOuvrir plutôt l\'appli Mail avec la fiche jointe ?'))return;}}
+    if(MAIL_DIRECT&&navigator.onLine&&to.length){try{await mailEnLigne(to,subj,body,files);parti=true;}catch(e){console.warn(e);busy(false);if(!confirm(e.message+'\n\nOuvrir plutôt l\'appli Mail avec la fiche jointe ?'))return;}}
     if(parti){busy(false);const st=nowStamp();for(const c of L){c.mailedAt=st;await DB.put('ctrl',c);}closeModal('mMail');SEL=null;toast('Mail envoyé à '+to.join(', '),3500);if(CUR)renderStep();else renderHome();}
     else{busy(false);const data={files,title:subj,text:(to.length?'À : '+to.join(', ')+'\n\n':'')+body};
       if(navigator.canShare&&navigator.canShare({files})){await navigator.share(data);}
@@ -875,13 +920,13 @@ const STEPS=[
      ${sug.length?`<div class="muted" style="margin-top:8px">Propositions (${esc(sugCtx().label||'d\'après la description')}) :</div>`+sug.map((r,j)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span style="flex:1;font-size:14px"><b>${esc(planLabel(r))}</b> <span class="muted">${esc(r.titre)} · ${esc(r.etage)}${r.zone?' / '+esc(r.zone):''}</span></span><button class="btn s w" data-sug="${k}|${j}">Utiliser</button></div>`).join(''):''}
      <div class="a"><button class="btn s" data-search="${k}">🔍 Chercher dans la liste</button><button class="btn s w" data-manual="${k}">Saisir</button>${CUR[k]?`<button class="btn s w" data-clear="${k}">Effacer</button>`:''}</div></div>`;}).join('')+
    (!PLANS?'<p class="muted">Charge la liste des plans (⚙︎) pour avoir des propositions.</p>':'')+
-   `<label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="cbMark" ${CUR.marquer_plans?'checked':''}> Marquer ces plans « contrôlé » dans la liste ${PLANS&&PLANS.src==='pln'?'FGH (à l\'envoi)':'des livrables à la synchronisation'}</label>`,
+   (PLANS&&PLANS.src==='pln'?`<label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="cbMark" ${CUR.marquer_plans?'checked':''}> Marquer les plans ARM et LIS « contrôlé » dans la liste FGH (à la validation)</label>`:''),
    b:root=>{root.querySelectorAll('[data-search]').forEach(x=>x.onclick=()=>openSearch(x.dataset.search));
      root.querySelectorAll('[data-manual]').forEach(x=>x.onclick=()=>{const k=x.dataset.manual;const v=prompt('N° de plan et indice :',CUR[k]||'');if(v!==null){CUR[k]=v.trim();save();renderStep();}});
      root.querySelectorAll('[data-clear]').forEach(x=>x.onclick=()=>{const k=x.dataset.clear;CUR[k]='';CUR.plans=(CUR.plans||[]).filter(p=>p.field!==k);if(CUR._planProp)delete CUR._planProp[k];save();renderStep();});
      root.querySelectorAll('[data-confirm]').forEach(x=>x.onclick=()=>{delete CUR._planProp[x.dataset.confirm];save();renderStep();toast('Plan confirmé');});
      root.querySelectorAll('[data-sug]').forEach(x=>x.onclick=()=>{const [k,j]=x.dataset.sug.split('|');const r=suggestPlans(k).filter(r=>planLabel(r)!==CUR[k])[+j];SRCH.field=k;CUR[k]='';CUR.plans=(CUR.plans||[]).filter(p=>p.field!==k);if(CUR._planProp)delete CUR._planProp[k];pickPlan(r,true);});
-     $('#cbMark').onchange=e=>{CUR.marquer_plans=e.target.checked;save();};}},
+     const cm=$('#cbMark');if(cm)cm.onchange=e=>{CUR.marquer_plans=e.target.checked;save();};}},
  {t:'Chantier',q:'Entreprise et conditions',r:()=>F('entreprise','Entreprise')+F('contremaitre','Contremaître')+F('distribution','Distribution')+
    F('meteo','Météo',{chips:['Ensoleillé','Nuageux','Pluie','Neige','Intérieur']})+F('temperature','Température',{ph:'ex. 12 °C'})},
  {t:'Coffrage',q:'Coffrage',r:()=>F('type_coffrage','Type de coffrage',{chips:['Coffrage cadre','Panneaux','Table','Bois','Prédalles']})+
@@ -937,7 +982,7 @@ const STEPS=[
    <div class="h">Fichiers</div>
    <button class="btn" id="bPdf">📄 Fiche PDF (+ photos)</button>
    <button class="btn w" id="bMd">📝 Export texte (.md)</button>
-   <button class="btn w" id="bZip">📦 Paquet pour Index et dossier photos (.zip)</button>
+   <button class="btn w" id="bZip">📦 Fiche + photos (.zip)</button>
    ${navigator.canShare?'<button class="btn w" id="bShare">↗ Partager (mail, WhatsApp…)</button>':''}
    <button class="btn red" id="bDel">Supprimer ce contrôle</button>
    <button class="btn w" id="bHome" style="margin-top:14px">‹ Retour à l'accueil</button>`;},
@@ -986,6 +1031,7 @@ function watchSections(){if(SECOBS)SECOBS.disconnect();if(!('IntersectionObserve
   $$('#stepBody .sec').forEach(s=>SECOBS.observe(s));}
 function checks(){const w=[];
   if(!CUR.description)w.push('Description vide.');if(IDX&&idxState(CUR)==='n° déjà pris dans l\'Index')w.push('Le n°'+CUR.numero+' est déjà pris dans l\'Index.');
+  const dbl=projCtrls().filter(x=>x!==CUR&&String(x.numero)===String(CUR.numero));if(dbl.length)w.push('Le n°'+CUR.numero+' est déjà utilisé par une autre fiche ('+(dbl[0].description||'sans description')+').');
   if(!CUR.plan_armatures)w.push('Plan d\'armatures non renseigné.');if((CUR.localisation||'').length>20)w.push('Localisation trop longue (> 20 caractères).');
   if(!CUR.conclusion)w.push('Conclusion non choisie.');if(!CUR.sig_ctrl)w.push('Signature du contrôleur manquante.');if(PHOTOS.some(p=>p.statut==='reprise'&&!p.comment))w.push('Photo(s) en reprise sans commentaire.');return w;}
 
@@ -995,11 +1041,11 @@ async function loadImg(blob){const url=URL.createObjectURL(blob);const img=new I
 async function normalize(file){const {img,url}=await loadImg(file);let w=img.naturalWidth,h=img.naturalHeight;const r=Math.min(1,2400/Math.max(w,h));w=Math.round(w*r);h=Math.round(h*r);
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(url);return{blob:await new Promise(r=>cv.toBlob(r,'image/jpeg',0.85)),w,h};}
 async function addFiles(files,openAfter){if(!files.length)return;busy(true,'Import…');let last=null;
-  try{for(const f of files){const {blob,w,h}=await normalize(f);last={id:uid(),ctrlId:CUR.id,ord:(PHOTOS.length?Math.max(...PHOTOS.map(x=>x.ord)):0)+1,orig:blob,annot:null,shapes:[],w,h,statut:'reprise',comment:''};
+  try{for(const f of files){const {blob,w,h}=await normalize(f);last={id:uid(),ctrlId:CUR.id,ord:(PHOTOS.length?Math.max(...PHOTOS.map(x=>x.ord)):0)+1,orig:blob,annot:null,shapes:[],w,h,statut:'ok',comment:''};
     PHOTOS.push(last);await DB.put('photos',last);}}catch(e){alert('Import impossible : '+e.message);}
   busy(false);CUR.nPh=PHOTOS.length;save();renderStep();if(openAfter&&last)openPhoto(last);}
 const ED={p:null,img:null,url:null,shapes:[],tool:'arrow',cur:null,k:1,statut:'reprise'};
-async function openPhoto(p){ED.p=p;ED.shapes=JSON.parse(JSON.stringify(p.shapes||[]));ED.statut=p.statut||'reprise';const {img,url}=await loadImg(p.orig);ED.img=img;ED.url=url;
+async function openPhoto(p){ED.p=p;ED.shapes=JSON.parse(JSON.stringify(p.shapes||[]));ED.statut=p.statut||'ok';const {img,url}=await loadImg(p.orig);ED.img=img;ED.url=url;
   $('#pTitle').textContent='Photo '+pad(PHOTOS.indexOf(p)+1);$('#pCm').value=p.comment||'';setSt();setTool(ED.tool);$('#vPhoto').classList.remove('hidden');requestAnimationFrame(edFit);}
 function setSt(){$$('#vPhoto [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===ED.statut));}
 function setTool(t){ED.tool=t;$$('#tools [data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));}
@@ -1107,7 +1153,7 @@ window.addEventListener('online',()=>{toast('Réseau retrouvé : sauvegarde en l
 window.addEventListener('offline',refreshSendUI);
 async function autoRefresh(){if(S&&S.plansSrc===undefined&&String(S.numero)==='6848'&&(!PLANS||PLANS.src!=='pln'))S.plansSrc='pln';
   if(navigator.onLine&&S&&S.plansSrc==='pln'&&(!PLANS||PLANS.src!=='pln'||Date.now()-PLANS.ts>6e5))await loadPLN(true);plnRetry();
-  if(!navigator.onLine||!ACCOUNT||!S)return;const old=d=>!d||!d.ts||Date.now()-d.ts>4*3600e3;
+  return;const old=d=>!d||!d.ts||Date.now()-d.ts>4*3600e3;
   for(const key of ['index','plans']){if(!(S.links||{})[key]||(key==='plans'&&S.plansSrc==='pln'))continue;const D=key==='index'?IDX:PLANS;if(!old(D))continue;
     try{const f=await downloadLinked(key);await loadConn(key,f,true);}catch(e){console.warn(e);}}}
 
