@@ -125,15 +125,16 @@ select.champ{padding-right:6px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{position:sticky;top:0;z-index:2;background:var(--couche);text-align:left;font-weight:600;font-size:12px;color:var(--texte-doux);padding:8px 10px;border-bottom:1px solid var(--ligne);white-space:nowrap;cursor:pointer;user-select:none}
 thead th:hover{color:var(--texte)}
-thead th[aria-sort] span::after{content:" ▲";font-size:9px;color:var(--or)}
-thead th[aria-sort="descending"] span::after{content:" ▼"}
+thead span[data-tri][aria-sort]::after,thead th[aria-sort] span::after{content:" ▲";font-size:9px;color:var(--or)}
+thead span[data-tri][aria-sort="descending"]::after,thead th[aria-sort="descending"] span::after{content:" ▼"}
+.th-code .tri-num{margin-left:14px;padding:1px 8px;border-radius:9px;border:1px solid var(--bord-controle);font-weight:400;font-size:11px}
+.th-code .tri-num:hover,.th-code .tri-num[aria-sort]{border-color:var(--or);color:var(--or)}
 tbody td{padding:7px 10px;border-bottom:1px solid var(--ligne);vertical-align:top}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--survol-ligne)}
 tbody tr.choisie{background:var(--choisie)}
 td.code{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--texte-doux)}
 td.code b{color:var(--texte);font-weight:600}
-td.num{font-family:var(--mono);white-space:nowrap;font-size:12px;color:var(--texte-doux)}td.num b{color:var(--texte);font-weight:700}
 td.ind{font-family:var(--mono);font-weight:600;color:var(--or);white-space:nowrap}
 td.code .pile,td.code .pile-vide,td.code .filet{display:inline-flex;vertical-align:-3px;width:20px;height:20px;margin:-2px 6px -2px -4px}
 td.code .pile{align-items:center;justify-content:center;padding:0;border:0;border-radius:4px;background:none;color:var(--or);cursor:pointer}
@@ -255,8 +256,7 @@ tr.eclair td{animation:eclair 1.6s ease-out}
     <div class="defile" id="defile">
       <table>
         <thead><tr>
-          <th data-tri="code"><span>Code</span></th>
-          <th data-tri="num" title="Trier par n°, puis niveau, puis zone"><span>N° · niv. · zone</span></th>
+          <th class="th-code"><span data-tri="code" title="Trier par code">Code</span><span data-tri="num" class="tri-num" title="Trier par n°, puis niveau, puis zone">N° · niv. · zone</span></th>
           <th data-tri="indice"><span>Ind.</span></th>
           <th data-tri="titre"><span>Titre</span></th>
           <th data-tri="date" class="col-m"><span>Date</span></th>
@@ -335,6 +335,6 @@ tr.eclair td{animation:eclair 1.6s ease-out}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=12"></script>
+<script src="/fgh/pln/pln.js?v=13"></script>
 </body>
 </html>

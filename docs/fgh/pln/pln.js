@@ -323,7 +323,6 @@
       : '<span class="pile-vide"></span>';
     return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
       '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
-      '<td class="num"><b>' + esc(p.numero) + "</b> · " + esc(p.niveau) + " · " + esc(p.zone) + "</td>" +
       '<td class="ind">' + esc(p.indice) + (neuf(p) ? '<span class="neuf" title="Déposé il y a moins de 7 jours">nouveau</span>' : "") + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
       (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone + " · " + libRub(p)) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
       '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
@@ -333,7 +332,7 @@
     VUE = trie(filtres());
     var nInd = 0; VUE.forEach(function (g) { nInd += g.rows.length; });
     $("#compte").textContent = VUE.length + " / " + GROUPES.length + " plans · " + nInd + " indices";
-    document.querySelectorAll("thead th").forEach(function (th) {
+    document.querySelectorAll("thead [data-tri]").forEach(function (th) {
       if (th.dataset.tri === TRI.col) th.setAttribute("aria-sort", TRI.sens > 0 ? "ascending" : "descending"); else th.removeAttribute("aria-sort");
     });
     var v = $("#vide");
@@ -352,8 +351,8 @@
       var g = VUE[i];
       if (PAR_RUB) {
         var r = rubrique(g.d), k = cleRub(g.d);
-        if (!avant || avant.r !== r.r) h.push('<tr class="rub"><td colspan="7"><b>' + esc(r.r.lib) + "</b><span>" + cpt[r.r.c] + "</span></td></tr>");
-        if (r.s && (!avant || avant.k !== k)) h.push('<tr class="rub sous"><td colspan="7">' + esc(r.s) + "<span>" + cpt[k] + "</span></td></tr>");
+        if (!avant || avant.r !== r.r) h.push('<tr class="rub"><td colspan="6"><b>' + esc(r.r.lib) + "</b><span>" + cpt[r.r.c] + "</span></td></tr>");
+        if (r.s && (!avant || avant.k !== k)) h.push('<tr class="rub sous"><td colspan="6">' + esc(r.s) + "<span>" + cpt[k] + "</span></td></tr>");
         avant = { r: r.r, k: k };
       }
       h.push(ligne(g.d, i, 0, g));
@@ -370,7 +369,7 @@
     var tr = e.target.closest("tr[data-i]"); if (tr) ouvre(VUE[+tr.dataset.i].rows[+tr.dataset.j]);
   });
   document.querySelector("thead").addEventListener("click", function (e) {
-    var th = e.target.closest("th"); if (!th) return;
+    var th = e.target.closest("[data-tri]"); if (!th) return;
     TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : th.dataset.tri === "date" ? -1 : 1 }; dessineListe();
   });
   $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(function () { dessineZones(); dessineListe(); }, 120); });
