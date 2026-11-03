@@ -100,6 +100,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .barre .titre b{font-weight:600}
 .barre .ver{padding:1px 8px;border-radius:10px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-doux);font-size:11px}
 .barre .esp{flex:1}
+.barre .menu-fgh{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--bord-controle);background:var(--controle);color:var(--texte-doux)}
+.barre .menu-fgh svg{width:14px;height:14px}
+.barre .menu-fgh:hover{background:var(--controle-survol);color:var(--texte)}
+@media (max-width:760px){.barre .menu-fgh span{display:none}}
 .barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
 .barre .json::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
 .barre .json.on{color:var(--vert)}
@@ -318,6 +322,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <header class="barre">
   <a class="logo" href="/fgh/" title="Outils du chantier FGH"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M5 19h22v5H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 15h8v11h-8z" fill="none" stroke="var(--or)" stroke-width="1.8"/><path d="M19 8l3 3 6-6" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sous-titre">STR Bim Tools</span></a>
   <span class="titre">FGH · <b>Validation des réservations</b></span>
+  <a class="menu-fgh" href="/fgh/" title="Retour au menu des outils FGH"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span>Menu FGH</span></a>
   <span class="ver" id="version"></span>
   <span class="json" id="json-etat">Aucun JSON connecté</span>
   <span class="esp"></span>
