@@ -127,8 +127,6 @@ thead th{position:sticky;top:0;z-index:2;background:var(--couche);text-align:lef
 thead th:hover{color:var(--texte)}
 thead span[data-tri][aria-sort]::after,thead th[aria-sort] span::after{content:" ▲";font-size:9px;color:var(--or)}
 thead span[data-tri][aria-sort="descending"]::after,thead th[aria-sort="descending"] span::after{content:" ▼"}
-.th-code .tri-num{margin-left:14px;padding:1px 8px;border-radius:9px;border:1px solid var(--bord-controle);font-weight:400;font-size:11px}
-.th-code .tri-num:hover,.th-code .tri-num[aria-sort]{border-color:var(--or);color:var(--or)}
 tbody td{padding:7px 10px;border-bottom:1px solid var(--ligne);vertical-align:top}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--survol-ligne)}
@@ -256,7 +254,7 @@ tr.eclair td{animation:eclair 1.6s ease-out}
     <div class="defile" id="defile">
       <table>
         <thead><tr>
-          <th class="th-code"><span data-tri="code" title="Trier par code">Code</span><span data-tri="num" class="tri-num" title="Trier par n°, puis niveau, puis zone">N° · niv. · zone</span></th>
+          <th data-tri="code" title="Trier par n°, puis niveau, puis zone"><span>Code</span></th>
           <th data-tri="indice"><span>Ind.</span></th>
           <th data-tri="titre"><span>Titre</span></th>
           <th data-tri="date" class="col-m"><span>Date</span></th>
@@ -335,6 +333,6 @@ tr.eclair td{animation:eclair 1.6s ease-out}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=13"></script>
+<script src="/fgh/pln/pln.js?v=14"></script>
 </body>
 </html>

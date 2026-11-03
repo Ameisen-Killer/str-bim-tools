@@ -255,7 +255,7 @@
     return l.sort(function (x, y) {
       var a = x.d, b = y.d;
       if (PAR_RUB) { var ra = rubrique(a), rb = rubrique(b); if (ra.i !== rb.i) return ra.i - rb.i; if (ra.s !== rb.s) return ra.s.localeCompare(rb.s, "fr", { numeric: true }); }
-      var r = c === "indice" ? cmpInd(a.indice, b.indice) : c === "num" ? cmpNum(a, b) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
+      var r = c === "indice" ? cmpInd(a.indice, b.indice) : c === "code" ? cmpNum(a, b) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
       return r * s || code(a).localeCompare(code(b));
     });
   }
