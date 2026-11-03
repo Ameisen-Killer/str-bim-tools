@@ -644,10 +644,10 @@
 
   // ------------------------------------------------------------------ exports
   function LV() { return VUE.map(function (g) { return g.d; }); }
-  // exports : toujours classés par rubrique, l'ordre de l'écran gardé à l'intérieur de chaque rubrique
+  // exports : classés par rubrique, puis n°, niveau et zone
   function vueRub() {
     return apparie(VUE.map(function (g, i) { return { g: g, i: i, r: rubrique(g.d) }; }).sort(function (a, b) {
-      return a.r.i - b.r.i || a.r.s.localeCompare(b.r.s, "fr", { numeric: true }) || a.i - b.i;
+      return a.r.i - b.r.i || a.r.s.localeCompare(b.r.s, "fr", { numeric: true }) || cmpNum(a.g.d, b.g.d) || a.i - b.i;
     }), function (x) { return x.g; });
   }
   // [{ type: "rub"|"sous"|"plan", lib, n, g }] dans l'ordre d'export
