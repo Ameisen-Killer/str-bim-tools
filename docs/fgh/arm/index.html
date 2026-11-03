@@ -417,7 +417,7 @@ const frIso=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||''));return m?
 async function plnFetch(path,o={}){const h={apikey:PLN.cle};if(o.body)h['Content-Type']='application/json';if(o.range)h.Range=o.range;if(o.prefer)h.Prefer=o.prefer;
   let r;try{r=await fetch(PLN.url+'/rest/v1/'+path,{method:o.method||'GET',headers:h,body:o.body?JSON.stringify(o.body):undefined});}catch(e){throw new Error('Liste FGH injoignable : pas de réseau ?');}
   if(!r.ok){let m='erreur '+r.status;try{const j=await r.json();m=j.message||m;if(/PGRST205|does not exist|could not find/i.test(m+' '+(j.code||'')))m='table pas encore créée dans Supabase (migration-fgh-plans.sql)';}catch(e){}throw new Error('Liste FGH : '+m);}
-  return r.status===204?null:r.json();}
+  if(r.status===204)return null;const t=await r.text();if(!t)return null;try{return JSON.parse(t);}catch(e){return null;}}
 async function loadPLN(silent){if(!S)return;if(!silent)busy(true,'Lecture de la liste FGH…');
   try{let all=[];for(let d=0;;d+=1000){const l=await plnFetch('fgh_plans?select=*&order=type,niveau,zone,numero',{range:d+'-'+(d+999)});all=all.concat(l||[]);if(!l||l.length<1000)break;}
     const rows=all.map(p=>({row:0,id:p.id,type:p.type,etage:PLN_ETAGE[p.niveau]??p.niveau,niveau:p.niveau,zone:p.zone,numero:p.numero,indice:p.indice,code:[p.projet,p.discipline,p.type,p.numero].join('-'),
