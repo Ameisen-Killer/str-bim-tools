@@ -245,6 +245,12 @@
     $("#corps").innerHTML = ""; var v = $("#vide"); v.hidden = false;
     v.innerHTML = "<b>" + esc(m) + "</b>";
   }
+  // déposé depuis moins de 7 jours (date de l'indice)
+  function neuf(p) {
+    if (!p.date_indice) return false;
+    var d = new Date(p.date_indice + "T12:00:00"), j = (Date.now() - d.getTime()) / 864e5;
+    return j > -1 && j < 7;
+  }
   function ligne(p, i, j, g) {
     var ancien = j > 0, n = g.rows.length, ouvert = !!OUVERTS[g.cle];
     var pile = ancien ? '<span class="filet" aria-hidden="true"></span>' : n > 1
@@ -252,7 +258,7 @@
       : '<span class="pile-vide"></span>';
     return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
       '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
-      '<td class="ind">' + esc(p.indice) + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
+      '<td class="ind">' + esc(p.indice) + (neuf(p) ? '<span class="neuf" title="Déposé il y a moins de 7 jours">nouveau</span>' : "") + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
       (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
       '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
       (p.source === "manuel" ? '<span class="pastille manuel" title="Saisi à la main dans cet outil">manuel</span>' : "") + "</td></tr>";
