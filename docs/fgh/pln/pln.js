@@ -244,13 +244,18 @@
       return ok(g);
     });
   }
+  // n°, puis niveau, puis zone (puis type)
+  function cmpNum(a, b) {
+    return String(a.numero).localeCompare(String(b.numero), "fr", { numeric: true }) || String(a.niveau).localeCompare(String(b.niveau), "fr", { numeric: true }) ||
+      String(a.zone).localeCompare(String(b.zone), "fr", { numeric: true }) || String(a.type).localeCompare(String(b.type));
+  }
   function trie(l) {
     var c = TRI.col, s = TRI.sens;
     var v = c === "code" ? function (p) { return code(p); } : c === "date" ? function (p) { return p.date_indice || ""; } : function (p) { return p[c] || ""; };
     return l.sort(function (x, y) {
       var a = x.d, b = y.d;
       if (PAR_RUB) { var ra = rubrique(a), rb = rubrique(b); if (ra.i !== rb.i) return ra.i - rb.i; if (ra.s !== rb.s) return ra.s.localeCompare(rb.s, "fr", { numeric: true }); }
-      var r = c === "indice" ? cmpInd(a.indice, b.indice) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
+      var r = c === "indice" ? cmpInd(a.indice, b.indice) : c === "num" ? cmpNum(a, b) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
       return r * s || code(a).localeCompare(code(b));
     });
   }
@@ -318,6 +323,7 @@
       : '<span class="pile-vide"></span>';
     return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
       '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
+      '<td class="num"><b>' + esc(p.numero) + "</b> · " + esc(p.niveau) + " · " + esc(p.zone) + "</td>" +
       '<td class="ind">' + esc(p.indice) + (neuf(p) ? '<span class="neuf" title="Déposé il y a moins de 7 jours">nouveau</span>' : "") + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
       (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone + " · " + libRub(p)) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
       '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
@@ -346,8 +352,8 @@
       var g = VUE[i];
       if (PAR_RUB) {
         var r = rubrique(g.d), k = cleRub(g.d);
-        if (!avant || avant.r !== r.r) h.push('<tr class="rub"><td colspan="6"><b>' + esc(r.r.lib) + "</b><span>" + cpt[r.r.c] + "</span></td></tr>");
-        if (r.s && (!avant || avant.k !== k)) h.push('<tr class="rub sous"><td colspan="6">' + esc(r.s) + "<span>" + cpt[k] + "</span></td></tr>");
+        if (!avant || avant.r !== r.r) h.push('<tr class="rub"><td colspan="7"><b>' + esc(r.r.lib) + "</b><span>" + cpt[r.r.c] + "</span></td></tr>");
+        if (r.s && (!avant || avant.k !== k)) h.push('<tr class="rub sous"><td colspan="7">' + esc(r.s) + "<span>" + cpt[k] + "</span></td></tr>");
         avant = { r: r.r, k: k };
       }
       h.push(ligne(g.d, i, 0, g));
