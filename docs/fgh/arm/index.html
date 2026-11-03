@@ -126,6 +126,36 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1d1d1b;color:#fff;padding:10px 16px;font-size:14px;z-index:90;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 #toast.on{opacity:.95}
 #busy{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:95;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+/* ordinateur : le mobile reste tel quel en dessous de 1000 px */
+@media (min-width:1000px){
+  header{padding:14px max(28px,calc((100vw - 1180px)/2)) 14px}
+  header h1{font-size:20px}
+  main{max-width:1180px;padding:0 28px 28px}
+  .it:hover,.sum:hover,.conn:hover{background:color-mix(in srgb,var(--card) 88%,var(--g))}
+  .btn:hover,.big:hover{filter:brightness(.97)}
+  #vHome{display:grid;grid-template-columns:320px minmax(0,1fr);column-gap:32px;align-items:start}
+  #vHome>*{grid-column:2}
+  #vHome>.big{grid-column:1;grid-row:1 / span 6;position:sticky;top:76px;height:180px;margin-top:22px}
+  #list{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:8px}
+  #list .it{border:1px solid var(--line)}
+  #vWiz{display:grid;grid-template-columns:230px minmax(0,820px);column-gap:36px;justify-content:center;align-items:start}
+  .secnav{position:sticky;top:76px;flex-direction:column;overflow:visible;margin:22px 0 0;padding:0}
+  .secnav button{text-align:left;padding:10px 14px;font-size:14px}
+  .sec{scroll-margin-top:84px;padding-top:22px}
+  .q{font-size:26px}
+  .thumbs{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .nav .in{max-width:820px}
+  .modal{padding:24px 28px 48px}
+  .modal .in{max-width:820px}
+  #dict .in{max-width:820px}
+  #vPhoto{display:grid;grid-template-columns:minmax(0,1fr) 400px;grid-template-rows:auto auto minmax(0,1fr)}
+  #vPhoto>header{grid-column:1 / -1}
+  #vPhoto .stage{grid-column:1;grid-row:2 / span 2}
+  #vPhoto .tools{grid-column:2;grid-row:2;flex-wrap:wrap;padding:16px 20px 0}
+  #vPhoto .pbody{grid-column:2;grid-row:3;padding:12px 20px 20px}
+  #vPhoto .pbody textarea{min-height:180px;resize:vertical}
+  #toast{bottom:32px}
+}
 </style>
 </head>
 <body>
