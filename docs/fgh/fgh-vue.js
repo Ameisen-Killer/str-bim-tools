@@ -2758,7 +2758,16 @@
         ptrs.clear(); cv.classList.remove("tire");
         menu(e);
       });
-      cv.addEventListener("dblclick", function(e){ e.preventDefault(); recadrer(); });
+      // double-clic : l'application peut s'en charger (FGH : boîte de coupe sur une pile de murs), sinon recadrage
+      cv.addEventListener("dblclick", function(e){
+        e.preventDefault();
+        if (rappels.surDouble && W && H){
+          var p = local(e), k = M.viser(camera(), p.x, p.y);
+          if (M.nom === "WebGL") demander();
+          if (rappels.surDouble(k > 0 && liste[k - 1] ? liste[k - 1].id : 0, e)) return;
+        }
+        recadrer();
+      });
       var minuterie = 0;
       cv.addEventListener("wheel", function(e){
         e.preventDefault();
@@ -2957,6 +2966,21 @@
       },
       // FGH : boîte englobante des éléments affichés (ou de certains) : { min, max } en mètres, ou null
       boiteDe: function(cles, a){ var b = boiteDe(cles || null, a || 0); return b ? { min: b.min, max: b.max, a: b.a } : null; },
+      // FGH : boîte englobante de chaque élément (clés données) dans le repère tourné de a : Map clé → { min, max }
+      boitesDe: function(cles, a){
+        var S = new Set(cles), out = new Map(), r = { a: a || 0 };
+        liste.forEach(function(it){
+          if (!S.has(it.id)) return;
+          var T = triangles(it.geo), mn = [Infinity, Infinity, it.geo.min[2]], mx = [-Infinity, -Infinity, it.geo.max[2]];
+          for (var i = 0; i < T.length; i += 3){
+            var l = versBoite(r, T[i], T[i + 1]);
+            if (l[0] < mn[0]) mn[0] = l[0]; if (l[0] > mx[0]) mx[0] = l[0];
+            if (l[1] < mn[1]) mn[1] = l[1]; if (l[1] > mx[1]) mx[1] = l[1];
+          }
+          if (isFinite(mn[0])) out.set(it.id, { min: mn, max: mx });
+        });
+        return out;
+      },
       // FGH : éléments affichés qui touchent la boîte de coupe (boîte englobante de chacun ramenée dans le repère
       // de la boîte) → Set de clés ; null sans boîte
       dansCoupe: function(){

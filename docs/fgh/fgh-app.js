@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.5.0";
+  var VERSION = "2.6.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -47,7 +47,7 @@
   var nivAuto = "";                        // niveau mis dans le filtre de la liste par la coupe par niveau
 
   var cube = null;
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); }, surCoupe: function(){ legende(); } });
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); }, surCoupe: function(){ legende(); }, surDouble: function(cle){ return boiteMurs(cle); } });
   vue.formats({
     longueur: function(v){ return (Math.round(v*1000)/1000).toFixed(3) + " m"; },
     point: function(p, zSeul){ return (zSeul ? ["Z"] : ["X", "Y", "Z"]).map(function(n){ return n + " " + p["XYZ".indexOf(n)].toFixed(3); }); }
@@ -524,6 +524,58 @@
     vue.coupe(cles, 1);
     $("#c-niv").value = "";
     majBoite();
+  }
+  // Double-clic sur un mur de la structure : boîte de coupe sur ce mur et sur les murs posés dessus et dessous,
+  // de proche en proche sur toute la hauteur (demande de Tony). Repère de la boîte : celui du mur cliqué.
+  var MUR = /^IFCWALL/;
+  function cleMur(cle){
+    var m = /^s(\d+):(\d+)$/.exec(cle || ""), fi = m && fichiers.filter(function(x){ return x.uid === +m[1]; })[0], i = fi && IFC.infos(fi.m, +m[2]);
+    return !!(i && MUR.test(i.type));
+  }
+  function boiteMurs(cle){
+    if (!cleMur(cle)) return false;
+    var murs = [];
+    if (voirStructure) fichiers.forEach(function(fi){
+      if (fi.role !== "str") return;
+      fi.ids.forEach(function(id){ var i = IFC.infos(fi.m, id); if (i && MUR.test(i.type)) murs.push("s" + fi.uid + ":" + id); });
+    });
+    var a = vue.angleDe([cle]);
+    if (a == null) a = angleBat;
+    var B = vue.boitesDe(murs, a), b0 = B.get(cle);
+    if (!b0) return false;
+    // axe de la longueur du mur cliqué (0 = u, 1 = v) ; on ne garde que les murs parallèles et minces dans ce repère
+    var lo = (b0.max[0] - b0.min[0]) >= (b0.max[1] - b0.min[1]) ? 0 : 1, ep = 1 - lo;
+    var cands = murs.filter(function(k){
+      var b = B.get(k);
+      if (!b) return false;
+      var L = b.max[lo] - b.min[lo], T = b.max[ep] - b.min[ep];
+      return L >= T && T <= 1.2;
+    });
+    // de proche en proche : recouvrement en plan (≥ 30 % de la plus courte longueur, épaisseurs qui se touchent)
+    // et écart vertical ≤ 80 cm (épaisseur d'une dalle entre deux murs)
+    var pris = new Set([cle]), file = [cle];
+    while (file.length){
+      var b = B.get(file.pop());
+      cands.forEach(function(c){
+        if (pris.has(c)) return;
+        var d = B.get(c);
+        var oL = Math.min(b.max[lo], d.max[lo]) - Math.max(b.min[lo], d.min[lo]);
+        var oT = Math.min(b.max[ep], d.max[ep]) - Math.max(b.min[ep], d.min[ep]);
+        var lmin = Math.min(b.max[lo] - b.min[lo], d.max[lo] - d.min[lo]);
+        var gz = Math.max(d.min[2] - b.max[2], b.min[2] - d.max[2]);
+        if (oL >= .3*lmin && oT > -.05 && gz <= .8){ pris.add(c); file.push(c); }
+      });
+    }
+    var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    pris.forEach(function(k){ var d = B.get(k); for (var q = 0; q < 3; q++){ if (d.min[q] < mn[q]) mn[q] = d.min[q]; if (d.max[q] > mx[q]) mx[q] = d.max[q]; } });
+    // marges : 50 cm de part et d'autre de l'épaisseur, 30 cm aux bouts, 10 cm dessus et dessous
+    var mg = [0, 0, .1]; mg[lo] = .3; mg[ep] = .5;
+    vue.orienterCoupe(a);
+    vue.coupeBoite({ min: [mn[0] - mg[0], mn[1] - mg[1], mn[2] - mg[2]], max: [mx[0] + mg[0], mx[1] + mg[1], mx[2] + mg[2]], a: a });
+    $("#c-niv").value = "";
+    majBoite();
+    etat("Coupe sur " + pris.size + " mur" + (pris.size > 1 ? "s" : "") + " superposé" + (pris.size > 1 ? "s" : "") + ", de " + mn[2].toFixed(2) + " à " + mx[2].toFixed(2) + " m. Double-clic ailleurs pour recadrer.");
+    return true;
   }
   // boîte de coupe de l'ensemble des maquettes affichées
   function boiteTout(){
