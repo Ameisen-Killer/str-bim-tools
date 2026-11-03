@@ -20,7 +20,7 @@
     "110": "Étage 1", "120": "Étage 2", "130": "Étage 3", "140": "Étage 4", "150": "Étage 5", "160": "Étage 6", "170": "Étage 7", "180": "Étage 8", "190": "Toiture" };
   var TYPES = { PLA: "Plan", ARM: "Armatures", LIS: "Listes de fers", ELV: "Élévation", DET: "Détail", NDC: "Note de calcul", DES: "Descriptif",
     RAP: "Rapport", CPE: "Coupe", SCH: "Schéma", CDC: "Cahier des charges", FTE: "Fiche technique", RFI: "RFI", MOD: "Maquette" };
-  var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque"];
+  var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par"];
 
   var $ = function (s) { return document.querySelector(s); };
   var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, TRI = { col: "code", sens: 1 }, VUE = [], EDITE = null;
@@ -146,7 +146,7 @@
       if (NIVEAU && p.niveau !== NIVEAU) return false;
       if (types.length && !TYPESEL[p.type]) return false;
       if (!mots.length) return true;
-      var t = plie([code(p), p.titre, p.indice, p.auteur, p.statut, p.remarque, niveauNom(p.niveau), TYPES[p.type]].join(" "));
+      var t = plie([code(p), p.titre, p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé n°" + p.controle_n : "", niveauNom(p.niveau), TYPES[p.type]].join(" "));
       return mots.every(function (m) { return t.indexOf(m) >= 0; });
     });
   }
@@ -194,7 +194,7 @@
       var p = VUE[i];
       h.push('<tr data-i="' + i + '"' + (EDITE && EDITE.id === p.id ? ' class="choisie"' : "") + '><td class="code">' + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
         '<td class="ind">' + esc(p.indice) + '</td><td class="titre">' + esc(p.titre || "—") + "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small></td>" +
-        '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") + (p.source === "manuel" ? '<span class="pastille manuel" title="Créé à la main dans cet outil">manuel</span>' : "") + "</td></tr>");
+        '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") + (p.controle_n ? '<span class="pastille ctrl" title="Contrôle d\'armatures avant bétonnage' + (p.controle_par ? " par " + esc(p.controle_par) : "") + '">✓ ctrl n°' + esc(p.controle_n) + (p.date_controle ? " · " + esc(dateFr(p.date_controle).slice(0, 5)) : "") + "</span> " : "") + (p.source === "manuel" ? '<span class="pastille manuel" title="Créé à la main dans cet outil">manuel</span>' : "") + "</td></tr>");
     }
     $("#corps").innerHTML = h.join("");
   }
@@ -225,7 +225,7 @@
   document.querySelectorAll(".voile").forEach(function (v) { v.addEventListener("mousedown", function (e) { if (e.target === v) ferme("#" + v.id); }); });
   function ouvre(p) {
     EDITE = p || null;
-    var d = p || { projet: "FGH", discipline: "STR", emetteur: "ABI", phase: "51", type: Object.keys(TYPESEL)[0] || "PLA", niveau: NIVEAU || "", zone: ZONE || "", numero: "", indice: "00", titre: "", date_indice: aujourdhui(), auteur: lsGet("fgh.nom") || "", statut: "", remarque: "" };
+    var d = p || { projet: "FGH", discipline: "STR", emetteur: "ABI", phase: "51", type: Object.keys(TYPESEL)[0] || "PLA", niveau: NIVEAU || "", zone: ZONE || "", numero: "", indice: "00", titre: "", date_indice: aujourdhui(), auteur: lsGet("fgh.nom") || "", statut: "", remarque: "", controle_n: "", date_controle: "", controle_par: "" };
     CHAMPS.forEach(function (k) { F.elements[k].value = d[k] == null ? "" : d[k]; });
     $("#fp-titre").textContent = p ? "Modifier le plan" : "Nouveau plan";
     $("#fp-suppr").hidden = !p; $("#fp-indice").hidden = !p;
@@ -237,7 +237,7 @@
     var o = {};
     CHAMPS.forEach(function (k) { o[k] = String(F.elements[k].value || "").trim(); });
     ["projet", "discipline", "emetteur", "phase", "type", "zone"].forEach(function (k) { o[k] = o[k].toUpperCase(); });
-    o.date_indice = o.date_indice || null;
+    o.date_indice = o.date_indice || null; o.date_controle = o.date_controle || null;
     return o;
   }
   function majCode() {
@@ -337,7 +337,7 @@
       var nouveaux = [], majs = [], egaux = 0, enAvance = 0;
       keys.forEach(function (k) {
         var n = R.plans[k], a = parCle[k];
-        if (!a) { nouveaux.push(Object.assign({ source: "kairnial", statut: "", remarque: "" }, n)); return; }
+        if (!a) { nouveaux.push(Object.assign({ source: "kairnial", statut: "", remarque: "", controle_n: "", date_controle: null, controle_par: "" }, n)); return; }
         var c = cmpInd(n.indice, a.indice);
         if (c > 0 || (c === 0 && (n.titre !== a.titre || (n.date_indice || null) !== (a.date_indice || null)))) {
           majs.push({ avant: a, apres: Object.assign({}, a, { indice: n.indice, titre: n.titre, date_indice: n.date_indice, auteur: n.auteur || a.auteur }) });
@@ -404,7 +404,7 @@
     Promise.all([charge(LIBS.jspdf), logo()]).then(function (r) {
       var img = r[1], d = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
       var W = 297, M = 12, vert = [77, 122, 28], pale = [234, 242, 216], gris = [135, 134, 139];
-      var cols = [["Code", 62], ["Ind.", 11], ["Titre", 118], ["Niveau", 20], ["Date", 19], ["Auteur", 26], ["Statut", 17]];
+      var cols = [["Code", 62], ["Ind.", 11], ["Titre", 108], ["Niveau", 18], ["Date", 17], ["Auteur", 26], ["Statut · contrôle", 31]];
       var X = [M]; cols.forEach(function (c, i) { X[i + 1] = X[i] + c[1]; });
       var y, page = 0, quand = dateFr(aujourdhui());
       function T(s, x, yy, o) { o = o || {}; d.setFont("helvetica", o.b ? "bold" : "normal"); d.setFontSize(o.s || 8); d.setTextColor.apply(d, o.c || [0, 0, 0]); d.text(String(s == null ? "" : s), x, yy, o.a ? { align: o.a } : undefined); }
@@ -429,7 +429,7 @@
         T(code(p), X[0] + 1.5, y, { s: 7 }); T(p.indice, X[1] + 1.5, y, { b: 1, s: 7.5, c: vert });
         d.setTextColor(0); d.text(lignes, X[2] + 1.5, y);
         T(niveauNom(p.niveau), X[3] + 1.5, y, { s: 7 }); T(dateFr(p.date_indice), X[4] + 1.5, y, { s: 7 });
-        T(d.splitTextToSize(p.auteur || "", cols[5][1] - 2)[0] || "", X[5] + 1.5, y, { s: 7 }); T(d.splitTextToSize(p.statut || "", cols[6][1] - 2)[0] || "", X[6] + 1.5, y, { s: 7 });
+        T(d.splitTextToSize(p.auteur || "", cols[5][1] - 2)[0] || "", X[5] + 1.5, y, { s: 7 }); T(d.splitTextToSize([p.statut, p.controle_n ? "ctrl n°" + p.controle_n : ""].filter(Boolean).join(" · "), cols[6][1] - 2)[0] || "", X[6] + 1.5, y, { s: 7 });
         y += h;
       });
       var n = d.getNumberOfPages();
@@ -445,8 +445,8 @@
       var wb = new window.ExcelJS.Workbook(); wb.creator = "AB Ingénieurs"; wb.created = new Date();
       var ws = wb.addWorksheet("Liste des plans", { pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .4, right: .4, top: .5, bottom: .5, header: .2, footer: .2 } },
         headerFooter: { oddFooter: "&L&8AB Ingénieurs · " + PROJET + "&R&8page &P / &N" } });
-      var tetes = ["Projet", "Discipline", "Émetteur", "Phase", "Type", "Niveau", "Zone", "N°", "Code", "Indice", "Titre", "Niveau (libellé)", "Date indice", "Auteur", "Statut", "Remarque"];
-      var larg = [8, 10, 9, 7, 7, 8, 7, 7, 34, 7, 70, 14, 12, 20, 16, 30];
+      var tetes = ["Projet", "Discipline", "Émetteur", "Phase", "Type", "Niveau", "Zone", "N°", "Code", "Indice", "Titre", "Niveau (libellé)", "Date indice", "Auteur", "Statut", "Remarque", "Contrôle n°", "Date contrôle", "Contrôlé par"];
+      var larg = [8, 10, 9, 7, 7, 8, 7, 7, 34, 7, 70, 14, 12, 20, 16, 30, 11, 13, 18];
       ws.columns = larg.map(function (w) { return { width: w }; });
       var id = wb.addImage({ base64: r[1], extension: "jpeg" });
       ws.addImage(id, { tl: { col: 0.15, row: 0.2 }, ext: { width: 58, height: 55 } });
@@ -461,9 +461,9 @@
         cell.alignment = { vertical: "middle" }; cell.border = { bottom: { style: "thin", color: { argb: "FF87868B" } } }; });
       VUE.forEach(function (p, i) {
         var row = ws.addRow([p.projet, p.discipline, p.emetteur, p.phase, p.type, p.niveau, p.zone, p.numero, code(p), p.indice, p.titre, niveauNom(p.niveau),
-          p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, p.remarque]);
+          p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, p.remarque, p.controle_n, p.date_controle ? new Date(p.date_controle + "T12:00:00") : null, p.controle_par]);
         row.font = { name: "Arial", size: 9 }; row.alignment = { vertical: "top", wrapText: false };
-        row.getCell(13).numFmt = "dd.mm.yyyy"; row.getCell(10).font = { name: "Arial", size: 9, bold: true, color: { argb: "FF4D7A1C" } };
+        row.getCell(13).numFmt = "dd.mm.yyyy"; row.getCell(18).numFmt = "dd.mm.yyyy"; row.getCell(10).font = { name: "Arial", size: 9, bold: true, color: { argb: "FF4D7A1C" } };
         if (i % 2) row.eachCell({ includeEmpty: true }, function (cell) { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F8F2" } }; });
       });
       ws.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6 + VUE.length, column: tetes.length } };

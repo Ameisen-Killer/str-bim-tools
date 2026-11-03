@@ -138,6 +138,7 @@ td.titre{min-width:260px}
 td.titre small{display:block;color:var(--texte-faible);font-size:12px}
 td.nw{white-space:nowrap;color:var(--texte-doux)}
 .pastille{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;line-height:16px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-doux);white-space:nowrap}
+.pastille.ctrl{background:rgba(108,203,95,.14);border-color:transparent;color:var(--vert);font-weight:600}
 .pastille.manuel{background:rgba(var(--or-rvb),.14);border-color:transparent;color:var(--or)}
 .vide{padding:48px 24px;text-align:center;color:var(--texte-doux)}
 .vide b{display:block;font-size:16px;color:var(--texte);margin-bottom:6px}
@@ -240,6 +241,9 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
         <label class="l2">Projet · discipline · émetteur · phase
           <span style="display:flex;gap:4px"><input class="champ" name="projet" maxlength="10" style="width:25%"><input class="champ" name="discipline" maxlength="10" style="width:25%"><input class="champ" name="emetteur" maxlength="10" style="width:25%"><input class="champ" name="phase" maxlength="10" style="width:25%"></span></label>
         <label class="l4">Remarque<textarea class="champ" name="remarque" maxlength="2000"></textarea></label>
+        <label>Contrôle arm. n°<input class="champ" name="controle_n" maxlength="20" inputmode="numeric" title="Rempli par l'outil ARM à l'envoi d'un contrôle"></label>
+        <label>Date du contrôle<input class="champ" name="date_controle" type="date"></label>
+        <label class="l2">Contrôlé par<input class="champ" name="controle_par" maxlength="100"></label>
       </div>
       <div class="alerte" id="fp-alerte" hidden></div>
       <p class="muet" id="fp-trace"></p>
@@ -273,6 +277,6 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=1"></script>
+<script src="/fgh/pln/pln.js?v=2"></script>
 </body>
 </html>

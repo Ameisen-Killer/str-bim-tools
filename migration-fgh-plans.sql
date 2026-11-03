@@ -30,11 +30,19 @@ create table if not exists public.fgh_plans (
   statut      text not null default '' check (char_length(statut) <= 40),
   remarque    text not null default '' check (char_length(remarque) <= 2000),
   source      text not null default 'manuel' check (source in ('manuel', 'kairnial')),
+  controle_n  text not null default '' check (char_length(controle_n) <= 20),
+  date_controle date,
+  controle_par text not null default '' check (char_length(controle_par) <= 100),
   cree_le     timestamptz not null default now(),
   modifie_le  timestamptz not null default now(),
   modifie_par text not null default '' check (char_length(modifie_par) <= 100)
 );
 create index if not exists fgh_plans_code on public.fgh_plans (type, niveau, zone, numero);
+-- Contrôle d'armatures (/fgh/arm/) : n°, date et auteur du dernier contrôle avant bétonnage
+-- (colonnes ajoutées le 03.11.2026 ; « if not exists » pour une base qui a déjà la table)
+alter table public.fgh_plans add column if not exists controle_n text not null default '' check (char_length(controle_n) <= 20);
+alter table public.fgh_plans add column if not exists date_controle date;
+alter table public.fgh_plans add column if not exists controle_par text not null default '' check (char_length(controle_par) <= 100);
 
 create or replace function public.fgh_plans_horodate()
 returns trigger

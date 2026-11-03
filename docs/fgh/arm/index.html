@@ -313,7 +313,10 @@ function renderConn(){
   $('#sNum').value=S.numero||'';$('#sNom').value=S.nom||'';$('#sProjet').value=S.projet||'';$('#sAuteur').value=S.auteur||'';$('#sLieu').value=S.lieu||'';
   $('#connList').innerHTML=
     connCard('index','Index des contrôles','Non connecté : le n° proposé ne tient pas compte des derniers contrôles.',IDX,IDX?`${esc(IDX.file)} · dernier n° ${IDX.last} · lu le ${IDX.loaded}`:'')+
-    connCard('plans','Liste des plans','Non connectée : pas de recherche du dernier indice.',PLANS,PLANS?`${esc(PLANS.file)} · ${PLANS.rows.length} lignes · lue le ${PLANS.loaded}`:'')+
+    (S.plansSrc==='pln'?`<div class="conn"><div class="hd"><span class="dot ${PLANS&&PLANS.src==='pln'?'ok':'ko'}"></span><div class="t"><b>Liste des plans</b><div class="muted">${PLANS&&PLANS.src==='pln'?`Liste FGH en ligne · ${PLANS.rows.length} plans · lue le ${PLANS.loaded}`:'Liste FGH en ligne, pas encore lue.'}</div></div></div>
+     <div class="acts"><button class="btn s" data-pln="1">Actualiser</button><a class="btn s w" href="/fgh/pln/" target="_blank" rel="noopener" style="text-decoration:none">Ouvrir la liste</a><button class="btn s w" data-plnoff="1">Utiliser un fichier Excel</button></div>
+     <p class="muted" style="margin:8px 0 0">Relue à chaque ouverture en ligne. À l'envoi d'un contrôle, ses plans ARM et LIS y sont marqués « contrôlé ».</p></div>`
+    :connCard('plans','Liste des plans','Non connectée : pas de recherche du dernier indice.',PLANS,PLANS?`${esc(PLANS.file)} · ${PLANS.rows.length} lignes · lue le ${PLANS.loaded}`:'').replace('<div class="acts">','<div class="acts"><button class="btn s" data-pln="1">Liste FGH en ligne</button>'))+
     `<div class="conn"><div class="hd"><span class="dot ${S.links.photos?'ok':'ko'}"></span><div class="t"><b>Dossier photos</b><div class="muted">Envoi des photos dans un sous-dossier par contrôle, nommé comme la fiche.</div></div></div>
      <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Lien OneDrive / SharePoint du dossier (envoi)</span><input data-link="photos" value="${esc(S.links.photos)}" placeholder="https://…sharepoint.com/…/Photos"></label>
      <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Chemin Windows (pour Claude)</span><input data-pp="pPhotos" value="${esc(S.pPhotos)}" placeholder="C:\\Users\\…\\Photos"></label>
@@ -325,6 +328,8 @@ function renderConn(){
     <div class="conn"><div class="hd"><span class="dot ${S.mailTo?'ok':''}"></span><div class="t"><b>Destinataires du mail</b><div class="muted">Une adresse par ligne. Vide = destinataires par défaut du skill.</div></div></div>
      <label class="fld" style="margin:8px 0 0;padding:6px 10px"><textarea data-pp="mailTo" placeholder="prenom.nom@entreprise.ch">${esc(S.mailTo)}</textarea></label></div>`;
   const R=$('#connList');
+  R.querySelectorAll('[data-pln]').forEach(b=>b.onclick=()=>loadPLN());
+  R.querySelectorAll('[data-plnoff]').forEach(b=>b.onclick=async()=>{S.plansSrc='xlsx';PLANS=null;await DB.kvSet('plans:'+S.id,null);saveProjects();renderConn();renderHome();});
   R.querySelectorAll('[data-load]').forEach(i=>i.onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)loadConn(i.dataset.load,f);});
   R.querySelectorAll('[data-unl]').forEach(b=>b.onclick=async()=>{if(!confirm('Déconnecter ce fichier ?'))return;const k=b.dataset.unl;if(k==='index')IDX=null;else PLANS=null;await DB.kvSet(k==='index'?'idx:'+S.id:'plans:'+S.id,null);renderConn();renderHome();});
   R.querySelectorAll('[data-cs]').forEach(i=>i.oninput=()=>{const c=S.conn[i.dataset.cs];c[i.dataset.f]=i.dataset.f==='firstRow'?(parseInt(i.value,10)||1):i.value.trim();saveProjects();});
@@ -370,6 +375,33 @@ $('#inCfg').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
 
 /* ---------- Index et liste des plans (lecture) ---------- */
 let IDX=null,PLANS=null;
+/* ---------- liste des plans FGH en ligne (/fgh/pln/, table fgh_plans de Supabase, clé publiable) ---------- */
+const PLN={url:'https://hxhjkdfnoygrlbdhjkwc.supabase.co',cle:'sb_publishable_33G_BjGlKGUBhSVIc_QUmQ_QDKC64vA'};
+// niveaux Kairnial écrits comme l'attendent les propositions de plans (SS-3, Rez inf, E4…)
+const PLN_ETAGE={'000':'','050':'SS-4','060':'SS-3','070':'SS-2','080':'SS-1','090':'Rez inf','100':'Rez','110':'E1','120':'E2','130':'E3','140':'E4','150':'E5','160':'E6','170':'E7','180':'E8','190':'Toiture'};
+const isoFr=d=>{const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(d||'').trim());return m?m[3]+'-'+m[2]+'-'+m[1]:null;};
+const frIso=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||''));return m?m[3]+'.'+m[2]+'.'+m[1]:'';};
+async function plnFetch(path,o={}){const h={apikey:PLN.cle};if(o.body)h['Content-Type']='application/json';if(o.range)h.Range=o.range;if(o.prefer)h.Prefer=o.prefer;
+  let r;try{r=await fetch(PLN.url+'/rest/v1/'+path,{method:o.method||'GET',headers:h,body:o.body?JSON.stringify(o.body):undefined});}catch(e){throw new Error('Liste FGH injoignable : pas de réseau ?');}
+  if(!r.ok){let m='erreur '+r.status;try{const j=await r.json();m=j.message||m;if(/PGRST205|does not exist|could not find/i.test(m+' '+(j.code||'')))m='table pas encore créée dans Supabase (migration-fgh-plans.sql)';}catch(e){}throw new Error('Liste FGH : '+m);}
+  return r.status===204?null:r.json();}
+async function loadPLN(silent){if(!S)return;if(!silent)busy(true,'Lecture de la liste FGH…');
+  try{let all=[];for(let d=0;;d+=1000){const l=await plnFetch('fgh_plans?select=*&order=type,niveau,zone,numero',{range:d+'-'+(d+999)});all=all.concat(l||[]);if(!l||l.length<1000)break;}
+    const rows=all.map(p=>({row:0,id:p.id,type:p.type,etage:PLN_ETAGE[p.niveau]??p.niveau,niveau:p.niveau,zone:p.zone,numero:p.numero,indice:p.indice,code:[p.projet,p.discipline,p.type,p.numero].join('-'),
+      titre:p.titre,date_indice:frIso(p.date_indice),statut:p.statut,controle:p.controle_n?'oui':'',date_controle:frIso(p.date_controle)}));
+    if(!rows.length)throw new Error('La liste FGH est vide : importe l\'export Kairnial dans /fgh/pln/.');
+    PLANS={loaded:nowStamp(),ts:Date.now(),file:'Liste des plans FGH (en ligne)',rows,src:'pln'};S.plansSrc='pln';await DB.kvSet('plans:'+S.id,PLANS);saveProjects();if(!silent)toast(rows.length+' plans lus dans la liste FGH');}
+  catch(e){if(silent)console.warn(e);else alert(e.message);}
+  if(!silent)busy(false);renderConn();renderHome();}
+// plans ARM et LIS liés au contrôle : notés « contrôlés » dans la liste FGH (n°, date, auteur)
+async function plnMark(c,quiet){if(!c||!c.marquer_plans)return;const L=(c.plans||[]).filter(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()));if(!L.length)return;
+  try{await plnFetch('fgh_plans?id=in.('+L.map(p=>p.id).join(',')+')',{method:'PATCH',prefer:'return=minimal',body:{controle_n:String(c.numero||''),date_controle:isoFr(c.date),controle_par:c.auteur||S.auteur||'',modifie_par:c.auteur||S.auteur||''}});
+    c.plnMarkedAt=nowStamp();c.plnPending=false;await DB.put('ctrl',c);
+    if(PLANS&&PLANS.src==='pln'){L.forEach(p=>{const r=PLANS.rows.find(x=>x.id===p.id);if(r){r.controle='oui';r.date_controle=c.date;}});DB.kvSet('plans:'+S.id,PLANS);}
+    if(!quiet)toast(L.length+' plan(s) marqué(s) contrôlé(s) dans la liste FGH');}
+  catch(e){c.plnPending=true;await DB.put('ctrl',c);if(!quiet)toast(e.message+' : nouvel essai au retour du réseau',4000);}
+  if(CUR===c&&!$('#vWiz').classList.contains('hidden'))renderStep();}
+async function plnRetry(){if(!navigator.onLine)return;for(const c of CTRLS.filter(x=>x.plnPending))await plnMark(c,true);}
 const cellStr=v=>v==null?'':v instanceof Date?fmt(v):String(v).trim();
 function xDate(v){if(v==null||v==='')return'';if(v instanceof Date)return fmt(v);const n=Number(v);if(!isNaN(n)&&n>20000&&n<80000){const d=new Date(Date.UTC(1899,11,30)+n*864e5);return pad(d.getUTCDate())+'.'+pad(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();}return String(v).trim();}
 async function readSheet(file,name){const wb=XLSX.read(await file.arrayBuffer(),{type:'array',sheets:[name],cellDates:true,dense:true});const ws=wb.Sheets[name];
@@ -423,7 +455,7 @@ function runSearch(){
 }
 const planLabel=r=>(r.code||r.numero)+' ind. '+r.indice;
 function pickPlan(r,quiet){const f=SRCH.field;if(CUR._planProp&&CUR._planProp[f]){delete CUR._planProp[f];CUR[f]='';CUR.plans=(CUR.plans||[]).filter(p=>p.field!==f);}const cur=(CUR[f]||'').split(' + ').filter(Boolean);const lab=planLabel(r);if(!cur.includes(lab))cur.push(lab);CUR[f]=cur.join(' + ');
-  CUR.plans=(CUR.plans||[]).filter(p=>!(p.numero===r.numero&&p.type===r.type));CUR.plans.push({field:f,type:r.type,numero:r.numero,indice:r.indice,code:r.code,titre:r.titre});
+  CUR.plans=(CUR.plans||[]).filter(p=>!(p.numero===r.numero&&p.type===r.type));CUR.plans.push({field:f,type:r.type,numero:r.numero,indice:r.indice,code:r.code,id:r.id,titre:r.titre});
   save();closeModal('mSearch');renderStep();if(!quiet||true)toast('Plan ajouté : '+lab);}
 
 /* ---------- contrôles ---------- */
@@ -435,7 +467,7 @@ const photoName=(c,i)=>safe(`n°${c.numero||'X'}_${c.date||today()}_${pad(i+1)}`
 let saveT=null;function save(){if(!CUR)return;const c=CUR;clearTimeout(saveT);saveT=setTimeout(()=>DB.put('ctrl',c),250);}
 function newCtrl(){const last=[...projCtrls()].sort((a,b)=>b.created-a.created)[0]||{};
   const c={id:uid(),projectId:S.id,created:Date.now(),numero:String(nextNumero()),date:today(),description:'',projet:S.projet,auteur:S.auteur,lieu:S.lieu,date_signature:today(),
-    entreprise_informee_le:fridayBefore(),traitement:[],plans:[],reprises:[]};
+    entreprise_informee_le:fridayBefore(),traitement:[],plans:[],reprises:[],marquer_plans:!!(PLANS&&PLANS.src==='pln')};
   ['entreprise','contremaitre','distribution'].forEach(k=>{if(last[k])c[k]=last[k];});
   const sameDay=projCtrls().filter(x=>x.date===c.date&&(x.meteo||x.temperature)).sort((a,b)=>b.created-a.created)[0];if(sameDay){c.meteo=sameDay.meteo||'';c.temperature=sameDay.temperature||'';}
   return c;}
@@ -470,7 +502,7 @@ $('#bBack').onclick=goHome;
 /* ---------- propositions de plans d'après étage / zone / ouvrage ---------- */
 const nz=s=>norm(s).replace(/[\s\-_.+\/]/g,'');
 const ETAGE_ALIAS=[[/rez[\s\-]*inf(erieur)?|\brinf\b|\bri\b/,'rinf'],[/rez[\s\-]*sup(erieur)?|\brsup\b|\brs\b/,'rsup'],[/rez[\s\-]*de[\s\-]*chauss[ée]e|\brdc\b|\brez\b/,'rez'],
-  [/sous[\s\-]*sol[\s\-]*(\d)/,'ss$1'],[/\bss[\s\-]*(\d)/,'ss$1'],[/\br[\s+]*\+?\s*(\d)\b/,'r$1'],[/\b(\d)(er|e|eme|ème)?\s*(etage|étage)/,'e$1'],[/\be[\s\-]*(\d)\b/,'e$1'],[/toiture|attique/,'toit']];
+  [/sous[\s\-]*sol[\s\-]*(\d)/,'ss$1'],[/\bss[\s\-]*(\d)/,'ss$1'],[/\br[\s+]*\+?\s*(\d)\b/,'r$1'],[/\b(\d)(er|e|eme|ème)?\s*(etage|étage)/,'e$1'],[/\be[\s\-]*(\d)\b/,'e$1'],[/\betage\s*(\d)\b/,'e$1'],[/toiture|attique/,'toit']];
 function sugCtx(){
   const txt=norm([CUR.description,CUR.localisation,CUR.type_element].filter(Boolean).join(' '));
   if(!PLANS||!txt)return{label:'',et:[],zo:[],words:[]};
@@ -497,7 +529,7 @@ function suggestPlans(field){
 function autoProposePlans(){ // pré-remplit si une proposition se détache nettement
   if(!PLANS||!CUR)return;CUR._planProp=CUR._planProp||{};let n=0;
   for(const f of ['plan_coffrage','plan_armatures','listes']){if(CUR[f])continue;const L=suggestPlans(f);if(L.length===1||(L.length>1&&L[0]!==L[1]&&L.length&&scoreGap(f)>=2)){const r=L[0];
-    CUR[f]=planLabel(r);CUR.plans=(CUR.plans||[]).filter(p=>p.field!==f);CUR.plans.push({field:f,type:r.type,numero:r.numero,indice:r.indice,code:r.code,titre:r.titre});CUR._planProp[f]=1;n++;}}
+    CUR[f]=planLabel(r);CUR.plans=(CUR.plans||[]).filter(p=>p.field!==f);CUR.plans.push({field:f,type:r.type,numero:r.numero,indice:r.indice,code:r.code,id:r.id,titre:r.titre});CUR._planProp[f]=1;n++;}}
   if(n){save();toast(n+' plan(s) proposé(s) d\'après l\'étage – à confirmer');}
 }
 function scoreGap(field){const c=sugCtx();const types=TYPESETS[field];
@@ -708,7 +740,7 @@ const STEPS=[
      ${sug.length?`<div class="muted" style="margin-top:8px">Propositions (${esc(sugCtx().label||'d\'après la description')}) :</div>`+sug.map((r,j)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span style="flex:1;font-size:14px"><b>${esc(planLabel(r))}</b> <span class="muted">${esc(r.titre)} · ${esc(r.etage)}${r.zone?' / '+esc(r.zone):''}</span></span><button class="btn s w" data-sug="${k}|${j}">Utiliser</button></div>`).join(''):''}
      <div class="a"><button class="btn s" data-search="${k}">🔍 Chercher dans la liste</button><button class="btn s w" data-manual="${k}">Saisir</button>${CUR[k]?`<button class="btn s w" data-clear="${k}">Effacer</button>`:''}</div></div>`;}).join('')+
    (!PLANS?'<p class="muted">Charge la liste des plans (⚙︎) pour avoir des propositions.</p>':'')+
-   `<label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="cbMark" ${CUR.marquer_plans?'checked':''}> Marquer ces plans « contrôlé » dans la liste des livrables à la synchronisation</label>`,
+   `<label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="cbMark" ${CUR.marquer_plans?'checked':''}> Marquer ces plans « contrôlé » dans la liste ${PLANS&&PLANS.src==='pln'?'FGH (à l\'envoi)':'des livrables à la synchronisation'}</label>`,
    b:root=>{root.querySelectorAll('[data-search]').forEach(x=>x.onclick=()=>openSearch(x.dataset.search));
      root.querySelectorAll('[data-manual]').forEach(x=>x.onclick=()=>{const k=x.dataset.manual;const v=prompt('N° de plan et indice :',CUR[k]||'');if(v!==null){CUR[k]=v.trim();save();renderStep();}});
      root.querySelectorAll('[data-clear]').forEach(x=>x.onclick=()=>{const k=x.dataset.clear;CUR[k]='';CUR.plans=(CUR.plans||[]).filter(p=>p.field!==k);if(CUR._planProp)delete CUR._planProp[k];save();renderStep();});
@@ -765,6 +797,7 @@ const STEPS=[
    `<div class="h">Envoi</div>
    <div class="${CUR.sentAt?'okmsg':'res'}" id="sendState">${sendStateTxt(CUR)}</div>
    <button class="btn main" id="bSend">📤 ${CUR.sentAt?'Renvoyer':'Envoyer'} photos et fiche</button>
+   ${PLANS&&PLANS.src==='pln'&&CUR.marquer_plans&&(CUR.plans||[]).some(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()))?`<div class="${CUR.plnMarkedAt?'okmsg':'res'}">${CUR.plnMarkedAt?'✓ Plans marqués contrôlés dans la liste FGH le '+esc(CUR.plnMarkedAt):CUR.plnPending?'↑ Marquage dans la liste FGH en attente du réseau':'Plans à marquer contrôlés dans la liste FGH à l\'envoi'}</div><button class="btn w" id="bPlnMark">✓ Marquer les plans contrôlés dans la liste FGH</button>`:''}
    <div class="h">Fichiers</div>
    <button class="btn" id="bPdf">📄 Fiche PDF (+ photos)</button>
    <button class="btn w" id="bMd">📝 Export texte (.md)</button>
@@ -775,7 +808,8 @@ const STEPS=[
    <button class="btn w" id="bHome" style="margin-top:14px">‹ Retour à l'accueil</button>`;},
    b:root=>{root.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goSec(+x.dataset.go));
      $('#bMd').onclick=()=>download(new Blob([makeMD()],{type:'text/markdown;charset=utf-8'}),safe(baseName(CUR))+'.md');
-     $('#bSend').onclick=()=>{remember(CUR);enqueue(CUR);};$('#bHome').onclick=goHome;
+     $('#bSend').onclick=()=>{const c=CUR;remember(c);enqueue(c).then(()=>{if(c.sendState==='pending'||c.sentAt)plnMark(c);});};
+     const pm=$('#bPlnMark');if(pm)pm.onclick=()=>plnMark(CUR);$('#bHome').onclick=goHome;
      $('#bPdf').onclick=async()=>{busy(true,'Création du PDF…');try{download(await makePDF(),safe(baseName(CUR))+'.pdf');}catch(e){alert(e.message);}busy(false);};
      $('#bZip').onclick=async()=>{busy(true,'Création du paquet…');try{download(await makeZip(),safe(baseName(CUR))+'.zip');}catch(e){alert(e.message);}busy(false);};
      const sh=$('#bShare');if(sh)sh.onclick=async()=>{busy(true,'Préparation…');try{const files=[new File([await makePDF()],safe(baseName(CUR))+'.pdf',{type:'application/pdf'}),new File([await makeZip()],safe(baseName(CUR))+'.zip',{type:'application/zip'})];busy(false);
@@ -924,8 +958,10 @@ window.addEventListener('online',()=>{toast('Réseau retrouvé : envoi des élé
 window.addEventListener('offline',refreshSendUI);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')flush();});
 setInterval(flush,60000);
-async function autoRefresh(){if(!navigator.onLine||!ACCOUNT||!S)return;const old=d=>!d||!d.ts||Date.now()-d.ts>4*3600e3;
-  for(const key of ['index','plans']){if(!(S.links||{})[key])continue;const D=key==='index'?IDX:PLANS;if(!old(D))continue;
+async function autoRefresh(){if(S&&S.plansSrc===undefined&&String(S.numero)==='6848'&&(!PLANS||PLANS.src!=='pln'))S.plansSrc='pln';
+  if(navigator.onLine&&S&&S.plansSrc==='pln'&&(!PLANS||PLANS.src!=='pln'||Date.now()-PLANS.ts>6e5))await loadPLN(true);plnRetry();
+  if(!navigator.onLine||!ACCOUNT||!S)return;const old=d=>!d||!d.ts||Date.now()-d.ts>4*3600e3;
+  for(const key of ['index','plans']){if(!(S.links||{})[key]||(key==='plans'&&S.plansSrc==='pln'))continue;const D=key==='index'?IDX:PLANS;if(!old(D))continue;
     try{const f=await downloadLinked(key);await loadConn(key,f,true);}catch(e){console.warn(e);}}}
 
 /* ---------- export ---------- */
