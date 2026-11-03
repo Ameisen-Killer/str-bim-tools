@@ -1,5 +1,5 @@
 // Service worker : l'appli s'ouvre sans réseau (cache), mise à jour en arrière-plan.
-const CACHE='controle-armature-v15';
+const CACHE='controle-armature-v16';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png',
   './vendor/jspdf-2.5.1.umd.min.js','./vendor/jszip-3.10.1.min.js','./vendor/xlsx-0.18.5.full.min.js',
   '/assets/polices/polices.css'];

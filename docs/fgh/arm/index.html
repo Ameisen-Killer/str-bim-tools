@@ -726,8 +726,15 @@ async function startRec(){
   if(eng==='web'){
     if(!SR){dStatus('Dictée du navigateur indisponible : choisis Whisper dans ⚙︎ › Dictée vocale.');stopUI();return;}
     if(!navigator.onLine){dStatus('Hors ligne : la dictée du navigateur a besoin du réseau. Utilise le micro du clavier iPhone ou Whisper.');stopUI();return;}
-    const r=new SR();r.lang='fr-CH';r.continuous=true;r.interimResults=true;DST.sr=r;const base=$('#dText').value;let fin='';
-    r.onresult=e=>{let tmp='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin=joinTxt(fin,t);else tmp+=t;}$('#dText').value=joinTxt(base,joinTxt(fin,tmp));};
+    // Android : la reconnaissance continue renvoie des résultats cumulés (« bien », « bien faire », « bien faire attention »…).
+    // On écoute donc phrase par phrase (relance automatique) et on fusionne les morceaux qui se recouvrent.
+    const AND=/Android/i.test(navigator.userAgent);
+    const r=new SR();r.lang='fr-CH';r.continuous=!AND;r.interimResults=true;DST.sr=r;let acquis=$('#dText').value,ses='';
+    const fus=(a,b)=>{a=String(a||'').trim();b=String(b||'').trim();if(!a)return b;if(!b)return a;const na=norm(a),nb=norm(b);
+      if(nb.startsWith(na))return b;if(na.startsWith(nb)||na.endsWith(nb))return a;return a+' '+b;};
+    r.onresult=e=>{let fin='',tmp='';for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin=fus(fin,t);else tmp=fus(tmp,t);}
+      ses=fus(fin,tmp);$('#dText').value=joinTxt(acquis,ses);};
+    r.onstart=()=>{acquis=$('#dText').value;ses='';};
     r.onerror=e=>{dStatus(e.error==='not-allowed'?'Micro refusé : autorise-le dans les réglages de Safari.':'Erreur de dictée : '+e.error);};
     r.onend=()=>{if(DST&&DST.rec&&DST.eng==='web'){try{r.start();}catch(e){stopUI();}}};
     try{r.start();dStatus('J\'écoute… (dictée du navigateur, nécessite le réseau)');}catch(e){dStatus(e.message);stopUI();}
