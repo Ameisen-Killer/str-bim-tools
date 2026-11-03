@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.6.0";
+  var VERSION = "2.7.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -106,10 +106,16 @@
   function asciiDxf(t){ return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "_"); }
   function exporterDxf(){
     if (!fichiers.length){ etat("Ouvre d'abord les IFC."); return; }
-    var S = vue.segmentsPlan();
+    // vue de dessus : plan dans le repère du projet Revit ; toute autre vue (élévation, 3D) : projection selon l'écran,
+    // abscisse depuis l'origine du projet, ordonnée = altitude réelle en élévation
+    var an = vue.angles(), ca = Math.cos(an.lacet), sa = Math.sin(an.lacet), cb = Math.cos(an.plongee), sb = Math.sin(an.plongee);
+    var plan = Math.abs(cb) < 1e-3 && sb > 0, axes = plan ? null : { r0: [ca, sa, 0], r1: [-sb*sa, sb*ca, cb] };
+    var S = vue.segmentsPlan(axes);
     if (!S.length){ etat("Rien à exporter : aucun élément affiché" + (vue.aCoupe() ? " dans la boîte de coupe." : ".")); return; }
     var O = origineProjet(), c = Math.cos(-angleProjet), s = Math.sin(-angleProjet);
-    function P(x, y){ var dx = x - O[0], dy = y - O[1]; return [c*dx - s*dy, s*dx + c*dy]; }
+    var P = plan ? function(x, y){ var dx = x - O[0], dy = y - O[1]; return [c*dx - s*dy, s*dx + c*dy]; }
+      : function(u, v){ return [u - (axes.r0[0]*O[0] + axes.r0[1]*O[1]), v - (axes.r1[0]*O[0] + axes.r1[1]*O[1])]; };
+    var elev = !plan && Math.abs(sb) < 1e-3;
     var parUid = new Map(); fichiers.forEach(function(fi){ parUid.set(fi.uid, fi); });
     var L = [], vus = new Set(), nl = 0, nr = 0, mn = [Infinity, Infinity], mx = [-Infinity, -Infinity];
     function g(code, v){ L.push(String(code), String(v)); }
@@ -132,7 +138,7 @@
       for (var i = 0; i < e.s.length; i += 4) ligne(calque, P(e.s[i], e.s[i+1]), P(e.s[i+2], e.s[i+3]));
       if (r && r.num){
         // numéro au centre de la réservation (centre de sa boîte englobante)
-        var p = P((e.min[0] + e.max[0])/2, (e.min[1] + e.max[1])/2); nr++;
+        var p = P(e.c[0], e.c[1]); nr++;
         corps.push("0", "TEXT", "8", "RES_NUMEROS", "10", nb(p[0]), "20", nb(p[1]), "30", "0.0", "40", "0.15", "1", asciiDxf(r.num), "72", "1", "73", "2", "11", nb(p[0]), "21", nb(p[1]), "31", "0.0");
       }
     });
@@ -154,7 +160,7 @@
     L = L.concat(corps);
     g(0, "ENDSEC"); g(0, "EOF");
     var niv = $("#c-niv").value, nomNiv = vue.aCoupe() && niv !== "" && niveaux[+niv] ? "_" + niveaux[+niv].nom : "";
-    var nom = ("FGH_plan_" + (maquette.nom || "maquette") + nomNiv).replace(/[^\w\-]+/g, "_") + ".dxf";
+    var nom = ((plan ? "FGH_plan_" : elev ? "FGH_elevation_" : "FGH_vue3D_") + (maquette.nom || "maquette") + (plan ? nomNiv : "")).replace(/[^\w\-]+/g, "_") + ".dxf";
     var blob = new Blob([L.join("\r\n") + "\r\n"], { type: "application/dxf" }), a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = nom;
     document.body.appendChild(a); a.click(); a.remove();

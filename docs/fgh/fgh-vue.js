@@ -2999,23 +2999,23 @@
       },
       // FGH : arêtes vives des éléments affichés, coupées par la boîte de coupe s'il y en a une, mises à plat (vue de
       // dessus) : [{ id, s: [x1, y1, x2, y2, …] (mètres, repère du fichier), min, max }] — sert à l'export DXF
-      segmentsPlan: function(){
+      // axes (facultatif) : { r0, r1 } vecteurs de l'écran (droite, haut) pour une projection selon la vue affichée ;
+      // les coordonnées rendues sont alors (r0·p, r1·p), sinon (x, y) vus de dessus ; c = centre projeté de l'élément
+      segmentsPlan: function(axes){
         var out = [], b = coupe;
+        function pr(x, y, z){ return axes ? [axes.r0[0]*x + axes.r0[1]*y + axes.r0[2]*z, axes.r1[0]*x + axes.r1[1]*y + axes.r1[2]*z] : [x, y]; }
         liste.forEach(function(it){
           var g = it.geo;
           if (!g.faces || (b && (g.min[2] > b.max[2] || g.max[2] < b.min[2]))) return;
           var A = aretesVives(g), s = [];
           for (var i = 0; i < A.length; i += 6){
-            var x1 = A[i], y1 = A[i+1], x2 = A[i+3], y2 = A[i+4];
-            if (b){
-              var r = couperSegment([A[i], A[i+1], A[i+2]], [A[i+3], A[i+4], A[i+5]], b);
-              if (!r) continue;
-              x1 = r[0]; y1 = r[1]; x2 = r[3]; y2 = r[4];
-            }
-            if (Math.abs(x2 - x1) + Math.abs(y2 - y1) < 1e-4) continue;   // arête verticale : un point sur le plan
-            s.push(x1, y1, x2, y2);
+            var r = [A[i], A[i+1], A[i+2], A[i+3], A[i+4], A[i+5]];
+            if (b){ r = couperSegment([A[i], A[i+1], A[i+2]], [A[i+3], A[i+4], A[i+5]], b); if (!r) continue; }
+            var p1 = pr(r[0], r[1], r[2]), p2 = pr(r[3], r[4], r[5]);
+            if (Math.abs(p2[0] - p1[0]) + Math.abs(p2[1] - p1[1]) < 1e-4) continue;   // arête dans l'axe de la vue : un point
+            s.push(p1[0], p1[1], p2[0], p2[1]);
           }
-          if (s.length) out.push({ id: it.id, s: s, min: g.min, max: g.max });
+          if (s.length) out.push({ id: it.id, s: s, min: g.min, max: g.max, c: pr((g.min[0] + g.max[0])/2, (g.min[1] + g.max[1])/2, (g.min[2] + g.max[2])/2) });
         });
         return out;
       },
