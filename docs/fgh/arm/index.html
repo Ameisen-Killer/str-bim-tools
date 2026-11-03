@@ -156,6 +156,14 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   #vPhoto .pbody textarea{min-height:180px;resize:vertical}
   #toast{bottom:32px}
 }
+#pdfPane{display:none}
+@media (min-width:1400px){
+  #vWiz{max-width:none;grid-template-columns:200px minmax(0,1fr) minmax(460px,44%);column-gap:28px}
+  #pdfPane{display:flex;flex-direction:column;position:sticky;top:76px;height:calc(100vh - 96px);margin-top:22px;background:var(--card);border:1px solid var(--line)}
+  #pdfPane .pp-h{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:14px}
+  #pdfPane .pp-h b{flex:1}#pdfPane .pp-h label{display:flex;align-items:center;gap:4px;cursor:pointer}
+  #ppFr{flex:1;width:100%;border:0;background:#525659}
+}
 </style>
 </head>
 <body>
@@ -184,6 +192,7 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 <main id="vWiz" class="hidden">
   <div class="secnav" id="secnav"></div>
   <div id="stepBody"></div>
+  <aside id="pdfPane"><div class="pp-h"><b>Aperçu de la fiche</b><span id="ppSt" class="muted"></span><label class="muted"><input type="checkbox" id="ppPh"> photos</label><button class="btn s w" id="ppGo">Actualiser</button></div><iframe id="ppFr" title="Aperçu PDF de la fiche"></iframe></aside>
 </main>
 <div class="powered" id="powered">Powered by <b>HMagne</b></div>
 <!-- Signature -->
@@ -956,7 +965,19 @@ function renderStep(keep=true){
   bindForm(body);STEPS.forEach((s,i)=>{if(s.b)s.b($('#sec'+i));});bindMics(body);
   watchSections();
   if(keep)window.scrollTo(0,y);
+  ppPlan(400);
 }
+/* aperçu PDF à côté de la fiche (grand écran seulement) */
+const PP_MQ=window.matchMedia?matchMedia('(min-width:1400px)'):{matches:false};let PP_T=null,PP_URL=null,PP_RUN=false,PP_AGAIN=false;
+function ppPlan(ms=1500){clearTimeout(PP_T);if(!PP_MQ.matches||!CUR)return;$('#ppSt').textContent='modifié…';PP_T=setTimeout(ppMake,ms);}
+async function ppMake(){if(!PP_MQ.matches||!CUR||$('#vWiz').classList.contains('hidden'))return;if(PP_RUN){PP_AGAIN=true;return;}PP_RUN=true;$('#ppSt').textContent='mise à jour…';
+  try{const b=await makePDF({noPhotos:!$('#ppPh').checked});const u=URL.createObjectURL(b);$('#ppFr').src=u+'#toolbar=0&navpanes=0&view=FitH';if(PP_URL)setTimeout((o=>()=>URL.revokeObjectURL(o))(PP_URL),3000);PP_URL=u;
+    $('#ppSt').textContent=new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+  catch(e){$('#ppSt').textContent='erreur : '+e.message;}finally{PP_RUN=false;if(PP_AGAIN){PP_AGAIN=false;ppPlan(300);}}}
+$('#ppGo').onclick=()=>ppMake();$('#ppPh').onchange=()=>ppPlan(100);
+['input','change'].forEach(t=>$('#stepBody').addEventListener(t,()=>ppPlan()));
+$('#stepBody').addEventListener('click',e=>{if(e.target.closest('button'))ppPlan();});
+if(PP_MQ.addEventListener)PP_MQ.addEventListener('change',()=>ppPlan(200));
 function goSec(i){const el=$('#sec'+i);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 let SECOBS=null;
 function watchSections(){if(SECOBS)SECOBS.disconnect();if(!('IntersectionObserver' in window))return;
