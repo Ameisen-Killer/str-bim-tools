@@ -205,6 +205,12 @@ tr.menu-ici td{background:var(--choisie)}
 .assoc:hover{border-color:var(--or)}
 .assoc svg{width:12px;height:12px}
 .zone .n.zero{opacity:.45}
+.titre-rub{padding:8px 12px 4px;font-size:12px;font-weight:600;color:var(--texte-faible);text-transform:uppercase;letter-spacing:.04em}
+.bt[aria-pressed="true"]{background:var(--controle);border-color:var(--or);color:var(--or)}
+tr.rub td{position:sticky;top:34px;z-index:1;padding:7px 12px;background:linear-gradient(rgba(var(--or-rvb),.14),rgba(var(--or-rvb),.14)),var(--couche);font-size:13px;color:var(--or);border-bottom:1px solid var(--ligne);cursor:default}
+tr.rub td b{font-weight:700}
+tr.rub td span{margin-left:8px;padding:0 7px;border-radius:9px;background:var(--controle);color:var(--texte-doux);font-size:11px;font-weight:400}
+tr.rub.sous td{position:static;padding:5px 12px 5px 28px;background:linear-gradient(var(--controle),var(--controle)),var(--couche);color:var(--texte-doux);font-size:12px;font-weight:600}
 .zone .n-neufs{margin-right:6px;padding:0 6px;border-radius:10px;background:var(--or);color:var(--sur-accent);font-size:10px;font-weight:700;line-height:16px}
 .types button.b-neufs{border-color:var(--or);color:var(--or);font-weight:600;margin-right:6px}
 .types button.b-neufs[aria-pressed="true"]{color:var(--sur-accent)}
@@ -221,6 +227,7 @@ tr.eclair td{animation:eclair 1.6s ease-out}
   <a class="menu-fair" href="/fgh/" title="Retour au menu Fairmont" aria-label="Retour au menu Fairmont"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></a>
   <img class="logo-ab" src="/fgh/logo-ab.jpg?v=1" alt="AB" width="36" height="34">
   <button type="button" class="bt" id="btn-zones" title="Afficher ou masquer les zones" aria-label="Afficher ou masquer les zones"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M6 2.5v11" stroke="currentColor" stroke-width="1.1"/></svg></button>
+  <button type="button" class="bt" id="btn-rub" aria-pressed="false" title="Regrouper la liste par rubrique (démolition, renforcement, noyaux…)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M2 8h12M2 12.5h12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><path d="M4.5 5.7h7M4.5 10.2h7" stroke="currentColor" stroke-width=".9" stroke-linecap="round" opacity=".5"/></svg><span>Rubriques</span></button>
   <span class="titre"><span class="fgh">FGH · </span><b>Liste des plans</b></span>
   <span class="etat" id="etat"><span>Connexion…</span></span>
   <span class="esp"></span>
@@ -324,6 +331,6 @@ tr.eclair td{animation:eclair 1.6s ease-out}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=9"></script>
+<script src="/fgh/pln/pln.js?v=10"></script>
 </body>
 </html>

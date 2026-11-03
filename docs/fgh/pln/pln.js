@@ -23,7 +23,7 @@
   var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par", "liste_assoc"];
 
   var $ = function (s) { return document.querySelector(s); };
-  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, NEUFS = false, TRI = { col: "date", sens: -1 }, VUE = [], EDITE = null;
+  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, NEUFS = false, RUB = "", PAR_RUB = lsGet("fgh.pln.rub") === "1", TRI = { col: "date", sens: -1 }, VUE = [], EDITE = null;
 
   // ------------------------------------------------------------------ outils
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -171,11 +171,26 @@
         }).join("") + "</div>";
       }
     });
+    // rubriques : comptées dans la zone et le niveau choisis, avec les types et la recherche
+    var ok = passeTypesRecherche(), cr = {};
+    GROUPES.forEach(function (g) { var p = g.d; if ((ZONE && p.zone !== ZONE) || (NIVEAU && p.niveau !== NIVEAU) || !ok(g)) return; var r = rubrique(p); cr[r.r.c] = (cr[r.r.c] || 0) + 1; if (r.s) cr[cleRub(p)] = (cr[cleRub(p)] || 0) + 1; });
+    h += '<div class="sep-zones"></div><div class="titre-rub">Rubriques</div>';
+    RUBRIQUES.forEach(function (r) {
+      var n = cr[r.c] || 0, ici = RUB === r.c || RUB.indexOf(r.c + "|") === 0;
+      if (!n && !ici) return;
+      h += '<button type="button" class="zone rub-b" data-r="' + esc(r.c) + '" aria-current="' + (RUB === r.c) + '"><span class="nom">' + esc(r.lib) + '</span><span class="n">' + n + "</span></button>";
+      if (ici && r.sous) h += '<div class="niveaux">' + r.sous.map(function (x) {
+        var k = r.c + "|" + x[2], m = cr[k] || 0; if (!m && RUB !== k) return "";
+        return '<button type="button" class="zone rub-b" data-r="' + esc(k) + '" aria-current="' + (RUB === k) + '"><span class="nom">' + esc(x[2]) + ' <small style="display:inline">' + x[0] + "–" + x[1] + '</small></span><span class="n">' + m + "</span></button>";
+      }).join("") + "</div>";
+    });
     $("#liste-zones").innerHTML = h;
     var manuels = GROUPES.filter(function (g) { return g.rows.some(function (p) { return p.source === "manuel"; }); }).length;
     $("#pied-zones").textContent = GROUPES.length + " plans · " + PLANS.length + " indices" + (manuels ? " · " + manuels + " avec saisie manuelle" : "");
   }
   $("#liste-zones").addEventListener("click", function (e) {
+    var rb = e.target.closest(".rub-b");
+    if (rb) { var k = rb.dataset.r; RUB = RUB === k ? (k.indexOf("|") > 0 ? k.split("|")[0] : "") : k; dessine(); $("#defile").scrollTop = 0; return; }
     var b = e.target.closest(".zone"); if (!b) return;
     var z = b.dataset.z, n = b.dataset.n || "";
     if (!n && z === ZONE && !NIVEAU && z) { ZONE = ""; } else { ZONE = z; NIVEAU = n; }
@@ -190,6 +205,9 @@
     lsSet("fgh.pln.zones", ouvert ? "1" : "0");
   }
   $("#btn-zones").addEventListener("click", function () { basculeZones(); });
+  function majBtnRub() { $("#btn-rub").setAttribute("aria-pressed", PAR_RUB); }
+  $("#btn-rub").addEventListener("click", function () { PAR_RUB = !PAR_RUB; lsSet("fgh.pln.rub", PAR_RUB ? "1" : "0"); majBtnRub(); dessineListe(); });
+  majBtnRub();
   if (matchMedia("(max-width:760px)").matches) document.documentElement.classList.add("sans-zones");
 
   // ------------------------------------------------------------------ liste
@@ -222,6 +240,7 @@
       var p = g.d;
       if (ZONE && p.zone !== ZONE) return false;
       if (NIVEAU && p.niveau !== NIVEAU) return false;
+      if (RUB && cleRub(p).indexOf(RUB) !== 0) return false;
       return ok(g);
     });
   }
@@ -230,6 +249,7 @@
     var v = c === "code" ? function (p) { return code(p); } : c === "date" ? function (p) { return p.date_indice || ""; } : function (p) { return p[c] || ""; };
     return l.sort(function (x, y) {
       var a = x.d, b = y.d;
+      if (PAR_RUB) { var ra = rubrique(a), rb = rubrique(b); if (ra.i !== rb.i) return ra.i - rb.i; if (ra.s !== rb.s) return ra.s.localeCompare(rb.s, "fr", { numeric: true }); }
       var r = c === "indice" ? cmpInd(a.indice, b.indice) : String(v(a)).localeCompare(String(v(b)), "fr", { numeric: true });
       return r * s || code(a).localeCompare(code(b));
     });
@@ -252,6 +272,39 @@
     $("#corps").innerHTML = ""; var v = $("#vide"); v.hidden = false;
     v.innerHTML = "<b>" + esc(m) + "</b>";
   }
+  // ------------------------------------------------------------------ rubriques (réservation des numéros AB, liste des livrables du 11.09.2025)
+  var RUBRIQUES = [
+    { c: "G", lib: "Géotechnique", de: 1, a: 99 },
+    { c: "N", lib: "Notes de calcul", de: 100, a: 499 },
+    { c: "C", lib: "Convention d'utilisation", de: 500, a: 529 },
+    { c: "S", lib: "Repérage des sondages", de: 530, a: 549 },
+    { c: "P", lib: "Plans généraux au 1/100", de: 550, a: 999 },
+    { c: "1", lib: "1 - Démolition", de: 1000, a: 1499 },
+    { c: "2", lib: "2 - Renforcement", de: 1500, a: 1999 },
+    { c: "3", lib: "3 - Reconstruction / Extension", de: 2000, a: 2499, sous: [[2000, 2099, "3.1 - Triangles façades"], [2100, 2199, "3.2 - Parking"], [2200, 2299, "3.3 - Socle"], [2300, 2499, "3.4 - Noyaux"]] },
+    { c: "4", lib: "4 - Charpente métallique", de: 2500, a: 3499, sous: [[2500, 2599, "4.1 - Parking SS-1"], [2600, 2699, "4.2 - Théâtre"], [2700, 2799, "4.3 - Piscine"], [2800, 2999, "4.4 - Marquises / Pergolas"], [3000, 3199, "4.5 - Façade Mont-Blanc"], [3200, 3399, "4.6 - Façade Patio"], [3400, 3499, "4.7 - Toiture"]] },
+    { c: "A", lib: "Armatures et listes de fers", types: ["ARM", "LIS"] },
+    { c: "X", lib: "Autres" }
+  ];
+  // { i: rang de la rubrique, r: rubrique, s: sous-rubrique ou "" } ; les plans d'armatures et listes forment leur propre rubrique
+  var CACHE_RUB = new WeakMap();
+  function rubrique(p) {
+    var cr = CACHE_RUB.get(p); if (cr && cr.n === p.numero && cr.t === p.type) return cr.v;
+    var n = parseInt(p.numero, 10), t = String(p.type || "").toUpperCase(), res = null;
+    for (var i = 0; i < RUBRIQUES.length && !res; i++) {
+      var r = RUBRIQUES[i];
+      if (r.types ? r.types.indexOf(t) >= 0 : r.de != null && n >= r.de && n <= r.a) {
+        var s = ""; (r.sous || []).forEach(function (x) { if (n >= x[0] && n <= x[1]) s = x[2]; });
+        res = { i: i, r: r, s: s };
+      }
+    }
+    if (!res && (t === "NDC" || t === "RAP")) res = { i: 1, r: RUBRIQUES[1], s: "" };
+    res = res || { i: RUBRIQUES.length - 1, r: RUBRIQUES[RUBRIQUES.length - 1], s: "" };
+    CACHE_RUB.set(p, { n: p.numero, t: p.type, v: res }); return res;
+  }
+  function cleRub(p) { var r = rubrique(p); return r.r.c + (r.s ? "|" + r.s : ""); }
+  function libRub(p) { var r = rubrique(p); return r.s || r.r.lib; }
+
   // déposé depuis moins de 7 jours (date de l'indice)
   function neuf(p) {
     if (!p.date_indice) return false;
@@ -266,7 +319,7 @@
     return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
       '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
       '<td class="ind">' + esc(p.indice) + (neuf(p) ? '<span class="neuf" title="Déposé il y a moins de 7 jours">nouveau</span>' : "") + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
-      (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
+      (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone + " · " + libRub(p)) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
       '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
       (p.source === "manuel" ? '<span class="pastille manuel" title="Saisi à la main dans cet outil">manuel</span>' : "") + "</td></tr>";
   }
@@ -287,8 +340,16 @@
     }
     v.hidden = !!VUE.length; if (!VUE.length) v.innerHTML = "<b>Aucun plan</b>Change la zone, les types ou la recherche.";
     var h = [];
+    var avant = null, cpt = {};
+    if (PAR_RUB) VUE.forEach(function (g) { var r = rubrique(g.d); cpt[r.r.c] = (cpt[r.r.c] || 0) + 1; cpt[cleRub(g.d)] = (cpt[cleRub(g.d)] || 0) + 1; });
     for (var i = 0; i < VUE.length; i++) {
       var g = VUE[i];
+      if (PAR_RUB) {
+        var r = rubrique(g.d), k = cleRub(g.d);
+        if (!avant || avant.r !== r.r) h.push('<tr class="rub"><td colspan="6"><b>' + esc(r.r.lib) + "</b><span>" + cpt[r.r.c] + "</span></td></tr>");
+        if (r.s && (!avant || avant.k !== k)) h.push('<tr class="rub sous"><td colspan="6">' + esc(r.s) + "<span>" + cpt[k] + "</span></td></tr>");
+        avant = { r: r.r, k: k };
+      }
       h.push(ligne(g.d, i, 0, g));
       if (OUVERTS[g.cle]) for (var j = 1; j < g.rows.length; j++) h.push(ligne(g.rows[j], i, j, g));
     }
@@ -300,7 +361,7 @@
     var va = e.target.closest(".assoc"); if (va) { vaA(va.dataset.va); return; }
     var b = e.target.closest(".pile");
     if (b) { var g = VUE[+b.dataset.pile]; if (OUVERTS[g.cle]) delete OUVERTS[g.cle]; else OUVERTS[g.cle] = 1; dessineListe(); return; }
-    var tr = e.target.closest("tr"); if (tr) ouvre(VUE[+tr.dataset.i].rows[+tr.dataset.j]);
+    var tr = e.target.closest("tr[data-i]"); if (tr) ouvre(VUE[+tr.dataset.i].rows[+tr.dataset.j]);
   });
   document.querySelector("thead").addEventListener("click", function (e) {
     var th = e.target.closest("th"); if (!th) return;
@@ -397,7 +458,7 @@
   var MENU = $("#menu-ligne"), MENU_P = null;
   function fermeMenu() { MENU.hidden = true; MENU_P = null; document.querySelectorAll("tr.menu-ici").forEach(function (t) { t.classList.remove("menu-ici"); }); }
   $("#corps").addEventListener("contextmenu", function (e) {
-    var tr = e.target.closest("tr"); if (!tr) return;
+    var tr = e.target.closest("tr[data-i]"); if (!tr) return;
     e.preventDefault(); fermeMenu();
     var g = VUE[+tr.dataset.i], p = g.rows[+tr.dataset.j]; MENU_P = p; tr.classList.add("menu-ici");
     $("#ml-tete").textContent = [p.type, p.niveau, p.zone, p.numero].join("-") + " · ind. " + p.indice;
@@ -530,9 +591,30 @@
 
   // ------------------------------------------------------------------ exports
   function LV() { return VUE.map(function (g) { return g.d; }); }
+  // exports : toujours classés par rubrique, l'ordre de l'écran gardé à l'intérieur de chaque rubrique
+  function vueRub() {
+    return VUE.map(function (g, i) { return { g: g, i: i, r: rubrique(g.d) }; }).sort(function (a, b) {
+      return a.r.i - b.r.i || a.r.s.localeCompare(b.r.s, "fr", { numeric: true }) || a.i - b.i;
+    });
+  }
+  // [{ type: "rub"|"sous"|"plan", lib, n, g }] dans l'ordre d'export
+  function lignesExport() {
+    var L = vueRub(), out = [], cpt = {};
+    L.forEach(function (x) { cpt[x.r.r.c] = (cpt[x.r.r.c] || 0) + 1; var k = x.r.r.c + "|" + x.r.s; cpt[k] = (cpt[k] || 0) + 1; });
+    var av = null;
+    L.forEach(function (x) {
+      if (!av || av.r !== x.r.r) out.push({ type: "rub", lib: x.r.r.lib, n: cpt[x.r.r.c] });
+      if (x.r.s && (!av || av.r !== x.r.r || av.s !== x.r.s)) out.push({ type: "sous", lib: x.r.s, n: cpt[x.r.r.c + "|" + x.r.s] });
+      out.push({ type: "plan", g: x.g, sous: !!x.r.s });
+      av = { r: x.r.r, s: x.r.s };
+    });
+    return out;
+  }
+  function texteCtrl(p) { return p.controle_n ? "n°" + p.controle_n + (p.date_controle ? " · " + dateFr(p.date_controle) : "") + (p.controle_par ? " · " + p.controle_par : "") : ""; }
   function libelleVue() {
     var b = [];
     if (ZONE) b.push("Zone " + ZONE + (NIVEAU ? " · " + niveauNom(NIVEAU) : ""));
+    if (RUB) b.push(RUB.split("|").pop() === RUB ? RUBRIQUES.filter(function (r) { return r.c === RUB; })[0].lib : RUB.split("|")[1]);
     if (NEUFS) b.push("Nouveaux (moins de 7 jours)");
     var t = Object.keys(TYPESEL); if (t.length) b.push(t.join(", "));
     if ($("#recherche").value.trim()) b.push("« " + $("#recherche").value.trim() + " »");
@@ -575,7 +657,16 @@
         y += 5;
       }
       entete();
-      LV().forEach(function (p, i) {
+      var zebre = 0;
+      lignesExport().forEach(function (L) {
+        if (L.type !== "plan") {
+          var hb = L.type === "rub" ? 6 : 5;
+          if (y + hb + 4 > 200) { d.addPage(); entete(); }
+          if (L.type === "rub") { d.setFillColor(202, 224, 155); d.rect(M, y - 3.6, W - 2 * M, hb, "F"); T(L.lib + "  (" + L.n + ")", M + 1.5, y + .4, { b: 1, s: 8.5, c: [40, 60, 15] }); }
+          else { d.setFillColor(238, 244, 226); d.rect(M + 4, y - 3.4, W - 2 * M - 4, hb, "F"); T(L.lib + "  (" + L.n + ")", M + 5.5, y, { b: 1, s: 7.5, c: [60, 80, 30] }); }
+          y += hb + .6; zebre = 0; return;
+        }
+        var p = L.g.d, i = zebre++;
         d.setFont("helvetica", "normal"); d.setFontSize(7.5);
         var lignes = d.splitTextToSize(p.titre || "—", cols[2][1] - 3).slice(0, 3), h = Math.max(1, lignes.length) * 3.4 + 1.6;
         if (y + h > 200) { d.addPage(); entete(); }
@@ -597,32 +688,65 @@
     occupe(true, "Création du classeur…");
     Promise.all([charge(LIBS.exceljs), logo()]).then(function (r) {
       var wb = new window.ExcelJS.Workbook(); wb.creator = "AB Ingénieurs"; wb.created = new Date();
-      var ws = wb.addWorksheet("Liste des plans", { pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .4, right: .4, top: .5, bottom: .5, header: .2, footer: .2 } },
-        headerFooter: { oddFooter: "&L&8AB Ingénieurs · " + PROJET + "&R&8page &P / &N" } });
-      var tetes = ["Projet", "Discipline", "Émetteur", "Phase", "Type", "Niveau", "Zone", "N°", "Code", "Indice", "Titre", "Niveau (libellé)", "Date indice", "Auteur", "Statut", "Remarque", "Contrôle n°", "Date contrôle", "Contrôlé par"];
-      var larg = [8, 10, 9, 7, 7, 8, 7, 7, 34, 7, 70, 14, 12, 20, 16, 30, 11, 13, 18];
+      var VERT = "FF4D7A1C", FONCE = "FF283C0F", PALE = "FFCAE09B", PALE2 = "FFEEF4E2", GRIS = "FF87868B";
+      var ws = wb.addWorksheet("Liste des plans", { properties: { outlineProperties: { summaryBelow: false } },
+        pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: .4, right: .4, top: .5, bottom: .5, header: .2, footer: .2 } },
+        headerFooter: { oddFooter: "&L&8AB Ingénieurs · " + PROJET + " · nomenclature des livrables&R&8page &P / &N" } });
+      var tetes = ["A_Code projet", "B_Discipline", "C_Emetteur", "D_Phase SIA", "E_Type document", "F_Code étage", "G_Zone", "H_Numéro de livrable", "I_Indice de révision",
+        "Code complet", "J_Titre du document", "K_Niveau", "L_Date de l'indice", "M_Auteur", "N_Statut", "O_Contrôle sur place (n° · date · par)", "P_Remarques"];
+      var larg = [7, 8, 8, 7, 8, 7, 7, 9, 8, 33, 62, 12, 11, 18, 14, 30, 40], NC = tetes.length;
       ws.columns = larg.map(function (w) { return { width: w }; });
       var id = wb.addImage({ base64: r[1], extension: "jpeg" });
       ws.addImage(id, { tl: { col: 0.15, row: 0.2 }, ext: { width: 58, height: 55 } });
-      ws.getRow(1).height = 15; ws.getRow(2).height = 15; ws.getRow(3).height = 15; ws.getRow(4).height = 15;
-      BUREAUX.forEach(function (b, i) { var c = ws.getCell(1 + i, 3); c.value = { richText: [{ text: b[0], font: { bold: true, size: 8, name: "Arial" } }, { text: " - T " + b[1], font: { size: 8, name: "Arial" } }] }; });
-      ws.mergeCells("I1:K1"); ws.getCell("I1").value = "LISTE DES PLANS"; ws.getCell("I1").font = { bold: true, size: 14, name: "Arial" };
-      ws.mergeCells("I2:K2"); ws.getCell("I2").value = PROJET; ws.getCell("I2").font = { size: 11, name: "Arial" };
-      ws.mergeCells("I3:K3"); ws.getCell("I3").value = libelleVue() + " · " + VUE.length + " plan(s) · édition du " + dateFr(aujourdhui()); ws.getCell("I3").font = { size: 9, name: "Arial", color: { argb: "FF87868B" } };
-      for (var c = 1; c <= tetes.length; c++) ws.getCell(5, c).border = { top: { style: "medium", color: { argb: "FF4D7A1C" } } };
-      var H = ws.getRow(6); H.values = tetes; H.height = 20;
-      H.eachCell(function (cell) { cell.font = { bold: true, name: "Arial", size: 9, color: { argb: "FF283C0F" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCAE09B" } };
-        cell.alignment = { vertical: "middle" }; cell.border = { bottom: { style: "thin", color: { argb: "FF87868B" } } }; });
-      LV().forEach(function (p, i) {
-        var row = ws.addRow([p.projet, p.discipline, p.emetteur, p.phase, p.type, p.niveau, p.zone, p.numero, code(p), p.indice, p.titre, niveauNom(p.niveau),
-          p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, p.remarque, p.controle_n, p.date_controle ? new Date(p.date_controle + "T12:00:00") : null, p.controle_par]);
-        row.font = { name: "Arial", size: 9 }; row.alignment = { vertical: "top", wrapText: false };
-        row.getCell(13).numFmt = "dd.mm.yyyy"; row.getCell(18).numFmt = "dd.mm.yyyy"; row.getCell(10).font = { name: "Arial", size: 9, bold: true, color: { argb: "FF4D7A1C" } };
-        if (i % 2) row.eachCell({ includeEmpty: true }, function (cell) { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F8F2" } }; });
+      [1, 2, 3, 4].forEach(function (k) { ws.getRow(k).height = 15; });
+      BUREAUX.forEach(function (b, i) { ws.getCell(1 + i, 3).value = { richText: [{ text: b[0], font: { bold: true, size: 8, name: "Arial" } }, { text: " - T " + b[1], font: { size: 8, name: "Arial" } }] }; });
+      ws.mergeCells("K1:Q1"); ws.getCell("K1").value = "HÔTEL FAIRMONT GENÈVE"; ws.getCell("K1").font = { bold: true, size: 18, name: "Arial", color: { argb: VERT } }; ws.getRow(1).height = 24;
+      ws.mergeCells("K2:Q2"); ws.getCell("K2").value = PROJET + " · Structure"; ws.getCell("K2").font = { size: 11, name: "Arial" };
+      ws.mergeCells("K3:Q3"); ws.getCell("K3").value = "Ingénieur structure : AB Ingénieurs SA (ABI)"; ws.getCell("K3").font = { size: 9, name: "Arial", color: { argb: GRIS } };
+      ws.mergeCells("A6:Q6"); var t6 = ws.getCell("A6"); t6.value = "NOMENCLATURE DES LIVRABLES – LISTE DES PLANS"; ws.getRow(6).height = 20;
+      t6.font = { bold: true, size: 12, name: "Arial", color: { argb: FONCE } }; t6.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PALE } }; t6.alignment = { vertical: "middle", indent: 1 };
+      var nInd = 0; VUE.forEach(function (g) { nInd += g.rows.length; });
+      [["Date de mise à jour :", new Date(aujourdhui() + "T12:00:00")], ["Nombre total de livrables :", VUE.length], ["Indices au total :", nInd], ["Vue exportée :", libelleVue()]].forEach(function (x, k) {
+        var rw = 7 + k; ws.mergeCells(rw, 1, rw, 4); ws.getCell(rw, 1).value = x[0]; ws.getCell(rw, 1).font = { size: 9, name: "Arial", bold: true };
+        ws.mergeCells(rw, 5, rw, 10); var c5 = ws.getCell(rw, 5); c5.value = x[1]; c5.font = { size: 9, name: "Arial" }; c5.alignment = { horizontal: "left" }; if (k === 0) c5.numFmt = "dd.mm.yyyy";
       });
-      ws.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6 + VUE.length, column: tetes.length } };
-      ws.views = [{ state: "frozen", ySplit: 6 }];
-      ws.pageSetup.printTitlesRow = "6:6";
+      ws.mergeCells("K8:Q9"); var nb = ws.getCell("K8"); nb.alignment = { wrapText: true, vertical: "top" }; nb.font = { size: 8, italic: true, name: "Arial", color: { argb: GRIS } };
+      nb.value = "Classement par rubrique selon la réservation des numéros (feuille « Rubriques »). Les plans d'armatures et les listes de fers forment leur propre rubrique. Seul le dernier indice de chaque plan figure ici ; tous les indices sont dans « Historique des indices ».";
+      var LH = 12, H = ws.getRow(LH); H.values = tetes; H.height = 36;
+      H.eachCell(function (cell) { cell.font = { bold: true, name: "Arial", size: 8, color: { argb: FONCE } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PALE } };
+        cell.alignment = { vertical: "middle", wrapText: true }; cell.border = { top: { style: "thin", color: { argb: GRIS } }, bottom: { style: "thin", color: { argb: GRIS } }, left: { style: "hair", color: { argb: GRIS } }, right: { style: "hair", color: { argb: GRIS } } }; });
+      var fin = { bottom: { style: "hair", color: { argb: "FFC8C8C8" } } };
+      lignesExport().forEach(function (L) {
+        if (L.type !== "plan") {
+          var rs = ws.addRow([]), n = rs.number; ws.mergeCells(n, 1, n, NC);
+          var c0 = ws.getCell(n, 1); c0.value = (L.type === "sous" ? "      " : "") + L.lib + "   (" + L.n + ")";
+          c0.font = { bold: true, name: "Arial", size: L.type === "rub" ? 10 : 9, color: { argb: L.type === "rub" ? FONCE : "FF3C501E" } };
+          c0.fill = { type: "pattern", pattern: "solid", fgColor: { argb: L.type === "rub" ? "FFDCEBBE" : PALE2 } }; c0.alignment = { vertical: "middle" };
+          rs.height = L.type === "rub" ? 18 : 15; if (L.type === "sous") rs.outlineLevel = 1; return;
+        }
+        var p = L.g.d;
+        var row = ws.addRow([p.projet, p.discipline, p.emetteur, p.phase, p.type, p.niveau, p.zone, p.numero, p.indice, code(p) + "-" + p.indice, p.titre, niveauNom(p.niveau),
+          p.date_indice ? new Date(p.date_indice + "T12:00:00") : null, p.auteur, p.statut, texteCtrl(p), p.remarque]);
+        row.font = { name: "Arial", size: 8 }; row.alignment = { vertical: "top" }; row.outlineLevel = L.sous ? 2 : 1;
+        row.eachCell({ includeEmpty: true }, function (cell) { cell.border = fin; });
+        row.getCell(13).numFmt = "dd.mm.yyyy"; row.getCell(9).font = { name: "Arial", size: 8, bold: true, color: { argb: VERT } };
+        if (p.controle_n) row.getCell(16).font = { name: "Arial", size: 8, bold: true, color: { argb: VERT } };
+        if (neuf(p)) row.getCell(11).font = { name: "Arial", size: 8, bold: true };
+      });
+      ws.autoFilter = { from: { row: LH, column: 1 }, to: { row: ws.rowCount, column: NC } };
+      ws.views = [{ state: "frozen", ySplit: LH }];
+      ws.pageSetup.printTitlesRow = LH + ":" + LH;
+      // Rubriques : réservation des numéros
+      var wr = wb.addWorksheet("Rubriques");
+      wr.columns = [{ width: 44 }, { width: 10 }, { width: 10 }, { width: 14 }];
+      var hr = wr.addRow(["Rubrique", "Début", "Fin", "Plans exportés"]);
+      hr.eachCell(function (cell) { cell.font = { bold: true, name: "Arial", size: 9, color: { argb: FONCE } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PALE } }; });
+      var cr = {}; vueRub().forEach(function (x) { cr[x.r.r.c] = (cr[x.r.r.c] || 0) + 1; if (x.r.s) cr[x.r.s] = (cr[x.r.s] || 0) + 1; });
+      var pad = function (n) { return n == null ? "" : ("000" + n).slice(-4); };
+      RUBRIQUES.forEach(function (rb) {
+        var w = wr.addRow([rb.lib, rb.types ? "types " + rb.types.join(", ") : pad(rb.de), rb.types ? "" : pad(rb.a), cr[rb.c] || 0]); w.font = { name: "Arial", size: 9, bold: true };
+        (rb.sous || []).forEach(function (x) { var v = wr.addRow(["      " + x[2], pad(x[0]), pad(x[1]), cr[x[2]] || 0]); v.font = { name: "Arial", size: 9 }; });
+      });
       // Historique : tous les indices des plans exportés, du plus récent au plus ancien
       var wh = wb.addWorksheet("Historique des indices", { pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
       wh.columns = [{ width: 34 }, { width: 7 }, { width: 70 }, { width: 12 }, { width: 20 }, { width: 16 }, { width: 11 }, { width: 13 }];
