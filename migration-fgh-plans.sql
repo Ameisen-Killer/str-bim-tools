@@ -43,6 +43,10 @@ create index if not exists fgh_plans_code on public.fgh_plans (type, niveau, zon
 alter table public.fgh_plans add column if not exists controle_n text not null default '' check (char_length(controle_n) <= 20);
 alter table public.fgh_plans add column if not exists date_controle date;
 alter table public.fgh_plans add column if not exists controle_par text not null default '' check (char_length(controle_par) <= 100);
+-- 03.11.2026 : résumé et lien PDF du contrôle ARM, liste associée à un plan d'armatures
+alter table public.fgh_plans add column if not exists controle_info text not null default '' check (char_length(controle_info) <= 200);
+alter table public.fgh_plans add column if not exists controle_lien text not null default '' check (char_length(controle_lien) <= 1000);
+alter table public.fgh_plans add column if not exists liste_assoc text not null default '' check (char_length(liste_assoc) <= 60);
 
 create or replace function public.fgh_plans_horodate()
 returns trigger

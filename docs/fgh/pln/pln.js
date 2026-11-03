@@ -20,7 +20,7 @@
     "110": "Étage 1", "120": "Étage 2", "130": "Étage 3", "140": "Étage 4", "150": "Étage 5", "160": "Étage 6", "170": "Étage 7", "180": "Étage 8", "190": "Toiture" };
   var TYPES = { PLA: "Plan", ARM: "Armatures", LIS: "Listes de fers", ELV: "Élévation", DET: "Détail", NDC: "Note de calcul", DES: "Descriptif",
     RAP: "Rapport", CPE: "Coupe", SCH: "Schéma", CDC: "Cahier des charges", FTE: "Fiche technique", RFI: "RFI", MOD: "Maquette" };
-  var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par"];
+  var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par", "liste_assoc"];
 
   var $ = function (s) { return document.querySelector(s); };
   var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, TRI = { col: "code", sens: 1 }, VUE = [], EDITE = null;
@@ -100,12 +100,51 @@
       var r = m[k].sort(function (a, b) { return cmpInd(b.indice, a.indice) || String(b.date_indice || "").localeCompare(String(a.date_indice || "")); });
       return { cle: k, rows: r, d: r[0] };
     });
+    var IX = {};
+    GROUPES.forEach(function (g) { IX[g.cle] = g; g.lie = null; });
+    GROUPES.forEach(function (g) {
+      if (g.d.type !== "ARM") return;
+      var man = null;
+      g.rows.some(function (p) { var m = /(?:^|-)LIS-(\w+)-(\w+)-(\w+)\s*$/i.exec(String(p.liste_assoc || "").trim()); if (m) man = "LIS|" + m[1] + "|" + m[2].toUpperCase() + "|" + m[3]; return !!m; });
+      var l = IX[man || ("LIS|" + g.d.niveau + "|" + g.d.zone + "|" + g.d.numero)];
+      if (l) { g.lie = l; g.lieMan = !!man; if (!l.lie) l.lie = g; }
+    });
+  }
+  // contrôle d'armatures du plan : l'indice affiché, sinon le dernier indice contrôlé du plan
+  function ctrlDe(g, p) {
+    if (p.controle_n) return { p: p, ici: true };
+    if (p !== g.d) return null;
+    var c = g.rows.filter(function (x) { return x.controle_n; })[0];
+    return c ? { p: c, ici: false } : null;
+  }
+  function ligneCtrl(g, p) {
+    var c = ctrlDe(g, p); if (!c) return "";
+    var q = c.p, info = String(q.controle_info || "");
+    return '<span class="ctrl-ligne' + (c.ici ? "" : " autre") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      "<span>Contrôlé sur place" + (q.date_controle ? " le " + esc(dateFr(q.date_controle)) : "") + (q.controle_par ? " par " + esc(q.controle_par) : "") +
+      " · fiche n°" + esc(q.controle_n) + (c.ici ? "" : " (ind. " + esc(q.indice) + ")") + (info ? " · " + esc(info.slice(0, 90)) : "") + "</span>" +
+      (q.controle_lien && /^https:\/\//.test(q.controle_lien) ? '<a href="' + esc(q.controle_lien) + '" target="_blank" rel="noopener" title="Fiche PDF dans SharePoint">PDF</a>' : "") +
+      '<a href="/fgh/arm/#ctrl=' + encodeURIComponent(q.controle_n) + '" title="Ouvrir ce contrôle dans ARM (sur l\'appareil qui l\'a saisi)">ARM</a></span>';
+  }
+  function lienAssoc(g) {
+    var l = g.lie; if (!l) return "";
+    var q = l.d, lib = g.d.type === "ARM" ? "Liste" : "Plan d'armatures";
+    return ' · <button type="button" class="assoc" data-va="' + esc(l.cle) + '" title="Aller à ' + esc(code(q)) + (g.lieMan ? " (association choisie à la main)" : " (même niveau, zone et n°)") + '">' +
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M5 7.5L3.8 8.7a2.3 2.3 0 0 0 3.3 3.3L8.3 10.8M11 8.5l1.2-1.2a2.3 2.3 0 0 0-3.3-3.3L7.7 5.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>' +
+      lib + " " + esc(q.numero) + " ind. " + esc(q.indice) + (q.controle_n ? " ✓" : "") + "</button>";
+  }
+  function vaA(k) {
+    var trouve = function () { for (var i = 0; i < VUE.length; i++) if (VUE[i].cle === k) return i; return -1; };
+    var i = trouve();
+    if (i < 0) { ZONE = ""; NIVEAU = ""; TYPESEL = {}; $("#recherche").value = ""; dessine(); i = trouve(); }
+    var tr = $("#corps").querySelector('tr[data-i="' + i + '"][data-j="0"]'); if (!tr) return;
+    tr.scrollIntoView({ block: "center", behavior: "smooth" }); tr.classList.remove("eclair"); void tr.offsetWidth; tr.classList.add("eclair");
   }
   function zonesInfos() {
-    var z = {};
+    var z = {}, ok = passeTypesRecherche();
     GROUPES.forEach(function (g) {
       var p = g.d, k = p.zone || "?"; z[k] = z[k] || { n: 0, noyaux: {}, niv: {} };
-      z[k].n++; z[k].niv[p.niveau] = (z[k].niv[p.niveau] || 0) + 1;
+      if (ok(g)) { z[k].n++; z[k].niv[p.niveau] = (z[k].niv[p.niveau] || 0) + 1; }
       var m, re = /noyau\s+([A-Z])\b/gi; while ((m = re.exec(p.titre || ""))) z[k].noyaux[m[1].toUpperCase()] = 1;
     });
     return z;
@@ -118,10 +157,10 @@
   }
   function dessineZones() {
     var Z = zonesInfos(), cles = Object.keys(Z).sort(function (a, b) { return (a === "TTZ") - (b === "TTZ") || a.localeCompare(b); });
-    var h = '<button type="button" class="zone" data-z="" aria-current="' + (!ZONE) + '"><span class="nom"><b>Toutes les zones</b></span><span class="n">' + GROUPES.length + "</span></button><div class=\"sep-zones\"></div>";
+    var h = '<button type="button" class="zone" data-z="" aria-current="' + (!ZONE) + '"><span class="nom"><b>Toutes les zones</b></span><span class="n">' + GROUPES.filter(passeTypesRecherche()).length + "</span></button><div class=\"sep-zones\"></div>";
     cles.forEach(function (k) {
       var i = Z[k], st = sousTitreZone(k, i), ici = ZONE === k;
-      h += '<button type="button" class="zone" data-z="' + esc(k) + '" aria-current="' + (ici && !NIVEAU) + '"><span class="nom"><b>Zone ' + esc(k) + "</b>" + (st ? "<small>" + esc(st) + "</small>" : "") + '</span><span class="n">' + i.n + "</span></button>";
+      h += '<button type="button" class="zone" data-z="' + esc(k) + '" aria-current="' + (ici && !NIVEAU) + '"><span class="nom"><b>Zone ' + esc(k) + "</b>" + (st ? "<small>" + esc(st) + "</small>" : "") + '</span><span class="n' + (i.n ? "" : " zero") + '">' + i.n + "</span></button>";
       if (ici) {
         h += '<div class="niveaux">' + Object.keys(i.niv).sort().map(function (nv) {
           return '<button type="button" class="zone" data-z="' + esc(k) + '" data-n="' + esc(nv) + '" aria-current="' + (NIVEAU === nv) + '"><span class="nom">' + esc(niveauNom(nv)) + ' <small style="display:inline">' + esc(nv) + '</small></span><span class="n">' + i.niv[nv] + "</span></button>";
@@ -151,18 +190,25 @@
 
   // ------------------------------------------------------------------ liste
   function texteRecherche(p) {
-    return [code(p), p.titre, "ind " + p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé n°" + p.controle_n : "", niveauNom(p.niveau), TYPES[p.type]].join(" ");
+    return [code(p), p.titre, "ind " + p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé sur place n°" + p.controle_n + " " + (p.controle_par || "") + " " + (p.controle_info || "") : "", niveauNom(p.niveau), TYPES[p.type]].join(" ");
+  }
+  // filtre des types cochés et de la recherche (sans la zone ni le niveau) : sert aussi aux compteurs du bandeau
+  function passeTypesRecherche() {
+    var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean), types = Object.keys(TYPESEL);
+    return function (g) {
+      if (types.length && !TYPESEL[g.d.type]) return false;
+      if (!mots.length) return true;
+      var t = plie(g.rows.map(texteRecherche).join(" "));
+      return mots.every(function (m) { return t.indexOf(m) >= 0; });
+    };
   }
   function filtres() {
-    var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean), types = Object.keys(TYPESEL);
+    var ok = passeTypesRecherche();
     return GROUPES.filter(function (g) {
       var p = g.d;
       if (ZONE && p.zone !== ZONE) return false;
       if (NIVEAU && p.niveau !== NIVEAU) return false;
-      if (types.length && !TYPESEL[p.type]) return false;
-      if (!mots.length) return true;
-      var t = plie(g.rows.map(texteRecherche).join(" "));
-      return mots.every(function (m) { return t.indexOf(m) >= 0; });
+      return ok(g);
     });
   }
   function trie(l) {
@@ -198,9 +244,8 @@
     return '<tr data-i="' + i + '" data-j="' + j + '" class="' + (ancien ? "ancien" : n > 1 ? "empile" : "") + (EDITE && EDITE.id === p.id ? " choisie" : "") + '">' +
       '<td class="code">' + pile + esc([p.projet, p.discipline, p.emetteur, p.phase].join("-")) + "-<b>" + esc([p.type, p.niveau, p.zone, p.numero].join("-")) + "</b></td>" +
       '<td class="ind">' + esc(p.indice) + (!ancien && n > 1 ? '<span class="nb-ind" title="' + n + ' indices">' + n + "</span>" : "") + '</td><td class="titre">' + esc(p.titre || "—") +
-      (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + "</td>" +
+      (ancien ? "" : "<small>" + esc((TYPES[p.type] || p.type) + " · " + niveauNom(p.niveau) + " · zone " + p.zone) + lienAssoc(g) + (p.remarque ? " · " + esc(p.remarque.slice(0, 80)) : "") + "</small>") + ligneCtrl(g, p) + "</td>" +
       '<td class="nw col-m">' + esc(dateFr(p.date_indice)) + '</td><td class="nw col-m">' + esc(p.auteur) + '</td><td class="col-m">' + (p.statut ? '<span class="pastille">' + esc(p.statut) + "</span> " : "") +
-      (p.controle_n ? '<span class="pastille ctrl" title="Contrôle d\'armatures avant bétonnage' + (p.controle_par ? " par " + esc(p.controle_par) : "") + '">✓ ctrl n°' + esc(p.controle_n) + (p.date_controle ? " · " + esc(dateFr(p.date_controle).slice(0, 5)) : "") + "</span> " : "") +
       (p.source === "manuel" ? '<span class="pastille manuel" title="Saisi à la main dans cet outil">manuel</span>' : "") + "</td></tr>";
   }
   function dessineListe() {
@@ -229,6 +274,8 @@
   }
   function dessine() { regroupe(); dessineZones(); dessineTypes(); dessineListe(); listes(); }
   $("#corps").addEventListener("click", function (e) {
+    if (e.target.closest("a")) return;
+    var va = e.target.closest(".assoc"); if (va) { vaA(va.dataset.va); return; }
     var b = e.target.closest(".pile");
     if (b) { var g = VUE[+b.dataset.pile]; if (OUVERTS[g.cle]) delete OUVERTS[g.cle]; else OUVERTS[g.cle] = 1; dessineListe(); return; }
     var tr = e.target.closest("tr"); if (tr) ouvre(VUE[+tr.dataset.i].rows[+tr.dataset.j]);
@@ -237,7 +284,7 @@
     var th = e.target.closest("th"); if (!th) return;
     TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : 1 }; dessineListe();
   });
-  $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(dessineListe, 120); });
+  $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(function () { dessineZones(); dessineListe(); }, 120); });
   document.addEventListener("keydown", function (e) {
     if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("#recherche").focus(); }
     if (e.key === "Escape") { if (!$("#f-plan").hidden) ferme("#f-plan"); else if (!$("#f-import").hidden) ferme("#f-import"); }
@@ -249,6 +296,7 @@
     remplit("#dl-niveaux", uniques("niveau").concat(Object.keys(NIVEAUX)).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(), niveauNom);
     remplit("#dl-zones", uniques("zone"));
     remplit("#dl-auteurs", uniques("auteur"));
+    remplit("#dl-lis", GROUPES.filter(function (g) { return g.d.type === "LIS"; }).map(function (g) { return [g.d.type, g.d.niveau, g.d.zone, g.d.numero].join("-"); }).sort(), function (v) { var g = GROUPES.filter(function (x) { return [x.d.type, x.d.niveau, x.d.zone, x.d.numero].join("-") === v; })[0]; return g ? g.d.titre : ""; });
   }
 
   // ------------------------------------------------------------------ fiche
@@ -258,7 +306,7 @@
   document.querySelectorAll(".voile").forEach(function (v) { v.addEventListener("mousedown", function (e) { if (e.target === v) ferme("#" + v.id); }); });
   function ouvre(p) {
     EDITE = p || null;
-    var d = p || { projet: "FGH", discipline: "STR", emetteur: "ABI", phase: "51", type: Object.keys(TYPESEL)[0] || "PLA", niveau: NIVEAU || "", zone: ZONE || "", numero: "", indice: "00", titre: "", date_indice: aujourdhui(), auteur: lsGet("fgh.nom") || "", statut: "", remarque: "", controle_n: "", date_controle: "", controle_par: "" };
+    var d = p || { projet: "FGH", discipline: "STR", emetteur: "ABI", phase: "51", type: Object.keys(TYPESEL)[0] || "PLA", niveau: NIVEAU || "", zone: ZONE || "", numero: "", indice: "00", titre: "", date_indice: aujourdhui(), auteur: lsGet("fgh.nom") || "", statut: "", remarque: "", controle_n: "", date_controle: "", controle_par: "", liste_assoc: "" };
     CHAMPS.forEach(function (k) { F.elements[k].value = d[k] == null ? "" : d[k]; });
     $("#fp-titre").textContent = p ? "Modifier l'indice " + p.indice : "Nouveau plan";
     $("#fp-suppr").hidden = !p; $("#fp-indice").hidden = !p;
@@ -269,7 +317,7 @@
   function lit() {
     var o = {};
     CHAMPS.forEach(function (k) { o[k] = String(F.elements[k].value || "").trim(); });
-    ["projet", "discipline", "emetteur", "phase", "type", "zone"].forEach(function (k) { o[k] = o[k].toUpperCase(); });
+    ["projet", "discipline", "emetteur", "phase", "type", "zone", "liste_assoc"].forEach(function (k) { o[k] = o[k].toUpperCase(); });
     o.date_indice = o.date_indice || null; o.date_controle = o.date_controle || null;
     return o;
   }
@@ -299,13 +347,13 @@
       $("#f-plan").hidden = true; EDITE = null; dessine();
     }).catch(function (err) { toast(err.message, 5000); }).then(function () { b.disabled = false; });
   });
-  $("#fp-suppr").addEventListener("click", function () {
-    if (!EDITE || !confirm("Supprimer l'indice " + EDITE.indice + " du plan " + code(EDITE) + " ?\nLes autres indices du plan restent. Cette suppression vaut pour tout le monde.")) return;
-    var p = EDITE;
+  function supprime(p) {
+    if (!p || !confirm("Supprimer l'indice " + p.indice + " du plan " + code(p) + " ?\nLes autres indices du plan restent. Cette suppression vaut pour tout le monde.")) return;
     appel(TABLE + "?id=eq." + encodeURIComponent(p.id), { methode: "DELETE" }).then(function () {
-      PLANS = PLANS.filter(function (x) { return x !== p; }); $("#f-plan").hidden = true; EDITE = null; dessine(); toast("Indice supprimé");
+      PLANS = PLANS.filter(function (x) { return x.id !== p.id; }); $("#f-plan").hidden = true; EDITE = null; dessine(); toast("Indice supprimé");
     }).catch(function (err) { toast(err.message, 5000); });
-  });
+  }
+  $("#fp-suppr").addEventListener("click", function () { supprime(EDITE); });
   // Nouvel indice : une nouvelle ligne, copiée de l'indice le plus avancé du plan ; l'ancien reste empilé dessous
   $("#fp-indice").addEventListener("click", function () {
     if (!EDITE) return;
@@ -321,6 +369,40 @@
     majCode(); F.elements.titre.focus();
   });
   $("#btn-nouveau").addEventListener("click", function () { ouvre(null); });
+
+  // ------------------------------------------------------------------ clic droit sur une ligne
+  // (appui long au téléphone : le navigateur envoie le même événement)
+  var MENU = $("#menu-ligne"), MENU_P = null;
+  function fermeMenu() { MENU.hidden = true; MENU_P = null; document.querySelectorAll("tr.menu-ici").forEach(function (t) { t.classList.remove("menu-ici"); }); }
+  $("#corps").addEventListener("contextmenu", function (e) {
+    var tr = e.target.closest("tr"); if (!tr) return;
+    e.preventDefault(); fermeMenu();
+    var g = VUE[+tr.dataset.i], p = g.rows[+tr.dataset.j]; MENU_P = p; tr.classList.add("menu-ici");
+    $("#ml-tete").textContent = [p.type, p.niveau, p.zone, p.numero].join("-") + " · ind. " + p.indice;
+    $("#ml-arm").querySelector("small").textContent = /^(ARM|LIS)$/.test(p.type) ? "ouvre ARM avec la fiche préremplie" : "plan " + p.type + " : à compléter dans ARM";
+    MENU.hidden = false;
+    var w = MENU.offsetWidth, h = MENU.offsetHeight;
+    MENU.style.left = Math.max(4, Math.min(e.clientX, innerWidth - w - 4)) + "px";
+    MENU.style.top = Math.max(4, Math.min(e.clientY, innerHeight - h - 4)) + "px";
+    MENU.querySelector("button").focus();
+  });
+  document.addEventListener("mousedown", function (e) { if (!MENU.hidden && !MENU.contains(e.target)) fermeMenu(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !MENU.hidden) fermeMenu(); });
+  $("#defile").addEventListener("scroll", function () { if (!MENU.hidden) fermeMenu(); });
+  MENU.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-a]"); if (!b || !MENU_P) return;
+    var p = MENU_P, a = b.dataset.a; fermeMenu();
+    if (a === "indice") { ouvre(p); $("#fp-indice").click(); }
+    else if (a === "modifier") ouvre(p);
+    else if (a === "supprimer") supprime(p);
+    else if (a === "copier") { var t = code(p) + " ind. " + p.indice; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast("Copié : " + t); }, function () { prompt("Code :", t); }); }
+    else if (a === "arm") versArm(p);
+  });
+  // Fiche de contrôle d'armature : ARM s'ouvre sur un nouveau contrôle, plan lié et champs remplis
+  function versArm(p) {
+    var d = { id: p.id, projet: p.projet, discipline: p.discipline, type: p.type, niveau: p.niveau, zone: p.zone, numero: p.numero, indice: p.indice, titre: p.titre };
+    location.href = "/fgh/arm/#pln=" + encodeURIComponent(JSON.stringify(d));
+  }
   function nom() {
     var n = lsGet("fgh.nom");
     if (n) return n;

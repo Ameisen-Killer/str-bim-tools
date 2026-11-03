@@ -388,19 +388,49 @@ async function plnFetch(path,o={}){const h={apikey:PLN.cle};if(o.body)h['Content
 async function loadPLN(silent){if(!S)return;if(!silent)busy(true,'Lecture de la liste FGH…');
   try{let all=[];for(let d=0;;d+=1000){const l=await plnFetch('fgh_plans?select=*&order=type,niveau,zone,numero',{range:d+'-'+(d+999)});all=all.concat(l||[]);if(!l||l.length<1000)break;}
     const rows=all.map(p=>({row:0,id:p.id,type:p.type,etage:PLN_ETAGE[p.niveau]??p.niveau,niveau:p.niveau,zone:p.zone,numero:p.numero,indice:p.indice,code:[p.projet,p.discipline,p.type,p.numero].join('-'),
-      titre:p.titre,date_indice:frIso(p.date_indice),statut:p.statut,controle:p.controle_n?'oui':'',date_controle:frIso(p.date_controle)}));
+      titre:p.titre,date_indice:frIso(p.date_indice),statut:p.statut,controle:p.controle_n?'oui':'',date_controle:frIso(p.date_controle),assoc:p.liste_assoc||''}));
     if(!rows.length)throw new Error('La liste FGH est vide : importe l\'export Kairnial dans /fgh/pln/.');
     PLANS={loaded:nowStamp(),ts:Date.now(),file:'Liste des plans FGH (en ligne)',rows,src:'pln'};S.plansSrc='pln';await DB.kvSet('plans:'+S.id,PLANS);saveProjects();if(!silent)toast(rows.length+' plans lus dans la liste FGH');}
   catch(e){if(silent)console.warn(e);else alert(e.message);}
   if(!silent)busy(false);renderConn();renderHome();}
 // plans ARM et LIS liés au contrôle : notés « contrôlés » dans la liste FGH (n°, date, auteur)
 async function plnMark(c,quiet){if(!c||!c.marquer_plans)return;const L=(c.plans||[]).filter(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()));if(!L.length)return;
-  try{await plnFetch('fgh_plans?id=in.('+L.map(p=>p.id).join(',')+')',{method:'PATCH',prefer:'return=minimal',body:{controle_n:String(c.numero||''),date_controle:isoFr(c.date),controle_par:c.auteur||S.auteur||'',modifie_par:c.auteur||S.auteur||''}});
+  const base={controle_n:String(c.numero||''),date_controle:isoFr(c.date),controle_par:c.auteur||S.auteur||'',modifie_par:c.auteur||S.auteur||''},q='fgh_plans?id=in.('+L.map(p=>p.id).join(',')+')';
+  const plus=Object.assign({},base,{controle_info:[c.ouvrage,c.localisation,c.description].filter(Boolean).join(' · ').slice(0,200),controle_lien:c.pdfUrl||''});
+  try{try{await plnFetch(q,{method:'PATCH',prefer:'return=minimal',body:plus});}
+    catch(e){if(!/controle_(info|lien)|schema cache/i.test(e.message))throw e;await plnFetch(q,{method:'PATCH',prefer:'return=minimal',body:base});}
     c.plnMarkedAt=nowStamp();c.plnPending=false;await DB.put('ctrl',c);
     if(PLANS&&PLANS.src==='pln'){L.forEach(p=>{const r=PLANS.rows.find(x=>x.id===p.id);if(r){r.controle='oui';r.date_controle=c.date;}});DB.kvSet('plans:'+S.id,PLANS);}
     if(!quiet)toast(L.length+' plan(s) marqué(s) contrôlé(s) dans la liste FGH');}
   catch(e){c.plnPending=true;await DB.put('ctrl',c);if(!quiet)toast(e.message+' : nouvel essai au retour du réseau',4000);}
   if(CUR===c&&!$('#vWiz').classList.contains('hidden'))renderStep();}
+async function depuisPLN(){const m=/^#(pln|ctrl)=(.+)$/.exec(location.hash);if(!m)return;history.replaceState(null,'',location.pathname+location.search);
+  if(String(S.numero)!=='6848'){const p=PROJECTS.find(x=>String(x.numero)==='6848');if(p)await setProject(p.id);}
+  if(m[1]==='ctrl'){const n=decodeURIComponent(m[2]),c=projCtrls().find(x=>String(x.numero)===n);
+    if(c)return openCtrl(c.id,true);return toast('Le contrôle n°'+n+' n\'est pas sur cet appareil (il a été saisi sur un autre).',5000);}
+  let d;try{d=JSON.parse(decodeURIComponent(m[2]));}catch(e){return;}
+  if(!PLANS||PLANS.src!=='pln'||Date.now()-(PLANS.ts||0)>60000)await loadPLN(true);
+  const rows=PLANS&&PLANS.src==='pln'?PLANS.rows:[],T=String(d.type||'').toUpperCase();
+  const r=rows.find(x=>x.id===d.id)||{id:d.id,type:T,etage:PLN_ETAGE[d.niveau]??d.niveau,niveau:d.niveau,zone:d.zone,numero:d.numero,indice:d.indice,code:[d.projet||'FGH',d.discipline||'STR',T,d.numero].join('-'),titre:d.titre||''};
+  const c=newCtrl();c.marquer_plans=true;c.plans=[];
+  const lier=(f,x)=>{c[f]=planLabel(x);c.plans.push({field:f,type:x.type,numero:x.numero,indice:x.indice,code:x.code,id:x.id,titre:x.titre});};
+  const champ=Object.keys(TYPESETS).find(f=>TYPESETS[f].includes(T))||'plan_armatures';lier(champ,r);
+  // plan d'armatures <-> liste associée : celle choisie dans la liste des plans, sinon même niveau, zone et n°
+  const derniers=latestByLivrable(rows),cleA=a=>{const m=/(?:^|-)LIS-(\w+)-(\w+)-(\w+)\s*$/i.exec(String(a||'').trim());return m?[m[1],m[2].toUpperCase(),m[3]].join('|'):'';};
+  const cleR=x=>[x.niveau,x.zone,x.numero].join('|');
+  Object.keys(TYPESETS).filter(f=>f!==champ).forEach(f=>{const L=derniers.filter(x=>TYPESETS[f].includes(String(x.type).toUpperCase()));let y=null;
+    if(T==='ARM'&&f==='listes'&&cleA(r.assoc))y=L.find(x=>cleR(x)===cleA(r.assoc));
+    if(!y&&T==='LIS'&&f==='plan_armatures')y=L.find(x=>cleA(x.assoc)===cleR(r));
+    if(!y)y=L.find(x=>cleR(x)===cleR(r)&&!(f==='plan_armatures'&&cleA(x.assoc)));
+    if(y)lier(f,y);});
+  const t=String(r.titre||'');let desc=t,av;do{av=desc;desc=desc.replace(/[\s\-–_]+(arm|armatures?|plan|lis|listes?(\s+de\s+fers)?|coffrage|elv)\s*$/i,'').trim();}while(desc!==av&&desc);
+  c.description=desc||t;
+  const n=norm(t),O=[[/radier/,'Radier'],[/dalle/,'Dalle'],[/voile|elevation/,'Voile'],[/\bmur/,'Mur'],[/poteau/,'Poteau'],[/poutre|sommier/,'Poutre'],[/escalier/,'Escalier'],[/fondation|semelle|pieu/,'Fondation']];
+  const o=O.find(([re])=>re.test(n));if(o)c.ouvrage=o[1];
+  const noy=/noyau\s+([a-z])\b/i.exec(t),et=PLN_ETAGE[r.niveau]??'';c.localisation=((noy?'Noyau '+noy[1].toUpperCase():r.zone&&r.zone!=='TTZ'?'Zone '+r.zone:'')+' '+et).trim().slice(0,20);
+  CTRLS.push(c);await DB.put('ctrl',c);await openCtrl(c.id,false);if(c.ouvrage)applyOuvrage(false);save();
+  toast('Fiche préremplie depuis '+planLabel(r)+(c.plans.length>1?' (+'+(c.plans.length-1)+' plan(s) voisin(s) à vérifier)':''),5000);}
+window.addEventListener('hashchange',()=>{if(S)depuisPLN();});
 async function plnRetry(){if(!navigator.onLine)return;for(const c of CTRLS.filter(x=>x.plnPending))await plnMark(c,true);}
 const cellStr=v=>v==null?'':v instanceof Date?fmt(v):String(v).trim();
 function xDate(v){if(v==null||v==='')return'';if(v instanceof Date)return fmt(v);const n=Number(v);if(!isNaN(n)&&n>20000&&n<80000){const d=new Date(Date.UTC(1899,11,30)+n*864e5);return pad(d.getUTCDate())+'.'+pad(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();}return String(v).trim();}
@@ -900,10 +930,10 @@ async function resolveLink(key,P=S){const link=(P.links||{})[key];if(!link)throw
   const it=await(await gfetch('/shares/'+shareId(link)+'/driveItem')).json();const o={link,driveId:it.parentReference.driveId,itemId:it.id,name:it.name};P.res[key]=o;saveProjects();return o;}
 async function downloadLinked(key){const f=await resolveLink(key);const r=await gfetch(`/drives/${f.driveId}/items/${f.itemId}/content`);return new File([await r.blob()],f.name);}
 async function uploadTo(P,key,relPath,blob){const f=await resolveLink(key,P);const path=relPath.split('/').map(encodeURIComponent).join('/');
-  if(blob.size<=4*1024*1024){await gfetch(`/drives/${f.driveId}/items/${f.itemId}:/${path}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',body:blob});return;}
+  if(blob.size<=4*1024*1024)return(await gfetch(`/drives/${f.driveId}/items/${f.itemId}:/${path}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',body:blob})).json().catch(()=>null);
   const ses=await(await gfetch(`/drives/${f.driveId}/items/${f.itemId}:/${path}:/createUploadSession`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'replace'}})})).json();
   const CH=327680*10;for(let o=0;o<blob.size;o+=CH){const e=Math.min(o+CH,blob.size);const r=await fetch(ses.uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes ${o}-${e-1}/${blob.size}`},body:blob.slice(o,e)});
-    if(!r.ok)throw new Error('Envoi interrompu (erreur '+r.status+')');}}
+    if(!r.ok)throw new Error('Envoi interrompu (erreur '+r.status+')');if(e>=blob.size)return r.json().catch(()=>null);}}
 function renderM365(){const b=$('#m365');if(!b)return;const ok=!!ACCOUNT;
   b.innerHTML=`<div class="hd"><span class="dot ${ok?'ok':MSAL?'wip':'ko'}"></span><div class="t"><b>${ok?esc(ACCOUNT.username):MSAL?'Non connecté':'Non configuré'}</b>
    <div class="muted">${ok?'Envoi et actualisation automatiques actifs.':'Sans compte : envoi par Partager / téléchargement.'}</div></div></div>
@@ -936,11 +966,13 @@ async function flush(){if(FLUSHING||!navigator.onLine||!ACCOUNT)return refreshSe
   try{const items=(await DB.all('outbox')).filter(i=>i.status!=='done').sort((a,b)=>a.created-b.created);const touched=new Set();
     for(const it of items){if(!navigator.onLine)break;const P=PROJECTS.find(p=>p.id===it.projectId);if(!P)continue;touched.add(it.ctrlId);
       try{if(it.kind==='mail'){await gfetch('/me/sendMail',{method:'POST',headers:{'Content-Type':'application/json'},body:await it.blob.text()});await DB.del('outbox',it.id);const st=nowStamp();for(const id of it.ctrlIds||[]){const c=CTRLS.find(x=>x.id===id);if(c){c.mailedAt=st;await DB.put('ctrl',c);}}toast('Mail envoyé');continue;}
-        await uploadTo(P,it.dest,it.path,it.blob);await DB.del('outbox',it.id);}
+        const up=await uploadTo(P,it.dest,it.path,it.blob);
+        if(it.dest==='fiches'&&/\.pdf$/i.test(it.path)&&up&&up.webUrl){const c=CTRLS.find(x=>x.id===it.ctrlId);if(c){c.pdfUrl=up.webUrl;await DB.put('ctrl',c);}}
+        await DB.del('outbox',it.id);}
       catch(e){it.tries++;it.status='error';it.err=e.message;await DB.put('outbox',it);const c=CTRLS.find(x=>x.id===it.ctrlId);if(c){c.sendState='error';c.sendErr=e.message;await DB.put('ctrl',c);}
         if(/Microsoft 365 : erreur 401|expirée|Non connecté/.test(e.message))break;}}
     const left=await DB.all('outbox');
-    for(const id of touched){const c=CTRLS.find(x=>x.id===id);if(c&&!left.some(i=>i.ctrlId===id)){c.sendState='';c.sendErr='';c.sentAt=nowStamp();await DB.put('ctrl',c);toast('n°'+c.numero+' envoyé');}}}
+    for(const id of touched){const c=CTRLS.find(x=>x.id===id);if(c&&!left.some(i=>i.ctrlId===id)){c.sendState='';c.sendErr='';c.sentAt=nowStamp();await DB.put('ctrl',c);toast('n°'+c.numero+' envoyé');if(c.marquer_plans&&c.pdfUrl)plnMark(c,true);}}}
   finally{FLUSHING=false;refreshSendUI();}}
 async function renderSendLine(){const n=(await DB.all('outbox')).length;const el=$('#sendLine');if(!el)return;
   el.innerHTML=n?`↑ <b style="color:var(--warn)">${n} élément(s) en attente d'envoi</b> · ${navigator.onLine?(ACCOUNT?'envoi en cours':'connexion Microsoft 365 requise'):'hors ligne'}`:(ACCOUNT?'Envois : <b>✓</b> à jour':'');}
@@ -1077,7 +1109,7 @@ if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(locatio
   PROJECTS.forEach(p=>{p.links=Object.assign({index:'',plans:'',photos:'',fiches:''},p.links||{});p.res=p.res||{};p.conn=Object.assign(clone(CONN_DEF),p.conn||{});});
   for(const c of CTRLS)if(!c.projectId){c.projectId=PROJECTS[0].id;await DB.put('ctrl',c);}
   await setProject(lsGet('ca-proj',null)||PROJECTS[0].id);
-  await msalInit();refreshSendUI();flush();autoRefresh();
+  await msalInit();refreshSendUI();flush();autoRefresh();depuisPLN();
   if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>

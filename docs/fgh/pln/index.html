@@ -185,6 +185,28 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
 .detail div{padding:2px 0;font-family:var(--mono)}
 .detail div em{font-style:normal;color:var(--or)}
 .muet{color:var(--texte-faible);font-size:12px}
+.menu-ligne{position:fixed;z-index:60;min-width:260px;padding:4px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre)}
+.menu-ligne .ml-tete{padding:6px 10px 6px;font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
+.menu-ligne button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;border-radius:4px;background:none;cursor:pointer;text-align:left;color:var(--texte)}
+.menu-ligne button:hover,.menu-ligne button:focus-visible{background:var(--controle-survol);outline:none}
+.menu-ligne button svg{width:16px;height:16px;flex:none;color:var(--or)}
+.menu-ligne button span small{display:block;font-size:11px;color:var(--texte-faible)}
+.menu-ligne button.danger,.menu-ligne button.danger svg{color:var(--rouge)}
+.menu-ligne .ml-sep{height:1px;background:var(--ligne);margin:4px 2px}
+tr.menu-ici td{background:var(--choisie)}
+.ctrl-ligne{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:4px;padding:3px 8px;border-radius:6px;background:rgba(var(--or-rvb),.12);color:var(--or);font-size:12px;font-weight:600;line-height:18px;width:fit-content;max-width:100%}
+.ctrl-ligne svg{width:14px;height:14px;flex:none}
+.ctrl-ligne span{font-weight:600}
+.ctrl-ligne.autre{background:var(--controle);color:var(--texte-doux);font-weight:400}
+.ctrl-ligne.autre span{font-weight:400}
+.ctrl-ligne a{padding:0 7px;border-radius:9px;border:1px solid currentColor;color:inherit;text-decoration:none;font-size:11px;font-weight:600}
+.ctrl-ligne a:hover{background:var(--or);border-color:var(--or);color:var(--sur-accent)}
+.assoc{display:inline-flex;align-items:center;gap:3px;padding:0 6px 0 4px;border:1px solid var(--bord-controle);border-radius:9px;background:var(--controle);color:var(--or);font:inherit;font-size:11px;line-height:16px;cursor:pointer;vertical-align:baseline}
+.assoc:hover{border-color:var(--or)}
+.assoc svg{width:12px;height:12px}
+.zone .n.zero{opacity:.45}
+@keyframes eclair{0%,40%{background:rgba(var(--or-rvb),.28)}100%{background:transparent}}
+tr.eclair td{animation:eclair 1.6s ease-out}
 #toast{position:fixed;left:50%;bottom:24px;z-index:90;transform:translateX(-50%) translateY(20px);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;background:var(--couche-2);color:var(--texte);border:1px solid var(--ligne);box-shadow:var(--ombre);padding:10px 16px;border-radius:6px;max-width:90vw}
 #toast.on{opacity:1;transform:translateX(-50%)}
 #occupe{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600}
@@ -255,6 +277,7 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
         <label>Contrôle arm. n°<input class="champ" name="controle_n" maxlength="20" inputmode="numeric" title="Rempli par l'outil ARM à l'envoi d'un contrôle"></label>
         <label>Date du contrôle<input class="champ" name="date_controle" type="date"></label>
         <label class="l2">Contrôlé par<input class="champ" name="controle_par" maxlength="100"></label>
+        <label class="l4">Liste associée (plans d'armatures)<input class="champ" name="liste_assoc" list="dl-lis" maxlength="60" placeholder="Vide = la liste de même niveau, zone et n° (ex. LIS-060-A01-1521)" title="À remplir seulement si la liste n'a pas le même n° que le plan"></label>
       </div>
       <div class="alerte" id="fp-alerte" hidden></div>
       <p class="muet" id="fp-trace"></p>
@@ -282,12 +305,21 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
   </div>
 </div>
 
-<datalist id="dl-types"></datalist><datalist id="dl-niveaux"></datalist><datalist id="dl-zones"></datalist><datalist id="dl-auteurs"></datalist>
+<datalist id="dl-types"></datalist><datalist id="dl-niveaux"></datalist><datalist id="dl-zones"></datalist><datalist id="dl-auteurs"></datalist><datalist id="dl-lis"></datalist>
 <datalist id="dl-statuts"><option value="En cours"><option value="Diffusé"><option value="Bon pour exécution"><option value="Visé"><option value="En attente"><option value="Annulé"></datalist>
 <input type="file" id="fichier" accept=".xlsx,.xls" hidden>
+<div class="menu-ligne" id="menu-ligne" role="menu" hidden>
+  <div class="ml-tete" id="ml-tete"></div>
+  <button type="button" role="menuitem" data-a="indice"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Ajouter un indice à ce plan</button>
+  <button type="button" role="menuitem" data-a="modifier"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13l1-3.5 7-7 2.5 2.5-7 7zM9.5 4l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Modifier cet indice</button>
+  <button type="button" role="menuitem" data-a="arm" id="ml-arm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="1.5" width="11" height="13" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M5 6h6M5 9h6M5 12h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg><span>Fiche de contrôle d'armature<small></small></span></button>
+  <button type="button" role="menuitem" data-a="copier"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M3 11V3a1 1 0 0 1 1-1h6" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>Copier le code</button>
+  <div class="ml-sep"></div>
+  <button type="button" role="menuitem" data-a="supprimer" class="danger"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 9h5.8l.6-9" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Supprimer cet indice</button>
+</div>
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=3"></script>
+<script src="/fgh/pln/pln.js?v=5"></script>
 </body>
 </html>
