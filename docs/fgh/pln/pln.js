@@ -23,7 +23,7 @@
   var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par", "liste_assoc"];
 
   var $ = function (s) { return document.querySelector(s); };
-  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, TRI = { col: "date", sens: -1 }, VUE = [], EDITE = null;
+  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, NEUFS = false, TRI = { col: "date", sens: -1 }, VUE = [], EDITE = null;
 
   // ------------------------------------------------------------------ outils
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -143,8 +143,11 @@
   function zonesInfos() {
     var z = {}, ok = passeTypesRecherche();
     GROUPES.forEach(function (g) {
-      var p = g.d, k = p.zone || "?"; z[k] = z[k] || { n: 0, noyaux: {}, niv: {} };
-      if (ok(g)) { z[k].n++; z[k].niv[p.niveau] = (z[k].niv[p.niveau] || 0) + 1; }
+      var p = g.d, k = p.zone || "?"; z[k] = z[k] || { n: 0, neufs: 0, noyaux: {}, niv: {}, nivNeufs: {} };
+      if (ok(g)) {
+        z[k].n++; z[k].niv[p.niveau] = (z[k].niv[p.niveau] || 0) + 1;
+        if (neuf(p)) { z[k].neufs++; z[k].nivNeufs[p.niveau] = (z[k].nivNeufs[p.niveau] || 0) + 1; }
+      }
       var m, re = /noyau\s+([A-Z])\b/gi; while ((m = re.exec(p.titre || ""))) z[k].noyaux[m[1].toUpperCase()] = 1;
     });
     return z;
@@ -155,15 +158,16 @@
     if (n.length) return (n.length > 1 ? "Noyaux " : "Noyau ") + n.join(" · ");
     return "";
   }
+  function pastilleNeufs(n) { return n ? '<span class="n-neufs" title="' + n + ' plan(s) déposé(s) depuis moins de 7 jours">+' + n + "</span>" : ""; }
   function dessineZones() {
     var Z = zonesInfos(), cles = Object.keys(Z).sort(function (a, b) { return (a === "TTZ") - (b === "TTZ") || a.localeCompare(b); });
     var h = '<button type="button" class="zone" data-z="" aria-current="' + (!ZONE) + '"><span class="nom"><b>Toutes les zones</b></span><span class="n">' + GROUPES.filter(passeTypesRecherche()).length + "</span></button><div class=\"sep-zones\"></div>";
     cles.forEach(function (k) {
       var i = Z[k], st = sousTitreZone(k, i), ici = ZONE === k;
-      h += '<button type="button" class="zone" data-z="' + esc(k) + '" aria-current="' + (ici && !NIVEAU) + '"><span class="nom"><b>Zone ' + esc(k) + "</b>" + (st ? "<small>" + esc(st) + "</small>" : "") + '</span><span class="n' + (i.n ? "" : " zero") + '">' + i.n + "</span></button>";
+      h += '<button type="button" class="zone" data-z="' + esc(k) + '" aria-current="' + (ici && !NIVEAU) + '"><span class="nom"><b>Zone ' + esc(k) + "</b>" + (st ? "<small>" + esc(st) + "</small>" : "") + "</span>" + pastilleNeufs(i.neufs) + '<span class="n' + (i.n ? "" : " zero") + '">' + i.n + "</span></button>";
       if (ici) {
         h += '<div class="niveaux">' + Object.keys(i.niv).sort().map(function (nv) {
-          return '<button type="button" class="zone" data-z="' + esc(k) + '" data-n="' + esc(nv) + '" aria-current="' + (NIVEAU === nv) + '"><span class="nom">' + esc(niveauNom(nv)) + ' <small style="display:inline">' + esc(nv) + '</small></span><span class="n">' + i.niv[nv] + "</span></button>";
+          return '<button type="button" class="zone" data-z="' + esc(k) + '" data-n="' + esc(nv) + '" aria-current="' + (NIVEAU === nv) + '"><span class="nom">' + esc(niveauNom(nv)) + ' <small style="display:inline">' + esc(nv) + "</small></span>" + pastilleNeufs(i.nivNeufs[nv]) + '<span class="n">' + i.niv[nv] + "</span></button>";
         }).join("") + "</div>";
       }
     });
@@ -205,6 +209,7 @@
   function passeTypesRecherche() {
     var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean).map(joker), types = Object.keys(TYPESEL);
     return function (g) {
+      if (NEUFS && !neuf(g.d)) return false;
       if (types.length && !TYPESEL[g.d.type]) return false;
       if (!mots.length) return true;
       var t = plie(g.rows.map(texteRecherche).join(" "));
@@ -232,12 +237,14 @@
   function dessineTypes() {
     var c = {};
     GROUPES.forEach(function (g) { var p = g.d; if ((!ZONE || p.zone === ZONE) && (!NIVEAU || p.niveau === NIVEAU)) c[p.type] = (c[p.type] || 0) + 1; });
-    $("#types").innerHTML = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (t) {
+    var nN = GROUPES.filter(function (g) { return (!ZONE || g.d.zone === ZONE) && (!NIVEAU || g.d.niveau === NIVEAU) && neuf(g.d); }).length;
+    $("#types").innerHTML = '<button type="button" class="b-neufs" data-neuf="1" aria-pressed="' + NEUFS + '" title="Plans déposés depuis moins de 7 jours">Nouveaux<i>' + nN + "</i></button>" + Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (t) {
       return '<button type="button" data-t="' + esc(t) + '" aria-pressed="' + !!TYPESEL[t] + '" title="' + esc(TYPES[t] || t) + '">' + esc(t) + "<i>" + c[t] + "</i></button>";
     }).join("");
   }
   $("#types").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.neuf) { NEUFS = !NEUFS; dessine(); return; }
     var t = b.dataset.t; if (TYPESEL[t]) delete TYPESEL[t]; else TYPESEL[t] = 1;
     dessine();
   });
@@ -526,6 +533,7 @@
   function libelleVue() {
     var b = [];
     if (ZONE) b.push("Zone " + ZONE + (NIVEAU ? " · " + niveauNom(NIVEAU) : ""));
+    if (NEUFS) b.push("Nouveaux (moins de 7 jours)");
     var t = Object.keys(TYPESEL); if (t.length) b.push(t.join(", "));
     if ($("#recherche").value.trim()) b.push("« " + $("#recherche").value.trim() + " »");
     return b.join(" · ") || "Tous les plans";
