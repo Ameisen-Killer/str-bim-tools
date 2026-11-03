@@ -1,4 +1,4 @@
-/* Visas — briques d'interface et stockage de l'outil (/visas/).
+/* Visas — briques d'interface et stockage de l'outil (/fgh/vis/).
    Reprises de la planification au moment où Visas en est sorti (01.10.2026),
    réduites à ce que la page utilise : barre, thème, messages, fenêtre,
    recherche, impression, tableaux lisibles sur téléphone.
@@ -163,7 +163,7 @@
     { v: "clair", l: "Clair" },
     { v: "systeme", l: "Système" }
   ];
-  var FOND_THEME = { clair: "#F3F0E8", sombre: "#050505" };
+  var FOND_THEME = { clair: "#F4F5F2", sombre: "#121410" };
   var CLE_THEME = "visas.theme";
   var mediaClair = global.matchMedia ? global.matchMedia("(prefers-color-scheme: light)") : null;
 
@@ -254,11 +254,9 @@
     hote.appendChild(el("div", { class: "barre" }, [
       el("div", { class: "barre-h" }, [
         el("div", { class: "fil" }, [
-          el("span", { class: "marque" }, [
-            el("a", { href: "/", text: "STR Bim Tools" }),
-            el("span", { class: "sep", text: "·" })
-          ]),
-          el("a", { href: "/visas/", class: "ici", text: "Visas" })
+          el("a", { href: "/fgh/", class: "menu-fair", title: "Retour au menu Fairmont", "aria-label": "Retour au menu Fairmont", html: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>' }),
+          el("img", { class: "logo-ab", src: "/fgh/logo-ab.jpg?v=1", alt: "AB", width: "36", height: "34" }),
+          el("a", { href: "/fgh/vis/", class: "ici", text: "Visas" })
         ]),
         el("div", { class: "barre-outils" }, [actionsPage, menuTheme()])
       ])
@@ -314,7 +312,7 @@
     if (!hote) return;
     vide(hote);
     hote.appendChild(el("footer", { class: "pied-outil" }, [
-      el("a", { href: "/", text: "← str-bim-tools.com" }),
+      el("a", { href: "/fgh/", text: "← Menu Fairmont" }),
       el("div", { class: "droite" }, [
         el("span", { text: "Exports partagés · base hébergée en Europe (Francfort)" }),
         el("a", { href: "/mentions-legales/", text: "Mentions légales" })

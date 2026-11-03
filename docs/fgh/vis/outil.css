@@ -1,4 +1,4 @@
-/* Visas — feuille de style de l'outil (/visas/).
+/* Visas — feuille de style de l'outil (/fgh/vis/, charte AB depuis le 03.11.2026).
    Reprise des briques de la planification au moment où Visas en est sorti
    (01.10.2026) : thèmes, barre, boutons, champs, tableaux, fenêtre, messages,
    recherche, téléphone et papier. Indépendante de /planif/ : la planification
@@ -15,16 +15,16 @@
   color-scheme:dark;
   --encre:236,232,224;          /* couleur du trait et du texte */
   --fond-rvb:5,5,5;
-  --or-rvb:214,168,92;
+  --or-rvb:156,203,82;
   --alerte-rvb:201,112,90;
 
-  --noir:#050505;               /* fond de page */
-  --noir-2:#0A0A0A;             /* fond des fenêtres, un cran au-dessus */
+  --noir:#121410;               /* fond de page */
+  --noir-2:#181B15;             /* fond des fenêtres, un cran au-dessus */
   --texte:#ECE8E0;
-  --or:#D6A85C;
+  --or:#9CCB52;
   --alerte:#C9705A;
   --voile:rgba(3,3,3,.78);      /* derrière les fenêtres */
-  --option-choisie:#2A2418;
+  --option-choisie:#26301A;
 
   /* Transparences calées pour un contraste d'au moins 4,5:1 (WCAG AA) sur le fond,
      y compris pour le texte « faible » : discret, mais toujours lisible. */
@@ -44,16 +44,16 @@
   color-scheme:light;
   --encre:22,19,15;
   --fond-rvb:243,240,232;
-  --or-rvb:122,83,18;
+  --or-rvb:77,122,28;
   --alerte-rvb:152,54,30;
 
-  --noir:#F3F0E8;
-  --noir-2:#FBFAF6;
-  --texte:#16130F;
-  --or:#7A5312;
+  --noir:#F4F5F2;
+  --noir-2:#FFFFFF;
+  --texte:#1D1D1B;
+  --or:#4D7A1C;
   --alerte:#98361E;
   --voile:rgba(22,19,15,.38);
-  --option-choisie:#EADBBE;
+  --option-choisie:#D5E8AC;
 
   --ligne:rgba(var(--encre),.22);
   --ligne-faible:rgba(var(--encre),.12);
@@ -97,7 +97,11 @@ p{margin:0}
 .barre-h a:hover{color:var(--or)}
 .barre-h .sep{color:var(--texte-faible);margin-inline:6px}
 .barre-h .ici{color:var(--or)}
-.fil{display:flex;align-items:baseline;flex-wrap:nowrap;min-width:0}
+.fil{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;min-width:0}
+.barre-h .menu-fair{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:-6px 0;color:var(--or)}
+.barre-h .menu-fair svg{width:20px;height:20px}
+.barre-h .menu-fair:hover{color:var(--texte)}
+.barre-h .logo-ab{display:block;width:36px;height:34px;margin:-6px 0;flex:none}
 
 /* À droite : les actions de la page, puis le thème */
 .barre-outils{display:flex;align-items:center;gap:18px;white-space:nowrap}
@@ -170,7 +174,7 @@ select option:checked{background:var(--option-choisie);color:var(--or)}
   flex:0 0 auto;display:inline-block;width:18px;height:18px;background-color:currentColor;
   -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;
 }
-.ico-export{--ico:url(/visas/icons/file_export.svg?v=1)}
+.ico-export{--ico:url(/fgh/vis/icons/file_export.svg?v=1)}
 
 /* --------------------------------------------------------- formulaires */
 .grille-champs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:18px 20px}
@@ -419,9 +423,9 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
   :root,:root[data-theme="sombre"],:root[data-theme="clair"]{
     --encre:22,19,15;
     --fond-rvb:255,255,255;
-    --or-rvb:122,83,18;
+    --or-rvb:77,122,28;
     --alerte-rvb:152,54,30;
-    --noir:#fff;--noir-2:#fff;--texte:#16130F;--or:#7A5312;--alerte:#98361E;
+    --noir:#fff;--noir-2:#fff;--texte:#16130F;--or:#4D7A1C;--alerte:#98361E;
     --ligne:rgba(var(--encre),.4);--ligne-faible:rgba(var(--encre),.22);
     --or-doux:rgba(var(--or-rvb),.8);
     --texte-doux:rgba(var(--encre),.88);--texte-faible:rgba(var(--encre),.7);
