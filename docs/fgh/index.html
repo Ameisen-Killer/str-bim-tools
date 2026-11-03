@@ -34,6 +34,12 @@
 }
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;background:var(--mica);color:var(--texte);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
+/* Filigrane : l'hôtel en fond, fixe, très atténué et fondu vers le haut dans le Mica */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:url("/fgh/fairmont-fond.jpg?v=1") center 70%/cover no-repeat;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 50%);mask-image:linear-gradient(to bottom,transparent 0%,#000 50%);
+  opacity:.16;filter:grayscale(.35)}
+:root[data-theme="clair"] body::before{opacity:.22;filter:grayscale(.2)}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--texte);outline-offset:2px;border-radius:8px}
 .barre{height:48px;display:flex;align-items:center;gap:12px;padding:0 10px 0 16px;white-space:nowrap;font-size:12px}
