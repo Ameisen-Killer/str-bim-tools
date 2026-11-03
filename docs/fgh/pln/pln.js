@@ -375,7 +375,7 @@
   $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(function () { dessineZones(); dessineListe(); }, 120); });
   document.addEventListener("keydown", function (e) {
     if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("#recherche").focus(); }
-    if (e.key === "Escape") { if (!$("#f-plan").hidden) ferme("#f-plan"); else if (!$("#f-import").hidden) ferme("#f-import"); }
+    if (e.key === "Escape") { if (!$("#f-plan").hidden) ferme("#f-plan"); else if (!$("#f-import").hidden) ferme("#f-import"); else if (!$("#f-apercu").hidden) ferme("#f-apercu"); }
   });
   function listes() {
     function remplit(id, vals, lib) { $(id).innerHTML = vals.map(function (v) { return '<option value="' + esc(v) + '">' + (lib ? esc(lib(v)) : ""); }).join(""); }
@@ -389,7 +389,7 @@
 
   // ------------------------------------------------------------------ fiche
   var F = $("#form-plan");
-  function ferme(s) { $(s).hidden = true; if (s === "#f-plan") { EDITE = null; dessineListe(); } }
+  function ferme(s) { $(s).hidden = true; if (s === "#f-plan") { EDITE = null; dessineListe(); } if (s === "#f-apercu") $("#fa-cadre").src = "about:blank"; }
   document.querySelectorAll("[data-ferme]").forEach(function (b) { b.addEventListener("click", function () { ferme("#" + b.closest(".voile").id); }); });
   document.querySelectorAll(".voile").forEach(function (v) { v.addEventListener("mousedown", function (e) { if (e.target === v) ferme("#" + v.id); }); });
   function ouvre(p) {
@@ -664,6 +664,24 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nomF; document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   }
+  // Enregistrer : fenêtre « Enregistrer sous » du système quand le navigateur la propose (Chrome, Edge), sinon téléchargement
+  function enregistre(blob, nomF) {
+    if (!window.showSaveFilePicker) { telecharge(blob, nomF); return Promise.resolve(true); }
+    var ext = nomF.split(".").pop(), types = { pdf: { description: "Document PDF", accept: { "application/pdf": [".pdf"] } },
+      xlsx: { description: "Classeur Excel", accept: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"] } } };
+    return window.showSaveFilePicker({ suggestedName: nomF, types: types[ext] ? [types[ext]] : undefined }).then(function (h) {
+      return h.createWritable().then(function (w) { return w.write(blob).then(function () { return w.close(); }); }).then(function () { toast("Enregistré : " + h.name); return true; });
+    }).catch(function (e) { if (e && e.name === "AbortError") return false; telecharge(blob, nomF); return true; });
+  }
+  var APERCU = null;
+  function apercu(blob, nomF, pages) {
+    if (APERCU) URL.revokeObjectURL(APERCU.url);
+    APERCU = { blob: blob, nom: nomF, url: URL.createObjectURL(blob) };
+    $("#fa-nom").textContent = nomF; $("#fa-info").textContent = pages + " page" + (pages > 1 ? "s" : "") + " · " + Math.max(1, Math.round(blob.size / 1024)) + " Ko";
+    $("#fa-cadre").src = APERCU.url + "#view=FitH"; $("#f-apercu").hidden = false;
+  }
+  $("#fa-enreg").addEventListener("click", function () { if (APERCU) enregistre(APERCU.blob, APERCU.nom).then(function (ok) { if (ok) ferme("#f-apercu"); }); });
+  $("#fa-ouvrir").addEventListener("click", function () { if (APERCU) window.open(APERCU.url, "_blank", "noopener"); });
   function logo() {
     return logo.p || (logo.p = fetch("/fgh/logo-ab.jpg?v=1").then(function (r) { return r.blob(); }).then(function (b) {
       return new Promise(function (ok) { var fr = new FileReader(); fr.onload = function () { ok(fr.result); }; fr.readAsDataURL(b); });
@@ -671,23 +689,25 @@
   }
   var BUREAUX = [["LAUSANNE", "021 614 20 00"], ["GENEVE", "022 349 80 88"], ["NYON", "022 363 76 10"], ["FRIBOURG", "026 321 35 55"]];
 
-  $("#btn-pdf").addEventListener("click", function () {
-    if (!VUE.length) { toast("Rien à exporter"); return; }
-    occupe(true, "Création du PDF…");
-    Promise.all([charge(LIBS.jspdf), logo()]).then(function (r) {
-      var img = r[1], d = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
-      var W = 297, M = 12, vert = [77, 122, 28], pale = [234, 242, 216], gris = [135, 134, 139];
-      var cols = [["Code", 62], ["Ind.", 11], ["Titre", 108], ["Niveau", 18], ["Date", 17], ["Auteur", 26], ["Statut · contrôle", 31]];
+  // PDF A4, paysage ou portrait ; colonnes adaptées à la largeur
+  var ORIENT = lsGet("fgh.pln.orient") === "portrait" ? "portrait" : "landscape", TOUS_IND = lsGet("fgh.pln.tousind") === "1";
+  function fairePdf(orient) {
+    return Promise.all([charge(LIBS.jspdf), logo()]).then(function (r) {
+      var img = r[1], d = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: orient });
+      var pay = orient === "landscape", W = pay ? 297 : 210, HP = pay ? 210 : 297, M = 12, BAS = HP - 10, vert = [77, 122, 28], pale = [234, 242, 216], gris = [135, 134, 139];
+      var cols = pay ? [["Code", 62, "code"], ["Ind.", 11, "ind"], ["Titre", 130, "titre"], ["Niveau", 18, "niv"], ["Date", 17, "date"], ["Statut · contrôle", 35, "statut"]]
+        : [["Code", 56, "code"], ["Ind.", 9, "ind"], ["Titre", 74, "titre"], ["Date", 16, "date"], ["Statut · contrôle", 31, "statut"]];
       var X = [M]; cols.forEach(function (c, i) { X[i + 1] = X[i] + c[1]; });
-      var y, page = 0, quand = dateFr(aujourdhui());
+      var iT = cols.findIndex(function (c) { return c[2] === "titre"; });
+      var y, quand = dateFr(aujourdhui());
       function T(s, x, yy, o) { o = o || {}; d.setFont("helvetica", o.b ? "bold" : "normal"); d.setFontSize(o.s || 8); d.setTextColor.apply(d, o.c || [0, 0, 0]); d.text(String(s == null ? "" : s), x, yy, o.a ? { align: o.a } : undefined); }
+      function court(t, w) { d.setFont("helvetica", "normal"); d.setFontSize(7); return d.splitTextToSize(t || "", w - 2)[0] || ""; }
       function entete() {
-        page++;
         d.addImage(img, "JPEG", M, 8, 13.2, 12.5);
         BUREAUX.forEach(function (b, i) { var yy = 11.2 + i * 3.2; T(b[0], M + 17, yy, { b: 1, s: 6.5 }); d.setFont("helvetica", "bold"); var w = d.getTextWidth(b[0]); T(" - T " + b[1], M + 17 + w, yy, { s: 6.5 }); });
         T("LISTE DES PLANS", W - M, 12.5, { b: 1, s: 12, a: "right" });
         T(PROJET, W - M, 17.5, { s: 9, a: "right" });
-        T(libelleVue() + " · " + VUE.length + " plan(s) · édition du " + quand, W - M, 21.5, { s: 7.5, a: "right", c: gris });
+        T(court(libelleVue(), pay ? 150 : 90) + " · " + VUE.length + " plan(s)" + (TOUS_IND ? ", tous les indices" : "") + " · édition du " + quand, W - M, 21.5, { s: 7.5, a: "right", c: gris });
         d.setDrawColor.apply(d, vert); d.setLineWidth(.5); d.line(M, 25, W - M, 25);
         y = 31; d.setFillColor.apply(d, pale); d.rect(M, y - 4.2, W - 2 * M, 6, "F");
         cols.forEach(function (c, i) { T(c[0], X[i] + 1.5, y, { b: 1, s: 7.5, c: [40, 60, 15] }); });
@@ -698,26 +718,53 @@
       lignesExport().forEach(function (L) {
         if (L.type !== "plan") {
           var hb = L.type === "rub" ? 6 : 5;
-          if (y + hb + 4 > 200) { d.addPage(); entete(); }
+          if (y + hb + 4 > BAS) { d.addPage(); entete(); }
           if (L.type === "rub") { d.setFillColor(202, 224, 155); d.rect(M, y - 3.6, W - 2 * M, hb, "F"); T(L.lib + "  (" + L.n + ")", M + 1.5, y + .4, { b: 1, s: 8.5, c: [40, 60, 15] }); }
           else { d.setFillColor(238, 244, 226); d.rect(M + 4, y - 3.4, W - 2 * M - 4, hb, "F"); T(L.lib + "  (" + L.n + ")", M + 5.5, y, { b: 1, s: 7.5, c: [60, 80, 30] }); }
           y += hb + .6; zebre = 0; return;
         }
-        var p = L.g.d, i = zebre++;
-        d.setFont("helvetica", "normal"); d.setFontSize(7.5);
-        var lignes = d.splitTextToSize(p.titre || "—", cols[2][1] - 3).slice(0, 3), h = Math.max(1, lignes.length) * 3.4 + 1.6;
-        if (y + h > 200) { d.addPage(); entete(); }
-        if (i % 2) { d.setFillColor(246, 248, 242); d.rect(M, y - 3.3, W - 2 * M, h, "F"); }
-        T(code(p), X[0] + 1.5, y, { s: 7 }); T(p.indice, X[1] + 1.5, y, { b: 1, s: 7.5, c: vert });
-        d.setTextColor(0); d.text(lignes, X[2] + 1.5, y);
-        T(niveauNom(p.niveau), X[3] + 1.5, y, { s: 7 }); T(dateFr(p.date_indice), X[4] + 1.5, y, { s: 7 });
-        T(d.splitTextToSize(p.auteur || "", cols[5][1] - 2)[0] || "", X[5] + 1.5, y, { s: 7 }); T(d.splitTextToSize([p.statut, p.controle_n ? "ctrl n°" + p.controle_n : ""].filter(Boolean).join(" · "), cols[6][1] - 2)[0] || "", X[6] + 1.5, y, { s: 7 });
-        y += h;
+        var i = zebre++;
+        (TOUS_IND ? L.g.rows : [L.g.d]).forEach(function (p, j) {
+          var vieux = j > 0, noir = vieux ? [110, 110, 110] : [0, 0, 0];
+          d.setFont("helvetica", "normal"); d.setFontSize(7.5);
+          var lignes = vieux ? [] : d.splitTextToSize(p.titre || "—", cols[iT][1] - 3).slice(0, 3), h = Math.max(1, lignes.length) * 3.4 + (vieux ? .8 : 1.6);
+          if (y + h > BAS) { d.addPage(); entete(); }
+          if (i % 2) { d.setFillColor(246, 248, 242); d.rect(M, y - 3.3, W - 2 * M, h, "F"); }
+          cols.forEach(function (c, k) {
+            var x = X[k] + 1.5;
+            if (c[2] === "code") T(vieux ? "" : code(p), x, y, { s: pay ? 7 : 6.5 });
+            else if (c[2] === "ind") T(p.indice, x + (vieux ? 1.5 : 0), y, { b: !vieux, s: vieux ? 7 : 7.5, c: vieux ? gris : vert });
+            else if (c[2] === "titre") { if (vieux) T(court(p.titre && p.titre !== L.g.d.titre ? p.titre : "indice précédent", c[1]), x, y, { s: 6.5, c: gris }); else { d.setFont("helvetica", "normal"); d.setFontSize(7.5); d.setTextColor(0); d.text(lignes, x, y); } }
+            else if (c[2] === "niv") T(vieux ? "" : niveauNom(p.niveau), x, y, { s: 7 });
+            else if (c[2] === "date") T(dateFr(p.date_indice), x, y, { s: 7, c: noir });
+            else if (c[2] === "auteur") T(court(p.auteur, c[1]), x, y, { s: 7, c: noir });
+            else if (c[2] === "statut") T(court([p.statut, p.controle_n ? "ctrl n°" + p.controle_n : ""].filter(Boolean).join(" · "), c[1]), x, y, { s: 7, c: noir });
+          });
+          y += h;
+        });
       });
       var n = d.getNumberOfPages();
-      for (var k = 1; k <= n; k++) { d.setPage(k); d.setDrawColor(200); d.setLineWidth(.2); d.line(M, 203, W - M, 203); T("AB Ingénieurs · " + PROJET + " · liste des plans du " + quand, M, 207, { s: 6.5, c: gris }); T("page " + k + " / " + n, W - M, 207, { s: 6.5, c: gris, a: "right" }); }
-      telecharge(d.output("blob"), nomFichier("pdf"));
-    }).catch(function (e) { toast(e.message, 5000); }).then(function () { occupe(false); });
+      for (var k = 1; k <= n; k++) { d.setPage(k); d.setDrawColor(200); d.setLineWidth(.2); d.line(M, HP - 7, W - M, HP - 7); T("AB Ingénieurs · " + PROJET + " · liste des plans du " + quand, M, HP - 3, { s: 6.5, c: gris }); T("page " + k + " / " + n, W - M, HP - 3, { s: 6.5, c: gris, a: "right" }); }
+      return { blob: d.output("blob"), pages: n };
+    });
+  }
+  function pdfApercu() {
+    occupe(true, "Création du PDF…");
+    document.querySelectorAll("#fa-orient button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.o === ORIENT); });
+    document.querySelectorAll("#fa-ind button").forEach(function (b) { b.setAttribute("aria-pressed", (b.dataset.t === "1") === TOUS_IND); });
+    return fairePdf(ORIENT).then(function (r) { apercu(r.blob, nomFichier("pdf"), r.pages); }).catch(function (e) { toast(e.message, 5000); }).then(function () { occupe(false); });
+  }
+  $("#btn-pdf").addEventListener("click", function () {
+    if (!VUE.length) { toast("Rien à exporter"); return; }
+    pdfApercu();
+  });
+  $("#fa-ind").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-t]"); if (!b || (b.dataset.t === "1") === TOUS_IND) return;
+    TOUS_IND = b.dataset.t === "1"; lsSet("fgh.pln.tousind", TOUS_IND ? "1" : "0"); pdfApercu();
+  });
+  $("#fa-orient").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-o]"); if (!b || b.dataset.o === ORIENT) return;
+    ORIENT = b.dataset.o; lsSet("fgh.pln.orient", ORIENT === "portrait" ? "portrait" : "paysage"); pdfApercu();
   });
 
   $("#btn-xlsx").addEventListener("click", function () {
@@ -801,7 +848,7 @@
       wh.views = [{ state: "frozen", ySplit: 1 }];
       return wb.xlsx.writeBuffer();
     }).then(function (buf) {
-      telecharge(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier("xlsx"));
+      enregistre(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), nomFichier("xlsx"));
     }).catch(function (e) { toast(e.message, 5000); }).then(function () { occupe(false); });
   });
 
