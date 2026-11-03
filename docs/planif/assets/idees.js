@@ -5,8 +5,8 @@
    (fichier choisi, collé avec Ctrl+V ou glissé dans la fenêtre). Le nom de
    l'auteur est celui du compte connecté : la base le pose elle-même
    (garde_idee, base-supabase.sql), l'écran ne fait que l'annoncer.
-   Seuls les titulaires du droit « Lire la boîte à idées » (idees_lire, les
-   administrateurs au départ) lisent les idées, changent leur état et les
+   Seuls les administrateurs du site (super admin, Donnees.niveauAcces() 3)
+   lisent les idées, de tous les bureaux, changent leur état et les
    suppriment : règles RLS de la table idees et du seau « idees ».
 
    Hors base, et pour le compte de démonstration (partagé, public), les idées
@@ -34,7 +34,7 @@
     var p = D && D.profil ? D.profil() : null;
     return !!(SB && SB.configure && SB.connecte() && p && p.multi) && !compteDemo();
   }
-  function peutLire() { return D.aDroit("idees_lire"); }
+  function peutLire() { return D.niveauAcces() === 3; }
   function bureauId() { var p = D.profil(); return p && p.bureau ? p.bureau.id : ""; }
 
   function cleLocale() { return CLE_LOCAL + (email() || "local"); }
@@ -104,12 +104,12 @@
 
   function depuisBase(x) {
     return { id: String(x.id), auteurNom: String(x.auteur_nom || x.auteur_email || "—"), texte: String(x.texte || ""),
-             captures: x.captures || [], statut: x.statut || "nouvelle", creeLe: String(x.cree_le || "") };
+             bureauNom: String(x.bureau_nom || ""), captures: x.captures || [], statut: x.statut || "nouvelle", creeLe: String(x.cree_le || "") };
   }
 
   function charge() {
     if (!enBase()) { idees = litLocal(); return Promise.resolve(idees); }
-    return SB.requete("idees?select=id,auteur_nom,auteur_email,texte,captures,statut,cree_le&order=cree_le.desc&limit=500")
+    return SB.requete("idees?select=id,auteur_nom,auteur_email,bureau_nom,texte,captures,statut,cree_le&order=cree_le.desc&limit=500")
       .then(function (l) { idees = (l || []).map(depuisBase); return idees; });
   }
 
@@ -253,7 +253,7 @@
     [zone, el("div", { class: "ab-id-ligne" }, [
         el("span", { class: "ab-id-note", text: demo
           ? (compteDemo() || D.enDemo() ? "Démo : ton idée reste dans ce navigateur, personne d'autre ne la voit." : "Mode local : ton idée reste dans ce navigateur.")
-          : "Seuls les administrateurs du bureau la liront." }),
+          : "Seuls les administrateurs du site la liront." }),
         compteur
       ]),
       el("h3", { class: "ab-id-inter", text: "Captures d'écran" }),
@@ -421,7 +421,9 @@
       });
       return el("article", { class: "ab-id-idee" }, [
         el("div", { class: "ab-id-tete" }, [
-          el("div", {}, [el("b", { text: x.auteurNom }), el("span", { class: "ab-id-date", text: quand(x.creeLe) })]),
+          el("div", {}, [el("b", { text: x.auteurNom }),
+            x.bureauNom ? el("span", { class: "ab-id-date", text: x.bureauNom }) : null,
+            el("span", { class: "ab-id-date", text: quand(x.creeLe) })]),
           select
         ]),
         el("p", { class: "ab-id-texte-lu", text: x.texte }),
@@ -472,7 +474,7 @@
     identite = id || {};
     if (!hote) return;
     var p = hote.querySelector(".ab-id-texte-intro");
-    if (p && peutLire()) p.textContent = "Une idée, une remarque, quelque chose qui coince ? Écris-le, ajoute des captures d'écran. Tu fais partie de ceux qui les lisent.";
+    if (p && peutLire()) p.textContent = "Une idée, une remarque, quelque chose qui coince ? Écris-le, ajoute des captures d'écran. En administrateur du site, tu les lis toutes.";
     sonde().then(function (ok) { baseOk = ok; actualise(); });
   }
 

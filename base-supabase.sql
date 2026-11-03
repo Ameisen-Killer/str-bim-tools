@@ -658,8 +658,8 @@ create trigger maj_le before update on public.news
 -- remarque, avec des captures d'écran (seau « idees » du stockage, rangées
 -- sous <bureau>/<idée>/). Le nom de l'auteur est posé par la base, d'après
 -- le compte connecté : impossible d'écrire au nom d'un autre. Seuls les
--- titulaires du droit idees_lire (les administrateurs au départ) lisent les
--- idées, changent leur état et les suppriment. Jamais le compte de
+-- administrateurs du site (super admin) lisent les idées, de tous les
+-- bureaux, changent leur état et les suppriment. Jamais le compte de
 -- démonstration, partagé et public (ses idées restent dans son navigateur).
 create table if not exists public.idees (
   id           uuid primary key default gen_random_uuid(),
@@ -669,6 +669,7 @@ create table if not exists public.idees (
                constraint idees_auteur_fk references public.membres (id) on delete set null,
   auteur_nom   text not null default '',
   auteur_email text not null default '',
+  bureau_nom   text not null default '',
   texte        text not null constraint idees_texte_check check (char_length(btrim(texte)) between 1 and 4000),
   captures     text[] not null default '{}' constraint idees_captures_check
                check (array_position(captures, null::text) is null and cardinality(captures) <= 6),
@@ -677,9 +678,10 @@ create table if not exists public.idees (
   cree_le      timestamptz not null default now(),
   maj_le       timestamptz not null default now()
 );
+alter table public.idees add column if not exists bureau_nom text not null default '';
 create index if not exists idees_bureau on public.idees (bureau_id, cree_le desc);
 comment on table public.idees is
-  'Boîte à idées de l''accueil. Dépôt : tout le bureau (sauf le compte démo), au nom du compte connecté. Lecture, état et suppression : droit idees_lire.';
+  'Boîte à idées de l''accueil. Dépôt : tout le bureau (sauf le compte démo), au nom du compte connecté. Lecture, état et suppression : les administrateurs du site (super admin), tous bureaux.';
 comment on column public.idees.captures is
   'Chemins des captures d''écran dans le seau « idees » du stockage : <bureau>/<idée>/<n>.jpg.';
 
@@ -696,6 +698,8 @@ begin
     if new.bureau_id is null then
       raise exception 'Connexion requise pour proposer une idée.';
     end if;
+    select b.nom into new.bureau_nom from public.bureaux b where b.id = new.bureau_id;
+    new.bureau_nom := coalesce(new.bureau_nom, '');
     new.auteur_id := public.mon_membre();
     new.auteur_email := lower(coalesce(auth.jwt() ->> 'email', ''));
     select nullif(btrim(coalesce(m.prenom, '') || ' ' || coalesce(m.nom, '')), '') into v_nom
@@ -712,6 +716,7 @@ begin
   end if;
   new.id := old.id;
   new.bureau_id := old.bureau_id;
+  new.bureau_nom := old.bureau_nom;
   new.auteur_id := old.auteur_id;
   new.auteur_nom := old.auteur_nom;
   new.auteur_email := old.auteur_email;
@@ -967,7 +972,7 @@ begin
      array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire', 'voir_conges_equipe', 'voir_absences_avenir']),
     (p_bureau, 'administrateur', 'Administrateur', null, 0,
      array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'conges_tous',
-           'news_rediger', 'news_archiver', 'news_supprimer', 'idees_lire',
+           'news_rediger', 'news_archiver', 'news_supprimer',
            'page_facturation', 'facturation_saisir', 'avancement_tous'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
@@ -1289,17 +1294,16 @@ create policy "droit de supprimer (suppression)" on public.news for delete to au
          and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
 
 -- Boîte à idées : tout le bureau dépose (sauf le compte démo) ; lire, changer
--- l'état et supprimer demandent le droit « Lire la boîte à idées ».
+-- l'état et supprimer : les administrateurs du site (super admin), tous bureaux.
 create policy "bureau courant (dépôt)" on public.idees for insert to authenticated
   with check (bureau_id = (select public.bureau_courant())
               and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
-create policy "droit de lire (lecture)" on public.idees for select to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
-create policy "droit de lire (état)" on public.idees for update to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')))
-  with check (bureau_id = (select public.bureau_courant()));
-create policy "droit de lire (suppression)" on public.idees for delete to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
+create policy "admin du site (lecture)" on public.idees for select to authenticated
+  using ((select public.est_super_admin()));
+create policy "admin du site (état)" on public.idees for update to authenticated
+  using ((select public.est_super_admin())) with check ((select public.est_super_admin()));
+create policy "admin du site (suppression)" on public.idees for delete to authenticated
+  using ((select public.est_super_admin()));
 
 -- Avancement et facturation. Qui saisit : la facturation, le droit « Saisir
 -- la facturation » ; l'avancement, le responsable de l'affaire, le chef du
@@ -2900,7 +2904,7 @@ create policy "visas : retrait" on storage.objects for delete to anon, authentic
 
 -- Captures de la boîte à idées : seau privé, images de 5 Mo au plus, rangées
 -- sous <bureau>/<idée>/. Tout le bureau en dépose (sauf le compte démo) ;
--- seuls les titulaires du droit idees_lire les voient et les retirent.
+-- seuls les administrateurs du site (super admin) les voient et les retirent.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('idees', 'idees', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do update
@@ -2914,13 +2918,9 @@ create policy "idees : dépôt" on storage.objects for insert to authenticated
               and (storage.foldername(name))[1] = (select public.bureau_courant())::text
               and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
 create policy "idees : lecture" on storage.objects for select to authenticated
-  using (bucket_id = 'idees'
-         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
-         and (select public.a_droit('idees_lire')));
+  using (bucket_id = 'idees' and (select public.est_super_admin()));
 create policy "idees : retrait" on storage.objects for delete to authenticated
-  using (bucket_id = 'idees'
-         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
-         and (select public.a_droit('idees_lire')));
+  using (bucket_id = 'idees' and (select public.est_super_admin()));
 
 -- Annotations : une zone de texte libre par plan (numéro), commune à tous et
 -- gardée d'un indice et d'un export à l'autre. Vider la zone efface la ligne.

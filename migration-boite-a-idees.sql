@@ -1,7 +1,7 @@
 -- =========================================================================
 -- Migration : boîte à idées de l'accueil (03.11.2026)
--- Table idees, seau « idees » du stockage (captures d'écran), droit
--- idees_lire donné aux groupes « administrateur » de chaque bureau.
+-- Table idees, seau « idees » du stockage (captures d'écran). Lecture
+-- réservée aux administrateurs du site (super admin), tous bureaux.
 -- Relançable. À exécuter dans Supabase > SQL Editor > New query > Run.
 -- =========================================================================
 
@@ -10,8 +10,8 @@
 -- remarque, avec des captures d'écran (seau « idees » du stockage, rangées
 -- sous <bureau>/<idée>/). Le nom de l'auteur est posé par la base, d'après
 -- le compte connecté : impossible d'écrire au nom d'un autre. Seuls les
--- titulaires du droit idees_lire (les administrateurs au départ) lisent les
--- idées, changent leur état et les suppriment. Jamais le compte de
+-- administrateurs du site (super admin) lisent les idées, de tous les
+-- bureaux, changent leur état et les suppriment. Jamais le compte de
 -- démonstration, partagé et public (ses idées restent dans son navigateur).
 create table if not exists public.idees (
   id           uuid primary key default gen_random_uuid(),
@@ -21,6 +21,7 @@ create table if not exists public.idees (
                constraint idees_auteur_fk references public.membres (id) on delete set null,
   auteur_nom   text not null default '',
   auteur_email text not null default '',
+  bureau_nom   text not null default '',
   texte        text not null constraint idees_texte_check check (char_length(btrim(texte)) between 1 and 4000),
   captures     text[] not null default '{}' constraint idees_captures_check
                check (array_position(captures, null::text) is null and cardinality(captures) <= 6),
@@ -29,9 +30,10 @@ create table if not exists public.idees (
   cree_le      timestamptz not null default now(),
   maj_le       timestamptz not null default now()
 );
+alter table public.idees add column if not exists bureau_nom text not null default '';
 create index if not exists idees_bureau on public.idees (bureau_id, cree_le desc);
 comment on table public.idees is
-  'Boîte à idées de l''accueil. Dépôt : tout le bureau (sauf le compte démo), au nom du compte connecté. Lecture, état et suppression : droit idees_lire.';
+  'Boîte à idées de l''accueil. Dépôt : tout le bureau (sauf le compte démo), au nom du compte connecté. Lecture, état et suppression : les administrateurs du site (super admin), tous bureaux.';
 comment on column public.idees.captures is
   'Chemins des captures d''écran dans le seau « idees » du stockage : <bureau>/<idée>/<n>.jpg.';
 
@@ -48,6 +50,8 @@ begin
     if new.bureau_id is null then
       raise exception 'Connexion requise pour proposer une idée.';
     end if;
+    select b.nom into new.bureau_nom from public.bureaux b where b.id = new.bureau_id;
+    new.bureau_nom := coalesce(new.bureau_nom, '');
     new.auteur_id := public.mon_membre();
     new.auteur_email := lower(coalesce(auth.jwt() ->> 'email', ''));
     select nullif(btrim(coalesce(m.prenom, '') || ' ' || coalesce(m.nom, '')), '') into v_nom
@@ -64,6 +68,7 @@ begin
   end if;
   new.id := old.id;
   new.bureau_id := old.bureau_id;
+  new.bureau_nom := old.bureau_nom;
   new.auteur_id := old.auteur_id;
   new.auteur_nom := old.auteur_nom;
   new.auteur_email := old.auteur_email;
@@ -86,22 +91,24 @@ drop policy if exists "bureau courant (dépôt)"      on public.idees;
 drop policy if exists "droit de lire (lecture)"     on public.idees;
 drop policy if exists "droit de lire (état)"        on public.idees;
 drop policy if exists "droit de lire (suppression)" on public.idees;
+drop policy if exists "admin du site (lecture)"     on public.idees;
+drop policy if exists "admin du site (état)"        on public.idees;
+drop policy if exists "admin du site (suppression)" on public.idees;
 -- Boîte à idées : tout le bureau dépose (sauf le compte démo) ; lire, changer
--- l'état et supprimer demandent le droit « Lire la boîte à idées ».
+-- l'état et supprimer : les administrateurs du site (super admin), tous bureaux.
 create policy "bureau courant (dépôt)" on public.idees for insert to authenticated
   with check (bureau_id = (select public.bureau_courant())
               and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
-create policy "droit de lire (lecture)" on public.idees for select to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
-create policy "droit de lire (état)" on public.idees for update to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')))
-  with check (bureau_id = (select public.bureau_courant()));
-create policy "droit de lire (suppression)" on public.idees for delete to authenticated
-  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
+create policy "admin du site (lecture)" on public.idees for select to authenticated
+  using ((select public.est_super_admin()));
+create policy "admin du site (état)" on public.idees for update to authenticated
+  using ((select public.est_super_admin())) with check ((select public.est_super_admin()));
+create policy "admin du site (suppression)" on public.idees for delete to authenticated
+  using ((select public.est_super_admin()));
 
 -- Captures de la boîte à idées : seau privé, images de 5 Mo au plus, rangées
 -- sous <bureau>/<idée>/. Tout le bureau en dépose (sauf le compte démo) ;
--- seuls les titulaires du droit idees_lire les voient et les retirent.
+-- seuls les administrateurs du site (super admin) les voient et les retirent.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('idees', 'idees', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do update
@@ -115,23 +122,18 @@ create policy "idees : dépôt" on storage.objects for insert to authenticated
               and (storage.foldername(name))[1] = (select public.bureau_courant())::text
               and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
 create policy "idees : lecture" on storage.objects for select to authenticated
-  using (bucket_id = 'idees'
-         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
-         and (select public.a_droit('idees_lire')));
+  using (bucket_id = 'idees' and (select public.est_super_admin()));
 create policy "idees : retrait" on storage.objects for delete to authenticated
-  using (bucket_id = 'idees'
-         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
-         and (select public.a_droit('idees_lire')));
+  using (bucket_id = 'idees' and (select public.est_super_admin()));
 
--- Le droit « Lire la boîte à idées » : aux groupes administrateur existants
--- (les autres groupes se cochent dans la console, Groupes et droits).
+-- Première version (droit « Lire la boîte à idées » des groupes) : retiré.
 update public.droits_groupes
-   set droits = array_append(droits, 'idees_lire'), maj_le = now()
- where statut = 'administrateur' and not ('idees_lire' = any (droits));
+   set droits = array_remove(droits, 'idees_lire'), maj_le = now()
+ where 'idees_lire' = any (droits);
 
--- Contrôle : une ligne par bureau, « oui » attendu partout.
-select b.nom as bureau,
-       case when exists (select 1 from public.droits_groupes g
-                          where g.bureau_id = b.id and 'idees_lire' = any (g.droits))
-            then 'oui' else 'NON (cocher le droit dans la console)' end as droit_idees_lire
-  from public.bureaux b order by b.nom;
+-- Contrôle : « oui » attendu sur chaque ligne.
+select 'table idees' as element, case when to_regclass('public.idees') is not null then 'oui' else 'NON' end as present
+union all
+select 'seau idees', case when exists (select 1 from storage.buckets where id = 'idees') then 'oui' else 'NON' end
+union all
+select 'lecture admin du site', case when exists (select 1 from pg_policies where tablename = 'idees' and policyname = 'admin du site (lecture)') then 'oui' else 'NON' end;
