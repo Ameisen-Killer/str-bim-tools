@@ -288,14 +288,16 @@
     { c: "2", lib: "2 - Renforcement", de: 1500, a: 1999 },
     { c: "3", lib: "3 - Reconstruction / Extension", de: 2000, a: 2499, sous: [[2000, 2099, "3.1 - Triangles façades"], [2100, 2199, "3.2 - Parking"], [2200, 2299, "3.3 - Socle"], [2300, 2499, "3.4 - Noyaux"]] },
     { c: "4", lib: "4 - Charpente métallique", de: 2500, a: 3499, sous: [[2500, 2599, "4.1 - Parking SS-1"], [2600, 2699, "4.2 - Théâtre"], [2700, 2799, "4.3 - Piscine"], [2800, 2999, "4.4 - Marquises / Pergolas"], [3000, 3199, "4.5 - Façade Mont-Blanc"], [3200, 3399, "4.6 - Façade Patio"], [3400, 3499, "4.7 - Toiture"]] },
-    { c: "A", lib: "Armatures et listes de fers", types: ["ARM", "LIS"] },
-    { c: "X", lib: "Autres" }
+    { c: "X", lib: "Autres" },
+    { c: "A", lib: "Armatures et listes de fers", types: ["ARM", "LIS"] }
   ];
   // { i: rang de la rubrique, r: rubrique, s: sous-rubrique ou "" } ; les plans d'armatures et listes forment leur propre rubrique
   var CACHE_RUB = new WeakMap();
   function rubrique(p) {
     var cr = CACHE_RUB.get(p); if (cr && cr.n === p.numero && cr.t === p.type) return cr.v;
     var n = parseInt(p.numero, 10), t = String(p.type || "").toUpperCase(), res = null;
+    // armatures et listes d'abord (leur n° tomberait sinon dans une plage de coffrage)
+    RUBRIQUES.forEach(function (r, i) { if (!res && r.types && r.types.indexOf(t) >= 0) res = { i: i, r: r, s: "" }; });
     for (var i = 0; i < RUBRIQUES.length && !res; i++) {
       var r = RUBRIQUES[i];
       if (r.types ? r.types.indexOf(t) >= 0 : r.de != null && n >= r.de && n <= r.a) {
@@ -304,8 +306,22 @@
       }
     }
     if (!res && (t === "NDC" || t === "RAP")) res = { i: 1, r: RUBRIQUES[1], s: "" };
-    res = res || { i: RUBRIQUES.length - 1, r: RUBRIQUES[RUBRIQUES.length - 1], s: "" };
+    var iX = RUBRIQUES.length - 2; res = res || { i: iX, r: RUBRIQUES[iX], s: "" };
     CACHE_RUB.set(p, { n: p.numero, t: p.type, v: res }); return res;
+  }
+  // chaque liste de fers juste après son plan d'armatures (s'il est dans la liste)
+  function apparie(L, gde) {
+    gde = gde || function (x) { return x; };
+    var dans = new Set(L.map(gde)), mis = new Set(), out = [], parG = new Map();
+    L.forEach(function (x) { parG.set(gde(x), x); });
+    L.forEach(function (x) {
+      var g = gde(x); if (mis.has(g)) return;
+      if (g.d.type === "LIS" && g.lie && dans.has(g.lie) && !mis.has(g.lie)) return;
+      out.push(x); mis.add(g);
+      if (g.d.type === "ARM" && g.lie && dans.has(g.lie) && !mis.has(g.lie) && g.lie.lie === g) { out.push(parG.get(g.lie)); mis.add(g.lie); }
+    });
+    L.forEach(function (x) { if (!mis.has(gde(x))) out.push(x); });
+    return out;
   }
   function cleRub(p) { var r = rubrique(p); return r.r.c + (r.s ? "|" + r.s : ""); }
   function libRub(p) { var r = rubrique(p); return r.s || r.r.lib; }
@@ -329,7 +345,7 @@
       (p.source === "manuel" ? '<span class="pastille manuel" title="Saisi à la main dans cet outil">manuel</span>' : "") + "</td></tr>";
   }
   function dessineListe() {
-    VUE = trie(filtres());
+    VUE = trie(filtres()); if (PAR_RUB) VUE = apparie(VUE);
     var nInd = 0; VUE.forEach(function (g) { nInd += g.rows.length; });
     $("#compte").textContent = VUE.length + " / " + GROUPES.length + " plans · " + nInd + " indices";
     document.querySelectorAll("thead [data-tri]").forEach(function (th) {
@@ -630,9 +646,9 @@
   function LV() { return VUE.map(function (g) { return g.d; }); }
   // exports : toujours classés par rubrique, l'ordre de l'écran gardé à l'intérieur de chaque rubrique
   function vueRub() {
-    return VUE.map(function (g, i) { return { g: g, i: i, r: rubrique(g.d) }; }).sort(function (a, b) {
+    return apparie(VUE.map(function (g, i) { return { g: g, i: i, r: rubrique(g.d) }; }).sort(function (a, b) {
       return a.r.i - b.r.i || a.r.s.localeCompare(b.r.s, "fr", { numeric: true }) || a.i - b.i;
-    });
+    }), function (x) { return x.g; });
   }
   // [{ type: "rub"|"sous"|"plan", lib, n, g }] dans l'ordre d'export
   function lignesExport() {
