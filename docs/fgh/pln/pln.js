@@ -695,8 +695,8 @@
     return Promise.all([charge(LIBS.jspdf), logo()]).then(function (r) {
       var img = r[1], d = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: orient });
       var pay = orient === "landscape", W = pay ? 297 : 210, HP = pay ? 210 : 297, M = 12, BAS = HP - 10, vert = [77, 122, 28], pale = [234, 242, 216], gris = [135, 134, 139];
-      var cols = pay ? [["Code", 62, "code"], ["Ind.", 11, "ind"], ["Titre", 130, "titre"], ["Niveau", 18, "niv"], ["Date", 17, "date"], ["Statut · contrôle", 35, "statut"]]
-        : [["Code", 56, "code"], ["Ind.", 9, "ind"], ["Titre", 74, "titre"], ["Date", 16, "date"], ["Statut · contrôle", 31, "statut"]];
+      var cols = pay ? [["Code", 62, "code"], ["Ind.", 11, "ind"], ["Titre", 165, "titre"], ["Niveau", 18, "niv"], ["Date", 17, "date"]]
+        : [["Code", 56, "code"], ["Ind.", 9, "ind"], ["Titre", 105, "titre"], ["Date", 16, "date"]];
       var X = [M]; cols.forEach(function (c, i) { X[i + 1] = X[i] + c[1]; });
       var iT = cols.findIndex(function (c) { return c[2] === "titre"; });
       var y, quand = dateFr(aujourdhui());
