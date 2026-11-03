@@ -321,8 +321,7 @@
       envoyer.textContent = captures.length ? "Envoi des captures…" : "Envoi…";
       dit("");
       enregistre(texte, captures.slice()).then(function () {
-        f.ferme();
-        annonce("Merci ! Ton idée est bien arrivée" + (demo ? " (dans ce navigateur)." : " chez les administrateurs."));
+        merci(f, demo);
         actualise();
       }).catch(function (e) {
         envoyer.disabled = false; annuler.disabled = false; envoyer.textContent = "Envoyer";
@@ -332,6 +331,20 @@
 
     etat();
     setTimeout(function () { zone.focus(); }, 60);
+  }
+
+  /* Après l'envoi, la fenêtre dit merci (03.11.2026, demande de Tony) */
+  function merci(f, demo) {
+    var sous = f.boite.querySelector(".ab-id-sous");
+    if (sous) sous.remove();
+    var ok = el("button", { type: "button", class: "ab-id-btn principal", text: "Fermer", onclick: function () { f.ferme(); } });
+    P.vide(f.corps).appendChild(el("div", { class: "ab-id-merci" }, [
+      el("p", { class: "ab-id-merci-titre", text: "Merci !" }),
+      el("p", { text: demo ? "Ton idée est enregistrée dans ce navigateur (démo) : personne d'autre ne la voit."
+                           : "Ton idée a bien été transmise aux administrateurs du site." }),
+      ok
+    ]));
+    setTimeout(function () { ok.focus(); }, 30);
   }
 
   /* ------------------------------------------------------------ lire */
