@@ -95,7 +95,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .barre a{text-decoration:none;color:inherit}
 .barre .logo{display:flex;align-items:center;gap:10px;color:var(--texte-doux)}
 .barre .logo svg{width:20px;height:20px;flex:none}
-.barre .logo img{display:block;height:32px;width:auto;flex:none}
+.barre .menu-fair{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:4px;color:var(--or)}
+.barre .menu-fair svg{width:20px;height:20px}
+.barre .menu-fair:hover{background:var(--controle-survol)}
+.barre .logo-ab{display:block;width:36px;height:34px;flex:none}
 .barre .logo:hover{color:var(--texte)}
 .barre .titre{font-size:14px;color:var(--texte)}
 .barre .titre b{font-weight:600}
@@ -317,7 +320,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 </head>
 <body>
 <header class="barre">
-  <a class="logo" href="/fgh/" title="Retour au menu Fairmont"><img src="/fgh/logo-ab-horizontal.svg?v=1" alt="AB Ingénieurs" width="96" height="32"><span class="sous-titre">Retour au menu Fairmont</span></a>
+  <a class="menu-fair" href="/fgh/" title="Retour au menu Fairmont" aria-label="Retour au menu Fairmont"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></a><img class="logo-ab" src="/fgh/logo-ab.jpg?v=1" alt="AB" width="36" height="34">
   <span class="titre">FGH · <b>Validation des réservations</b></span>
   <span class="ver" id="version"></span>
   <span class="json" id="json-etat">Aucun JSON connecté</span>
