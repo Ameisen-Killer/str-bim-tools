@@ -145,6 +145,7 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   <div class="h" style="display:flex;align-items:center"><span style="flex:1">Mes contrôles</span><button class="btn s w" id="bSel" style="text-transform:none;letter-spacing:0">Sélectionner</button></div>
   <div id="selBar" class="hidden" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="btn s w" id="selSigned">Signés non envoyés</button><button class="btn s w" id="selNone">Aucun</button><button class="btn s" id="selMail">✉️ Envoyer par mail (<span id="selN">0</span>)</button></div>
   <div id="list"></div>
+  <p class="muted" id="syEtat" style="text-align:center;font-size:12px;margin:14px 0 4px"></p>
   <div class="data" id="dataLine"></div>
   <div class="data" id="sendLine"></div>
 </main>
@@ -274,6 +275,7 @@ const DB=(()=>{let db=null;const mem={ctrl:new Map(),photos:new Map(),kv:new Map
   return{open,
     put:(s,o)=>db?rq(s,'readwrite',st=>st.put(o)):(mem[s].set(o.id,o),Promise.resolve()),
     del:(s,id)=>db?rq(s,'readwrite',st=>st.delete(id)):(mem[s].delete(id),Promise.resolve()),
+    get:(s,id)=>db?rq(s,'readonly',st=>st.get(id)):Promise.resolve(mem[s].get(id)),
     all:s=>db?rq(s,'readonly',st=>st.getAll()):Promise.resolve([...mem[s].values()]),
     byCtrl:id=>db?rq('photos','readonly',st=>st.index('ctrl').getAll(id)):Promise.resolve([...mem.photos.values()].filter(p=>p.ctrlId===id)),
     kvGet:k=>db?rq('kv','readonly',st=>st.get(k)):Promise.resolve(mem.kv.get(k)),
@@ -346,7 +348,7 @@ function renderConn(){
 $('#bExpCfg').onclick=()=>{const o=clone(S);delete o.id;delete o._projetManual;o._type='controle-armature-projet';download(new Blob([JSON.stringify(o,null,2)],{type:'application/json'}),safe('projet_'+(S.numero||S.nom||'sans_nom'))+'.json');};
 $('#bDelProj').onclick=async()=>{if(PROJECTS.length<2){toast('Il faut garder au moins un projet');return;}
   const n=projCtrls().length;if(!confirm(`Supprimer le projet ${projLabel(S)}${n?` et ses ${n} contrôle(s)`:''} du téléphone ?`))return;
-  for(const c of projCtrls()){for(const ph of await DB.byCtrl(c.id))await DB.del('photos',ph.id);await DB.del('ctrl',c.id);}
+  for(const c of projCtrls()){for(const ph of await DB.byCtrl(c.id))await DB_del('photos',ph.id);await DB_del('ctrl',c.id);}
   CTRLS=CTRLS.filter(c=>c.projectId!==S.id);PROJECTS=PROJECTS.filter(p=>p!==S);await saveProjects();closeModal('mData');await setProject(PROJECTS[0].id);};
 // sélecteur de projet
 function renderProjects(){
@@ -432,6 +434,72 @@ async function depuisPLN(){const m=/^#(pln|ctrl)=(.+)$/.exec(location.hash);if(!
   CTRLS.push(c);await DB.put('ctrl',c);await openCtrl(c.id,false);if(c.ouvrage)applyOuvrage(false);save();
   toast('Fiche préremplie depuis '+planLabel(r)+(c.plans.length>1?' (+'+(c.plans.length-1)+' plan(s) voisin(s) à vérifier)':''),5000);}
 window.addEventListener('hashchange',()=>{if(S)depuisPLN();});
+/* ---------- fiches et photos en ligne : Supabase (tables fgh_controles et fgh_controles_photos, seau privé fgh-arm) ----------
+   Tout reste d'abord sur l'appareil (hors réseau). Chaque enregistrement est noté puis envoyé dès que le réseau le permet ;
+   à l'ouverture et toutes les 5 minutes, ARM récupère ce que les autres appareils ont envoyé. La version la plus récente gagne. */
+const DB_put=DB.put,DB_del=DB.del;let SYQ={},SYT=null,SYB=false,SYERR='';
+const SY_OFF=['sendState','sendErr','projectId','_maj'];
+function syMark(s,id,del){SYQ[s+':'+id]={s,id,del:!!del,t:Date.now()};DB.kvSet('sync:file',SYQ);clearTimeout(SYT);SYT=setTimeout(syPush,2500);}
+DB.put=(s,o)=>{if((s==='ctrl'||s==='photos')&&o&&o.id){o._maj=Date.now();syMark(s,o.id);}return DB_put(s,o);};
+DB.del=(s,id)=>{if(s==='ctrl'||s==='photos')syMark(s,id,true);return DB_del(s,id);};
+async function stFetch(path,o={}){const h={apikey:PLN.cle};if(o.type)h['Content-Type']=o.type;if(o.upsert)h['x-upsert']='true';
+  let r;try{r=await fetch(PLN.url+'/storage/v1/object/'+(o.lire?'authenticated/':'')+'fgh-arm/'+path,{method:o.method||'GET',headers:h,body:o.body});}catch(e){throw new Error('Photos en ligne injoignables : pas de réseau ?');}
+  if(!r.ok){let m='erreur '+r.status;try{const j=await r.json();m=j.message||j.error||m;}catch(e){}throw new Error('Photos en ligne : '+m);}return r;}
+const stPut=(path,b)=>stFetch(path,{method:'POST',body:b,type:b.type||'image/jpeg',upsert:true});
+const stGet=async path=>(await stFetch(path,{lire:true})).blob();
+const stDel=path=>stFetch(path,{method:'DELETE'}).catch(()=>{});
+function syRowC(c){const d={};Object.keys(c).forEach(k=>{if(!SY_OFF.includes(k))d[k]=c[k];});const P=PROJECTS.find(p=>p.id===c.projectId)||S;
+  return{id:c.id,projet:String(P.numero||''),numero:String(c.numero||''),date_ctrl:String(c.date||''),auteur:String(c.auteur||''),maj:c._maj||Date.now(),supprime:false,data:d};}
+async function syPush(){if(SYB||!navigator.onLine)return;const keys=Object.keys(SYQ);if(!keys.length)return;SYB=true;let fait=0;
+  try{for(const k of keys){const q=SYQ[k];if(!q)continue;
+      if(q.s==='ctrl'){
+        if(q.del)await plnFetch('fgh_controles?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[{id:q.id,supprime:true,maj:q.t}]});
+        else{const c=CTRLS.find(x=>x.id===q.id)||await DB.get('ctrl',q.id);if(c)await plnFetch('fgh_controles?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[syRowC(c)]});}}
+      else{const base='p/'+q.id;
+        if(q.del){await plnFetch('fgh_controles_photos?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[{id:q.id,ctrl_id:'',supprime:true,maj:q.t}]});await stDel(base+'-o.jpg');await stDel(base+'-a.jpg');}
+        else{const p=await DB.get('photos',q.id);
+          if(p){if(p.orig&&p._sentO!==p.orig.size){await stPut(base+'-o.jpg',p.orig);p._sentO=p.orig.size;}
+            const aSz=p.annot?p.annot.size:0;if(p._sentA!==aSz){if(p.annot)await stPut(base+'-a.jpg',p.annot);else await stDel(base+'-a.jpg');p._sentA=aSz;}
+            await plnFetch('fgh_controles_photos?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[{id:p.id,ctrl_id:p.ctrlId,ord:p.ord||0,w:p.w||0,h:p.h||0,statut:p.statut||'',
+              commentaire:p.comment||'',shapes:p.shapes||[],chemin_o:p.orig?base+'-o.jpg':'',chemin_a:p.annot?base+'-a.jpg':'',maj:p._maj||Date.now(),supprime:false}]});
+            await DB_put('photos',p);const m=(typeof PHOTOS!=='undefined'&&PHOTOS||[]).find(x=>x.id===p.id);if(m){m._sentO=p._sentO;m._sentA=p._sentA;}}}}
+      if(SYQ[k]===q)delete SYQ[k];fait++;}
+    SYERR='';}
+  catch(e){if(SYERR!==e.message){SYERR=e.message;toast((/pas encore créée/.test(e.message)?'Fiches en ligne : table pas encore créée dans Supabase (migration-fgh-arm.sql)':e.message)+' : nouvel essai plus tard',5000);}setTimeout(syPush,60000);}
+  finally{SYB=false;await DB.kvSet('sync:file',SYQ);if(fait)syEtat();if(Object.keys(SYQ).length&&!SYERR)setTimeout(syPush,500);}}
+// fiches reçues (rapide, à l'ouverture) puis photos (en arrière-plan)
+async function syPullC(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGet('sync:marques')||{};let n=0,depuis=M.c||'1970-01-01T00:00:00Z';
+  for(;;){const L=await plnFetch('fgh_controles?select=*&modifie_le=gte.'+encodeURIComponent(depuis)+'&order=modifie_le&limit=500');
+    for(const r of L||[]){depuis=r.modifie_le;if(SYQ['ctrl:'+r.id])continue;const loc=CTRLS.find(x=>x.id===r.id);if(loc&&loc===CUR)continue;
+      if(r.supprime){if(loc){for(const ph of await DB.byCtrl(r.id))await DB_del('photos',ph.id);await DB_del('ctrl',r.id);CTRLS=CTRLS.filter(x=>x!==loc);n++;}continue;}
+      if(loc&&(loc._maj||0)>=r.maj)continue;
+      const P=PROJECTS.find(p=>String(p.numero)===String(r.projet))||S,c=Object.assign({},r.data||{},{id:r.id,projectId:P.id,_maj:r.maj});
+      if(loc){Object.keys(loc).forEach(k=>delete loc[k]);Object.assign(loc,c);await DB_put('ctrl',loc);}else{CTRLS.push(c);await DB_put('ctrl',c);}n++;}
+    if(!L||L.length<500)break;}
+  M.c=depuis;await DB.kvSet('sync:marques',M);return n;}
+async function syPullP(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGet('sync:marques')||{};let n=0,depuis=M.p||'1970-01-01T00:00:00Z';
+  for(;;){const L=await plnFetch('fgh_controles_photos?select=*&modifie_le=gte.'+encodeURIComponent(depuis)+'&order=modifie_le&limit=200');
+    for(const r of L||[]){if(SYQ['photos:'+r.id]){depuis=r.modifie_le;continue;}const loc=await DB.get('photos',r.id);
+      if(r.supprime){if(loc){await DB_del('photos',r.id);n++;}depuis=r.modifie_le;continue;}
+      if(loc&&(loc._maj||0)>=r.maj){depuis=r.modifie_le;continue;}
+      const orig=r.chemin_o?(loc&&loc._sentO&&loc.orig&&loc._maj===r.maj?loc.orig:await stGet(r.chemin_o)):null,annot=r.chemin_a?await stGet(r.chemin_a):null;
+      const p={id:r.id,ctrlId:r.ctrl_id,ord:r.ord,w:r.w,h:r.h,statut:r.statut,comment:r.commentaire,shapes:r.shapes||[],orig,annot,_maj:r.maj,_sentO:orig?orig.size:0,_sentA:annot?annot.size:0};
+      await DB_put('photos',p);depuis=r.modifie_le;n++;
+      if(CUR&&CUR.id===p.ctrlId&&typeof PHOTOS!=='undefined'){const i=PHOTOS.findIndex(x=>x.id===p.id);if(i>=0)PHOTOS[i]=p;else PHOTOS.push(p);PHOTOS.sort((a,b)=>a.ord-b.ord);}}
+    M.p=depuis;await DB.kvSet('sync:marques',M);if(!L||L.length<200)break;}
+  return n;}
+let SYPULL=false;
+async function sySync(quiet){if(SYPULL)return;SYPULL=true;
+  try{await syPush();const a=await syPullC();if(a&&!CUR)renderHome();const b=await syPullP();if((a||b)&&!quiet)toast((a?a+' fiche(s)':'')+(a&&b?' et ':'')+(b?b+' photo(s)':'')+' reçue(s) des autres appareils');
+    if(b&&CUR&&!$('#vWiz').classList.contains('hidden'))renderStep();syEtat();}
+  catch(e){console.warn(e);if(SYERR!==e.message){SYERR=e.message;if(!quiet)toast(e.message,4000);}}finally{SYPULL=false;}}
+function syEtat(){const n=Object.keys(SYQ).length;lsSet('ca-sync',{t:Date.now(),n});const el=$('#syEtat');if(el)el.textContent=n?n+' élément(s) à envoyer en ligne':'Fiches et photos en ligne : à jour '+new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});}
+async function syInit(){SYQ=await DB.kvGet('sync:file')||{};
+  if(!await DB.kvGet('sync:init')){for(const c of CTRLS){SYQ['ctrl:'+c.id]={s:'ctrl',id:c.id,t:Date.now()};for(const ph of await DB.byCtrl(c.id))SYQ['photos:'+ph.id]={s:'photos',id:ph.id,t:Date.now()};}
+    await DB.kvSet('sync:file',SYQ);await DB.kvSet('sync:init',1);}}
+setInterval(()=>sySync(true),5*60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sySync(true);});
+window.addEventListener('online',()=>sySync(true));
 async function plnRetry(){if(!navigator.onLine)return;for(const c of CTRLS.filter(x=>x.plnPending))await plnMark(c,true);}
 const cellStr=v=>v==null?'':v instanceof Date?fmt(v):String(v).trim();
 function xDate(v){if(v==null||v==='')return'';if(v instanceof Date)return fmt(v);const n=Number(v);if(!isNaN(n)&&n>20000&&n<80000){const d=new Date(Date.UTC(1899,11,30)+n*864e5);return pad(d.getUTCDate())+'.'+pad(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();}return String(v).trim();}
@@ -845,7 +913,7 @@ const STEPS=[
      $('#bZip').onclick=async()=>{busy(true,'Création du paquet…');try{download(await makeZip(),safe(baseName(CUR))+'.zip');}catch(e){alert(e.message);}busy(false);};
      const sh=$('#bShare');if(sh)sh.onclick=async()=>{busy(true,'Préparation…');try{const files=[new File([await makePDF()],safe(baseName(CUR))+'.pdf',{type:'application/pdf'}),new File([await makeZip()],safe(baseName(CUR))+'.zip',{type:'application/zip'})];busy(false);
        if(!navigator.canShare({files}))throw new Error('Partage non supporté : utiliser les boutons de téléchargement.');await navigator.share({files,title:baseName(CUR)});}catch(e){busy(false);if(e.name!=='AbortError')alert(e.message);}};
-     $('#bDel').onclick=async()=>{if(!confirm('Supprimer ce contrôle et ses photos du téléphone ?'))return;for(const p of PHOTOS)await DB.del('photos',p.id);await DB.del('ctrl',CUR.id);CTRLS=CTRLS.filter(c=>c!==CUR);CUR=null;goHome();};}},
+     $('#bDel').onclick=async()=>{if(!confirm('Supprimer ce contrôle et ses photos, sur cet appareil et en ligne (pour tous) ?'))return;for(const p of PHOTOS)await DB.del('photos',p.id);await DB.del('ctrl',CUR.id);CTRLS=CTRLS.filter(c=>c!==CUR);CUR=null;goHome();};}},
 ];
 const SEC_DONE=[c=>!!c.description,c=>!!c.plan_armatures,c=>!!c.entreprise,c=>!!c.type_coffrage,c=>CHECKS.every(([k])=>c[k]),()=>PHOTOS.length>0,c=>!!c.beton_qualite,c=>!!c.conclusion,()=>false];
 function renderStep(keep=true){
@@ -1101,7 +1169,7 @@ async function makePDF(opt={}){
 /* ---------- démarrage ---------- */
 if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{if(!await DB.open())toast('Stockage local indisponible : données perdues à la fermeture',5000);
-  CTRLS=await DB.all('ctrl');PROJECTS=await DB.kvGet('projects')||[];AFFAIRES=await DB.kvGet('affaires')||[];
+  CTRLS=await DB.all('ctrl');PROJECTS=await DB.kvGet('projects')||[];SYQ=await DB.kvGet('sync:file')||{};AFFAIRES=await DB.kvGet('affaires')||[];
   if(!PROJECTS.length){ // 1er lancement / migration de l'ancienne version
     const old=lsGet('ca-settings',{});const p=newProject('6848','Fairmont - Genève');Object.assign(p,{projet:old.projet||'6848 - Fairmont - Genève',auteur:old.auteur||'Hubert Magne',lieu:old.lieu||'Genève',
       pCtrl:old.pCtrl||'C:\\Users\\huma\\OneDrive - AB Ingénieurs SA\\Fichiers de Tony Varin - 6848 - Fairmont GE [OD]\\7-PV-Rapport\\Controle Arm',
@@ -1110,7 +1178,9 @@ if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(locatio
   PROJECTS.forEach(p=>{p.links=Object.assign({index:'',plans:'',photos:'',fiches:''},p.links||{});p.res=p.res||{};p.conn=Object.assign(clone(CONN_DEF),p.conn||{});});
   for(const c of CTRLS)if(!c.projectId){c.projectId=PROJECTS[0].id;await DB.put('ctrl',c);}
   await setProject(lsGet('ca-proj',null)||PROJECTS[0].id);
-  await msalInit();refreshSendUI();flush();autoRefresh();depuisPLN();
+  await syInit();await msalInit();refreshSendUI();flush();autoRefresh();
+  try{await syPush();await syPullC();renderHome();}catch(e){console.warn(e);}
+  depuisPLN();sySync(true);
   if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
