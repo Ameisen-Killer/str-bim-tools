@@ -73,9 +73,9 @@ create policy "fgh arm : lecture" on public.fgh_controles_photos for select to a
 create policy "fgh arm : ajout" on public.fgh_controles_photos for insert to anon, authenticated with check (true);
 create policy "fgh arm : modif" on public.fgh_controles_photos for update to anon, authenticated using (true) with check (true);
 
--- photos : seau privé, JPEG/PNG de 15 Mo au plus
+-- photos (JPEG/PNG) et fiches PDF à envoyer par mail : seau privé, 40 Mo au plus par fichier
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('fgh-arm', 'fgh-arm', false, 15728640, array['image/jpeg', 'image/png'])
+values ('fgh-arm', 'fgh-arm', false, 41943040, array['image/jpeg', 'image/png', 'application/pdf'])
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 

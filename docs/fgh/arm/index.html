@@ -202,12 +202,10 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   <div class="row2" style="margin:0"><label class="fld" style="flex:0 0 34%;margin:0 0 8px"><span>N° d'affaire</span><input id="sNum"></label><label class="fld" style="flex:1;margin:0 0 8px"><span>Nom</span><input id="sNom"></label></div>
   <label class="fld"><span>Intitulé sur la fiche (N° et titre du projet)</span><input id="sProjet"></label>
   <div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0 0 8px"><span>Auteur du contrôle</span><input id="sAuteur"></label><label class="fld" style="flex:1;margin:0 0 8px"><span>Lieu</span><input id="sLieu"></label></div>
-  <div class="h">Compte Microsoft 365 (envoi et actualisation)</div>
-  <div class="conn" id="m365"></div>
+  <div class="conn hidden" id="m365"></div>
   <div class="h">Connecteurs</div>
   <div id="connList"></div>
-  <div class="h">Envois</div>
-  <div class="conn" id="outboxBox"></div>
+  <div class="conn hidden" id="outboxBox"></div>
   <div class="h">Dictée vocale</div>
   <div class="conn" id="dictCfg"></div>
   <div class="h">Partager ce projet</div>
@@ -315,23 +313,17 @@ function renderConn(){
   if(!S)return;$('#cTitle').textContent=projLabel(S);
   $('#sNum').value=S.numero||'';$('#sNom').value=S.nom||'';$('#sProjet').value=S.projet||'';$('#sAuteur').value=S.auteur||'';$('#sLieu').value=S.lieu||'';
   $('#connList').innerHTML=
-    connCard('index','Index des contrôles','Non connecté : le n° proposé ne tient pas compte des derniers contrôles.',IDX,IDX?`${esc(IDX.file)} · dernier n° ${IDX.last} · lu le ${IDX.loaded}`:'')+
     (S.plansSrc==='pln'?`<div class="conn"><div class="hd"><span class="dot ${PLANS&&PLANS.src==='pln'?'ok':'ko'}"></span><div class="t"><b>Liste des plans</b><div class="muted">${PLANS&&PLANS.src==='pln'?`Liste FGH en ligne · ${PLANS.rows.length} plans · lue le ${PLANS.loaded}`:'Liste FGH en ligne, pas encore lue.'}</div></div></div>
      <div class="acts"><button class="btn s" data-pln="1">Actualiser</button><a class="btn s w" href="/fgh/pln/" target="_blank" rel="noopener" style="text-decoration:none">Ouvrir la liste</a><button class="btn s w" data-plnoff="1">Utiliser un fichier Excel</button></div>
      <p class="muted" style="margin:8px 0 0">Relue à chaque ouverture en ligne. À l'envoi d'un contrôle, ses plans ARM et LIS y sont marqués « contrôlé ».</p></div>`
     :connCard('plans','Liste des plans','Non connectée : pas de recherche du dernier indice.',PLANS,PLANS?`${esc(PLANS.file)} · ${PLANS.rows.length} lignes · lue le ${PLANS.loaded}`:'').replace('<div class="acts">','<div class="acts"><button class="btn s" data-pln="1">Liste FGH en ligne</button>'))+
-    `<div class="conn"><div class="hd"><span class="dot ${S.links.photos?'ok':'ko'}"></span><div class="t"><b>Dossier photos</b><div class="muted">Envoi des photos dans un sous-dossier par contrôle, nommé comme la fiche.</div></div></div>
-     <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Lien OneDrive / SharePoint du dossier (envoi)</span><input data-link="photos" value="${esc(S.links.photos)}" placeholder="https://…sharepoint.com/…/Photos"></label>
-     <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Chemin Windows (pour Claude)</span><input data-pp="pPhotos" value="${esc(S.pPhotos)}" placeholder="C:\\Users\\…\\Photos"></label>
-     ${S.links.photos?'<div class="acts"><button class="btn s w" data-test="photos">Tester le lien</button></div>':''}</div>
-    <div class="conn"><div class="hd"><span class="dot ${S.links.fiches?'ok':'ko'}"></span><div class="t"><b>Dossier des fiches</b><div class="muted">Envoi de la fiche PDF et du fichier de synchronisation (sous-dossier Skill/sync).</div></div></div>
-     <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Lien OneDrive / SharePoint du dossier « Controle Arm » (envoi)</span><input data-link="fiches" value="${esc(S.links.fiches)}" placeholder="https://…sharepoint.com/…/Controle Arm"></label>
-     <label class="fld" style="margin:8px 0 0;padding:6px 10px"><span>Chemin Windows (pour Claude)</span><input data-pp="pCtrl" value="${esc(S.pCtrl)}" placeholder="C:\\Users\\…\\Controle Arm"></label>
-     ${S.links.fiches?'<div class="acts"><button class="btn s w" data-test="fiches">Tester le lien</button></div>':''}</div>
-    <div class="conn"><div class="hd"><span class="dot ${S.mailTo?'ok':''}"></span><div class="t"><b>Destinataires du mail</b><div class="muted">Une adresse par ligne. Vide = destinataires par défaut du skill.</div></div></div>
+    `<div class="conn"><div class="hd"><span class="dot ${Object.keys(SYQ).length?'':'ok'}"></span><div class="t"><b>Sauvegarde en ligne</b><div class="muted">Fiches et photos copiées dans la base du site dès qu'il y a du réseau, et visibles sur tous les appareils.</div></div></div>
+     <p class="muted" style="margin:8px 0 0">${Object.keys(SYQ).length?Object.keys(SYQ).length+' élément(s) en attente d\'envoi':'Tout est sauvegardé.'}</p><div class="acts"><button class="btn s" data-sync="1">Synchroniser maintenant</button></div></div>
+    <div class="conn"><div class="hd"><span class="dot ${S.mailTo?'ok':''}"></span><div class="t"><b>Adresse(s) mail</b><div class="muted">Proposée(s) quand tu t'envoies une fiche. Une par ligne.</div></div></div>
      <label class="fld" style="margin:8px 0 0;padding:6px 10px"><textarea data-pp="mailTo" placeholder="prenom.nom@entreprise.ch">${esc(S.mailTo)}</textarea></label></div>`;
   const R=$('#connList');
   R.querySelectorAll('[data-pln]').forEach(b=>b.onclick=()=>loadPLN());
+  R.querySelectorAll('[data-sync]').forEach(b=>b.onclick=async()=>{SYERR='';busy(true,'Synchronisation…');await sySync(false);busy(false);renderConn();});
   R.querySelectorAll('[data-plnoff]').forEach(b=>b.onclick=async()=>{S.plansSrc='xlsx';PLANS=null;await DB.kvSet('plans:'+S.id,null);saveProjects();renderConn();renderHome();});
   R.querySelectorAll('[data-load]').forEach(i=>i.onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)loadConn(i.dataset.load,f);});
   R.querySelectorAll('[data-unl]').forEach(b=>b.onclick=async()=>{if(!confirm('Déconnecter ce fichier ?'))return;const k=b.dataset.unl;if(k==='index')IDX=null;else PLANS=null;await DB.kvSet(k==='index'?'idx:'+S.id:'plans:'+S.id,null);renderConn();renderHome();});
@@ -747,33 +739,39 @@ $('#bSel').onclick=()=>{SEL=SEL?null:new Set();renderHome();};
 $('#selNone').onclick=()=>{SEL=new Set();renderHome();};
 $('#selSigned').onclick=()=>{SEL=new Set(projCtrls().filter(c=>c.sig_ctrl&&c.conclusion&&!c.mailedAt).map(c=>c.id));renderHome();if(!SEL.size)toast('Aucun contrôle signé non envoyé');};
 $('#selMail').onclick=()=>{if(!SEL||!SEL.size){toast('Sélectionne au moins un contrôle');return;}openMail([...SEL].map(id=>CTRLS.find(c=>c.id===id)).filter(Boolean).sort((a,b)=>a.numero-b.numero));};
-function mailBody(L){const ph=S.pPhotos||'';
+function mailBody(L){
   const lines=['Bonjour,','',L.length>1?'Nous avons réalisé les contrôles d\'armature suivants :':'Nous venons de réaliser le contrôle d\'armature suivant :',''];
   L.forEach(c=>{const plans=[c.plan_coffrage,c.plan_armatures].filter(Boolean).join(', ');
     lines.push(`• n°${c.numero} – ${c.description}${plans?' (plans '+plans+')':''}`);
     if(c.conclusion==='ok')lines.push('  Rien à signaler – bétonnage validé (cf. rapport ci-joint).');
     else{const T=[c.conclusions_texte_1,c.conclusions_texte_2].filter(Boolean).join(' ');lines.push('  Des reprises sont à effectuer avant bétonnage (cf. rapport ci-joint)'+(T?' : '+T:'.'));}
     lines.push('');});
-  if(ph)lines.push('Photos des contrôles : '+ph,'');
   lines.push('Cordialement,',S.auteur||'');return lines.join('\n');}
 function openMail(L){MAILSEL=L;const uns=L.filter(c=>!c.sig_ctrl||!c.conclusion);
-  $('#mlTo').value=S.mailTo||'';
+  $('#mlTo').value=S.mailTo||lsGet('ca-mailme','')||'';
   const all=L.every(c=>c.conclusion==='ok'),any=L.some(c=>c.conclusion==='pas_ok');
   $('#mlSubj').value=`${S.numero||''} ${S.nom||''} – Contrôle${L.length>1?'s':''} avant bétonnage n°${L.map(c=>c.numero).join(', ')}${L.length===1?' – '+L[0].description:''} – ${any?'Reprises':all?'Validation':'Contrôle'}`.trim();
   $('#mlBody').value=mailBody(L);$('#mlPh').checked=false;
-  $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${ACCOUNT?'Envoi par Microsoft 365 ('+esc(ACCOUNT.username)+')'+(navigator.onLine?'':' – hors ligne : envoi au retour du réseau'):'Sans compte Microsoft 365 : le mail s\'ouvre dans l\'appli Mail du téléphone avec les PDF joints.'}</div>`;
+  $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${navigator.onLine?'Envoi direct depuis contact@str-bim-tools.com, la fiche PDF en pièce jointe.':'Hors ligne : le mail s\'ouvre dans l\'appli Mail du téléphone avec la fiche jointe.'}</div>`;
   openModal('mMail');}
+// envoi par la fonction Supabase « fgh-arm-mail » (Resend) : PDF déposés dans le seau fgh-arm (m/…), joints puis effacés par la fonction
+async function mailEnLigne(to,subj,body,files){busy(true,'Envoi du mail…');const dossier='m/'+uid()+uid(),pj=[];
+  const tot=files.reduce((a,f)=>a+f.size,0);if(tot>30e6)throw new Error('Mail trop lourd ('+Math.round(tot/1e6)+' Mo) : décoche « Joindre aussi les photos ».');
+  for(const [i,f] of files.entries()){const chemin=dossier+'/fiche-'+(i+1)+'.pdf';await stFetch(chemin,{method:'POST',body:f,type:'application/pdf',upsert:true});pj.push({chemin,nom:f.name});}
+  let r;try{r=await fetch(PLN.url+'/functions/v1/fgh-arm-mail',{method:'POST',headers:{apikey:PLN.cle,'Content-Type':'application/json'},body:JSON.stringify({a:to,sujet:subj,texte:body,fichiers:pj})});}
+  catch(e){throw new Error('Envoi du mail impossible : serveur injoignable.');}
+  let j={};try{j=await r.json();}catch(e){}
+  if(!r.ok||!j.ok)throw new Error('Envoi du mail impossible : '+(j.erreur||(r.status===404?'la fonction fgh-arm-mail n\'est pas encore déployée dans Supabase':'erreur '+r.status)));
+  lsSet('ca-mailme',to.join('\n'));}
+function syEnAttente(c){if(!c)return 0;let n=SYQ['ctrl:'+c.id]?1:0;(typeof PHOTOS!=='undefined'&&CUR===c?PHOTOS:[]).forEach(p=>{if(SYQ['photos:'+p.id])n++;});return n;}
 async function pdfFor(c,withPhotos){const sc=CUR,sp=PHOTOS;CUR=c;PHOTOS=(await DB.byCtrl(c.id)).sort((a,b)=>a.ord-b.ord);try{return await makePDF({noPhotos:!withPhotos});}finally{CUR=sc;PHOTOS=sp;}}
 const b64=blob=>blobToDataURL(blob).then(u=>u.split(',')[1]);
 $('#mlSend').onclick=async()=>{const L=MAILSEL;const to=$('#mlTo').value.split(/[\n;,]+/).map(x=>x.trim()).filter(Boolean);const subj=$('#mlSubj').value,body=$('#mlBody').value,wp=$('#mlPh').checked;
   busy(true,'Préparation des PDF…');
   try{const files=[];for(const c of L){files.push(new File([await pdfFor(c,wp)],safe(baseName(c))+'.pdf',{type:'application/pdf'}));}
-    if(ACCOUNT){if(!to.length)throw new Error('Indique au moins un destinataire.');
-      let size=files.reduce((a,f)=>a+f.size,0);if(size>3e6&&wp)throw new Error('Mail trop lourd avec les photos ('+Math.round(size/1e6)+' Mo) : décoche « Joindre aussi les photos ».');
-      const msg={message:{subject:subj,body:{contentType:'Text',content:body},toRecipients:to.map(a=>({emailAddress:{address:a}})),
-        attachments:await Promise.all(files.map(async f=>({'@odata.type':'#microsoft.graph.fileAttachment',name:f.name,contentType:'application/pdf',contentBytes:await b64(f)})))},saveToSentItems:true};
-      await DB.put('outbox',{id:uid(),kind:'mail',ctrlIds:L.map(c=>c.id),projectId:S.id,dest:'mail',path:'✉️ '+subj,blob:new Blob([JSON.stringify(msg)],{type:'application/json'}),status:'pending',tries:0,created:Date.now()});
-      busy(false);closeModal('mMail');toast(navigator.onLine?'Envoi du mail…':'Hors ligne : le mail partira au retour du réseau',3000);SEL=null;renderHome();flush();}
+    let parti=false;
+    if(navigator.onLine&&to.length){try{await mailEnLigne(to,subj,body,files);parti=true;}catch(e){console.warn(e);busy(false);if(!confirm(e.message+'\n\nOuvrir plutôt l\'appli Mail avec la fiche jointe ?'))return;}}
+    if(parti){busy(false);const st=nowStamp();for(const c of L){c.mailedAt=st;await DB.put('ctrl',c);}closeModal('mMail');SEL=null;toast('Mail envoyé à '+to.join(', '),3500);if(CUR)renderStep();else renderHome();}
     else{busy(false);const data={files,title:subj,text:(to.length?'À : '+to.join(', ')+'\n\n':'')+body};
       if(navigator.canShare&&navigator.canShare({files})){await navigator.share(data);}
       else{files.forEach(f=>download(f,f.name));location.href='mailto:'+encodeURIComponent(to.join(','))+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body+'\n\n(PDF téléchargés à joindre)');}
@@ -893,21 +891,23 @@ const STEPS=[
    sec(4,'Vérifications',CHECKS.map(([k,l])=>(CUR[k]==='oui'?'✓ ':CUR[k]==='non'?'✗ ':'– ')+esc({recouvrement:'Recouvrement',disposition_nappes:'Disposition',ecartement_nappes:'Écartement',poinconnement_dispo:'Poinçonnement'}[k])).join(' · '))+
    sec(5,'Photos',PHOTOS.length+' photo(s), '+PHOTOS.filter(p=>p.statut==='reprise').length+' reprise(s)')+
    sec(7,'Conclusion',CUR.conclusion==='ok'?'Validé':CUR.conclusion==='pas_ok'?'Reprises : '+repItems().length:'à choisir')+
-   `<div class="h">Envoi</div>
-   <div class="${CUR.sentAt?'okmsg':'res'}" id="sendState">${sendStateTxt(CUR)}</div>
-   <button class="btn main" id="bSend">📤 ${CUR.sentAt?'Renvoyer':'Envoyer'} photos et fiche</button>
-   ${PLANS&&PLANS.src==='pln'&&CUR.marquer_plans&&(CUR.plans||[]).some(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()))?`<div class="${CUR.plnMarkedAt?'okmsg':'res'}">${CUR.plnMarkedAt?'✓ Plans marqués contrôlés dans la liste FGH le '+esc(CUR.plnMarkedAt):CUR.plnPending?'↑ Marquage dans la liste FGH en attente du réseau':'Plans à marquer contrôlés dans la liste FGH à l\'envoi'}</div><button class="btn w" id="bPlnMark">✓ Marquer les plans contrôlés dans la liste FGH</button>`:''}
+   `<div class="h">Sauvegarde et envoi</div>
+   <div class="${syEnAttente(CUR)?'res':'okmsg'}" id="sendState">${syEnAttente(CUR)?'↑ Sauvegarde en ligne en attente du réseau ('+syEnAttente(CUR)+' élément(s))':'✓ Fiche et '+PHOTOS.length+' photo(s) sauvegardées en ligne'}${CUR.sentAt?' · validé le '+esc(CUR.sentAt):''}</div>
+   <button class="btn main" id="bSend">✓ ${CUR.sentAt?'Valider à nouveau':'Valider le contrôle'}</button>
+   <button class="btn" id="bMailMe">✉️ M'envoyer la fiche par mail</button>
+   ${PLANS&&PLANS.src==='pln'&&CUR.marquer_plans&&(CUR.plans||[]).some(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()))?`<div class="${CUR.plnMarkedAt?'okmsg':'res'}">${CUR.plnMarkedAt?'✓ Plans marqués contrôlés dans la liste FGH le '+esc(CUR.plnMarkedAt):CUR.plnPending?'↑ Marquage dans la liste FGH en attente du réseau':'Plans à marquer contrôlés dans la liste FGH à la validation'}</div><button class="btn w" id="bPlnMark">✓ Marquer les plans contrôlés dans la liste FGH</button>`:''}
    <div class="h">Fichiers</div>
    <button class="btn" id="bPdf">📄 Fiche PDF (+ photos)</button>
    <button class="btn w" id="bMd">📝 Export texte (.md)</button>
    <button class="btn w" id="bZip">📦 Paquet pour Index et dossier photos (.zip)</button>
-   ${navigator.canShare?'<button class="btn w" id="bShare">↗ Partager (OneDrive, mail…)</button>':''}
-   <p class="muted">Après l'envoi, demande à Claude « synchronise le contrôle n°${esc(CUR.numero)} » : Index${CUR.marquer_plans?', liste des plans':''} et mail sont mis à jour.</p>
-   <button class="btn red" id="bDel">Supprimer ce contrôle du téléphone</button>
+   ${navigator.canShare?'<button class="btn w" id="bShare">↗ Partager (mail, WhatsApp…)</button>':''}
+   <button class="btn red" id="bDel">Supprimer ce contrôle</button>
    <button class="btn w" id="bHome" style="margin-top:14px">‹ Retour à l'accueil</button>`;},
    b:root=>{root.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goSec(+x.dataset.go));
      $('#bMd').onclick=()=>download(new Blob([makeMD()],{type:'text/markdown;charset=utf-8'}),safe(baseName(CUR))+'.md');
-     $('#bSend').onclick=()=>{const c=CUR;remember(c);enqueue(c).then(()=>{if(c.sendState==='pending'||c.sentAt)plnMark(c);});};
+     $('#bSend').onclick=async()=>{const c=CUR;const w=checks();if(w.length&&!confirm('À vérifier :\n• '+w.join('\n• ')+'\n\nValider quand même ?'))return;
+       remember(c);c.sentAt=nowStamp();await DB.put('ctrl',c);sySync(true);await plnMark(c);toast(navigator.onLine?'Contrôle validé et sauvegardé en ligne':'Contrôle validé : sauvegarde en ligne au retour du réseau',3000);renderStep();};
+     $('#bMailMe').onclick=()=>{remember(CUR);openMail([CUR]);};
      const pm=$('#bPlnMark');if(pm)pm.onclick=()=>plnMark(CUR);$('#bHome').onclick=goHome;
      $('#bPdf').onclick=async()=>{busy(true,'Création du PDF…');try{download(await makePDF(),safe(baseName(CUR))+'.pdf');}catch(e){alert(e.message);}busy(false);};
      $('#bZip').onclick=async()=>{busy(true,'Création du paquet…');try{download(await makeZip(),safe(baseName(CUR))+'.zip');}catch(e){alert(e.message);}busy(false);};
@@ -1178,7 +1178,7 @@ if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(locatio
   PROJECTS.forEach(p=>{p.links=Object.assign({index:'',plans:'',photos:'',fiches:''},p.links||{});p.res=p.res||{};p.conn=Object.assign(clone(CONN_DEF),p.conn||{});});
   for(const c of CTRLS)if(!c.projectId){c.projectId=PROJECTS[0].id;await DB.put('ctrl',c);}
   await setProject(lsGet('ca-proj',null)||PROJECTS[0].id);
-  await syInit();await msalInit();refreshSendUI();flush();autoRefresh();
+  await syInit();refreshSendUI();autoRefresh();
   try{await syPush();await syPullC();renderHome();}catch(e){console.warn(e);}
   depuisPLN();sySync(true);
   if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});

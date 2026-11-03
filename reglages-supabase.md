@@ -186,3 +186,25 @@ service sont fournies d'office à la fonction.
 
 Une visite faite ensuite affiche son nom réseau dans « 05 — Dernières visites » de /stats/
 (« sans nom réseau » quand l'adresse n'en a pas, « — » pour les visites d'avant).
+
+## 10. Fiches ARM par mail (outil /fgh/arm/)
+
+Depuis le 03.11.2026, ARM n'utilise plus Microsoft 365 ni SharePoint : fiches et photos sont
+sauvegardées dans Supabase (`migration-fgh-arm.sql`), et le bouton « M'envoyer la fiche par mail »
+passe par une fonction qui envoie avec Resend, depuis une adresse du domaine.
+
+1. SQL Editor : coller `migration-fgh-arm.sql`, Run (rejouable).
+2. Resend > API Keys > Create API key, permission **Sending access**, domaine `str-bim-tools.com`.
+   Copier la clé (elle ne s'affiche qu'une fois).
+3. Supabase > Edge Functions > Secrets (ou Settings > Edge Functions) : ajouter
+   - `RESEND_API_KEY` = la clé du point 2 ;
+   - `FGH_MAIL_AUTORISES` = les adresses ou domaines qui peuvent recevoir une fiche, séparés par des
+     virgules, par exemple `varintony@gmail.com, @mon-bureau.ch` (un domaine commence par `@`) ;
+   - au choix `FGH_MAIL_DE` = l'expéditeur, par défaut `Contrôle armatures FGH <contact@str-bim-tools.com>`.
+4. Edge Functions > Deploy a new function > **Via Editor**, nom **`fgh-arm-mail`**, coller le
+   contenu de `supabase/functions/fgh-arm-mail/index.ts`, Deploy. Puis **Enforce JWT Verification**
+   désactivé, Save.
+
+Sans la fonction (ou hors réseau), ARM propose d'ouvrir l'appli Mail du téléphone avec la fiche jointe.
+Une adresse hors de `FGH_MAIL_AUTORISES` est refusée : c'est ce qui empêche quiconque d'utiliser la
+fonction pour écrire à n'importe qui depuis le domaine.
