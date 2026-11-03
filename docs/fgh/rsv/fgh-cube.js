@@ -55,11 +55,11 @@
       var clair = document.documentElement.getAttribute("data-theme") === "clair";
       return clair ? {
         face: [252, 252, 252], ombre: [.80, .20], arete: "rgba(0,0,0,.36)", texte: "rgb(60,60,60)",
-        or: "rgb(0,95,184)", orFond: "rgba(0,95,184,.20)", anneau: "rgba(0,0,0,.07)", anneauTrait: "rgba(0,0,0,.28)",
+        or: "rgb(77,122,28)", orFond: "rgba(77,122,28,.20)", anneau: "rgba(0,0,0,.07)", anneauTrait: "rgba(0,0,0,.28)",
         lettre: "rgb(60,60,60)", outil: "rgba(0,0,0,.55)"
       } : {
         face: [70, 70, 70], ombre: [.70, .50], arete: "rgba(255,255,255,.36)", texte: "rgb(255,255,255)",
-        or: "rgb(96,205,255)", orFond: "rgba(96,205,255,.32)", anneau: "rgba(255,255,255,.09)", anneauTrait: "rgba(255,255,255,.30)",
+        or: "rgb(156,203,82)", orFond: "rgba(156,203,82,.32)", anneau: "rgba(255,255,255,.09)", anneauTrait: "rgba(255,255,255,.30)",
         lettre: "rgb(255,255,255)", outil: "rgba(255,255,255,.62)"
       };
     }

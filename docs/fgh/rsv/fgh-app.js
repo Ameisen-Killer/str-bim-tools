@@ -1202,7 +1202,7 @@
   $("#btn-theme").addEventListener("click", function(){
     var c = document.documentElement.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
     document.documentElement.setAttribute("data-theme", c);
-    document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
+    document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F4F5F2" : "#1B1D19");
     lsSet("fgh.theme", c);
   });
   // fermeture de la page : la dernière décision (commentaire en cours de frappe compris) part tout de suite

@@ -6,25 +6,25 @@
 <meta name="robots" content="noindex, nofollow">
 <title>FGH · Validation des réservations · STR Bim Tools</title>
 <meta name="description" content="Valide ou refuse les demandes de réservation dans le navigateur, sur les IFC de la structure et des réservations. Les fichiers ne quittent pas ton poste.">
-<meta name="theme-color" content="#202020">
-<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("fgh.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
+<meta name="theme-color" content="#1B1D19">
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("fgh.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F4F5F2");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 19h24v5H4z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M12 16h8v11h-8z' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Cpath d='M20 6l3 3 6-6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
-/* Habillage inspiré de Windows 11 (Fluent) : fond Mica, couches claires arrondies, contrôles à 4 px,
+/* Charte AB (vert et gris du bureau, 03.11.2026) sur l'habillage inspiré de Windows 11 (Fluent) : fond Mica, couches claires arrondies, contrôles à 4 px,
    cartes à 8 px, accent bleu Windows, police Segoe UI Variable (celle de Windows, aucun téléchargement) */
 :root{
   color-scheme:dark;
   --encre:255,255,255;
   --fond-rvb:44,44,44;
-  --or-rvb:96,205,255;
-  --or:#60CDFF;
-  --sur-accent:#000;
-  --mica:#202020;
-  --couche:#272727;
-  --couche-2:#2D2D2D;
+  --or-rvb:156,203,82;
+  --or:#9CCB52;
+  --sur-accent:#12180A;
+  --mica:#1B1D19;
+  --couche:#22251F;
+  --couche-2:#292D25;
   --controle:rgba(255,255,255,.061);
   --controle-survol:rgba(255,255,255,.084);
   --controle-appui:rgba(255,255,255,.033);
@@ -44,7 +44,7 @@
   --sans:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
   --titre:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
   --haut:48px;
-  --vue-fond:#1C1C1C;
+  --vue-fond:#191B17;
   --vue-piece:226,226,226;
   --vue-arete:255,255,255;
 }
@@ -52,11 +52,11 @@
   color-scheme:light;
   --encre:0,0,0;
   --fond-rvb:251,251,251;
-  --or-rvb:0,95,184;
-  --or:#005FB8;
+  --or-rvb:77,122,28;
+  --or:#4D7A1C;
   --sur-accent:#FFF;
-  --mica:#F3F3F3;
-  --couche:#F9F9F9;
+  --mica:#F4F5F2;
+  --couche:#FAFBF8;
   --couche-2:#FFFFFF;
   --controle:rgba(255,255,255,.7);
   --controle-survol:rgba(249,249,249,.5);
@@ -73,7 +73,7 @@
   --vert:#0F7B0F;
   --orange:#9D5D00;
   --bleu:#2F6496;
-  --vue-fond:#EEF0F3;
+  --vue-fond:#EEF1EA;
   --vue-piece:250,250,250;
   --vue-arete:30,30,30;
 }
@@ -95,16 +95,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .barre a{text-decoration:none;color:inherit}
 .barre .logo{display:flex;align-items:center;gap:10px;color:var(--texte-doux)}
 .barre .logo svg{width:20px;height:20px;flex:none}
+.barre .logo img{display:block;height:32px;width:auto;flex:none}
 .barre .logo:hover{color:var(--texte)}
 .barre .titre{font-size:14px;color:var(--texte)}
 .barre .titre b{font-weight:600}
 .barre .ver{padding:1px 8px;border-radius:10px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-doux);font-size:11px}
 .barre .esp{flex:1}
-.barre .menu-fgh{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--bord-controle);background:var(--controle);color:var(--texte-doux)}
-.barre .menu-fgh svg{width:14px;height:14px}
-.barre .menu-fgh:hover{background:var(--controle-survol);color:var(--texte)}
-@media (max-width:760px){.barre .menu-fgh span{display:none}}
-.barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
+@media (max-width:760px){.barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
 .barre .json::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
 .barre .json.on{color:var(--vert)}
 @media (max-width:760px){.barre .json{max-width:30vw}}
@@ -320,9 +317,8 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 </head>
 <body>
 <header class="barre">
-  <a class="logo" href="/fgh/" title="Outils du chantier FGH"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M5 19h22v5H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 15h8v11h-8z" fill="none" stroke="var(--or)" stroke-width="1.8"/><path d="M19 8l3 3 6-6" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sous-titre">STR Bim Tools</span></a>
+  <a class="logo" href="/fgh/" title="Retour au menu Fairmont"><img src="/fgh/logo-ab-horizontal.svg?v=1" alt="AB Ingénieurs" width="96" height="32"><span class="sous-titre">Retour au menu Fairmont</span></a>
   <span class="titre">FGH · <b>Validation des réservations</b></span>
-  <a class="menu-fgh" href="/fgh/" title="Retour au menu des outils FGH"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="2" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><span>Menu FGH</span></a>
   <span class="ver" id="version"></span>
   <span class="json" id="json-etat">Aucun JSON connecté</span>
   <span class="esp"></span>
@@ -416,8 +412,8 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <input type="file" id="fichier" accept=".ifc" multiple hidden>
 
 <script src="/fgh/rsv/fgh-core.js?v=2"></script>
-<script src="/fgh/rsv/fgh-vue.js?v=18"></script>
-<script src="/fgh/rsv/fgh-cube.js?v=4"></script>
-<script src="/fgh/rsv/fgh-app.js?v=36"></script>
+<script src="/fgh/rsv/fgh-vue.js?v=19"></script>
+<script src="/fgh/rsv/fgh-cube.js?v=5"></script>
+<script src="/fgh/rsv/fgh-app.js?v=37"></script>
 </body>
 </html>
