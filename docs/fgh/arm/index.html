@@ -272,7 +272,6 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 <script src="/fgh/arm/vendor/jspdf-2.5.1.umd.min.js?v=1"></script>
 <script src="/fgh/arm/vendor/jszip-3.10.1.min.js?v=1"></script>
 <script src="/fgh/arm/vendor/xlsx-0.18.5.full.min.js?v=1"></script>
-<script src="/fgh/arm/vendor/msal-browser-2.39.0.min.js?v=1"></script>
 <script>
 'use strict';
 const LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAChAKoDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9SKKKK/n88sKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAr1LwZ+z3Z+IfC9lrmq61cW011F5nkpGpAUklTz6rg/jXCeBPDMni/xZZaAo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';
@@ -488,7 +487,7 @@ async function syPush(){if(SYB||!navigator.onLine)return;const keys=Object.keys(
       if(SYQ[k]===q)delete SYQ[k];fait++;}
     SYERR='';}
   catch(e){if(SYERR!==e.message){SYERR=e.message;toast((/pas encore créée/.test(e.message)?'Fiches en ligne : table pas encore créée dans Supabase (migration-fgh-arm.sql)':e.message)+' : nouvel essai plus tard',5000);}setTimeout(syPush,60000);}
-  finally{SYB=false;await DB.kvSet('sync:file',SYQ);if(fait)syEtat();if(Object.keys(SYQ).length&&!SYERR)setTimeout(syPush,500);}}
+  finally{SYB=false;await DB.kvSet('sync:file',SYQ);syEtat();if(Object.keys(SYQ).length&&!SYERR)setTimeout(syPush,500);}}
 // fiches reçues (rapide, à l'ouverture) puis photos (en arrière-plan)
 async function syPullC(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGet('sync:marques')||{};let n=0,depuis=M.c||'1970-01-01T00:00:00Z';
   for(;;){const L=await plnFetch('fgh_controles?select=*&modifie_le=gte.'+encodeURIComponent(depuis)+'&order=modifie_le&limit=500');
@@ -515,7 +514,7 @@ async function sySync(quiet){if(SYPULL)return;SYPULL=true;
   try{await syPush();const a=await syPullC();if(a&&!CUR)renderHome();const b=await syPullP();if((a||b)&&!quiet)toast((a?a+' fiche(s)':'')+(a&&b?' et ':'')+(b?b+' photo(s)':'')+' reçue(s) des autres appareils');
     if(b&&CUR&&!$('#vWiz').classList.contains('hidden'))renderStep();syEtat();}
   catch(e){console.warn(e);if(SYERR!==e.message){SYERR=e.message;if(!quiet)toast(e.message,4000);}}finally{SYPULL=false;}}
-function syEtat(){const n=Object.keys(SYQ).length;lsSet('ca-sync',{t:Date.now(),n});const el=$('#syEtat');if(el)el.textContent=n?n+' élément(s) à envoyer en ligne':'Fiches et photos en ligne : à jour '+new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});}
+function syEtat(){const n=Object.keys(SYQ).length;lsSet('ca-sync',{t:Date.now(),n});const el=$('#syEtat');if(el)el.textContent=n?n+' élément(s) à sauvegarder sur Supabase'+(SYERR?' · '+(/pas encore créée/.test(SYERR)?'table pas encore créée (migration-fgh-arm.sql)':SYERR):(navigator.onLine?' · envoi en cours':' · hors ligne')):'Fiches et photos en ligne : à jour '+new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});}
 async function syInit(){SYQ=await DB.kvGet('sync:file')||{};
   if(!await DB.kvGet('sync:init')){for(const c of CTRLS){SYQ['ctrl:'+c.id]={s:'ctrl',id:c.id,t:Date.now()};for(const ph of await DB.byCtrl(c.id))SYQ['photos:'+ph.id]={s:'photos',id:ph.id,t:Date.now()};}
     await DB.kvSet('sync:file',SYQ);await DB.kvSet('sync:init',1);}}
@@ -599,18 +598,18 @@ function renderHome(){if(!S)return;
   const L=[...projCtrls()].sort((a,b)=>b.created-a.created);
   $('#list').innerHTML=L.length?L.map(c=>{const d=c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';const st=idxState(c);
     return `<div class="it" data-open="${c.id}">${SEL?`<input type="checkbox" data-sel="${c.id}" ${SEL.has(c.id)?'checked':''} style="width:22px;height:22px;flex:0 0 auto">`:''}<span class="dot ${d}"></span><div class="t"><div><b>n°${esc(c.numero)}</b> ${esc(c.description||'sans description')}</div>
-    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'reprises':'en cours'}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · envoyé':c.sendState==='pending'?' · ↑ en attente':''}${st?' · '+st:''}</div></div><span class="chev">›</span></div>`;}).join('')
+    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'reprises':'en cours'}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · validé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div></div><span class="chev">›</span></div>`;}).join('')
     :'<div class="it" style="cursor:default"><div class="t s muted">Aucun contrôle pour l\'instant.</div></div>';
   $$('[data-open]').forEach(el=>el.onclick=e=>{if(SEL){const id=el.dataset.open;SEL.has(id)?SEL.delete(id):SEL.add(id);renderHome();return;}openCtrl(el.dataset.open,true);});
   $('#selBar').classList.toggle('hidden',!SEL);$('#bSel').textContent=SEL?'Terminer':'Sélectionner';if(SEL)$('#selN').textContent=SEL.size;
   renderSendLine();
-  $('#dataLine').innerHTML=`Index ${IDX?'<b>✓</b>':'<i>✗</i>'} · Liste des plans ${PLANS?'<b>✓</b>':'<i>✗</i>'} · ${IDX||PLANS?'lu le '+(IDX||PLANS).loaded.slice(0,5):'à charger'} ›`;
+  $('#dataLine').innerHTML=`Liste des plans ${PLANS?'<b>✓</b> · lue le '+PLANS.loaded.slice(0,5):'<i>✗</i> · à charger'} ›`;
 }
 $('#dataLine').onclick=()=>openModal('mData');$('#bSet').onclick=()=>openModal('mData');
 function openModal(id){renderData();$('#'+id).classList.remove('hidden');}
 function closeModal(id){$('#'+id).classList.add('hidden');}
 $$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
-$('#bNew').onclick=async()=>{if(!IDX&&!confirm('Index non chargé : le n° proposé peut être déjà pris. Continuer ?'))return;
+$('#bNew').onclick=async()=>{
   const c=newCtrl();CTRLS.push(c);await DB.put('ctrl',c);openCtrl(c.id,false);};
 async function openCtrl(id,existing){CUR=CTRLS.find(c=>c.id===id);PHOTOS=(await DB.byCtrl(id)).sort((a,b)=>a.ord-b.ord);
   $('#vHome').classList.add('hidden');$('#vWiz').classList.remove('hidden');$('#bBack').classList.remove('hidden');
@@ -858,7 +857,7 @@ const STEPS=[
    F('localisation','Localisation',{max:20,ph:'ex. Noyau C Rinf'})+F('type_element','Type d\'élément',{ph:'ex. Façade socle - Allège - Axe B1 à B5'})+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>N° de contrôle</span><input data-k="numero" inputmode="numeric" value="${esc(CUR.numero)}"></label>
    <label class="fld" style="flex:1;margin:0"><span>Date</span><input data-k="date" value="${esc(CUR.date)}"></label></div>
-   <p class="muted">${IDX?'Dernier n° dans l\'Index : '+IDX.last+(idxState(CUR)==='n° déjà pris dans l\'Index'?' · <b style="color:var(--ko)">ce n° est déjà pris</b>':''):'Index non chargé : n° à vérifier.'}</p>`},
+   <p class="muted">${IDX?'Dernier n° dans l\'Index : '+IDX.last+(idxState(CUR)==='n° déjà pris dans l\'Index'?' · <b style="color:var(--ko)">ce n° est déjà pris</b>':''):''}</p>`},
  {t:'Plans',q:'Quels plans ?',pre:()=>autoProposePlans(),r:()=>[['plan_coffrage','Plan de coffrage'],['plan_armatures','Plan d\'armatures'],['listes','Listes de fers']].map(([k,l])=>{
      const linked=(CUR.plans||[]).filter(p=>p.field===k);
      const prop=CUR._planProp&&CUR._planProp[k];const sug=CUR[k]&&!prop?[]:suggestPlans(k).filter(r=>planLabel(r)!==CUR[k]);
@@ -965,7 +964,7 @@ function watchSections(){if(SECOBS)SECOBS.disconnect();if(!('IntersectionObserve
     const on=$(`#secnav button[data-j="${i}"]`);if(on)on.scrollIntoView({block:'nearest',inline:'center'});}});},{rootMargin:'-120px 0px -60% 0px'});
   $$('#stepBody .sec').forEach(s=>SECOBS.observe(s));}
 function checks(){const w=[];
-  if(!CUR.description)w.push('Description vide.');if(!IDX)w.push('Index non chargé : n° non vérifié.');else if(idxState(CUR)==='n° déjà pris dans l\'Index')w.push('Le n°'+CUR.numero+' est déjà pris dans l\'Index.');
+  if(!CUR.description)w.push('Description vide.');if(IDX&&idxState(CUR)==='n° déjà pris dans l\'Index')w.push('Le n°'+CUR.numero+' est déjà pris dans l\'Index.');
   if(!CUR.plan_armatures)w.push('Plan d\'armatures non renseigné.');if((CUR.localisation||'').length>20)w.push('Localisation trop longue (> 20 caractères).');
   if(!CUR.conclusion)w.push('Conclusion non choisie.');if(!CUR.sig_ctrl)w.push('Signature du contrôleur manquante.');if(PHOTOS.some(p=>p.statut==='reprise'&&!p.comment))w.push('Photo(s) en reprise sans commentaire.');return w;}
 
@@ -1073,8 +1072,7 @@ async function flush(){if(FLUSHING||!navigator.onLine||!ACCOUNT)return refreshSe
     const left=await DB.all('outbox');
     for(const id of touched){const c=CTRLS.find(x=>x.id===id);if(c&&!left.some(i=>i.ctrlId===id)){c.sendState='';c.sendErr='';c.sentAt=nowStamp();await DB.put('ctrl',c);toast('n°'+c.numero+' envoyé');if(c.marquer_plans&&c.pdfUrl)plnMark(c,true);}}}
   finally{FLUSHING=false;refreshSendUI();}}
-async function renderSendLine(){const n=(await DB.all('outbox')).length;const el=$('#sendLine');if(!el)return;
-  el.innerHTML=n?`↑ <b style="color:var(--warn)">${n} élément(s) en attente d'envoi</b> · ${navigator.onLine?(ACCOUNT?'envoi en cours':'connexion Microsoft 365 requise'):'hors ligne'}`:(ACCOUNT?'Envois : <b>✓</b> à jour':'');}
+async function renderSendLine(){const el=$('#sendLine');if(el)el.innerHTML='';}
 async function renderOutbox(){const b=$('#outboxBox');if(!b)return;const L=(await DB.all('outbox')).sort((a,b)=>a.created-b.created);
   b.innerHTML=`<div class="hd"><span class="dot ${L.length?'wip':'ok'}"></span><div class="t"><b>${L.length?L.length+' élément(s) en attente':'Rien en attente'}</b><div class="muted">${navigator.onLine?'En ligne':'Hors ligne'} · les envois partent automatiquement dès que le réseau revient (appli ouverte).</div></div></div>`+
    L.slice(0,12).map(i=>`<div class="muted" style="margin-top:6px">${i.status==='error'?'⚠':'↑'} ${esc(i.path)}${i.err?' – '+esc(i.err):''}</div>`).join('')+(L.length>12?`<div class="muted">… ${L.length-12} autres</div>`:'')+
@@ -1083,12 +1081,9 @@ async function renderOutbox(){const b=$('#outboxBox');if(!b)return;const L=(awai
   const c=$('#obClr');if(c)c.onclick=async()=>{if(!confirm('Supprimer les envois en attente ? (les contrôles et photos restent sur le téléphone)'))return;for(const i of await DB.all('outbox'))await DB.del('outbox',i.id);
     CTRLS.forEach(x=>{if(x.sendState){x.sendState='';DB.put('ctrl',x);}});refreshSendUI();};}
 function refreshSendUI(){$('#netBadge').classList.toggle('hidden',navigator.onLine);renderSendLine();if(!$('#mData').classList.contains('hidden'))renderOutbox();
-  if(CUR&&!$('#vWiz').classList.contains('hidden')){const e=$('#sendState');if(e){e.innerHTML=sendStateTxt(CUR);e.className=CUR.sentAt?'okmsg':'res';}}
   if(!$('#vHome').classList.contains('hidden'))renderHomeList&&renderHomeList();}
-window.addEventListener('online',()=>{toast('Réseau retrouvé : envoi des éléments en attente');flush();autoRefresh();});
+window.addEventListener('online',()=>{toast('Réseau retrouvé : sauvegarde en ligne');autoRefresh();});
 window.addEventListener('offline',refreshSendUI);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')flush();});
-setInterval(flush,60000);
 async function autoRefresh(){if(S&&S.plansSrc===undefined&&String(S.numero)==='6848'&&(!PLANS||PLANS.src!=='pln'))S.plansSrc='pln';
   if(navigator.onLine&&S&&S.plansSrc==='pln'&&(!PLANS||PLANS.src!=='pln'||Date.now()-PLANS.ts>6e5))await loadPLN(true);plnRetry();
   if(!navigator.onLine||!ACCOUNT||!S)return;const old=d=>!d||!d.ts||Date.now()-d.ts>4*3600e3;
@@ -1208,6 +1203,8 @@ if('serviceWorker' in navigator&&window.isSecureContext&&/^https?:/.test(locatio
   PROJECTS.forEach(p=>{p.links=Object.assign({index:'',plans:'',photos:'',fiches:''},p.links||{});p.res=p.res||{};p.conn=Object.assign(clone(CONN_DEF),p.conn||{});});
   for(const c of CTRLS)if(!c.projectId){c.projectId=PROJECTS[0].id;await DB.put('ctrl',c);}
   await setProject(lsGet('ca-proj',null)||PROJECTS[0].id);
+  // l'ancienne file d'envoi Microsoft 365 n'est plus utilisée : on la vide
+  try{for(const it of await DB.all('outbox'))await DB.del('outbox',it.id);for(const c of CTRLS)if(c.sendState||c.sendErr){c.sendState='';c.sendErr='';await DB_put('ctrl',c);}}catch(e){console.warn(e);}
   await syInit();refreshSendUI();autoRefresh();
   try{await syPush();await syPullC();renderHome();}catch(e){console.warn(e);}
   depuisPLN();sySync(true);
