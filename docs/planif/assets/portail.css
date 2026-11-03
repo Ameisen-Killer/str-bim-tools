@@ -369,3 +369,109 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-entete .ab-centre { order: 2; margin-left: auto; }
   .ab-entete .ab-qui { order: 3; }
 }
+
+/* ------------------------------------------------------------ boîte à idées
+   (03.11.2026, idees.js) : un bandeau sous les encadrés, et ses fenêtres. */
+.ab-idees {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 6px 18px;
+  margin: 20px calc(var(--marge) * -.4) 0; padding: 18px 22px;
+}
+.ab-idees-icone { width: 52px; height: 52px; }
+.ab-idees h3 { margin: 0; font-size: 21px; font-weight: 600; }
+.ab-idees-texte p { margin: 4px 0 0; color: var(--faible); font-size: 15px; }
+.ab-id-boutons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+.ab-id-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px; border-radius: 10px;
+  border: 1px solid var(--filet); background: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: background-color .18s, filter .18s;
+}
+.ab-id-btn:hover { background: var(--m-pale); }
+.ab-id-btn.principal { border-color: transparent; background: var(--vert-clair); }
+.ab-id-btn.principal:hover { filter: brightness(.96); background: var(--vert-clair); }
+.ab-id-btn:disabled { opacity: .5; cursor: default; }
+.ab-id-btn:focus-visible { outline: 2px solid var(--vert-texte); outline-offset: 2px; }
+.ab-id-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.ab-id-badge {
+  padding: 1px 8px; border-radius: 20px; background: var(--rouge); color: #fff; font-size: 12.5px; font-weight: 600;
+}
+.ab-id-note { color: var(--faible); font-size: 13.5px; }
+
+.ab-fen.ab-fen-large {
+  width: min(720px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto;
+  padding: 26px 26px 22px; text-align: left;
+}
+.ab-fen.ab-id-lire { width: min(880px, 100%); }
+.ab-fen.survol { outline: 3px dashed var(--vert-vif); outline-offset: -10px; }
+.ab-id-titre { justify-content: flex-start; padding-right: 40px; }
+.ab-id-sous { margin: 4px 0 0; color: var(--vert-texte); font-size: 15px; font-weight: 500; }
+.ab-id-corps { margin-top: 16px; }
+.ab-id-texte {
+  display: block; width: 100%; min-height: 140px; resize: vertical; padding: 12px 14px;
+  border: 1px solid #D5D8D2; border-radius: 10px; font: inherit; font-size: 16px; line-height: 1.45; color: var(--texte);
+}
+.ab-id-texte:focus { outline: 2px solid var(--vert-texte); outline-offset: 0; border-color: transparent; }
+.ab-id-ligne { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.ab-id-compteur { color: var(--faible); font-size: 12.5px; white-space: nowrap; }
+.ab-id-inter { margin: 18px 0 8px; font-size: 15px; font-weight: 600; }
+.ab-id-depot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 14px;
+  border: 1.5px dashed #CDD1CA; border-radius: 10px; color: var(--faible); font-size: 14px;
+}
+.ab-id-depot.plein { opacity: .5; pointer-events: none; }
+.ab-id-vignettes { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.ab-id-vignette {
+  position: relative; width: 132px; height: 92px; padding: 0; border: 1px solid var(--filet); border-radius: 8px;
+  background: #F1F2EF; overflow: hidden; cursor: zoom-in;
+}
+.ab-id-vignette img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ab-id-vignette img.charge { opacity: 0; }
+.ab-id-retire {
+  position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(30, 34, 38, .72); color: #fff; font-size: 17px; line-height: 1; cursor: pointer;
+}
+.ab-id-manque { display: grid; place-items: center; height: 100%; font-size: 12px; color: var(--faible); }
+.ab-id-erreur { margin: 12px 0 0; color: var(--rouge-texte); font-size: 14px; }
+.ab-id-pied { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+.ab-id-filtres { display: flex; gap: 8px; margin-bottom: 6px; }
+.ab-id-filtre {
+  padding: 6px 13px; border: 1px solid var(--filet); border-radius: 20px; background: #fff; font-size: 14px; cursor: pointer;
+}
+.ab-id-filtre.actif { background: var(--m-pale); border-color: transparent; color: var(--vert-texte); font-weight: 600; }
+.ab-id-idee { padding: 16px 0; border-top: 1px solid var(--filet); }
+.ab-id-idee:first-child { border-top: 0; }
+.ab-id-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ab-id-tete b { font-weight: 600; }
+.ab-id-date { margin-left: 10px; color: var(--faible); font-size: 13.5px; }
+.ab-id-etat {
+  flex: none; padding: 5px 8px; border: 1px solid var(--filet); border-radius: 8px; background: #fff;
+  font: inherit; font-size: 14px; color: var(--texte);
+}
+.ab-id-etat.nouvelle { border-color: var(--rouge); color: var(--rouge-texte); font-weight: 600; }
+.ab-id-etat.retenue { border-color: var(--orange); }
+.ab-id-etat.faite { border-color: var(--vert-ok); }
+.ab-id-etat.ecartee { color: var(--faible); }
+.ab-id-texte-lu { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ab-id-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.ab-id-suppr { padding: 4px 8px; border: 0; border-radius: 6px; background: none; color: var(--faible); font-size: 13px; cursor: pointer; }
+.ab-id-suppr:hover, .ab-id-suppr.confirme { color: var(--rouge-texte); background: #FBE4E2; }
+
+.ab-visionneuse {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px;
+  background: rgba(20, 22, 24, .86); cursor: zoom-out; animation: ab-voile .2s ease-out;
+}
+.ab-visionneuse img { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); background: #fff; }
+
+@media (max-width: 760px) {
+  .ab-idees { margin-left: 0; margin-right: 0; }
+}
+@media (max-width: 640px) {
+  .ab-idees { grid-template-columns: 40px minmax(0, 1fr); padding: 16px 14px; }
+  .ab-idees-icone { width: 40px; height: 40px; }
+  .ab-idees h3 { font-size: 18px; }
+  .ab-id-boutons { grid-column: 1 / -1; justify-content: flex-start; }
+  .ab-fen.ab-fen-large { padding: 22px 16px 18px; }
+  .ab-id-vignette { width: calc(50% - 5px); height: 100px; }
+  .ab-id-tete { flex-direction: column; }
+  .ab-id-date { display: block; margin: 2px 0 0; }
+}

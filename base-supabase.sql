@@ -652,6 +652,82 @@ create trigger garde before update on public.news
 drop trigger if exists maj_le on public.news;
 create trigger maj_le before update on public.news
   for each row execute function public.touche_maj_le();
+
+-- --------------------------------------------------------- boîte à idées ---
+-- Boîte à idées de l'accueil (03.11.2026) : chacun propose une idée, une
+-- remarque, avec des captures d'écran (seau « idees » du stockage, rangées
+-- sous <bureau>/<idée>/). Le nom de l'auteur est posé par la base, d'après
+-- le compte connecté : impossible d'écrire au nom d'un autre. Seuls les
+-- titulaires du droit idees_lire (les administrateurs au départ) lisent les
+-- idées, changent leur état et les suppriment. Jamais le compte de
+-- démonstration, partagé et public (ses idées restent dans son navigateur).
+create table if not exists public.idees (
+  id           uuid primary key default gen_random_uuid(),
+  bureau_id    uuid not null default public.bureau_par_defaut()
+               constraint idees_bureau_fk references public.bureaux (id) on delete cascade,
+  auteur_id    uuid default public.mon_membre()
+               constraint idees_auteur_fk references public.membres (id) on delete set null,
+  auteur_nom   text not null default '',
+  auteur_email text not null default '',
+  texte        text not null constraint idees_texte_check check (char_length(btrim(texte)) between 1 and 4000),
+  captures     text[] not null default '{}' constraint idees_captures_check
+               check (array_position(captures, null::text) is null and cardinality(captures) <= 6),
+  statut       text not null default 'nouvelle' constraint idees_statut_check
+               check (statut in ('nouvelle', 'lue', 'retenue', 'faite', 'ecartee')),
+  cree_le      timestamptz not null default now(),
+  maj_le       timestamptz not null default now()
+);
+create index if not exists idees_bureau on public.idees (bureau_id, cree_le desc);
+comment on table public.idees is
+  'Boîte à idées de l''accueil. Dépôt : tout le bureau (sauf le compte démo), au nom du compte connecté. Lecture, état et suppression : droit idees_lire.';
+comment on column public.idees.captures is
+  'Chemins des captures d''écran dans le seau « idees » du stockage : <bureau>/<idée>/<n>.jpg.';
+
+-- L'auteur, le bureau et la date viennent de la base ; une modification ne
+-- touche que l'état.
+create or replace function public.garde_idee()
+returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_nom text;
+begin
+  if tg_op = 'INSERT' then
+    new.bureau_id := public.bureau_courant();
+    if new.bureau_id is null then
+      raise exception 'Connexion requise pour proposer une idée.';
+    end if;
+    new.auteur_id := public.mon_membre();
+    new.auteur_email := lower(coalesce(auth.jwt() ->> 'email', ''));
+    select nullif(btrim(coalesce(m.prenom, '') || ' ' || coalesce(m.nom, '')), '') into v_nom
+      from public.membres m where m.id = new.auteur_id;
+    new.auteur_nom := coalesce(v_nom, new.auteur_email);
+    new.statut := 'nouvelle';
+    new.cree_le := now();
+    new.maj_le := now();
+    if exists (select 1 from unnest(new.captures) c
+                where c not like new.bureau_id::text || '/' || new.id::text || '/%') then
+      raise exception 'Capture rangée au mauvais endroit.';
+    end if;
+    return new;
+  end if;
+  new.id := old.id;
+  new.bureau_id := old.bureau_id;
+  new.auteur_id := old.auteur_id;
+  new.auteur_nom := old.auteur_nom;
+  new.auteur_email := old.auteur_email;
+  new.texte := old.texte;
+  new.captures := old.captures;
+  new.cree_le := old.cree_le;
+  new.maj_le := now();
+  return new;
+end $$;
+revoke all on function public.garde_idee() from public, anon, authenticated;
+drop trigger if exists garde on public.idees;
+create trigger garde before insert or update on public.idees
+  for each row execute function public.garde_idee();
+
+revoke all on public.idees from anon;
+grant select, insert, update, delete on public.idees to authenticated;
 comment on column public.contacts.role is
   'Rôle dans les projets — architecte, maître d''ouvrage, entreprise… Texte libre.';
 comment on column public.contacts.natel is
@@ -891,7 +967,7 @@ begin
      array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire', 'voir_conges_equipe', 'voir_absences_avenir']),
     (p_bureau, 'administrateur', 'Administrateur', null, 0,
      array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'conges_tous',
-           'news_rediger', 'news_archiver', 'news_supprimer',
+           'news_rediger', 'news_archiver', 'news_supprimer', 'idees_lire',
            'page_facturation', 'facturation_saisir', 'avancement_tous'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
@@ -998,7 +1074,7 @@ declare
   p record;
 begin
   foreach t in array array['membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts',
-                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
+                           'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'idees', 'mandat_saisies', 'reglages', 'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                            'succursale_disciplines', 'presences', 'activite', 'activite_pages'] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -1006,7 +1082,7 @@ begin
   for p in
     select tablename, policyname from pg_policies
     where schemaname = 'public'
-      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'mandat_saisies', 'reglages',
+      and tablename in ('membres', 'absences', 'avis', 'affaires', 'affaire_membres', 'taches', 'contacts', 'ao_agenda', 'rendez_vous', 'conges', 'veille_ao', 'veille_suivi', 'messages', 'news', 'idees', 'mandat_saisies', 'reglages',
                         'droits_groupes', 'acces', 'bureaux', 'succursales', 'disciplines',
                         'succursale_disciplines', 'presences', 'activite', 'activite_pages')
   loop
@@ -1211,6 +1287,19 @@ create policy "droit de supprimer (suppression)" on public.news for delete to au
   using (bureau_id = (select public.bureau_courant())
          and (select public.a_droit('news_supprimer'))
          and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
+
+-- Boîte à idées : tout le bureau dépose (sauf le compte démo) ; lire, changer
+-- l'état et supprimer demandent le droit « Lire la boîte à idées ».
+create policy "bureau courant (dépôt)" on public.idees for insert to authenticated
+  with check (bureau_id = (select public.bureau_courant())
+              and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
+create policy "droit de lire (lecture)" on public.idees for select to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
+create policy "droit de lire (état)" on public.idees for update to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')))
+  with check (bureau_id = (select public.bureau_courant()));
+create policy "droit de lire (suppression)" on public.idees for delete to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (select public.a_droit('idees_lire')));
 
 -- Avancement et facturation. Qui saisit : la facturation, le droit « Saisir
 -- la facturation » ; l'avancement, le responsable de l'affaire, le chef du
@@ -2808,6 +2897,30 @@ drop policy if exists "visas : retrait" on storage.objects;
 create policy "visas : lecture" on storage.objects for select to anon, authenticated using (bucket_id = 'visas');
 create policy "visas : dépôt"   on storage.objects for insert to anon, authenticated with check (bucket_id = 'visas');
 create policy "visas : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'visas');
+
+-- Captures de la boîte à idées : seau privé, images de 5 Mo au plus, rangées
+-- sous <bureau>/<idée>/. Tout le bureau en dépose (sauf le compte démo) ;
+-- seuls les titulaires du droit idees_lire les voient et les retirent.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('idees', 'idees', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "idees : dépôt"   on storage.objects;
+drop policy if exists "idees : lecture" on storage.objects;
+drop policy if exists "idees : retrait" on storage.objects;
+create policy "idees : dépôt" on storage.objects for insert to authenticated
+  with check (bucket_id = 'idees'
+              and (storage.foldername(name))[1] = (select public.bureau_courant())::text
+              and lower(coalesce(auth.jwt() ->> 'email', '')) <> 'demo@str-bim-tools.com');
+create policy "idees : lecture" on storage.objects for select to authenticated
+  using (bucket_id = 'idees'
+         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
+         and (select public.a_droit('idees_lire')));
+create policy "idees : retrait" on storage.objects for delete to authenticated
+  using (bucket_id = 'idees'
+         and (storage.foldername(name))[1] = (select public.bureau_courant())::text
+         and (select public.a_droit('idees_lire')));
 
 -- Annotations : une zone de texte libre par plan (numéro), commune à tous et
 -- gardée d'un indice et d'un export à l'autre. Vider la zone efface la ligne.

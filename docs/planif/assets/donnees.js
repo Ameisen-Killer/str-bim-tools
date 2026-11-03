@@ -124,7 +124,7 @@
       droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "conges_tous",
-               "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
+               "news_rediger", "news_archiver", "news_supprimer", "idees_lire", "page_facturation", "facturation_saisir", "avancement_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge",
                "planning_equipe", "taches_a_affecter", "conges_secteur", "avancement_secteur"] },
@@ -242,7 +242,8 @@
     { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
                                              "membres_modifier", "conges_secteur", "conges_tous", "tchat_moderer"] },
     { titre: "Avancement et facturation", droits: ["avancement_secteur", "avancement_tous", "facturation_saisir"] },
-    { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] }
+    { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] },
+    { titre: "Boîte à idées", droits: ["idees_lire"] }
   ];
   var ORDRE_DROITS = [].concat.apply([], CATEGORIES_DROITS.map(function (c) { return c.droits; }));
   var DROITS = {
@@ -317,6 +318,10 @@
     news_supprimer: {
       titre: "Supprimer les news",
       aide: "Effacer une news pour de bon, archives comprises."
+    },
+    idees_lire: {
+      titre: "Lire la boîte à idées",
+      aide: "Lire les idées et les remarques déposées depuis l'accueil (captures comprises), changer leur état et les supprimer. Tout le monde peut en proposer ; sans ce droit, on ne voit pas celles des autres."
     },
     tchat_moderer: {
       titre: "Retirer les messages des autres",
