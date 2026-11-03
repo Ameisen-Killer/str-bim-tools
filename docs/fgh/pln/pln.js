@@ -651,8 +651,9 @@
     }), function (x) { return x.g; });
   }
   // [{ type: "rub"|"sous"|"plan", lib, n, g }] dans l'ordre d'export
-  function lignesExport() {
+  function lignesExport(sansArm) {
     var L = vueRub(), out = [], cpt = {};
+    if (sansArm) L = L.filter(function (x) { return !x.r.r.types; });
     L.forEach(function (x) { cpt[x.r.r.c] = (cpt[x.r.r.c] || 0) + 1; var k = x.r.r.c + "|" + x.r.s; cpt[k] = (cpt[k] || 0) + 1; });
     var av = null;
     L.forEach(function (x) {
@@ -706,7 +707,7 @@
   var BUREAUX = [["LAUSANNE", "021 614 20 00"], ["GENEVE", "022 349 80 88"], ["NYON", "022 363 76 10"], ["FRIBOURG", "026 321 35 55"]];
 
   // PDF A4, paysage ou portrait ; colonnes adaptées à la largeur
-  var ORIENT = lsGet("fgh.pln.orient") === "portrait" ? "portrait" : "landscape", TOUS_IND = lsGet("fgh.pln.tousind") === "1";
+  var ORIENT = lsGet("fgh.pln.orient") === "portrait" ? "portrait" : "landscape", TOUS_IND = lsGet("fgh.pln.tousind") === "1", AVEC_ARM = lsGet("fgh.pln.arm") !== "0";
   function fairePdf(orient) {
     return Promise.all([charge(LIBS.jspdf), logo()]).then(function (r) {
       var img = r[1], d = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: orient });
@@ -715,7 +716,7 @@
         : [["Code", 56, "code"], ["Ind.", 9, "ind"], ["Titre", 105, "titre"], ["Date", 16, "date"]];
       var X = [M]; cols.forEach(function (c, i) { X[i + 1] = X[i] + c[1]; });
       var iT = cols.findIndex(function (c) { return c[2] === "titre"; });
-      var y, quand = dateFr(aujourdhui());
+      var y, quand = dateFr(aujourdhui()), LIGNES = lignesExport(!AVEC_ARM), NPL = LIGNES.filter(function (L) { return L.type === "plan"; }).length;
       function T(s, x, yy, o) { o = o || {}; d.setFont("helvetica", o.b ? "bold" : "normal"); d.setFontSize(o.s || 8); d.setTextColor.apply(d, o.c || [0, 0, 0]); d.text(String(s == null ? "" : s), x, yy, o.a ? { align: o.a } : undefined); }
       function court(t, w) { d.setFont("helvetica", "normal"); d.setFontSize(7); return d.splitTextToSize(t || "", w - 2)[0] || ""; }
       function entete() {
@@ -723,7 +724,7 @@
         BUREAUX.forEach(function (b, i) { var yy = 11.2 + i * 3.2; T(b[0], M + 17, yy, { b: 1, s: 6.5 }); d.setFont("helvetica", "bold"); var w = d.getTextWidth(b[0]); T(" - T " + b[1], M + 17 + w, yy, { s: 6.5 }); });
         T("LISTE DES PLANS", W - M, 12.5, { b: 1, s: 12, a: "right" });
         T(PROJET, W - M, 17.5, { s: 9, a: "right" });
-        T(court(libelleVue(), pay ? 150 : 90) + " · " + VUE.length + " plan(s)" + (TOUS_IND ? ", tous les indices" : "") + " · édition du " + quand, W - M, 21.5, { s: 7.5, a: "right", c: gris });
+        T(court(libelleVue(), pay ? 150 : 90) + " · " + NPL + " plan(s)" + (AVEC_ARM ? "" : " hors armatures") + (TOUS_IND ? ", tous les indices" : "") + " · édition du " + quand, W - M, 21.5, { s: 7.5, a: "right", c: gris });
         d.setDrawColor.apply(d, vert); d.setLineWidth(.5); d.line(M, 25, W - M, 25);
         y = 31; d.setFillColor.apply(d, pale); d.rect(M, y - 4.2, W - 2 * M, 6, "F");
         cols.forEach(function (c, i) { T(c[0], X[i] + 1.5, y, { b: 1, s: 7.5, c: [40, 60, 15] }); });
@@ -731,7 +732,7 @@
       }
       entete();
       var zebre = 0;
-      lignesExport().forEach(function (L) {
+      LIGNES.forEach(function (L) {
         if (L.type !== "plan") {
           var hb = L.type === "rub" ? 6 : 5;
           if (y + hb + 4 > BAS) { d.addPage(); entete(); }
@@ -768,11 +769,16 @@
     occupe(true, "Création du PDF…");
     document.querySelectorAll("#fa-orient button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.o === ORIENT); });
     document.querySelectorAll("#fa-ind button").forEach(function (b) { b.setAttribute("aria-pressed", (b.dataset.t === "1") === TOUS_IND); });
+    document.querySelectorAll("#fa-arm button").forEach(function (b) { b.setAttribute("aria-pressed", (b.dataset.a === "1") === AVEC_ARM); });
     return fairePdf(ORIENT).then(function (r) { apercu(r.blob, nomFichier("pdf"), r.pages); }).catch(function (e) { toast(e.message, 5000); }).then(function () { occupe(false); });
   }
   $("#btn-pdf").addEventListener("click", function () {
     if (!VUE.length) { toast("Rien à exporter"); return; }
     pdfApercu();
+  });
+  $("#fa-arm").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-a]"); if (!b || (b.dataset.a === "1") === AVEC_ARM) return;
+    AVEC_ARM = b.dataset.a === "1"; lsSet("fgh.pln.arm", AVEC_ARM ? "1" : "0"); pdfApercu();
   });
   $("#fa-ind").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-t]"); if (!b || (b.dataset.t === "1") === TOUS_IND) return;
