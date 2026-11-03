@@ -192,14 +192,23 @@
   function texteRecherche(p) {
     return [code(p), p.titre, "ind " + p.indice, p.auteur, p.statut, p.remarque, p.controle_n ? "controle controlé sur place n°" + p.controle_n + " " + (p.controle_par || "") + " " + (p.controle_info || "") : "", niveauNom(p.niveau), TYPES[p.type]].join(" ");
   }
+  // Jokers façon DOS : « ? » = un caractère, « * » = n'importe quelle suite ; dans un mot qui contient un chiffre,
+  // « x » vaut aussi un caractère (3xxx = 3000 à 3999, 060-A0x-15xx…). Le mot doit alors couvrir tout le bloc.
+  function joker(m) {
+    var x = /\d/.test(m) && /x/.test(m);
+    if (!x && !/[*?]/.test(m)) return m;
+    var re = m.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^\\s]*").replace(/\?/g, "[^\\s]");
+    if (x) re = re.replace(/x/g, "[^\\s-]");
+    return new RegExp("(^|[^0-9a-z])" + re + "(?![0-9a-z])");
+  }
   // filtre des types cochés et de la recherche (sans la zone ni le niveau) : sert aussi aux compteurs du bandeau
   function passeTypesRecherche() {
-    var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean), types = Object.keys(TYPESEL);
+    var mots = plie($("#recherche").value).split(/\s+/).filter(Boolean).map(joker), types = Object.keys(TYPESEL);
     return function (g) {
       if (types.length && !TYPESEL[g.d.type]) return false;
       if (!mots.length) return true;
       var t = plie(g.rows.map(texteRecherche).join(" "));
-      return mots.every(function (m) { return t.indexOf(m) >= 0; });
+      return mots.every(function (m) { return typeof m === "string" ? t.indexOf(m) >= 0 : m.test(t); });
     };
   }
   function filtres() {
