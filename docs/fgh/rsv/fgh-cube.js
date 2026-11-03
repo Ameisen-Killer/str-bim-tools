@@ -1,4 +1,4 @@
-// /fgh/ : cube de navigation, comme le ViewCube de Revit, dessiné dans un petit canvas au coin de la vue 3D.
+// /fgh/rsv/ : cube de navigation, comme le ViewCube de Revit, dessiné dans un petit canvas au coin de la vue 3D.
 // - Clic sur une face, une arête ou un coin : vue animée depuis ce côté, recadrée. Survol en surbrillance.
 // - Glisser le cube : rotation libre ; glisser la boussole : rotation autour de la verticale ; clic sur N, E,
 //   S ou O : vue depuis ce point cardinal (le nord vient de l'IFC, TrueNorth).

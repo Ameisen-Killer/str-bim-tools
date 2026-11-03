@@ -1,8 +1,8 @@
-// Web Worker de /fgh/ (copie de /ifc/ifc-lecteur.js) : première étape de la lecture d'un IFC (contrôles, découpage des entités) en
+// Web Worker de /fgh/rsv/ (copie de /ifc/ifc-lecteur.js) : première étape de la lecture d'un IFC (contrôles, découpage des entités) en
 // arrière-plan, pour que la page ne gèle pas sur les gros fichiers. Reçoit { buffer }, renvoie
 // { progres } de temps en temps, puis { resultat, buffer } (tableaux typés et octets transférés sans
 // copie) ou { erreur, ifc }. Aucune requête réseau : le fichier ne quitte pas le navigateur.
-importScripts("/fgh/fgh-core.js?v=2");
+importScripts("/fgh/rsv/fgh-core.js?v=2");
 
 onmessage = function(e){
   var buffer = e.data.buffer;

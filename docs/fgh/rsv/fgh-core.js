@@ -1,4 +1,4 @@
-// Copie de /ifc/ifc-core.js pour /fgh/ (validation des réservations), sans changement.
+// Copie de /ifc/ifc-core.js pour /fgh/rsv/ (validation des réservations), sans changement.
 // Noyau IFC de /ifc/ : lecture STEP (ISO 10303-21), index des éléments, suppression propre, export.
 // Aussi chargé par le Web Worker ifc-lecteur.js (lecture en arrière-plan) : rien ici ne touche à la page.
 // - Le fichier est lu octet par octet (un caractère = un octet) : tout ce qui n'est pas touché

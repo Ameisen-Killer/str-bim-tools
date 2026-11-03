@@ -1,4 +1,4 @@
-// Copie de /ifc/ifc-vue.js pour /fgh/ (validation des réservations), avec trois ajouts repérés « FGH » :
+// Copie de /ifc/ifc-vue.js pour /fgh/rsv/ (validation des réservations), avec trois ajouts repérés « FGH » :
 // géométrie ramenée en mètres (maquettes STR et RES exportées dans des unités différentes), boîte de coupe
 // posée par ses coordonnées (coupe par niveau), teintes changées sans tout recharger.
 // Aperçu 3D de /ifc/ : rendu maison, sans bibliothèque. WebGL écrit à la main (tampon de profondeur,

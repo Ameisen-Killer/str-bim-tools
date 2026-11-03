@@ -1,4 +1,4 @@
-// /fgh/ : validation des réservations FGH par l'ingénieur, sans Revit.
+// /fgh/rsv/ : validation des réservations FGH par l'ingénieur, sans Revit.
 // - Ouvre l'IFC des réservations (jeu de propriétés STR_FGH_RES ajouté par le bouton Revit « Export IFC RES »)
 //   et l'IFC light de la structure, superposés dans la même vue 3D (fgh-vue.js, copie de /ifc/).
 // - L'ingénieur change PVA_RES_VAL_Statut, PVA_RES_VAL_Date et PVA_RES_VAL_Commentaire ; chaque changement
@@ -198,7 +198,7 @@
     return lireFichier(f).then(function(buf){
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/fgh/fgh-lecteur.js?v=2"); }
+        try { w = new Worker("/fgh/rsv/fgh-lecteur.js?v=3"); }
         catch (e){ avecWorker = false; lireClassique(f).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
