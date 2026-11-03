@@ -23,7 +23,7 @@
   var CHAMPS = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero", "indice", "titre", "date_indice", "auteur", "statut", "remarque", "controle_n", "date_controle", "controle_par", "liste_assoc"];
 
   var $ = function (s) { return document.querySelector(s); };
-  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, TRI = { col: "code", sens: 1 }, VUE = [], EDITE = null;
+  var PLANS = [], ZONE = "", NIVEAU = "", TYPESEL = {}, TRI = { col: "date", sens: -1 }, VUE = [], EDITE = null;
 
   // ------------------------------------------------------------------ outils
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -291,7 +291,7 @@
   });
   document.querySelector("thead").addEventListener("click", function (e) {
     var th = e.target.closest("th"); if (!th) return;
-    TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : 1 }; dessineListe();
+    TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : th.dataset.tri === "date" ? -1 : 1 }; dessineListe();
   });
   $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(function () { dessineZones(); dessineListe(); }, 120); });
   document.addEventListener("keydown", function (e) {
