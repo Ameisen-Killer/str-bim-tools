@@ -393,10 +393,41 @@
     CHAMPS.forEach(function (k) { F.elements[k].value = d[k] == null ? "" : d[k]; });
     $("#fp-titre").textContent = p ? "Modifier l'indice " + p.indice : "Nouveau plan";
     $("#fp-suppr").hidden = !p; $("#fp-indice").hidden = !p;
+    $("#fp-rub-l").hidden = !!p; if (!p) remplitRub();
     $("#fp-trace").textContent = p ? "Créé le " + horo(p.cree_le) + " · modifié le " + horo(p.modifie_le) + (p.modifie_par ? " par " + p.modifie_par : "") + (p.source === "kairnial" ? " · importé de Kairnial" : " · créé à la main") : "";
     majCode(); $("#f-plan").hidden = false; dessineListe();
     setTimeout(function () { F.elements[p ? "titre" : "type"].focus(); }, 30);
   }
+  // prochain n° libre d'une plage : après le plus grand n° déjà pris (plans hors armatures et listes)
+  function prochainNumero(de, a) {
+    var max = de - 1;
+    PLANS.forEach(function (p) { if (/^(ARM|LIS)$/.test(String(p.type).toUpperCase())) return; var n = parseInt(p.numero, 10); if (n >= de && n <= a && n > max) max = n; });
+    if (max + 1 > a) { for (var n = de; n <= a; n++) if (!PLANS.some(function (p) { return parseInt(p.numero, 10) === n; })) return n; return null; }
+    return max + 1;
+  }
+  function plagesRub() {
+    var L = [];
+    RUBRIQUES.forEach(function (r) {
+      if (r.de == null) return;
+      if (r.sous) r.sous.forEach(function (x) { L.push({ lib: r.lib.split(" - ")[1] + " · " + x[2], de: x[0], a: x[1] }); });
+      else L.push({ lib: r.lib, de: r.de, a: r.a });
+    });
+    return L;
+  }
+  function remplitRub() {
+    var pad = function (n) { return ("000" + n).slice(-4); };
+    $("#fp-rub").innerHTML = '<option value="">— choisir pour proposer un n° —</option>' + plagesRub().map(function (x, i) {
+      var n = prochainNumero(x.de, x.a);
+      return '<option value="' + i + '"' + (n == null ? " disabled" : "") + ">" + esc(x.lib) + " (" + pad(x.de) + "–" + pad(x.a) + ") → " + (n == null ? "plage pleine" : pad(n)) + "</option>";
+    }).join("");
+  }
+  $("#fp-rub").addEventListener("change", function () {
+    var x = plagesRub()[+this.value]; if (!x) return;
+    var n = prochainNumero(x.de, x.a); if (n == null) return;
+    F.elements.numero.value = ("000" + n).slice(-4);
+    if (/^(ARM|LIS)$/.test(F.elements.type.value.toUpperCase())) F.elements.type.value = "PLA";
+    majCode(); F.elements.titre.focus();
+  });
   function lit() {
     var o = {};
     CHAMPS.forEach(function (k) { o[k] = String(F.elements[k].value || "").trim(); });
@@ -406,6 +437,7 @@
   }
   function majCode() {
     var o = lit(); $("#fp-code").textContent = code(o) + (o.indice ? " · ind. " + o.indice : "");
+    $("#fp-rub-info").textContent = o.numero ? "Rubrique : " + libRub(o) : "";
     var meme = PLANS.filter(function (p) { return cle(p) === cle(o) && (!EDITE || p.id !== EDITE.id); });
     var doublon = meme.filter(function (p) { return cmpInd(p.indice, o.indice) === 0; })[0];
     var a = $("#fp-alerte");

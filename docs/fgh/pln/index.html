@@ -170,6 +170,7 @@ td.nw{white-space:nowrap;color:var(--texte-doux)}
 .fenetre footer .esp{flex:1}
 .grille{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 12px}
 .grille label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--texte-doux)}
+.grille label[hidden]{display:none}
 .grille label.l2{grid-column:span 2}.grille label.l4{grid-column:1/-1}
 .grille .champ{width:100%}
 textarea.champ{height:auto;min-height:64px;resize:vertical}
@@ -273,10 +274,11 @@ tr.eclair td{animation:eclair 1.6s ease-out}
     <header><h2 id="fp-titre">Plan</h2><p id="fp-code"></p></header>
     <div class="corps">
       <div class="grille">
+        <label class="l4" id="fp-rub-l">Rubrique : propose le prochain n° libre<select class="champ" id="fp-rub"></select></label>
         <label>Type<input class="champ" name="type" list="dl-types" required maxlength="10"></label>
         <label>Niveau<input class="champ" name="niveau" list="dl-niveaux" required maxlength="10"></label>
         <label>Zone<input class="champ" name="zone" list="dl-zones" required maxlength="10"></label>
-        <label>N° (4 chiffres)<input class="champ" name="numero" required maxlength="10" inputmode="numeric"></label>
+        <label>N° (4 chiffres)<input class="champ" name="numero" required maxlength="10" inputmode="numeric"><small class="muet" id="fp-rub-info"></small></label>
         <label class="l4">Titre<input class="champ" name="titre" maxlength="300"></label>
         <label>Indice<input class="champ" name="indice" maxlength="10" inputmode="numeric"></label>
         <label>Date de l'indice<input class="champ" name="date_indice" type="date"></label>
@@ -331,6 +333,6 @@ tr.eclair td{animation:eclair 1.6s ease-out}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/pln/pln.js?v=10"></script>
+<script src="/fgh/pln/pln.js?v=11"></script>
 </body>
 </html>
