@@ -9,81 +9,144 @@
 <meta name="theme-color" content="#202020">
 <script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("fgh.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 19h24v5H4z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M12 16h8v11h-8z' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Cpath d='M20 6l3 3 6-6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="preload" href="/fgh/fairmont-fond.jpg?v=1" as="image">
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
-/* Même habillage que /fgh/rsv/ (inspiré de Windows 11, Fluent) */
+/* Même habillage que /fgh/rsv/ (inspiré de Windows 11, Fluent), en version vitrine :
+   grand bandeau photo qui respire, cartes en verre dépoli posées dessus */
 :root{
   color-scheme:dark;
   --or-rvb:96,205,255;--or:#60CDFF;--sur-accent:#000;
-  --mica:#202020;--couche:#272727;--couche-2:#2D2D2D;
-  --controle:rgba(255,255,255,.061);--controle-survol:rgba(255,255,255,.084);
-  --bord-controle:rgba(255,255,255,.07);--ligne:rgba(255,255,255,.083);
-  --texte:#FFFFFF;--texte-doux:rgba(255,255,255,.786);--texte-faible:rgba(255,255,255,.545);
-  --ombre:0 8px 16px rgba(0,0,0,.26),0 0 0 1px rgba(0,0,0,.2);
+  --mica:#202020;--mica-rvb:32,32,32;--couche-rvb:39,39,39;
+  --ligne:rgba(255,255,255,.09);--bord-verre:rgba(255,255,255,.12);
+  --texte:#FFFFFF;--texte-doux:rgba(255,255,255,.78);--texte-faible:rgba(255,255,255,.5);
+  --ombre:0 24px 48px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.25);
   --sans:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
   --titre:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
 }
 :root[data-theme="clair"]{
   color-scheme:light;
   --or-rvb:0,95,184;--or:#005FB8;--sur-accent:#FFF;
-  --mica:#F3F3F3;--couche:#F9F9F9;--couche-2:#FFFFFF;
-  --controle:rgba(255,255,255,.7);--controle-survol:rgba(249,249,249,.5);
-  --bord-controle:rgba(0,0,0,.0578);--ligne:rgba(0,0,0,.0803);
-  --texte:#1B1B1B;--texte-doux:rgba(0,0,0,.62);--texte-faible:rgba(0,0,0,.45);
-  --ombre:0 8px 16px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.06);
+  --mica:#F3F3F3;--mica-rvb:243,243,243;--couche-rvb:252,252,252;
+  --ligne:rgba(0,0,0,.08);--bord-verre:rgba(255,255,255,.7);
+  --texte:#1B1B1B;--texte-doux:rgba(0,0,0,.64);--texte-faible:rgba(0,0,0,.45);
+  --ombre:0 24px 48px rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.05);
 }
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:var(--mica);color:var(--texte);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased}
-/* Filigrane : l'hôtel en fond, fixe, très atténué et fondu vers le haut dans le Mica */
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:url("/fgh/fairmont-fond.jpg?v=1") center 70%/cover no-repeat;
-  -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 50%);mask-image:linear-gradient(to bottom,transparent 0%,#000 50%);
-  opacity:.16;filter:grayscale(.35)}
-:root[data-theme="clair"] body::before{opacity:.22;filter:grayscale(.2)}
+html{background:var(--mica)}
+body{margin:0;min-height:100vh;background:var(--mica);color:var(--texte);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 button{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--texte);outline-offset:2px;border-radius:8px}
-.barre{height:48px;display:flex;align-items:center;gap:12px;padding:0 10px 0 16px;white-space:nowrap;font-size:12px}
-.barre a{text-decoration:none;color:var(--texte-doux);display:flex;align-items:center;gap:10px}
-.barre a:hover{color:var(--texte)}
+:focus-visible{outline:2px solid var(--or);outline-offset:3px;border-radius:12px}
+
+/* ---------- Barre posée sur la photo ---------- */
+.barre{position:absolute;top:0;left:0;right:0;z-index:5;height:56px;display:flex;align-items:center;gap:12px;padding:env(safe-area-inset-top) 12px 0 18px;color:#fff;font-size:12px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.barre a{text-decoration:none;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:10px}
+.barre a:hover{color:#fff}
 .barre svg{width:20px;height:20px;flex:none}
-.barre .titre{font-size:14px;color:var(--texte)}.barre .titre b{font-weight:600}
+.barre .titre{font-size:14px}.barre .titre b{font-weight:600}
 .barre .esp{flex:1}
-.barre button{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;background:transparent;cursor:pointer}
+.barre button{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:17px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.22);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:#fff;cursor:pointer}
 .barre button svg{width:16px;height:16px}
-.barre button:hover{background:var(--controle-survol);border-color:var(--bord-controle)}
-main{max-width:880px;margin:0 auto;padding:28px 16px 48px}
-h1{font-family:var(--titre);font-size:28px;line-height:36px;font-weight:600;margin:0 0 4px}
-.chapo{color:var(--texte-doux);margin:0 0 28px;font-size:15px}
-.outils{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.outil{display:flex;gap:16px;align-items:flex-start;padding:18px;border-radius:8px;background:var(--couche);border:1px solid var(--ligne);text-decoration:none;color:inherit;transition:background .15s,box-shadow .15s,transform .15s}
-.outil:hover{background:var(--couche-2);box-shadow:var(--ombre);transform:translateY(-1px)}
-.outil svg{width:48px;height:48px;flex:none}
-.outil .code{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;padding:1px 8px;border-radius:10px;background:rgba(var(--or-rvb),.14);color:var(--or);margin-bottom:6px}
-.outil h2{font-size:16px;line-height:22px;font-weight:600;margin:0 0 4px}
-.outil p{margin:0;color:var(--texte-doux)}
-.pied{margin-top:32px;color:var(--texte-faible);font-size:12px}
+.barre button:hover{background:rgba(0,0,0,.38)}
+@media (max-width:520px){.barre button span{display:none}.barre button{padding:0 9px}}
+
+/* ---------- Bandeau ---------- */
+.heros{position:relative;height:min(74vh,720px);min-height:440px;overflow:hidden;isolation:isolate}
+.heros .photo{position:absolute;inset:-4%;background:url("/fgh/fairmont-fond.jpg?v=1") center 46%/cover no-repeat;transform-origin:50% 60%;
+  animation:respire 38s ease-in-out infinite alternate, entree-photo 2.2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes respire{from{transform:scale(1.02) translate3d(0,0,0)}to{transform:scale(1.12) translate3d(-1.5%,-1%,0)}}
+@keyframes entree-photo{from{opacity:0;filter:blur(14px) saturate(.4)}to{opacity:1;filter:none}}
+/* voile : sombre en haut pour la barre, fondu dans le Mica en bas */
+.heros::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 22%,rgba(0,0,0,0) 42%,rgba(var(--mica-rvb),.55) 72%,var(--mica) 100%)}
+/* reflet qui passe lentement sur le lac */
+.heros .reflet{position:absolute;left:0;right:0;bottom:12%;height:22%;z-index:1;pointer-events:none;mix-blend-mode:screen;opacity:.5;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.22) 45%,transparent 60%) 0 0/250% 100% no-repeat;
+  animation:reflet 9s linear infinite}
+@keyframes reflet{from{background-position:120% 0}to{background-position:-120% 0}}
+.heros .texte{position:absolute;z-index:2;left:0;right:0;bottom:120px;max-width:1040px;margin:0 auto;padding:0 24px}
+.etiquette{display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 8px;border-radius:14px;font-size:12px;font-weight:600;letter-spacing:.04em;
+  background:rgba(var(--couche-rvb),.55);border:1px solid var(--bord-verre);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:var(--texte-doux)}
+.etiquette i{width:8px;height:8px;border-radius:50%;background:#6CCB5F;box-shadow:0 0 0 0 rgba(108,203,95,.6);animation:pouls 2.4s ease-out infinite}
+@keyframes pouls{to{box-shadow:0 0 0 9px rgba(108,203,95,0)}}
+h1{font-family:var(--titre);font-weight:600;font-size:clamp(38px,7.2vw,80px);line-height:1;letter-spacing:-.025em;margin:14px 0 10px}
+h1 span{display:block;font-weight:300;letter-spacing:-.01em;background:linear-gradient(90deg,var(--or),#B4E6FF 55%,var(--or));-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:lueur 7s ease-in-out infinite}
+:root[data-theme="clair"] h1 span{background-image:linear-gradient(90deg,#005FB8,#3A9BE8 55%,#005FB8)}
+@keyframes lueur{50%{background-position:100% 0}}
+.chapo{margin:0;font-size:16px;line-height:24px;color:var(--texte-doux);max-width:560px}
+
+/* ---------- Outils ---------- */
+main{position:relative;z-index:3;max-width:1040px;margin:-84px auto 0;padding:0 24px 56px}
+.outils{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.outil{--x:50%;--y:50%;position:relative;display:flex;flex-direction:column;gap:18px;padding:22px 22px 20px;border-radius:14px;overflow:hidden;
+  text-decoration:none;color:inherit;background:rgba(var(--couche-rvb),.68);border:1px solid var(--bord-verre);
+  -webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);box-shadow:var(--ombre);
+  transition:transform .35s cubic-bezier(.2,.7,.2,1),border-color .35s;animation:monte .9s cubic-bezier(.2,.7,.2,1) backwards}
+.outil:nth-child(1){animation-delay:.35s}.outil:nth-child(2){animation-delay:.5s}.outil:nth-child(3){animation-delay:.65s}
+@keyframes monte{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+/* halo qui suit le pointeur */
+.outil::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .35s;
+  background:radial-gradient(420px circle at var(--x) var(--y),rgba(var(--or-rvb),.18),transparent 60%)}
+.outil:hover{transform:translateY(-4px);border-color:rgba(var(--or-rvb),.45)}
+.outil:hover::before{opacity:1}
+.outil .haut{display:flex;align-items:center;gap:14px}
+.outil svg.ico{width:52px;height:52px;flex:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));transition:transform .45s cubic-bezier(.2,.7,.2,1)}
+.outil:hover svg.ico{transform:scale(1.08) rotate(-4deg)}
+.code{font-family:var(--titre);font-size:30px;font-weight:700;letter-spacing:.04em;line-height:1;color:transparent;-webkit-text-stroke:1px rgba(var(--or-rvb),.7)}
+.outil h2{font-size:18px;line-height:24px;font-weight:600;margin:0 0 6px}
+.outil p{margin:0;color:var(--texte-doux);font-size:14px;line-height:21px}
+.outil .bas{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:14px;border-top:1px solid var(--ligne);font-size:13px;color:var(--texte-faible)}
+.outil .bas .esp{flex:1}
+.outil .ouvrir{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--or)}
+.outil .ouvrir svg{width:14px;height:14px;transition:transform .3s}
+.outil:hover .ouvrir svg{transform:translateX(4px)}
+.pied{margin-top:36px;display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--texte-faible);font-size:12px;animation:monte .9s .8s both}
+.pied a{color:inherit}
+@media (max-width:560px){
+  .heros{height:66vh;min-height:400px}
+  .heros .photo{background-position:42% 46%}
+  .heros .texte{bottom:104px;padding:0 16px}
+  main{padding:0 16px 40px;margin-top:-72px}
+  .outils{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<header class="barre">
-  <a href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M5 19h22v5H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 15h8v11h-8z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="titre">FGH · <b>Outils du chantier</b></span></a>
-  <span class="esp"></span>
-  <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
-</header>
+<section class="heros">
+  <div class="photo" role="img" aria-label="Hôtel Fairmont Genève, façade sur le lac"></div>
+  <div class="reflet"></div>
+  <header class="barre">
+    <a href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".16"/><path d="M5 19h22v5H5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 15h8v11h-8z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="titre">FGH · <b>Outils du chantier</b></span></a>
+    <span class="esp"></span>
+    <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
+  </header>
+  <div class="texte">
+    <span class="etiquette"><i></i>Chantier en cours · Quai du Mont-Blanc</span>
+    <h1>Hôtel Fairmont<span>Genève</span></h1>
+    <p class="chapo">Les outils dédiés au chantier, sur le poste comme sur le téléphone.</p>
+  </div>
+</section>
+
 <main>
-  <h1>Hôtel Fairmont Genève</h1>
-  <p class="chapo">Outils dédiés au chantier.</p>
   <div class="outils">
     <a class="outil" href="/fgh/rsv/">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="r1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#E39B2E"/></linearGradient><linearGradient id="r2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6CCB5F"/><stop offset="1" stop-color="#2E8B2E"/></linearGradient></defs><rect x="5" y="9" width="32" height="32" rx="3" fill="url(#r1)"/><rect x="11" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".9"/><rect x="22" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/><rect x="11" y="26" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/><circle cx="35" cy="34" r="10" fill="url(#r2)"/><path d="M30.5 34.2l3 3 6-6.2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div><span class="code">RSV</span><h2>Validation des réservations</h2><p>Valide ou refuse les demandes de réservation sur les IFC de la structure et des réservations, sans Revit.</p></div>
+      <div class="haut">
+        <svg class="ico" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="r1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#E39B2E"/></linearGradient><linearGradient id="r2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6CCB5F"/><stop offset="1" stop-color="#2E8B2E"/></linearGradient></defs><rect x="5" y="9" width="32" height="32" rx="3" fill="url(#r1)"/><rect x="11" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".9"/><rect x="22" y="15" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/><rect x="11" y="26" width="9" height="9" rx="1" fill="#fff" fill-opacity=".55"/><circle cx="35" cy="34" r="10" fill="url(#r2)"/><path d="M30.5 34.2l3 3 6-6.2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="code">RSV</span>
+      </div>
+      <div><h2>Validation des réservations</h2><p>Valide ou refuse les demandes de réservation sur les IFC de la structure et des réservations, sans Revit.</p></div>
+      <div class="bas"><span>Poste de travail · IFC</span><span class="esp"></span><span class="ouvrir">Ouvrir<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     </a>
     <a class="outil" href="/fgh/arm/">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="a1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A9D46B"/><stop offset="1" stop-color="#5A8A1F"/></linearGradient></defs><rect x="4" y="6" width="34" height="38" rx="3" fill="#ECECE8"/><rect x="4" y="6" width="34" height="8" rx="3" fill="url(#a1)"/><path d="M10 22h22M10 28h22M10 34h22M15 18v20M27 18v20" stroke="#4A4A45" stroke-width="1.8" stroke-linecap="round"/><circle cx="36" cy="35" r="9" fill="url(#a1)"/><path d="M32 35.2l2.8 2.8 5.2-5.4" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div><span class="code">ARM</span><h2>Contrôle d'armatures</h2><p>Contrôle avant bétonnage sur le téléphone : plans, vérifications, photos annotées, fiche PDF signée et envoi.</p></div>
+      <div class="haut">
+        <svg class="ico" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="a1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A9D46B"/><stop offset="1" stop-color="#5A8A1F"/></linearGradient></defs><rect x="4" y="6" width="34" height="38" rx="3" fill="#ECECE8"/><rect x="4" y="6" width="34" height="8" rx="3" fill="url(#a1)"/><path d="M10 22h22M10 28h22M10 34h22M15 18v20M27 18v20" stroke="#4A4A45" stroke-width="1.8" stroke-linecap="round"/><circle cx="36" cy="35" r="9" fill="url(#a1)"/><path d="M32 35.2l2.8 2.8 5.2-5.4" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="code">ARM</span>
+      </div>
+      <div><h2>Contrôle d'armatures</h2><p>Contrôle avant bétonnage : plans, vérifications, photos annotées, fiche PDF signée et envoi.</p></div>
+      <div class="bas"><span>Téléphone · hors ligne</span><span class="esp"></span><span class="ouvrir">Ouvrir<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     </a>
   </div>
-  <p class="pied">Pages réservées au chantier, hors menu du site.</p>
+  <p class="pied"><span>Pages réservées au chantier, hors menu du site.</span><a href="/">str-bim-tools.com</a></p>
 </main>
 <script>
 document.getElementById("btn-theme").addEventListener("click", function(){
@@ -91,6 +154,14 @@ document.getElementById("btn-theme").addEventListener("click", function(){
   r.setAttribute("data-theme", c);
   try { localStorage.setItem("fgh.theme", c); } catch (e) {}
   document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
+});
+// halo des cartes qui suit le pointeur
+document.querySelectorAll(".outil").forEach(function(el){
+  el.addEventListener("pointermove", function(e){
+    var b = el.getBoundingClientRect();
+    el.style.setProperty("--x", (e.clientX - b.left) + "px");
+    el.style.setProperty("--y", (e.clientY - b.top) + "px");
+  });
 });
 </script>
 </body>
