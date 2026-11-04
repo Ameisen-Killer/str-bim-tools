@@ -29,8 +29,70 @@
   function moi() { return lsGet("org.nom") || ""; }
 
   // ------------------------------------------------------------------ base
+  // Mode fichier (par défaut depuis le 04.11.2026, demande de Tony) : chantiers et réservations
+  // vivent dans ce navigateur (localStorage « org.donnees ») et se sauvent ou s'ouvrent en JSON.
+  // La base Supabase reste prête : ?base=1 dans l'adresse (retenu), ?base=0 pour revenir au fichier.
+  var LOCAL = (function () {
+    var q = /[?&]base=([01])/.exec(location.search); if (q) lsSet("org.mode", q[1] === "1" ? "base" : "fichier");
+    return lsGet("org.mode") !== "base";
+  })();
+  function nouvelId() { return window.crypto && crypto.randomUUID ? crypto.randomUUID() : "x" + Date.now().toString(36) + Math.random().toString(36).slice(2); }
+  function litLocal() { try { var d = JSON.parse(lsGet("org.donnees") || "null"); if (d && Array.isArray(d.chantiers) && Array.isArray(d.reservations)) return d; } catch (e) {} return { chantiers: [], reservations: [] }; }
+  function ecritLocal(d) {
+    try { localStorage.setItem("org.donnees", JSON.stringify(d)); } catch (e) { throw new Error("Le navigateur refuse d'enregistrer (stockage plein ou navigation privée) : exporte le JSON."); }
+    lsSet("org.modifie", new Date().toISOString());
+  }
+  function refus(m, code) { var e = new Error(m); e.code = code; return e; }
+  // les quelques appels de l'outil, rejoués sur les données du navigateur (mêmes règles que la base)
+  function local(chemin, o) {
+    return Promise.resolve().then(function () {
+      var m = /^(doc_chantiers|doc_reservations)(?:\?(.*))?$/.exec(chemin); if (!m) throw new Error("Appel local inconnu.");
+      var d = litLocal(), t = m[1] === "doc_chantiers" ? d.chantiers : d.reservations, P = {}, maint = new Date().toISOString();
+      (m[2] || "").split("&").forEach(function (x) { var i = x.indexOf("="); if (i > 0) P[x.slice(0, i)] = decodeURIComponent(x.slice(i + 1)); });
+      var filtre = function (r) { return Object.keys(P).every(function (k) { return !/^eq\./.test(P[k]) || String(r[k]) === P[k].slice(3); }); };
+      var meth = o.methode || "GET";
+      if (meth === "GET") {
+        var l = t.filter(filtre), ord = P.order;
+        if (ord) l.sort(function (a, b) { return a[ord] < b[ord] ? -1 : a[ord] > b[ord] ? 1 : 0; });
+        var pl = /^(\d+)-(\d+)$/.exec(o.plage || ""); return copie(pl ? l.slice(+pl[1], +pl[2] + 1) : l);
+      }
+      function verifie(r) {
+        if (m[1] === "doc_chantiers") {
+          if (d.chantiers.some(function (c) { return c.id !== r.id && U(c.code) === U(r.code); })) throw refus("Ce code de chantier existe déjà.", "23505");
+          return;
+        }
+        if (r.statut === "annule") return;
+        var c = d.chantiers.filter(function (x) { return x.id === r.chantier; })[0], pr = {};
+        ((c && c.config && c.config.types) || []).forEach(function (y) { if (y.propre) pr[U(y.c)] = 1; });
+        var esp = function (ty) { return pr[U(ty)] ? U(ty) : "*"; };
+        var a = d.reservations.filter(function (x) { return x.chantier === r.chantier && x.id !== r.id && x.statut !== "annule" && esp(x.type) === esp(r.type) && x.de <= r.a && r.de <= x.a; })[0];
+        if (a) throw refus("Numéros déjà réservés : " + a.de + " à " + a.a + " (" + a.titre + ")", "23P01");
+      }
+      if (meth === "POST") {
+        var r = copie(o.corps), ex = r.id ? t.filter(function (x) { return x.id === r.id; })[0] : null;
+        if (ex) { var n = Object.assign(copie(ex), r, { modifie_le: maint }); verifie(n); t[t.indexOf(ex)] = n; ecritLocal(d); return [copie(n)]; }
+        r.id = r.id || nouvelId(); r.cree_le = r.modifie_le = maint;
+        if (m[1] === "doc_reservations") r = Object.assign({ discipline: "", phase: "", batiment: "", niveau: "", zone: "", titre: "", par: "", echeance: null, statut: "reserve", remarque: "" }, r);
+        else r = Object.assign({ nom: "", config: {} }, r);
+        verifie(r); t.push(r); ecritLocal(d); return [copie(r)];
+      }
+      var vis = t.filter(filtre);
+      if (meth === "PATCH") {
+        var sortie = vis.map(function (x) { var n = Object.assign(copie(x), copie(o.corps), { modifie_le: maint }); verifie(n); return n; });
+        sortie.forEach(function (n) { var i = t.findIndex(function (x) { return x.id === n.id; }); t[i] = n; });
+        ecritLocal(d); return copie(sortie);
+      }
+      if (meth === "DELETE") {
+        vis.forEach(function (x) { t.splice(t.indexOf(x), 1); });
+        if (m[1] === "doc_chantiers") d.reservations = d.reservations.filter(function (x) { return !vis.some(function (c) { return c.id === x.chantier; }); });
+        ecritLocal(d); return null;
+      }
+      throw new Error("Appel local inconnu.");
+    });
+  }
   function appel(chemin, o) {
     o = o || {};
+    if (LOCAL && /^doc_/.test(chemin)) return local(chemin, o);
     var h = { apikey: BASE.cle };
     if (o.corps !== undefined) h["Content-Type"] = "application/json";
     if (o.prefer) h.Prefer = o.prefer;
@@ -187,6 +249,7 @@
     if (SEL && !plageDe(SEL)) SEL = "";
     return rechargeDonnees();
   }
+  function aExporter() { var m = lsGet("org.modifie"), x = lsGet("org.exporte"); return !!m && (!x || m > x); }
   function rechargeDonnees(silence) {
     if (!CUR) return Promise.resolve();
     if (!silence) etat("Chargement…");
@@ -197,7 +260,7 @@
     ]).then(function (r) {
       if (!CUR || CUR.id !== id) return;
       RES = r[0]; PLANS = dernierIndice(r[1]);
-      etat(RES.length + " réservation(s)" + (CONF.liste_plans ? " · " + PLANS.length + " plans" : "") + " · à jour", "ok");
+      etat(RES.length + " réservation(s)" + (CONF.liste_plans ? " · " + PLANS.length + " plans" : "") + (LOCAL ? " · fichier dans ce navigateur" + (aExporter() ? ", à exporter" : "") : " · à jour"), LOCAL && aExporter() ? "" : "ok");
       dessine();
     }).catch(function (e) { etat("Base indisponible", "ko"); toast(e.message, 5000); });
   }
@@ -212,7 +275,7 @@
     ["plages", "res", "ref"].forEach(function (v) { $("#v-" + v).hidden = true; });
     $("#v-vide").hidden = false;
     $("#vide").innerHTML = "<h2>" + esc(titre || "Aucun chantier pour l'instant") + "</h2><p>" +
-      esc(texte || "Crée un premier chantier : vide, pour bâtir toi-même tes référentiels et tes plages, ou prérempli avec la numérotation du Fairmont.") + "</p>" +
+      esc(texte || "Crée un premier chantier : vide, pour bâtir toi-même tes référentiels et tes plages, ou prérempli avec la numérotation du Fairmont. Tu peux aussi ouvrir un JSON exporté avec « Importer ».") + "</p>" +
       (manque ? '<p>Une fois la migration passée, recharge la page (Ctrl+F5).</p>' :
         '<div class="actions"><button class="btn accent" data-m="fgh">Chantier Fairmont prérempli</button><button class="btn" data-m="vide">Chantier vide</button></div>');
   }
@@ -649,6 +712,7 @@
     var d = new Date(), j = { format: "str-bim-tools/organiseur", version: 1, exporte_le: d.toISOString(),
       chantier: { code: CUR.code, nom: CUR.nom, config: CONF },
       reservations: RES.map(function (r) { var o = copie(r); delete o.chantier; return o; }) };
+    lsSet("org.exporte", new Date().toISOString()); setTimeout(function () { rechargeDonnees(true); }, 50);
     telecharge("organiseur-" + CUR.code + "-" + d.getFullYear() + deux(d.getMonth() + 1) + deux(d.getDate()) + ".json", j);
   });
   // Feuilles Revit : une entrée par n° réservé, prête pour un script de création de feuilles
