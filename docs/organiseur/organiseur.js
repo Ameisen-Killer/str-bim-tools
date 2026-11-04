@@ -508,14 +508,53 @@
     for (var n = +p.de; n <= +p.a; n++) { var o = occ[n]; if (!o) continue; if (o.pl.length) e++; else if (o.r) r++; }
     return { e: e, r: r, tot: tot, libre: tot - e - r };
   }
+  // couleur d'une plage : une teinte par lot, les sous-plages en variantes plus claires ou plus foncées
+  var TEINTES = [28, 205, 145, 340, 265, 175, 8, 48, 225, 95, 305, 190];
+  function couleur(cle) {
+    var p = String(cle).split(".").map(Number), t = TEINTES[p[0] % TEINTES.length] + (p[0] >= TEINTES.length ? 17 : 0);
+    if (p.length === 1) return "hsl(" + t + " 62% 46%)";
+    var k = p[p.length - 1], l = 54 + (k % 2 ? -10 : 0) + (p.length - 2) * 6;
+    return "hsl(" + (t + (k % 3 - 1) * 6) + " 55% " + l + "%)";
+  }
+  function dessineBande() {
+    var B = $("#bande"), L = aplat();
+    if (!L.length) { B.innerHTML = '<div class="bande-t"><b>Plages de numéros</b><span>aucune plage : construis-les dans « Référentiels du chantier »</span></div>'; return; }
+    var hauts = L.filter(function (x) { return !x.d; }), d0 = Math.min.apply(null, hauts.map(function (x) { return +x.p.de; })), d1 = Math.max.apply(null, hauts.map(function (x) { return +x.p.a; }));
+    var tot = Math.max(1, d1 - d0 + 1), X = function (n) { return ((n - d0) / tot * 100).toFixed(3) + "%"; }, W = function (p) { return ((+p.a - +p.de + 1) / tot * 100).toFixed(3) + "%"; };
+    var prof = Math.min(2, Math.max.apply(null, L.map(function (x) { return x.d; }))), h = "";
+    h += '<div class="bande-t"><b>Plages de numéros</b><span>' + pad(d0) + " à " + pad(d1) + " · largeur = nombre de n° · trait du bas : réservés (orange clair) et émis (vert clair)</span></div>";
+    for (var r = 0; r <= prof; r++) {
+      h += '<div class="rang r' + r + '">';
+      if (!r) {   // trous entre les lots : n° non attribués
+        var tri = hauts.slice().sort(function (a, b) { return a.p.de - b.p.de; }), fin = d0 - 1;
+        tri.forEach(function (x) { if (+x.p.de > fin + 1) h += '<span class="trou" style="left:' + X(fin + 1) + ";width:" + ((+x.p.de - fin - 1) / tot * 100).toFixed(3) + '%" title="' + pad(fin + 1) + "–" + pad(+x.p.de - 1) + ' : hors plage"></span>'; fin = Math.max(fin, +x.p.a); });
+      }
+      L.filter(function (x) { return x.d === r; }).forEach(function (x) {
+        var s = stats(x.p, "*"), pe = s.tot ? s.e / s.tot * 100 : 0, pr = s.tot ? s.r / s.tot * 100 : 0;
+        h += '<button type="button" class="seg-p" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '" style="left:' + X(+x.p.de) + ";width:" + W(x.p) + ";--cp:" + couleur(x.cle) + '" title="' +
+          esc(x.chemin + " · " + pad(x.p.de) + "–" + pad(x.p.a) + " · " + s.libre + " libre(s), " + s.r + " réservé(s), " + s.e + " émis") + '">' + esc(x.p.lib || "?") + (r ? "" : "<small>" + pad(x.p.de) + "</small>") +
+          '<span class="occ"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span></button>';
+      });
+      h += "</div>";
+    }
+    // repères : début de chaque lot et fin de la barre, sautés s'ils se touchent
+    var rep = hauts.map(function (x) { return +x.p.de; }).concat([d1]).sort(function (a, b) { return a - b; }), der = -100;
+    h += '<div class="axe">' + rep.map(function (n, i) {
+      var pc = (n - d0) / tot * 100; if (pc - der < 6 && i < rep.length - 1) return ""; der = pc;
+      return '<span class="' + (i === 0 ? "g" : i === rep.length - 1 ? "d" : "") + '" style="left:' + (i === rep.length - 1 ? "100%" : pc.toFixed(3) + "%") + '">' + pad(n) + "</span>";
+    }).join("") + "</div>";
+    B.innerHTML = h;
+  }
+  $("#bande").addEventListener("click", function (e) { var b = e.target.closest(".seg-p"); if (!b) return; SEL = SEL === b.dataset.k ? "" : b.dataset.k; dessinePlages(); });
   function dessinePlages() {
     var L = aplat();
+    dessineBande();
     var h = '<div class="titre-arbre">Plages du chantier</div>';
     if (!L.length) h += '<div class="vide" style="padding:10px">Aucune plage. Construis ton arbre dans l\'onglet « Référentiels du chantier ».</div>';
     L.forEach(function (x) {
       var s = stats(x.p, "*"), pe = s.tot ? s.e / s.tot * 100 : 0, pr = s.tot ? s.r / s.tot * 100 : 0;
       h += '<button type="button" class="lot' + (x.d ? " sous" : "") + '" style="padding-left:' + (10 + x.d * 16) + 'px" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '">' +
-        '<span class="nom">' + esc(x.p.lib || "(sans nom)") + '</span><span class="bornes">' + pad(x.p.de) + "–" + pad(x.p.a) + "</span>" +
+        '<span class="nom"><i class="puce" style="--cp:' + couleur(x.cle) + '"></i>' + esc(x.p.lib || "(sans nom)") + '</span><span class="bornes">' + pad(x.p.de) + "–" + pad(x.p.a) + "</span>" +
         '<span class="jauge"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span>' +
         "<small>" + s.libre + " libre(s) · " + s.r + " réservé(s) · " + s.e + " émis" + (x.p.types.length ? " · " + esc(x.p.types.join(", ")) : "") + "</small></button>";
     });
