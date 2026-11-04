@@ -510,42 +510,46 @@
   }
   // couleur d'une plage : une teinte par lot, les sous-plages en variantes plus claires ou plus foncées
   var TEINTES = [28, 205, 145, 340, 265, 175, 8, 48, 225, 95, 305, 190];
-  function couleur(cle) {
+  function teinte(cle) {
     var p = String(cle).split(".").map(Number), t = TEINTES[p[0] % TEINTES.length] + (p[0] >= TEINTES.length ? 17 : 0);
-    if (p.length === 1) return "hsl(" + t + " 62% 46%)";
-    var k = p[p.length - 1], l = 54 + (k % 2 ? -10 : 0) + (p.length - 2) * 6;
-    return "hsl(" + (t + (k % 3 - 1) * 6) + " 55% " + l + "%)";
+    if (p.length === 1) return [t, 62, 46];
+    var k = p[p.length - 1]; return [t + (k % 3 - 1) * 6, 55, 54 + (k % 2 ? -10 : 0) + (p.length - 2) * 6];
   }
+  // dl : écart de clarté ; a : opacité (fond des n° libres)
+  function couleur(cle, dl, a) { var c = teinte(cle); return "hsl(" + c[0] + " " + c[1] + "% " + Math.max(8, Math.min(92, c[2] + (dl || 0))) + "%" + (a != null ? " / " + a : "") + ")"; }
+  function vars(cle) { return "--cp:" + couleur(cle) + ";--cf:" + couleur(cle, -20) + ";--cl:" + couleur(cle, 0, 0.2); }
   function dessineBande() {
     var B = $("#bande"), L = aplat();
-    if (!L.length) { B.innerHTML = '<div class="bande-t"><b>Plages de numéros</b><span>aucune plage : construis-les dans « Référentiels du chantier »</span></div>'; return; }
+    if (!L.length) { B.innerHTML = '<div class="bande-t"><span class="tt">Plages de numéros</span><span>aucune plage : construis-les dans « Référentiels du chantier »</span></div>'; return; }
     var hauts = L.filter(function (x) { return !x.d; }), d0 = Math.min.apply(null, hauts.map(function (x) { return +x.p.de; })), d1 = Math.max.apply(null, hauts.map(function (x) { return +x.p.a; }));
-    var tot = Math.max(1, d1 - d0 + 1), X = function (n) { return ((n - d0) / tot * 100).toFixed(3) + "%"; }, W = function (p) { return ((+p.a - +p.de + 1) / tot * 100).toFixed(3) + "%"; };
-    var prof = Math.min(2, Math.max.apply(null, L.map(function (x) { return x.d; }))), h = "";
-    h += '<div class="bande-t"><b>Plages de numéros</b><span>' + pad(d0) + " à " + pad(d1) + " · largeur = nombre de n° · trait du bas : réservés (orange clair) et émis (vert clair)</span></div>";
-    for (var r = 0; r <= prof; r++) {
-      h += '<div class="rang r' + r + '">';
-      if (!r) {   // trous entre les lots : n° non attribués
-        var tri = hauts.slice().sort(function (a, b) { return a.p.de - b.p.de; }), fin = d0 - 1;
-        tri.forEach(function (x) { if (+x.p.de > fin + 1) h += '<span class="trou" style="left:' + X(fin + 1) + ";width:" + ((+x.p.de - fin - 1) / tot * 100).toFixed(3) + '%" title="' + pad(fin + 1) + "–" + pad(+x.p.de - 1) + ' : hors plage"></span>'; fin = Math.max(fin, +x.p.a); });
-      }
-      L.filter(function (x) { return x.d === r; }).forEach(function (x) {
-        var s = stats(x.p, "*"), pe = s.tot ? s.e / s.tot * 100 : 0, pr = s.tot ? s.r / s.tot * 100 : 0;
-        h += '<button type="button" class="seg-p" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '" style="left:' + X(+x.p.de) + ";width:" + W(x.p) + ";--cp:" + couleur(x.cle) + '" title="' +
-          esc(x.chemin + " · " + pad(x.p.de) + "–" + pad(x.p.a) + " · " + s.libre + " libre(s), " + s.r + " réservé(s), " + s.e + " émis") + '">' + esc(x.p.lib || "?") + (r ? "" : "<small>" + pad(x.p.de) + "</small>") +
-          '<span class="occ"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span></button>';
-      });
-      h += "</div>";
-    }
-    // repères : début de chaque lot et fin de la barre, sautés s'ils se touchent
+    var tot = Math.max(1, d1 - d0 + 1), pc = function (n) { return (n - d0) / tot * 100; };
+    var T = { e: 0, r: 0, l: 0 }; hauts.forEach(function (x) { var s = stats(x.p, "*"); T.e += s.e; T.r += s.r; T.l += s.libre; });
+    var h = '<div class="bande-t"><span><span class="gros">' + T.e + "</span>émis<span class=\"gros\" style=\"margin-left:14px\">" + T.r + '</span>réservés</span><span class="tt">' + pad(d0) + " – " + pad(d1) + '</span><span>libres<span class="gros">' + T.l + "</span></span></div>";
+    // la barre : une case par plage sans sous-plage, émis hachurés, réservés pleins, libres pâles
+    h += '<div class="barre-p">';
+    var tri = hauts.slice().sort(function (a, b) { return a.p.de - b.p.de; }), fin = d0 - 1;
+    tri.forEach(function (x) { if (+x.p.de > fin + 1) h += '<span class="trou" style="left:' + pc(fin + 1).toFixed(3) + "%;width:" + ((+x.p.de - fin - 1) / tot * 100).toFixed(3) + '%" title="' + pad(fin + 1) + "–" + pad(+x.p.de - 1) + ' : hors plage"></span>'; fin = Math.max(fin, +x.p.a); });
+    var dansSel = function (k) { return SEL && (k === SEL || k.indexOf(SEL + ".") === 0); };
+    L.filter(function (x) { return !(x.p.sous || []).length; }).forEach(function (x) {
+      var s = stats(x.p, "*");
+      h += '<button type="button" class="feuille' + (dansSel(x.cle) && x.cle !== SEL ? " dans" : "") + '" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '" style="left:calc(' + pc(+x.p.de).toFixed(3) + "% + 1px);width:calc(" + ((+x.p.a - +x.p.de + 1) / tot * 100).toFixed(3) + "% - 2px);" + vars(x.cle) + '" title="' +
+        esc(x.chemin + " · " + pad(x.p.de) + "–" + pad(x.p.a) + " · " + s.e + " émis, " + s.r + " réservé(s), " + s.libre + " libre(s)") + '"><i class="e" style="flex:' + s.e + '"></i><i class="r" style="flex:' + s.r + '"></i></button>';
+    });
+    h += '</div><div class="lots">';
+    hauts.forEach(function (x) {
+      h += '<button type="button" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '" style="left:calc(' + pc(+x.p.de).toFixed(3) + "% + 1px);width:calc(" + ((+x.p.a - +x.p.de + 1) / tot * 100).toFixed(3) + "% - 2px);" + vars(x.cle) + '" title="' + esc(x.p.lib + " · " + pad(x.p.de) + "–" + pad(x.p.a)) + '">' + esc(x.p.lib || "?") + "</button>";
+    });
+    h += "</div>";
     var rep = hauts.map(function (x) { return +x.p.de; }).concat([d1]).sort(function (a, b) { return a - b; }), der = -100;
     h += '<div class="axe">' + rep.map(function (n, i) {
-      var pc = (n - d0) / tot * 100; if (pc - der < 6 && i < rep.length - 1) return ""; der = pc;
-      return '<span class="' + (i === 0 ? "g" : i === rep.length - 1 ? "d" : "") + '" style="left:' + (i === rep.length - 1 ? "100%" : pc.toFixed(3) + "%") + '">' + pad(n) + "</span>";
+      var q = pc(n); if (q - der < 6 && i < rep.length - 1) return ""; der = q;
+      return '<span class="' + (i === 0 ? "g" : i === rep.length - 1 ? "d" : "") + '" style="left:' + (i === rep.length - 1 ? "100" : q.toFixed(3)) + '%">' + pad(n) + "</span>";
     }).join("") + "</div>";
+    h += '<div class="legende-p"><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,transparent 2px 4px)">Émis</span><span style="--m:var(--texte-doux)">Réservés</span><span style="--m:rgba(var(--encre),.18)">Libres</span>' +
+      (rep.length && T ? '<span style="--m:repeating-linear-gradient(135deg,rgba(var(--encre),.25) 0 2px,transparent 2px 5px)">Hors plage</span>' : "") + "</div>";
     B.innerHTML = h;
   }
-  $("#bande").addEventListener("click", function (e) { var b = e.target.closest(".seg-p"); if (!b) return; SEL = SEL === b.dataset.k ? "" : b.dataset.k; dessinePlages(); });
+  $("#bande").addEventListener("click", function (e) { var b = e.target.closest("button[data-k]"); if (!b) return; SEL = SEL === b.dataset.k ? "" : b.dataset.k; dessinePlages(); });
   function dessinePlages() {
     var L = aplat();
     dessineBande();
@@ -555,7 +559,7 @@
       var s = stats(x.p, "*"), pe = s.tot ? s.e / s.tot * 100 : 0, pr = s.tot ? s.r / s.tot * 100 : 0;
       h += '<button type="button" class="lot' + (x.d ? " sous" : "") + '" style="padding-left:' + (10 + x.d * 16) + 'px" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '">' +
         '<span class="nom"><i class="puce" style="--cp:' + couleur(x.cle) + '"></i>' + esc(x.p.lib || "(sans nom)") + '</span><span class="bornes">' + pad(x.p.de) + "–" + pad(x.p.a) + "</span>" +
-        '<span class="jauge"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span>' +
+        '<span class="jauge" style="' + vars(x.cle) + '"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span>' +
         "<small>" + s.libre + " libre(s) · " + s.r + " réservé(s) · " + s.e + " émis" + (x.p.types.length ? " · " + esc(x.p.types.join(", ")) : "") + "</small></button>";
     });
     var hors = RES.filter(function (r) { return r.statut !== "annule" && !plageDuBloc(r.de, r.a); }).length;

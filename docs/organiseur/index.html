@@ -104,22 +104,28 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 /* ---------- Plages ---------- */
 #v-plages{display:grid;grid-template-columns:340px 1fr;grid-template-rows:auto minmax(0,1fr);gap:8px}
 /* barre des plages : chaque lot à la largeur de son nombre de n°, ses sous-plages dessous */
-.bande-p{grid-column:1/-1;padding:10px 12px 8px}
-.bande-t{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--texte-faible);margin-bottom:6px}
-.bande-t b{color:var(--texte);font-size:13px}
-.rang{position:relative;height:30px;margin-bottom:3px}
-.rang.r1{height:22px}.rang.r2{height:18px}
-.seg-p{position:absolute;top:0;bottom:0;border:0;padding:0 6px;border-radius:3px;background:var(--cp);color:#fff;font-size:11.5px;font-weight:600;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
-.rang.r1 .seg-p,.rang.r2 .seg-p{font-size:10.5px;font-weight:500}
-.seg-p:hover{filter:brightness(1.12)}
-.seg-p[aria-current="true"]{box-shadow:0 0 0 2px var(--texte),inset 0 0 0 1px rgba(0,0,0,.2);z-index:2}
-.seg-p .occ{position:absolute;left:0;right:0;bottom:0;height:4px;display:flex;background:rgba(0,0,0,.25)}
-.seg-p .occ i{display:block;height:100%}.seg-p .occ .e{background:#E9FFE6}.seg-p .occ .r{background:#FFE3B5}
-.seg-p small{font-weight:400;opacity:.85;margin-left:6px;font-family:var(--mono)}
-.trou{position:absolute;top:0;bottom:0;border-radius:3px;background:repeating-linear-gradient(135deg,rgba(var(--encre),.08) 0 4px,transparent 4px 8px)}
+.bande-p{grid-column:1/-1;padding:12px 14px 10px}
+/* barre des plages, façon résultats d'élection : barre fine, chiffres en grand, émis en hachures, légende à carrés */
+.bande-t{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--texte-doux)}
+.bande-t .gros{font-family:var(--titre);font-size:24px;line-height:24px;font-weight:700;color:var(--texte);margin:0 4px}
+.bande-t .tt{font-size:15px;color:var(--texte)}
+.barre-p{position:relative;height:16px;margin:2px 0 4px}
+.feuille{position:absolute;top:0;bottom:0;display:flex;border:0;padding:0;border-radius:2px;overflow:hidden;cursor:pointer;background:var(--cl)}
+.feuille i{display:block;height:100%}
+.feuille .e{background:repeating-linear-gradient(135deg,var(--cf) 0 3px,var(--cp) 3px 6px)}
+.feuille .r{background:var(--cp)}
+.feuille:hover{filter:brightness(1.15)}
+.feuille[aria-current="true"],.feuille.dans{outline:2px solid var(--texte);outline-offset:1px;z-index:2}
+.trou{position:absolute;top:3px;bottom:3px;border-radius:2px;background:repeating-linear-gradient(135deg,rgba(var(--encre),.18) 0 2px,transparent 2px 5px)}
+.lots{position:relative;height:20px}
+.lots button{position:absolute;top:0;height:20px;border:0;border-top:3px solid var(--cp);background:none;padding:2px 2px 0;font-size:11px;font-weight:600;color:var(--texte-doux);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;text-align:left}
+.lots button:hover,.lots button[aria-current="true"]{color:var(--texte)}
+.lots button[aria-current="true"]{border-top-width:5px}
 .axe{position:relative;height:14px;font-family:var(--mono);font-size:10px;color:var(--texte-faible)}
 .axe span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 .axe span.g{transform:none}.axe span.d{transform:translateX(-100%)}
+.legende-p{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px;font-size:12.5px;color:var(--texte-doux)}
+.legende-p span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:7px;vertical-align:-2px;background:var(--m)}
 .puce{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px;background:var(--cp)}
 .arbre{padding:6px}
 .lot{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:4px;background:none;cursor:pointer}
@@ -129,9 +135,9 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .lot.sous{padding-left:26px}
 .lot.sous .nom{font-weight:400}
 .lot .bornes{font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
-.lot .jauge{grid-column:1/-1;height:4px;border-radius:2px;background:var(--c-libre);display:flex;overflow:hidden}
+.lot .jauge{grid-column:1/-1;height:6px;border-radius:2px;background:var(--cl,var(--c-libre));display:flex;overflow:hidden}
 .jauge i{display:block;height:100%}
-.jauge .e{background:var(--c-emis)}.jauge .r{background:var(--c-res)}
+.jauge .e{background:repeating-linear-gradient(135deg,var(--cf,#333) 0 2px,var(--cp,var(--c-emis)) 2px 4px)}.jauge .r{background:var(--cp,var(--c-res))}
 .lot small{grid-column:1/-1;font-size:11px;color:var(--texte-faible)}
 .titre-arbre{padding:10px 10px 4px;font-size:11px;font-weight:600;color:var(--texte-faible);text-transform:uppercase;letter-spacing:.06em}
 
@@ -386,6 +392,6 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=15"></script>
+<script src="/organiseur/organiseur.js?v=16"></script>
 </body>
 </html>
