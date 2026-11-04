@@ -235,7 +235,7 @@
   // ------------------------------------------------------------------ modèles
   function confVide() {
     return { segments: GABARIT.slice(), separateur: "-", chiffres: 4, fixes: { emetteur: "" }, liste_plans: "",
-      disciplines: [], phases: [], types: [], batiments: [], niveaux: [], zones: [], plages: [] };
+      disciplines: [], phases: [], types: [], batiments: [], zones: [], plages: [] };
   }
   // Fairmont : référentiels repris de /fgh/pln/ (codes Kairnial, liste des livrables AB du 11.09.2025)
   function confFairmont(zones) {
@@ -247,10 +247,10 @@
     var T = { PLA: "Plan", ARM: "Armatures", LIS: "Listes de fers", ELV: "Élévation", DET: "Détail", NDC: "Note de calcul", DES: "Descriptif",
       RAP: "Rapport", CPE: "Coupe", SCH: "Schéma", CDC: "Cahier des charges", FTE: "Fiche technique", RFI: "RFI", MOD: "Maquette" };
     c.types = Object.keys(T).map(function (k) { return { c: k, lib: T[k], propre: k === "ARM" || k === "LIS" }; });
-    c.batiments = [{ c: "FGH", lib: "Hôtel Fairmont Genève" }];
+    c.batiments = [{ c: "FGH", lib: "Hôtel Fairmont Genève", niveaux: [] }];
     var N = { "000": "Tous niveaux", "050": "SS-4", "060": "SS-3", "070": "SS-2", "080": "SS-1", "090": "Rez inf", "100": "Rez",
       "110": "Étage 1", "120": "Étage 2", "130": "Étage 3", "140": "Étage 4", "150": "Étage 5", "160": "Étage 6", "170": "Étage 7", "180": "Étage 8", "190": "Toiture" };
-    c.niveaux = Object.keys(N).map(function (k) { return { c: k, lib: N[k], bat: "", fictif: k === "000" }; });
+    c.batiments[0].niveaux = Object.keys(N).map(function (k) { return { c: k, lib: N[k], fictif: k === "000" }; });
     c.zones = (zones && zones.length ? zones : ["TTZ"]).map(function (z) { return { c: z, lib: z === "TTZ" ? "Toutes zones" : "Zone " + z, bat: "" }; });
     function P(lib, de, a, sous) { return { lib: lib, de: de, a: a, types: [], sous: (sous || []).map(function (s) { return P(s[2], s[0], s[1]); }) }; }
     c.plages = [
@@ -267,6 +267,17 @@
     var d = confVide(); c = c && typeof c === "object" ? c : {};
     Object.keys(d).forEach(function (k) { if (c[k] == null || (Array.isArray(d[k]) && !Array.isArray(c[k]))) c[k] = d[k]; });
     if (typeof c.fixes !== "object") c.fixes = {};
+    // niveaux par bâtiment (04.11.2026) : l'ancienne liste commune est répartie dans chaque bâtiment
+    if (Array.isArray(c.niveaux) && c.niveaux.length) {
+      if (!c.batiments.length) c.batiments = [{ c: "B1", lib: "Bâtiment" }];
+      c.batiments.forEach(function (b) {
+        if (Array.isArray(b.niveaux) && b.niveaux.length) return;
+        b.niveaux = c.niveaux.filter(function (n) { var bl = U(n.bat).split(/[\s,;]+/).filter(Boolean); return !bl.length || bl.indexOf(U(b.c)) >= 0; })
+          .map(function (n) { var o = copie(n); delete o.bat; return o; });
+      });
+    }
+    delete c.niveaux;
+    c.batiments.forEach(function (b) { if (!Array.isArray(b.niveaux)) b.niveaux = []; });
     // ancien gabarit texte « {projet}-{type}-… » : converti en liste de trigrammes
     if (typeof c.gabarit === "string") { var g = c.gabarit.match(/\{(\w+)\}/g); if (g) c.segments = g.map(function (x) { return x.slice(1, -1); }); }
     delete c.gabarit;
@@ -281,6 +292,13 @@
   // ------------------------------------------------------------------ numérotation
   function pad(n) { var s = String(n); while (s.length < CONF.chiffres) s = "0" + s; return s; }
   function lib(liste, c) { var x = (CONF[liste] || []).filter(function (e) { return U(e.c) === U(c); })[0]; return x ? x.lib : ""; }
+  // niveaux d'un bâtiment, ou de tous les bâtiments (sans doublon de code) si aucun n'est choisi
+  function niveauxDe(bat) {
+    var bs = CONF.batiments.filter(function (b) { return !bat || U(b.c) === U(bat); }), vu = {}, L = [];
+    bs.forEach(function (b) { b.niveaux.forEach(function (n) { if (n.c && !vu[U(n.c)]) { vu[U(n.c)] = 1; L.push(n); } }); });
+    return L;
+  }
+  function libNiv(bat, c) { var x = niveauxDe(bat).concat(niveauxDe("")).filter(function (n) { return U(n.c) === U(c); })[0]; return x ? x.lib : ""; }
   function propres() { var m = {}; CONF.types.forEach(function (t) { if (t.propre) m[U(t.c)] = 1; }); return m; }
   function espace(t) { return propres()[U(t)] ? U(t) : "*"; }
   function valeurs(r, n) {
@@ -537,7 +555,7 @@
 
   function ligneRes(r) {
     var st = statutDe(r), num = pad(r.de) + (r.a > r.de ? "–" + pad(r.a) : "");
-    var emp = [lib("batiments", r.batiment) || r.batiment, lib("niveaux", r.niveau) || r.niveau, r.zone ? "zone " + r.zone : ""].filter(Boolean).join(" · ");
+    var emp = [lib("batiments", r.batiment) || r.batiment, libNiv(r.batiment, r.niveau) || r.niveau, r.zone ? "zone " + r.zone : ""].filter(Boolean).join(" · ");
     return '<tr class="clic" data-id="' + esc(r.id) + '"><td class="mono">' + num + "</td><td class=\"mono\" style=\"font-size:12px\">" + esc(codeDoc(r, r.de)) + (r.a > r.de ? "<small>à " + pad(r.a) + "</small>" : "") +
       "</td><td>" + esc(r.titre || "—") + "<small>" + esc(lib("types", r.type) || r.type) + (r.remarque ? " · " + esc(r.remarque.slice(0, 80)) : "") + "</small></td>" +
       (VUE === "res" ? '<td class="masque-p">' + esc(emp) + '</td><td class="masque-p">' + esc(r.par) + "</td><td>" + dateFr(r.echeance) + "</td>" : "") +
@@ -571,7 +589,7 @@
   function filtreBat(liste) { var b = FR.elements.batiment.value; return liste.filter(function (x) { return !x.bat || !b || U(x.bat).split(/[\s,;]+/).indexOf(U(b)) >= 0; }); }
   function remplitLieux() {
     var nv = FR.elements.niveau.value, z = FR.elements.zone.value;
-    $("#fr-niv").innerHTML = options(filtreBat(CONF.niveaux), "—"); FR.elements.niveau.value = nv; if (FR.elements.niveau.value !== nv) FR.elements.niveau.value = "";
+    $("#fr-niv").innerHTML = options(niveauxDe(FR.elements.batiment.value), "—"); FR.elements.niveau.value = nv; if (FR.elements.niveau.value !== nv) FR.elements.niveau.value = "";
     $("#fr-zone").innerHTML = options(filtreBat(CONF.zones), "—"); FR.elements.zone.value = z; if (FR.elements.zone.value !== z) FR.elements.zone.value = "";
   }
   function typesDePlage() {
@@ -698,9 +716,8 @@
     return bats.map(function (b, i) {
       var L = Math.max(1, nb(b.lg, 20)), W = Math.max(1, nb(b.la, 15)), X = nb(b.x, x0), Y = nb(b.y, 0); x0 = X + L + 8;
       var z = null, hp = 0, niv = [];
-      CONF.niveaux.forEach(function (n, k) {
+      (b.niveaux || []).forEach(function (n, k) {
         if (n.fictif) return;
-        var bl = U(n.bat).split(/[\s,;]+/).filter(Boolean); if (bl.length && b.c && bl.indexOf(U(b.c)) < 0) return;
         var h = Math.max(0.2, nb(n.h, 3)), zz = typeof n.alt === "number" ? n.alt : z == null ? 0 : z + hp;
         niv.push({ k: k, n: n, z: zz, h: h }); z = zz; hp = h;
       });
@@ -729,7 +746,7 @@
       });
       var dern = -1e9;
       m.niv.forEach(function (v) {
-        var on = onB || (MQ.foc && MQ.foc.l === "niveaux" && MQ.foc.i === v.k);
+        var on = onB || (MQ.foc && MQ.foc.l === "niv" && m.i === NIVB && MQ.foc.i === v.k);
         h += '<polygon class="mq-dalle' + (on ? " on" : "") + '" points="' + poly(m, v.z) + '"><title>' + esc(v.n.c + " · " + v.n.lib + " · z = " + (Math.round(v.z * 100) / 100) + " m") + "</title></polygon>";
         // étiquette au coin le plus à droite, sautée si elle chevauche la précédente (sauf niveau en cours)
         var cs = [[0, 0], [m.L, 0], [m.L, m.W], [0, m.W]].map(function (c) { return S(m.X + c[0], m.Y + c[1], v.z); }).sort(function (a, b) { return b[0] - a[0]; })[0];
@@ -750,16 +767,26 @@
       if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; dessineMaquette();
     });
     ["pointerup", "pointercancel"].forEach(function (t) { $("#ref").addEventListener(t, function () { g = null; }); });
-    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; var f = (d.l === "batiments" || d.l === "niveaux") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
+    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
     window.addEventListener("resize", function () { if (VUE === "ref") dessineMaquette(); });
   })();
 
+  var NIVB = 0;   // bâtiment dont on édite les niveaux
+  function liste(k) { return k === "niv" ? (CONF.batiments[NIVB] || { niveaux: [] }).niveaux : CONF[k]; }
+  $("#ref").addEventListener("change", function (e) {
+    if (e.target.id === "niv-bat") { NIVB = +e.target.value; MQ.foc = null; dessineRef(); }
+    else if (e.target.id === "niv-copie" && e.target.value !== "") {
+      var src = CONF.batiments[+e.target.value], dst = CONF.batiments[NIVB];
+      if (dst.niveaux.length && !window.confirm("Remplacer les " + dst.niveaux.length + " niveaux de " + (dst.c || "ce bâtiment") + " par ceux de " + (src.c || "l'autre") + " ?")) { e.target.value = ""; return; }
+      dst.niveaux = copie(src.niveaux); marque(); dessineRef();
+    }
+  });
   var LISTES = [
     { k: "disciplines", t: "Disciplines", aide: "Code court qui entre dans le code du document (ex. STR).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "phases", t: "Phases", aide: "Phases du projet (ex. SIA 112 : 51 projet d'exécution).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "types", t: "Types de document", aide: "Plans, détails, notes de calcul, fiches, rapports… Coche « n° propres » pour un type qui a sa propre suite de numéros (ex. ARM et LIS, qui reprennent le n° de l'ouvrage) ; les autres partagent la numérotation commune.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["propre", "N° propres", 90, "case"]] },
     { k: "batiments", t: "Bâtiments", aide: "Un ou plusieurs bâtiments. Longueur et largeur dessinent l'emprise (20 × 15 m si vide) ; X et Y placent le bâtiment sur le site (sinon côte à côte).", cols: [["c", "Code", 90], ["lib", "Nom"], ["lg", "Long. (m)", 76, "nb"], ["la", "Larg. (m)", 76, "nb"], ["x", "X (m)", 64, "nb"], ["y", "Y (m)", 64, "nb"]] },
-    { k: "niveaux", t: "Niveaux", aide: "Du plus bas au plus haut. Hauteur d'étage : 3 m si vide. Altitude : facultative, sinon les niveaux s'empilent. « Hors maquette » pour un niveau fictif (ex. 000 tous niveaux). « Bâtiments » : codes séparés par une virgule si le niveau n'existe que dans certains bâtiments (vide = tous).", cols: [["c", "Code", 76], ["lib", "Libellé"], ["h", "Haut. (m)", 72, "nb"], ["alt", "Alt. (m)", 72, "nb"], ["fictif", "Hors maq.", 62, "case"], ["bat", "Bâtiments", 96]] },
+    { k: "niv", t: "Niveaux du bâtiment", aide: "Chaque bâtiment a ses niveaux, du plus bas au plus haut. Hauteur d'étage : 3 m si vide. Altitude : facultative, sinon les niveaux s'empilent. « Hors maquette » pour un niveau fictif (ex. 000 tous niveaux).", cols: [["c", "Code", 76], ["lib", "Libellé"], ["h", "Haut. (m)", 72, "nb"], ["alt", "Alt. (m)", 72, "nb"], ["fictif", "Hors maq.", 62, "case"]] },
     { k: "zones", t: "Zones", aide: "Zones ou secteurs. « Bâtiments » : vide = tous.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["bat", "Bâtiments", 140]] }
   ];
   function dessineRef() {
@@ -778,8 +805,16 @@
       '<button class="btn ajout" data-ajout-plage="">+ Ajouter un lot</button><div class="avert" id="ref-avert" style="color:var(--rouge);font-size:12.5px;margin-top:6px"></div></div>';
     LISTES.forEach(function (L) {
       if (L.k === "batiments") h += '<div class="ref-bat"><div class="ref-bat-l">';
-      h += '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + '</p><table><thead><tr>' + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
-        CONF[L.k].map(function (e, i) {
+      if (L.k === "niv") {
+        if (!CONF.batiments.length) { h += '<div class="bloc"><h3>Niveaux</h3><p>Ajoute d\'abord un bâtiment : chaque bâtiment a ses propres niveaux.</p></div>'; return; }
+        if (NIVB >= CONF.batiments.length) NIVB = 0;
+        var autres = CONF.batiments.map(function (b, i) { return i === NIVB ? "" : '<option value="' + i + '">' + esc(b.c + " · " + (b.lib || "") + " (" + b.niveaux.length + " niv.)") + "</option>"; }).join("");
+        h += '<div class="bloc"><h3>Niveaux du bâtiment <select class="champ" id="niv-bat" style="display:inline-block;width:auto;height:30px;margin-left:6px">' +
+          CONF.batiments.map(function (b, i) { return '<option value="' + i + '"' + (i === NIVB ? " selected" : "") + ">" + esc((b.c || "?") + (b.lib ? " · " + b.lib : "")) + "</option>"; }).join("") + "</select></h3><p>" + esc(L.aide) + "</p>" +
+          (autres ? '<p><select class="champ" id="niv-copie" style="width:auto;height:30px"><option value="">Reprendre les niveaux d\'un autre bâtiment…</option>' + autres + "</select></p>" : "") + "<table>";
+      }
+      h += (L.k === "niv" ? "" : '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + "</p><table>") + '<thead><tr>' + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
+        liste(L.k).map(function (e, i) {
           return "<tr>" + L.cols.map(function (c) {
             return c[3] === "case" ? '<td><input type="checkbox" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '"' + (e[c[0]] ? " checked" : "") + "></td>"
               : c[3] === "nb" ? '<td><input class="champ mono" inputmode="decimal" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '" value="' + esc(e[c[0]] == null ? "" : e[c[0]]) + '" maxlength="12"></td>'
@@ -790,7 +825,7 @@
     });
     $("#ref").innerHTML = h; majEnreg(); verifiePlages(); dessineMaquette();
   }
-  function exempleVal() { return valeurs({ type: (CONF.types[0] || {}).c, discipline: (CONF.disciplines[0] || {}).c, phase: (CONF.phases[0] || {}).c, batiment: (CONF.batiments[0] || {}).c, niveau: (CONF.niveaux[0] || {}).c, zone: (CONF.zones[0] || {}).c }, CONF.plages[0] ? +CONF.plages[0].de : 1); }
+  function exempleVal() { return valeurs({ type: (CONF.types[0] || {}).c, discipline: (CONF.disciplines[0] || {}).c, phase: (CONF.phases[0] || {}).c, batiment: (CONF.batiments[0] || {}).c, niveau: (((CONF.batiments[0] || {}).niveaux || [])[0] || {}).c, zone: (CONF.zones[0] || {}).c }, CONF.plages[0] ? +CONF.plages[0].de : 1); }
   function chipsSeg() {
     var v = exempleVal();
     return CONF.segments.map(function (k, i) {
@@ -842,8 +877,9 @@
       else if (d.g === "chiffres") CONF.chiffres = Math.max(1, Math.min(6, parseInt(v, 10) || 4));
       else CONF[d.g] = v;
     } else if (d.l) {
-      CONF[d.l][+d.i][d.c] = d.c === "c" ? U(v) : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
-      if (d.l === "batiments" || d.l === "niveaux") dessineMaquette();
+      liste(d.l)[+d.i][d.c] = d.c === "c" ? U(v) : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
+      if (d.l === "batiments" || d.l === "niv") dessineMaquette();
+      if (d.l === "batiments" && (d.c === "c" || d.c === "lib")) { var sb = $("#niv-bat"); if (sb && sb.options[+d.i]) sb.options[+d.i].textContent = (CONF.batiments[+d.i].c || "?") + (CONF.batiments[+d.i].lib ? " · " + CONF.batiments[+d.i].lib : ""); }
     } else if (d.p) {
       var x = plageDe(d.p).p;
       if (d.c === "types") x.types = v.split(/[\s,;]+/).map(U).filter(Boolean);
@@ -856,9 +892,9 @@
     var b = e.target.closest("button"); if (!b) return; var d = b.dataset, s;
     if (d.segx) { CONF.segments = CONF.segments.filter(function (k) { return k !== d.segx; }); marque(); majSegs(); return; }
     if (d.segplus) { CONF.segments.splice(Math.max(0, CONF.segments.indexOf("numero")), 0, d.segplus); marque(); majSegs(); return; }
-    if (d.ajout) CONF[d.ajout].push({ c: "", lib: "" });
-    else if (d.sup) { s = d.sup.split("|"); CONF[s[0]].splice(+s[1], 1); }
-    else if (d.mv) { s = d.mv.split("|"); var L = CONF[s[0]], i = +s[1], j = i + +s[2]; if (j < 0 || j >= L.length) return; L.splice(j, 0, L.splice(i, 1)[0]); }
+    if (d.ajout) liste(d.ajout).push(d.ajout === "batiments" ? { c: "", lib: "", niveaux: [] } : { c: "", lib: "" });
+    else if (d.sup) { s = d.sup.split("|"); liste(s[0]).splice(+s[1], 1); }
+    else if (d.mv) { s = d.mv.split("|"); var L = liste(s[0]), i = +s[1], j = i + +s[2]; if (j < 0 || j >= L.length) return; L.splice(j, 0, L.splice(i, 1)[0]); }
     else if (d.ajoutPlage !== undefined) {
       if (d.ajoutPlage === "") { var der = CONF.plages[CONF.plages.length - 1], de = der ? +der.a + 1 : 1; CONF.plages.push({ lib: "", de: de, a: de + 99, types: [], sous: [] }); }
       else { var p = plageDe(d.ajoutPlage).p, ds = p.sous.length ? +p.sous[p.sous.length - 1].a + 1 : +p.de; p.sous.push({ lib: "", de: ds, a: Math.min(+p.a, ds + 99), types: [], sous: [] }); }
@@ -897,7 +933,8 @@
   $("#b-annuler-ref").addEventListener("click", function () { CONF = normalise(copie(CUR.config)); delete CUR._code; delete CUR._nom; SALE = false; dessineRef(); });
   $("#b-enreg").addEventListener("click", function () {
     if (!verifiePlages()) { toast("Corrige d'abord les plages signalées en rouge.", 4000); return; }
-    ["disciplines", "phases", "types", "batiments", "niveaux", "zones"].forEach(function (k) { CONF[k] = CONF[k].filter(function (x) { return x.c; }); });
+    ["disciplines", "phases", "types", "batiments", "zones"].forEach(function (k) { CONF[k] = CONF[k].filter(function (x) { return x.c; }); });
+    CONF.batiments.forEach(function (b) { b.niveaux = b.niveaux.filter(function (x) { return x.c; }); });
     var corps = { config: CONF, modifie_par: moi() };
     if (CUR._code != null && U(CUR._code)) corps.code = U(CUR._code);
     if (CUR._nom != null) corps.nom = CUR._nom.trim();
@@ -929,7 +966,7 @@
         F.push({ numero_feuille: codeDoc(r, n), nom_feuille: r.titre || lib("types", r.type) || r.type, indice: "00",
           trigrammes: CONF.segments.map(function (k) { return { cle: k, libelle: SEGMENTS[k], valeur: v[k] }; }),
           parametres: { projet: v.projet, discipline: v.discipline, emetteur: v.emetteur, phase: v.phase, type: v.type, batiment: v.batiment, niveau: v.niveau, zone: v.zone, numero: v.numero },
-          libelles: { discipline: lib("disciplines", r.discipline), phase: lib("phases", r.phase), type: lib("types", r.type), batiment: lib("batiments", r.batiment), niveau: lib("niveaux", r.niveau), zone: lib("zones", r.zone) },
+          libelles: { discipline: lib("disciplines", r.discipline), phase: lib("phases", r.phase), type: lib("types", r.type), batiment: lib("batiments", r.batiment), niveau: libNiv(r.batiment, r.niveau), zone: lib("zones", r.zone) },
           plage: (plageDuBloc(r.de, r.a) || { chemin: "" }).chemin, reserve_par: r.par, echeance: r.echeance, statut: statutDe(r).c, reservation: r.id });
       }
     });
