@@ -470,9 +470,11 @@ async function depuisPLN(){const m=/^#(pln|ctrl)=(.+)$/.exec(location.hash);if(!
     if(y)lier(f,y);});
   const t=String(r.titre||'');let desc=t,av;do{av=desc;desc=desc.replace(/[\s\-–_]+(arm|armatures?|plan|lis|listes?(\s+de\s+fers)?|coffrage|elv)\s*$/i,'').trim();}while(desc!==av&&desc);
   c.description=desc||t;
-  const n=norm(t),O=[[/radier/,'Radier'],[/dalle/,'Dalle'],[/voile|elevation/,'Voile'],[/\bmur/,'Mur'],[/poteau/,'Poteau'],[/poutre|sommier/,'Poutre'],[/escalier/,'Escalier'],[/fondation|semelle|pieu/,'Fondation']];
-  const o=O.find(([re])=>re.test(n));if(o)c.ouvrage=o[1];
-  const noy=/noyau\s+([a-z])\b/i.exec(t),et=PLN_ETAGE[r.niveau]??'';c.localisation=((noy?'Noyau '+noy[1].toUpperCase():r.zone&&r.zone!=='TTZ'?'Zone '+r.zone:'')+' '+et).trim().slice(0,20);
+  const n=norm(t),O=[[/dalle/,'Dalle sur'],[/voile|elevation|mur|poteau/,'Élévation']];
+  const o=O.find(([re])=>re.test(n));if(o){c.ouvrage=o[1];c.type_element=typeCompose(c);}
+  const noy=/noyau\s+([a-z])\b/i.exec(t),gaine=/gaine\s+cloche/i.test(t),zA=/\bA0[0-4]\b/i.exec(t+' '+(r.zone||''));
+  c.loc_etage=etageLib(PLN_ETAGE[r.niveau]??'');c.loc_partie=noy?'Noyau '+noy[1].toUpperCase():gaine?'Gaine Cloche':zA?zA[0].toUpperCase():'';
+  c.localisation=locCompose(c).slice(0,20);
   CTRLS.push(c);await DB.put('ctrl',c);await openCtrl(c.id,false);if(c.ouvrage)applyOuvrage(false);save();
   toast('Fiche préremplie depuis '+planLabel(r)+(c.plans.length>1?' (+'+(c.plans.length-1)+' plan(s) voisin(s) à vérifier)':''),5000);}
 window.addEventListener('hashchange',()=>{if(S)depuisPLN();});
@@ -873,9 +875,17 @@ const MIC=(k,lab,o={})=>`<div class="fldmic">${F(k,lab,Object.assign({area:1},o)
 const joinTxt=(a,b)=>[String(a||'').trim(),String(b||'').trim()].filter(Boolean).join(' ');
 function bindMics(root){root.querySelectorAll('[data-mic]').forEach(b=>b.onclick=()=>{const k=b.dataset.mic;dictate(b.dataset.lab,t=>{CUR[k]=joinTxt(CUR[k],t);if(k.startsWith('conclusions_texte'))CUR.concl_manual=true;save();renderStep();});});}
 /* ---------- mémoires : par type d'ouvrage + valeurs récentes ---------- */
-const OUVRAGES=['Radier','Dalle','Voile','Mur','Poteau','Poutre','Escalier','Fondation'];
+const OUVRAGES=['Élévation','Dalle sur'];
+// localisation = partie d'ouvrage : « étage 4 – Noyau B » (étages pris dans la liste des plans)
+const LOC_PARTIES=['Noyau B','Noyau C','Gaine Cloche','A00','A01','A02','A03','A04'];
+const etageLib=v=>{const m=/^E(\d+)$/.exec(String(v||''));return m?'étage '+m[1]:String(v||'');};
+function locEtages(){const ordre=Object.values(PLN_ETAGE).filter(Boolean);
+  const pres=PLANS&&PLANS.rows?new Set(PLANS.rows.map(r=>r.etage).filter(Boolean)):null;
+  return ordre.filter(v=>!pres||pres.has(v)).map(etageLib);}
+const locCompose=c=>[c.loc_etage,c.loc_partie].filter(Boolean).join(' – ');
+const typeCompose=c=>[c.ouvrage,c.elements_precis].map(x=>String(x||'').trim()).filter(Boolean).join(' ');
 const OUV_FIELDS=['type_coffrage','controle_incorpores','poinconnement_type','beton_qualite','adjuvant','traitement','essai_nature','essai_nombre'];
-const RECENT_FIELDS=['entreprise','contremaitre','distribution','meteo','temperature','localisation','type_element','type_coffrage','controle_incorpores','poinconnement_type','beton_qualite','adjuvant','essai_nature','ouvrage'];
+const RECENT_FIELDS=['elements_precis','entreprise','contremaitre','distribution','meteo','temperature','localisation','type_element','type_coffrage','controle_incorpores','poinconnement_type','beton_qualite','adjuvant','essai_nature','ouvrage'];
 const mem=()=>{S.mem=S.mem||{};S.mem.ouvrage=S.mem.ouvrage||{};S.mem.recent=S.mem.recent||{};return S.mem;};
 const recent=k=>RECENT_FIELDS.includes(k)?(mem().recent[k]||[]).slice(0,6):[];
 function remember(c){if(!c||!S)return;const M=mem();
@@ -914,11 +924,22 @@ function autoConclusion(force){
 
 /* ---------- étapes du questionnaire ---------- */
 const STEPS=[
- {t:'Élément',q:'Quel élément contrôles-tu ?',r:()=>F('ouvrage','Type d\'ouvrage (mémorise coffrage, béton, cure…)',{chips:OUVRAGES,ph:'ex. Dalle'})+F('description','Description (nom de la fiche et du dossier photos)',{ph:'ex. Noyau C - Elévations du Rez inf'})+
-   F('localisation','Localisation',{max:20,ph:'ex. Noyau C Rinf'})+F('type_element','Type d\'élément',{ph:'ex. Façade socle - Allège - Axe B1 à B5'})+
+ {t:'Élément',q:'Quel élément contrôles-tu ?',r:()=>F('ouvrage','Type d\'élément (mémorise coffrage, béton, cure…)',{chips:OUVRAGES,ph:'ex. Élévation'})+
+   F('elements_precis','Élévations contrôlées (facultatif)',{ph:'ex. B4-B5'})+
+   `<p class="muted" style="margin:-4px 0 12px">Sur la fiche, « Type d'élément » : <b id="teApercu">${esc(CUR.type_element||'—')}</b></p>`+
+   F('description','Description (nom de la fiche et du dossier photos)',{ph:'ex. Noyau C - Elévations du Rez inf'})+
+   `<div class="fld"><span>Localisation (partie d'ouvrage) : étage</span></div><div class="chips" data-loc="loc_etage">${locEtages().map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_etage===x?'on':''}">${esc(x)}</button>`).join('')}</div>
+   <div class="fld"><span>puis, si besoin : noyau, gaine ou zone</span></div><div class="chips" data-loc="loc_partie">${LOC_PARTIES.map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_partie===x?'on':''}">${esc(x)}</button>`).join('')}</div>`+
+   F('localisation','Localisation (sur la fiche, 20 caractères au plus)',{max:20,ph:'ex. étage 4 – Noyau B'})+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>N° de contrôle</span><input data-k="numero" inputmode="numeric" value="${esc(CUR.numero)}"></label>
    <label class="fld" style="flex:1;margin:0"><span>Date</span><input data-k="date" value="${esc(CUR.date)}"></label></div>
-   <p class="muted">${IDX?'Dernier n° dans l\'Index : '+IDX.last+(idxState(CUR)==='n° déjà pris dans l\'Index'?' · <b style="color:var(--ko)">ce n° est déjà pris</b>':''):''}</p>`},
+   <p class="muted">${IDX?'Dernier n° dans l\'Index : '+IDX.last+(idxState(CUR)==='n° déjà pris dans l\'Index'?' · <b style="color:var(--ko)">ce n° est déjà pris</b>':''):''}</p>`,
+   b:root=>{const majType=()=>{const t=typeCompose(CUR);if(t)CUR.type_element=t;const a=root.querySelector('#teApercu');if(a)a.textContent=CUR.type_element||'—';save();};
+     ['ouvrage','elements_precis'].forEach(k=>{const i=root.querySelector(`[data-k="${k}"]`);if(i)i.addEventListener('input',majType);});
+     const ch=root.querySelector('[data-chips="ouvrage"]');if(ch)ch.addEventListener('click',()=>setTimeout(majType,0));
+     root.querySelectorAll('[data-loc]').forEach(g=>g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.loc;CUR[k]=CUR[k]===b.dataset.v?'':b.dataset.v;
+       g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===CUR[k]));CUR.localisation=locCompose(CUR);
+       const i=root.querySelector('[data-k="localisation"]');if(i){i.value=CUR.localisation;i.dispatchEvent(new Event('input'));}else save();});}},
  {t:'Plans',q:'Quels plans ?',pre:()=>autoProposePlans(),r:()=>[['plan_coffrage','Plan de coffrage'],['plan_armatures','Plan d\'armatures'],['listes','Listes de fers']].map(([k,l])=>{
      const linked=(CUR.plans||[]).filter(p=>p.field===k);
      const prop=CUR._planProp&&CUR._planProp[k];const sug=CUR[k]&&!prop?[]:suggestPlans(k).filter(r=>planLabel(r)!==CUR[k]);
