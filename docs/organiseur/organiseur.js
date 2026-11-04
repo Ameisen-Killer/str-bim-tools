@@ -795,8 +795,8 @@
   $("#ref").addEventListener("click", function (e) {
     var g = e.target.closest && e.target.closest(".cp-niv"); if (!g) return;
     var b = +g.dataset.b, k = +g.dataset.k;
-    if (b !== NIVB) { NIVB = b; dessineRef(); }
-    var i = document.querySelector('#ref input[data-l="niv"][data-i="' + k + '"][data-c="lib"]'); if (i) { i.focus(); i.scrollIntoView({ block: "center", behavior: "smooth" }); }
+    NIVB = b;
+    var i = document.querySelector('#ref input[data-l="niv"][data-b="' + b + '"][data-i="' + k + '"][data-c="lib"]'); if (i) { i.focus(); i.scrollIntoView({ block: "center", behavior: "smooth" }); }
   });
   (function () {
     var g = null;
@@ -805,7 +805,7 @@
       if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; dessineMaquette();
     });
     ["pointerup", "pointercancel"].forEach(function (t) { $("#ref").addEventListener(t, function () { g = null; }); });
-    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
+    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; if (d.l === "niv") NIVB = +d.b; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
     window.addEventListener("resize", function () { if (VUE === "ref") dessineMaquette(); });
   })();
 
@@ -813,8 +813,8 @@
   function liste(k) { return k === "niv" ? (CONF.batiments[NIVB] || { niveaux: [] }).niveaux : CONF[k]; }
   $("#ref").addEventListener("change", function (e) {
     if (e.target.id === "niv-bat") { NIVB = +e.target.value; MQ.foc = null; dessineRef(); }
-    else if (e.target.id === "niv-copie" && e.target.value !== "") {
-      var src = CONF.batiments[+e.target.value], dst = CONF.batiments[NIVB];
+    else if (e.target.dataset.copie != null && e.target.value !== "") {
+      var src = CONF.batiments[+e.target.value], dst = CONF.batiments[+e.target.dataset.copie];
       if (dst.niveaux.length && !window.confirm("Remplacer les " + dst.niveaux.length + " niveaux de " + (dst.c || "ce bâtiment") + " par ceux de " + (src.c || "l'autre") + " ?")) { e.target.value = ""; return; }
       dst.niveaux = copie(src.niveaux); marque(); dessineRef();
     }
@@ -842,15 +842,8 @@
       '<table><thead><tr><th>Libellé</th><th style="width:96px">Du n°</th><th style="width:96px">Au n°</th><th style="width:150px">Types</th><th style="width:136px"></th></tr></thead><tbody id="ref-plages">' + lignesPlages() + "</tbody></table>" +
       '<button class="btn ajout" data-ajout-plage="">+ Ajouter un lot</button><div class="avert" id="ref-avert" style="color:var(--rouge);font-size:12.5px;margin-top:6px"></div></div>';
     LISTES.forEach(function (L) {
-      if (L.k === "batiments") h += '<div class="ref-bat"><div class="ref-bat-l">';
-      if (L.k === "niv") {
-        if (!CONF.batiments.length) { h += '<div class="bloc"><h3>Niveaux</h3><p>Ajoute d\'abord un bâtiment : chaque bâtiment a ses propres niveaux.</p></div>'; return; }
-        if (NIVB >= CONF.batiments.length) NIVB = 0;
-        var autres = CONF.batiments.map(function (b, i) { return i === NIVB ? "" : '<option value="' + i + '">' + esc(b.c + " · " + (b.lib || "") + " (" + b.niveaux.length + " niv.)") + "</option>"; }).join("");
-        h += '<div class="bloc"><h3>Niveaux du bâtiment <select class="champ" id="niv-bat" style="display:inline-block;width:auto;height:30px;margin-left:6px">' +
-          CONF.batiments.map(function (b, i) { return '<option value="' + i + '"' + (i === NIVB ? " selected" : "") + ">" + esc((b.c || "?") + (b.lib ? " · " + b.lib : "")) + "</option>"; }).join("") + "</select></h3><p>" + esc(L.aide) + "</p>" +
-          (autres ? '<p><select class="champ" id="niv-copie" style="width:auto;height:30px"><option value="">Reprendre les niveaux d\'un autre bâtiment…</option>' + autres + "</select></p>" : "") + "<table>";
-      }
+      if (L.k === "niv") return;
+      if (L.k === "batiments") { h += '<div class="ref-bat"><div class="ref-bat-l">' + blocBatiments(); return; }
       h += (L.k === "niv" ? "" : '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + "</p><table>") + '<thead><tr>' + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
         liste(L.k).map(function (e, i) {
           return "<tr>" + L.cols.map(function (c) {
@@ -863,6 +856,36 @@
         '<div class="mq-tete"><b>Coupe des niveaux</b><small>les niveaux de tous les bâtiments, par altitude</small></div><svg id="coupe" role="img" aria-label="Coupe des niveaux des bâtiments"></svg></aside></div>';
     });
     $("#ref").innerHTML = h; majEnreg(); verifiePlages(); dessineMaquette();
+  }
+  // Bâtiments et niveaux dans un seul tableau : chaque bâtiment, puis ses niveaux juste en dessous
+  function blocBatiments() {
+    function ch(l, b, i, c, v, o) {
+      o = o || {};
+      if (o.cas) return '<td><input type="checkbox" data-l="' + l + '" data-b="' + b + '" data-i="' + i + '" data-c="' + c + '"' + (v ? " checked" : "") + ' title="Niveau fictif, non dessiné"></td>';
+      return '<td' + (o.sty ? ' style="' + o.sty + '"' : "") + '><input class="champ' + (o.mono ? " mono" : "") + '"' + (o.nb ? ' inputmode="decimal" maxlength="12"' : ' maxlength="' + (c === "c" ? 10 : 200) + '"') +
+        ' data-l="' + l + '" data-b="' + b + '" data-i="' + i + '" data-c="' + c + '" value="' + esc(v == null ? "" : v) + '"' + (o.ph ? ' placeholder="' + o.ph + '"' : "") + "></td>";
+    }
+    function act(l, b, i) {
+      return '<td class="x" style="white-space:nowrap">' + (l === "batiments" ? '<button class="mini plus" data-ajout="niv" data-b="' + b + '" title="Ajouter un niveau à ce bâtiment">+</button>' : "") +
+        '<button class="mini plus" data-mv="' + l + "|" + i + '|-1" data-b="' + b + '" title="Monter">↑</button><button class="mini plus" data-mv="' + l + "|" + i + '|1" data-b="' + b + '" title="Descendre">↓</button>' +
+        '<button class="mini" data-sup="' + l + "|" + i + '" data-b="' + b + '" title="' + (l === "batiments" ? "Retirer le bâtiment et ses niveaux" : "Retirer le niveau") + '">×</button></td>';
+    }
+    var h = '<div class="bloc"><h3>Bâtiments et niveaux</h3><p>Chaque bâtiment, puis ses niveaux du plus bas au plus haut (« + » sur la ligne du bâtiment pour en ajouter). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
+      '<table class="t-bat"><thead><tr><th style="width:96px">Code</th><th>Nom</th><th style="width:78px">Long. (m)</th><th style="width:78px">Larg. (m)</th><th style="width:70px">X (m)</th><th style="width:70px">Y (m)</th><th style="width:124px"></th></tr></thead><tbody>';
+    if (!CONF.batiments.length) h += '<tr><td colspan="7" style="color:var(--texte-faible);padding:8px 4px">Aucun bâtiment pour l\'instant.</td></tr>';
+    CONF.batiments.forEach(function (b, bi) {
+      h += '<tr class="l-bat">' + ch("batiments", bi, bi, "c", b.c, { mono: 1 }) + ch("batiments", bi, bi, "lib", b.lib) + ch("batiments", bi, bi, "lg", b.lg, { nb: 1, mono: 1 }) + ch("batiments", bi, bi, "la", b.la, { nb: 1, mono: 1 }) +
+        ch("batiments", bi, bi, "x", b.x, { nb: 1, mono: 1 }) + ch("batiments", bi, bi, "y", b.y, { nb: 1, mono: 1 }) + act("batiments", bi, bi) + "</tr>";
+      var autres = CONF.batiments.map(function (o, k) { return k === bi || !o.niveaux.length ? "" : '<option value="' + k + '">' + esc((o.c || "?") + " (" + o.niveaux.length + " niv.)") + "</option>"; }).join("");
+      h += '<tr class="l-tete"><td class="ind">Niveaux de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td>Haut. (m)</td><td>Alt. (m)</td><td>Hors maq.</td><td colspan="2">' +
+        (autres ? '<select class="champ" data-copie="' + bi + '" style="height:26px;font-size:12px"><option value="">Reprendre de…</option>' + autres + "</select>" : "") + "</td></tr>";
+      if (!b.niveaux.length) h += '<tr class="l-niv"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucun niveau : « + » sur la ligne du bâtiment.</td></tr>';
+      b.niveaux.forEach(function (n, i) {
+        h += '<tr class="l-niv">' + ch("niv", bi, i, "c", n.c, { mono: 1, sty: "padding-left:22px" }) + ch("niv", bi, i, "lib", n.lib) + ch("niv", bi, i, "h", n.h, { nb: 1, mono: 1, ph: "3" }) + ch("niv", bi, i, "alt", n.alt, { nb: 1, mono: 1 }) +
+          ch("niv", bi, i, "fictif", n.fictif, { cas: 1 }) + "<td></td>" + act("niv", bi, i) + "</tr>";
+      });
+    });
+    return h + '</tbody></table><button class="btn ajout" data-ajout="batiments">+ Ajouter un bâtiment</button></div>';
   }
   function exempleVal() { return valeurs({ type: (CONF.types[0] || {}).c, discipline: (CONF.disciplines[0] || {}).c, phase: (CONF.phases[0] || {}).c, batiment: (CONF.batiments[0] || {}).c, niveau: (((CONF.batiments[0] || {}).niveaux || [])[0] || {}).c, zone: (CONF.zones[0] || {}).c }, CONF.plages[0] ? +CONF.plages[0].de : 1); }
   function chipsSeg() {
@@ -916,6 +939,7 @@
       else if (d.g === "chiffres") CONF.chiffres = Math.max(1, Math.min(6, parseInt(v, 10) || 4));
       else CONF[d.g] = v;
     } else if (d.l) {
+      if (d.l === "niv") NIVB = +d.b;
       liste(d.l)[+d.i][d.c] = d.c === "c" ? U(v) : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
       if (d.l === "batiments" || d.l === "niv") dessineMaquette();
       if (d.l === "batiments" && (d.c === "c" || d.c === "lib")) { var sb = $("#niv-bat"); if (sb && sb.options[+d.i]) sb.options[+d.i].textContent = (CONF.batiments[+d.i].c || "?") + (CONF.batiments[+d.i].lib ? " · " + CONF.batiments[+d.i].lib : ""); }
@@ -929,6 +953,7 @@
   });
   $("#ref").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return; var d = b.dataset, s;
+    if (d.b != null && /^niv/.test(d.ajout || d.sup || d.mv || "")) NIVB = +d.b;
     if (d.segx) { CONF.segments = CONF.segments.filter(function (k) { return k !== d.segx; }); marque(); majSegs(); return; }
     if (d.segplus) { CONF.segments.splice(Math.max(0, CONF.segments.indexOf("numero")), 0, d.segplus); marque(); majSegs(); return; }
     if (d.ajout) liste(d.ajout).push(d.ajout === "batiments" ? { c: "", lib: "", niveaux: [] } : { c: "", lib: "" });
