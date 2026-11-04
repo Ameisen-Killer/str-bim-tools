@@ -389,6 +389,8 @@
     TRI = { col: th.dataset.tri, sens: TRI.col === th.dataset.tri ? -TRI.sens : th.dataset.tri === "date" ? -1 : 1 }; dessineListe();
   });
   $("#recherche").addEventListener("input", function () { clearTimeout(dessineListe.t); dessineListe.t = setTimeout(function () { dessineZones(); dessineListe(); }, 120); });
+  // lien direct depuis ARM : /fgh/pln/#q=<code> remplit la recherche
+  (function () { var m = /^#q=(.+)$/.exec(location.hash); if (!m) return; $("#recherche").value = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname + location.search); $("#recherche").dispatchEvent(new Event("input")); })();
   document.addEventListener("keydown", function (e) {
     if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("#recherche").focus(); }
     if (e.key === "Escape") { if (!$("#f-plan").hidden) ferme("#f-plan"); else if (!$("#f-import").hidden) ferme("#f-import"); else if (!$("#f-apercu").hidden) ferme("#f-apercu"); }

@@ -25,6 +25,7 @@ create table if not exists public.fgh_controles_photos (
   h           integer not null default 0,
   statut      text not null default '' check (char_length(statut) <= 20),
   commentaire text not null default '' check (char_length(commentaire) <= 4000),
+  item text not null default '' check (char_length(item) <= 60),
   shapes      jsonb not null default '[]'::jsonb,
   chemin_o    text not null default '' check (char_length(chemin_o) <= 200),
   chemin_a    text not null default '' check (char_length(chemin_a) <= 200),
@@ -89,3 +90,6 @@ create policy "fgh arm : remplacement" on storage.objects for update to anon, au
 create policy "fgh arm : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'fgh-arm');
 
 notify pgrst, 'reload schema';
+
+-- 04.11.2026 : photo rattachée à un point de contrôle (fond de coffrage, enrobage, incorporés…)
+alter table public.fgh_controles_photos add column if not exists item text not null default '' check (char_length(item) <= 60);

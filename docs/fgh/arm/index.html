@@ -56,6 +56,10 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 .chk span{flex:1}
 .tg{width:48px;height:40px;display:flex;align-items:center;justify-content:center;font:800 18px Inter,sans-serif;background:var(--bg);color:#aaa;margin-left:6px;border:0;cursor:pointer}
 .tg.ok.on{background:var(--g);color:#fff}.tg.ko.on{background:var(--ko);color:#fff}
+.tg.so{font-size:13px;font-weight:700}.tg.so.on{background:var(--mut);color:#fff}.tg.ph{font-size:18px;background:var(--gb);color:var(--ink)}
+.chk .cl{flex:1;min-width:0}.chk-ph{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.chk-ph .th{width:44px;height:44px;aspect-ratio:auto}
+@media (max-width:420px){.chk{padding:10px}.chk .tg{width:40px;margin-left:4px}}
+.prep-it{background:var(--card);padding:10px 14px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start}.prep-it input[type=text]{width:100%;border:1px solid var(--line);background:var(--field);color:var(--ink);font:500 14px Inter,sans-serif;padding:5px 7px;margin-top:4px}
 .plan{background:var(--card);padding:12px 14px;margin-bottom:8px}
 .plan .l{font-size:12px;color:var(--mut)}
 .plan .v{font-weight:700;font-size:17px;min-height:24px}
@@ -189,11 +193,12 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 <!-- Accueil -->
 <main id="vHome">
   <button class="big" id="bNew">+ Nouveau contrôle<small id="nNext"></small></button>
+  <button class="btn w" id="bPrep" style="margin-top:0">✉️ Préparer les contrôles depuis un mail de demande</button>
   <div class="h" style="display:flex;align-items:center"><span style="flex:1">Mes contrôles</span><button class="btn s w" id="bSel" style="text-transform:none;letter-spacing:0">Sélectionner</button></div>
   <div id="selBar" class="hidden" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button class="btn s w" id="selSigned">Signés non envoyés</button><button class="btn s w" id="selNone">Aucun</button><button class="btn s" id="selMail">✉️ Envoyer par mail (<span id="selN">0</span>)</button></div>
   <div class="filtres" id="filtres">
     <input id="fQ" type="search" placeholder="Rechercher : n°, description, localisation, plan, entreprise…" autocomplete="off">
-    <div class="chips" id="fSt"><button data-v="">Tous</button><button data-v="wip">En cours</button><button data-v="ko">Reprises</button><button data-v="ok">Validés</button><button data-v="att">À sauvegarder</button></div>
+    <div class="chips" id="fSt"><button data-v="">Tous</button><button data-v="wip">En cours</button><button data-v="ko">À reprendre</button><button data-v="ok">Validés</button><button data-v="att">À sauvegarder</button></div>
     <div class="fl-per"><label>Du <input id="fDe" type="date"></label><label>au <input id="fA" type="date"></label><button class="btn s w" id="fRaz">Effacer</button><span class="muted" id="fN"></span><button class="btn s" id="fPdf">📄 Télécharger les PDF</button></div>
   </div>
   <div id="list"></div>
@@ -239,11 +244,11 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   <header style="position:static"><button class="back" id="pBack">‹</button><h1 id="pTitle">Photo</h1><button class="ico" id="pDel" title="Supprimer">🗑</button></header>
   <div class="stage" id="stage"><canvas id="cv"></canvas></div>
   <div class="tools" id="tools">
-    <button data-tool="arrow" class="on">➚ Flèche</button><button data-tool="ellipse">◯ Cercle</button><button data-tool="text">T Texte</button><button id="tUndo">↶</button>
+    <button data-tool="arrow" class="on">➚ Flèche</button><button data-tool="ellipse">◯ Cercle</button><button data-tool="free">✎ Libre</button><button data-tool="text">T Texte</button><button id="tUndo">↶</button>
   </div>
   <div class="pbody">
     <div class="fldmic" style="margin:0"><textarea id="pCm" placeholder="Commentaire (ex. écartement 12 cm au lieu de 20 cm – ajouter distanciers)"></textarea><button class="mic" id="pMic" title="Dicter">🎤</button></div>
-    <div class="row2" style="margin:8px 0"><button data-st="reprise" class="ko">Reprise</button><button data-st="ok" class="ok">OK</button></div>
+    <div class="row2" style="margin:8px 0"><button data-st="reprise" class="ko">À reprendre</button><button data-st="ok" class="ok">OK</button></div>
     <button class="btn main" id="pOk" style="margin:0">Valider la photo</button>
   </div>
 </div>
@@ -290,6 +295,15 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 </div></div>
 
 <div id="toast"></div>
+<input id="inItem" type="file" accept="image/*" hidden>
+<!-- Préparation depuis un mail de demande de contrôle -->
+<div id="mPrep" class="modal hidden"><div class="in">
+  <div class="mh"><h2>Préparer depuis un mail</h2><button class="btn s w" data-close="mPrep">Fermer</button></div>
+  <p class="muted">Colle le texte du mail de demande de contrôle. ARM repère les jours et les éléments, et prépare une fiche par contrôle, déjà datée et préremplie.</p>
+  <label class="fld"><span>Texte du mail</span><textarea id="prTxt" style="min-height:200px" placeholder="ex. Lundi 10.11 : élévations étage 4 noyau B axes B4-B5&#10;Mercredi : dalle sur étage 3 zone A02"></textarea></label>
+  <button class="btn" id="prGo">Analyser le mail</button>
+  <div id="prRes"></div>
+</div></div>
 <div id="busy" class="hidden">Traitement…</div>
 
 <script src="/fgh/arm/vendor/jspdf-2.5.1.umd.min.js?v=1"></script>
@@ -474,7 +488,7 @@ async function depuisPLN(){const m=/^#(pln|ctrl)=(.+)$/.exec(location.hash);if(!
   const o=O.find(([re])=>re.test(n));if(o){c.ouvrage=o[1];c.type_element=typeCompose(c);}
   const noy=/noyau\s+([a-z])\b/i.exec(t),gaine=/gaine\s+cloche/i.test(t),zA=/\bA0[0-4]\b/i.exec(t+' '+(r.zone||''));
   c.loc_etage=etageLib(PLN_ETAGE[r.niveau]??'');c.loc_partie=noy?'Noyau '+noy[1].toUpperCase():gaine?'Gaine Cloche':zA?zA[0].toUpperCase():'';
-  c.localisation=locCompose(c).slice(0,20);
+  c.localisation=locCompose(c).slice(0,20);{const d=descAuto(c);if(d&&c.ouvrage)c.description=d;}
   CTRLS.push(c);await DB.put('ctrl',c);await openCtrl(c.id,false);if(c.ouvrage)applyOuvrage(false);save();
   toast('Fiche préremplie depuis '+planLabel(r)+(c.plans.length>1?' (+'+(c.plans.length-1)+' plan(s) voisin(s) à vérifier)':''),5000);}
 window.addEventListener('hashchange',()=>{if(S)depuisPLN();});
@@ -504,8 +518,9 @@ async function syPush(){if(SYB||!navigator.onLine)return;const keys=Object.keys(
         else{const p=await DB.get('photos',q.id);
           if(p){if(p.orig&&p._sentO!==p.orig.size){await stPut(base+'-o.jpg',p.orig);p._sentO=p.orig.size;}
             const aSz=p.annot?p.annot.size:0;if(p._sentA!==aSz){if(p.annot)await stPut(base+'-a.jpg',p.annot);else await stDel(base+'-a.jpg');p._sentA=aSz;}
-            await plnFetch('fgh_controles_photos?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[{id:p.id,ctrl_id:p.ctrlId,ord:p.ord||0,w:p.w||0,h:p.h||0,statut:p.statut||'',
-              commentaire:p.comment||'',shapes:p.shapes||[],chemin_o:p.orig?base+'-o.jpg':'',chemin_a:p.annot?base+'-a.jpg':'',maj:p._maj||Date.now(),supprime:false}]});
+            const row={id:p.id,ctrl_id:p.ctrlId,ord:p.ord||0,w:p.w||0,h:p.h||0,statut:p.statut||'',
+              commentaire:p.comment||'',item:p.item||'',shapes:p.shapes||[],chemin_o:p.orig?base+'-o.jpg':'',chemin_a:p.annot?base+'-a.jpg':'',maj:p._maj||Date.now(),supprime:false};const up=()=>plnFetch('fgh_controles_photos?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[row]});
+            try{await up();}catch(e){if(!/item/i.test(e.message))throw e;delete row.item;await up();} // colonne item pas encore créée
             await DB_put('photos',p);const m=(typeof PHOTOS!=='undefined'&&PHOTOS||[]).find(x=>x.id===p.id);if(m){m._sentO=p._sentO;m._sentA=p._sentA;}}}}
       if(SYQ[k]===q)delete SYQ[k];fait++;}
     SYERR='';}
@@ -528,7 +543,7 @@ async function syPullP(){if(!navigator.onLine||!S)return 0;const M=await DB.kvGe
       if(r.supprime){if(loc){await DB_del('photos',r.id);n++;}depuis=r.modifie_le;continue;}
       if(loc&&(loc._maj||0)>=r.maj){depuis=r.modifie_le;continue;}
       const orig=r.chemin_o?(loc&&loc._sentO&&loc.orig&&loc._maj===r.maj?loc.orig:await stGet(r.chemin_o)):null,annot=r.chemin_a?await stGet(r.chemin_a):null;
-      const p={id:r.id,ctrlId:r.ctrl_id,ord:r.ord,w:r.w,h:r.h,statut:r.statut,comment:r.commentaire,shapes:r.shapes||[],orig,annot,_maj:r.maj,_sentO:orig?orig.size:0,_sentA:annot?annot.size:0};
+      const p={id:r.id,ctrlId:r.ctrl_id,ord:r.ord,w:r.w,h:r.h,statut:r.statut,comment:r.commentaire,item:r.item||'',shapes:r.shapes||[],orig,annot,_maj:r.maj,_sentO:orig?orig.size:0,_sentA:annot?annot.size:0};
       await DB_put('photos',p);depuis=r.modifie_le;n++;
       if(CUR&&CUR.id===p.ctrlId&&typeof PHOTOS!=='undefined'){const i=PHOTOS.findIndex(x=>x.id===p.id);if(i>=0)PHOTOS[i]=p;else PHOTOS.push(p);PHOTOS.sort((a,b)=>a.ord-b.ord);}}
     M.p=depuis;await DB.kvSet('sync:marques',M);if(!L||L.length<200)break;}
@@ -605,20 +620,67 @@ function pickPlan(r,quiet){const f=SRCH.field;if(CUR._planProp&&CUR._planProp[f]
 /* ---------- contrôles ---------- */
 let CTRLS=[],CUR=null,PHOTOS=[],STEP=0;
 const TRAIT=[['nattes','Nattes isolantes'],['cure','Traitement de cure'],['autre','Autre'],['arrosage','Arrosage'],['feuille','Feuille plastique'],['sans','Sans']];
-const CHECKS=[['recouvrement','Recouvrement des aciers'],['disposition_nappes','Disposition des nappes'],['ecartement_nappes','Écartement des nappes'],['poinconnement_dispo','Poinçonnement : disposition des pièces']];
-const baseName=c=>`n°${c.numero||'?'}_${c.date||today()} - ${c.description||'sans description'}`;
+const COFF_CHECKS=[['fond_propre','Fond de coffrage propre'],['enrobage_ok','Enrobage respecté'],['ecarteurs','Écarteurs ou paniers de support']];
+const ARM_CHECKS=[['recouvrement','Recouvrement des aciers'],['disposition_nappes','Disposition des nappes'],['ecartement_nappes','Écartement des nappes'],['sens_lits','Sens des lits'],
+  ['attentes','Attentes / EBEA'],['chainages','Chaînages et renfort réservations'],['goujons','Goujons ou consoles iso'],['poinconnement_dispo','Poinçonnement : disposition des pièces']];
+const CHECKS=[...COFF_CHECKS,...ARM_CHECKS];
+const REP_TXT={fond_propre:()=>'Fond de coffrage à nettoyer',enrobage_ok:c=>'Enrobage'+(c.enrobage?' de '+c.enrobage:'')+' non respecté',ecarteurs:()=>'Écarteurs ou paniers de support à reprendre'};
+const ITEM_LIB=k=>(CHECKS.find(x=>x[0]===k)||[k,k==='controle_incorpores'?'Incorporés':''])[1];
+// ligne d'un point : ✓ / ✗ / sans objet, et photo(s) rattachée(s) au point (même si OK)
+const chkRow=(k,l)=>{const P=PHOTOS.filter(p=>p.item===k);
+  return `<div class="chk"><div class="cl">${l}${P.length?`<div class="chk-ph">${P.map(p=>`<button class="th" data-ph="${p.id}" style="background-image:url(${thumbURL(p)})" title="${esc(p.comment||'')}"></button>`).join('')}</div>`:''}</div>`+
+    [['oui','ok','✓'],['non','ko','✗'],['so','so','s.o.']].map(([v,c,t])=>`<button class="tg ${c} ${CUR[k]===v?'on':''}" data-yn="${k}" data-v="${v}" title="${v==='so'?'Sans objet':v==='oui'?'Conforme':'Non conforme : à reprendre'}">${t}</button>`).join('')+
+    `<button class="tg ph" data-iph="${k}" title="Ajouter une photo à ce point">📷</button></div>`;};
+let ITEM_K='';
+function bindChecks(root){
+  root.querySelectorAll('[data-yn]').forEach(x=>x.onclick=async()=>{const k=x.dataset.yn;CUR[k]=CUR[k]===x.dataset.v?'':x.dataset.v;
+    for(const p of PHOTOS.filter(p=>p.item===k)){const st=CUR[k]==='non'?'reprise':'ok';if(p.statut!==st){p.statut=st;await DB.put('photos',p);}}save();renderStep();});
+  root.querySelectorAll('[data-iph]').forEach(x=>x.onclick=()=>{ITEM_K=x.dataset.iph;$('#inItem').click();});
+  root.querySelectorAll('.chk [data-ph]').forEach(x=>x.onclick=()=>openPhoto(PHOTOS.find(p=>p.id===x.dataset.ph)));}
+$('#inItem').onchange=e=>{const fl=[...e.target.files];e.target.value='';if(fl.length&&CUR)addFiles(fl,true,ITEM_K);};
+const baseName=c=>`n°${c.numero||'?'}${c.indice?' ind. '+c.indice:''}_${c.date||today()} - ${c.description||'sans description'}`;
 const photoName=(c,i)=>safe(`n°${c.numero||'X'}_${c.date||today()}_${pad(i+1)}`)+'.jpg';
 const snap=c=>JSON.stringify(c,(k,v)=>k==='_maj'?undefined:v);let SNAP='';
 function putCur(c){const j=snap(c);if(c===CUR&&j===SNAP)return Promise.resolve();if(c===CUR)SNAP=j;return DB.put('ctrl',c);}
 let saveT=null;function save(){if(!CUR)return;const c=CUR;clearTimeout(saveT);saveT=setTimeout(()=>putCur(c),250);}
 function newCtrl(){const last=[...projCtrls()].sort((a,b)=>b.created-a.created)[0]||{};
   const c={id:uid(),projectId:S.id,created:Date.now(),numero:String(nextNumero()),date:today(),description:'',projet:S.projet,auteur:S.auteur,lieu:S.lieu,date_signature:today(),
-    entreprise_informee_le:fridayBefore(),traitement:[],plans:[],reprises:[],marquer_plans:!!(PLANS&&PLANS.src==='pln')};
+    entreprise_informee_le:fridayBefore(),traitement:[],plans:[],reprises:[],type_coffrage:'Type 2',_auto:{type_coffrage:1},marquer_plans:!!(PLANS&&PLANS.src==='pln')};
   ['entreprise','contremaitre','distribution'].forEach(k=>{if(last[k])c[k]=last[k];});
   const sameDay=projCtrls().filter(x=>x.date===c.date&&(x.meteo||x.temperature)).sort((a,b)=>b.created-a.created)[0];if(sameDay){c.meteo=sameDay.meteo||'';c.temperature=sameDay.temperature||'';}
   return c;}
 
 const renderHomeList=()=>renderHome();
+/* préparation des contrôles de la semaine depuis le mail de demande */
+const JOURS=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+function prepDate(l,ref){const t=norm(l);let m=/\b(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?\b/.exec(t);
+  if(m){let y=m[3]?+m[3]:ref.getFullYear();if(y<100)y+=2000;const d=new Date(y,+m[2]-1,+m[1]);if(!isNaN(d))return fmt(d);}
+  const j=JOURS.findIndex(x=>new RegExp('\\b'+x+'\\b').test(t));if(j<0)return'';
+  const lun=new Date(ref);const dw=(lun.getDay()+6)%7;lun.setDate(lun.getDate()-dw+(dw>=5?7:0));const d=new Date(lun);d.setDate(lun.getDate()+((j+6)%7));return fmt(d);}
+function prepAnalyse(txt){const ref=new Date(),out=[];let date='';
+  txt.split(/\r?\n|;|•/).map(x=>x.trim()).filter(Boolean).forEach(l=>{const d=prepDate(l,ref);if(d)date=d;
+    const n=norm(l);if(!/(etage|niveau|noyau|gaine|radier|dalle|voile|elevation|mur|poteau|\ba0[0-4]\b|\bss-?\d|rez|toiture|\be\d\b)/.test(n))return;
+    const c={date:date||today(),texte:l};const et=/(?:etage|niveau|\be)\s*(\d)\b/.exec(n),ss=/\bss[\s-]*(\d)\b/.exec(n);
+    c.loc_etage=/rez[\s-]*inf/.test(n)?'Rez inf':/\brez\b|rez[\s-]*de[\s-]*chauss/.test(n)?'Rez':ss?'SS-'+ss[1]:/toiture/.test(n)?'Toiture':et?'étage '+et[1]:'';
+    const noy=/noyau\s+([a-c])\b/.exec(n),zA=/\ba0[0-4]\b/.exec(n);c.loc_partie=noy?'Noyau '+noy[1].toUpperCase():/gaine\s+cloche/.test(n)?'Gaine Cloche':zA?zA[0].toUpperCase():'';
+    c.ouvrage=/dalle/.test(n)?'Dalle sur':/voile|elevation|mur|poteau/.test(n)?'Élévation':'';
+    const ax=/\b([a-z]\d{1,2})\s*(?:-|a|à|au)\s*([a-z]\d{1,2})\b/i.exec(l);c.elements_precis=ax?ax[1].toUpperCase()+'-'+ax[2].toUpperCase():'';out.push(c);});
+  return out;}
+let PREP=[];
+function prepRendu(){$('#prRes').innerHTML=PREP.length?`<div class="h">${PREP.length} contrôle(s) trouvé(s)</div>`+PREP.map((c,i)=>{const loc=locCompose(c),ty=typeCompose(c);
+    return `<div class="prep-it"><input type="checkbox" data-pc="${i}" ${c.off?'':'checked'} style="width:20px;height:20px;margin-top:3px"><div style="flex:1"><b>${esc(c.date)}</b> · ${esc([loc,ty].filter(Boolean).join(' – ')||'à compléter')}
+      <div class="muted">${esc(c.texte)}</div><input type="text" data-pd="${i}" value="${esc(c.date)}" title="Date (jj.mm.aaaa)"></div></div>`;}).join('')+
+    `<button class="btn main" id="prCreer">Créer les fiches cochées</button><p class="muted">Les fiches sont créées avec leur date, leur localisation et leur type d'élément ; il reste à les compléter sur place.</p>`
+    :'<p class="muted">Aucun contrôle reconnu : chaque contrôle doit tenir sur une ligne avec l\'étage, le noyau ou l\'élément (et le jour ou la date).</p>';
+  $$('#prRes [data-pc]').forEach(x=>x.onchange=()=>{PREP[+x.dataset.pc].off=!x.checked;});
+  $$('#prRes [data-pd]').forEach(x=>x.onchange=()=>{PREP[+x.dataset.pd].date=x.value.trim();});
+  const b=$('#prCreer');if(b)b.onclick=async()=>{const L=PREP.filter(c=>!c.off);for(const p of L){const c=newCtrl();
+      Object.assign(c,{date:p.date,date_signature:p.date,loc_etage:p.loc_etage,loc_partie:p.loc_partie,ouvrage:p.ouvrage,elements_precis:p.elements_precis,prep:true});
+      c.localisation=locCompose(c).slice(0,20);c.type_element=typeCompose(c);c.description=descAuto(c)||p.texte.slice(0,80);
+      CTRLS.push(c);const sc=CUR;CUR=c;if(c.ouvrage)applyOuvrage(false);CUR=sc;await DB.put('ctrl',c);}
+    closeModal('mPrep');renderHome();toast(L.length+' fiche(s) préparée(s) : elles sont en ligne pour tous les appareils',4000);};}
+$('#bPrep').onclick=()=>{$('#prTxt').value='';PREP=[];$('#prRes').innerHTML='';openModal('mPrep');};
+$('#prGo').onclick=()=>{PREP=prepAnalyse($('#prTxt').value);prepRendu();};
 /* filtres de la liste (recherche, état, période) et PDF en lot */
 let FILT=Object.assign({q:'',st:'',de:'',a:''},lsGet('ca-filt',{})),FILT_L=[];
 const etatC=c=>c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';
@@ -652,7 +714,7 @@ function renderHome(){if(!S)return;
   $$('#fSt button').forEach(b=>b.classList.toggle('on',b.dataset.v===FILT.st));
   $('#list').innerHTML=L.length?L.map(c=>{const d=c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';const st=idxState(c);
     return `<div class="it" data-open="${c.id}">${SEL?`<input type="checkbox" data-sel="${c.id}" ${SEL.has(c.id)?'checked':''} style="width:22px;height:22px;flex:0 0 auto">`:''}<span class="dot ${d}"></span><div class="t"><div><b>n°${esc(c.numero)}</b> ${esc(c.description||'sans description')}</div>
-    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'reprises':'en cours'}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · terminé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div><div class="mini" data-mini="${c.id}"></div></div><span class="chev">›</span></div>`;}).join('')
+    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'à reprendre':'en cours'}${c.indice?' · ind. '+esc(c.indice):''}${c.prep&&!c.sig_ctrl?' · préparé':''}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · terminé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div><div class="mini" data-mini="${c.id}"></div></div><span class="chev">›</span></div>`;}).join('')
     :`<div class="it" style="cursor:default"><div class="t s muted">${TOUS.length?'Aucune fiche ne correspond aux filtres.':'Aucun contrôle pour l\'instant.'}</div></div>`;
   miniatures(L);
   $$('[data-open]').forEach(el=>el.onclick=e=>{if(SEL){const id=el.dataset.open;SEL.has(id)?SEL.delete(id):SEL.add(id);renderHome();return;}openCtrl(el.dataset.open,true);});
@@ -801,7 +863,7 @@ function makeMD(){const c=CUR,v=x=>x&&String(x).trim()?String(x).trim():'—',yn
   '## Conclusion','',c.conclusion==='ok'?'**OK – pas de remarque particulière**':c.conclusion==='pas_ok'?'**Pas OK – voir mesures ci-dessous**':'_Conclusion non renseignée_','',
   ...[c.conclusions_texte_1,c.conclusions_texte_2].filter(x=>x&&x.trim()).map(x=>'> '+x.trim()),'',
   ...(it.length?['### Reprises à effectuer avant bétonnage','',...it.map((x,i)=>`${i+1}. ${x.txt}${x.ref?' ('+x.ref+')':''}`),'']:[]),
-  ...(PHOTOS.length?['## Photos','',...PHOTOS.map((p,i)=>`- **Photo ${pad(i+1)}** – ${p.statut==='reprise'?'REPRISE':'OK'} – \`${photoName(c,i)}\`${p.comment?' : '+p.comment:''}`),'']:[]),
+  ...(PHOTOS.length?['## Photos','',...PHOTOS.map((p,i)=>`- **Photo ${pad(i+1)}** – ${p.statut==='reprise'?'À REPRENDRE':'OK'}${p.item?' – '+ITEM_LIB(p.item):''} – \`${photoName(c,i)}\`${p.comment?' : '+p.comment:''}`),'']:[]),
   '---','',`Entreprise informée le : ${v(c.entreprise_informee_le)}  `,`Auteur du contrôle : ${v(c.auteur)}  `,`Lieu, date : ${v(c.lieu)}, ${v(c.date_signature)}`,''];
   return L.join('\n');}
 
@@ -841,7 +903,7 @@ function mailBody(L){
 function openMail(L){MAILSEL=L;const uns=L.filter(c=>!c.sig_ctrl||!c.conclusion);
   $('#mlTo').value=S.mailTo||lsGet('ca-mailme','')||'';
   const all=L.every(c=>c.conclusion==='ok'),any=L.some(c=>c.conclusion==='pas_ok');
-  $('#mlSubj').value=`${S.numero||''} ${S.nom||''} – Contrôle${L.length>1?'s':''} avant bétonnage n°${L.map(c=>c.numero).join(', ')}${L.length===1?' – '+L[0].description:''} – ${any?'Reprises':all?'Validation':'Contrôle'}`.trim();
+  $('#mlSubj').value=`${S.numero||''} ${S.nom||''} – Contrôle${L.length>1?'s':''} avant bétonnage n°${L.map(c=>c.numero).join(', ')}${L.length===1?' – '+L[0].description:''} – ${any?'À reprendre':all?'Validation':'Contrôle'}`.trim();
   $('#mlBody').value=mailBody(L);$('#mlPh').checked=false;
   $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${MAIL_DIRECT&&navigator.onLine?'Envoi direct depuis contact@str-bim-tools.com, la fiche PDF en pièce jointe.':'Le mail s\'ouvre dans ton appli de messagerie avec la fiche jointe (sur ordinateur : PDF téléchargé à joindre).'}</div>`;
   openModal('mMail');}
@@ -883,6 +945,7 @@ function locEtages(){const ordre=Object.values(PLN_ETAGE).filter(Boolean);
   const pres=PLANS&&PLANS.rows?new Set(PLANS.rows.map(r=>r.etage).filter(Boolean)):null;
   return ordre.filter(v=>!pres||pres.has(v)).map(etageLib);}
 const locCompose=c=>[c.loc_etage,c.loc_partie].filter(Boolean).join(' – ');
+const descAuto=c=>[c.localisation,c.type_element].map(x=>String(x||'').trim()).filter(Boolean).join(' – ');
 const typeCompose=c=>[c.ouvrage,c.elements_precis].map(x=>String(x||'').trim()).filter(Boolean).join(' ');
 const OUV_FIELDS=['type_coffrage','controle_incorpores','poinconnement_type','beton_qualite','adjuvant','traitement','essai_nature','essai_nombre'];
 const RECENT_FIELDS=['elements_precis','entreprise','contremaitre','distribution','meteo','temperature','localisation','type_element','type_coffrage','controle_incorpores','poinconnement_type','beton_qualite','adjuvant','essai_nature','ouvrage'];
@@ -910,8 +973,12 @@ function bindForm(root){
 
 /* ---------- reprises ---------- */
 function repItems(){
-  const a=CHECKS.filter(([k])=>CUR[k]==='non').map(([k,l])=>({txt:l+' non conforme',ref:''}));
-  const b=PHOTOS.map((p,i)=>({p,i})).filter(x=>x.p.statut==='reprise').map(x=>({txt:x.p.comment||'voir photo',ref:'photo '+pad(x.i+1)}));
+  const refs=k=>PHOTOS.map((p,i)=>({p,i})).filter(x=>x.p.item===k);
+  const pt=(k,txt)=>{const R=refs(k),cm=R.map(x=>x.p.comment).filter(Boolean).join(' ; ');return{txt:txt+(cm?' : '+cm:''),ref:R.map(x=>'photo '+pad(x.i+1)).join(', ')};};
+  const a=CHECKS.filter(([k])=>CUR[k]==='non').map(([k,l])=>pt(k,REP_TXT[k]?REP_TXT[k](CUR):l+' non conforme'));
+  if(norm(CUR.controle_incorpores)==='non conforme')a.push(pt('controle_incorpores','Incorporés non conformes'));
+  const dejaVu=p=>p.item&&(CUR[p.item]==='non'||(p.item==='controle_incorpores'&&norm(CUR.controle_incorpores)==='non conforme'));
+  const b=PHOTOS.map((p,i)=>({p,i})).filter(x=>x.p.statut==='reprise'&&!dejaVu(x.p)).map(x=>({txt:x.p.comment||'voir photo',ref:'photo '+pad(x.i+1)}));
   const c=(CUR.reprises||[]).filter(r=>r.txt&&r.txt.trim()).map(r=>({txt:r.txt.trim(),ref:''}));return[...a,...b,...c];}
 function autoConclusion(force){
   if(CUR.concl_manual&&!force)return;const it=repItems();
@@ -927,14 +994,18 @@ const STEPS=[
  {t:'Élément',q:'Quel élément contrôles-tu ?',r:()=>F('ouvrage','Type d\'élément (mémorise coffrage, béton, cure…)',{chips:OUVRAGES,ph:'ex. Élévation'})+
    F('elements_precis','Élévations contrôlées (facultatif)',{ph:'ex. B4-B5'})+
    `<p class="muted" style="margin:-4px 0 12px">Sur la fiche, « Type d'élément » : <b id="teApercu">${esc(CUR.type_element||'—')}</b></p>`+
-   F('description','Description (nom de la fiche et du dossier photos)',{ph:'ex. Noyau C - Elévations du Rez inf'})+
    `<div class="fld"><span>Localisation (partie d'ouvrage) : étage</span></div><div class="chips" data-loc="loc_etage">${locEtages().map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_etage===x?'on':''}">${esc(x)}</button>`).join('')}</div>
    <div class="fld"><span>puis, si besoin : noyau, gaine ou zone</span></div><div class="chips" data-loc="loc_partie">${LOC_PARTIES.map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_partie===x?'on':''}">${esc(x)}</button>`).join('')}</div>`+
    F('localisation','Localisation (sur la fiche, 20 caractères au plus)',{max:20,ph:'ex. étage 4 – Noyau B'})+
+   F('description','Description = localisation + type d\'élément (nom de la fiche et du dossier photos)',{ph:'ex. étage 4 – Noyau B – Élévation B4-B5'})+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>N° de contrôle</span><input data-k="numero" inputmode="numeric" value="${esc(CUR.numero)}"></label>
    <label class="fld" style="flex:1;margin:0"><span>Date</span><input data-k="date" value="${esc(CUR.date)}"></label></div>
    <p class="muted">${IDX?'Dernier n° dans l\'Index : '+IDX.last+(idxState(CUR)==='n° déjà pris dans l\'Index'?' · <b style="color:var(--ko)">ce n° est déjà pris</b>':''):''}</p>`,
-   b:root=>{const majType=()=>{const t=typeCompose(CUR);if(t)CUR.type_element=t;const a=root.querySelector('#teApercu');if(a)a.textContent=CUR.type_element||'—';save();};
+   b:root=>{if(CUR.desc_manual===undefined)CUR.desc_manual=!!CUR.description&&CUR.description!==descAuto(CUR);
+     const majDesc=()=>{if(CUR.desc_manual)return;const d=descAuto(CUR);if(!d)return;CUR.description=d;const i=root.querySelector('[data-k="description"]');if(i)i.value=d;$('#hTitle').textContent='n°'+(CUR.numero||'?')+' – '+d;save();};
+     const di=root.querySelector('[data-k="description"]');if(di)di.addEventListener('input',()=>{CUR.desc_manual=!!di.value.trim()&&di.value.trim()!==descAuto(CUR);});
+     const li=root.querySelector('[data-k="localisation"]');if(li)li.addEventListener('input',majDesc);
+     const majType=()=>{const t=typeCompose(CUR);if(t)CUR.type_element=t;const a=root.querySelector('#teApercu');if(a)a.textContent=CUR.type_element||'—';save();majDesc();};
      ['ouvrage','elements_precis'].forEach(k=>{const i=root.querySelector(`[data-k="${k}"]`);if(i)i.addEventListener('input',majType);});
      const ch=root.querySelector('[data-chips="ouvrage"]');if(ch)ch.addEventListener('click',()=>setTimeout(majType,0));
      root.querySelectorAll('[data-loc]').forEach(g=>g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.loc;CUR[k]=CUR[k]===b.dataset.v?'':b.dataset.v;
@@ -957,25 +1028,30 @@ const STEPS=[
      const cm=$('#cbMark');if(cm)cm.onchange=e=>{CUR.marquer_plans=e.target.checked;save();};}},
  {t:'Chantier',q:'Entreprise et conditions',r:()=>F('entreprise','Entreprise')+F('contremaitre','Contremaître')+F('distribution','Distribution')+
    F('meteo','Météo',{chips:['Ensoleillé','Nuageux','Pluie','Neige','Intérieur']})+F('temperature','Température',{ph:'ex. 12 °C'})},
- {t:'Coffrage',q:'Coffrage',r:()=>F('type_coffrage','Type de coffrage',{chips:['Coffrage cadre','Panneaux','Table','Bois','Prédalles']})+
-   F('controle_incorpores','Contrôle des incorporés',{chips:['Conforme','Non conforme','Sans objet']})},
- {t:'Vérifications',q:'Les armatures sont-elles conformes ?',r:()=>CHECKS.map(([k,l])=>`<div class="chk"><span>${l}</span><button class="tg ok ${CUR[k]==='oui'?'on':''}" data-yn="${k}" data-v="oui">✓</button><button class="tg ko ${CUR[k]==='non'?'on':''}" data-yn="${k}" data-v="non">✗</button></div>`).join('')+
-   `<div style="height:10px"></div>`+F('poinconnement_type','Poinçonnement : type d\'élément',{chips:['Sans objet']})+
-   `<p class="muted">Un ✗ crée automatiquement une reprise. Ajoute une photo à l'étape suivante pour la localiser.</p>`,
-   b:root=>root.querySelectorAll('[data-yn]').forEach(x=>x.onclick=()=>{const k=x.dataset.yn;CUR[k]=CUR[k]===x.dataset.v?'':x.dataset.v;save();renderStep();})},
+ {t:'Coffrage',q:'Coffrage',r:()=>F('type_coffrage','Type de coffrage',{chips:['Type 1','Type 2','Type 3','Type 4']})+
+   chkRow('fond_propre','Fond de coffrage propre')+
+   `<div class="chk" style="border-bottom:0"><div class="cl">Enrobage</div></div><div class="chips" data-chips="enrobage" style="background:var(--card);margin:0;padding:0 14px 10px">${['2 cm','3 cm','4 cm'].map(x=>`<button data-v="${x}" class="${CUR.enrobage===x?'on':''}">${x}</button>`).join('')}</div>`+
+   chkRow('enrobage_ok','Enrobage respecté')+chkRow('ecarteurs','Écarteurs ou paniers de support')+
+   `<div style="height:10px"></div>`+F('controle_incorpores','Contrôle des incorporés',{chips:['Conforme','Non conforme','Sans objet']})+
+   (()=>{const P=PHOTOS.filter(p=>p.item==='controle_incorpores');return `<div class="chk"><div class="cl">Photos annotées des incorporés${P.length?`<div class="chk-ph">${P.map(p=>`<button class="th" data-ph="${p.id}" style="background-image:url(${thumbURL(p)})"></button>`).join('')}</div>`:''}</div><button class="tg ph" data-iph="controle_incorpores" title="Ajouter une photo">📷</button></div>`;})()+
+   `<p class="muted">Un ✗ ajoute le point dans les reprises de la conclusion. 📷 rattache une photo au point, même s'il est OK.</p>`,
+   b:root=>bindChecks(root)},
+ {t:'Vérifications',q:'Les armatures sont-elles conformes ?',r:()=>ARM_CHECKS.map(([k,l])=>chkRow(k,l)).join('')+
+   `<p class="muted">Un ✗ ajoute le point dans les reprises de la conclusion. 📷 rattache une photo au point, même s'il est OK.</p>`,
+   b:root=>bindChecks(root)},
  {t:'Photos',q:'Photos du contrôle',r:()=>`<div class="thumbs">${PHOTOS.map((p,i)=>`<button class="th" data-ph="${p.id}" style="background-image:url(${thumbURL(p)})"><i class="${p.statut==='reprise'?'r':'o'}">${pad(i+1)}</i></button>`).join('')}
    <label class="th add">+<input id="inCam" type="file" accept="image/*" capture="environment" hidden></label></div>
    <label class="btn w" style="margin-top:10px">Ajouter depuis la galerie<input id="inGal" type="file" accept="image/*" multiple hidden></label>
    <p class="muted">Nommage : ${esc(photoName(CUR,PHOTOS.length))} · touche une photo pour l'annoter et la commenter.</p>`,
    b:root=>{root.querySelectorAll('[data-ph]').forEach(x=>x.onclick=()=>openPhoto(PHOTOS.find(p=>p.id===x.dataset.ph)));
      $('#inCam').onchange=e=>{addFiles([...e.target.files],true);e.target.value='';};$('#inGal').onchange=e=>{addFiles([...e.target.files],false);e.target.value='';};}},
- {t:'Bétonnage',q:'Bétonnage',r:()=>F('beton_qualite','Qualité du béton',{ph:'ex. C30/37 XC4'})+F('adjuvant','Adjuvant')+
+ {t:'Bétonnage',q:'Bétonnage',r:()=>F('beton_qualite','Qualité du béton',{ph:'ex. C30/37 XC4'})+F('adjuvant','Adjuvant',{chips:['Selon besoin entreprise','Antigel','Retardateur de prise']})+
    `<div class="fld"><span>Traitement après bétonnage</span></div><div class="chips" data-multi="traitement">${TRAIT.map(([k,l])=>`<button data-v="${k}" class="${(CUR.traitement||[]).includes(k)?'on':''}">${l}</button>`).join('')}</div>`+
-   F('essai_nature','Essais demandés : nature')+F('essai_nombre','Nombre',{num:true}),
+   F('essai_nature','Essais demandés : nature',{chips:['Selon besoin entreprise']})+F('essai_nombre','Nombre',{num:true}),
    b:root=>root.querySelector('[data-multi]').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;const t=CUR.traitement||[];CUR.traitement=t.includes(v)?t.filter(x=>x!==v):[...t,v];if(CUR._auto)delete CUR._auto.traitement;b.classList.toggle('on');save();}},
  {t:'Conclusion',q:'Conclusion',pre:()=>autoConclusion(false),r:()=>{const it=repItems();
    return (it.length?it.map(x=>`<div class="rep">⚠ ${esc(x.txt)}${x.ref?' ('+x.ref+')':''}</div>`).join(''):'<div class="okmsg">Aucune reprise relevée</div>')+
-   `<div class="row2"><button class="ok ${CUR.conclusion==='ok'?'on':''}" data-c="ok">Validé</button><button class="ko ${CUR.conclusion==='pas_ok'?'on':''}" data-c="pas_ok">Reprises</button></div>`+
+   `<div class="row2"><button class="ok ${CUR.conclusion==='ok'?'on':''}" data-c="ok">Validé</button><button class="ko ${CUR.conclusion==='pas_ok'?'on':''}" data-c="pas_ok">À reprendre</button></div>`+
    `<button class="btn" id="bDictRep">🎤 Dicter les reprises</button><p class="muted" style="margin-top:-2px">Dis « photo 2 : … » pour écrire sous la photo 2 ; le reste devient une reprise sans photo.</p>`+
    `<div class="fld"><span>Reprises sans photo</span></div>`+(CUR.reprises||[]).map((r,i)=>`<div class="fldmic"><label class="fld"><textarea data-ri="${i}" placeholder="ex. nettoyer le fond de coffrage">${esc(r.txt)}</textarea></label><div style="display:flex;flex-direction:column;gap:6px"><button class="mic" data-rmic="${i}">🎤</button><button class="mic" style="background:var(--kob);color:var(--ko)" data-rdel="${i}">✕</button></div></div>`).join('')+
    `<button class="btn w" id="bAddRep">+ Ajouter une reprise sans photo</button>`+
@@ -999,15 +1075,21 @@ const STEPS=[
    return (w.length?`<div class="warnbox">${w.map(esc).join('<br>')}</div>`:'')+
    sec(0,esc(baseName(CUR)),esc([CUR.localisation,CUR.type_element].filter(Boolean).join(' · ')||'—'))+
    sec(1,'Plans',esc([CUR.plan_coffrage,CUR.plan_armatures,CUR.listes].filter(Boolean).join(' · ')||'—'))+
-   sec(4,'Vérifications',CHECKS.map(([k,l])=>(CUR[k]==='oui'?'✓ ':CUR[k]==='non'?'✗ ':'– ')+esc({recouvrement:'Recouvrement',disposition_nappes:'Disposition',ecartement_nappes:'Écartement',poinconnement_dispo:'Poinçonnement'}[k])).join(' · '))+
-   sec(5,'Photos',PHOTOS.length+' photo(s), '+PHOTOS.filter(p=>p.statut==='reprise').length+' reprise(s)')+
-   sec(7,'Conclusion',CUR.conclusion==='ok'?'Validé':CUR.conclusion==='pas_ok'?'Reprises : '+repItems().length:'à choisir')+
+   sec(3,'Coffrage et vérifications',(()=>{const n=v=>CHECKS.filter(([k])=>CUR[k]===v).length,ko=CHECKS.filter(([k])=>CUR[k]==='non').map(([,l])=>l);
+     return `✓ ${n('oui')} · ✗ ${n('non')} · s.o. ${n('so')} · non renseigné ${CHECKS.length-n('oui')-n('non')-n('so')}`+(ko.length?'<br>✗ '+ko.map(esc).join(', '):'');})())+
+   sec(5,'Photos',PHOTOS.length+' photo(s), '+PHOTOS.filter(p=>p.statut==='reprise').length+' à reprendre')+
+   sec(7,'Conclusion',CUR.conclusion==='ok'?'Validé':CUR.conclusion==='pas_ok'?'À reprendre : '+repItems().length+' point(s)':'à choisir')+
    `<div class="h">Sauvegarde et envoi</div>
    <div class="${syEnAttente(CUR)?'res':'okmsg'}" id="sendState">${syEnAttente(CUR)?'↑ Sauvegarde en ligne en attente du réseau ('+syEnAttente(CUR)+' élément(s))':'✓ Fiche et '+PHOTOS.length+' photo(s) sauvegardées en ligne'}${CUR.sentAt?' · validé le '+esc(CUR.sentAt):''}</div>
    <button class="btn main" id="bSend">✓ ${CUR.sentAt?'Valider à nouveau':'Valider le contrôle'}</button>
    <button class="btn" id="bMailMe">✉️ M'envoyer la fiche par mail</button>
    ${PLANS&&PLANS.src==='pln'&&CUR.marquer_plans&&(CUR.plans||[]).some(p=>p.id&&['ARM','LIS'].includes(String(p.type).toUpperCase()))?`<div class="${CUR.plnMarkedAt?'okmsg':'res'}">${CUR.plnMarkedAt?'✓ Plans marqués contrôlés dans la liste FGH le '+esc(CUR.plnMarkedAt):CUR.plnPending?'↑ Marquage dans la liste FGH en attente du réseau':'Plans à marquer contrôlés dans la liste FGH à la validation'}</div><button class="btn w" id="bPlnMark">✓ Marquer les plans contrôlés dans la liste FGH</button>`:''}
+   <div class="h">Plans liés</div>
+   ${(()=>{const L=CUR.plans||[];const lien=p=>'/fgh/pln/#q='+encodeURIComponent(p.code||p.numero||'');
+     return (L.length?L.map(p=>`<div class="res" style="display:flex;gap:8px;align-items:center"><span style="flex:1"><b>${esc(p.type||'')} ${esc(p.numero||'')} ind. ${esc(p.indice||'')}</b> <span class="muted">${esc(p.titre||'')}</span></span><a class="btn s w" style="text-decoration:none" href="${lien(p)}" target="_blank" rel="noopener">Voir</a></div>`).join(''):'<p class="muted">Aucun plan lié.</p>')+
+       (!CUR.listes?`<button class="btn w" id="bLierLis">🔍 Lier la liste de fers</button>`:'');})()}
    <div class="h">Fichiers</div>
+   <button class="btn w" id="bInd">🔁 Nouvel indice de la fiche${CUR.indice?' (actuel : '+esc(CUR.indice)+')':''}</button>
    <button class="btn" id="bPdf">📄 Fiche PDF (+ photos)</button>
    <button class="btn w" id="bMd">📝 Export texte (.md)</button>
    <button class="btn w" id="bZip">📦 Fiche + photos (.zip)</button>
@@ -1019,6 +1101,10 @@ const STEPS=[
      $('#bSend').onclick=async()=>{const c=CUR;const w=checks();if(w.length&&!confirm('À vérifier :\n• '+w.join('\n• ')+'\n\nValider quand même ?'))return;
        remember(c);c.sentAt=nowStamp();await DB.put('ctrl',c);sySync(true);await plnMark(c);toast(navigator.onLine?'Contrôle validé et sauvegardé en ligne':'Contrôle validé : sauvegarde en ligne au retour du réseau',3000);renderStep();};
      $('#bMailMe').onclick=()=>{remember(CUR);openMail([CUR]);};
+     const bl=$('#bLierLis');if(bl)bl.onclick=()=>openSearch('listes');
+     $('#bInd').onclick=()=>{const L='abcdefghijklmnopqrstuvwxyz',n=CUR.indice?L[L.indexOf(CUR.indice)+1]||'z':'a';
+       if(!confirm('Passer la fiche n°'+CUR.numero+' à l\'indice '+n+' ?\nÀ faire quand une fiche déjà transmise est corrigée : le PDF et le nom de fichier porteront « ind. '+n+' ».'))return;
+       CUR.indices=[...(CUR.indices||[]),{ind:n,le:nowStamp()}];CUR.indice=n;CUR.sentAt='';save();renderStep();toast('Fiche passée à l\'indice '+n);};
      const pm=$('#bPlnMark');if(pm)pm.onclick=()=>plnMark(CUR);$('#bHome').onclick=goHome;
      $('#bPdf').onclick=async()=>{busy(true,'Création du PDF…');try{download(await makePDF(),safe(baseName(CUR))+'.pdf');}catch(e){alert(e.message);}busy(false);};
      $('#bZip').onclick=async()=>{busy(true,'Création du paquet…');try{download(await makeZip(),safe(baseName(CUR))+'.zip');}catch(e){alert(e.message);}busy(false);};
@@ -1026,7 +1112,7 @@ const STEPS=[
        if(!navigator.canShare({files}))throw new Error('Partage non supporté : utiliser les boutons de téléchargement.');await navigator.share({files,title:baseName(CUR)});}catch(e){busy(false);if(e.name!=='AbortError')alert(e.message);}};
      $('#bDel').onclick=async()=>{if(!confirm('Supprimer ce contrôle et ses photos, sur cet appareil et en ligne (pour tous) ?'))return;for(const p of PHOTOS)await DB.del('photos',p.id);await DB.del('ctrl',CUR.id);CTRLS=CTRLS.filter(c=>c!==CUR);CUR=null;goHome();};}},
 ];
-const SEC_DONE=[c=>!!c.description,c=>!!c.plan_armatures,c=>!!c.entreprise,c=>!!c.type_coffrage,c=>CHECKS.every(([k])=>c[k]),()=>PHOTOS.length>0,c=>!!c.beton_qualite,c=>!!c.conclusion,()=>false];
+const SEC_DONE=[c=>!!c.description,c=>!!c.plan_armatures,c=>!!c.entreprise,c=>!!c.type_coffrage&&COFF_CHECKS.every(([k])=>c[k]),c=>ARM_CHECKS.every(([k])=>c[k]),()=>PHOTOS.length>0,c=>!!c.beton_qualite,c=>!!c.conclusion,()=>false];
 function renderStep(keep=true){
   const y=window.scrollY;
   STEPS.forEach(s=>{if(s.pre)s.pre();});
@@ -1068,13 +1154,13 @@ const URLS=new Map();function thumbURL(p){const b=p.annot||p.orig;let u=URLS.get
 async function loadImg(blob){const url=URL.createObjectURL(blob);const img=new Image();img.src=url;await img.decode();return{img,url};}
 async function normalize(file){const {img,url}=await loadImg(file);let w=img.naturalWidth,h=img.naturalHeight;const r=Math.min(1,2400/Math.max(w,h));w=Math.round(w*r);h=Math.round(h*r);
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(url);return{blob:await new Promise(r=>cv.toBlob(r,'image/jpeg',0.85)),w,h};}
-async function addFiles(files,openAfter){if(!files.length)return;busy(true,'Import…');let last=null;
-  try{for(const f of files){const {blob,w,h}=await normalize(f);last={id:uid(),ctrlId:CUR.id,ord:(PHOTOS.length?Math.max(...PHOTOS.map(x=>x.ord)):0)+1,orig:blob,annot:null,shapes:[],w,h,statut:'ok',comment:''};
+async function addFiles(files,openAfter,item){if(!files.length)return;busy(true,'Import…');let last=null;
+  try{for(const f of files){const {blob,w,h}=await normalize(f);last={id:uid(),ctrlId:CUR.id,ord:(PHOTOS.length?Math.max(...PHOTOS.map(x=>x.ord)):0)+1,orig:blob,annot:null,shapes:[],w,h,statut:item&&CUR[item]==='non'?'reprise':'ok',comment:'',item:item||''};
     PHOTOS.push(last);await DB.put('photos',last);}}catch(e){alert('Import impossible : '+e.message);}
   busy(false);CUR.nPh=PHOTOS.length;save();renderStep();if(openAfter&&last)openPhoto(last);}
 const ED={p:null,img:null,url:null,shapes:[],tool:'arrow',cur:null,k:1,statut:'reprise'};
 async function openPhoto(p){ED.p=p;ED.shapes=JSON.parse(JSON.stringify(p.shapes||[]));ED.statut=p.statut||'ok';const {img,url}=await loadImg(p.orig);ED.img=img;ED.url=url;
-  $('#pTitle').textContent='Photo '+pad(PHOTOS.indexOf(p)+1);$('#pCm').value=p.comment||'';setSt();setTool(ED.tool);$('#vPhoto').classList.remove('hidden');requestAnimationFrame(edFit);}
+  $('#pTitle').textContent='Photo '+pad(PHOTOS.indexOf(p)+1)+(p.item?' · '+ITEM_LIB(p.item):'');$('#pCm').value=p.comment||'';setSt();setTool(ED.tool);$('#vPhoto').classList.remove('hidden');requestAnimationFrame(edFit);}
 function setSt(){$$('#vPhoto [data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===ED.statut));}
 function setTool(t){ED.tool=t;$$('#tools [data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));}
 $$('#vPhoto [data-st]').forEach(b=>b.onclick=()=>{ED.statut=b.dataset.st;setSt();});
@@ -1089,6 +1175,7 @@ function drawShape(ctx,s,k,b){const lw=b*k;ctx.save();ctx.strokeStyle=RED;ctx.fi
   if(s.t==='ellipse'){ctx.beginPath();ctx.ellipse((s.x1+s.x2)/2*k,(s.y1+s.y2)/2*k,Math.abs(s.x2-s.x1)/2*k||1,Math.abs(s.y2-s.y1)/2*k||1,0,0,Math.PI*2);ctx.stroke();}
   else if(s.t==='arrow'){const x1=s.x1*k,y1=s.y1*k,x2=s.x2*k,y2=s.y2*k,a=Math.atan2(y2-y1,x2-x1),hl=lw*4;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2-Math.cos(a)*hl*.6,y2-Math.sin(a)*hl*.6);ctx.stroke();
     ctx.shadowBlur=0;ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(a-.45),y2-hl*Math.sin(a-.45));ctx.lineTo(x2-hl*Math.cos(a+.45),y2-hl*Math.sin(a+.45));ctx.closePath();ctx.fill();}
+  else if(s.t==='free'){ctx.beginPath();s.pts.forEach(([x,y],i)=>i?ctx.lineTo(x*k,y*k):ctx.moveTo(x*k,y*k));ctx.stroke();}
   else if(s.t==='text'){const fs=b*6*k;ctx.font=`800 ${fs}px Inter,Arial,sans-serif`;ctx.shadowBlur=0;const tw=ctx.measureText(s.s).width,pd=fs*.3;
     ctx.fillStyle='rgba(255,255,255,.9)';ctx.fillRect(s.x*k-pd,s.y*k-fs,tw+pd*2,fs*1.3);ctx.fillStyle=RED;ctx.fillText(s.s,s.x*k,s.y*k);}
   ctx.restore();}
@@ -1096,9 +1183,9 @@ function edDraw(){const cv=$('#cv'),ctx=cv.getContext('2d');ctx.drawImage(ED.img
 function edPt(e){const r=$('#cv').getBoundingClientRect(),s=ED.img.naturalWidth/r.width;return[(e.clientX-r.left)*s,(e.clientY-r.top)*s];}
 $('#cv').addEventListener('pointerdown',e=>{e.preventDefault();const [x,y]=edPt(e);
   if(ED.tool==='text'){const s=prompt('Texte :');if(s&&s.trim()){ED.shapes.push({t:'text',x,y,s:s.trim()});edDraw();}return;}
-  $('#cv').setPointerCapture(e.pointerId);ED.cur={t:ED.tool,x1:x,y1:y,x2:x,y2:y};});
-$('#cv').addEventListener('pointermove',e=>{if(!ED.cur)return;[ED.cur.x2,ED.cur.y2]=edPt(e);edDraw();});
-const edUp=()=>{if(!ED.cur)return;const s=ED.cur;ED.cur=null;if(Math.hypot(s.x2-s.x1,s.y2-s.y1)>bw()*3)ED.shapes.push(s);edDraw();};
+  $('#cv').setPointerCapture(e.pointerId);ED.cur=ED.tool==='free'?{t:'free',pts:[[x,y]]}:{t:ED.tool,x1:x,y1:y,x2:x,y2:y};});
+$('#cv').addEventListener('pointermove',e=>{if(!ED.cur)return;const q=edPt(e);if(ED.cur.t==='free'){const l=ED.cur.pts[ED.cur.pts.length-1];if(Math.hypot(q[0]-l[0],q[1]-l[1])>bw()*.6)ED.cur.pts.push(q);}else[ED.cur.x2,ED.cur.y2]=q;edDraw();});
+const edUp=()=>{if(!ED.cur)return;const s=ED.cur;ED.cur=null;if(s.t==='free'?s.pts.length>2:Math.hypot(s.x2-s.x1,s.y2-s.y1)>bw()*3)ED.shapes.push(s);edDraw();};
 $('#cv').addEventListener('pointerup',edUp);$('#cv').addEventListener('pointercancel',edUp);
 function closePhoto(){$('#vPhoto').classList.add('hidden');URL.revokeObjectURL(ED.url);ED.p=null;renderStep();}
 $('#pBack').onclick=closePhoto;
@@ -1224,7 +1311,7 @@ async function makePDF(opt={}){
   T('RAPPORT DE CONTRÔLE AVANT',VAL,11.8,{b:1,s:9.5});T('BETONNAGE',VAL,15.5,{b:1,s:9.5});T('Version 2019',VAL,23.2,{s:9.5});
   d.setLineWidth(.3);d.line(15,28.9,R,28.9);
   // identification
-  T('N° et titre du projet:',15,35.4);T(c.projet,X(43.8),35.4,{b:1,w:VAL-X(43.8)-2});T('N° du contrôle',VAL,35.4);T(c.numero,X(147.2),35.2,{b:1,s:11.5});
+  T('N° et titre du projet:',15,35.4);T(c.projet,X(43.8),35.4,{b:1,w:VAL-X(43.8)-2});T('N° du contrôle',VAL,35.4);T(String(c.numero||'')+(c.indice?'  ind. '+c.indice:''),X(147.2),35.2,{b:1,s:11.5});
   T('Entreprise',15,42.9);T(c.entreprise,X(43.8),42.9,{b:1,i:1,w:VAL-X(43.8)-2});T('Météo : '+(c.meteo||''),VAL,42.9,{w:X(140.7)-VAL-2});T('Température : '+(c.temperature||''),X(140.7),42.9);
   T('Contremaître: '+(c.contremaitre||''),15,50.5,{w:MID-17});T('Distribution: '+(c.distribution||''),MID,50.5,{w:R-MID});UL(15,R,52.5);
   T('Localisation:',15,58.2,{b:1});T(c.localisation,15+d.getTextWidth('Localisation:')+3,58.2,{w:MID-40});T('Type d\'élément:',MID,58.2,{b:1});
@@ -1236,7 +1323,11 @@ async function makePDF(opt={}){
   T('Armatures:',15,109.4,{b:1});T('acier B500B',X(43.8),109.4);
   T('Plan n°',MID,109.4);T(fit(c.plan_armatures,R-VAL,8.5).slice(0,2),VAL,109.4,{s:8.5});
   T('Listes n°',MID,120.8);T(fit(c.listes,R-VAL,8.5).slice(0,2),VAL,120.8,{s:8.5});UL(VAL,R,126);
-  const yn=(lab,v,y)=>{T(lab,MID,y,{s:7.5});BOX(X(129),y+.4,v==='oui');T('oui',X(132.3),y+.4,{s:7.5});BOX(X(129),y+3.6,v==='non');T('non',X(132.3),y+3.6,{s:7.5});};
+  const yn=(lab,v,y)=>{T(lab,MID,y,{s:7.5});BOX(X(129),y+.4,v==='oui');T('oui',X(132.3),y+.4,{s:7.5});BOX(X(129),y+3.6,v==='non');T('non',X(132.3),y+3.6,{s:7.5});if(v==='so')T('sans objet',X(138),y+2,{s:7.5,i:1});};
+  // points ajoutés (colonne de gauche) : libellé puis oui / non / sans objet
+  const yn3=(lab,v,y)=>{T(lab,15,y,{s:7.2,w:MID-17});[['oui','oui',17],['non','non',29],['so','s.o.',41]].forEach(([k,t,x])=>{BOX(x,y+3.3,v===k);T(t,x+3.6,y+3.3,{s:7});});};
+  yn3('Fond de coffrage propre',c.fond_propre,79.5);yn3('Enrobage'+(c.enrobage?' '+c.enrobage:'')+' respecté',c.enrobage_ok,87);yn3('Ecarteurs / paniers de support',c.ecarteurs,94.5);
+  yn3('Sens des lits',c.sens_lits,115);yn3('Attentes / EBEA',c.attentes,122.5);yn3('Chaînages et renfort réservations',c.chainages,130);yn3('Goujons ou consoles iso',c.goujons,137.5);
   yn('Recouvrement des aciers conforme',c.recouvrement,132.1);yn('Disposition des nappes conforme',c.disposition_nappes,139.8);yn('Ecartement des nappes conforme',c.ecartement_nappes,147.4);
   T('Armature de poinçonnement:',15,158.6,{b:1});T('Type d\'élément:',MID,158.6,{b:1});T(fit(c.poinconnement_type,R-VAL,8.5)[0]||'',VAL,158,{s:8.5});UL(VAL,R,160.6);
   yn('Disposition des pièces conforme',c.poinconnement_dispo,166.7);
@@ -1275,7 +1366,7 @@ async function makePDF(opt={}){
       if(avail<90){d.addPage();head();y=27;avail=282-y;}
       const boxH=Math.min(slot,avail)-capH-3;const r=Math.min((R-15)/p.w,boxH/p.h),iw=p.w*r,ih=p.h*r;
       d.addImage(await blobToDataURL(p.annot||p.orig),'JPEG',15+(R-15-iw)/2,y,iw,ih,undefined,'FAST');
-      let ty=y+ih+4.5;d.setTextColor(...(p.statut==='reprise'?[192,57,43]:[90,138,31]));T(`Photo ${pad(i+1)} – ${p.statut==='reprise'?'REPRISE':'OK'}`,15,ty,{b:1,s:9.5});
+      let ty=y+ih+4.5;d.setTextColor(...(p.statut==='reprise'?[192,57,43]:[90,138,31]));T(`Photo ${pad(i+1)} – ${p.statut==='reprise'?'À REPRENDRE':'OK'}${p.item?' – '+ITEM_LIB(p.item):''}`,15,ty,{b:1,s:9.5});
       d.setTextColor(120);T(photoName(c,i),R,ty,{s:7.5,a:'right'});d.setTextColor(0);
       if(p.comment)T(fit(p.comment,R-15,9).slice(0,2),15,ty+4.5,{s:9});
       y=ty+capH;
