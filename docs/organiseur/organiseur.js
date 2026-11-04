@@ -827,6 +827,25 @@
   var NIVB = 0;   // bâtiment dont on édite les niveaux
   function liste(k) { var b = CONF.batiments[NIVB] || { niveaux: [], zones: [] }; return k === "niv" ? b.niveaux : k === "zon" ? b.zones : CONF[k]; }
   $("#ref").addEventListener("change", function (e) {
+    // altitude saisie : le niveau se range parmi les niveaux du bâtiment selon cette altitude
+    var dd = e.target.dataset || {};
+    if (dd.l === "niv" && dd.c === "alt") {
+      var bt = CONF.batiments[+dd.b], ix = +dd.i, nv = bt && bt.niveaux[ix];
+      if (!nv || typeof nv.alt !== "number") return;
+      var reste = bt.niveaux.filter(function (x, k) { return k !== ix; }), z = null, hp = 0, pos = 0;
+      reste.forEach(function (x, k) {
+        if (x.fictif) return;
+        var zz = typeof x.alt === "number" ? x.alt : z == null ? 0 : z + hp;
+        if (zz <= nv.alt) pos = k + 1;
+        z = zz; hp = Math.max(0.2, nb(x.h, 3));
+      });
+      if (pos === ix) return;
+      reste.splice(pos, 0, nv); bt.niveaux = reste; marque(); dessineRef();
+      var champ = document.querySelector('#ref input[data-l="niv"][data-b="' + dd.b + '"][data-i="' + pos + '"][data-c="alt"]');
+      if (champ) { champ.focus(); champ.closest("tr").classList.add("bouge"); }
+      toast((nv.lib || nv.c || "Niveau") + " rangé à son altitude.");
+      return;
+    }
     if (e.target.id === "niv-bat") { NIVB = +e.target.value; MQ.foc = null; dessineRef(); }
     else if (e.target.dataset.copie != null && e.target.value !== "") {
       var src = CONF.batiments[+e.target.value], dst = CONF.batiments[+e.target.dataset.copie];
