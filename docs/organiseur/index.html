@@ -203,7 +203,20 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 .mq-t{font:10px var(--sans);fill:var(--texte-doux)}
 .mq-t.on{fill:var(--or);font-weight:700}
 .mq-nom{font:600 12px var(--sans);fill:var(--texte)}
-@media (max-width:1100px){.ref-bat{grid-template-columns:1fr}.maquette{position:static;order:-1}#mq{height:320px}}
+#coupe{display:block;width:100%;height:240px}
+.maquette{max-height:calc(100vh - 140px);overflow:auto}
+.cp-guide{stroke:var(--texte-faible);stroke-dasharray:2 4;stroke-width:.8;opacity:.6}
+.cp-alt{font:10px var(--mono);fill:var(--texte-faible)}
+.cp-bat{fill:none;stroke:var(--texte-doux);stroke-width:1.2}
+.cp-niv{cursor:pointer}
+.cp-niv rect{fill:rgba(var(--or-rvb),.05);stroke:none}
+.cp-niv line{stroke:var(--texte-doux);stroke-width:1.4}
+.cp-niv text{font:10px var(--sans);fill:var(--texte-doux)}
+.cp-niv:hover rect{fill:rgba(var(--or-rvb),.16)}
+.cp-niv.on rect{fill:rgba(var(--or-rvb),.32)}
+.cp-niv.on line{stroke:var(--or);stroke-width:2.2}
+.cp-niv.on text{fill:var(--or);font-weight:700}
+@media (max-width:1100px){.ref-bat{grid-template-columns:1fr}.maquette{position:static;order:-1;max-height:none}#mq{height:320px}}
 
 /* ---------- Fenêtre de réservation ---------- */
 .voile{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:50;padding:12px}
@@ -343,6 +356,6 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=6"></script>
+<script src="/organiseur/organiseur.js?v=7"></script>
 </body>
 </html>

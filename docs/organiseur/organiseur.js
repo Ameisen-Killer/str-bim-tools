@@ -759,7 +759,45 @@
     var n = M.reduce(function (s, m) { return s + m.niv.length; }, 0);
     if (!n) h += '<text class="mq-t" x="14" y="' + (H - 12) + '">Ajoute des niveaux pour voir les étages.</text>';
     svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.innerHTML = h;
+    dessineCoupe(M);
   }
+  // Coupe : une colonne par bâtiment, l'altitude en ordonnée ; les traits pointillés prolongent chaque
+  // altitude d'un bâtiment à l'autre pour voir comment les niveaux s'intercalent. Un clic ouvre le niveau.
+  function dessineCoupe(M) {
+    var svg = $("#coupe"); if (!svg) return;
+    M = M.filter(function (m) { return m.niv.length; });
+    var W = svg.clientWidth || 420;
+    if (!M.length) { svg.setAttribute("viewBox", "0 0 " + W + " 60"); svg.style.height = "60px"; svg.innerHTML = '<text class="mq-t" x="14" y="34">Ajoute des niveaux pour voir la coupe.</text>'; return; }
+    var z1 = Math.min.apply(null, M.map(function (m) { return m.bas; })), z2 = Math.max.apply(null, M.map(function (m) { return m.haut; }));
+    var e = Math.max(8, Math.min(26, 520 / Math.max(1, z2 - z1))), H = Math.round((z2 - z1) * e + 54), g = 52, col = (W - g - 10) / M.length;
+    var Y = function (z) { return 30 + (z2 - z) * e; }, f = function (z) { return (z > 0 ? "+" : "") + z.toFixed(2); };
+    var h = "", alts = {};
+    M.forEach(function (m) { m.niv.forEach(function (v) { alts[v.z.toFixed(2)] = 1; }); alts[m.haut.toFixed(2)] = 1; });
+    var dern = -1e9;
+    Object.keys(alts).map(Number).sort(function (a, b) { return b - a; }).forEach(function (z) {
+      var y = Y(z); h += '<line class="cp-guide" x1="' + (g - 4) + '" y1="' + y.toFixed(1) + '" x2="' + (W - 6) + '" y2="' + y.toFixed(1) + '"/>';
+      if (y - dern >= 10) { dern = y; h += '<text class="cp-alt" x="' + (g - 7) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + f(z) + "</text>"; }
+    });
+    M.forEach(function (m, c) {
+      var x = g + c * col + 6, w = col - 12;
+      h += '<text class="mq-nom" x="' + (x + w / 2).toFixed(1) + '" y="16" text-anchor="middle">' + esc(m.b.c || m.b.lib || "Bâtiment") + "</text>";
+      h += '<rect class="cp-bat" x="' + x.toFixed(1) + '" y="' + Y(m.haut).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + ((m.haut - m.bas) * e).toFixed(1) + '"/>';
+      m.niv.forEach(function (v) {
+        var on = MQ.foc && MQ.foc.l === "niv" && m.i === NIVB && MQ.foc.i === v.k, y = Y(v.z), hh = Math.max(2, v.h * e);
+        h += '<g class="cp-niv' + (on ? " on" : "") + '" data-b="' + m.i + '" data-k="' + v.k + '"><title>' + esc((m.b.c || "") + " · " + v.n.c + " " + v.n.lib + " · " + f(v.z) + " m · " + v.h + " m") + "</title>" +
+          '<rect x="' + x.toFixed(1) + '" y="' + (y - hh).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hh.toFixed(1) + '"/>' +
+          '<line x1="' + x.toFixed(1) + '" y1="' + y.toFixed(1) + '" x2="' + (x + w).toFixed(1) + '" y2="' + y.toFixed(1) + '"/>' +
+          (hh >= 11 ? '<text x="' + (x + 5).toFixed(1) + '" y="' + (y - Math.min(hh, 13) / 2 + 3.5).toFixed(1) + '">' + esc((v.n.lib || v.n.c) + (w > 110 ? "  " + v.n.c : "")) + "</text>" : "") + "</g>";
+      });
+    });
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.style.height = H + "px"; svg.innerHTML = h;
+  }
+  $("#ref").addEventListener("click", function (e) {
+    var g = e.target.closest && e.target.closest(".cp-niv"); if (!g) return;
+    var b = +g.dataset.b, k = +g.dataset.k;
+    if (b !== NIVB) { NIVB = b; dessineRef(); }
+    var i = document.querySelector('#ref input[data-l="niv"][data-i="' + k + '"][data-c="lib"]'); if (i) { i.focus(); i.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  });
   (function () {
     var g = null;
     $("#ref").addEventListener("pointerdown", function (e) { var s = e.target.closest("#mq"); if (!s) return; e.preventDefault(); s.setPointerCapture(e.pointerId); g = { x: e.clientX, y: e.clientY }; });
@@ -821,7 +859,8 @@
               : '<td><input class="champ' + (c[0] === "c" ? " mono" : "") + '" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '" value="' + esc(e[c[0]] || "") + '" maxlength="' + (c[0] === "c" ? 10 : 200) + '"></td>';
           }).join("") + '<td class="x"><button class="mini plus" data-mv="' + L.k + '|' + i + '|-1" title="Monter">↑</button><button class="mini plus" data-mv="' + L.k + '|' + i + '|1" title="Descendre">↓</button><button class="mini" data-sup="' + L.k + '|' + i + '" title="Retirer">×</button></td></tr>';
         }).join("") + '</tbody></table><button class="btn ajout" data-ajout="' + L.k + '">+ Ajouter</button></div>';
-      if (L.k === "zones") h += '</div><aside class="maquette"><div class="mq-tete"><b>Maquette filaire</b><small>glisser pour tourner</small></div><svg id="mq" role="img" aria-label="Maquette filaire des bâtiments et de leurs niveaux"></svg></aside></div>';
+      if (L.k === "zones") h += '</div><aside class="maquette"><div class="mq-tete"><b>Maquette filaire</b><small>glisser pour tourner</small></div><svg id="mq" role="img" aria-label="Maquette filaire des bâtiments et de leurs niveaux"></svg>' +
+        '<div class="mq-tete"><b>Coupe des niveaux</b><small>les niveaux de tous les bâtiments, par altitude</small></div><svg id="coupe" role="img" aria-label="Coupe des niveaux des bâtiments"></svg></aside></div>';
     });
     $("#ref").innerHTML = h; majEnreg(); verifiePlages(); dessineMaquette();
   }
