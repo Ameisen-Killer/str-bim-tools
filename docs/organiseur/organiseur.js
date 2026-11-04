@@ -41,7 +41,89 @@
   function ecritLocal(d) {
     try { localStorage.setItem("org.donnees", JSON.stringify(d)); } catch (e) { throw new Error("Le navigateur refuse d'enregistrer (stockage plein ou navigation privée) : exporte le JSON."); }
     lsSet("org.modifie", new Date().toISOString());
+    fichierPlanifie();
   }
+
+  // ------------------------------------------------------------------ fichier JSON lié
+  // Chrome et Edge sur ordinateur : l'outil garde la main sur un fichier .json choisi par
+  // l'utilisateur et le réécrit à chaque changement : toute la configuration de tous les chantiers
+  // (référentiels, trigrammes, plages, bâtiments et niveaux) et leurs réservations.
+  // Le lien est retenu (IndexedDB) ; après un rechargement, le navigateur redemande l'accord d'un clic.
+  var FI = { h: null, droit: "", quand: "", err: "" }, FI_OK = typeof window.showSaveFilePicker === "function";
+  function idb(mode, f) {
+    return new Promise(function (ok, ko) {
+      var r = indexedDB.open("organiseur", 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("kv"); };
+      r.onerror = function () { ko(r.error); };
+      r.onsuccess = function () { var t = r.result.transaction("kv", mode), q = f(t.objectStore("kv")); t.oncomplete = function () { ok(q && q.result); }; t.onerror = function () { ko(t.error); }; };
+    });
+  }
+  function contenuFichier() { var d = litLocal(); return JSON.stringify({ format: "str-bim-tools/organiseur-fichier", version: 1, enregistre_le: new Date().toISOString(), chantiers: d.chantiers, reservations: d.reservations }, null, 2); }
+  function ecritFichier() {
+    if (!FI.h || FI.droit !== "granted") return Promise.resolve();
+    return FI.h.createWritable().then(function (w) { return w.write(contenuFichier()).then(function () { return w.close(); }); }).then(function () {
+      FI.quand = new Date(); FI.err = ""; lsSet("org.exporte", new Date().toISOString()); majFichier();
+    }).catch(function (e) { FI.err = e.message || "écriture refusée"; majFichier(); });
+  }
+  function fichierPlanifie() { if (!FI.h) return; clearTimeout(fichierPlanifie.t); fichierPlanifie.t = setTimeout(ecritFichier, 400); }
+  function majFichier() {
+    var b = $("#b-fichier"), n = $("#fichier-nom");
+    b.classList.toggle("lie", !!FI.h && FI.droit === "granted" && !FI.err);
+    b.classList.toggle("attente", !!FI.h && FI.droit !== "granted");
+    n.textContent = !FI.h ? "Aucun fichier lié" : FI.err ? FI.h.name + " · erreur" : FI.droit !== "granted" ? FI.h.name + " · cliquer pour reprendre" : FI.h.name + (FI.quand ? " · enregistré " + deux(FI.quand.getHours()) + ":" + deux(FI.quand.getMinutes()) : " · lié");
+    b.title = !FI.h ? "Aucun fichier lié : les données ne sont que dans ce navigateur" : "Lié à " + FI.h.name + (FI.err ? " (" + FI.err + ")" : "");
+  }
+  function lie(h, lire) {
+    return h.requestPermission({ mode: "readwrite" }).then(function (p) {
+      if (p !== "granted") throw new Error("Accès au fichier refusé.");
+      FI.h = h; FI.droit = p; FI.err = "";
+      idb("readwrite", function (s) { return s.put(h, "fichier"); }).catch(function () {});
+      if (!lire) return ecritFichier();
+      return h.getFile().then(function (f) { return f.text(); }).then(function (t) {
+        var j = t.trim() ? JSON.parse(t) : null;
+        if (j && Array.isArray(j.chantiers) && Array.isArray(j.reservations)) { ecritLocal({ chantiers: j.chantiers, reservations: j.reservations }); toast(j.chantiers.length + " chantier(s) lus dans " + h.name + "."); return charge(); }
+        if (j && j.chantier) throw new Error("Ce fichier est l'export d'un seul chantier : ouvre-le avec « Importer ».");
+        if (j) throw new Error("Ce fichier n'est pas un fichier de l'organiseur.");
+        return ecritFichier();
+      });
+    }).then(majFichier).catch(function (e) { FI.err = ""; majFichier(); toast(e.message, 5000); });
+  }
+  var TYPES_FI = [{ description: "Organiseur (JSON)", accept: { "application/json": [".json"] } }];
+  function fenFichier() {
+    var c = $("#fi-corps"), p = $("#fi-pied");
+    if (!LOCAL) { c.innerHTML = '<p class="texte">L\'outil travaille sur la base partagée (adresse avec ?base=1) : pas de fichier à lier. Ajoute ?base=0 à l\'adresse pour revenir au fichier.</p>'; p.innerHTML = '<span class="esp"></span><button class="btn" data-fi="x">Fermer</button>'; }
+    else if (!FI_OK) { c.innerHTML = '<p class="texte">Ce navigateur ne sait pas garder un fichier ouvert (il faut Chrome ou Edge sur ordinateur). Tes données restent dans ce navigateur : sauve-les avec <b>JSON</b> et rouvre-les avec <b>Importer</b>.</p>'; p.innerHTML = '<span class="esp"></span><button class="btn" data-fi="x">Fermer</button>'; }
+    else {
+      c.innerHTML = '<p class="texte">' + (FI.h ? "Lié à <b>" + esc(FI.h.name) + "</b>" + (FI.droit === "granted" ? " : chaque changement y est enregistré tout de suite." : " : le navigateur demande ton accord pour y écrire à nouveau.") :
+        "Aucun fichier lié : tes chantiers ne sont que dans ce navigateur.") + "</p>" +
+        '<p class="texte">Le fichier contient toute la configuration de tous tes chantiers (référentiels, trigrammes, plages, bâtiments et niveaux) et leurs réservations. « Nouveau fichier » le crée et le garde à jour. « Ouvrir un fichier » charge un .json de l\'organiseur (il remplace ce qui est dans ce navigateur) puis le garde à jour. Mets-le dans un dossier synchronisé (OneDrive…) pour le retrouver sur un autre poste.</p>';
+      p.innerHTML = (FI.h ? '<button class="btn danger" data-fi="delie">Délier</button>' : "") + '<span class="esp"></span>' +
+        (FI.h && FI.droit !== "granted" ? '<button class="btn accent" data-fi="reprendre">Reprendre ' + esc(FI.h.name) + "</button>" : "") +
+        '<button class="btn" data-fi="ouvrir">Ouvrir un fichier…</button><button class="btn' + (FI.h ? "" : " accent") + '" data-fi="nouveau">Nouveau fichier…</button>';
+    }
+    $("#voile-fi").hidden = false;
+  }
+  $("#b-fichier").addEventListener("click", function () {
+    if (FI.h && FI.droit !== "granted") { lie(FI.h, false); return; }
+    fenFichier();
+  });
+  $("#voile-fi").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
+  $("#fi-pied").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-fi]"); if (!b) return; var a = b.dataset.fi;
+    $("#voile-fi").hidden = true;
+    if (a === "nouveau") window.showSaveFilePicker({ suggestedName: "organiseur.json", types: TYPES_FI }).then(function (h) { return lie(h, false); }).catch(function () {});
+    else if (a === "ouvrir") {
+      var d = litLocal();
+      if (d.chantiers.length && !window.confirm("Le fichier ouvert remplacera les chantiers de ce navigateur. Continuer ?")) return;
+      window.showOpenFilePicker({ types: TYPES_FI, multiple: false }).then(function (l) { return lie(l[0], true); }).catch(function () {});
+    }
+    else if (a === "reprendre") lie(FI.h, false);
+    else if (a === "delie") { FI = { h: null, droit: "", quand: "", err: "" }; idb("readwrite", function (s) { return s.delete("fichier"); }).catch(function () {}); majFichier(); toast("Fichier délié : les données restent dans ce navigateur."); rechargeDonnees(true); }
+  });
+  if (LOCAL && FI_OK) idb("readonly", function (s) { return s.get("fichier"); }).then(function (h) {
+    if (!h) return; FI.h = h;
+    return h.queryPermission({ mode: "readwrite" }).then(function (p) { FI.droit = p; if (p === "granted") ecritFichier(); });
+  }).catch(function () {}).then(majFichier);
   function refus(m, code) { var e = new Error(m); e.code = code; return e; }
   // les quelques appels de l'outil, rejoués sur les données du navigateur (mêmes règles que la base)
   function local(chemin, o) {
@@ -260,7 +342,7 @@
     ]).then(function (r) {
       if (!CUR || CUR.id !== id) return;
       RES = r[0]; PLANS = dernierIndice(r[1]);
-      etat(RES.length + " réservation(s)" + (CONF.liste_plans ? " · " + PLANS.length + " plans" : "") + (LOCAL ? " · fichier dans ce navigateur" + (aExporter() ? ", à exporter" : "") : " · à jour"), LOCAL && aExporter() ? "" : "ok");
+      etat(RES.length + " réservation(s)" + (CONF.liste_plans ? " · " + PLANS.length + " plans" : "") + (LOCAL ? (FI.h ? "" : " · dans ce navigateur seulement" + (aExporter() ? ", pense à lier un fichier" : "")) : " · base partagée"), LOCAL && !FI.h && aExporter() ? "" : "ok");
       dessine();
     }).catch(function (e) { etat("Base indisponible", "ko"); toast(e.message, 5000); });
   }
@@ -551,7 +633,7 @@
   });
   $("#fr-fermer").addEventListener("click", function () { $("#voile").hidden = true; });
   $("#b-reserver").addEventListener("click", function () { if (!CUR) { toast("Crée d'abord un chantier."); return; } ouvreRes(null, { plage: SEL }); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { $("#voile").hidden = true; $("#voile-ch").hidden = true; } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { $("#voile").hidden = true; $("#voile-ch").hidden = true; $("#voile-fi").hidden = true; } });
 
   // ------------------------------------------------------------------ référentiels
   // ------------------------------------------------------------------ maquette filaire
@@ -821,6 +903,10 @@
     var f = this.files[0]; if (!f) return;
     f.text().then(function (t) {
       var j = JSON.parse(t);
+      if (j && Array.isArray(j.chantiers) && Array.isArray(j.reservations) && LOCAL) {
+        if (litLocal().chantiers.length && !window.confirm("Ce fichier contient " + j.chantiers.length + " chantier(s) : il remplacera ceux de ce navigateur. Continuer ?")) return;
+        ecritLocal({ chantiers: j.chantiers, reservations: j.reservations }); toast(j.chantiers.length + " chantier(s) chargés."); return charge();
+      }
       if (!j || !j.chantier || !j.chantier.code) throw new Error("Ce fichier n'est pas un export de l'organiseur.");
       var code = U(j.chantier.code), ex = CH.filter(function (x) { return U(x.code) === code; })[0];
       if (ex && !window.confirm("Le chantier " + code + " existe : remplacer ses référentiels et plages par ceux du fichier, et ajouter ou mettre à jour ses réservations ?")) return;

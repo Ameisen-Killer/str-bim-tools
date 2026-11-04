@@ -76,6 +76,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.nu:hover{background:var(--controle-survol)}
 .btn.danger{color:var(--rouge)}
 .btn:disabled{opacity:.45;cursor:default}
+.btn.fichier{max-width:260px;color:var(--or);border-color:rgba(var(--or-rvb),.45)}
+.btn.fichier span{overflow:hidden;text-overflow:ellipsis}
+.btn.fichier.lie{color:var(--vert);border-color:rgba(108,203,95,.45)}
+.btn.fichier.attente{color:var(--or)}
+.fen .texte{grid-column:1/-1;margin:0;color:var(--texte-doux);font-size:13px}
+.fen .texte b{color:var(--texte)}
 @media (max-width:760px){.barre .titre,.barre .etat span{display:none}.barre .btn span{display:none}.barre select{max-width:46vw}}
 
 /* ---------- Onglets ---------- */
@@ -85,7 +91,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .onglets button[aria-selected="true"]{color:var(--texte);font-weight:600}
 .onglets button[aria-selected="true"]::after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:3px;border-radius:2px;background:var(--or)}
 
-.vue{height:calc(100% - var(--haut) - 40px);padding:0 8px 8px;min-height:0}
+main{height:calc(100% - var(--haut) - 40px);min-height:0}
+.vue{height:100%;padding:0 8px 8px;min-height:0}
 .panneau{min-height:0;display:flex;flex-direction:column;background:var(--couche);border:1px solid var(--ligne);border-radius:8px;overflow:hidden}
 .defile{flex:1;min-height:0;overflow:auto}
 .vide{padding:28px 18px;color:var(--texte-faible);max-width:640px}
@@ -218,7 +225,8 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 
 @media (max-width:860px){
   body{overflow:auto}
-  .vue{height:auto}
+  main,.vue{height:auto}
+  .vue .panneau{height:auto!important}
   #v-plages{grid-template-columns:1fr}
   .panneau{max-height:none}
   #v-plages .panneau:first-child .defile{max-height:42vh}
@@ -233,6 +241,7 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
   <select id="chantier" title="Chantier" aria-label="Chantier"></select>
   <span class="etat" id="etat"><span>Chargement…</span></span>
   <span class="esp"></span>
+  <button class="btn fichier" id="b-fichier" title="Fichier JSON lié"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z M9.5 1.5V5H13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="fichier-nom">Aucun fichier lié</span></button>
   <button class="btn nu" id="b-json" title="Exporter le chantier en JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>JSON</span></button>
   <button class="btn nu" id="b-import" title="Importer un chantier depuis un JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Importer</span></button>
   <button class="btn nu" id="b-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
@@ -323,7 +332,15 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
   </form>
 </div>
 
+<div class="voile" id="voile-fi" hidden>
+  <div class="fen">
+    <div class="tete"><h2>Fichier JSON lié</h2></div>
+    <div class="corps" id="fi-corps"></div>
+    <div class="pied" id="fi-pied"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=3"></script>
+<script src="/organiseur/organiseur.js?v=4"></script>
 </body>
 </html>
