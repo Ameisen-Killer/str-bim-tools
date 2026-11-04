@@ -867,10 +867,11 @@
     }
     function act(l, b, i) {
       return '<td class="x" style="white-space:nowrap">' + (l === "batiments" ? '<button class="mini plus" data-ajout="niv" data-b="' + b + '" title="Ajouter un niveau à ce bâtiment">+</button>' : "") +
-        '<button class="mini plus" data-mv="' + l + "|" + i + '|-1" data-b="' + b + '" title="Monter">↑</button><button class="mini plus" data-mv="' + l + "|" + i + '|1" data-b="' + b + '" title="Descendre">↓</button>' +
+        // pour un niveau, « monter » = passer au-dessus, donc plus loin dans la liste
+        '<button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|1" : "|-1") + '" data-b="' + b + '" title="Monter">↑</button><button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|-1" : "|1") + '" data-b="' + b + '" title="Descendre">↓</button>' +
         '<button class="mini" data-sup="' + l + "|" + i + '" data-b="' + b + '" title="' + (l === "batiments" ? "Retirer le bâtiment et ses niveaux" : "Retirer le niveau") + '">×</button></td>';
     }
-    var h = '<div class="bloc"><h3>Bâtiments et niveaux</h3><p>Chaque bâtiment, puis ses niveaux du plus bas au plus haut (« + » sur la ligne du bâtiment pour en ajouter). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
+    var h = '<div class="bloc"><h3>Bâtiments et niveaux</h3><p>Chaque bâtiment, puis ses niveaux comme dans le bâtiment : le plus haut en haut, le plus bas en bas (« + » sur la ligne du bâtiment ajoute un niveau au-dessus). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
       '<table class="t-bat"><thead><tr><th style="width:96px">Code</th><th>Nom</th><th style="width:78px">Long. (m)</th><th style="width:78px">Larg. (m)</th><th style="width:70px">X (m)</th><th style="width:70px">Y (m)</th><th style="width:124px"></th></tr></thead><tbody>';
     if (!CONF.batiments.length) h += '<tr><td colspan="7" style="color:var(--texte-faible);padding:8px 4px">Aucun bâtiment pour l\'instant.</td></tr>';
     CONF.batiments.forEach(function (b, bi) {
@@ -880,7 +881,9 @@
       h += '<tr class="l-tete"><td class="ind">Niveaux de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td>Haut. (m)</td><td>Alt. (m)</td><td>Hors maq.</td><td colspan="2">' +
         (autres ? '<select class="champ" data-copie="' + bi + '" style="height:26px;font-size:12px"><option value="">Reprendre de…</option>' + autres + "</select>" : "") + "</td></tr>";
       if (!b.niveaux.length) h += '<tr class="l-niv"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucun niveau : « + » sur la ligne du bâtiment.</td></tr>';
-      b.niveaux.forEach(function (n, i) {
+      // affichés comme dans le bâtiment : le plus haut en haut, le plus bas en bas (la liste reste rangée du bas vers le haut)
+      b.niveaux.map(function (n, i) { return [n, i]; }).reverse().forEach(function (x) {
+        var n = x[0], i = x[1];
         h += '<tr class="l-niv">' + ch("niv", bi, i, "c", n.c, { mono: 1, sty: "padding-left:22px" }) + ch("niv", bi, i, "lib", n.lib) + ch("niv", bi, i, "h", n.h, { nb: 1, mono: 1, ph: "3" }) + ch("niv", bi, i, "alt", n.alt, { nb: 1, mono: 1 }) +
           ch("niv", bi, i, "fictif", n.fictif, { cas: 1 }) + "<td></td>" + act("niv", bi, i) + "</tr>";
       });
