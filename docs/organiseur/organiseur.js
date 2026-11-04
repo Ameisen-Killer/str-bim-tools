@@ -58,7 +58,25 @@
       r.onsuccess = function () { var t = r.result.transaction("kv", mode), q = f(t.objectStore("kv")); t.oncomplete = function () { ok(q && q.result); }; t.onerror = function () { ko(t.error); }; };
     });
   }
-  function contenuFichier() { var d = litLocal(); return JSON.stringify({ format: "str-bim-tools/organiseur-fichier", version: 1, enregistre_le: new Date().toISOString(), chantiers: d.chantiers, reservations: d.reservations }, null, 2); }
+  // un fichier = un chantier : sa configuration complète et ses réservations
+  function documentJson() {
+    var d = litLocal(), c = d.chantiers[0] || null;
+    return { format: "str-bim-tools/organiseur", version: 2, enregistre_le: new Date().toISOString(),
+      chantier: c ? { id: c.id, code: c.code, nom: c.nom, config: c.config, cree_le: c.cree_le, modifie_le: c.modifie_le } : null,
+      reservations: d.reservations.map(function (r) { var o = copie(r); delete o.chantier; return o; }) };
+  }
+  function contenuFichier() { return JSON.stringify(documentJson(), null, 2); }
+  // lit un fichier de l'organiseur (un chantier ; un ancien fichier à plusieurs chantiers donne le premier)
+  function versDocument(j) {
+    var c, res;
+    if (j && j.chantier && j.chantier.code) {
+      c = { id: j.chantier.id || nouvelId(), code: U(j.chantier.code), nom: j.chantier.nom || "", config: j.chantier.config || {}, cree_le: j.chantier.cree_le || new Date().toISOString(), modifie_le: j.chantier.modifie_le || new Date().toISOString() };
+      res = j.reservations || [];
+    } else if (j && Array.isArray(j.chantiers) && j.chantiers.length) {
+      c = j.chantiers[0]; res = (j.reservations || []).filter(function (r) { return r.chantier === c.id; });
+    } else throw new Error("Ce fichier n'est pas un fichier de l'organiseur.");
+    return { chantiers: [c], reservations: res.map(function (r) { return Object.assign({}, r, { chantier: c.id, id: r.id || nouvelId() }); }) };
+  }
   function ecritFichier() {
     if (!FI.h || FI.droit !== "granted") return Promise.resolve();
     return FI.h.createWritable().then(function (w) { return w.write(contenuFichier()).then(function () { return w.close(); }); }).then(function () {
@@ -74,19 +92,27 @@
     b.title = !FI.h ? "Aucun fichier lié : les données ne sont que dans ce navigateur" : "Lié à " + FI.h.name + (FI.err ? " (" + FI.err + ")" : "");
   }
   function lie(h, lire) {
-    return h.requestPermission({ mode: "readwrite" }).then(function (p) {
-      if (p !== "granted") throw new Error("Accès au fichier refusé.");
+    // si Chrome ne donne pas tout de suite le droit d'écrire, le fichier est quand même lu ;
+    // le bouton du fichier propose alors « cliquer pour reprendre »
+    return h.requestPermission({ mode: "readwrite" }).catch(function () { return "prompt"; }).then(function (p) {
+      if (p !== "granted" && !lire) throw new Error("Accès au fichier refusé.");
       FI.h = h; FI.droit = p; FI.err = "";
       idb("readwrite", function (s) { return s.put(h, "fichier"); }).catch(function () {});
       if (!lire) return ecritFichier();
       return h.getFile().then(function (f) { return f.text(); }).then(function (t) {
-        var j = t.trim() ? JSON.parse(t) : null;
-        if (j && Array.isArray(j.chantiers) && Array.isArray(j.reservations)) { ecritLocal({ chantiers: j.chantiers, reservations: j.reservations }); toast(j.chantiers.length + " chantier(s) lus dans " + h.name + "."); return charge(); }
-        if (j && j.chantier) throw new Error("Ce fichier est l'export d'un seul chantier : ouvre-le avec « Importer ».");
-        if (j) throw new Error("Ce fichier n'est pas un fichier de l'organiseur.");
-        return ecritFichier();
+        if (!t.trim()) return ecritFichier();
+        var doc = versDocument(JSON.parse(t));
+        ecritLocal(doc); toast("Chantier " + doc.chantiers[0].code + " ouvert depuis " + h.name + "."); return charge();
       });
-    }).then(majFichier).catch(function (e) { FI.err = ""; majFichier(); toast(e.message, 5000); });
+    }).then(majFichier).catch(function (e) { if (lire) delie(); FI.err = ""; majFichier(); toast(e.message, 5000); });
+  }
+  function delie() { FI = { h: null, droit: "", quand: "", err: "" }; idb("readwrite", function (s) { return s.delete("fichier"); }).catch(function () {}); majFichier(); }
+  function sansFichierConfirme() { return !CUR || FI.h || window.confirm("Le chantier " + CUR.code + " n'est enregistré dans aucun fichier : il sera remplacé. Continuer ?"); }
+  // ouvrir un autre chantier : avec lien au fichier si le navigateur le permet, sinon simple lecture
+  function ouvrirFichier() {
+    if (!sansFichierConfirme()) return;
+    if (FI_OK) { window.showOpenFilePicker({ types: TYPES_FI, multiple: false }).then(function (l) { delie(); return lie(l[0], true); }).catch(function () {}); return; }
+    $("#f-import").value = ""; $("#f-import").click();
   }
   var TYPES_FI = [{ description: "Organiseur (JSON)", accept: { "application/json": [".json"] } }];
   function fenFichier() {
@@ -94,12 +120,13 @@
     if (!LOCAL) { c.innerHTML = '<p class="texte">L\'outil travaille sur la base partagée (adresse avec ?base=1) : pas de fichier à lier. Ajoute ?base=0 à l\'adresse pour revenir au fichier.</p>'; p.innerHTML = '<span class="esp"></span><button class="btn" data-fi="x">Fermer</button>'; }
     else if (!FI_OK) { c.innerHTML = '<p class="texte">Ce navigateur ne sait pas garder un fichier ouvert (il faut Chrome ou Edge sur ordinateur). Tes données restent dans ce navigateur : sauve-les avec <b>JSON</b> et rouvre-les avec <b>Importer</b>.</p>'; p.innerHTML = '<span class="esp"></span><button class="btn" data-fi="x">Fermer</button>'; }
     else {
-      c.innerHTML = '<p class="texte">' + (FI.h ? "Lié à <b>" + esc(FI.h.name) + "</b>" + (FI.droit === "granted" ? " : chaque changement y est enregistré tout de suite." : " : le navigateur demande ton accord pour y écrire à nouveau.") :
-        "Aucun fichier lié : tes chantiers ne sont que dans ce navigateur.") + "</p>" +
-        '<p class="texte">Le fichier contient toute la configuration de tous tes chantiers (référentiels, trigrammes, plages, bâtiments et niveaux) et leurs réservations. « Nouveau fichier » le crée et le garde à jour. « Ouvrir un fichier » charge un .json de l\'organiseur (il remplace ce qui est dans ce navigateur) puis le garde à jour. Mets-le dans un dossier synchronisé (OneDrive…) pour le retrouver sur un autre poste.</p>';
+      c.innerHTML = '<p class="texte">' + (FI.h ? "Le chantier " + esc(CUR ? CUR.code : "") + " est lié à <b>" + esc(FI.h.name) + "</b>" + (FI.droit === "granted" ? " : chaque changement y est enregistré tout de suite." : " : le navigateur demande ton accord pour y écrire à nouveau.") :
+        CUR ? "Le chantier " + esc(CUR.code) + " n'est enregistré dans aucun fichier : il n'est que dans ce navigateur." : "Aucun chantier ouvert.") + "</p>" +
+        '<p class="texte">Un fichier = un chantier, avec toute sa configuration (référentiels, trigrammes, plages, bâtiments et niveaux) et ses réservations. Mets tes fichiers dans un dossier synchronisé (OneDrive…) pour les retrouver sur un autre poste.</p>';
       p.innerHTML = (FI.h ? '<button class="btn danger" data-fi="delie">Délier</button>' : "") + '<span class="esp"></span>' +
         (FI.h && FI.droit !== "granted" ? '<button class="btn accent" data-fi="reprendre">Reprendre ' + esc(FI.h.name) + "</button>" : "") +
-        '<button class="btn" data-fi="ouvrir">Ouvrir un fichier…</button><button class="btn' + (FI.h ? "" : " accent") + '" data-fi="nouveau">Nouveau fichier…</button>';
+        '<button class="btn" data-fi="nveau">Nouveau chantier…</button><button class="btn" data-fi="ouvrir">Ouvrir…</button>' +
+        (CUR ? '<button class="btn' + (FI.h ? "" : " accent") + '" data-fi="sous">Enregistrer sous…</button>' : "");
     }
     $("#voile-fi").hidden = false;
   }
@@ -111,14 +138,11 @@
   $("#fi-pied").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-fi]"); if (!b) return; var a = b.dataset.fi;
     $("#voile-fi").hidden = true;
-    if (a === "nouveau") window.showSaveFilePicker({ suggestedName: "organiseur.json", types: TYPES_FI }).then(function (h) { return lie(h, false); }).catch(function () {});
-    else if (a === "ouvrir") {
-      var d = litLocal();
-      if (d.chantiers.length && !window.confirm("Le fichier ouvert remplacera les chantiers de ce navigateur. Continuer ?")) return;
-      window.showOpenFilePicker({ types: TYPES_FI, multiple: false }).then(function (l) { return lie(l[0], true); }).catch(function () {});
-    }
+    if (a === "sous") window.showSaveFilePicker({ suggestedName: (CUR ? CUR.code : "chantier") + ".json", types: TYPES_FI }).then(function (h) { return lie(h, false); }).catch(function () {});
+    else if (a === "ouvrir") ouvrirFichier();
+    else if (a === "nveau") ouvreNouveau();
     else if (a === "reprendre") lie(FI.h, false);
-    else if (a === "delie") { FI = { h: null, droit: "", quand: "", err: "" }; idb("readwrite", function (s) { return s.delete("fichier"); }).catch(function () {}); majFichier(); toast("Fichier délié : les données restent dans ce navigateur."); rechargeDonnees(true); }
+    else if (a === "delie") { delie(); toast("Fichier délié : le chantier reste dans ce navigateur."); rechargeDonnees(true); }
   });
   if (LOCAL && FI_OK) idb("readonly", function (s) { return s.get("fichier"); }).then(function (h) {
     if (!h) return; FI.h = h;
@@ -313,6 +337,12 @@
     return appel("doc_chantiers?select=*&order=code").then(function (l) {
       CH = l || [];
       var id = lsGet("org.chantier"), c = CH.filter(function (x) { return x.id === id; })[0] || CH[0] || null;
+      // mode fichier : un seul chantier ouvert ; les autres d'avant le 04.11.2026 sont mis de côté (org.anciens)
+      if (LOCAL && CH.length > 1) {
+        var d = litLocal(); lsSet("org.anciens", JSON.stringify(d));
+        try { localStorage.setItem("org.donnees", JSON.stringify({ chantiers: [c], reservations: d.reservations.filter(function (r) { return r.chantier === c.id; }) })); } catch (e) {}
+        CH = [c]; toast("Un chantier par fichier : " + c.code + " reste ouvert, les autres sont mis de côté.", 5000);
+      }
       remplitChantiers(c);
       if (!c) { CUR = null; ecranVide(); etat("Aucun chantier", "ok"); return; }
       return ouvre(c);
@@ -322,6 +352,9 @@
     });
   }
   function remplitChantiers(c) {
+    $("#chantier").hidden = LOCAL; $("#ch-nom").hidden = !LOCAL; $("#lib-import").textContent = LOCAL ? "Ouvrir" : "Importer";
+    $("#b-import").title = LOCAL ? "Ouvrir le fichier JSON d'un chantier" : "Importer un chantier depuis un JSON"; $("#b-json").title = LOCAL ? "Télécharger une copie du fichier du chantier" : "Exporter le chantier en JSON";
+    $("#ch-nom").textContent = c ? c.code + (c.nom ? " · " + c.nom : "") : "";
     $("#chantier").innerHTML = CH.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.code + (x.nom ? " · " + x.nom : "")) + "</option>"; }).join("") +
       '<option value="+">+ Nouveau chantier…</option>';
     if (c) $("#chantier").value = c.id;
@@ -357,13 +390,13 @@
     ["plages", "res", "ref"].forEach(function (v) { $("#v-" + v).hidden = true; });
     $("#v-vide").hidden = false;
     $("#vide").innerHTML = "<h2>" + esc(titre || "Aucun chantier pour l'instant") + "</h2><p>" +
-      esc(texte || "Crée un premier chantier : vide, pour bâtir toi-même tes référentiels et tes plages, ou prérempli avec la numérotation du Fairmont. Tu peux aussi ouvrir un JSON exporté avec « Importer ».") + "</p>" +
+      esc(texte || (LOCAL ? "Ouvre le fichier JSON d'un chantier, ou crée un chantier : vide, pour bâtir toi-même tes référentiels et tes plages, ou prérempli avec la numérotation du Fairmont. Un chantier = un fichier." : "Crée un premier chantier : vide, ou prérempli avec la numérotation du Fairmont.")) + "</p>" +
       (manque ? '<p>Une fois la migration passée, recharge la page (Ctrl+F5).</p>' :
-        '<div class="actions"><button class="btn accent" data-m="fgh">Chantier Fairmont prérempli</button><button class="btn" data-m="vide">Chantier vide</button></div>');
+        '<div class="actions">' + (LOCAL ? '<button class="btn accent" data-m="ouvrir">Ouvrir un fichier…</button>' : "") + '<button class="btn' + (LOCAL ? "" : " accent") + '" data-m="fgh">Chantier Fairmont prérempli</button><button class="btn" data-m="vide">Chantier vide</button></div>');
   }
   $("#vide").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-m]"); if (!b) return;
-    if (b.dataset.m === "fgh") creeChantier("FGH", "Hôtel Fairmont Genève", "fgh"); else ouvreNouveau();
+    if (b.dataset.m === "ouvrir") ouvrirFichier(); else ouvreNouveau(b.dataset.m === "fgh");
   });
 
   // ------------------------------------------------------------------ chantiers
@@ -384,16 +417,34 @@
       $("#v-vide").hidden = true; remplitChantiers(c); toast("Chantier " + c.code + " créé."); VUE = modele === "vide" ? "ref" : "plages"; return ouvre(c);
     }).catch(function (e) { toast(e.message, 5000); });
   }
-  function ouvreNouveau() {
+  function ouvreNouveau(fgh) {
     var F = $("#fc"); F.reset();
     $("#fc-modele").innerHTML = '<option value="vide">Rien (référentiels et plages à créer)</option><option value="fgh">Numérotation du Fairmont (préremplie)</option>' +
       CH.map(function (x) { return '<option value="' + esc(x.id) + '">Copie des référentiels et plages de ' + esc(x.code) + "</option>"; }).join("");
+    if (fgh) { F.elements.code.value = "FGH"; F.elements.nom.value = "Hôtel Fairmont Genève"; F.elements.modele.value = "fgh"; }
     $("#voile-ch").hidden = false; setTimeout(function () { F.elements.code.focus(); }, 30);
   }
   $("#fc").addEventListener("submit", function (e) {
-    e.preventDefault(); var F = this;
-    if (CH.some(function (x) { return U(x.code) === U(F.elements.code.value); })) { toast("Ce code de chantier existe déjà."); return; }
-    $("#voile-ch").hidden = true; creeChantier(F.elements.code.value, F.elements.nom.value.trim(), F.elements.modele.value);
+    e.preventDefault(); var F = this, code = U(F.elements.code.value), nom = F.elements.nom.value.trim(), mod = F.elements.modele.value;
+    if (!LOCAL) {
+      if (CH.some(function (x) { return U(x.code) === code; })) { toast("Ce code de chantier existe déjà."); return; }
+      $("#voile-ch").hidden = true; creeChantier(code, nom, mod); return;
+    }
+    // mode fichier : le nouveau chantier remplace celui qui est ouvert et part dans son propre fichier
+    if (!sansFichierConfirme()) return;
+    $("#voile-ch").hidden = true;
+    var choix = FI_OK ? window.showSaveFilePicker({ suggestedName: code + ".json", types: TYPES_FI }) : Promise.resolve(null);
+    choix.then(function (h) {
+      delie();
+      var garde = CH.slice();
+      try { localStorage.setItem("org.donnees", JSON.stringify({ chantiers: [], reservations: [] })); } catch (er) {}
+      CH = garde;   // pour « copie des référentiels de… »
+      return creeChantier(code, nom, mod).then(function () {
+        CH = CH.filter(function (x) { return x.id === (CUR && CUR.id); });
+        if (h) return lie(h, false);
+        toast("Chantier créé : sauve-le avec le bouton JSON.", 5000);
+      });
+    }).catch(function () { toast("Création annulée."); });
   });
   $("#fc-fermer").addEventListener("click", function () { $("#voile-ch").hidden = true; if (CUR) $("#chantier").value = CUR.id; });
   $("#chantier").addEventListener("change", function () {
@@ -862,6 +913,7 @@
   // ------------------------------------------------------------------ JSON
   $("#b-json").addEventListener("click", function () {
     if (!CUR) { toast("Aucun chantier à exporter."); return; }
+    if (LOCAL) { telecharge(CUR.code + ".json", documentJson()); if (!FI.h) { lsSet("org.exporte", new Date().toISOString()); setTimeout(function () { rechargeDonnees(true); }, 50); } return; }
     var d = new Date(), j = { format: "str-bim-tools/organiseur", version: 1, exporte_le: d.toISOString(),
       chantier: { code: CUR.code, nom: CUR.nom, config: CONF },
       reservations: RES.map(function (r) { var o = copie(r); delete o.chantier; return o; }) };
@@ -898,15 +950,12 @@
   }
   $("#fr-revit").addEventListener("click", function () { if (EDITE) exportRevit([EDITE], pad(EDITE.de) + (EDITE.a > EDITE.de ? "-" + pad(EDITE.a) : "")); });
   $("#r-revit").addEventListener("click", function () { exportRevit(VUE_RES, "selection"); });
-  $("#b-import").addEventListener("click", function () { $("#f-import").value = ""; $("#f-import").click(); });
+  $("#b-import").addEventListener("click", function () { if (LOCAL) { ouvrirFichier(); return; } $("#f-import").value = ""; $("#f-import").click(); });
   $("#f-import").addEventListener("change", function () {
     var f = this.files[0]; if (!f) return;
     f.text().then(function (t) {
       var j = JSON.parse(t);
-      if (j && Array.isArray(j.chantiers) && Array.isArray(j.reservations) && LOCAL) {
-        if (litLocal().chantiers.length && !window.confirm("Ce fichier contient " + j.chantiers.length + " chantier(s) : il remplacera ceux de ce navigateur. Continuer ?")) return;
-        ecritLocal({ chantiers: j.chantiers, reservations: j.reservations }); toast(j.chantiers.length + " chantier(s) chargés."); return charge();
-      }
+      if (LOCAL) { var doc = versDocument(j); delie(); ecritLocal(doc); toast("Chantier " + doc.chantiers[0].code + " ouvert (sans lien au fichier : pense au bouton JSON)."); return charge(); }
       if (!j || !j.chantier || !j.chantier.code) throw new Error("Ce fichier n'est pas un export de l'organiseur.");
       var code = U(j.chantier.code), ex = CH.filter(function (x) { return U(x.code) === code; })[0];
       if (ex && !window.confirm("Le chantier " + code + " existe : remplacer ses référentiels et plages par ceux du fichier, et ajouter ou mettre à jour ses réservations ?")) return;
