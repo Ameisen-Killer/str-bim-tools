@@ -881,21 +881,21 @@
         ' data-l="' + l + '" data-b="' + b + '" data-i="' + i + '" data-c="' + c + '" value="' + esc(v == null ? "" : v) + '"' + (o.ph ? ' placeholder="' + o.ph + '"' : "") + "></td>";
     }
     function act(l, b, i) {
-      return '<td class="x" style="white-space:nowrap">' + (l === "batiments" ? '<button class="mini plus" data-ajout="niv" data-b="' + b + '" title="Ajouter un niveau à ce bâtiment">+</button>' : "") +
+      return '<td class="x" style="white-space:nowrap">' + 
         // pour un niveau, « monter » = passer au-dessus, donc plus loin dans la liste
         '<button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|1" : "|-1") + '" data-b="' + b + '" title="Monter">↑</button><button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|-1" : "|1") + '" data-b="' + b + '" title="Descendre">↓</button>' +
         '<button class="mini" data-sup="' + l + "|" + i + '" data-b="' + b + '" title="' + (l === "batiments" ? "Retirer le bâtiment et ses niveaux" : "Retirer le niveau") + '">×</button></td>';
     }
-    var h = '<div class="bloc"><h3>Bâtiments, niveaux et zones</h3><p>Chaque bâtiment, puis ses niveaux et ses zones. Niveaux rangés comme dans le bâtiment : le plus haut en haut, le plus bas en bas (« + » sur la ligne du bâtiment ajoute un niveau au-dessus). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
+    var h = '<div class="bloc"><h3>Bâtiments, niveaux et zones</h3><p>Chaque bâtiment, puis ses niveaux et ses zones. Niveaux rangés comme dans le bâtiment : le plus haut en haut, le plus bas en bas (« + Niveau » en ajoute un au-dessus, « + Zone » une zone). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
       '<table class="t-bat"><thead><tr><th style="width:96px">Code</th><th>Nom</th><th style="width:78px">Long. (m)</th><th style="width:78px">Larg. (m)</th><th style="width:70px">X (m)</th><th style="width:70px">Y (m)</th><th style="width:124px"></th></tr></thead><tbody>';
     if (!CONF.batiments.length) h += '<tr><td colspan="7" style="color:var(--texte-faible);padding:8px 4px">Aucun bâtiment pour l\'instant.</td></tr>';
     CONF.batiments.forEach(function (b, bi) {
       h += '<tr class="l-bat">' + ch("batiments", bi, bi, "c", b.c, { mono: 1 }) + ch("batiments", bi, bi, "lib", b.lib) + ch("batiments", bi, bi, "lg", b.lg, { nb: 1, mono: 1 }) + ch("batiments", bi, bi, "la", b.la, { nb: 1, mono: 1 }) +
         ch("batiments", bi, bi, "x", b.x, { nb: 1, mono: 1 }) + ch("batiments", bi, bi, "y", b.y, { nb: 1, mono: 1 }) + act("batiments", bi, bi) + "</tr>";
       var autres = CONF.batiments.map(function (o, k) { return k === bi || !o.niveaux.length ? "" : '<option value="' + k + '">' + esc((o.c || "?") + " (" + o.niveaux.length + " niv.)") + "</option>"; }).join("");
-      h += '<tr class="l-tete"><td class="ind">Niveaux de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td>Haut. (m)</td><td>Alt. (m)</td><td>Hors maq.</td><td colspan="2">' +
+      h += '<tr class="l-tete"><td class="ind">Niveaux de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td>Haut. (m)</td><td>Alt. (m)</td><td>Hors maq.</td><td colspan="2" style="white-space:nowrap"><button class="btn ajout-l" data-ajout="niv" data-b="' + bi + '" title="Ajouter un niveau au-dessus des autres">+ Niveau</button> ' +
         (autres ? '<select class="champ" data-copie="' + bi + '" style="height:26px;font-size:12px"><option value="">Reprendre de…</option>' + autres + "</select>" : "") + "</td></tr>";
-      if (!b.niveaux.length) h += '<tr class="l-niv"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucun niveau : « + » sur la ligne du bâtiment.</td></tr>';
+      if (!b.niveaux.length) h += '<tr class="l-niv"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucun niveau : bouton « + Niveau » ci-dessus.</td></tr>';
       // affichés comme dans le bâtiment : le plus haut en haut, le plus bas en bas (la liste reste rangée du bas vers le haut)
       b.niveaux.map(function (n, i) { return [n, i]; }).reverse().forEach(function (x) {
         var n = x[0], i = x[1];
@@ -903,8 +903,8 @@
           ch("niv", bi, i, "fictif", n.fictif, { cas: 1 }) + "<td></td>" + act("niv", bi, i) + "</tr>";
       });
       // zones du bâtiment ; une zone qui en regroupe d'autres liste leurs codes (* = toutes)
-      h += '<tr class="l-tete"><td class="ind">Zones de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td colspan="4">Regroupe (codes de zones ; * = toutes ; vide = zone simple)</td><td><button class="mini plus" data-ajout="zon" data-b="' + bi + '" title="Ajouter une zone à ce bâtiment">+</button></td></tr>';
-      if (!b.zones.length) h += '<tr class="l-niv l-zon"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucune zone : « + » ci-dessus.</td></tr>';
+      h += '<tr class="l-tete"><td class="ind">Zones de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td colspan="4">Regroupe (codes de zones ; * = toutes ; vide = zone simple)</td><td><button class="btn ajout-l" data-ajout="zon" data-b="' + bi + '" title="Ajouter une zone à ce bâtiment">+ Zone</button></td></tr>';
+      if (!b.zones.length) h += '<tr class="l-niv l-zon"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucune zone : bouton « + Zone » ci-dessus.</td></tr>';
       b.zones.forEach(function (z, i) {
         var mal = (z.regroupe && z.regroupe !== "*") ? z.regroupe.split(/[\s,;]+/).filter(function (k) { return k && !b.zones.some(function (y) { return U(y.c) === U(k); }); }) : [];
         h += '<tr class="l-niv l-zon">' + ch("zon", bi, i, "c", z.c, { mono: 1, sty: "padding-left:22px" }) + ch("zon", bi, i, "lib", z.lib) +
