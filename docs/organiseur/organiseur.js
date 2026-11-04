@@ -505,7 +505,7 @@
   // ---------- plages
   function stats(p, esp) {
     var occ = occupation(esp), e = 0, r = 0, tot = Math.max(0, p.a - p.de + 1);
-    for (var n = +p.de; n <= +p.a; n++) { var o = occ[n]; if (!o) continue; if (o.pl.length) e++; else if (o.r) r++; }
+    for (var n = +p.de; n <= +p.a; n++) { var o = occ[n]; if (!o) continue; if (o.pl.length || o.r.statut === "emis") e++; else if (o.r) r++; }
     return { e: e, r: r, tot: tot, libre: tot - e - r };
   }
   // couleur d'une plage : une teinte par lot, les sous-plages en variantes plus claires ou plus foncées
@@ -533,7 +533,7 @@
     L.filter(function (x) { return !(x.p.sous || []).length; }).forEach(function (x) {
       var s = stats(x.p, "*");
       h += '<button type="button" class="feuille' + (dansSel(x.cle) && x.cle !== SEL ? " dans" : "") + '" data-k="' + x.cle + '" aria-current="' + (SEL === x.cle) + '" style="left:calc(' + pc(+x.p.de).toFixed(3) + "% + 1px);width:calc(" + ((+x.p.a - +x.p.de + 1) / tot * 100).toFixed(3) + "% - 2px);" + vars(x.cle) + '" title="' +
-        esc(x.chemin + " · " + pad(x.p.de) + "–" + pad(x.p.a) + " · " + s.e + " émis, " + s.r + " réservé(s), " + s.libre + " libre(s)") + '"><i class="e" style="flex:' + s.e + '"></i><i class="r" style="flex:' + s.r + '"></i></button>';
+        esc(x.chemin + " · " + pad(x.p.de) + "–" + pad(x.p.a) + " · " + s.e + " émis, " + s.r + " réservé(s), " + s.libre + " libre(s)") + '"><i class="e" style="flex:' + s.e + '"></i><i class="r" style="flex:' + s.r + '"></i><i style="flex:' + s.libre + '"></i></button>';
     });
     h += '</div><div class="lots">';
     hauts.forEach(function (x) {
@@ -585,6 +585,7 @@
     else for (var n = +p.de; n <= +p.a; n++) {
       var o = occ[n], c = "case", t = pad(n) + " · libre";
       if (o && o.pl.length) { c += o.r ? " e" : " h"; t = pad(n) + " · émis : " + o.pl.map(function (q) { return q.type + " ind " + q.indice + " " + (q.titre || ""); }).join(" / ") + (o.r ? "" : " (sans réservation)"); }
+      else if (o && o.r && o.r.statut === "emis") { c += " e"; t = pad(n) + " · émis (marqué à la main) : " + o.r.type + " " + (o.r.titre || ""); }
       else if (o && o.r) { c += " r"; t = pad(n) + " · réservé : " + o.r.type + " " + (o.r.titre || "") + (o.r.par ? " (" + o.r.par + ")" : ""); }
       cases += '<button type="button" class="' + c + '" data-n="' + n + '" title="' + esc(t) + '">' + pad(n).slice(-3) + "</button>";
     }
