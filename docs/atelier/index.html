@@ -73,7 +73,7 @@ a{color:inherit;text-decoration:none}
 .bureau{position:fixed;inset:0 0 48px 0;padding:12px 8px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,104px);grid-auto-columns:92px;gap:4px;align-content:start}
 .icone{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px 4px;border:1px solid transparent;border-radius:4px;color:#fff;text-align:center;cursor:default;outline:none;
   text-shadow:0 1px 2px rgba(0,0,0,.6),0 0 6px rgba(0,0,0,.35);font-size:12px;line-height:16px;opacity:0;transform:translateY(6px);animation:apparait .45s cubic-bezier(.1,.9,.2,1) forwards}
-.icone:nth-child(2){animation-delay:.07s}.icone:nth-child(3){animation-delay:.14s}.icone:nth-child(4){animation-delay:.21s}
+.icone:nth-child(2){animation-delay:.07s}.icone:nth-child(3){animation-delay:.14s}.icone:nth-child(4){animation-delay:.21s}.icone:nth-child(5){animation-delay:.28s}
 @keyframes apparait{to{opacity:1;transform:none}}
 .icone .tuile{width:60px;height:60px;border-radius:15px;display:grid;place-items:center;background:var(--tuile);border:1px solid var(--tuile-bord);box-shadow:0 4px 12px rgba(0,0,0,.25);
   -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);transition:transform .18s cubic-bezier(.3,1.6,.5,1)}
@@ -226,7 +226,7 @@ a{color:inherit;text-decoration:none}
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.7.0";
+  var VERSION = "1.8.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -247,8 +247,16 @@ a{color:inherit;text-decoration:none}
     '<rect x="4" y="7" width="40" height="28" rx="3" fill="url(#d1)"/><path d="M19 35h10l2 6H17z" fill="#8A8A94"/><rect x="14" y="41" width="20" height="2.5" rx="1.2" fill="#8A8A94"/>' +
     '<rect x="10" y="22" width="5" height="9" rx="1" fill="url(#d2)"/><rect x="18" y="16" width="5" height="15" rx="1" fill="url(#d2)"/><rect x="26" y="19" width="5" height="12" rx="1" fill="url(#d2)"/><rect x="34" y="12" width="5" height="19" rx="1" fill="#6CCB5F"/></svg>';
 
+  // Organiseur de documents : classeur à onglets numérotés
+  DESSINS.doc = '<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="e1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD58A"/><stop offset="1" stop-color="#F0A33A"/></linearGradient><linearGradient id="e2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E4E8EE"/></linearGradient></defs>' +
+    '<path d="M5 12a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" fill="url(#e1)"/>' +
+    '<rect x="11" y="17" width="26" height="20" rx="2" fill="url(#e2)"/><rect x="31" y="14" width="7" height="6" rx="1.5" fill="#C9572B"/><rect x="31" y="22" width="7" height="6" rx="1.5" fill="#4FA35A"/><rect x="31" y="30" width="7" height="6" rx="1.5" fill="#2F6496"/>' +
+    '<path d="M15 23h12M15 27h12M15 31h8" stroke="#6B7685" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<text x="15" y="21" font-family="Cascadia Mono,Consolas,monospace" font-size="4.6" font-weight="700" fill="#A35200">0100</text></svg>';
+
   var APPS = [
     {id:"fgh", nom:"Validateur réservations", court:"Réservations", href:"/fgh/rsv/", desc:"Valide les réservations FGH sur la maquette IFC, sans Revit."},
+    {id:"doc", nom:"Organiseur de documents", court:"Numéros", href:"/organiseur/", desc:"Numérote les documents d'un chantier et réserve des plages de numéros à l'avance."},
     {id:"ifc", nom:"Visionneuse IFC", court:"IFC", href:"/ifc/", desc:"Ouvre, explore et modifie une maquette IFC dans le navigateur."},
     {id:"dxf", nom:"Visionneuse DXF", court:"DXF / DWG", href:"/dxf/", desc:"Ouvre un plan DXF ou DWG : calques, propriétés, mesure."},
     {id:"bench", nom:"Bench", court:"Bench", href:"/bench/", desc:"Compare les processeurs et cartes graphiques des postes de travail."}

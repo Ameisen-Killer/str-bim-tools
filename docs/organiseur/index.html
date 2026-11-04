@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Organiseur de documents · STR Bim Tools</title>
+<meta name="description" content="Numérotation des documents d'un chantier : disciplines, phases, types, bâtiments, niveaux et zones, plages de numéros réservées à l'avance.">
+<meta name="theme-color" content="#202020">
+<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("org.theme")||"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FFB454'/%3E%3Cpath d='M8 9h16M8 16h16M8 23h10' stroke='%23241503' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/polices/polices.css?v=4">
+<style>
+/* Habillage inspiré de Windows 11 (Fluent), le même que /dxf/, /ifc/ et /fgh/ ; accent ambre */
+:root{
+  color-scheme:dark;
+  --encre:255,255,255;
+  --or-rvb:255,180,84;--or:#FFB454;--sur-accent:#241503;
+  --mica:#202020;--couche:#272727;--couche-2:#2D2D2D;
+  --controle:rgba(255,255,255,.061);--controle-survol:rgba(255,255,255,.084);--controle-appui:rgba(255,255,255,.033);
+  --bord-controle:rgba(255,255,255,.07);--bord-bas:rgba(255,255,255,.035);--ligne:rgba(255,255,255,.083);
+  --texte:#FFFFFF;--texte-doux:rgba(255,255,255,.786);--texte-faible:rgba(255,255,255,.545);
+  --ombre:0 8px 16px rgba(0,0,0,.26),0 0 0 1px rgba(0,0,0,.2);
+  --rouge:#FF99A4;--vert:#6CCB5F;--bleu:#8DB3E2;
+  --c-libre:rgba(255,255,255,.07);--c-res:#C98A2E;--c-emis:#4FA35A;--c-hors:#7A7A85;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"IBM Plex Mono",ui-monospace,monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+  --titre:"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,-apple-system,"Inter Tight",sans-serif;
+  --haut:48px;
+}
+:root[data-theme="clair"]{
+  color-scheme:light;
+  --encre:0,0,0;
+  --or-rvb:163,82,0;--or:#A35200;--sur-accent:#FFF;
+  --mica:#F3F3F3;--couche:#F9F9F9;--couche-2:#FFFFFF;
+  --controle:rgba(255,255,255,.7);--controle-survol:rgba(249,249,249,.5);--controle-appui:rgba(249,249,249,.3);
+  --bord-controle:rgba(0,0,0,.0578);--bord-bas:rgba(0,0,0,.1622);--ligne:rgba(0,0,0,.0803);
+  --texte:#1B1B1B;--texte-doux:rgba(0,0,0,.62);--texte-faible:rgba(0,0,0,.45);
+  --ombre:0 8px 16px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.06);
+  --rouge:#C42B1C;--vert:#0F7B0F;--bleu:#2F6496;
+  --c-libre:rgba(0,0,0,.06);--c-res:#E0A040;--c-emis:#3E9A4B;--c-hors:#9A9AA3;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--mica);color:var(--texte);font-family:var(--sans);font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+::selection{background:rgba(var(--or-rvb),.35)}
+.mono{font-family:var(--mono)}
+:focus-visible{outline:2px solid var(--texte);outline-offset:1px;border-radius:4px}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-thumb{background:rgba(var(--encre),.28);border:4px solid transparent;border-radius:8px;background-clip:padding-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- Barre ---------- */
+.barre{height:var(--haut);display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;white-space:nowrap;font-size:12px}
+.barre a{text-decoration:none;color:inherit}
+.retour{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:4px;color:var(--or)}
+.retour:hover{background:var(--controle-survol)}
+.retour svg{width:18px;height:18px}
+.barre .titre{font-size:14px}
+.barre .titre b{font-weight:600}
+.barre .esp{flex:1}
+.barre select{height:32px;max-width:34vw;padding:0 28px 0 10px;border-radius:4px;border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);background:var(--controle);cursor:pointer}
+.barre select option{background:var(--couche-2);color:var(--texte)}
+.etat{display:inline-flex;align-items:center;gap:6px;color:var(--texte-faible);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.etat::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--texte-faible)}
+.etat.ok::before{background:var(--vert)}.etat.ko{color:var(--rouge)}.etat.ko::before{background:var(--rouge)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);background:var(--controle);cursor:pointer;color:var(--texte);white-space:nowrap;text-decoration:none;font-size:13px}
+.btn:hover{background:var(--controle-survol)}
+.btn:active{background:var(--controle-appui);color:var(--texte-doux)}
+.btn svg{width:16px;height:16px;flex:none}
+.btn.accent{background:var(--or);color:var(--sur-accent);border-color:transparent;font-weight:600}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn.nu{background:transparent;border-color:transparent}
+.btn.nu:hover{background:var(--controle-survol)}
+.btn.danger{color:var(--rouge)}
+.btn:disabled{opacity:.45;cursor:default}
+@media (max-width:760px){.barre .titre,.barre .etat span{display:none}.barre .btn span{display:none}.barre select{max-width:46vw}}
+
+/* ---------- Onglets ---------- */
+.onglets{display:flex;gap:4px;padding:0 12px 8px;overflow-x:auto}
+.onglets button{height:32px;padding:0 14px;border:0;border-radius:4px;background:transparent;cursor:pointer;color:var(--texte-doux);position:relative}
+.onglets button:hover{background:var(--controle-survol);color:var(--texte)}
+.onglets button[aria-selected="true"]{color:var(--texte);font-weight:600}
+.onglets button[aria-selected="true"]::after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:3px;border-radius:2px;background:var(--or)}
+
+.vue{height:calc(100% - var(--haut) - 40px);padding:0 8px 8px;min-height:0}
+.panneau{min-height:0;display:flex;flex-direction:column;background:var(--couche);border:1px solid var(--ligne);border-radius:8px;overflow:hidden}
+.defile{flex:1;min-height:0;overflow:auto}
+.vide{padding:28px 18px;color:var(--texte-faible);max-width:640px}
+.vide h2{margin:0 0 6px;color:var(--texte);font-family:var(--titre);font-size:20px;font-weight:600}
+.vide p{margin:0 0 14px}
+.vide .actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- Plages ---------- */
+#v-plages{display:grid;grid-template-columns:340px 1fr;gap:8px}
+.arbre{padding:6px}
+.lot{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:4px;background:none;cursor:pointer}
+.lot:hover{background:var(--controle-survol)}
+.lot[aria-current="true"]{background:rgba(var(--or-rvb),.14)}
+.lot .nom{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lot.sous{padding-left:26px}
+.lot.sous .nom{font-weight:400}
+.lot .bornes{font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
+.lot .jauge{grid-column:1/-1;height:4px;border-radius:2px;background:var(--c-libre);display:flex;overflow:hidden}
+.jauge i{display:block;height:100%}
+.jauge .e{background:var(--c-emis)}.jauge .r{background:var(--c-res)}
+.lot small{grid-column:1/-1;font-size:11px;color:var(--texte-faible)}
+.titre-arbre{padding:10px 10px 4px;font-size:11px;font-weight:600;color:var(--texte-faible);text-transform:uppercase;letter-spacing:.06em}
+
+.detail{padding:14px 16px 18px}
+.detail h2{margin:0;font-family:var(--titre);font-size:20px;font-weight:600}
+.detail .sous-t{color:var(--texte-faible);font-size:12px;margin:2px 0 12px}
+.outils-d{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.outils-d select{height:32px;padding:0 10px;border-radius:4px;border:1px solid var(--bord-controle);background:var(--controle)}
+.outils-d select option{background:var(--couche-2);color:var(--texte)}
+.legende{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--texte-doux)}
+.legende span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:3px;margin:0 0 16px}
+.case{height:26px;border:0;border-radius:3px;background:var(--c-libre);font-family:var(--mono);font-size:10.5px;color:var(--texte-faible);cursor:pointer;padding:0}
+.case:hover{outline:1px solid var(--or)}
+.case.r{background:var(--c-res);color:#241503}
+.case.e{background:var(--c-emis);color:#fff}
+.case.h{background:var(--c-hors);color:#fff}
+.case.sel{outline:2px solid var(--texte)}
+.compte{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 12px;font-size:13px}
+.compte b{font-family:var(--titre);font-size:18px;margin-right:4px}
+
+/* ---------- Tableaux ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--couche);text-align:left;font-weight:600;font-size:12px;color:var(--texte-doux);padding:8px 10px;border-bottom:1px solid var(--ligne);white-space:nowrap;z-index:1}
+td{padding:7px 10px;border-bottom:1px solid var(--ligne);vertical-align:top}
+tr.clic{cursor:pointer}
+tr.clic:hover td{background:rgba(var(--or-rvb),.06)}
+td small{display:block;color:var(--texte-faible);font-size:11.5px}
+.statut{display:inline-block;padding:0 8px;border-radius:10px;font-size:11.5px;white-space:nowrap;background:rgba(var(--or-rvb),.18)}
+.statut.emis{background:rgba(79,163,90,.22)}
+.statut.annule{background:var(--controle);color:var(--texte-faible);text-decoration:line-through}
+.filtres{display:flex;flex-wrap:wrap;gap:8px;padding:10px;border-bottom:1px solid var(--ligne)}
+.champ{height:32px;background:var(--controle);border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);padding:5px 10px;border-radius:4px;outline:none;color:var(--texte);min-width:0}
+.champ:focus{background:var(--couche-2);border-bottom:2px solid var(--or);padding-bottom:4px}
+select.champ option{background:var(--couche-2);color:var(--texte)}
+.champ::placeholder{color:var(--texte-faible)}
+
+/* ---------- Référentiels ---------- */
+#v-ref .defile{padding:6px 16px 80px}
+.bloc{margin:14px 0 22px;max-width:980px}
+.bloc h3{margin:0 0 2px;font-family:var(--titre);font-size:16px;font-weight:600}
+.bloc > p{margin:0 0 8px;color:var(--texte-faible);font-size:12.5px}
+.bloc table td{padding:3px 4px;border:0}
+.bloc table th{position:static;background:none;padding:4px;border:0}
+.bloc .champ{width:100%;height:30px}
+.bloc td.x{width:34px}
+.bloc tr.sous td:first-child .champ{margin-left:22px;width:calc(100% - 22px)}
+.mini{width:30px;height:30px;border:0;border-radius:4px;background:none;color:var(--texte-faible);cursor:pointer;font-size:16px}
+.mini:hover{background:var(--controle-survol);color:var(--rouge)}
+.mini.plus:hover{color:var(--or)}
+.ajout{margin-top:4px}
+.ligne-ch{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.ligne-ch label{display:grid;gap:3px;font-size:12px;color:var(--texte-doux)}
+.ligne-ch .champ{width:100%}
+.apercu{margin-top:8px;font-family:var(--mono);font-size:13px;color:var(--or)}
+.enreg{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 16px;background:var(--couche);border-top:1px solid var(--ligne)}
+.enreg .msg{color:var(--texte-faible);font-size:12px}
+.enreg.sale .msg{color:var(--or)}
+
+.segs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:14px;margin:6px 0 8px;border:1px dashed var(--ligne);border-radius:8px;background:var(--controle)}
+.seg{position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-width:54px;padding:6px 12px 5px;border-radius:6px;background:var(--couche-2);border:1px solid var(--bord-controle);box-shadow:0 1px 2px rgba(0,0,0,.18);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.seg b{font-family:var(--mono);font-size:15px;color:var(--or)}
+.seg small{font-size:10.5px;color:var(--texte-faible)}
+.seg:hover{border-color:rgba(var(--or-rvb),.5)}
+.seg.tenue{cursor:grabbing;border-color:var(--or);box-shadow:0 6px 14px rgba(0,0,0,.3);transform:scale(1.06)}
+.seg-x{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;border:1px solid var(--ligne);background:var(--couche);color:var(--texte-faible);font-size:12px;line-height:14px;cursor:pointer;padding:0;display:none}
+.seg:hover .seg-x,.seg:focus-within .seg-x{display:block}
+@media (pointer:coarse){.seg-x{display:block}}
+.seg-x:hover{color:var(--rouge)}
+.sep-seg{font-family:var(--mono);font-size:16px;color:var(--texte-faible)}
+.ajout-segs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;color:var(--texte-faible)}
+.ajout-segs .btn{height:28px;padding:0 8px;font-size:12px}
+
+/* ---------- Fenêtre de réservation ---------- */
+.voile{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:50;padding:12px}
+.fen{width:min(640px,100%);max-height:calc(100% - 8px);overflow:auto;background:var(--couche-2);border-radius:8px;box-shadow:var(--ombre);border:1px solid var(--ligne)}
+.fen .tete{padding:18px 20px 6px}
+.fen h2{margin:0;font-family:var(--titre);font-size:20px;font-weight:600}
+.fen .corps{padding:8px 20px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.fen label{display:grid;gap:3px;font-size:12px;color:var(--texte-doux);min-width:0}
+.fen label.large{grid-column:1/-1}
+.fen .champ{width:100%}
+.fen textarea.champ{height:64px;resize:vertical}
+.fen .code{grid-column:1/-1;font-family:var(--mono);font-size:13px;color:var(--or);background:var(--controle);border-radius:4px;padding:8px 10px;word-break:break-all}
+.fen .avert{grid-column:1/-1;color:var(--rouge);font-size:12.5px}
+.fen .pied{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px;background:var(--couche);border-top:1px solid var(--ligne)}
+.fen .pied .esp{flex:1}
+@media (max-width:560px){.fen .corps{grid-template-columns:1fr}}
+
+.toast{position:fixed;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--couche-2);border:1px solid var(--ligne);box-shadow:var(--ombre);padding:9px 16px;border-radius:6px;transition:.2s;z-index:60;max-width:calc(100% - 24px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:860px){
+  body{overflow:auto}
+  .vue{height:auto}
+  #v-plages{grid-template-columns:1fr}
+  .panneau{max-height:none}
+  #v-plages .panneau:first-child .defile{max-height:42vh}
+  .masque-p{display:none}
+}
+</style>
+</head>
+<body>
+<header class="barre">
+  <a class="retour" href="/atelier/" title="Retour à l'atelier"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+  <span class="titre"><b>Organiseur</b> de documents</span>
+  <select id="chantier" title="Chantier" aria-label="Chantier"></select>
+  <span class="etat" id="etat"><span>Chargement…</span></span>
+  <span class="esp"></span>
+  <button class="btn nu" id="b-json" title="Exporter le chantier en JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>JSON</span></button>
+  <button class="btn nu" id="b-import" title="Importer un chantier depuis un JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2M4.5 5.5L8 2l3.5 3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Importer</span></button>
+  <button class="btn nu" id="b-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+  <button class="btn accent" id="b-reserver" title="Réserver des numéros"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Réserver</span></button>
+  <input type="file" id="f-import" accept=".json,application/json" hidden>
+</header>
+<nav class="onglets" role="tablist">
+  <button role="tab" data-v="plages" aria-selected="true">Plages</button>
+  <button role="tab" data-v="res" aria-selected="false">Réservations</button>
+  <button role="tab" data-v="ref" aria-selected="false">Référentiels du chantier</button>
+</nav>
+
+<main>
+  <section class="vue" id="v-vide" hidden><div class="panneau"><div class="vide" id="vide"></div></div></section>
+
+  <section class="vue" id="v-plages">
+    <div class="panneau"><div class="defile arbre" id="arbre"></div></div>
+    <div class="panneau"><div class="defile detail" id="detail"></div></div>
+  </section>
+
+  <section class="vue" id="v-res" hidden>
+    <div class="panneau" style="height:100%">
+      <div class="filtres">
+        <input class="champ" id="r-cherche" type="search" placeholder="Rechercher (titre, n°, qui…)" style="flex:1;min-width:180px">
+        <select class="champ" id="r-type"></select>
+        <select class="champ" id="r-statut">
+          <option value="">Toutes les réservations</option>
+          <option value="actif" selected>Actives (réservées et émises)</option>
+          <option value="reserve">Réservées</option>
+          <option value="emis">Émises</option>
+          <option value="annule">Annulées</option>
+        </select>
+        <button class="btn" id="r-revit" title="Une feuille par n° des réservations affichées (hors annulées), pour le script Revit">JSON Revit</button>
+      </div>
+      <div class="defile"><table><thead><tr><th>N°</th><th>Code</th><th>Titre</th><th class="masque-p">Emplacement</th><th class="masque-p">Qui</th><th>Échéance</th><th>État</th></tr></thead><tbody id="r-corps"></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="vue" id="v-ref" hidden>
+    <div class="panneau" style="height:100%">
+      <div class="defile" id="ref"></div>
+      <div class="enreg" id="enreg"><button class="btn accent" id="b-enreg" disabled>Enregistrer</button><button class="btn" id="b-annuler-ref" disabled>Annuler les changements</button><span class="msg" id="enreg-msg">Aucun changement.</span></div>
+    </div>
+  </section>
+</main>
+
+<div class="voile" id="voile" hidden>
+  <form class="fen" id="fr" autocomplete="off">
+    <div class="tete"><h2 id="fr-titre">Réserver des numéros</h2></div>
+    <div class="corps">
+      <label class="large">Plage<select class="champ" name="plage" id="fr-plage"></select></label>
+      <label>Type de document<select class="champ" name="type" id="fr-type"></select></label>
+      <label>Combien de numéros<input class="champ" name="nombre" type="number" min="1" max="1000" value="1"></label>
+      <label>Du n°<input class="champ mono" name="de" type="number" min="0" max="999999" required></label>
+      <label>Au n°<input class="champ mono" name="a" type="number" min="0" max="999999" required></label>
+      <label>Discipline<select class="champ" name="discipline" id="fr-disc"></select></label>
+      <label>Phase<select class="champ" name="phase" id="fr-phase"></select></label>
+      <label>Bâtiment<select class="champ" name="batiment" id="fr-bat"></select></label>
+      <label>Niveau<select class="champ" name="niveau" id="fr-niv"></select></label>
+      <label>Zone<select class="champ" name="zone" id="fr-zone"></select></label>
+      <label>Échéance<input class="champ" name="echeance" type="date"></label>
+      <label class="large">Titre prévu<input class="champ" name="titre" maxlength="300" placeholder="ex. Socle, dalle sur SS-1, coffrage"></label>
+      <label>Réservé par<input class="champ" name="par" maxlength="100"></label>
+      <label>État<select class="champ" name="statut"><option value="reserve">Réservé</option><option value="emis">Émis</option><option value="annule">Annulé</option></select></label>
+      <label class="large">Remarque<textarea class="champ" name="remarque" maxlength="2000"></textarea></label>
+      <div class="code" id="fr-code"></div>
+      <div class="avert" id="fr-avert" hidden></div>
+    </div>
+    <div class="pied">
+      <button type="button" class="btn danger" id="fr-suppr" hidden>Supprimer</button>
+      <button type="button" class="btn" id="fr-revit" hidden title="Une feuille par n° de cette réservation, pour le script Revit">JSON Revit</button>
+      <span class="esp"></span>
+      <button type="button" class="btn" id="fr-fermer">Fermer</button>
+      <button type="submit" class="btn accent" id="fr-ok">Réserver</button>
+    </div>
+  </form>
+</div>
+
+<div class="voile" id="voile-ch" hidden>
+  <form class="fen" id="fc" autocomplete="off">
+    <div class="tete"><h2>Nouveau chantier</h2></div>
+    <div class="corps">
+      <label>Code (début du code des documents)<input class="champ mono" name="code" maxlength="20" required placeholder="ex. FGH"></label>
+      <label>Nom<input class="champ" name="nom" maxlength="200" placeholder="ex. Hôtel Fairmont Genève"></label>
+      <label class="large">Partir de<select class="champ" name="modele" id="fc-modele"></select></label>
+    </div>
+    <div class="pied"><span class="esp"></span><button type="button" class="btn" id="fc-fermer">Fermer</button><button type="submit" class="btn accent">Créer</button></div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="/organiseur/organiseur.js?v=1"></script>
+</body>
+</html>
