@@ -9,7 +9,7 @@
   "use strict";
   var BASE = { url: "https://hxhjkdfnoygrlbdhjkwc.supabase.co", cle: "sb_publishable_33G_BjGlKGUBhSVIc_QUmQ_QDKC64vA" };
   var GABARIT = ["projet", "discipline", "emetteur", "phase", "type", "niveau", "zone", "numero"];
-  // les trigrammes possibles du code, dans l'ordre où l'utilisateur les range (glisser-déposer)
+  // les trigrammes possibles du code (majuscules et minuscules gardées telles que saisies, comparaisons sans casse), dans l'ordre où l'utilisateur les range (glisser-déposer)
   var SEGMENTS = { projet: "Projet", discipline: "Discipline", emetteur: "Émetteur", phase: "Phase", type: "Type", batiment: "Bâtiment", niveau: "Niveau", zone: "Zone", numero: "N°" };
 
   var $ = function (s) { return document.querySelector(s); };
@@ -70,7 +70,7 @@
   function versDocument(j) {
     var c, res;
     if (j && j.chantier && j.chantier.code) {
-      c = { id: j.chantier.id || nouvelId(), code: U(j.chantier.code), nom: j.chantier.nom || "", config: j.chantier.config || {}, cree_le: j.chantier.cree_le || new Date().toISOString(), modifie_le: j.chantier.modifie_le || new Date().toISOString() };
+      c = { id: j.chantier.id || nouvelId(), code: String(j.chantier.code).trim(), nom: j.chantier.nom || "", config: j.chantier.config || {}, cree_le: j.chantier.cree_le || new Date().toISOString(), modifie_le: j.chantier.modifie_le || new Date().toISOString() };
       res = j.reservations || [];
     } else if (j && Array.isArray(j.chantiers) && j.chantiers.length) {
       c = j.chantiers[0]; res = (j.reservations || []).filter(function (r) { return r.chantier === c.id; });
@@ -302,7 +302,7 @@
   function propres() { var m = {}; CONF.types.forEach(function (t) { if (t.propre) m[U(t.c)] = 1; }); return m; }
   function espace(t) { return propres()[U(t)] ? U(t) : "*"; }
   function valeurs(r, n) {
-    var v = { projet: CUR ? (CUR._code != null ? U(CUR._code) : CUR.code) : "", discipline: r.discipline, emetteur: CONF.fixes.emetteur, phase: r.phase, type: r.type,
+    var v = { projet: CUR ? (CUR._code != null ? String(CUR._code).trim() : CUR.code) : "", discipline: r.discipline, emetteur: CONF.fixes.emetteur, phase: r.phase, type: r.type,
       batiment: r.batiment, niveau: r.niveau, zone: r.zone, numero: n == null ? "" : pad(n) };
     Object.keys(v).forEach(function (k) { if (v[k] == null || v[k] === "") v[k] = CONF.fixes[k] || ""; });
     return v;
@@ -428,7 +428,7 @@
     var conf = modele === "fgh" ? zonesFgh().then(confFairmont)
       : Promise.resolve(modele && modele !== "vide" ? (function () { var c = CH.filter(function (x) { return x.id === modele; })[0]; var k = normalise(copie(c ? c.config : {})); k.liste_plans = ""; return k; })() : confVide());
     return conf.then(function (config) {
-      return appel("doc_chantiers", { methode: "POST", prefer: "return=representation", corps: { code: U(code), nom: nom || "", config: config, modifie_par: moi() } });
+      return appel("doc_chantiers", { methode: "POST", prefer: "return=representation", corps: { code: String(code).trim(), nom: nom || "", config: config, modifie_par: moi() } });
     }).then(function (l) {
       var c = l && l[0]; if (!c) return;
       CH.push(c); CH.sort(function (a, b) { return a.code.localeCompare(b.code); });
@@ -443,7 +443,7 @@
     $("#voile-ch").hidden = false; setTimeout(function () { F.elements.code.focus(); }, 30);
   }
   $("#fc").addEventListener("submit", function (e) {
-    e.preventDefault(); var F = this, code = U(F.elements.code.value), nom = F.elements.nom.value.trim(), mod = F.elements.modele.value;
+    e.preventDefault(); var F = this, code = F.elements.code.value.trim(), nom = F.elements.nom.value.trim(), mod = F.elements.modele.value;
     if (!LOCAL) {
       if (CH.some(function (x) { return U(x.code) === code; })) { toast("Ce code de chantier existe déjà."); return; }
       $("#voile-ch").hidden = true; creeChantier(code, nom, mod); return;
@@ -644,7 +644,7 @@
   function avert(m) { $("#fr-avert").textContent = m || ""; $("#fr-avert").hidden = !m; }
   function brouillon() {
     var E = FR.elements;
-    return { type: U(E.type.value), discipline: E.discipline.value, phase: E.phase.value, batiment: E.batiment.value, niveau: E.niveau.value, zone: E.zone.value,
+    return { type: E.type.value, discipline: E.discipline.value, phase: E.phase.value, batiment: E.batiment.value, niveau: E.niveau.value, zone: E.zone.value,
       de: parseInt(E.de.value, 10), a: parseInt(E.a.value, 10), titre: E.titre.value.trim(), par: E.par.value.trim(), echeance: E.echeance.value || null,
       statut: E.statut.value, remarque: E.remarque.value.trim() };
   }
@@ -943,12 +943,12 @@
       else CONF[d.g] = v;
     } else if (d.l) {
       if (d.l === "niv") NIVB = +d.b;
-      liste(d.l)[+d.i][d.c] = d.c === "c" ? U(v) : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
+      liste(d.l)[+d.i][d.c] = d.c === "c" ? v.trim() : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
       if (d.l === "batiments" || d.l === "niv") dessineMaquette();
       if (d.l === "batiments" && (d.c === "c" || d.c === "lib")) { var sb = $("#niv-bat"); if (sb && sb.options[+d.i]) sb.options[+d.i].textContent = (CONF.batiments[+d.i].c || "?") + (CONF.batiments[+d.i].lib ? " · " + CONF.batiments[+d.i].lib : ""); }
     } else if (d.p) {
       var x = plageDe(d.p).p;
-      if (d.c === "types") x.types = v.split(/[\s,;]+/).map(U).filter(Boolean);
+      if (d.c === "types") x.types = v.split(/[\s,;]+/).filter(Boolean);
       else if (d.c === "lib") x.lib = v; else x[d.c] = v === "" ? "" : parseInt(v, 10);
       verifiePlages();
     } else return;
@@ -1003,7 +1003,7 @@
     ["disciplines", "phases", "types", "batiments", "zones"].forEach(function (k) { CONF[k] = CONF[k].filter(function (x) { return x.c; }); });
     CONF.batiments.forEach(function (b) { b.niveaux = b.niveaux.filter(function (x) { return x.c; }); });
     var corps = { config: CONF, modifie_par: moi() };
-    if (CUR._code != null && U(CUR._code)) corps.code = U(CUR._code);
+    if (CUR._code != null && String(CUR._code).trim()) corps.code = String(CUR._code).trim();
     if (CUR._nom != null) corps.nom = CUR._nom.trim();
     this.disabled = true;
     appel("doc_chantiers?id=eq." + CUR.id, { methode: "PATCH", prefer: "return=representation", corps: corps }).then(function (l) {
