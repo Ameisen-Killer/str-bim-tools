@@ -683,7 +683,7 @@ $('#bPrep').onclick=()=>{$('#prTxt').value='';PREP=[];$('#prRes').innerHTML='';o
 $('#prGo').onclick=()=>{PREP=prepAnalyse($('#prTxt').value);prepRendu();};
 /* filtres de la liste (recherche, état, période) et PDF en lot */
 let FILT=Object.assign({q:'',st:'',de:'',a:''},lsGet('ca-filt',{})),FILT_L=[];
-const etatC=c=>c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';
+const etatC=c=>c.conclusion==='ok'||c.conclusion==='remarque'?'ok':c.conclusion==='pas_ok'?'ko':'wip';
 function filtreCtrls(L){const q=norm(FILT.q).split(/\s+/).filter(Boolean);
   return L.filter(c=>{if(FILT.st==='att'){if(!syEnAttente(c))return false;}else if(FILT.st&&etatC(c)!==FILT.st)return false;
     const d=isoFr(c.date)||'';if(FILT.de&&(!d||d<FILT.de))return false;if(FILT.a&&(!d||d>FILT.a))return false;
@@ -712,9 +712,9 @@ function renderHome(){if(!S)return;
   const TOUS=projCtrls(),L=filtreCtrls(TOUS).sort((a,b)=>b.created-a.created);FILT_L=L;
   $('#fN').textContent=L.length===TOUS.length?L.length+' fiche(s)':L.length+' / '+TOUS.length+' fiche(s)';$('#fPdf').disabled=!L.length;
   $$('#fSt button').forEach(b=>b.classList.toggle('on',b.dataset.v===FILT.st));
-  $('#list').innerHTML=L.length?L.map(c=>{const d=c.conclusion==='ok'?'ok':c.conclusion==='pas_ok'?'ko':'wip';const st=idxState(c);
+  $('#list').innerHTML=L.length?L.map(c=>{const d=etatC(c);const st=idxState(c);
     return `<div class="it" data-open="${c.id}">${SEL?`<input type="checkbox" data-sel="${c.id}" ${SEL.has(c.id)?'checked':''} style="width:22px;height:22px;flex:0 0 auto">`:''}<span class="dot ${d}"></span><div class="t"><div><b>n°${esc(c.numero)}</b> ${esc(c.description||'sans description')}</div>
-    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='pas_ok'?'à reprendre':'en cours'}${c.indice?' · ind. '+esc(c.indice):''}${c.prep&&!c.sig_ctrl?' · préparé':''}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · terminé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div><div class="mini" data-mini="${c.id}"></div></div><span class="chev">›</span></div>`;}).join('')
+    <div class="s">${esc((c.date||'').slice(0,5))} · ${c.nPh||0} photo(s) · ${c.conclusion==='ok'?'validé':c.conclusion==='remarque'?'validé avec remarque':c.conclusion==='pas_ok'?'à reprendre':'en cours'}${c.indice?' · ind. '+esc(c.indice):''}${c.prep&&!c.sig_ctrl?' · préparé':''}${c.sig_ctrl?' · signé':''}${c.mailedAt?' · ✉️ '+esc(c.mailedAt.slice(0,5)):''}${c.sentAt?' · terminé':''}${syEnAttente(c)?' · ↑ à sauvegarder':''}${st?' · '+st:''}</div><div class="mini" data-mini="${c.id}"></div></div><span class="chev">›</span></div>`;}).join('')
     :`<div class="it" style="cursor:default"><div class="t s muted">${TOUS.length?'Aucune fiche ne correspond aux filtres.':'Aucun contrôle pour l\'instant.'}</div></div>`;
   miniatures(L);
   $$('[data-open]').forEach(el=>el.onclick=e=>{if(SEL){const id=el.dataset.open;SEL.has(id)?SEL.delete(id):SEL.add(id);renderHome();return;}openCtrl(el.dataset.open,true);});
@@ -860,7 +860,7 @@ function makeMD(){const c=CUR,v=x=>x&&String(x).trim()?String(x).trim():'—',yn
   '## Armatures (acier B500B)','',`- Plan n° : ${v(c.plan_armatures)}`,`- Listes n° : ${v(c.listes)}`,`- Recouvrement des aciers : ${yn(c.recouvrement)}`,`- Disposition des nappes : ${yn(c.disposition_nappes)}`,`- Écartement des nappes : ${yn(c.ecartement_nappes)}`,
   `- Armature de poinçonnement : ${v(c.poinconnement_type)} – disposition des pièces : ${yn(c.poinconnement_dispo)}`,'',
   '## Béton','',`- Qualité : ${v(c.beton_qualite)}`,`- Adjuvant : ${v(c.adjuvant)}`,`- Traitement après bétonnage : ${v(tr)}`,`- Essais demandés : ${v(c.essai_nature)}${c.essai_nombre?' ('+c.essai_nombre+')':''}`,'',
-  '## Conclusion','',c.conclusion==='ok'?'**OK – pas de remarque particulière**':c.conclusion==='pas_ok'?'**Pas OK – voir mesures ci-dessous**':'_Conclusion non renseignée_','',
+  '## Conclusion','',c.conclusion==='ok'?'**OK – pas de remarque particulière**':c.conclusion==='remarque'?'**OK avec remarque – voir ci-dessous**':c.conclusion==='pas_ok'?'**Pas OK – voir mesures ci-dessous**':'_Conclusion non renseignée_','',
   ...[c.conclusions_texte_1,c.conclusions_texte_2].filter(x=>x&&x.trim()).map(x=>'> '+x.trim()),'',
   ...(it.length?['### Reprises à effectuer avant bétonnage','',...it.map((x,i)=>`${i+1}. ${x.txt}${x.ref?' ('+x.ref+')':''}`),'']:[]),
   ...(PHOTOS.length?['## Photos','',...PHOTOS.map((p,i)=>`- **Photo ${pad(i+1)}** – ${p.statut==='reprise'?'À REPRENDRE':'OK'}${p.item?' – '+ITEM_LIB(p.item):''} – \`${photoName(c,i)}\`${p.comment?' : '+p.comment:''}`),'']:[]),
@@ -897,12 +897,13 @@ function mailBody(L){
   L.forEach(c=>{const plans=[c.plan_coffrage,c.plan_armatures].filter(Boolean).join(', ');
     lines.push(`• n°${c.numero} – ${c.description}${plans?' (plans '+plans+')':''}`);
     if(c.conclusion==='ok')lines.push('  Rien à signaler – bétonnage validé (cf. rapport ci-joint).');
+    else if(c.conclusion==='remarque'){const T=[c.conclusions_texte_1,c.conclusions_texte_2].filter(Boolean).join(' ');lines.push('  Bétonnage validé avec remarque (cf. rapport ci-joint)'+(T?' : '+T:'.'));}
     else{const T=[c.conclusions_texte_1,c.conclusions_texte_2].filter(Boolean).join(' ');lines.push('  Des reprises sont à effectuer avant bétonnage (cf. rapport ci-joint)'+(T?' : '+T:'.'));}
     lines.push('');});
   lines.push('Cordialement,',S.auteur||'');return lines.join('\n');}
 function openMail(L){MAILSEL=L;const uns=L.filter(c=>!c.sig_ctrl||!c.conclusion);
   $('#mlTo').value=S.mailTo||lsGet('ca-mailme','')||'';
-  const all=L.every(c=>c.conclusion==='ok'),any=L.some(c=>c.conclusion==='pas_ok');
+  const all=L.every(c=>c.conclusion==='ok'||c.conclusion==='remarque'),any=L.some(c=>c.conclusion==='pas_ok');
   $('#mlSubj').value=`${S.numero||''} ${S.nom||''} – Contrôle${L.length>1?'s':''} avant bétonnage n°${L.map(c=>c.numero).join(', ')}${L.length===1?' – '+L[0].description:''} – ${any?'À reprendre':all?'Validation':'Contrôle'}`.trim();
   $('#mlBody').value=mailBody(L);$('#mlPh').checked=false;
   $('#mlInfo').innerHTML=`${L.length} fiche(s) PDF jointe(s)${uns.length?`<div class="warn">⚠ Non signé(s) ou sans conclusion : n°${uns.map(c=>c.numero).join(', ')}</div>`:''}<div class="muted">${MAIL_DIRECT&&navigator.onLine?'Envoi direct depuis contact@str-bim-tools.com, la fiche PDF en pièce jointe.':'Le mail s\'ouvre dans ton appli de messagerie avec la fiche jointe (sur ordinateur : PDF téléchargé à joindre).'}</div>`;
@@ -982,8 +983,8 @@ function repItems(){
   const c=(CUR.reprises||[]).filter(r=>r.txt&&r.txt.trim()).map(r=>({txt:r.txt.trim(),ref:''}));return[...a,...b,...c];}
 function autoConclusion(force){
   if(CUR.concl_manual&&!force)return;const it=repItems();
-  if(!it.length){CUR.conclusions_texte_1='';CUR.conclusions_texte_2='';if(!CUR.conclusion)CUR.conclusion='ok';}
-  else{CUR.conclusion='pas_ok';const parts=it.map(x=>x.txt.replace(/[.;\s]+$/,'')+(x.ref?' ('+x.ref+')':''));
+  if(!it.length){CUR.conclusions_texte_1='';CUR.conclusions_texte_2='';if(!CUR.conclusion&&!CUR.concl_choix)CUR.conclusion='ok';}
+  else{if(!CUR.concl_choix)CUR.conclusion='pas_ok';const parts=it.map(x=>x.txt.replace(/[.;\s]+$/,'')+(x.ref?' ('+x.ref+')':''));
     const full='Reprises à effectuer avant bétonnage : '+parts.join(' ; ')+'.';
     if(full.length<=110){CUR.conclusions_texte_1=full;CUR.conclusions_texte_2='';}
     else{const h=Math.ceil(parts.length/2);CUR.conclusions_texte_1='Reprises avant bétonnage : '+parts.slice(0,h).join(' ; ')+' ;';CUR.conclusions_texte_2=parts.slice(h).join(' ; ')+'.';}}
@@ -1010,7 +1011,7 @@ const STEPS=[
      const ch=root.querySelector('[data-chips="ouvrage"]');if(ch)ch.addEventListener('click',()=>setTimeout(majType,0));
      root.querySelectorAll('[data-loc]').forEach(g=>g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.loc;CUR[k]=CUR[k]===b.dataset.v?'':b.dataset.v;
        g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===CUR[k]));CUR.localisation=locCompose(CUR);
-       const i=root.querySelector('[data-k="localisation"]');if(i){i.value=CUR.localisation;i.dispatchEvent(new Event('input'));}else save();});}},
+       const i=root.querySelector('[data-k="localisation"]');if(i){i.value=CUR.localisation;i.dispatchEvent(new Event('input'));}save();majDesc();});}},
  {t:'Plans',q:'Quels plans ?',pre:()=>autoProposePlans(),r:()=>[['plan_coffrage','Plan de coffrage'],['plan_armatures','Plan d\'armatures'],['listes','Listes de fers']].map(([k,l])=>{
      const linked=(CUR.plans||[]).filter(p=>p.field===k);
      const prop=CUR._planProp&&CUR._planProp[k];const sug=CUR[k]&&!prop?[]:suggestPlans(k).filter(r=>planLabel(r)!==CUR[k]);
@@ -1037,21 +1038,16 @@ const STEPS=[
    `<p class="muted">Un ✗ ajoute le point dans les reprises de la conclusion. 📷 rattache une photo au point, même s'il est OK.</p>`,
    b:root=>bindChecks(root)},
  {t:'Vérifications',q:'Les armatures sont-elles conformes ?',r:()=>ARM_CHECKS.map(([k,l])=>chkRow(k,l)).join('')+
+   (()=>{const P=PHOTOS.filter(p=>!p.item);return `<div class="chk" style="margin-top:10px"><div class="cl">Autres photos${P.length?`<div class="chk-ph">${P.map(p=>`<button class="th" data-ph="${p.id}" style="background-image:url(${thumbURL(p)})"></button>`).join('')}</div>`:''}</div><button class="tg ph" data-iph="" title="Ajouter une photo">📷</button></div>`;})()+
    `<p class="muted">Un ✗ ajoute le point dans les reprises de la conclusion. 📷 rattache une photo au point, même s'il est OK.</p>`,
    b:root=>bindChecks(root)},
- {t:'Photos',q:'Photos du contrôle',r:()=>`<div class="thumbs">${PHOTOS.map((p,i)=>`<button class="th" data-ph="${p.id}" style="background-image:url(${thumbURL(p)})"><i class="${p.statut==='reprise'?'r':'o'}">${pad(i+1)}</i></button>`).join('')}
-   <label class="th add">+<input id="inCam" type="file" accept="image/*" capture="environment" hidden></label></div>
-   <label class="btn w" style="margin-top:10px">Ajouter depuis la galerie<input id="inGal" type="file" accept="image/*" multiple hidden></label>
-   <p class="muted">Nommage : ${esc(photoName(CUR,PHOTOS.length))} · touche une photo pour l'annoter et la commenter.</p>`,
-   b:root=>{root.querySelectorAll('[data-ph]').forEach(x=>x.onclick=()=>openPhoto(PHOTOS.find(p=>p.id===x.dataset.ph)));
-     $('#inCam').onchange=e=>{addFiles([...e.target.files],true);e.target.value='';};$('#inGal').onchange=e=>{addFiles([...e.target.files],false);e.target.value='';};}},
  {t:'Bétonnage',q:'Bétonnage',r:()=>F('beton_qualite','Qualité du béton',{ph:'ex. C30/37 XC4'})+F('adjuvant','Adjuvant',{chips:['Selon besoin entreprise','Antigel','Retardateur de prise']})+
    `<div class="fld"><span>Traitement après bétonnage</span></div><div class="chips" data-multi="traitement">${TRAIT.map(([k,l])=>`<button data-v="${k}" class="${(CUR.traitement||[]).includes(k)?'on':''}">${l}</button>`).join('')}</div>`+
    F('essai_nature','Essais demandés : nature',{chips:['Selon besoin entreprise']})+F('essai_nombre','Nombre',{num:true}),
    b:root=>root.querySelector('[data-multi]').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;const t=CUR.traitement||[];CUR.traitement=t.includes(v)?t.filter(x=>x!==v):[...t,v];if(CUR._auto)delete CUR._auto.traitement;b.classList.toggle('on');save();}},
  {t:'Conclusion',q:'Conclusion',pre:()=>autoConclusion(false),r:()=>{const it=repItems();
    return (it.length?it.map(x=>`<div class="rep">⚠ ${esc(x.txt)}${x.ref?' ('+x.ref+')':''}</div>`).join(''):'<div class="okmsg">Aucune reprise relevée</div>')+
-   `<div class="row2"><button class="ok ${CUR.conclusion==='ok'?'on':''}" data-c="ok">Validé</button><button class="ko ${CUR.conclusion==='pas_ok'?'on':''}" data-c="pas_ok">À reprendre</button></div>`+
+   `<div class="row2"><button class="ok ${CUR.conclusion==='ok'?'on':''}" data-c="ok">Validé</button><button class="ok ${CUR.conclusion==='remarque'?'on':''}" data-c="remarque">Validé avec remarque</button><button class="ko ${CUR.conclusion==='pas_ok'?'on':''}" data-c="pas_ok">À reprendre</button></div>`+
    `<button class="btn" id="bDictRep">🎤 Dicter les reprises</button><p class="muted" style="margin-top:-2px">Dis « photo 2 : … » pour écrire sous la photo 2 ; le reste devient une reprise sans photo.</p>`+
    `<div class="fld"><span>Reprises sans photo</span></div>`+(CUR.reprises||[]).map((r,i)=>`<div class="fldmic"><label class="fld"><textarea data-ri="${i}" placeholder="ex. nettoyer le fond de coffrage">${esc(r.txt)}</textarea></label><div style="display:flex;flex-direction:column;gap:6px"><button class="mic" data-rmic="${i}">🎤</button><button class="mic" style="background:var(--kob);color:var(--ko)" data-rdel="${i}">✕</button></div></div>`).join('')+
    `<button class="btn w" id="bAddRep">+ Ajouter une reprise sans photo</button>`+
@@ -1060,7 +1056,7 @@ const STEPS=[
    `<div class="fld"><span>Signatures</span></div><div class="row2" style="margin:0 0 8px">${[['sig_ctrl','Contrôleur'],['sig_cm','Contremaître']].map(([k,l])=>`<button class="${CUR[k]?'ok on':''}" data-sig="${k}" style="display:flex;flex-direction:column;align-items:center;gap:4px">${CUR[k]?`<img src="${CUR[k]}" style="height:34px;background:#fff">`:'✍︎'}<span style="font-size:13px">${l}${CUR[k]?' ✓':''}</span></button>`).join('')}</div>`+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>Entreprise informée le</span><input data-k="entreprise_informee_le" value="${esc(CUR.entreprise_informee_le)}"></label>
    <label class="fld" style="flex:1;margin:0"><span>Auteur</span><input data-k="auteur" value="${esc(CUR.auteur)}"></label></div>`;},
-   b:root=>{root.querySelectorAll('[data-c]').forEach(x=>x.onclick=()=>{CUR.conclusion=x.dataset.c;save();renderStep();});
+   b:root=>{root.querySelectorAll('[data-c]').forEach(x=>x.onclick=()=>{CUR.conclusion=CUR.conclusion===x.dataset.c?'':x.dataset.c;CUR.concl_choix=!!CUR.conclusion;save();renderStep();});
      $('#bRegen').onclick=()=>{autoConclusion(true);renderStep();toast('Texte régénéré');};
      CUR.reprises=CUR.reprises||[];
      root.querySelectorAll('[data-sig]').forEach(b=>b.onclick=()=>signPad(b.dataset.sig==='sig_ctrl'?'Signature du contrôleur':'Signature du contremaître',CUR[b.dataset.sig],v=>{CUR[b.dataset.sig]=v;if(v)CUR.signedAt=nowStamp();save();renderStep();}));
@@ -1070,16 +1066,9 @@ const STEPS=[
      $('#bAddRep').onclick=()=>{CUR.reprises.push({txt:''});save();renderStep();setTimeout(()=>{const t=$$('[data-ri]').pop();if(t)t.focus();},50);};
      $('#bDictRep').onclick=()=>dictate('Reprises (« photo 2 : … »)',t=>{const n=routeDictation(t);save();renderStep();toast(n);});
      bindMics(root);}},
- {t:'Terminer',q:'Récapitulatif',r:()=>{const w=checks();
-   const sec=(i,t,v)=>`<div class="sum" data-go="${i}"><div class="t"><b>${t}</b><div>${v}</div></div><span class="chev">›</span></div>`;
+ {t:'Terminer',q:'Validation',r:()=>{const w=checks();
    return (w.length?`<div class="warnbox">${w.map(esc).join('<br>')}</div>`:'')+
-   sec(0,esc(baseName(CUR)),esc([CUR.localisation,CUR.type_element].filter(Boolean).join(' · ')||'—'))+
-   sec(1,'Plans',esc([CUR.plan_coffrage,CUR.plan_armatures,CUR.listes].filter(Boolean).join(' · ')||'—'))+
-   sec(3,'Coffrage et vérifications',(()=>{const n=v=>CHECKS.filter(([k])=>CUR[k]===v).length,ko=CHECKS.filter(([k])=>CUR[k]==='non').map(([,l])=>l);
-     return `✓ ${n('oui')} · ✗ ${n('non')} · s.o. ${n('so')} · non renseigné ${CHECKS.length-n('oui')-n('non')-n('so')}`+(ko.length?'<br>✗ '+ko.map(esc).join(', '):'');})())+
-   sec(5,'Photos',PHOTOS.length+' photo(s), '+PHOTOS.filter(p=>p.statut==='reprise').length+' à reprendre')+
-   sec(7,'Conclusion',CUR.conclusion==='ok'?'Validé':CUR.conclusion==='pas_ok'?'À reprendre : '+repItems().length+' point(s)':'à choisir')+
-   `<div class="h">Sauvegarde et envoi</div>
+   `<div class="h" style="margin-top:4px">Sauvegarde et envoi</div>
    <div class="${syEnAttente(CUR)?'res':'okmsg'}" id="sendState">${syEnAttente(CUR)?'↑ Sauvegarde en ligne en attente du réseau ('+syEnAttente(CUR)+' élément(s))':'✓ Fiche et '+PHOTOS.length+' photo(s) sauvegardées en ligne'}${CUR.sentAt?' · validé le '+esc(CUR.sentAt):''}</div>
    <button class="btn main" id="bSend">✓ ${CUR.sentAt?'Valider à nouveau':'Valider le contrôle'}</button>
    <button class="btn" id="bMailMe">✉️ M'envoyer la fiche par mail</button>
@@ -1091,13 +1080,10 @@ const STEPS=[
    <div class="h">Fichiers</div>
    <button class="btn w" id="bInd">🔁 Nouvel indice de la fiche${CUR.indice?' (actuel : '+esc(CUR.indice)+')':''}</button>
    <button class="btn" id="bPdf">📄 Fiche PDF (+ photos)</button>
-   <button class="btn w" id="bMd">📝 Export texte (.md)</button>
    <button class="btn w" id="bZip">📦 Fiche + photos (.zip)</button>
-   ${navigator.canShare?'<button class="btn w" id="bShare">↗ Partager (mail, WhatsApp…)</button>':''}
    <button class="btn red" id="bDel">Supprimer ce contrôle</button>
    <button class="btn w" id="bHome" style="margin-top:14px">‹ Retour à l'accueil</button>`;},
-   b:root=>{root.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goSec(+x.dataset.go));
-     $('#bMd').onclick=()=>download(new Blob([makeMD()],{type:'text/markdown;charset=utf-8'}),safe(baseName(CUR))+'.md');
+   b:root=>{
      $('#bSend').onclick=async()=>{const c=CUR;const w=checks();if(w.length&&!confirm('À vérifier :\n• '+w.join('\n• ')+'\n\nValider quand même ?'))return;
        remember(c);c.sentAt=nowStamp();await DB.put('ctrl',c);sySync(true);await plnMark(c);toast(navigator.onLine?'Contrôle validé et sauvegardé en ligne':'Contrôle validé : sauvegarde en ligne au retour du réseau',3000);renderStep();};
      $('#bMailMe').onclick=()=>{remember(CUR);openMail([CUR]);};
@@ -1108,11 +1094,9 @@ const STEPS=[
      const pm=$('#bPlnMark');if(pm)pm.onclick=()=>plnMark(CUR);$('#bHome').onclick=goHome;
      $('#bPdf').onclick=async()=>{busy(true,'Création du PDF…');try{download(await makePDF(),safe(baseName(CUR))+'.pdf');}catch(e){alert(e.message);}busy(false);};
      $('#bZip').onclick=async()=>{busy(true,'Création du paquet…');try{download(await makeZip(),safe(baseName(CUR))+'.zip');}catch(e){alert(e.message);}busy(false);};
-     const sh=$('#bShare');if(sh)sh.onclick=async()=>{busy(true,'Préparation…');try{const files=[new File([await makePDF()],safe(baseName(CUR))+'.pdf',{type:'application/pdf'}),new File([await makeZip()],safe(baseName(CUR))+'.zip',{type:'application/zip'})];busy(false);
-       if(!navigator.canShare({files}))throw new Error('Partage non supporté : utiliser les boutons de téléchargement.');await navigator.share({files,title:baseName(CUR)});}catch(e){busy(false);if(e.name!=='AbortError')alert(e.message);}};
      $('#bDel').onclick=async()=>{if(!confirm('Supprimer ce contrôle et ses photos, sur cet appareil et en ligne (pour tous) ?'))return;for(const p of PHOTOS)await DB.del('photos',p.id);await DB.del('ctrl',CUR.id);CTRLS=CTRLS.filter(c=>c!==CUR);CUR=null;goHome();};}},
 ];
-const SEC_DONE=[c=>!!c.description,c=>!!c.plan_armatures,c=>!!c.entreprise,c=>!!c.type_coffrage&&COFF_CHECKS.every(([k])=>c[k]),c=>ARM_CHECKS.every(([k])=>c[k]),()=>PHOTOS.length>0,c=>!!c.beton_qualite,c=>!!c.conclusion,()=>false];
+const SEC_DONE=[c=>!!c.description,c=>!!c.plan_armatures,c=>!!c.entreprise,c=>!!c.type_coffrage&&COFF_CHECKS.every(([k])=>c[k]),c=>ARM_CHECKS.every(([k])=>c[k]),c=>!!c.beton_qualite,c=>!!c.conclusion,()=>false];
 function renderStep(keep=true){
   const y=window.scrollY;
   STEPS.forEach(s=>{if(s.pre)s.pre();});
@@ -1324,11 +1308,6 @@ async function makePDF(opt={}){
   T('Plan n°',MID,109.4);T(fit(c.plan_armatures,R-VAL,8.5).slice(0,2),VAL,109.4,{s:8.5});
   T('Listes n°',MID,120.8);T(fit(c.listes,R-VAL,8.5).slice(0,2),VAL,120.8,{s:8.5});UL(VAL,R,126);
   const yn=(lab,v,y)=>{T(lab,MID,y,{s:7.5});BOX(X(129),y+.4,v==='oui');T('oui',X(132.3),y+.4,{s:7.5});BOX(X(129),y+3.6,v==='non');T('non',X(132.3),y+3.6,{s:7.5});if(v==='so')T('sans objet',X(138),y+2,{s:7.5,i:1});};
-  // points ajoutés (colonne de gauche) : libellé puis oui / non / sans objet
-  const yn3=(lab,v,y)=>{T(lab,15,y,{s:7.2,w:MID-17});[['oui','oui',17],['non','non',29],['so','s.o.',41]].forEach(([k,t,x])=>{BOX(x,y+3.3,v===k);T(t,x+3.6,y+3.3,{s:7});});};
-  yn3('Fond de coffrage propre',c.fond_propre,79.5);yn3('Enrobage'+(c.enrobage?' '+c.enrobage:'')+' respecté',c.enrobage_ok,87);yn3('Ecarteurs / paniers de support',c.ecarteurs,94.5);
-  yn3('Sens des lits',c.sens_lits,115);yn3('Attentes / EBEA',c.attentes,122.5);yn3('Chaînages et renfort réservations',c.chainages,130);yn3('Goujons ou consoles iso',c.goujons,137.5);
-  yn('Recouvrement des aciers conforme',c.recouvrement,132.1);yn('Disposition des nappes conforme',c.disposition_nappes,139.8);yn('Ecartement des nappes conforme',c.ecartement_nappes,147.4);
   T('Armature de poinçonnement:',15,158.6,{b:1});T('Type d\'élément:',MID,158.6,{b:1});T(fit(c.poinconnement_type,R-VAL,8.5)[0]||'',VAL,158,{s:8.5});UL(VAL,R,160.6);
   yn('Disposition des pièces conforme',c.poinconnement_dispo,166.7);
   // béton
@@ -1342,6 +1321,7 @@ async function makePDF(opt={}){
   // conclusion
   T('Conclusions:',15,216.1,{b:1});BOX(X(70),216.1,c.conclusion==='ok');T('OK pas de remarque particulière',X(70)+4,216.1,{s:8});
   BOX(X(121),216.3,c.conclusion==='pas_ok');T('Pas OK voir mesures ci-dessous',X(121)+4,216.3,{s:8});
+  BOX(X(70),221.8,c.conclusion==='remarque');T('OK avec remarque, voir ci-dessous',X(70)+4,221.8,{s:8});
   const cy=[227.5,232.8,236.7];cy.forEach(y=>UL(X(70.7),R,y));
   let lines=[];[c.conclusions_texte_1,c.conclusions_texte_2].filter(Boolean).forEach(t=>lines.push(...fit(t,R-X(70.7),8.5)));
   let fs=8.5;while(lines.length>3&&fs>6.5){fs-=.5;lines=[];[c.conclusions_texte_1,c.conclusions_texte_2].filter(Boolean).forEach(t=>lines.push(...fit(t,R-X(70.7),fs)));}
