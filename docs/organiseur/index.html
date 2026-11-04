@@ -155,9 +155,9 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:3px;margin:0 0 16px}
 .case{height:26px;border:0;border-radius:3px;background:var(--c-libre);font-family:var(--mono);font-size:10.5px;color:var(--texte-faible);cursor:pointer;padding:0}
 .case:hover{outline:1px solid var(--or)}
-.case.r{background:repeating-linear-gradient(135deg,#A86A14 0 3px,var(--c-res) 3px 6px);color:#241503}
-.case.e{background:repeating-linear-gradient(135deg,#2B6E35 0 3px,var(--c-emis) 3px 6px);color:#fff}
-.case.h{background:repeating-linear-gradient(135deg,#5E5E66 0 3px,var(--c-hors) 3px 6px);color:#fff}
+.case.r{background:repeating-linear-gradient(135deg,#A86A14 0 3px,var(--c-res) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
+.case.e{background:repeating-linear-gradient(135deg,#2B6E35 0 3px,var(--c-emis) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
+.case.h{background:repeating-linear-gradient(135deg,#5E5E66 0 3px,var(--c-hors) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
 .case.sel{outline:2px solid var(--texte)}
 .compte{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 12px;font-size:13px}
 .compte b{font-family:var(--titre);font-size:18px;margin-right:4px}
@@ -395,6 +395,6 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=18"></script>
+<script src="/organiseur/organiseur.js?v=19"></script>
 </body>
 </html>
