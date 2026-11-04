@@ -251,7 +251,7 @@
     var N = { "000": "Tous niveaux", "050": "SS-4", "060": "SS-3", "070": "SS-2", "080": "SS-1", "090": "Rez inf", "100": "Rez",
       "110": "Étage 1", "120": "Étage 2", "130": "Étage 3", "140": "Étage 4", "150": "Étage 5", "160": "Étage 6", "170": "Étage 7", "180": "Étage 8", "190": "Toiture" };
     c.batiments[0].niveaux = Object.keys(N).map(function (k) { return { c: k, lib: N[k], fictif: k === "000" }; });
-    c.zones = (zones && zones.length ? zones : ["TTZ"]).map(function (z) { return { c: z, lib: z === "TTZ" ? "Toutes zones" : "Zone " + z, bat: "" }; });
+    c.batiments[0].zones = (zones && zones.length ? zones : ["TTZ"]).map(function (z) { return z === "TTZ" ? { c: z, lib: "Toutes zones", regroupe: "*" } : { c: z, lib: "Zone " + z, regroupe: "" }; });
     function P(lib, de, a, sous) { return { lib: lib, de: de, a: a, types: [], sous: (sous || []).map(function (s) { return P(s[2], s[0], s[1]); }) }; }
     c.plages = [
       P("Géotechnique", 1, 99), P("Notes de calcul", 100, 499), P("Convention d'utilisation", 500, 529),
@@ -277,7 +277,14 @@
       });
     }
     delete c.niveaux;
-    c.batiments.forEach(function (b) { if (!Array.isArray(b.niveaux)) b.niveaux = []; });
+    c.batiments.forEach(function (b) { if (!Array.isArray(b.niveaux)) b.niveaux = []; if (!Array.isArray(b.zones)) b.zones = []; });
+    // zones par bâtiment (04.11.2026) : une zone liée à des bâtiments passe dans chacun d'eux ;
+    // celles du chantier (sans bâtiment) restent des regroupements à l'échelle du chantier
+    c.zones = c.zones.filter(function (z) {
+      var bl = U(z.bat).split(/[\s,;]+/).filter(Boolean); if (!bl.length) { delete z.bat; if (z.regroupe == null) z.regroupe = ""; return true; }
+      c.batiments.forEach(function (b) { if (bl.indexOf(U(b.c)) >= 0 && !b.zones.some(function (x) { return U(x.c) === U(z.c); })) b.zones.push({ c: z.c, lib: z.lib, regroupe: "" }); });
+      return false;
+    });
     // ancien gabarit texte « {projet}-{type}-… » : converti en liste de trigrammes
     if (typeof c.gabarit === "string") { var g = c.gabarit.match(/\{(\w+)\}/g); if (g) c.segments = g.map(function (x) { return x.slice(1, -1); }); }
     delete c.gabarit;
@@ -298,6 +305,14 @@
     bs.forEach(function (b) { b.niveaux.forEach(function (n) { if (n.c && !vu[U(n.c)]) { vu[U(n.c)] = 1; L.push(n); } }); });
     return L;
   }
+  // zones d'un bâtiment (avec ses regroupements) puis les regroupements du chantier
+  function zonesDe(bat) {
+    var vu = {}, L = [];
+    CONF.batiments.filter(function (b) { return !bat || U(b.c) === U(bat); }).forEach(function (b) { b.zones.forEach(function (z) { if (z.c && !vu[U(z.c)]) { vu[U(z.c)] = 1; L.push(z); } }); });
+    CONF.zones.forEach(function (z) { if (z.c && !vu[U(z.c)]) { vu[U(z.c)] = 1; L.push(z); } });
+    return L.map(function (z) { return { c: z.c, lib: (z.lib || "") + (z.regroupe ? " (regroupe " + (z.regroupe === "*" ? "toutes les zones" : z.regroupe) + ")" : "") }; });
+  }
+  function libZone(bat, c) { var x = zonesDe(bat).concat(zonesDe("")).filter(function (z) { return U(z.c) === U(c); })[0]; return x ? x.lib : ""; }
   function libNiv(bat, c) { var x = niveauxDe(bat).concat(niveauxDe("")).filter(function (n) { return U(n.c) === U(c); })[0]; return x ? x.lib : ""; }
   function propres() { var m = {}; CONF.types.forEach(function (t) { if (t.propre) m[U(t.c)] = 1; }); return m; }
   function espace(t) { return propres()[U(t)] ? U(t) : "*"; }
@@ -590,7 +605,7 @@
   function remplitLieux() {
     var nv = FR.elements.niveau.value, z = FR.elements.zone.value;
     $("#fr-niv").innerHTML = options(niveauxDe(FR.elements.batiment.value), "—"); FR.elements.niveau.value = nv; if (FR.elements.niveau.value !== nv) FR.elements.niveau.value = "";
-    $("#fr-zone").innerHTML = options(filtreBat(CONF.zones), "—"); FR.elements.zone.value = z; if (FR.elements.zone.value !== z) FR.elements.zone.value = "";
+    $("#fr-zone").innerHTML = options(zonesDe(FR.elements.batiment.value), "—"); FR.elements.zone.value = z; if (FR.elements.zone.value !== z) FR.elements.zone.value = "";
   }
   function typesDePlage() {
     var x = plageDe(FR.elements.plage.value), t = x && x.p.types.length ? x.p.types.map(U) : null;
@@ -805,12 +820,12 @@
       if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; dessineMaquette();
     });
     ["pointerup", "pointercancel"].forEach(function (t) { $("#ref").addEventListener(t, function () { g = null; }); });
-    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; if (d.l === "niv") NIVB = +d.b; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
+    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; if (d.l === "niv" || d.l === "zon") NIVB = +d.b; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
     window.addEventListener("resize", function () { if (VUE === "ref") dessineMaquette(); });
   })();
 
   var NIVB = 0;   // bâtiment dont on édite les niveaux
-  function liste(k) { return k === "niv" ? (CONF.batiments[NIVB] || { niveaux: [] }).niveaux : CONF[k]; }
+  function liste(k) { var b = CONF.batiments[NIVB] || { niveaux: [], zones: [] }; return k === "niv" ? b.niveaux : k === "zon" ? b.zones : CONF[k]; }
   $("#ref").addEventListener("change", function (e) {
     if (e.target.id === "niv-bat") { NIVB = +e.target.value; MQ.foc = null; dessineRef(); }
     else if (e.target.dataset.copie != null && e.target.value !== "") {
@@ -825,7 +840,7 @@
     { k: "types", t: "Types de document", aide: "Plans, détails, notes de calcul, fiches, rapports… Coche « n° propres » pour un type qui a sa propre suite de numéros (ex. ARM et LIS, qui reprennent le n° de l'ouvrage) ; les autres partagent la numérotation commune.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["propre", "N° propres", 90, "case"]] },
     { k: "batiments", t: "Bâtiments", aide: "Un ou plusieurs bâtiments. Longueur et largeur dessinent l'emprise (20 × 15 m si vide) ; X et Y placent le bâtiment sur le site (sinon côte à côte).", cols: [["c", "Code", 90], ["lib", "Nom"], ["lg", "Long. (m)", 76, "nb"], ["la", "Larg. (m)", 76, "nb"], ["x", "X (m)", 64, "nb"], ["y", "Y (m)", 64, "nb"]] },
     { k: "niv", t: "Niveaux du bâtiment", aide: "Chaque bâtiment a ses niveaux, du plus bas au plus haut. Hauteur d'étage : 3 m si vide. Altitude : facultative, sinon les niveaux s'empilent. « Hors maquette » pour un niveau fictif (ex. 000 tous niveaux).", cols: [["c", "Code", 76], ["lib", "Libellé"], ["h", "Haut. (m)", 72, "nb"], ["alt", "Alt. (m)", 72, "nb"], ["fictif", "Hors maq.", 62, "case"]] },
-    { k: "zones", t: "Zones", aide: "Zones ou secteurs. « Bâtiments » : vide = tous.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["bat", "Bâtiments", 140]] }
+    { k: "zones", t: "Zones du chantier (regroupements entre bâtiments)", aide: "Une zone qui en regroupe d'autres sur plusieurs bâtiments. « Regroupe » : codes de bâtiments (tout le bâtiment) ou de zones, séparés par une virgule ; * = tout le chantier. Les zones d'un bâtiment se saisissent sous ce bâtiment.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["regroupe", "Regroupe", 200]] }
   ];
   function dessineRef() {
     var h = '<div class="bloc"><h3>Chantier et code des documents</h3><p>Fais glisser les trigrammes sur l\'exemple pour changer leur ordre ; × en retire un, les boutons du dessous en ajoutent.</p>' +
@@ -871,7 +886,7 @@
         '<button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|1" : "|-1") + '" data-b="' + b + '" title="Monter">↑</button><button class="mini plus" data-mv="' + l + "|" + i + (l === "niv" ? "|-1" : "|1") + '" data-b="' + b + '" title="Descendre">↓</button>' +
         '<button class="mini" data-sup="' + l + "|" + i + '" data-b="' + b + '" title="' + (l === "batiments" ? "Retirer le bâtiment et ses niveaux" : "Retirer le niveau") + '">×</button></td>';
     }
-    var h = '<div class="bloc"><h3>Bâtiments et niveaux</h3><p>Chaque bâtiment, puis ses niveaux comme dans le bâtiment : le plus haut en haut, le plus bas en bas (« + » sur la ligne du bâtiment ajoute un niveau au-dessus). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
+    var h = '<div class="bloc"><h3>Bâtiments, niveaux et zones</h3><p>Chaque bâtiment, puis ses niveaux et ses zones. niveaux comme dans le bâtiment : le plus haut en haut, le plus bas en bas (« + » sur la ligne du bâtiment ajoute un niveau au-dessus). Bâtiment : longueur et largeur de l\'emprise (20 × 15 m si vide), X et Y pour le placer (sinon côte à côte). Niveau : hauteur d\'étage (3 m si vide), altitude facultative (sinon les niveaux s\'empilent), « hors maquette » pour un niveau fictif comme 000.</p>' +
       '<table class="t-bat"><thead><tr><th style="width:96px">Code</th><th>Nom</th><th style="width:78px">Long. (m)</th><th style="width:78px">Larg. (m)</th><th style="width:70px">X (m)</th><th style="width:70px">Y (m)</th><th style="width:124px"></th></tr></thead><tbody>';
     if (!CONF.batiments.length) h += '<tr><td colspan="7" style="color:var(--texte-faible);padding:8px 4px">Aucun bâtiment pour l\'instant.</td></tr>';
     CONF.batiments.forEach(function (b, bi) {
@@ -886,6 +901,14 @@
         var n = x[0], i = x[1];
         h += '<tr class="l-niv">' + ch("niv", bi, i, "c", n.c, { mono: 1, sty: "padding-left:22px" }) + ch("niv", bi, i, "lib", n.lib) + ch("niv", bi, i, "h", n.h, { nb: 1, mono: 1, ph: "3" }) + ch("niv", bi, i, "alt", n.alt, { nb: 1, mono: 1 }) +
           ch("niv", bi, i, "fictif", n.fictif, { cas: 1 }) + "<td></td>" + act("niv", bi, i) + "</tr>";
+      });
+      // zones du bâtiment ; une zone qui en regroupe d'autres liste leurs codes (* = toutes)
+      h += '<tr class="l-tete"><td class="ind">Zones de ' + esc(b.c || "ce bâtiment") + '</td><td>Libellé</td><td colspan="4">Regroupe (codes de zones ; * = toutes ; vide = zone simple)</td><td><button class="mini plus" data-ajout="zon" data-b="' + bi + '" title="Ajouter une zone à ce bâtiment">+</button></td></tr>';
+      if (!b.zones.length) h += '<tr class="l-niv l-zon"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucune zone : « + » ci-dessus.</td></tr>';
+      b.zones.forEach(function (z, i) {
+        var mal = (z.regroupe && z.regroupe !== "*") ? z.regroupe.split(/[\s,;]+/).filter(function (k) { return k && !b.zones.some(function (y) { return U(y.c) === U(k); }); }) : [];
+        h += '<tr class="l-niv l-zon">' + ch("zon", bi, i, "c", z.c, { mono: 1, sty: "padding-left:22px" }) + ch("zon", bi, i, "lib", z.lib) +
+          '<td colspan="4"><input class="champ mono" maxlength="300" data-l="zon" data-b="' + bi + '" data-i="' + i + '" data-c="regroupe" value="' + esc(z.regroupe || "") + '" placeholder="zone simple"' + (mal.length ? ' style="border-color:var(--rouge)" title="Zones inconnues dans ce bâtiment : ' + esc(mal.join(", ")) + '"' : "") + "></td>" + act("zon", bi, i) + "</tr>";
       });
     });
     return h + '</tbody></table><button class="btn ajout" data-ajout="batiments">+ Ajouter un bâtiment</button></div>';
@@ -942,7 +965,7 @@
       else if (d.g === "chiffres") CONF.chiffres = Math.max(1, Math.min(6, parseInt(v, 10) || 4));
       else CONF[d.g] = v;
     } else if (d.l) {
-      if (d.l === "niv") NIVB = +d.b;
+      if (d.l === "niv" || d.l === "zon") NIVB = +d.b;
       liste(d.l)[+d.i][d.c] = d.c === "c" ? v.trim() : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
       if (d.l === "batiments" || d.l === "niv") dessineMaquette();
       if (d.l === "batiments" && (d.c === "c" || d.c === "lib")) { var sb = $("#niv-bat"); if (sb && sb.options[+d.i]) sb.options[+d.i].textContent = (CONF.batiments[+d.i].c || "?") + (CONF.batiments[+d.i].lib ? " · " + CONF.batiments[+d.i].lib : ""); }
@@ -956,10 +979,10 @@
   });
   $("#ref").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return; var d = b.dataset, s;
-    if (d.b != null && /^niv/.test(d.ajout || d.sup || d.mv || "")) NIVB = +d.b;
+    if (d.b != null && /^(niv|zon)/.test(d.ajout || d.sup || d.mv || "")) NIVB = +d.b;
     if (d.segx) { CONF.segments = CONF.segments.filter(function (k) { return k !== d.segx; }); marque(); majSegs(); return; }
     if (d.segplus) { CONF.segments.splice(Math.max(0, CONF.segments.indexOf("numero")), 0, d.segplus); marque(); majSegs(); return; }
-    if (d.ajout) liste(d.ajout).push(d.ajout === "batiments" ? { c: "", lib: "", niveaux: [] } : { c: "", lib: "" });
+    if (d.ajout) liste(d.ajout).push(d.ajout === "batiments" ? { c: "", lib: "", niveaux: [], zones: [] } : d.ajout === "zon" || d.ajout === "zones" ? { c: "", lib: "", regroupe: "" } : { c: "", lib: "" });
     else if (d.sup) { s = d.sup.split("|"); liste(s[0]).splice(+s[1], 1); }
     else if (d.mv) { s = d.mv.split("|"); var L = liste(s[0]), i = +s[1], j = i + +s[2]; if (j < 0 || j >= L.length) return; L.splice(j, 0, L.splice(i, 1)[0]); }
     else if (d.ajoutPlage !== undefined) {
@@ -1001,7 +1024,7 @@
   $("#b-enreg").addEventListener("click", function () {
     if (!verifiePlages()) { toast("Corrige d'abord les plages signalées en rouge.", 4000); return; }
     ["disciplines", "phases", "types", "batiments", "zones"].forEach(function (k) { CONF[k] = CONF[k].filter(function (x) { return x.c; }); });
-    CONF.batiments.forEach(function (b) { b.niveaux = b.niveaux.filter(function (x) { return x.c; }); });
+    CONF.batiments.forEach(function (b) { b.niveaux = b.niveaux.filter(function (x) { return x.c; }); b.zones = b.zones.filter(function (x) { return x.c; }); });
     var corps = { config: CONF, modifie_par: moi() };
     if (CUR._code != null && String(CUR._code).trim()) corps.code = String(CUR._code).trim();
     if (CUR._nom != null) corps.nom = CUR._nom.trim();
@@ -1033,7 +1056,7 @@
         F.push({ numero_feuille: codeDoc(r, n), nom_feuille: r.titre || lib("types", r.type) || r.type, indice: "00",
           trigrammes: CONF.segments.map(function (k) { return { cle: k, libelle: SEGMENTS[k], valeur: v[k] }; }),
           parametres: { projet: v.projet, discipline: v.discipline, emetteur: v.emetteur, phase: v.phase, type: v.type, batiment: v.batiment, niveau: v.niveau, zone: v.zone, numero: v.numero },
-          libelles: { discipline: lib("disciplines", r.discipline), phase: lib("phases", r.phase), type: lib("types", r.type), batiment: lib("batiments", r.batiment), niveau: libNiv(r.batiment, r.niveau), zone: lib("zones", r.zone) },
+          libelles: { discipline: lib("disciplines", r.discipline), phase: lib("phases", r.phase), type: lib("types", r.type), batiment: lib("batiments", r.batiment), niveau: libNiv(r.batiment, r.niveau), zone: libZone(r.batiment, r.zone) },
           plage: (plageDuBloc(r.de, r.a) || { chemin: "" }).chemin, reserve_par: r.par, echeance: r.echeance, statut: statutDe(r).c, reservation: r.id });
       }
     });
