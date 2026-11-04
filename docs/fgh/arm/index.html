@@ -44,6 +44,7 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
 .step{font-size:13px;color:var(--mut);font-weight:600}
 .q{font-size:24px;font-weight:800;margin:2px 0 16px;line-height:1.2}
 .fld{display:block;background:var(--card);padding:10px 14px;margin-bottom:8px}
+.stitre{font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 6px}
 .fld>span{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
 .fld input,.fld textarea{width:100%;border:0;background:transparent;color:var(--ink);font:600 17px Inter,sans-serif;padding:2px 0;outline:none}
 .fld textarea{font-weight:500;font-size:16px;min-height:58px;resize:vertical}
@@ -982,12 +983,12 @@ function repItems(){
   const b=PHOTOS.map((p,i)=>({p,i})).filter(x=>x.p.statut==='reprise'&&!dejaVu(x.p)).map(x=>({txt:x.p.comment||'voir photo',ref:'photo '+pad(x.i+1)}));
   const c=(CUR.reprises||[]).filter(r=>r.txt&&r.txt.trim()).map(r=>({txt:r.txt.trim(),ref:''}));return[...a,...b,...c];}
 function autoConclusion(force){
-  if(CUR.concl_manual&&!force)return;const it=repItems();
+  const it=repItems();
   if(!it.length){CUR.conclusions_texte_1='';CUR.conclusions_texte_2='';if(!CUR.conclusion&&!CUR.concl_choix)CUR.conclusion='ok';}
   else{if(!CUR.concl_choix)CUR.conclusion='pas_ok';const parts=it.map(x=>x.txt.replace(/[.;\s]+$/,'')+(x.ref?' ('+x.ref+')':''));
-    const full='Reprises à effectuer avant bétonnage : '+parts.join(' ; ')+'.';
+    const tete=CUR.conclusion==='remarque'?'Remarques':'Reprises à effectuer avant bétonnage';const full=tete+' : '+parts.join(' ; ')+'.';
     if(full.length<=110){CUR.conclusions_texte_1=full;CUR.conclusions_texte_2='';}
-    else{const h=Math.ceil(parts.length/2);CUR.conclusions_texte_1='Reprises avant bétonnage : '+parts.slice(0,h).join(' ; ')+' ;';CUR.conclusions_texte_2=parts.slice(h).join(' ; ')+'.';}}
+    else{const h=Math.ceil(parts.length/2);CUR.conclusions_texte_1=(CUR.conclusion==='remarque'?'Remarques':'Reprises avant bétonnage')+' : '+parts.slice(0,h).join(' ; ')+' ;';CUR.conclusions_texte_2=parts.slice(h).join(' ; ')+'.';}}
   CUR.concl_manual=false;save();}
 
 /* ---------- étapes du questionnaire ---------- */
@@ -995,8 +996,8 @@ const STEPS=[
  {t:'Élément',q:'Quel élément contrôles-tu ?',r:()=>F('ouvrage','Type d\'élément (mémorise coffrage, béton, cure…)',{chips:OUVRAGES,ph:'ex. Élévation'})+
    F('elements_precis','Élévations contrôlées (facultatif)',{ph:'ex. B4-B5'})+
    `<p class="muted" style="margin:-4px 0 12px">Sur la fiche, « Type d'élément » : <b id="teApercu">${esc(CUR.type_element||'—')}</b></p>`+
-   `<div class="fld"><span>Localisation (partie d'ouvrage) : étage</span></div><div class="chips" data-loc="loc_etage">${locEtages().map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_etage===x?'on':''}">${esc(x)}</button>`).join('')}</div>
-   <div class="fld"><span>puis, si besoin : noyau, gaine ou zone</span></div><div class="chips" data-loc="loc_partie">${LOC_PARTIES.map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_partie===x?'on':''}">${esc(x)}</button>`).join('')}</div>`+
+   `<div class="stitre">Localisation (partie d'ouvrage) : étage</div><div class="chips" data-loc="loc_etage">${locEtages().map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_etage===x?'on':''}">${esc(x)}</button>`).join('')}</div>
+   <div class="stitre">puis, si besoin : noyau, gaine ou zone</div><div class="chips" data-loc="loc_partie">${LOC_PARTIES.map(x=>`<button data-v="${esc(x)}" class="${CUR.loc_partie===x?'on':''}">${esc(x)}</button>`).join('')}</div>`+
    F('localisation','Localisation (sur la fiche, 20 caractères au plus)',{max:20,ph:'ex. étage 4 – Noyau B'})+
    F('description','Description = localisation + type d\'élément (nom de la fiche et du dossier photos)',{ph:'ex. étage 4 – Noyau B – Élévation B4-B5'})+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>N° de contrôle</span><input data-k="numero" inputmode="numeric" value="${esc(CUR.numero)}"></label>
@@ -1042,22 +1043,19 @@ const STEPS=[
    `<p class="muted">Un ✗ ajoute le point dans les reprises de la conclusion. 📷 rattache une photo au point, même s'il est OK.</p>`,
    b:root=>bindChecks(root)},
  {t:'Bétonnage',q:'Bétonnage',r:()=>F('beton_qualite','Qualité du béton',{ph:'ex. C30/37 XC4'})+F('adjuvant','Adjuvant',{chips:['Selon besoin entreprise','Antigel','Retardateur de prise']})+
-   `<div class="fld"><span>Traitement après bétonnage</span></div><div class="chips" data-multi="traitement">${TRAIT.map(([k,l])=>`<button data-v="${k}" class="${(CUR.traitement||[]).includes(k)?'on':''}">${l}</button>`).join('')}</div>`+
+   `<div class="stitre">Traitement après bétonnage</div><div class="chips" data-multi="traitement">${TRAIT.map(([k,l])=>`<button data-v="${k}" class="${(CUR.traitement||[]).includes(k)?'on':''}">${l}</button>`).join('')}</div>`+
    F('essai_nature','Essais demandés : nature',{chips:['Selon besoin entreprise']})+F('essai_nombre','Nombre',{num:true}),
    b:root=>root.querySelector('[data-multi]').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;const t=CUR.traitement||[];CUR.traitement=t.includes(v)?t.filter(x=>x!==v):[...t,v];if(CUR._auto)delete CUR._auto.traitement;b.classList.toggle('on');save();}},
  {t:'Conclusion',q:'Conclusion',pre:()=>autoConclusion(false),r:()=>{const it=repItems();
    return (it.length?it.map(x=>`<div class="rep">⚠ ${esc(x.txt)}${x.ref?' ('+x.ref+')':''}</div>`).join(''):'<div class="okmsg">Aucune reprise relevée</div>')+
    `<div class="row2"><button class="ok ${CUR.conclusion==='ok'?'on':''}" data-c="ok">Validé</button><button class="ok ${CUR.conclusion==='remarque'?'on':''}" data-c="remarque">Validé avec remarque</button><button class="ko ${CUR.conclusion==='pas_ok'?'on':''}" data-c="pas_ok">À reprendre</button></div>`+
    `<button class="btn" id="bDictRep">🎤 Dicter les reprises</button><p class="muted" style="margin-top:-2px">Dis « photo 2 : … » pour écrire sous la photo 2 ; le reste devient une reprise sans photo.</p>`+
-   `<div class="fld"><span>Reprises sans photo</span></div>`+(CUR.reprises||[]).map((r,i)=>`<div class="fldmic"><label class="fld"><textarea data-ri="${i}" placeholder="ex. nettoyer le fond de coffrage">${esc(r.txt)}</textarea></label><div style="display:flex;flex-direction:column;gap:6px"><button class="mic" data-rmic="${i}">🎤</button><button class="mic" style="background:var(--kob);color:var(--ko)" data-rdel="${i}">✕</button></div></div>`).join('')+
+   `<div class="stitre">Reprises sans photo</div>`+(CUR.reprises||[]).map((r,i)=>`<div class="fldmic"><label class="fld"><textarea data-ri="${i}" placeholder="ex. nettoyer le fond de coffrage">${esc(r.txt)}</textarea></label><div style="display:flex;flex-direction:column;gap:6px"><button class="mic" data-rmic="${i}">🎤</button><button class="mic" style="background:var(--kob);color:var(--ko)" data-rdel="${i}">✕</button></div></div>`).join('')+
    `<button class="btn w" id="bAddRep">+ Ajouter une reprise sans photo</button>`+
-   MIC('conclusions_texte_1','Mesures (ligne 1)')+MIC('conclusions_texte_2','Mesures (ligne 2)')+
-   `<button class="btn w" id="bRegen">Régénérer le texte depuis les reprises</button>`+
-   `<div class="fld"><span>Signatures</span></div><div class="row2" style="margin:0 0 8px">${[['sig_ctrl','Contrôleur'],['sig_cm','Contremaître']].map(([k,l])=>`<button class="${CUR[k]?'ok on':''}" data-sig="${k}" style="display:flex;flex-direction:column;align-items:center;gap:4px">${CUR[k]?`<img src="${CUR[k]}" style="height:34px;background:#fff">`:'✍︎'}<span style="font-size:13px">${l}${CUR[k]?' ✓':''}</span></button>`).join('')}</div>`+
+   `<div class="stitre">Signatures</div><div class="row2" style="margin:0 0 8px">${[['sig_ctrl','Contrôleur'],['sig_cm','Contremaître']].map(([k,l])=>`<button class="${CUR[k]?'ok on':''}" data-sig="${k}" style="display:flex;flex-direction:column;align-items:center;gap:4px">${CUR[k]?`<img src="${CUR[k]}" style="height:34px;background:#fff">`:'✍︎'}<span style="font-size:13px">${l}${CUR[k]?' ✓':''}</span></button>`).join('')}</div>`+
    `<div class="row2" style="margin:0"><label class="fld" style="flex:1;margin:0"><span>Entreprise informée le</span><input data-k="entreprise_informee_le" value="${esc(CUR.entreprise_informee_le)}"></label>
    <label class="fld" style="flex:1;margin:0"><span>Auteur</span><input data-k="auteur" value="${esc(CUR.auteur)}"></label></div>`;},
    b:root=>{root.querySelectorAll('[data-c]').forEach(x=>x.onclick=()=>{CUR.conclusion=CUR.conclusion===x.dataset.c?'':x.dataset.c;CUR.concl_choix=!!CUR.conclusion;save();renderStep();});
-     $('#bRegen').onclick=()=>{autoConclusion(true);renderStep();toast('Texte régénéré');};
      CUR.reprises=CUR.reprises||[];
      root.querySelectorAll('[data-sig]').forEach(b=>b.onclick=()=>signPad(b.dataset.sig==='sig_ctrl'?'Signature du contrôleur':'Signature du contremaître',CUR[b.dataset.sig],v=>{CUR[b.dataset.sig]=v;if(v)CUR.signedAt=nowStamp();save();renderStep();}));
      root.querySelectorAll('[data-ri]').forEach(t=>t.oninput=()=>{CUR.reprises[+t.dataset.ri].txt=t.value;save();});
