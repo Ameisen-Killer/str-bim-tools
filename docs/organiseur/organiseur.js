@@ -602,6 +602,7 @@
   $("#detail").addEventListener("click", function (e) {
     if (e.target.closest("#d-res")) { ouvreRes(null, { plage: SEL, type: ESPACE !== "*" ? ESPACE : "" }); return; }
     var c = e.target.closest(".case");
+    if (c && GL.avale) { GL.avale = false; return; }
     if (c) {
       var n = +c.dataset.n, o = occupation(ESPACE)[n];
       if (o && o.r) ouvreRes(o.r); else if (!o) ouvreRes(null, { plage: SEL, de: n, type: ESPACE !== "*" ? ESPACE : "" });
@@ -609,6 +610,74 @@
       return;
     }
     var tr = e.target.closest("tr[data-id]"); if (tr) ouvreRes(RES.filter(function (r) { return r.id === tr.dataset.id; })[0]);
+  });
+  // clic gauche maintenu sur les cases libres : sélection de plusieurs n° d'affilée, puis réservation
+  var GL = { de: null, a: null, avale: false };
+  function marqueSel() {
+    var x = Math.min(GL.de, GL.a), y = Math.max(GL.de, GL.a);
+    document.querySelectorAll("#detail .case").forEach(function (c) { var n = +c.dataset.n; c.classList.toggle("sel", GL.de != null && n >= x && n <= y); });
+  }
+  $("#detail").addEventListener("pointerdown", function (e) {
+    var c = e.target.closest(".case"); if (!c || e.button !== 0 || e.pointerType === "touch") return;
+    if (occupation(ESPACE)[+c.dataset.n]) return;
+    e.preventDefault(); GL.de = GL.a = +c.dataset.n; GL.avale = false;
+  });
+  document.addEventListener("pointermove", function (e) {
+    if (GL.de == null) return;
+    var c = document.elementFromPoint(e.clientX, e.clientY); c = c && c.closest && c.closest("#detail .case"); if (!c) return;
+    var n = +c.dataset.n; if (n !== GL.a) { GL.a = n; marqueSel(); }
+  });
+  document.addEventListener("pointerup", function () {
+    if (GL.de == null) return;
+    var x = Math.min(GL.de, GL.a), y = Math.max(GL.de, GL.a); GL.de = GL.a = null;
+    if (x === y) return;   // simple clic : géré par « click »
+    GL.avale = true; setTimeout(function () { GL.avale = false; }, 300);
+    ouvreRes(null, { plage: SEL, de: x, a: y, type: ESPACE !== "*" ? ESPACE : "" });
+    setTimeout(marqueSel, 0);
+  });
+
+  // menu du clic droit sur une case
+  function fermeMenu() { $("#menu-ctx").hidden = true; }
+  $("#detail").addEventListener("contextmenu", function (e) {
+    var c = e.target.closest(".case"); if (!c) return;
+    e.preventDefault();
+    var n = +c.dataset.n, o = occupation(ESPACE)[n], r = o && o.r, M = $("#menu-ctx"), h = '<div class="mc-t">N° ' + pad(n) + "</div>";
+    if (r) {
+      var nb = r.a - r.de + 1, bloc = pad(r.de) + (nb > 1 ? "–" + pad(r.a) : "");
+      h += '<button data-mc="liberer">Libérer ce n°' + (nb > 1 ? " (la réservation " + bloc + " est gardée sans lui)" : "") + "</button>" +
+        (nb > 1 ? '<button data-mc="supprimer" class="danger">Supprimer la réservation ' + bloc + " (" + nb + " n°)</button>" : '<button data-mc="supprimer" class="danger">Supprimer la réservation</button>') +
+        '<button data-mc="statut">' + (r.statut === "emis" ? "Repasser en réservé" : "Marquer comme émis") + "</button>" +
+        '<button data-mc="modifier">Modifier la réservation…</button>';
+    } else if (o && o.pl.length) h += '<div class="mc-i">Émis dans la liste des plans : rien à libérer ici.</div>';
+    else h += '<button data-mc="reserver">Réserver ce n°…</button>';
+    M.innerHTML = h; M.hidden = false; M.dataset.n = n; M.dataset.id = r ? r.id : "";
+    var w = M.offsetWidth, hh = M.offsetHeight;
+    M.style.left = Math.min(e.clientX, innerWidth - w - 6) + "px"; M.style.top = Math.min(e.clientY, innerHeight - hh - 6) + "px";
+  });
+  document.addEventListener("pointerdown", function (e) { if (!e.target.closest("#menu-ctx")) fermeMenu(); });
+  window.addEventListener("blur", fermeMenu); window.addEventListener("resize", fermeMenu);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermeMenu(); });
+  document.addEventListener("scroll", fermeMenu, true);
+  $("#menu-ctx").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-mc]"); if (!b) return;
+    var M = this, n = +M.dataset.n, r = RES.filter(function (x) { return x.id === M.dataset.id; })[0], a = b.dataset.mc; fermeMenu();
+    if (a === "reserver") { ouvreRes(null, { plage: SEL, de: n, type: ESPACE !== "*" ? ESPACE : "" }); return; }
+    if (!r) return;
+    if (a === "modifier") { ouvreRes(r); return; }
+    var q;
+    if (a === "statut") q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", prefer: "return=representation", corps: { statut: r.statut === "emis" ? "reserve" : "emis", modifie_par: moi() } });
+    else if (a === "supprimer" || (a === "liberer" && r.de === r.a)) {
+      if (a === "supprimer" && r.a > r.de && !window.confirm("Supprimer la réservation " + pad(r.de) + "–" + pad(r.a) + " (" + (r.a - r.de + 1) + " n°) ?")) return;
+      q = appel("doc_reservations?id=eq." + r.id, { methode: "DELETE" });
+    }
+    else if (n === r.de) q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: { de: n + 1, modifie_par: moi() } });
+    else if (n === r.a) q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: { a: n - 1, modifie_par: moi() } });
+    else {   // au milieu : la réservation est coupée en deux autour du n° libéré
+      var suite = {}; ["chantier", "type", "discipline", "phase", "batiment", "niveau", "zone", "titre", "par", "echeance", "statut", "remarque"].forEach(function (k) { suite[k] = r[k]; });
+      suite.de = n + 1; suite.a = r.a; suite.modifie_par = moi();
+      q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: { a: n - 1, modifie_par: moi() } }).then(function () { return appel("doc_reservations", { methode: "POST", corps: suite }); });
+    }
+    q.then(function () { toast(a === "statut" ? "État changé." : a === "supprimer" ? "Réservation supprimée." : "N° " + pad(n) + " libéré."); return rechargeDonnees(true); }).catch(function (err) { toast(err.message, 5000); rechargeDonnees(true); });
   });
   $("#detail").addEventListener("change", function (e) { if (e.target.id === "d-esp") { ESPACE = e.target.value; dessineDetail(); } });
 
@@ -687,7 +756,7 @@
       if (CONF.phases.length === 1) E.phase.value = CONF.phases[0].c;
       if (CONF.batiments.length === 1) E.batiment.value = CONF.batiments[0].c;
       remplitLieux(); E.par.value = moi(); E.statut.value = "reserve";
-      if (pre.de != null) { E.de.value = pre.de; E.a.value = pre.de; E.nombre.value = 1; } else propose();
+      if (pre.de != null) { var pa = pre.a != null ? pre.a : pre.de; E.de.value = pre.de; E.a.value = pa; E.nombre.value = pa - pre.de + 1; } else propose();
     }
     majCode(); $("#voile").hidden = false;
     setTimeout(function () { (r ? E.titre : E.type).focus(); }, 30);

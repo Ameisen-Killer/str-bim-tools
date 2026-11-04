@@ -158,7 +158,14 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .case.r{background:repeating-linear-gradient(135deg,#A86A14 0 3px,var(--c-res) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
 .case.e{background:repeating-linear-gradient(135deg,#2B6E35 0 3px,var(--c-emis) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
 .case.h{background:repeating-linear-gradient(135deg,#5E5E66 0 3px,var(--c-hors) 3px 6px);color:#fff;font-weight:700;text-shadow:0 0 3px rgba(0,0,0,.65)}
-.case.sel{outline:2px solid var(--texte)}
+.case.sel{outline:2px solid var(--texte);background:rgba(var(--or-rvb),.45);color:var(--texte)}
+.grille{user-select:none}
+.menu-ctx{position:fixed;z-index:70;min-width:220px;max-width:340px;padding:4px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre)}
+.menu-ctx .mc-t{padding:6px 10px 4px;font-family:var(--mono);font-size:12px;color:var(--texte-faible)}
+.menu-ctx .mc-i{padding:6px 10px 8px;font-size:12.5px;color:var(--texte-doux)}
+.menu-ctx button{display:block;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:4px;background:none;cursor:pointer;font-size:13px;color:var(--texte)}
+.menu-ctx button:hover{background:var(--controle-survol)}
+.menu-ctx button.danger{color:var(--rouge)}
 .compte{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 12px;font-size:13px}
 .compte b{font-family:var(--titre);font-size:18px;margin-right:4px}
 
@@ -394,7 +401,8 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
   </div>
 </div>
 
+<div class="menu-ctx" id="menu-ctx" role="menu" hidden></div>
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=19"></script>
+<script src="/organiseur/organiseur.js?v=20"></script>
 </body>
 </html>
