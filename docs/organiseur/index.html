@@ -113,7 +113,7 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .feuille{position:absolute;top:0;bottom:0;display:flex;border:0;padding:0;border-radius:2px;overflow:hidden;cursor:pointer;background:var(--cl)}
 .feuille i{display:block;height:100%}
 .feuille .e{background:repeating-linear-gradient(135deg,var(--cf) 0 3px,var(--cp) 3px 6px)}
-.feuille .r{background:var(--cp)}
+.feuille .r{background:repeating-linear-gradient(135deg,var(--cp) 0 3px,var(--cr) 3px 7px)}
 .feuille:hover{filter:brightness(1.15)}
 .feuille[aria-current="true"],.feuille.dans{outline:2px solid var(--texte);outline-offset:1px;z-index:2}
 .trou{position:absolute;top:3px;bottom:3px;border-radius:2px;background:repeating-linear-gradient(135deg,rgba(var(--encre),.18) 0 2px,transparent 2px 5px)}
@@ -137,7 +137,7 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .lot .bornes{font-family:var(--mono);font-size:11px;color:var(--texte-faible)}
 .lot .jauge{grid-column:1/-1;height:6px;border-radius:2px;background:var(--cl,var(--c-libre));display:flex;overflow:hidden}
 .jauge i{display:block;height:100%}
-.jauge .e{background:repeating-linear-gradient(135deg,var(--cf,#333) 0 2px,var(--cp,var(--c-emis)) 2px 4px)}.jauge .r{background:var(--cp,var(--c-res))}
+.jauge .e{background:repeating-linear-gradient(135deg,var(--cf,#333) 0 2px,var(--cp,var(--c-emis)) 2px 4px)}.jauge .r{background:repeating-linear-gradient(135deg,var(--cp,var(--c-res)) 0 2px,var(--cr,#F3D29A) 2px 5px)}
 .lot small{grid-column:1/-1;font-size:11px;color:var(--texte-faible)}
 .titre-arbre{padding:10px 10px 4px;font-size:11px;font-weight:600;color:var(--texte-faible);text-transform:uppercase;letter-spacing:.06em}
 
@@ -149,10 +149,13 @@ main{height:calc(100% - var(--haut) - 40px);min-height:0}
 .outils-d select option{background:var(--couche-2);color:var(--texte)}
 .legende{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--texte-doux)}
 .legende span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.legende .l-r::before{background:repeating-linear-gradient(135deg,#A86A14 0 2px,var(--c-res) 2px 4px)}
+.legende .l-e::before{background:repeating-linear-gradient(135deg,#2B6E35 0 2px,var(--c-emis) 2px 4px)}
+.legende .l-h::before{background:repeating-linear-gradient(135deg,#5E5E66 0 2px,var(--c-hors) 2px 4px)}
 .grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:3px;margin:0 0 16px}
 .case{height:26px;border:0;border-radius:3px;background:var(--c-libre);font-family:var(--mono);font-size:10.5px;color:var(--texte-faible);cursor:pointer;padding:0}
 .case:hover{outline:1px solid var(--or)}
-.case.r{background:var(--c-res);color:#241503}
+.case.r{background:repeating-linear-gradient(135deg,#A86A14 0 3px,var(--c-res) 3px 6px);color:#241503}
 .case.e{background:repeating-linear-gradient(135deg,#2B6E35 0 3px,var(--c-emis) 3px 6px);color:#fff}
 .case.h{background:repeating-linear-gradient(135deg,#5E5E66 0 3px,var(--c-hors) 3px 6px);color:#fff}
 .case.sel{outline:2px solid var(--texte)}
@@ -392,6 +395,6 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=17"></script>
+<script src="/organiseur/organiseur.js?v=18"></script>
 </body>
 </html>

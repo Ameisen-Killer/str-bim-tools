@@ -517,7 +517,7 @@
   }
   // dl : écart de clarté ; a : opacité (fond des n° libres)
   function couleur(cle, dl, a) { var c = teinte(cle); return "hsl(" + c[0] + " " + c[1] + "% " + Math.max(8, Math.min(92, c[2] + (dl || 0))) + "%" + (a != null ? " / " + a : "") + ")"; }
-  function vars(cle) { return "--cp:" + couleur(cle) + ";--cf:" + couleur(cle, -20) + ";--cl:" + couleur(cle, 0, 0.2); }
+  function vars(cle) { return "--cp:" + couleur(cle) + ";--cf:" + couleur(cle, -20) + ";--cr:" + couleur(cle, 22) + ";--cl:" + couleur(cle, 0, 0.2); }
   function dessineBande() {
     var B = $("#bande"), L = aplat();
     if (!L.length) { B.innerHTML = '<div class="bande-t"><span class="tt">Plages de numéros</span><span>aucune plage : construis-les dans « Référentiels du chantier »</span></div>'; return; }
@@ -545,7 +545,7 @@
       var q = pc(n); if (q - der < 6 && i < rep.length - 1) return ""; der = q;
       return '<span class="' + (i === 0 ? "g" : i === rep.length - 1 ? "d" : "") + '" style="left:' + (i === rep.length - 1 ? "100" : q.toFixed(3)) + '%">' + pad(n) + "</span>";
     }).join("") + "</div>";
-    h += '<div class="legende-p"><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,transparent 2px 4px)">Émis</span><span style="--m:var(--texte-doux)">Réservés</span><span style="--m:rgba(var(--encre),.18)">Libres</span>' +
+    h += '<div class="legende-p"><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,transparent 2px 4px)">Émis</span><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,rgba(var(--encre),.3) 2px 5px)">Réservés</span><span style="--m:rgba(var(--encre),.18)">Libres</span>' +
       (rep.length && T ? '<span style="--m:repeating-linear-gradient(135deg,rgba(var(--encre),.25) 0 2px,transparent 2px 5px)">Hors plage</span>' : "") + "</div>";
     B.innerHTML = h;
   }
@@ -595,7 +595,7 @@
       '<div class="compte"><span><b>' + s.libre + "</b>libres</span><span><b>" + s.r + "</b>réservés</span><span><b>" + s.e + "</b>émis</span></div>" +
       '<div class="outils-d"><button class="btn accent" id="d-res">Réserver dans cette plage</button>' +
       (esps.length > 1 ? '<select id="d-esp" title="Suite de numéros affichée">' + esps.map(function (e) { return '<option value="' + esc(e) + '"' + (e === ESPACE ? " selected" : "") + ">" + (e === "*" ? "Numérotation commune" : "N° propres " + esc(e) + " (" + esc(lib("types", e)) + ")") + "</option>"; }).join("") + "</select>" : "") +
-      '<span class="legende"><span style="--c:var(--c-libre)">Libre</span><span style="--c:var(--c-res)">Réservé</span><span style="--c:var(--c-emis)">Émis</span><span style="--c:var(--c-hors)">Émis sans réservation</span></span></div>' +
+      '<span class="legende"><span style="--c:var(--c-libre)">Libre</span><span class="l-r">Réservé</span><span class="l-e">Émis</span><span class="l-h">Émis sans réservation</span></span></div>' +
       '<div class="grille">' + cases + "</div>" +
       (dedans.length ? '<table><thead><tr><th>N°</th><th>Code</th><th>Titre</th><th>État</th></tr></thead><tbody>' + dedans.map(ligneRes).join("") + "</tbody></table>" : '<p class="vide" style="padding:0">Aucune réservation dans cette plage.</p>');
   }
