@@ -179,6 +179,24 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 .ajout-segs{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:10px;font-size:12px;color:var(--texte-faible)}
 .ajout-segs .btn{height:28px;padding:0 8px;font-size:12px}
 
+.ref-bat{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:20px;max-width:1440px;align-items:start}
+.ref-bat-l .bloc{max-width:none}
+.maquette{position:sticky;top:10px;margin-top:14px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;overflow:hidden}
+.mq-tete{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px 0}
+.mq-tete small{color:var(--texte-faible);font-size:11px}
+#mq{display:block;width:100%;height:400px;cursor:grab;touch-action:none;user-select:none}
+#mq:active{cursor:grabbing}
+.mq-sol{fill:rgba(var(--encre),.04);stroke:var(--texte-faible);stroke-dasharray:3 3;stroke-width:1}
+.mq-dalle{fill:rgba(var(--or-rvb),.05);stroke:var(--texte-doux);stroke-width:1}
+.mq-dalle.on{fill:rgba(var(--or-rvb),.32);stroke:var(--or);stroke-width:2}
+.mq-toit{fill:none;stroke:var(--texte);stroke-width:1.4}
+.mq-toit.on,.mq-arete.on{stroke:var(--or)}
+.mq-arete{stroke:var(--texte-faible);stroke-width:1}
+.mq-t{font:10px var(--sans);fill:var(--texte-doux)}
+.mq-t.on{fill:var(--or);font-weight:700}
+.mq-nom{font:600 12px var(--sans);fill:var(--texte)}
+@media (max-width:1100px){.ref-bat{grid-template-columns:1fr}.maquette{position:static;order:-1}#mq{height:320px}}
+
 /* ---------- Fenêtre de réservation ---------- */
 .voile{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:50;padding:12px}
 .fen{width:min(640px,100%);max-height:calc(100% - 8px);overflow:auto;background:var(--couche-2);border-radius:8px;box-shadow:var(--ombre);border:1px solid var(--ligne)}
@@ -306,6 +324,6 @@ select.champ option{background:var(--couche-2);color:var(--texte)}
 </div>
 
 <div class="toast" id="toast" role="status"></div>
-<script src="/organiseur/organiseur.js?v=2"></script>
+<script src="/organiseur/organiseur.js?v=3"></script>
 </body>
 </html>

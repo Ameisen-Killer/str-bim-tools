@@ -144,7 +144,7 @@
     c.batiments = [{ c: "FGH", lib: "Hôtel Fairmont Genève" }];
     var N = { "000": "Tous niveaux", "050": "SS-4", "060": "SS-3", "070": "SS-2", "080": "SS-1", "090": "Rez inf", "100": "Rez",
       "110": "Étage 1", "120": "Étage 2", "130": "Étage 3", "140": "Étage 4", "150": "Étage 5", "160": "Étage 6", "170": "Étage 7", "180": "Étage 8", "190": "Toiture" };
-    c.niveaux = Object.keys(N).map(function (k) { return { c: k, lib: N[k], bat: "" }; });
+    c.niveaux = Object.keys(N).map(function (k) { return { c: k, lib: N[k], bat: "", fictif: k === "000" }; });
     c.zones = (zones && zones.length ? zones : ["TTZ"]).map(function (z) { return { c: z, lib: z === "TTZ" ? "Toutes zones" : "Zone " + z, bat: "" }; });
     function P(lib, de, a, sous) { return { lib: lib, de: de, a: a, types: [], sous: (sous || []).map(function (s) { return P(s[2], s[0], s[1]); }) }; }
     c.plages = [
@@ -554,12 +554,79 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") { $("#voile").hidden = true; $("#voile-ch").hidden = true; } });
 
   // ------------------------------------------------------------------ référentiels
+  // ------------------------------------------------------------------ maquette filaire
+  // Chaque bâtiment : emprise rectangulaire, une dalle par niveau, arêtes verticales jusqu'au toit.
+  // Vue axonométrique qu'on tourne au pointeur ; le niveau ou le bâtiment en cours de saisie est en couleur.
+  var MQ = { th: -0.6, ph: 0.55, foc: null };
+  function nombre(v) { v = String(v).trim().replace(",", "."); if (v === "") return ""; var n = parseFloat(v); return isNaN(n) ? "" : n; }
+  function nb(v, def) { return typeof v === "number" && !isNaN(v) ? v : def; }
+  function modeleBat() {
+    var bats = CONF.batiments.length ? CONF.batiments : [{ c: "", lib: "" }], x0 = 0;
+    return bats.map(function (b, i) {
+      var L = Math.max(1, nb(b.lg, 20)), W = Math.max(1, nb(b.la, 15)), X = nb(b.x, x0), Y = nb(b.y, 0); x0 = X + L + 8;
+      var z = null, hp = 0, niv = [];
+      CONF.niveaux.forEach(function (n, k) {
+        if (n.fictif) return;
+        var bl = U(n.bat).split(/[\s,;]+/).filter(Boolean); if (bl.length && b.c && bl.indexOf(U(b.c)) < 0) return;
+        var h = Math.max(0.2, nb(n.h, 3)), zz = typeof n.alt === "number" ? n.alt : z == null ? 0 : z + hp;
+        niv.push({ k: k, n: n, z: zz, h: h }); z = zz; hp = h;
+      });
+      return { i: i, b: b, X: X, Y: Y, L: L, W: W, niv: niv, haut: niv.length ? niv[niv.length - 1].z + niv[niv.length - 1].h : 0, bas: niv.length ? Math.min.apply(null, niv.map(function (x) { return x.z; })) : 0 };
+    });
+  }
+  function dessineMaquette() {
+    var svg = $("#mq"); if (!svg) return;
+    var M = modeleBat(), ct = Math.cos(MQ.th), st = Math.sin(MQ.th), sp = Math.sin(MQ.ph), cp = Math.cos(MQ.ph);
+    function P(x, y, z) { return [x * ct - y * st, (x * st + y * ct) * sp - z * cp]; }
+    var pts = [];
+    M.forEach(function (m) { [m.bas, m.haut].forEach(function (z) { [[0, 0], [m.L, 0], [m.L, m.W], [0, m.W]].forEach(function (c) { pts.push(P(m.X + c[0], m.Y + c[1], z)); }); }); });
+    if (!pts.length) { svg.innerHTML = ""; return; }
+    var W = svg.clientWidth || 420, H = svg.clientHeight || 380, xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+    var x1 = Math.min.apply(null, xs), x2 = Math.max.apply(null, xs), y1 = Math.min.apply(null, ys), y2 = Math.max.apply(null, ys);
+    var e = Math.min((W - 130) / Math.max(1, x2 - x1), (H - 40) / Math.max(1, y2 - y1)), ox = 14 - x1 * e, oy = 26 - y1 * e;
+    function S(x, y, z) { var p = P(x, y, z); return [ox + p[0] * e, oy + p[1] * e]; }
+    function poly(m, z) { return [[0, 0], [m.L, 0], [m.L, m.W], [0, m.W]].map(function (c) { var q = S(m.X + c[0], m.Y + c[1], z); return q[0].toFixed(1) + "," + q[1].toFixed(1); }).join(" "); }
+    var h = "";
+    M.forEach(function (m) {
+      var onB = MQ.foc && MQ.foc.l === "batiments" && MQ.foc.i === m.i;
+      h += '<polygon class="mq-sol" points="' + poly(m, m.bas) + '"/>';
+      [[0, 0], [m.L, 0], [m.L, m.W], [0, m.W]].forEach(function (c) {
+        var a = S(m.X + c[0], m.Y + c[1], m.bas), b = S(m.X + c[0], m.Y + c[1], m.haut);
+        h += '<line class="mq-arete' + (onB ? " on" : "") + '" x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '"/>';
+      });
+      var dern = -1e9;
+      m.niv.forEach(function (v) {
+        var on = onB || (MQ.foc && MQ.foc.l === "niveaux" && MQ.foc.i === v.k);
+        h += '<polygon class="mq-dalle' + (on ? " on" : "") + '" points="' + poly(m, v.z) + '"><title>' + esc(v.n.c + " · " + v.n.lib + " · z = " + (Math.round(v.z * 100) / 100) + " m") + "</title></polygon>";
+        // étiquette au coin le plus à droite, sautée si elle chevauche la précédente (sauf niveau en cours)
+        var cs = [[0, 0], [m.L, 0], [m.L, m.W], [0, m.W]].map(function (c) { return S(m.X + c[0], m.Y + c[1], v.z); }).sort(function (a, b) { return b[0] - a[0]; })[0];
+        if (on || Math.abs(cs[1] - dern) >= 11) { dern = cs[1]; h += '<text class="mq-t' + (on ? " on" : "") + '" x="' + (cs[0] + 6).toFixed(1) + '" y="' + (cs[1] + 3.5).toFixed(1) + '">' + esc(v.n.lib || v.n.c) + "</text>"; }
+      });
+      h += '<polygon class="mq-toit' + (onB ? " on" : "") + '" points="' + poly(m, m.haut) + '"/>';
+      var t = S(m.X + m.L / 2, m.Y + m.W / 2, m.haut);
+      h += '<text class="mq-nom" x="' + t[0].toFixed(1) + '" y="' + (t[1] - 8).toFixed(1) + '" text-anchor="middle">' + esc(m.b.lib || m.b.c || "Bâtiment") + "</text>";
+    });
+    var n = M.reduce(function (s, m) { return s + m.niv.length; }, 0);
+    if (!n) h += '<text class="mq-t" x="14" y="' + (H - 12) + '">Ajoute des niveaux pour voir les étages.</text>';
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.innerHTML = h;
+  }
+  (function () {
+    var g = null;
+    $("#ref").addEventListener("pointerdown", function (e) { var s = e.target.closest("#mq"); if (!s) return; e.preventDefault(); s.setPointerCapture(e.pointerId); g = { x: e.clientX, y: e.clientY }; });
+    $("#ref").addEventListener("pointermove", function (e) {
+      if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; dessineMaquette();
+    });
+    ["pointerup", "pointercancel"].forEach(function (t) { $("#ref").addEventListener(t, function () { g = null; }); });
+    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; var f = (d.l === "batiments" || d.l === "niveaux") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
+    window.addEventListener("resize", function () { if (VUE === "ref") dessineMaquette(); });
+  })();
+
   var LISTES = [
     { k: "disciplines", t: "Disciplines", aide: "Code court qui entre dans le code du document (ex. STR).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "phases", t: "Phases", aide: "Phases du projet (ex. SIA 112 : 51 projet d'exécution).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "types", t: "Types de document", aide: "Plans, détails, notes de calcul, fiches, rapports… Coche « n° propres » pour un type qui a sa propre suite de numéros (ex. ARM et LIS, qui reprennent le n° de l'ouvrage) ; les autres partagent la numérotation commune.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["propre", "N° propres", 90, "case"]] },
-    { k: "batiments", t: "Bâtiments", aide: "Un ou plusieurs bâtiments du chantier.", cols: [["c", "Code", 110], ["lib", "Nom"]] },
-    { k: "niveaux", t: "Niveaux", aide: "Du plus bas au plus haut. « Bâtiments » : codes séparés par une virgule si le niveau n'existe que dans certains bâtiments (vide = tous).", cols: [["c", "Code", 110], ["lib", "Libellé"], ["bat", "Bâtiments", 140]] },
+    { k: "batiments", t: "Bâtiments", aide: "Un ou plusieurs bâtiments. Longueur et largeur dessinent l'emprise (20 × 15 m si vide) ; X et Y placent le bâtiment sur le site (sinon côte à côte).", cols: [["c", "Code", 90], ["lib", "Nom"], ["lg", "Long. (m)", 76, "nb"], ["la", "Larg. (m)", 76, "nb"], ["x", "X (m)", 64, "nb"], ["y", "Y (m)", 64, "nb"]] },
+    { k: "niveaux", t: "Niveaux", aide: "Du plus bas au plus haut. Hauteur d'étage : 3 m si vide. Altitude : facultative, sinon les niveaux s'empilent. « Hors maquette » pour un niveau fictif (ex. 000 tous niveaux). « Bâtiments » : codes séparés par une virgule si le niveau n'existe que dans certains bâtiments (vide = tous).", cols: [["c", "Code", 76], ["lib", "Libellé"], ["h", "Haut. (m)", 72, "nb"], ["alt", "Alt. (m)", 72, "nb"], ["fictif", "Hors maq.", 62, "case"], ["bat", "Bâtiments", 96]] },
     { k: "zones", t: "Zones", aide: "Zones ou secteurs. « Bâtiments » : vide = tous.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["bat", "Bâtiments", 140]] }
   ];
   function dessineRef() {
@@ -577,15 +644,18 @@
       '<table><thead><tr><th>Libellé</th><th style="width:96px">Du n°</th><th style="width:96px">Au n°</th><th style="width:150px">Types</th><th style="width:136px"></th></tr></thead><tbody id="ref-plages">' + lignesPlages() + "</tbody></table>" +
       '<button class="btn ajout" data-ajout-plage="">+ Ajouter un lot</button><div class="avert" id="ref-avert" style="color:var(--rouge);font-size:12.5px;margin-top:6px"></div></div>';
     LISTES.forEach(function (L) {
+      if (L.k === "batiments") h += '<div class="ref-bat"><div class="ref-bat-l">';
       h += '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + '</p><table><thead><tr>' + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
         CONF[L.k].map(function (e, i) {
           return "<tr>" + L.cols.map(function (c) {
             return c[3] === "case" ? '<td><input type="checkbox" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '"' + (e[c[0]] ? " checked" : "") + "></td>"
+              : c[3] === "nb" ? '<td><input class="champ mono" inputmode="decimal" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '" value="' + esc(e[c[0]] == null ? "" : e[c[0]]) + '" maxlength="12"></td>'
               : '<td><input class="champ' + (c[0] === "c" ? " mono" : "") + '" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '" value="' + esc(e[c[0]] || "") + '" maxlength="' + (c[0] === "c" ? 10 : 200) + '"></td>';
           }).join("") + '<td class="x"><button class="mini plus" data-mv="' + L.k + '|' + i + '|-1" title="Monter">↑</button><button class="mini plus" data-mv="' + L.k + '|' + i + '|1" title="Descendre">↓</button><button class="mini" data-sup="' + L.k + '|' + i + '" title="Retirer">×</button></td></tr>';
         }).join("") + '</tbody></table><button class="btn ajout" data-ajout="' + L.k + '">+ Ajouter</button></div>';
+      if (L.k === "zones") h += '</div><aside class="maquette"><div class="mq-tete"><b>Maquette filaire</b><small>glisser pour tourner</small></div><svg id="mq" role="img" aria-label="Maquette filaire des bâtiments et de leurs niveaux"></svg></aside></div>';
     });
-    $("#ref").innerHTML = h; majEnreg(); verifiePlages();
+    $("#ref").innerHTML = h; majEnreg(); verifiePlages(); dessineMaquette();
   }
   function exempleVal() { return valeurs({ type: (CONF.types[0] || {}).c, discipline: (CONF.disciplines[0] || {}).c, phase: (CONF.phases[0] || {}).c, batiment: (CONF.batiments[0] || {}).c, niveau: (CONF.niveaux[0] || {}).c, zone: (CONF.zones[0] || {}).c }, CONF.plages[0] ? +CONF.plages[0].de : 1); }
   function chipsSeg() {
@@ -639,7 +709,8 @@
       else if (d.g === "chiffres") CONF.chiffres = Math.max(1, Math.min(6, parseInt(v, 10) || 4));
       else CONF[d.g] = v;
     } else if (d.l) {
-      CONF[d.l][+d.i][d.c] = d.c === "c" ? U(v) : v;
+      CONF[d.l][+d.i][d.c] = d.c === "c" ? U(v) : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
+      if (d.l === "batiments" || d.l === "niveaux") dessineMaquette();
     } else if (d.p) {
       var x = plageDe(d.p).p;
       if (d.c === "types") x.types = v.split(/[\s,;]+/).map(U).filter(Boolean);
