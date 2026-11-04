@@ -839,16 +839,28 @@
   var MQ = { th: -0.6, ph: 0.55, foc: null };
   function nombre(v) { v = String(v).trim().replace(",", "."); if (v === "") return ""; var n = parseFloat(v); return isNaN(n) ? "" : n; }
   function nb(v, def) { return typeof v === "number" && !isNaN(v) ? v : def; }
+  // altitude de chaque niveau d'un bâtiment (donnée, ou empilée sur le niveau du dessous)
+  // et hauteur d'étage : l'écart avec le niveau du dessus quand celui-ci a une altitude donnée ;
+  // sinon (niveau le plus haut, ou dessus sans altitude) la hauteur saisie, 3 m par défaut
+  function etages(b) {
+    var L = [], z = null, hp = 0;
+    (b.niveaux || []).forEach(function (n, k) {
+      if (n.fictif) return;
+      var zz = typeof n.alt === "number" ? n.alt : z == null ? 0 : z + hp;
+      L.push({ k: k, n: n, z: zz, saisie: true }); z = zz; hp = Math.max(0.2, nb(n.h, 3));
+      L[L.length - 1].h = hp;
+    });
+    L.forEach(function (e, i) {
+      var d = L[i + 1];
+      if (d && typeof d.n.alt === "number" && d.z > e.z) { e.h = Math.round((d.z - e.z) * 1000) / 1000; e.saisie = false; }
+    });
+    return L;
+  }
   function modeleBat() {
     var bats = CONF.batiments.length ? CONF.batiments : [{ c: "", lib: "" }], x0 = 0;
     return bats.map(function (b, i) {
       var L = Math.max(1, nb(b.lg, 20)), W = Math.max(1, nb(b.la, 15)), X = nb(b.x, x0), Y = nb(b.y, 0); x0 = X + L + 8;
-      var z = null, hp = 0, niv = [];
-      (b.niveaux || []).forEach(function (n, k) {
-        if (n.fictif) return;
-        var h = Math.max(0.2, nb(n.h, 3)), zz = typeof n.alt === "number" ? n.alt : z == null ? 0 : z + hp;
-        niv.push({ k: k, n: n, z: zz, h: h }); z = zz; hp = h;
-      });
+      var niv = etages(b);
       return { i: i, b: b, X: X, Y: Y, L: L, W: W, niv: niv, haut: niv.length ? niv[niv.length - 1].z + niv[niv.length - 1].h : 0, bas: niv.length ? Math.min.apply(null, niv.map(function (x) { return x.z; })) : 0 };
     });
   }
@@ -939,7 +951,17 @@
 
   var NIVB = 0;   // bâtiment dont on édite les niveaux
   function liste(k) { var b = CONF.batiments[NIVB] || { niveaux: [], zones: [] }; return k === "niv" ? b.niveaux : k === "zon" ? b.zones : CONF[k]; }
+  // redessine le tableau (hauteurs calculées) en gardant le champ où le curseur est parti
+  function garde() {
+    setTimeout(function () {
+      var a = document.activeElement, d = a && a.dataset || {}, sel = d.l ? '#ref [data-l="' + d.l + '"][data-i="' + d.i + '"][data-c="' + d.c + '"]' + (d.b != null ? '[data-b="' + d.b + '"]' : "") : null;
+      var y = $("#ref").scrollTop; dessineRef(); $("#ref").scrollTop = y;
+      var n = sel && document.querySelector(sel); if (n) n.focus();
+    }, 0);
+  }
   $("#ref").addEventListener("change", function (e) {
+    var d0 = e.target.dataset || {};
+    if (d0.l === "niv" && (d0.c === "h" || d0.c === "fictif" || (d0.c === "alt" && typeof liste("niv")[+d0.i].alt !== "number"))) { garde(); return; }
     // altitude saisie : le niveau se range parmi les niveaux du bâtiment selon cette altitude
     var dd = e.target.dataset || {};
     if (dd.l === "niv" && dd.c === "alt") {
@@ -952,7 +974,7 @@
         if (zz <= nv.alt) pos = k + 1;
         z = zz; hp = Math.max(0.2, nb(x.h, 3));
       });
-      if (pos === ix) return;
+      if (pos === ix) { garde(); return; }
       reste.splice(pos, 0, nv); bt.niveaux = reste; marque(); dessineRef();
       var champ = document.querySelector('#ref input[data-l="niv"][data-b="' + dd.b + '"][data-i="' + pos + '"][data-c="alt"]');
       if (champ) { champ.focus(); champ.closest("tr").classList.add("bouge"); }
@@ -1029,9 +1051,11 @@
         (autres ? '<select class="champ" data-copie="' + bi + '" style="height:26px;font-size:12px"><option value="">Reprendre de…</option>' + autres + "</select>" : "") + "</td></tr>";
       if (!b.niveaux.length) h += '<tr class="l-niv"><td class="ind" colspan="7" style="color:var(--texte-faible);padding:4px 4px 10px 26px">Aucun niveau : bouton « + Niveau » ci-dessus.</td></tr>';
       // affichés comme dans le bâtiment : le plus haut en haut, le plus bas en bas (la liste reste rangée du bas vers le haut)
+      var ET = {}; etages(b).forEach(function (e) { ET[e.k] = e; });
       b.niveaux.map(function (n, i) { return [n, i]; }).reverse().forEach(function (x) {
-        var n = x[0], i = x[1];
-        h += '<tr class="l-niv">' + ch("niv", bi, i, "c", n.c, { mono: 1, sty: "padding-left:22px" }) + ch("niv", bi, i, "lib", n.lib) + ch("niv", bi, i, "h", n.h, { nb: 1, mono: 1, ph: "3" }) + ch("niv", bi, i, "alt", n.alt, { nb: 1, mono: 1 }) +
+        var n = x[0], i = x[1], et = ET[i];
+        var cH = et && !et.saisie ? '<td><span class="h-calc" title="Calculée : altitude du niveau au-dessus moins celle-ci">' + String(et.h).replace(".", ",") + "</span></td>" : ch("niv", bi, i, "h", n.h, { nb: 1, mono: 1, ph: "3" });
+        h += '<tr class="l-niv">' + ch("niv", bi, i, "c", n.c, { mono: 1, sty: "padding-left:22px" }) + ch("niv", bi, i, "lib", n.lib) + cH + ch("niv", bi, i, "alt", n.alt, { nb: 1, mono: 1 }) +
           ch("niv", bi, i, "fictif", n.fictif, { cas: 1 }) + "<td></td>" + act("niv", bi, i) + "</tr>";
       });
       // zones du bâtiment ; une zone qui en regroupe d'autres liste leurs codes (* = toutes)
