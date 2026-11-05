@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/portail.css?v=44">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=45">
 </head>
 <body>
 
@@ -185,9 +185,10 @@
     Object.keys(PAGES_MODULES).forEach(function (id) {
       var hote = Portail.vide(document.getElementById(id));
       PAGES_MODULES[id].filter(function (p) { return D.pagePermise(p.cle); }).forEach(function (p) {
-        var a = el("a", { class: "ab-page-ico", href: p.href });
-        a.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">' + p.ico + "</svg>";
-        a.appendChild(el("span", { text: p.nom }));
+        var a = el("a", { class: "ab-page-ico", href: p.href, "data-cle": p.cle });
+        // L'icône dans un cadre : la pastille du nombre s'y pose dans l'angle (pastille())
+        a.innerHTML = '<span class="ab-page-img"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">' + p.ico + "</svg></span>";
+        a.appendChild(el("span", { class: "ab-page-nom", text: p.nom }));
         hote.appendChild(a);
       });
     });
@@ -243,27 +244,35 @@
   }
 
   /* Sur la carte Communication : les demandes de congé qui attendent ma décision */
+  /* Les nombres à traiter, en pastille dans l'angle de l'icône de leur page
+     (05.11.2026, demande de Tony) : congés à valider sur Absences et congés,
+     messages du tchat sur Le bureau aujourd'hui, publications de la veille sur
+     Veille simap.ch. Le détail en bulle au survol. */
+  function pastille(cle, n, detail) {
+    var ico = document.querySelector('.ab-page-ico[data-cle="' + cle + '"]');
+    if (!ico) return null;
+    var vieille = ico.querySelector(".ab-pastille");
+    if (vieille) vieille.remove();
+    ico.removeAttribute("title");
+    if (!n) return ico;
+    ico.querySelector(".ab-page-img").appendChild(el("span", { class: "ab-pastille", "aria-hidden": "true", text: n > 99 ? "99+" : String(n) }));
+    ico.title = detail;
+    ico.setAttribute("aria-label", ico.querySelector(".ab-page-nom").textContent + " : " + detail);
+    return ico;
+  }
   function badgeConges() {
-    var carte = document.getElementById("module-comm"), ancien = carte.querySelector(".ab-badge:not(.tchat)");
-    if (ancien) ancien.remove();
     var n = D.congesAValider().length;
-    if (n) carte.appendChild(el("span", { class: "ab-badge", text: n + (n > 1 ? " congés à valider" : " congé à valider") }));
-    // Et les messages du tchat arrivés depuis ma dernière visite
+    pastille("absences", n, n + (n > 1 ? " congés à valider" : " congé à valider"));
+    // Les messages du tchat arrivés depuis ma dernière visite
     if (window.Tchat) Tchat.nonLus().then(function (nm) {
-      var b = carte.querySelector(".ab-badge.tchat");
-      if (b) b.remove();
-      document.getElementById("acces-comm").href = nm ? "/planif/communication/#tchat" : "/planif/communication/";
-      if (nm) carte.appendChild(el("span", { class: "ab-badge tchat", text: nm + (nm > 1 ? " nouveaux messages" : " nouveau message") }));
+      var ico = pastille("communication", nm, nm + (nm > 1 ? " nouveaux messages au tchat" : " nouveau message au tchat"));
+      if (ico) ico.href = nm ? "/planif/communication/#tchat" : "/planif/communication/";
     });
-    // Sur la carte Inter-secteurs : les nouvelles publications de la veille simap.ch
-    var inter = document.getElementById("module-inter"), vieux = inter.querySelector(".ab-badge");
-    if (vieux) vieux.remove();
-    // La veille est la première page du module ; sans elle, le module s'ouvre sur sa première page permise
+    // Les nouvelles publications de la veille simap.ch
     var nv = D.pagePermise("veille") ? D.veilleNouvelles().length : 0;
-    if (nv) {
-      document.getElementById("acces-inter").href = "/planif/inter-secteurs/";
-      inter.appendChild(el("span", { class: "ab-badge veille", text: nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication") }));
-    } else document.getElementById("acces-inter").href = D.lienModule("inter");
+    pastille("veille", nv, nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication"));
+    // La veille est la première page du module ; sans elle, le module s'ouvre sur sa première page permise
+    document.getElementById("acces-inter").href = D.pagePermise("veille") ? "/planif/inter-secteurs/" : D.lienModule("inter");
   }
 
   /** Plus importante d'abord : échéance, puis priorité (1 avant 5), puis libellé. */
