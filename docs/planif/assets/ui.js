@@ -2723,12 +2723,10 @@
      Un encadré bien visible en tête des pages Le bureau aujourd'hui et Absences
      et congés (05.11.2026, demande de Tony : « je ne vois pas clairement les
      demandes à valider »), avec Accepter / Refuser sur chaque ligne. Vide quand
-     rien n'attend ma décision. #a-valider dans l'adresse y mène (pastille de
-     l'accueil). */
+     rien n'attend ma décision. */
   var JOURS_DC = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
   function jourDC(iso) { var d = C.dt(iso); return d ? JOURS_DC[d.getDay()] + " " + C.fmtCourt(iso) : "—"; }
   function periodeDC(c) { return c.debut === c.fin ? jourDC(c.debut) : jourDC(c.debut) + " → " + jourDC(c.fin); }
-  var dcVu = false;
   function demandesConge(hote, surChange) {
     if (!hote) return;
     vide(hote);
@@ -2760,10 +2758,6 @@
       ]),
       ul
     ]));
-    if (!dcVu && location.hash === "#a-valider") {
-      dcVu = true;
-      requestAnimationFrame(function () { hote.scrollIntoView({ block: "start", behavior: "smooth" }); });
-    }
   }
   function decideConge(c, accepte, surChange) {
     var m = D.membre(c.membreId);
