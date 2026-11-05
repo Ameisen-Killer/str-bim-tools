@@ -16,8 +16,10 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 <style>
 /* Poser une absence d'un clic (13.10.2026) : la personne, ou un jour libre de sa ligne */
 .pl-nom.pose-absence{cursor:pointer;border-radius:6px;transition:background .2s}
@@ -41,27 +43,27 @@
    l'affaire. Il remplace la ligne de filtres à cases. */
 .eq-page{display:grid;grid-template-columns:272px 28px minmax(0,1fr);align-items:start;margin-top:10px}
 .eq-page.replie{grid-template-columns:0 28px minmax(0,1fr)}
-.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
+.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(calc(100vh * var(--vhk,1)) - var(--h-chrome,0px) - 20px);overflow:auto;
   display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
 .eq-page.replie .eq-bandeau{visibility:hidden;padding:0;overflow:hidden}
 .eq-bandeau .recherche{margin:0;padding:2px 0 8px}
-.eq-bandeau .recherche-champ{font-size:16px;min-width:0}
+.eq-bandeau .recherche-champ{font-size:var(--t-texte,15px);min-width:0}
 .eq-bandeau .recherche-touche{display:none}
 .eq-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
   background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
 .eq-replier:hover{color:var(--or);border-color:var(--or-doux)}
 .eq-arbre{display:flex;flex-direction:column;gap:1px}
-.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
-.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:5px 9px;border:0;border-radius:7px;background:none;
-  font:inherit;font-size:13.5px;color:var(--texte);text-align:left;cursor:pointer}
+.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:var(--t-mini,12px);font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
+.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:5px 10px;border:0;border-radius:7px;background:none;
+  font:inherit;font-size:var(--t-texte,15px);color:var(--texte);text-align:left;cursor:pointer}
 .eq-arbre button:hover{background:var(--ab-vert-pale)}
 .eq-arbre button[aria-current="true"]{background:var(--ab-vert-clair);font-weight:600}
-.eq-arbre button.niv1{padding-left:24px;font-size:13px;color:var(--texte-doux)}
+.eq-arbre button.niv1{padding-left:24px;font-size:var(--t-doux,14px);color:var(--texte-doux)}
 .eq-arbre button.niv0{font-weight:600}
 .eq-arbre button .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.eq-arbre button .n{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
-.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:12px;color:var(--texte-faible)}
-.eq-affaire select{width:100%;min-height:34px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:13px;color:var(--texte)}
+.eq-arbre button .n{flex:none;font-size:var(--t-petit,13px);color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:var(--t-petit,13px);color:var(--texte-faible)}
+.eq-affaire select{width:100%;min-height:36px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:var(--t-doux,14px);color:var(--texte)}
 .eq-contenu{min-width:0}
 .eq-contenu .section:first-child{margin-top:0}
 @media (max-width:760px){
@@ -71,7 +73,7 @@
   .eq-replier{position:static;width:100%;height:38px;margin:8px 0 10px;font-size:14px}
 }
 @media print{.eq-bandeau,.eq-replier{display:none}.eq-page{display:block}}
-.eq-masque{display:flex;align-items:center;gap:8px;margin:10px 8px 0;font-size:13px;color:var(--texte-doux);cursor:pointer}
+.eq-masque{display:flex;align-items:center;gap:8px;margin:10px 8px 0;font-size:var(--t-doux,14px);color:var(--texte-doux);cursor:pointer}
 </style>
 </head>
 <body class="large">
@@ -173,8 +175,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script>
@@ -708,8 +710,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var montre = function () {
           var d = Math.min(choix.a, choix.b), f = Math.max(choix.a, choix.b);
           var z = zone.getBoundingClientRect(), rd = cases[d].getBoundingClientRect(), rf = cases[f].getBoundingClientRect();
-          marque.style.left = (rd.left - z.left) + "px";
-          marque.style.width = (rf.right - rd.left) + "px";
+          var k = window.Echelle ? Echelle.k() : 1;   // le zoom de la page (echelle.js)
+          marque.style.left = (rd.left - z.left) / k + "px";
+          marque.style.width = (rf.right - rd.left) / k + "px";
           // Les jours que la personne aurait travaillés : ni week-end, ni férié, ni jour off (½ pour une demi-journée)
           var ouvres = Calc.joursTravaillesEntre(m, jours[d], jours[f], canton);
           marque.textContent = f > d || ouvres !== 1 ? C.fmtJours(ouvres) + " j" : "";

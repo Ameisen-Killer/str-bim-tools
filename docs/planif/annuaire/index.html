@@ -16,8 +16,10 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 </head>
 <body class="large">
 
@@ -59,8 +61,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script>
@@ -197,7 +199,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       }
       if (!c.telephone && !c.natel) telephones.appendChild(el("span", { class: "secondaire", text: "—" }));
 
-      corps.appendChild(suivi.marque(el("tr", {}, [
+      var rangee = el("tr", {}, [
         el("td", {}, [
           el("div", { class: "principal" }, [UI.surligne(nomAffiche(c), mots)]),
           personne && c.societe ? el("div", { class: "secondaire" }, [UI.surligne(c.societe, mots)]) : null
@@ -216,7 +218,20 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           UI.boutonIcone("modifier", "Modifier", nomAffiche(c), function () { formulaire(c.id); }),
           UI.boutonIcone("supprimer", "Supprimer", nomAffiche(c), function () { supprime(c); })
         ])
-      ]), c.id));
+      ]);
+      // Clic droit sur la ligne (05.11.2026) : appeler, écrire, modifier
+      rangee.addEventListener("contextmenu", function (e) {
+        if (e.target.closest("a, input, select, textarea")) return;
+        var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
+        UI.menuContexte(e, { titre: nomAffiche(c), items: [
+          tel("Appeler", c.telephone), tel("Appeler le natel", c.natel),
+          c.email ? { label: "Écrire à " + c.email, lien: "mailto:" + c.email } : null,
+          { sep: true },
+          { label: "Modifier", action: function () { formulaire(c.id); } },
+          { label: "Supprimer", rouge: true, action: function () { supprime(c); } }
+        ] });
+      });
+      corps.appendChild(suivi.marque(rangee, c.id));
     });
 
     hote.appendChild(el("table", { class: "liste", style: "min-width:1040px" }, [

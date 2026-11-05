@@ -113,7 +113,7 @@
    Déplacée par son titre ; plein écran sur téléphone. */
 .tc-fenetre{
   position:fixed;z-index:50;right:24px;bottom:24px;
-  width:min(440px,calc(100vw - 32px));height:min(640px,calc(100vh - 120px));
+  width:min(440px,calc(100vw - 32px));height:min(640px,calc(calc(100vh * var(--vhk,1)) - 120px));
   display:flex;flex-direction:column;padding:0 16px 14px;background:#fff;border-radius:12px;
   box-shadow:0 22px 60px rgba(30,34,38,.24),0 2px 8px rgba(30,34,38,.08);
 }
@@ -225,7 +225,7 @@
 .nw-ligne-lien{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--ligne-faible);background:#FBFBF9}
 .nw-ligne-lien[hidden]{display:none}
 .nw-lien-champ{flex:1;min-width:0;height:36px;border:1px solid var(--ligne);border-radius:6px;padding:0 10px;font:inherit;font-size:14px}
-.nw-editeur{min-height:320px;max-height:min(56vh,620px);overflow-y:auto;padding:14px 18px;outline:none}
+.nw-editeur{min-height:320px;max-height:min(calc(56vh * var(--vhk,1)),620px);overflow-y:auto;padding:14px 18px;outline:none}
 .nw-pied-edition{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--texte-faible)}
 @media (max-width:640px){
   .nw-champ-titre{font-size:18px}

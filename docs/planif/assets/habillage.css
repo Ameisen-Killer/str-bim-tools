@@ -148,7 +148,7 @@
 :root[data-version="v2"] .nav-badge[hidden]{display:none}
 
 /* --------------------------------------------------------- en-tête de page */
-:root[data-version="v2"] .entete{padding-top:clamp(22px,3.4vh,36px);padding-bottom:clamp(14px,2.4vh,22px)}
+:root[data-version="v2"] .entete{padding-top:clamp(22px,calc(3.4vh * var(--vhk,1)),36px);padding-bottom:clamp(14px,calc(2.4vh * var(--vhk,1)),22px)}
 :root[data-version="v2"] .entete h1{font-size:clamp(30px,3.6vw,50px);font-weight:700;letter-spacing:-.02em;line-height:1.08}
 :root[data-version="v2"] .entete h1 .compte-titre{font-size:clamp(14px,1.3vw,18px);font-weight:500;color:var(--texte-faible);letter-spacing:0}
 :root[data-version="v2"] .entete .chapeau{font-size:17px;color:var(--texte-faible)}
@@ -299,3 +299,66 @@
 :root[data-version="v2"] .barre{view-transition-name:planif-barre}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
 ::view-transition-group(planif-barre){animation-duration:0s}
+
+/* =====================================================================
+   Charte commune (05.11.2026, demande de Tony : « que chaque page respecte
+   une charte commune »). Toute la planification s'affiche à 90 % sur
+   ordinateur (echelle.css) ; les tailles ci-dessous sont celles d'avant ce
+   zoom. Une seule échelle de texte pour toutes les pages :
+     titre de page --t-h1 · titre de section ou de groupe --t-h2 ·
+     titre de fenêtre --t-fenetre · texte courant des listes, du bandeau de
+     gauche et des menus --t-texte (15) · texte d'appoint --t-doux (14) ·
+     libellés, compteurs, en-têtes de colonnes --t-petit (13) · intertitres
+     en capitales --t-mini (12).
+   ===================================================================== */
+:root[data-version="v2"]{
+  --t-h1:clamp(28px,2.8vw,40px);
+  --t-h2:clamp(19px,1.7vw,23px);
+  --t-fenetre:clamp(20px,1.8vw,24px);
+  --t-texte:15px;--t-doux:14px;--t-petit:13px;--t-mini:12px;
+}
+:root[data-version="v2"] .entete h1{font-size:var(--t-h1)}
+:root[data-version="v2"] .entete h1 .compte-titre{font-size:clamp(14px,1.2vw,17px)}
+:root[data-version="v2"] .tete-section h2,
+:root[data-version="v2"] .tete-section h2.titre-metier,
+:root[data-version="v2"] .groupe-taches h3,
+:root[data-version="v2"] .pl-groupe h3{font-size:var(--t-h2);font-weight:650}
+:root[data-version="v2"] .modale-tete h2{font-size:var(--t-fenetre);line-height:1.2}
+:root[data-version="v2"] .sous-nav a{font-size:var(--t-doux)}
+:root[data-version="v2"] table.liste td{font-size:var(--t-texte)}
+:root[data-version="v2"] table.liste .principal{font-size:var(--t-texte)}
+:root[data-version="v2"] table.liste th,:root[data-version="v2"] table.liste .secondaire{font-size:var(--t-petit)}
+
+/* Fenêtres : toutes resserrées comme le formulaire de tâche, et assez hautes
+   pour s'en passer d'ascenseur sur un écran d'ordinateur. */
+:root[data-version="v2"] .modale-boite{margin-top:clamp(12px,calc(4vh * var(--vhk,1)),44px);max-height:calc(calc(100dvh * var(--vhk,1)) - 40px)}
+:root[data-version="v2"] .compacte fieldset{margin-top:14px}
+:root[data-version="v2"] .compacte .grille-champs{gap:10px 16px}
+:root[data-version="v2"] .compacte .legende + .grille-champs{margin-top:8px}
+:root[data-version="v2"] .compacte .champ .aide{font-size:12px;line-height:1.35}
+/* Une case à cocher dans un champ : à sa taille, et lisible (elle héritait du
+   style des champs de saisie et des libellés, d'où une case perdue au milieu) */
+:root[data-version="v2"] .champ .case input,:root[data-version="v2"] .cases .case input{
+  width:auto;height:auto;min-height:0;padding:0;border:0;box-shadow:none;background:none;flex:none;accent-color:var(--m-fort)}
+:root[data-version="v2"] .champ > label.case{font-size:var(--t-doux);font-weight:450;color:var(--texte);justify-content:flex-start}
+:root[data-version="v2"] .case{font-family:inherit;letter-spacing:0;font-size:var(--t-doux);padding:7px 12px}
+:root[data-version="v2"] .cases{margin-top:4px}
+
+/* Menu du clic droit (UI.menuContexte), le même partout */
+.menu-ctx{
+  position:fixed;z-index:250;min-width:230px;max-width:min(340px,calc(100vw - 16px));
+  display:flex;flex-direction:column;padding:6px;
+  background:#fff;border:1px solid var(--ligne-faible,rgba(0,0,0,.08));border-radius:10px;
+  box-shadow:var(--ab-ombre-haute,0 10px 30px rgba(0,0,0,.14));animation:monte .16s cubic-bezier(.2,.7,.2,1);
+}
+.menu-ctx-titre{padding:6px 12px 6px;font-size:12px;font-weight:600;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-ctx-item{
+  display:flex;align-items:center;width:100%;min-height:36px;padding:8px 12px;margin:0;border:0;border-radius:6px;
+  background:none;color:var(--texte);font:inherit;font-size:var(--t-doux,14px);text-align:left;text-decoration:none;cursor:pointer;
+}
+.menu-ctx-item:hover,.menu-ctx-item:focus-visible{background:var(--m-pale);outline:none}
+.menu-ctx-item.rouge{color:var(--alerte)}
+.menu-ctx-sep{height:1px;margin:5px 8px;background:var(--ligne-faible,rgba(0,0,0,.08))}
+/* Priorité et parts terminées côte à côte dans le formulaire de tâche */
+:root[data-version="v2"] .champ-priorite .priorite-ligne input[type=range]{flex:1 1 110px}
+:root[data-version="v2"] .champ-priorite .priorite-lib{min-width:0;font-size:var(--t-petit)}

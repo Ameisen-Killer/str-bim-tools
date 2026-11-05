@@ -16,39 +16,41 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 <style>
 /* « 31 Ingénieurs » : même titre que les intertitres du calendrier des
    absences (planif.css .pl-groupe h3, habillage.css h3) — 14.10.2026 */
-:root[data-version="v2"] .tete-section h2.titre-metier{font-size:clamp(21px,2.4vw,28px);font-weight:650}
+:root[data-version="v2"] .tete-section h2.titre-metier{font-size:var(--t-h2,clamp(19px,1.7vw,23px));font-weight:650}
 @media print{:root[data-version="v2"] .tete-section h2.titre-metier{font-size:12pt}}
 /* Bandeau de gauche repliable (02.11.2026, demande de Tony, repris du bureau /planif2/) :
    recherche, « Tous », « Administrateurs », chaque succursale et ses secteurs, puis les
    rôles et l'affaire. Il remplace la ligne de filtres à cases. */
 .eq-page{display:grid;grid-template-columns:272px 28px minmax(0,1fr);align-items:start;margin-top:10px}
 .eq-page.replie{grid-template-columns:0 28px minmax(0,1fr)}
-.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(100vh - var(--h-chrome,0px) - 20px);overflow:auto;
+.eq-bandeau{position:sticky;top:calc(var(--h-chrome,0px) + 10px);max-height:calc(calc(100vh * var(--vhk,1)) - var(--h-chrome,0px) - 20px);overflow:auto;
   display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--noir);box-shadow:var(--ab-ombre)}
 .eq-page.replie .eq-bandeau{visibility:hidden;padding:0;overflow:hidden}
 .eq-bandeau .recherche{margin:0;padding:2px 0 8px}
-.eq-bandeau .recherche-champ{font-size:16px;min-width:0}
+.eq-bandeau .recherche-champ{font-size:var(--t-texte,15px);min-width:0}
 .eq-bandeau .recherche-touche{display:none}
 .eq-replier{position:sticky;top:calc(var(--h-chrome,0px) + 22px);justify-self:center;width:24px;height:44px;padding:0;border:1px solid var(--ligne);border-radius:7px;
   background:var(--noir);color:var(--texte-doux);font-size:16px;cursor:pointer;box-shadow:var(--ab-ombre)}
 .eq-replier:hover{color:var(--or);border-color:var(--or-doux)}
 .eq-arbre{display:flex;flex-direction:column;gap:1px}
-.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
-.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:5px 9px;border:0;border-radius:7px;background:none;
-  font:inherit;font-size:13.5px;color:var(--texte);text-align:left;cursor:pointer}
+.eq-arbre .titre-groupe{margin:12px 8px 4px;font-size:var(--t-mini,12px);font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--texte-faible)}
+.eq-arbre button{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:5px 10px;border:0;border-radius:7px;background:none;
+  font:inherit;font-size:var(--t-texte,15px);color:var(--texte);text-align:left;cursor:pointer}
 .eq-arbre button:hover{background:var(--ab-vert-pale)}
 .eq-arbre button[aria-current="true"]{background:var(--ab-vert-clair);font-weight:600}
-.eq-arbre button.niv1{padding-left:24px;font-size:13px;color:var(--texte-doux)}
+.eq-arbre button.niv1{padding-left:24px;font-size:var(--t-doux,14px);color:var(--texte-doux)}
 .eq-arbre button.niv0{font-weight:600}
 .eq-arbre button .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.eq-arbre button .n{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
-.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:12px;color:var(--texte-faible)}
-.eq-affaire select{width:100%;min-height:34px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:13px;color:var(--texte)}
+.eq-arbre button .n{flex:none;font-size:var(--t-petit,13px);color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.eq-affaire{display:flex;flex-direction:column;gap:4px;margin:4px 8px 0;font-size:var(--t-petit,13px);color:var(--texte-faible)}
+.eq-affaire select{width:100%;min-height:36px;padding:4px 8px;border:1px solid var(--ligne);border-radius:7px;background:#fff;font:inherit;font-size:var(--t-doux,14px);color:var(--texte)}
 .eq-contenu{min-width:0}
 .eq-contenu .section:first-child{margin-top:0}
 @media (max-width:760px){
@@ -119,8 +121,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script>
@@ -488,7 +490,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var periodes = aVenir(m), prochaine = periodes[0];
       var sousTitre = rattachement(m);
 
-      corps.appendChild(suivi.marque(el("tr", { style: m.actif ? "" : "opacity:.45" }, [
+      var rangee = el("tr", { style: m.actif ? "" : "opacity:.45" }, [
         el("td", {}, [
           el("div", { class: "principal" }, [UI.surligne(m.prenom + " " + m.nom, mots)]),
           el("div", { class: "secondaire" }, [sousTitre ? UI.surligne(sousTitre, mots)
@@ -520,7 +522,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           UI.boutonIcone("jours", D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", m.prenom + " " + m.nom, function () { UI.joursTravailles(m.id, dessine); }),
           UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); })
         ])
-      ]), m.id));
+      ]);
+      // Clic droit sur la ligne (05.11.2026) : les actions sur la personne
+      rangee.addEventListener("contextmenu", function (e) {
+        if (e.target.closest("a, input, select, textarea")) return;
+        var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
+        UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: [
+          { label: "Voir ses tâches", lien: "/planif/taches/?membre=" + encodeURIComponent(m.id) },
+          { label: "Absences", action: function () { UI.absences(m.id, dessine); } },
+          { label: D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", action: function () { UI.joursTravailles(m.id, dessine); } },
+          D.aDroit("membres_modifier") ? { label: "Modifier la fiche", action: function () { ficheMembre(m.id); } } : null,
+          { sep: true },
+          tel("Appeler le natel", m.telNatel), tel("Appeler la ligne directe", m.telExterne)
+        ] });
+      });
+      corps.appendChild(suivi.marque(rangee, m.id));
     });
 
     hote.appendChild(el("table", { class: "liste" }, [

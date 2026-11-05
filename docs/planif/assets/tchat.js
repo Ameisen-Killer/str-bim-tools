@@ -506,12 +506,18 @@
      Échap la ferme. Ouverte, elle le reste d'une page à l'autre de l'onglet. */
   var ouvert = false, fenetre = null, fenetreIci = false, CLE_POS = "planif.tchat.pos", CLE_OUVERT = "planif.tchat.ouvert";
 
+  /* x, y : position à l'écran (pointeur, mesures), retenue telle quelle ; le
+     style la reçoit convertie sous le zoom de la page (echelle.js). */
+  var posEcran = null;
   function place(x, y) {
-    var l = Math.max(8, Math.min(x, global.innerWidth - fenetre.offsetWidth - 8));
-    var h = Math.max(8, Math.min(y, global.innerHeight - fenetre.offsetHeight - 8));
-    fenetre.style.left = l + "px"; fenetre.style.top = h + "px";
+    var r = fenetre.getBoundingClientRect();
+    var l = Math.max(8, Math.min(x, global.innerWidth - r.width - 8));
+    var h = Math.max(8, Math.min(y, global.innerHeight - r.height - 8));
+    var k = global.Echelle ? global.Echelle.k() : 1;
+    fenetre.style.left = (l / k) + "px"; fenetre.style.top = (h / k) + "px";
     fenetre.style.right = "auto"; fenetre.style.bottom = "auto";
-    return { x: l, y: h };
+    posEcran = { x: Math.round(l), y: Math.round(h) };
+    return posEcran;
   }
   function petitEcran() { return global.matchMedia && global.matchMedia("(max-width: 640px)").matches; }
 
@@ -542,12 +548,12 @@
     function lache() {
       if (!depart) return;
       depart = null;
-      ecrit(CLE_POS, JSON.stringify({ x: parseInt(fenetre.style.left, 10), y: parseInt(fenetre.style.top, 10) }));
+      if (posEcran) ecrit(CLE_POS, JSON.stringify(posEcran));
     }
     tete.addEventListener("pointerup", lache);
     tete.addEventListener("pointercancel", lache);
     global.addEventListener("resize", function () {
-      if (!fenetre.hidden && !petitEcran() && fenetre.style.left) place(parseInt(fenetre.style.left, 10), parseInt(fenetre.style.top, 10));
+      if (!fenetre.hidden && !petitEcran() && fenetre.style.left && posEcran) place(posEcran.x, posEcran.y);
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && ouvert && !document.querySelector(".modale.ouverte") && fenetre.contains(document.activeElement)) ferme();

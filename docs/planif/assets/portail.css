@@ -429,7 +429,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-id-note { color: var(--faible); font-size: 13.5px; }
 
 .ab-fen.ab-fen-large {
-  width: min(720px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto;
+  width: min(720px, 100%); max-height: calc(calc(100vh * var(--vhk,1)) - 32px); max-height: calc(calc(100dvh * var(--vhk,1)) - 32px); overflow: auto;
   padding: 26px 26px 22px; text-align: left;
 }
 .ab-fen.ab-id-lire { width: min(880px, 100%); }

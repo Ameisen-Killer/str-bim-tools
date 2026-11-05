@@ -216,7 +216,7 @@ html[data-direct="oui"] .bulle-en-ligne::after{
 .bureau-btn .fleche{font-size:9px;letter-spacing:0}
 .menu-bureau{
   position:absolute;left:-12px;top:calc(100% + 14px);z-index:50;
-  min-width:250px;max-width:min(92vw,440px);max-height:min(62vh,460px);overflow-y:auto;
+  min-width:250px;max-width:min(92vw,440px);max-height:min(calc(62vh * var(--vhk,1)),460px);overflow-y:auto;
   display:flex;flex-direction:column;padding:6px;
   background:var(--noir-2);border:1px solid var(--ligne);
   animation:monte .25s cubic-bezier(.2,.7,.2,1);
@@ -243,7 +243,7 @@ html[data-direct="oui"] .bulle-en-ligne::after{
 /* Le titre suit la barre de près : le surtitre « Planification » a disparu
    de partout (26.09.2026), papier compris, et son espace avec lui. La marge
    haute du titre ne revient que derrière un surtitre, si l'on en remet un. */
-.entete{position:relative;padding-top:clamp(20px,3vh,32px);padding-bottom:clamp(18px,3vh,30px)}
+.entete{position:relative;padding-top:clamp(20px,calc(3vh * var(--vhk,1)),32px);padding-bottom:clamp(18px,calc(3vh * var(--vhk,1)),30px)}
 .entete .surtitre,.entete h1,.entete .chapeau{position:relative;z-index:1}
 .surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
 .entete h1{margin-top:0;font-size:clamp(34px,5.4vw,62px);line-height:1;letter-spacing:.01em}
@@ -256,7 +256,7 @@ html[data-direct="oui"] .bulle-en-ligne::after{
   margin-left:.5em;font-family:var(--mono);font-variant-numeric:tabular-nums;
   font-size:clamp(12px,1.25vw,16px);letter-spacing:.1em;color:var(--texte-faible);white-space:nowrap;
 }
-.filet-or{height:1px;margin-top:clamp(20px,3vh,32px);background:rgba(var(--or-rvb),.55);transform:scaleX(0);transform-origin:left;transition:transform 1.6s cubic-bezier(.55,.05,.25,1) .2s}
+.filet-or{height:1px;margin-top:clamp(20px,calc(3vh * var(--vhk,1)),32px);background:rgba(var(--or-rvb),.55);transform:scaleX(0);transform-origin:left;transition:transform 1.6s cubic-bezier(.55,.05,.25,1) .2s}
 .vu .filet-or,.filet-or.vu{transform:scaleX(1)}
 
 /* ------------------------------------------------------------- boutons */
@@ -342,10 +342,10 @@ fieldset{border:0;margin:0;padding:0;min-width:0}
 .case-teinte .pastille{width:11px;height:11px}
 
 /* ------------------------------------------------------------ sections */
-.section{padding-block:clamp(26px,4vh,42px);border-top:1px solid var(--ligne)}
+.section{padding-block:clamp(26px,calc(4vh * var(--vhk,1)),42px);border-top:1px solid var(--ligne)}
 /* Première section : pas de filet au-dessus, et rien qui la repousse — le
    contenu commence sous le trait d'or de l'en-tête, pas trois rangs plus bas. */
-.section:first-of-type{border-top:0;padding-top:clamp(12px,1.6vh,20px)}
+.section:first-of-type{border-top:0;padding-top:clamp(12px,calc(1.6vh * var(--vhk,1)),20px)}
 .tete-section{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:22px}
 /* Titre de section parti (le compte est monté dans le titre de page) : il ne
    reste que les actions de la liste, qui gardent leur place, à droite. */
@@ -562,7 +562,7 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .modale-fond{position:absolute;inset:0;background:var(--voile);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modale-boite{
   position:relative;margin:0 auto;max-width:760px;width:calc(100% - 2*var(--g));
-  margin-top:clamp(20px,6vh,78px);margin-bottom:40px;max-height:calc(100dvh - 80px);
+  margin-top:clamp(20px,calc(6vh * var(--vhk,1)),78px);margin-bottom:40px;max-height:calc(calc(100dvh * var(--vhk,1)) - 80px);
   overflow-y:auto;background:var(--noir-2);border:1px solid var(--ligne);
   padding:clamp(22px,3.4vw,34px);
   animation:monte .42s cubic-bezier(.2,.7,.2,1);
@@ -903,7 +903,7 @@ footer.pied-outil .droite{display:flex;flex-wrap:wrap;gap:10px 18px}
      plus rien ne défile — un formulaire de tâche mesure 1100 px, ses boutons
      tombaient 260 px sous le bas de l'écran, hors d'atteinte (corrigé le
      26.09.2026). Ici la boîte fait exactement un écran et défile dedans. */
-  .modale-boite{margin-top:0;margin-bottom:0;min-height:100dvh;max-height:100dvh;width:100%;
+  .modale-boite{margin-top:0;margin-bottom:0;min-height:calc(100dvh * var(--vhk,1));max-height:calc(100dvh * var(--vhk,1));width:100%;
     overscroll-behavior:contain}
 }
 /* ------------------------------------------------------------ recherche
@@ -1033,8 +1033,8 @@ mark.trouve{
 html.palette-ouverte{overflow:hidden}
 .pal-fond{position:absolute;inset:0;background:var(--voile);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:pal-fondu .18s ease-out}
 .pal-boite{
-  position:relative;margin:min(13vh,120px) auto 0;width:min(700px,calc(100vw - 32px));
-  max-height:min(72vh,660px);display:flex;flex-direction:column;
+  position:relative;margin:min(calc(13vh * var(--vhk,1)),120px) auto 0;width:min(700px,calc(100vw - 32px));
+  max-height:min(calc(72vh * var(--vhk,1)),660px);display:flex;flex-direction:column;
   background:var(--noir-2);border:1px solid var(--ligne);
   box-shadow:0 34px 90px rgba(0,0,0,.45),0 0 0 1px rgba(var(--or-rvb),.07);
   animation:pal-entre .2s cubic-bezier(.2,.7,.2,1);
@@ -1317,7 +1317,7 @@ html.palette-ouverte{overflow:hidden}
   .btn-palette-lib,.btn-palette kbd{display:none}
   .barre-outils .btn-palette{border:0;padding:10px 0;min-width:32px;justify-content:center}
   .btn-palette .recherche-loupe{transform:none;margin-right:0}
-  .pal-boite{margin-top:max(8px,env(safe-area-inset-top));width:calc(100vw - 16px);max-height:calc(100dvh - 24px)}
+  .pal-boite{margin-top:max(8px,env(safe-area-inset-top));width:calc(100vw - 16px);max-height:calc(calc(100dvh * var(--vhk,1)) - 24px)}
   .pal-champ{font-size:17px}
   .pal-echap,.pal-touches{display:none}
   .pal-meta{display:none}
@@ -1343,7 +1343,7 @@ html.palette-ouverte{overflow:hidden}
    Fond swisstopo (geo.admin.ch) en gris, inversé sur les thèmes sombres ; un
    losange à la teinte de chaque affaire, son numéro à côté ; une bulle au clic. */
 .carte-aff{
-  position:relative;height:clamp(420px,calc(100svh - var(--h-chrome,120px) - 190px),900px);
+  position:relative;height:clamp(420px,calc(calc(100svh * var(--vhk,1)) - var(--h-chrome,120px) - 190px),900px);
   overflow:hidden;border:1px solid var(--ligne);background:rgba(var(--encre),.04);
   touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
 }
@@ -1417,7 +1417,7 @@ html.palette-ouverte{overflow:hidden}
 .ca-manque{margin-top:22px}
 .ca-manque ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
 @media (max-width:640px){
-  .carte-aff{height:calc(100svh - var(--h-chrome,110px) - 150px);min-height:360px;margin-inline:calc(-1*var(--g,16px))}
+  .carte-aff{height:calc(calc(100svh * var(--vhk,1)) - var(--h-chrome,110px) - 150px);min-height:360px;margin-inline:calc(-1*var(--g,16px))}
   .ca-point b{font-size:11px;padding:3px 5px}
   .ca-fonds{bottom:30px}                 /* au-dessus du crédit swisstopo, qui prend le bas */
 }
@@ -1609,7 +1609,7 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 .lc-panneau.lc-large{width:min(620px,calc(100vw - 16px))}
 .lc-cherche{width:100%;height:36px;margin-bottom:6px;padding:0 10px;border:1px solid var(--ligne);border-radius:7px;font:inherit;font-size:14px;color:inherit;background:#fff}
 .lc-cherche:focus{outline:2px solid var(--m-fort,var(--or));outline-offset:-1px}
-.lc-liste{max-height:min(340px,calc(100vh - 140px));overflow-y:auto;position:relative}
+.lc-liste{max-height:min(340px,calc(calc(100vh * var(--vhk,1)) - 140px));overflow-y:auto;position:relative}
 .lc-option{padding:7px 10px;border-radius:7px;cursor:pointer;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lc-option.actif{background:var(--m-voile,rgba(0,0,0,.05))}
 .lc-option.choisie{font-weight:600;color:var(--m-fort,var(--or))}

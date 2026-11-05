@@ -5,6 +5,8 @@
   "use strict";
 
   var D = global.Donnees, C = global.Cal;
+  /** Une mesure d'écran (rect, pointeur) en valeur de style, sous le zoom de la page (echelle.js). */
+  function ech(v) { return global.Echelle ? global.Echelle.px(v) : v; }
 
   /* ------------------------------------------------------------- éléments */
 
@@ -149,7 +151,8 @@
     dernierFocus = document.activeElement;
     fermeEnCours = o.surFermeture || null;
     boutonEntree = null;
-    boite.className = "modale-boite" + (o.compacte ? " compacte" : "");
+    // Toutes les fenêtres resserrées (05.11.2026, charte commune) : o.compacte n'est plus distinctif
+    boite.className = "modale-boite compacte";
     vide(boite);
 
     boite.appendChild(el("div", { class: "modale-tete" }, [
@@ -1104,7 +1107,7 @@
       // Ni les actions d'une page, ni la page ouverte : la suivante a les siennes
       [].forEach.call(copie.querySelectorAll(".pousse"), function (n) { n.remove(); });
       [].forEach.call(copie.querySelectorAll("[aria-current]"), function (n) { n.removeAttribute("aria-current"); });
-      global.localStorage.setItem("planif.barre:" + mail, JSON.stringify({ html: copie.innerHTML, h: hauteurChrome }));
+      global.localStorage.setItem("planif.barre:" + mail, JSON.stringify({ html: copie.innerHTML, h: Math.round(ech(hauteurChrome)) }));
     } catch (e) {}
   }
 
@@ -1116,7 +1119,7 @@
   function mesureChrome(hote) {
     function pose() {
       hauteurChrome = Math.round(hote.getBoundingClientRect().height);
-      document.documentElement.style.setProperty("--h-chrome", hauteurChrome + "px");
+      document.documentElement.style.setProperty("--h-chrome", Math.round(ech(hauteurChrome)) + "px");
     }
     pose();
     if (suiviChrome) suiviChrome.disconnect();
@@ -1151,7 +1154,7 @@
       var h = Math.round(bloc.getBoundingClientRect().height);
       if (h === derniere) return;        // écrire sur documentElement invalide le
       derniere = h;                      // style de toute la page : une fois par
-      document.documentElement.style.setProperty("--h-collee", h + "px");   // changement, pas par image
+      document.documentElement.style.setProperty("--h-collee", Math.round(ech(h)) + "px");   // changement, pas par image
     }
     function juge() {
       attend = false;
@@ -2068,7 +2071,7 @@
     }
     entree.addEventListener("input", pose);
     pose();
-    return el("div", { class: "champ large champ-priorite" }, [
+    return el("div", { class: "champ champ-priorite" }, [
       el("label", { for: "c-priorite", text: "Priorité" }),
       el("div", { class: "priorite-ligne" }, [
         el("span", { class: "priorite-borne", "aria-hidden": "true", text: "1" }),
@@ -2298,7 +2301,7 @@
           }),
           champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
           VERSION_AB ? curseurPriorite(t ? t.priorite : (b.priorite || 5)) : null,
-          el("div", { class: "champ large" }, [
+          el("div", { class: "champ" }, [
             el("span", { class: "legende", text: "Parts terminées" }),
             casesParts
           ]),
@@ -2453,7 +2456,7 @@
       if (!visible(m.r) && !(a && visible(a.r))) return;
       if (!a) { if (o.entrees) travail.push({ m: m, entree: true }); return; }
       var c = cumul(m), pc = cumul(parCle[m.parent]);
-      var dx = c.x - pc.x, dy = c.y - pc.y;
+      var dx = ech(c.x - pc.x), dy = ech(c.y - pc.y);
       var sx = m.n.hasAttribute("data-anim-taille") && m.r.width > 0 ? a.r.width / m.r.width : 1;
       var bouge = Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5 || Math.abs(sx - 1) > 0.01;
       var etat = m.n.getAttribute("data-anim-etat") || "";
@@ -2586,8 +2589,8 @@
     var o = hote.getBoundingClientRect();
     function boite(b) {
       var r = b.getBoundingClientRect();
-      return { g: r.left - o.left, d: r.right - o.left, h: r.top - o.top, b: r.bottom - o.top,
-               cx: (r.left + r.right) / 2 - o.left, cy: (r.top + r.bottom) / 2 - o.top, ht: r.height };
+      return { g: ech(r.left - o.left), d: ech(r.right - o.left), h: ech(r.top - o.top), b: ech(r.bottom - o.top),
+               cx: ech((r.left + r.right) / 2 - o.left), cy: ech((r.top + r.bottom) / 2 - o.top), ht: ech(r.height) };
     }
     var c = boite(de), d = boite(vers);
     var x1, y1, x2, y2, chemin, k;
@@ -2706,7 +2709,7 @@
     var px = x + 16, py = y + 20;
     if (px + r.width > l - 10) px = Math.max(10, x - r.width - 16);
     if (py + r.height > h - 10) py = Math.max(10, y - r.height - 14);
-    bulleEl.style.transform = "translate(" + Math.round(px) + "px," + Math.round(py) + "px)";
+    bulleEl.style.transform = "translate(" + Math.round(ech(px)) + "px," + Math.round(ech(py)) + "px)";
   }
 
   function cacheBulle() {
@@ -2715,6 +2718,81 @@
     bulleEl = null;
   }
   global.addEventListener("scroll", cacheBulle, { passive: true });
+
+  /* ------------------------------------------------ menu du clic droit
+     Le même menu partout (05.11.2026, demande de Tony) : tâches, affaires,
+     membres. Un appui long au doigt l'ouvre aussi (événement contextmenu).
+       menuContexte(e, { titre, items: [{ label, action | lien, rouge, sep }] })
+     Une entrée nulle est ignorée ; { sep: true } trace un filet. Échap, un clic
+     ailleurs, le défilement ou un redimensionnement le ferment. */
+  var menuCtx = null;
+  function fermeMenuContexte() {
+    if (!menuCtx) return;
+    menuCtx.n.remove();
+    document.removeEventListener("pointerdown", menuCtx.dehors, true);
+    document.removeEventListener("keydown", menuCtx.clavier, true);
+    global.removeEventListener("scroll", fermeMenuContexte, true);
+    global.removeEventListener("resize", fermeMenuContexte);
+    global.removeEventListener("blur", fermeMenuContexte);
+    menuCtx = null;
+  }
+  function menuContexte(e, o) {
+    if (e && e.preventDefault) e.preventDefault();
+    fermeMenuContexte();
+    cacheBulle();
+    var items = (o.items || []).filter(Boolean);
+    // Pas de filet en tête, en fin, ni deux de suite
+    items = items.filter(function (it, i) {
+      if (!it.sep) return true;
+      var avant = items.slice(0, i).some(function (x) { return !x.sep; });
+      var apres = items[i + 1] && !items[i + 1].sep;
+      return avant && apres;
+    });
+    if (!items.length) return;
+    var n = el("div", { class: "menu-ctx", role: "menu", "aria-label": o.titre || "Actions" });
+    if (o.titre) n.appendChild(el("div", { class: "menu-ctx-titre", text: o.titre }));
+    var boutons = [];
+    items.forEach(function (it) {
+      if (it.sep) { n.appendChild(el("div", { class: "menu-ctx-sep", role: "separator" })); return; }
+      var b = el(it.lien ? "a" : "button", {
+        class: "menu-ctx-item" + (it.rouge ? " rouge" : ""), role: "menuitem", tabindex: "-1",
+        href: it.lien || null, target: it.nouvelOnglet ? "_blank" : null, rel: it.nouvelOnglet ? "noopener" : null,
+        type: it.lien ? null : "button", text: it.label
+      });
+      b.addEventListener("click", function (ev) {
+        if (!it.lien) ev.preventDefault();
+        fermeMenuContexte();
+        if (it.action) it.action();
+      });
+      boutons.push(b);
+      n.appendChild(b);
+    });
+    document.body.appendChild(n);
+    // Au pointeur ; au clavier (touche Menu, Maj+F10), sous l'élément visé
+    var x = e && e.clientX, y = e && e.clientY;
+    if (!x && !y && e && e.target && e.target.getBoundingClientRect) {
+      var rc = e.target.getBoundingClientRect(); x = rc.left + 12; y = rc.top + Math.min(rc.height, 28);
+    }
+    var r = n.getBoundingClientRect();
+    if (x + r.width > global.innerWidth - 8) x = Math.max(8, x - r.width);
+    if (y + r.height > global.innerHeight - 8) y = Math.max(8, y - r.height);
+    n.style.left = ech(x) + "px"; n.style.top = ech(y) + "px";
+    var dehors = function (ev) { if (!n.contains(ev.target)) fermeMenuContexte(); };
+    var clavier = function (ev) {
+      var i = boutons.indexOf(document.activeElement);
+      if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); fermeMenuContexte(); }
+      else if (ev.key === "ArrowDown") { ev.preventDefault(); boutons[(i + 1) % boutons.length].focus(); }
+      else if (ev.key === "ArrowUp") { ev.preventDefault(); boutons[(i - 1 + boutons.length) % boutons.length].focus(); }
+      else if (ev.key === "Tab") fermeMenuContexte();
+    };
+    menuCtx = { n: n, dehors: dehors, clavier: clavier };
+    document.addEventListener("pointerdown", dehors, true);
+    document.addEventListener("keydown", clavier, true);
+    global.addEventListener("scroll", fermeMenuContexte, true);
+    global.addEventListener("resize", fermeMenuContexte);
+    global.addEventListener("blur", fermeMenuContexte);
+    if (boutons[0]) boutons[0].focus({ preventScroll: true });
+  }
 
   /* ------------------------------------------------ filtre à cases
      Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : affaires,
@@ -2876,11 +2954,11 @@
     /** Sous le menu, ou au-dessus s'il manque de place ; jamais hors de l'écran. */
     function place() {
       var r = select.getBoundingClientRect();
-      panneau.style.minWidth = Math.max(r.width, 300) + "px";
-      var h = panneau.offsetHeight, w = panneau.offsetWidth;
+      panneau.style.minWidth = Math.max(ech(r.width), 300) + "px";
+      var p = panneau.getBoundingClientRect(), h = p.height, w = p.width;   // mesures d'écran, comme r
       var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
-      panneau.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
-      panneau.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
+      panneau.style.top = ech(Math.max(8, Math.min(haut, global.innerHeight - h - 8))) + "px";
+      panneau.style.left = ech(Math.max(8, Math.min(r.left, global.innerWidth - w - 8))) + "px";
     }
     function ajoute(op, groupe, intertitre) {
       var n = el("div", { class: "lc-option" + (op.value === select.value ? " choisie" : "") + (op.disabled ? " inactive" : ""),
@@ -3142,10 +3220,10 @@
     document.body.appendChild(boite);
     dessine();
     // Sous le champ, ou au-dessus s'il manque de place ; jamais hors de l'écran
-    var r = input.getBoundingClientRect(), h = boite.offsetHeight, w = boite.offsetWidth;
+    var r = input.getBoundingClientRect(), rb = boite.getBoundingClientRect(), h = rb.height, w = rb.width;
     var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
-    boite.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
-    boite.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
+    boite.style.top = ech(Math.max(8, Math.min(haut, global.innerHeight - h - 8))) + "px";
+    boite.style.left = ech(Math.max(8, Math.min(r.left, global.innerWidth - w - 8))) + "px";
 
     var o = {
       input: input, boite: boite,
@@ -3262,10 +3340,10 @@
   }
   /** Sous le champ, ou au-dessus s'il manque de place ; jamais hors de l'écran. */
   function dpPlace(boite, input) {
-    var r = input.getBoundingClientRect(), h = boite.offsetHeight, w = boite.offsetWidth;
+    var r = input.getBoundingClientRect(), rb = boite.getBoundingClientRect(), h = rb.height, w = rb.width;
     var haut = r.bottom + 6 + h > global.innerHeight && r.top - 6 - h > 0 ? r.top - 6 - h : r.bottom + 6;
-    boite.style.top = Math.max(8, Math.min(haut, global.innerHeight - h - 8)) + "px";
-    boite.style.left = Math.max(8, Math.min(r.left, global.innerWidth - w - 8)) + "px";
+    boite.style.top = ech(Math.max(8, Math.min(haut, global.innerHeight - h - 8))) + "px";
+    boite.style.left = ech(Math.max(8, Math.min(r.left, global.innerWidth - w - 8))) + "px";
   }
 
   if (global.document) {
@@ -3302,6 +3380,7 @@
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
     formulaireTache: formulaireTache, ficheTache: ficheTache, imprime: imprime,
+    menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,
     recherche: recherche, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,

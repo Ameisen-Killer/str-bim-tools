@@ -2,9 +2,9 @@
    Chargée après marque.css et portail.css. Une carte blanche au centre : le
    logo de la marque à gauche, le formulaire à droite ; empilés sur téléphone. */
 
-body { min-height: 100vh; min-height: 100dvh; }
+body { min-height: calc(100vh * var(--vhk,1)); min-height: calc(100dvh * var(--vhk,1)); }
 .cx {
-  min-height: 100vh; min-height: 100dvh;
+  min-height: calc(100vh * var(--vhk,1)); min-height: calc(100dvh * var(--vhk,1));
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
 }

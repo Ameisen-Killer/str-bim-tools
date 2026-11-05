@@ -16,24 +16,26 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
-<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 <style>
 /* Menu du clic droit sur un membre de l'équipe (responsable d'affaire, 28.10.2026) */
 .menu-resp{
   position:fixed;z-index:200;min-width:220px;max-width:calc(100vw - 16px);
   display:flex;flex-direction:column;padding:6px;
-  background:var(--noir-2);border:1px solid var(--ligne);border-radius:10px;
-  box-shadow:0 10px 30px rgba(0,0,0,.14);animation:monte .2s cubic-bezier(.2,.7,.2,1);
+  background:#fff;border:1px solid var(--ligne-faible);border-radius:10px;
+  box-shadow:var(--ab-ombre-haute);animation:monte .16s cubic-bezier(.2,.7,.2,1);
 }
-.menu-resp-titre{padding:7px 12px 6px;font-size:11px;color:var(--texte-doux);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-resp-titre{padding:6px 12px 6px;font-size:12px;font-weight:600;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .menu-resp button{
   display:flex;align-items:center;gap:12px;width:100%;text-align:left;border-radius:6px;
-  padding:10px 12px;margin:0;color:var(--texte);background:none;border:0;cursor:pointer;font:inherit;font-size:13px;
+  min-height:36px;padding:8px 12px;margin:0;color:var(--texte);background:none;border:0;cursor:pointer;font:inherit;font-size:var(--t-doux,14px);
 }
-.menu-resp button:hover,.menu-resp button:focus-visible{background:rgba(var(--encre),.06);outline:none}
+.menu-resp button:hover,.menu-resp button:focus-visible{background:var(--m-pale);outline:none}
 .menu-resp .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
 .etiq[title]{cursor:context-menu}
 </style>
@@ -83,8 +85,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
@@ -262,7 +264,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var resp = m.id === a.responsableId;
         var n = el("span", { class: "etiq " + classe + (resp ? " resp" : ""),
           title: resp ? "Responsable d'affaire · clic droit pour changer" : "Clic droit : désigner responsable" }, [UI.surligne(nom, mots)]);
-        n.addEventListener("contextmenu", function (e) { e.preventDefault(); menuResponsable(a, m, e.clientX, e.clientY); });
+        n.addEventListener("contextmenu", function (e) { e.preventDefault(); e.stopPropagation(); menuResponsable(a, m, e.clientX, e.clientY); });
         return n;
       }
       // Ingénieurs puis dessinateurs, par ordre alphabétique dans chaque groupe
@@ -273,7 +275,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       tries(a.dessinateurs).forEach(function (m) { equipe.appendChild(etiquette(m, "des")); });
       if (!equipe.childNodes.length) equipe.appendChild(el("span", { class: "secondaire", text: "Aucun membre affecté" }));
 
-      corps.appendChild(suivi.marque(el("tr", {}, [
+      var rangee = el("tr", {}, [
         el("td", {}, [
           el("div", { style: "display:flex;align-items:center;gap:9px" }, [
             el("span", { class: "pastille", style: "color:" + t, "aria-hidden": "true" }),
@@ -316,7 +318,22 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             ? UI.boutonIcone("supprimer", "Supprimer", D.libelleAffaire(a), function () { supprime(a, taches.length); })
             : null
         ])
-      ]), a.id));
+      ]);
+      // Clic droit sur la ligne (05.11.2026) : les actions de l'affaire
+      rangee.addEventListener("contextmenu", function (e) {
+        if (e.target.closest("a, input, select, textarea")) return;
+        UI.menuContexte(e, { titre: D.libelleAffaire(a), items: [
+          { label: "Modifier l'affaire", action: function () { formulaire(a.id); } },
+          { label: "Nouvelle tâche sur cette affaire", action: function () { UI.formulaireTache(null, { affaireId: a.id, surEnregistrement: dessine }); } },
+          { label: "Voir ses tâches", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" },
+          D.phasesMandat(a).length ? { label: D.voitFacturation() ? "Avancement et facturation" : "Avancement", action: function () {
+            Mandat.saisie(a.id, { surEnregistrement: dessine, detail: function () { formulaire(a.id); } }); } } : null,
+          a.adresse ? { label: "Voir sur Google Maps", lien: D.lienCarte(a), nouvelOnglet: true } : null,
+          { sep: true },
+          D.aDroit("affaires_creer") ? { label: "Supprimer l'affaire", rouge: true, action: function () { supprime(a, taches.length); } } : null
+        ] });
+      });
+      corps.appendChild(suivi.marque(rangee, a.id));
     });
 
     hote.appendChild(el("table", { class: "liste", style: "min-width:940px" }, [
@@ -490,8 +507,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     document.body.appendChild(menuResp);
     // Collé au pointeur, sans déborder de l'écran
     var r = menuResp.getBoundingClientRect();
-    menuResp.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + "px";
-    menuResp.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + "px";
+    var k = window.Echelle ? Echelle.k() : 1;   // le zoom de la page (echelle.js)
+    menuResp.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) / k + "px";
+    menuResp.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) / k + "px";
     bouton.focus();
   }
 

@@ -16,9 +16,11 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
-<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
 <style>
 .imp-periode{display:none}
@@ -144,8 +146,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
@@ -598,6 +600,28 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         if (ev.key !== "Enter" || ev.target !== rangee) return;
         ev.preventDefault();
         fiche(t.id);
+      });
+      // Clic droit sur la ligne (05.11.2026) : les actions de la tâche et de son affaire
+      rangee.addEventListener("contextmenu", function (ev) {
+        if (ev.target.closest("a, input, select, textarea")) return;
+        var ecrit = D.peutEcrireTache(t), fini = t.statut === "termine";
+        UI.menuContexte(ev, { titre: t.titre, items: [
+          { label: "Ouvrir la fiche", action: function () { fiche(t.id); } },
+          { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { formulaire(t.id); } },
+          ecrit ? { label: fini ? "Rouvrir la tâche" : "Marquer la tâche terminée", action: function () {
+            D.retoucheTache(t.id, fini ? { statut: "en_cours" } : { statut: "termine" })
+              .then(function () { dessine(); UI.toast(fini ? "Tâche rouverte." : "Tâche terminée."); })
+              .catch(function (e) { UI.toast(e.message); });
+          } } : null,
+          { sep: true },
+          a ? { label: "Nouvelle tâche sur cette affaire", action: function () { UI.formulaireTache(null, { affaireId: a.id, surEnregistrement: dessine }); } } : null,
+          a && filtres.affaire !== a.id ? { label: "Toutes les tâches de cette affaire", action: function () {
+            cle = "tous"; filtres.membre = ""; filtres.affaire = a.id; dessine(); } } : null,
+          a && (!D.pagePermise || D.pagePermise("affaires")) ? { label: "Voir l'affaire",
+            lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null,
+          { sep: true },
+          ecrit ? { label: "Supprimer la tâche", rouge: true, action: function () { supprime(t); } } : null
+        ] });
       });
       /* Comme au tableau de bord : au survol de la ligne, un fil relie
          l'étiquette du calcul à celle du dessin (UI.fil), qui s'entourent. */

@@ -1,0 +1,9 @@
+/* Planification — échelle d'affichage (05.11.2026, demande de Tony).
+   Sur ordinateur, tout l'outil s'affiche à 90 %, comme le zoom 90 % de Chrome
+   qu'il trouvait plus juste ; le téléphone garde sa taille (cibles au doigt).
+   Chargée sur toutes les pages, avant les autres feuilles.
+   Les hauteurs en vh multiplient par --vhk (posé par echelle.js) : sous un zoom,
+   100vh ne couvrirait plus que 90 % de la fenêtre. */
+:root{--zoom:1;--vhk:1}
+@media (min-width:761px) and (hover:hover){:root{--zoom:.9}}
+@media screen{html{zoom:var(--zoom)}}

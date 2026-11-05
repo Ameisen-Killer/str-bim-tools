@@ -16,8 +16,10 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 </head>
 <body class="large">
 
@@ -75,8 +77,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script>
@@ -183,7 +185,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }
 
   /* ---------------------------------------------------------- dessin */
-  function mesure() { var r = carte.getBoundingClientRect(); L = r.width; H = r.height; }
+  /* Le zoom de la page (90 % sur ordinateur, echelle.js) est annulé dans la scène
+     et la bulle : leurs pixels y redeviennent ceux de l'écran, comme les mesures
+     et le pointeur sur lesquels tout le dessin se règle. */
+  function neutre(n) { var k = window.Echelle ? Echelle.k() : 1; if (n) n.style.zoom = k === 1 ? "" : String(1 / k); }
+  function mesure() { var r = carte.getBoundingClientRect(); L = r.width; H = r.height; neutre(scene); }
 
   function dessineTuiles() {
     var n = Math.pow(2, vue.z), x0 = vue.cx - L / 2, y0 = vue.cy - H / 2;
@@ -259,10 +265,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   }
   function placeBulle() {
     if (!bulle || !choisi || !positions[choisi]) return;
-    var e = ecran(positions[choisi]), l = bulle.offsetWidth, h = bulle.offsetHeight;
+    // Calculs à l'écran ; la bulle garde le zoom de la page, sa position est convertie (echelle.js)
+    var k = window.Echelle ? Echelle.k() : 1, rb = bulle.getBoundingClientRect();
+    var e = ecran(positions[choisi]), l = rb.width, h = rb.height;
     var x = Math.min(Math.max(12, e[0] - l / 2), L - l - 12);
     var y = e[1] - h - 18 < 12 ? e[1] + 18 : e[1] - h - 18;
-    bulle.style.left = Math.round(x) + "px"; bulle.style.top = Math.round(Math.min(Math.max(12, y), H - h - 12)) + "px";
+    bulle.style.left = Math.round(x / k) + "px"; bulle.style.top = Math.round(Math.min(Math.max(12, y), H - h - 12) / k) + "px";
   }
   function fermeBulle() {
     if (bulle) bulle.remove();

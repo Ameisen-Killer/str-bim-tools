@@ -16,8 +16,10 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
 <style>
   /* Console › Activité (15.10.2026, refaite le même jour dans l'esprit de la
      page /stats/ du site, demande de Tony) : qui ouvre l'outil, quand, combien
@@ -100,7 +102,7 @@
   .ac-tete{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 20px;margin-bottom:6px}
   .ac-tete h2{margin:6px 0 0;font-size:clamp(22px,2.4vw,30px);font-weight:600;letter-spacing:-.01em}
   .ac-tete h2 em{font-style:normal;color:var(--or)}
-  .ac-courbe{position:relative;height:clamp(220px,30vh,300px);margin-top:18px}
+  .ac-courbe{position:relative;height:clamp(220px,calc(30vh * var(--vhk,1)),300px);margin-top:18px}
   .ac-courbe svg.trace{position:absolute;left:0;right:0;top:12px;bottom:26px;width:100%;height:calc(100% - 38px);overflow:visible}
   .ac-ligne{fill:none;stroke:var(--or);stroke-width:2.2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
   .ac-ligne.b{stroke:rgba(var(--encre),.38);stroke-width:1.4;stroke-dasharray:4 5}
@@ -280,7 +282,7 @@
 </script>
 
 <main>
-  <div class="wrap large" style="padding-top:clamp(18px,3vh,30px)">
+  <div class="wrap large" style="padding-top:clamp(18px,calc(3vh * var(--vhk,1)),30px)">
     <div class="ac-zone" id="activite"></div>
   </div>
 </main>
@@ -304,7 +306,7 @@
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
 <script src="/planif/assets/donnees.js?v=85"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script>
 (function () {

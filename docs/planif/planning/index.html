@@ -16,9 +16,11 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/planif.css?v=107">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=24">
-<link rel="stylesheet" href="/planif/assets/bandeau.css?v=1">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/planif.css?v=108">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
+<link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 </head>
 <body class="large">
 
@@ -122,8 +124,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=120"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
@@ -759,7 +761,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var x = Math.min(window.innerWidth - b.width - 8, Math.max(8, r.left + r.width / 2 - b.width / 2));
     var y = r.top - b.height - 10;
     if (y < 8) y = r.bottom + 10;
-    bulleLibres.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+    var k = window.Echelle ? Echelle.k() : 1;   // le zoom de la page (echelle.js)
+    bulleLibres.style.transform = "translate(" + Math.round(x / k) + "px," + Math.round(y / k) + "px)";
   }
   function cacheBulleLibres() { if (bulleLibres) bulleLibres.classList.remove("vue"); }
   window.addEventListener("scroll", cacheBulleLibres, { passive: true });
@@ -880,7 +883,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Tâche à deux parts : le clic droit mène à l'autre (vaAutrePart)
     var autre = info.role === "ingenieur" ? "dessinateur" : "ingenieur";
     var jumelee = t[D.PARTS[autre].charge] > 0;
-    var versAutre = jumelee ? " · clic droit : " + (autre === "ingenieur" ? "aller au calcul" : "aller au dessin") : "";
+    var versAutre = " · clic droit : actions";
 
     var n = el("div", {
       class: classes.join(" "),
@@ -931,10 +934,25 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       bulle(r.left + 12, r.bottom - 8);
     });
     n.addEventListener("blur", function () { cacheLien(); UI.cacheBulle(); });
+    /* Clic droit (05.11.2026) : le menu commun — fiche, modifier, l'autre part
+       (ce que faisait le clic droit seul jusque-là), terminer la part, l'affaire. */
     n.addEventListener("contextmenu", function (e) {
-      if (!jumelee || document.body.classList.contains("glisse-en-cours")) return;
-      e.preventDefault();
-      vaAutrePart(info);
+      if (document.body.classList.contains("glisse-en-cours")) { e.preventDefault(); return; }
+      var ecrit = D.peutEcrireTache(t), champFini = D.PARTS[info.role].fini;
+      UI.menuContexte(e, { titre: (a ? a.code + " · " : "") + t.titre, items: [
+        { label: "Ouvrir la fiche", action: function () { fiche(info); } },
+        { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { UI.formulaireTache(t.id, { surEnregistrement: rend }); } },
+        jumelee ? { label: autre === "ingenieur" ? "Aller au calcul" : "Aller au dessin", action: function () { vaAutrePart(info); } } : null,
+        ecrit && t.statut !== "termine" ? { label: (info.fini ? "Rouvrir le " : "Terminer le ") + D.PARTS[info.role].label.toLowerCase(), action: function () {
+          var ch = {}; ch[champFini] = !info.fini;
+          D.retoucheTache(t.id, ch).then(rend).catch(function (x) { UI.toast(x.message); });
+        } } : null,
+        { sep: true },
+        a ? { label: "Nouvelle tâche sur cette affaire", action: function () { UI.formulaireTache(null, { affaireId: a.id, surEnregistrement: rend }); } } : null,
+        a ? { label: "Tâches de cette affaire", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" } : null,
+        a && (!D.pagePermise || D.pagePermise("affaires")) ? { label: "Voir l'affaire",
+          lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null
+      ] });
     });
     n.addEventListener("pointerdown", function () { cacheLien(); UI.cacheBulle(); });
     n.addEventListener("keydown", function (e) {
@@ -1094,7 +1112,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         if (!bouge) { bouge = true; n.classList.add("glisse"); document.body.classList.add("glisse-en-cours"); }
         var col1 = colonne(ev.clientX);
         delta = col1 - col0;
-        n.style.transform = "translateX(" + (bords[col1].g - bords[col0].g) + "px)";
+        n.style.transform = "translateX(" + (bords[col1].g - bords[col0].g) / (window.Echelle ? Echelle.k() : 1) + "px)";
 
         var trouve = null;
         for (var i = 0; i < zones.length; i++) {

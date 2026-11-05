@@ -16,7 +16,9 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=43">
+<link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<script src="/planif/assets/echelle.js?v=1"></script>
+<link rel="stylesheet" href="/planif/assets/portail.css?v=44">
 </head>
 <body>
 
@@ -99,7 +101,7 @@
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
 <script src="/planif/assets/portail.js?v=30"></script>
-<script src="/planif/assets/tchat.js?v=12"></script>
+<script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/idees.js?v=3"></script>
 <script>
 (function () {
@@ -331,10 +333,11 @@
   }
   function placeCarte() {
     if (!carte || !carte.classList.contains("vu")) return;
-    var w = carte.offsetWidth, h = carte.offsetHeight, x = dernierPointeur.x + 16, y = dernierPointeur.y + 20;
+    var k = window.Echelle ? Echelle.k() : 1;   // le zoom de la page (echelle.js) : calculs à l'écran, style converti
+    var rc = carte.getBoundingClientRect(), w = rc.width, h = rc.height, x = dernierPointeur.x + 16, y = dernierPointeur.y + 20;
     if (x + w > window.innerWidth - 10) x = Math.max(10, dernierPointeur.x - w - 12);
     if (y + h > window.innerHeight - 10) y = Math.max(10, dernierPointeur.y - h - 14);
-    carte.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+    carte.style.transform = "translate(" + Math.round(x / k) + "px," + Math.round(y / k) + "px)";
   }
   function cacheCarte() {
     clearTimeout(minuterieCarte);
