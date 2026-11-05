@@ -198,9 +198,10 @@ button { font: inherit; color: inherit; }
 .ab-page-ico svg .doux { stroke: var(--vert-vif); }
 .ab-page-img { position: relative; display: inline-flex; }
 .ab-pastille {
-  position: absolute; top: -6px; right: -10px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
-  display: grid; place-items: center; box-shadow: 0 0 0 2px var(--carte, #fff);
-  background: var(--alerte, #C0392B); color: #fff; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  position: absolute; top: -6px; right: -10px; box-sizing: border-box; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  display: block; text-align: center; line-height: 22px; letter-spacing: 0; box-shadow: 0 0 0 2px var(--carte, #fff);
+  background: var(--alerte, #C0392B); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "case";   /* chiffres centrés sur la hauteur des capitales */
 }
 .ab-module-pages .ab-acceder { text-decoration: none; color: var(--texte); }
 .ab-page-ico svg .plein { fill: #2A3036; stroke: none; }
