@@ -295,7 +295,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var sel = el("select", { "aria-label": "Filtrer par affaire" }, [el("option", { value: "", text: "Toutes les affaires" })]
         .concat(aff.map(function (a) { return el("option", { value: a.id, text: D.libelleAffaire(a) }); })));
       sel.value = filtres.affaires[0] || "";
-      sel.addEventListener("change", function () { filtres.affaires = sel.value ? [sel.value] : []; memorise(); dessine(); });
+      // Choisir une affaire montre toute son équipe : le bandeau repasse sur « Tous » (05.11.2026, demande de Tony)
+      sel.addEventListener("change", function () { filtres.affaires = sel.value ? [sel.value] : []; if (sel.value) cle = "tous"; memorise(); dessine(); });
       hote.appendChild(el("label", { class: "eq-affaire" }, [sel]));
     }
   }
@@ -349,15 +350,17 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       });
   }
 
-  // Est « dans l'affaire » qui y est rattaché dans la fiche affaire ou qui y porte au moins une tâche ;
+  // Est « dans l'affaire » son responsable, qui y est rattaché dans la fiche affaire, ou qui y porte
+  // une tâche en cours (les tâches terminées ne comptent plus, 05.11.2026) ;
   // plusieurs affaires cochées : dans l'une au moins
   function membresAffaires(ids) {
     var dans = Object.create(null);
     ids.forEach(function (id) {
       var a = D.affaire(id);
       if (!a) return;
+      if (a.responsableId) dans[a.responsableId] = true;
       a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
-      D.taches({ affaireId: id }).forEach(function (t) {
+      D.taches({ affaireId: id, sansTerminees: true }).forEach(function (t) {
         if (t.ingenieurId) dans[t.ingenieurId] = true;
         if (t.dessinateurId) dans[t.dessinateurId] = true;
       });
