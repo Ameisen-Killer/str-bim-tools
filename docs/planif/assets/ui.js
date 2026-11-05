@@ -2122,24 +2122,9 @@
       else if (t.dessinateurId === moi.id && t.chargeDessin > 0) maPart = "dessinateur";
     }
 
-    /* Mes affaires en tête : celles dont je suis responsable, où je suis dans
-       l'équipe, ou où une tâche m'est affectée. Les autres suivent. */
-    var jeSuis = D.monMembre();
-    var miennes = {};
-    if (jeSuis) {
-      affaires.forEach(function (a) {
-        if (a.responsableId === jeSuis.id || (a.ingenieurs || []).indexOf(jeSuis.id) >= 0
-          || (a.dessinateurs || []).indexOf(jeSuis.id) >= 0) miennes[a.id] = true;
-      });
-      D.taches({ membreId: jeSuis.id }).forEach(function (x) { miennes[x.affaireId] = true; });
-    }
-    var optAff = function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; };
-    var lesMiennes = affaires.filter(function (a) { return miennes[a.id]; });
-    var lesAutres = affaires.filter(function (a) { return !miennes[a.id]; });
-    var optionsAffaires = lesMiennes.length && lesAutres.length
-      ? [{ groupe: "Mes affaires", options: lesMiennes.map(optAff) },
-         { groupe: "Autres affaires", options: lesAutres.map(optAff) }]
-      : affaires.map(optAff);
+    // Mes affaires en tête, puis les autres (Donnees.optionsAffaires)
+    var optionsAffaires = D.optionsAffaires(affaires, function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
+    var lesMiennes = affaires.filter(function (a) { return D.mesAffaires()[a.id]; });
     var affaireDefaut = (lesMiennes[0] || affaires[0]).id;
 
     var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaireDefaut);

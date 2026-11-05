@@ -120,7 +120,11 @@
 
   function liste(hote, libelle, options, valeur, choix) {
     if (libelle) titre(hote, libelle);
-    var sel = el("select", { "aria-label": libelle || "" }, options.map(function (x) { return el("option", { value: x[0], text: x[1] }); }));
+    // Une entrée { groupe, options } devient un sous-groupe titré (mes affaires, puis les autres)
+    var option = function (x) { return el("option", { value: x[0], text: x[1] }); };
+    var sel = el("select", { "aria-label": libelle || "" }, options.map(function (x) {
+      return x.options ? el("optgroup", { label: x.groupe }, x.options.map(option)) : option(x);
+    }));
     sel.value = valeur == null ? "" : valeur;
     sel.addEventListener("change", function () { choix(sel.value); });
     hote.appendChild(el("label", { class: "bd-affaire" }, [sel]));

@@ -362,6 +362,7 @@
       }))
       .concat([{ code: "admin_site", nom: "Admin du site", statuts: null }]);
   }
+  var mesAff = { v: -1, moi: null, ids: {} };   // cache de Donnees.mesAffaires
   var CLE_ROLE_DEMO = "planif.demo.role", CLE_ROLE_SUPER = "planif.super.role";
 
   /** Les statuts d'un membre, dans l'ordre, débarrassés des valeurs inconnues. */
@@ -1181,6 +1182,31 @@
     libellePhase: libellePhase,
     /** « 26-801 · Immeuble… », ou le nom seul pour une affaire sans numéro (13.10.2026). */
     libelleAffaire: function (a) { return a ? (a.code ? a.code + " · " : "") + a.nom : "—"; },
+
+    /** Mes affaires : celles dont je suis responsable, où je suis dans l'équipe,
+     *  ou où je porte une tâche en cours. Un objet { id: true }, vide sans fiche. */
+    mesAffaires: function () {
+      var moi = D.monMembre();
+      if (!moi) return {};
+      if (mesAff.v === version && mesAff.moi === moi.id) return mesAff.ids;
+      var ids = {};
+      D.affaires({ tous: true }).forEach(function (a) {
+        if (a.responsableId === moi.id || (a.ingenieurs || []).indexOf(moi.id) >= 0
+          || (a.dessinateurs || []).indexOf(moi.id) >= 0) ids[a.id] = true;
+      });
+      D.taches({ membreId: moi.id, sansTerminees: true }).forEach(function (t) { ids[t.affaireId] = true; });
+      mesAff = { v: version, moi: moi.id, ids: ids };
+      return ids;
+    },
+    /** Les options d'un menu d'affaires, mes affaires en tête (05.11.2026, demande
+     *  de Tony) : [{ groupe: "Mes affaires", options }, { groupe: "Autres affaires", options }],
+     *  ou la liste à plat quand l'un des deux groupes serait vide. f : affaire → option. */
+    optionsAffaires: function (liste, f) {
+      var miennes = D.mesAffaires();
+      var a = liste.filter(function (x) { return miennes[x.id]; }), b = liste.filter(function (x) { return !miennes[x.id]; });
+      if (!a.length || !b.length) return liste.map(f);
+      return [{ groupe: "Mes affaires", options: a.map(f) }, { groupe: "Autres affaires", options: b.map(f) }];
+    },
     PARTS: PARTS,
 
     /** Profil de la personne connectée (bureau, droits), sans charger les données : la console s'en contente. */

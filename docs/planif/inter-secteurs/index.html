@@ -134,14 +134,14 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=84"></script>
+<script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=119"></script>
+<script src="/planif/assets/ui.js?v=120"></script>
 <script src="/planif/assets/tchat.js?v=12"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
-<script src="/planif/assets/bandeau.js?v=1"></script>
+<script src="/planif/assets/bandeau.js?v=2"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
 <script>
 (function () {
@@ -512,8 +512,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         Bandeau.entree(hote, kd, nomSecteur(d), nombre(kd), sc === "*" ? 0 : 1, factu.cle === kd, choisit);
       });
     });
-    var opts = auMandat.filter(function (a) { return a.id === factu.affaire || dansCleFactu(a, factu.cle); })
-      .map(function (a) { return [a.id, D.libelleAffaire(a)]; });
+    var opts = D.optionsAffaires(auMandat.filter(function (a) { return a.id === factu.affaire || dansCleFactu(a, factu.cle); }),
+      function (a) { return [a.id, D.libelleAffaire(a)]; });
     Bandeau.liste(hote, "Affaire", [["", "Toutes les affaires"]].concat(opts), factu.affaire, function (v) { factu.affaire = v; retiensFactu(); rend(); });
     Bandeau.caseACocher(hote, "Voir les affaires terminées", filtres.terminees, function (v) { filtres.terminees = v; rend(); });
   }
