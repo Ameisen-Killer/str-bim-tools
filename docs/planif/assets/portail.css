@@ -176,6 +176,27 @@ button { font: inherit; color: inherit; }
 .ab-module:hover .ab-rond-fleche { animation: ab-pousse .5s ease; }
 @keyframes ab-pousse { 50% { transform: translateX(3px); } }
 
+/* Carte Communication (05.11.2026) : les icônes de ses pages, son nom dans le bandeau du bas */
+.ab-module-pages { padding-top: 22px; }
+.ab-module-pages:hover .ab-acceder { background: var(--vert-clair); }
+.ab-module-pages .ab-acceder:hover, .ab-module-pages .ab-acceder:focus-visible { background: var(--vert-logo); outline: none; }
+.ab-module-pages .ab-acceder span { font-size: clamp(17px, 1.4vw, 21px); font-weight: 700; letter-spacing: .01em; }
+.ab-pages {
+  flex: 1; align-self: stretch; display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  align-content: center; gap: 6px; margin: 22px 4px 0;
+}
+.ab-page-ico {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 4px 10px;
+  border-radius: 10px; color: var(--texte); text-decoration: none; text-align: center;
+  font-size: 14px; font-weight: 600; line-height: 1.25; transition: background .18s, transform .18s;
+}
+.ab-page-ico:hover, .ab-page-ico:focus-visible { background: var(--vert-clair); transform: translateY(-2px); outline: none; }
+.ab-module-pages .ab-page-ico svg {
+  width: 56px; height: 56px; fill: none; stroke: #2A3036; stroke-width: 2.4;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ab-page-ico svg .doux { stroke: var(--vert-vif); }
+
 /* Icônes des modules : trait foncé, accents verts */
 .ic-f { fill: none; stroke: #2A3036; stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
 .ic-v { fill: none; stroke: var(--vert-vif); stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
@@ -325,6 +346,14 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-module p { margin: 0; font-size: 14px; grid-column: 2; }
   .ab-acceder { grid-column: 3; grid-row: 1 / 3; margin: 0; padding: 0; background: none; justify-content: center; }
   .ab-acceder span { display: none; }
+  /* Carte Communication : les icônes sur une ligne, le bandeau en dessous */
+  .ab-module.ab-module-pages { display: flex; flex-direction: column; align-items: stretch; padding: 12px; }
+  .ab-module-pages .ab-badge { order: -1; align-self: flex-start; margin: 0 0 4px; }
+  .ab-pages { margin: 0; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 2px; }
+  .ab-page-ico { padding: 8px 2px; font-size: 12px; gap: 6px; }
+  .ab-module-pages .ab-page-ico svg { width: 40px; height: 40px; }
+  .ab-module-pages .ab-acceder { margin-top: 8px; padding: 8px 10px 8px 18px; background: var(--vert-clair); justify-content: space-between; }
+  .ab-module-pages .ab-acceder span { display: inline; font-size: 16px; }
   .ab-encadre { padding: 16px 14px 12px; }
   .ab-encadre h3 { font-size: 18px; }
   .ab-encadre h3 small { display: block; margin: 2px 0 0; }
