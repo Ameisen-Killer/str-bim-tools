@@ -16,7 +16,7 @@
 <link rel="preload" href="/assets/polices/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
-<link rel="stylesheet" href="/planif/assets/portail.css?v=42">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=43">
 </head>
 <body>
 
@@ -33,36 +33,20 @@
 
   <!-- Les quatre entrées vers les modules. -->
   <nav class="ab-modules" aria-label="Modules">
-    <!-- Communication (05.11.2026, essai demandé par Tony) : la carte montre les
+    <!-- Les modules (05.11.2026, demande de Tony) : chaque carte montre les
          icônes de ses pages permises, et le bandeau du bas porte son nom. -->
     <div class="ab-module ab-module-pages ab-monte" style="--r:0" data-page="communication" id="module-comm">
       <div class="ab-pages" id="pages-comm"></div>
       <a class="ab-acceder" href="/planif/communication/" id="acces-comm"><span>COMMUNICATION</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></a>
     </div>
-    <a class="ab-module ab-monte" style="--r:1" data-page="taches" href="/planif/taches/">
-      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <rect class="ic-v" x="8" y="8" width="48" height="48" rx="4"/>
-        <rect class="ic-f" x="15" y="16" width="11" height="11" rx="1.5"/>
-        <rect class="ic-f" x="15" y="36" width="11" height="11" rx="1.5"/>
-        <path class="ic-v" d="m17.5 21.5 3 3 5-6M17.5 41.5l3 3 5-6"/>
-        <path class="ic-f" d="M32 19h17M32 39h17"/>
-        <path class="ic-v" d="M32 25h11M32 45h11"/>
-      </svg>
-      <h2>Tâches</h2>
-      <p>Tâches, tableau de bord, affaires et tableau de charge</p>
-      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
-    </a>
-    <a class="ab-module ab-monte" style="--r:2" data-page="inter" href="/planif/inter-secteurs/" id="module-inter">
-      <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <path class="ic-f" d="M17 6h21l12 12v37a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z"/>
-        <path class="ic-f" d="M38 6v12h12"/>
-        <rect class="ic-v" x="21" y="18" width="9" height="7" rx="1"/>
-        <path class="ic-f" d="M21 33h22M21 40h22M21 47h22"/>
-      </svg>
-      <h2>Inter-secteurs</h2>
-      <p>Veille simap.ch, appels d'offres et leur agenda, facturation</p>
-      <span class="ab-acceder"><span>Accéder</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></span>
-    </a>
+    <div class="ab-module ab-module-pages ab-monte" style="--r:1" data-page="taches" id="module-taches">
+      <div class="ab-pages" id="pages-taches"></div>
+      <a class="ab-acceder" href="/planif/taches/" id="acces-taches"><span>TÂCHES</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></a>
+    </div>
+    <div class="ab-module ab-module-pages ab-monte" style="--r:2" data-page="inter" id="module-inter">
+      <div class="ab-pages" id="pages-inter"></div>
+      <a class="ab-acceder" href="/planif/inter-secteurs/" id="acces-inter"><span>INTER-SECTEURS</span><svg viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="ab-rond" cx="17" cy="17" r="15.5"/><path class="ab-rond-fleche" d="M10 17h13.5M18 11.5l5.5 5.5-5.5 5.5"/></svg></a>
+    </div>
   </nav>
 
   <div class="ab-encadres">
@@ -132,7 +116,7 @@
     salut(id);
     Portail.memoriseEntete();
     Idees.monte(document.getElementById("idees"), id);
-    pagesComm();
+    pagesModules();
     cartesPermises();
     refus();
     Portail.surRetour(dessine);
@@ -159,9 +143,10 @@
     ]));
   }
 
-  /* Carte Communication : une icône par page permise, son nom dessous
+  /* Cartes des modules : une icône par page permise, son nom dessous
      (icônes au trait reprises de la version bureau /planif2/). */
-  var PAGES_COMM = [
+  var PAGES_MODULES = {
+    "pages-comm": [
     { cle: "communication", href: "/planif/communication/", nom: "Le bureau aujourd'hui",
       ico: '<path d="M8 9h22a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H17l-6 5v-5H8a4 4 0 0 1-4-4V13a4 4 0 0 1 4-4z"/><path class="doux" d="M38 17h2a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4h-2v5l-6-5h-8a4 4 0 0 1-4-4v-1"/>' },
     { cle: "absences", href: "/planif/absences/", nom: "Absences et congés",
@@ -170,14 +155,39 @@
       ico: '<circle cx="18" cy="16" r="6"/><path d="M6 40c0-7 5-12 12-12s12 5 12 12"/><circle class="doux" cx="33" cy="17" r="5"/><path class="doux" d="M32 27c6 0 10 4 10 11"/>' },
     { cle: "annuaire", href: "/planif/annuaire/", nom: "Annuaire",
       ico: '<path d="M11 5h25a3 3 0 0 1 3 3v32a3 3 0 0 1-3 3H11z"/><path class="doux" d="M7 13h7M7 24h7M7 35h7"/><circle cx="25" cy="20" r="5"/><path d="M17 35c1-5 4-7 8-7s7 2 8 7"/>' }
-  ];
-  function pagesComm() {
-    var hote = Portail.vide(document.getElementById("pages-comm"));
-    PAGES_COMM.filter(function (p) { return D.pagePermise(p.cle); }).forEach(function (p) {
-      var a = el("a", { class: "ab-page-ico", href: p.href });
-      a.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">' + p.ico + "</svg>";
-      a.appendChild(el("span", { text: p.nom }));
-      hote.appendChild(a);
+  ],
+    "pages-taches": [
+    { cle: "taches", href: "/planif/taches/", nom: "Tâches",
+      ico: '<rect x="8" y="5" width="32" height="38" rx="4"/><path d="M15 17l3 3 5-6M15 31l3 3 5-6"/><path class="doux" d="M28 17h6M28 31h6"/>' },
+    { cle: "tableau", href: "/planif/planning/", nom: "Tableau de bord",
+      ico: '<path d="M6 7v34h36"/><rect class="plein" x="12" y="11" width="16" height="5" rx="2.5"/><rect class="plein doux" x="19" y="20" width="18" height="5" rx="2.5"/><rect class="plein" x="14" y="29" width="10" height="5" rx="2.5"/><rect class="plein doux" x="27" y="29" width="12" height="5" rx="2.5"/>' },
+    { cle: "affaires", href: "/planif/affaires/", nom: "Affaires",
+      ico: '<path d="M5 13a3 3 0 0 1 3-3h10l4 4h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path class="doux" d="M5 20h38"/>' },
+    { cle: "charge", href: "/planif/charge/", nom: "Tableau de charge",
+      ico: '<rect class="plein doux" x="7" y="8" width="9" height="9" rx="2"/><rect class="plein" x="19.5" y="8" width="9" height="9" rx="2"/><rect class="plein doux" x="32" y="8" width="9" height="9" rx="2"/><rect class="plein" x="7" y="20" width="9" height="9" rx="2"/><rect class="plein doux" x="19.5" y="20" width="9" height="9" rx="2"/><rect x="32" y="20" width="9" height="9" rx="2"/><rect x="7" y="32" width="9" height="9" rx="2"/><rect class="plein" x="19.5" y="32" width="9" height="9" rx="2"/><rect class="plein" x="32" y="32" width="9" height="9" rx="2"/>' }
+    ],
+    "pages-inter": [
+    { cle: "veille", href: "/planif/inter-secteurs/", nom: "Veille simap.ch",
+      ico: '<circle cx="24" cy="24" r="18"/><circle class="doux" cx="24" cy="24" r="10"/><path d="M24 24l12-12"/><circle class="plein" cx="31" cy="20" r="2.5"/>' },
+    { cle: "ao_publics", href: "/planif/inter-secteurs/?vue=publics", nom: "AO publics",
+      ico: '<path d="M6 17L24 6l18 11M8 18h32M12 22v14M20 22v14M28 22v14M36 22v14M6 41h36"/>' },
+    { cle: "ao_prives", href: "/planif/inter-secteurs/?vue=prives", nom: "AO privés",
+      ico: '<rect x="5" y="14" width="38" height="27" rx="4"/><path d="M17 14v-4a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v4"/><path class="doux" d="M5 25h38"/><path d="M21 23v5h6v-5"/>' },
+    { cle: "agenda_ao", href: "/planif/inter-secteurs/?vue=agenda", nom: "Agenda des AO",
+      ico: '<rect x="5" y="9" width="30" height="28" rx="4"/><path d="M5 17h30M13 5v7M27 5v7"/><circle class="fond" cx="35" cy="35" r="9"/><path d="M35 30v5l3 2"/>' },
+    { cle: "facturation", href: "/planif/inter-secteurs/?vue=facturation", nom: "Facturation",
+      ico: '<path d="M7 34a17 17 0 1 1 34 0"/><path class="doux" d="M12 34h3M33 34h3M24 17v3"/><path d="M24 34l8-10"/><circle class="plein" cx="24" cy="34" r="3"/><path d="M7 41h34"/>' }
+    ]
+  };
+  function pagesModules() {
+    Object.keys(PAGES_MODULES).forEach(function (id) {
+      var hote = Portail.vide(document.getElementById(id));
+      PAGES_MODULES[id].filter(function (p) { return D.pagePermise(p.cle); }).forEach(function (p) {
+        var a = el("a", { class: "ab-page-ico", href: p.href });
+        a.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">' + p.ico + "</svg>";
+        a.appendChild(el("span", { text: p.nom }));
+        hote.appendChild(a);
+      });
     });
   }
 
@@ -249,9 +259,9 @@
     // La veille est la première page du module ; sans elle, le module s'ouvre sur sa première page permise
     var nv = D.pagePermise("veille") ? D.veilleNouvelles().length : 0;
     if (nv) {
-      inter.href = "/planif/inter-secteurs/";
+      document.getElementById("acces-inter").href = "/planif/inter-secteurs/";
       inter.appendChild(el("span", { class: "ab-badge veille", text: nv + (nv > 1 ? " nouvelles publications" : " nouvelle publication") }));
-    } else inter.href = D.lienModule("inter");
+    } else document.getElementById("acces-inter").href = D.lienModule("inter");
   }
 
   /** Plus importante d'abord : échéance, puis priorité (1 avant 5), puis libellé. */

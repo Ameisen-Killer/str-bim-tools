@@ -176,7 +176,7 @@ button { font: inherit; color: inherit; }
 .ab-module:hover .ab-rond-fleche { animation: ab-pousse .5s ease; }
 @keyframes ab-pousse { 50% { transform: translateX(3px); } }
 
-/* Carte Communication (05.11.2026) : les icônes de ses pages, son nom dans le bandeau du bas */
+/* Cartes des modules (05.11.2026) : les icônes de leurs pages, leur nom dans le bandeau du bas */
 .ab-module-pages { padding-top: 22px; }
 .ab-module-pages:hover .ab-acceder { background: var(--vert-clair); }
 .ab-module-pages .ab-acceder:hover, .ab-module-pages .ab-acceder:focus-visible { background: var(--vert-logo); outline: none; }
@@ -196,6 +196,9 @@ button { font: inherit; color: inherit; }
   stroke-linecap: round; stroke-linejoin: round;
 }
 .ab-page-ico svg .doux { stroke: var(--vert-vif); }
+.ab-page-ico svg .plein { fill: #2A3036; stroke: none; }
+.ab-page-ico svg .plein.doux { fill: var(--vert-vif); }
+.ab-page-ico svg .fond { fill: var(--carte, #fff); }
 
 /* Icônes des modules : trait foncé, accents verts */
 .ic-f { fill: none; stroke: #2A3036; stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
@@ -346,7 +349,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
   .ab-module p { margin: 0; font-size: 14px; grid-column: 2; }
   .ab-acceder { grid-column: 3; grid-row: 1 / 3; margin: 0; padding: 0; background: none; justify-content: center; }
   .ab-acceder span { display: none; }
-  /* Carte Communication : les icônes sur une ligne, le bandeau en dessous */
+  /* Cartes des modules : les icônes sur une ligne, le bandeau en dessous */
   .ab-module.ab-module-pages { display: flex; flex-direction: column; align-items: stretch; padding: 12px; }
   .ab-module-pages .ab-badge { order: -1; align-self: flex-start; margin: 0 0 4px; }
   .ab-pages { margin: 0; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 2px; }
