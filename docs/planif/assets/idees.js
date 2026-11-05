@@ -20,7 +20,7 @@
   var D = global.Donnees, SB = global.Sb, P = global.Portail, el = P.el;
   var MAX_CAPTURES = 6, MAX_TEXTE = 4000, SEAU = "idees";
   var CLE_LOCAL = "planif.idees.local:";
-  var ETATS = [["nouvelle", "Nouvelle"], ["lue", "Lue"], ["retenue", "Retenue"], ["faite", "Réalisée"], ["ecartee", "Écartée"]];
+  var ETATS = [["nouvelle", "Nouvelle"], ["lue", "Lue"], ["retenue", "Pris en compte"], ["faite", "Réalisée"], ["ecartee", "Rejeté"]];
   var A_TRAITER = { nouvelle: 1, lue: 1, retenue: 1 };
 
   var hote = null, identite = {}, baseOk = true, idees = [], filtre = "traiter";
@@ -409,6 +409,16 @@
           dessine();
         }).catch(function (e) { suppr.disabled = false; annonce(e.message); });
       });
+      function bouton(v, texte, genre) {
+        var b = el("button", { type: "button", class: "ab-id-rep " + genre + (x.statut === v ? " actif" : ""),
+          "aria-pressed": x.statut === v ? "true" : "false", text: texte });
+        b.addEventListener("click", function () {
+          if (x.statut === v) return;
+          b.disabled = true;
+          changeEtat(x, v).then(dessine).catch(function (e) { b.disabled = false; annonce(e.message); });
+        });
+        return b;
+      }
       var vign = el("div", { class: "ab-id-vignettes" });
       x.captures.forEach(function (c, i) {
         var img = el("img", { alt: "Capture " + (i + 1), class: "charge" });
@@ -428,7 +438,9 @@
         ]),
         el("p", { class: "ab-id-texte-lu", text: x.texte }),
         x.captures.length ? vign : null,
-        el("div", { class: "ab-id-actions" }, [suppr])
+        el("div", { class: "ab-id-actions" }, [
+          // Les deux réponses courantes en un clic (05.11.2026, demande de Tony)
+          bouton("retenue", "Pris en compte", "ok"), bouton("ecartee", "Rejeté", "non"), suppr])
       ]);
     }
 

@@ -491,7 +491,11 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-id-etat.faite { border-color: var(--vert-ok); }
 .ab-id-etat.ecartee { color: var(--faible); }
 .ab-id-texte-lu { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ab-id-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.ab-id-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; }
+.ab-id-rep { padding: 5px 12px; border: 1px solid var(--ligne, #DADDD6); border-radius: 6px; background: #fff; color: var(--texte); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ab-id-rep.ok:hover, .ab-id-rep.ok.actif { background: var(--vert-clair); border-color: transparent; }
+.ab-id-rep.non:hover, .ab-id-rep.non.actif { background: #F0F1EE; border-color: transparent; color: var(--faible); }
+.ab-id-rep.actif { cursor: default; }
 .ab-id-suppr { padding: 4px 8px; border: 0; border-radius: 6px; background: none; color: var(--faible); font-size: 13px; cursor: pointer; }
 .ab-id-suppr:hover, .ab-id-suppr.confirme { color: var(--rouge-texte); background: #FBE4E2; }
 
