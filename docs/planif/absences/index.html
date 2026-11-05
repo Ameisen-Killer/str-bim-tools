@@ -795,6 +795,24 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     ]);
 
     n.addEventListener("click", function () { UI.absences(m.id, rend); });
+    // Clic droit (05.11.2026) : les absences de la personne, ses jours, sa fiche équipe, retirer celle-ci
+    n.addEventListener("contextmenu", function (e) {
+      var peut = D.peutAbsences(m.id);
+      UI.menuContexte(e, { titre: m.prenom + " " + m.nom + " · " + a.motif + " · " + C.fmtCourt(a.debut) + (fin !== a.debut ? " → " + C.fmtCourt(fin) : ""), items: [
+        { label: peut ? "Modifier ses absences" : "Voir ses absences", action: function () { UI.absences(m.id, rend); } },
+        { label: D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", action: function () { UI.joursTravailles(m.id, rend); } },
+        { label: "Voir ses tâches", lien: "/planif/taches/?membre=" + encodeURIComponent(m.id) },
+        { sep: true },
+        peut && a.id ? { label: "Retirer cette absence", rouge: true, action: function () {
+          UI.confirme("Retirer cette absence ?", m.prenom + " " + m.nom + " · " + a.motif + " · " + C.fmtCH(a.debut) + " → " + C.fmtCH(fin), "Retirer", true)
+            .then(function (ok) {
+              if (!ok) return;
+              D.suppAbsence(m.id, a.id).then(function () { rend(); UI.toast("Absence retirée."); })
+                .catch(function (x) { UI.toast(x.message); });
+            });
+        } } : null
+      ] });
+    });
     n.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); UI.absences(m.id, rend); }
     });

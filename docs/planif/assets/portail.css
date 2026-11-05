@@ -239,7 +239,10 @@ button { font: inherit; color: inherit; }
   padding: 10px 2px; min-height: 42px; text-decoration: none; color: var(--texte); font-size: 16px;
 }
 a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
-.ab-ligne.trois { grid-template-columns: 14px minmax(0, .9fr) minmax(0, 1fr) auto; }
+/* Absences : colonnes de largeur fixe, les mêmes d'une ligne à l'autre (05.11.2026) —
+   une dernière colonne « auto » décalait les dates selon la longueur du motif */
+.ab-ligne.trois { grid-template-columns: 14px minmax(0, 1fr) 9.5em minmax(0, 8.5em); }
+.ab-ligne.trois .ab-quand { justify-content: flex-end; overflow: hidden; text-overflow: ellipsis; }
 .ab-point { width: 14px; height: 14px; border-radius: 50%; background: var(--gris-point); }
 .ab-point.rouge { background: var(--rouge); }
 .ab-point.orange { background: var(--orange); }
