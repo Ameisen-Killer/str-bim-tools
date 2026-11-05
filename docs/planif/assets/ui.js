@@ -2719,6 +2719,74 @@
   }
   global.addEventListener("scroll", cacheBulle, { passive: true });
 
+  /* ------------------------------------------------ demandes de congé à valider
+     Un encadré bien visible en tête des pages Le bureau aujourd'hui et Absences
+     et congés (05.11.2026, demande de Tony : « je ne vois pas clairement les
+     demandes à valider »), avec Accepter / Refuser sur chaque ligne. Vide quand
+     rien n'attend ma décision. #a-valider dans l'adresse y mène (pastille de
+     l'accueil). */
+  var JOURS_DC = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+  function jourDC(iso) { var d = C.dt(iso); return d ? JOURS_DC[d.getDay()] + " " + C.fmtCourt(iso) : "—"; }
+  function periodeDC(c) { return c.debut === c.fin ? jourDC(c.debut) : jourDC(c.debut) + " → " + jourDC(c.fin); }
+  var dcVu = false;
+  function demandesConge(hote, surChange) {
+    if (!hote) return;
+    vide(hote);
+    var l = D.congesAValider ? D.congesAValider() : [];
+    hote.hidden = !l.length;
+    if (!l.length) return;
+    var canton = D.canton();
+    var ul = el("ul", { class: "dc-liste" });
+    l.forEach(function (c) {
+      var m = D.membre(c.membreId);
+      var n = global.Calc ? global.Calc.joursTravaillesEntre(m, c.debut, c.fin, canton) : null;
+      ul.appendChild(el("li", { class: "dc-ligne" }, [
+        el("span", { class: "dc-qui" }, [
+          el("b", { text: m ? m.prenom + " " + m.nom : "—" }),
+          el("span", { text: " · " + c.motif })
+        ]),
+        el("span", { class: "dc-quand", text: periodeDC(c) + (n != null ? " · " + C.fmtJours(n) + (n > 1 ? " jours" : " jour") : "") +
+          (c.commentaire ? " · « " + c.commentaire + " »" : "") }),
+        el("span", { class: "dc-boutons" }, [
+          el("button", { type: "button", class: "btn btn-or", text: "Accepter", onclick: function () { decideConge(c, true, surChange); } }),
+          el("button", { type: "button", class: "btn btn-rouge", text: "Refuser", onclick: function () { decideConge(c, false, surChange); } })
+        ])
+      ]));
+    });
+    hote.appendChild(el("section", { class: "dc-panneau", "aria-labelledby": "dc-titre" }, [
+      el("h2", { id: "dc-titre", class: "dc-titre" }, [
+        el("span", { class: "dc-nombre", text: String(l.length) }),
+        l.length > 1 ? "demandes de congé attendent ta décision" : "demande de congé attend ta décision"
+      ]),
+      ul
+    ]));
+    if (!dcVu && location.hash === "#a-valider") {
+      dcVu = true;
+      requestAnimationFrame(function () { hote.scrollIntoView({ block: "start", behavior: "smooth" }); });
+    }
+  }
+  function decideConge(c, accepte, surChange) {
+    var m = D.membre(c.membreId);
+    var corps = el("div", {}, [
+      el("p", { style: "margin-bottom:12px", text: (m ? m.prenom + " " + m.nom : "—") + " · " + c.motif + " · " + periodeDC(c) +
+        (accepte ? ". L'absence sera inscrite au planning." : ".") }),
+      el("div", { class: "grille-champs" }, [
+        champ({ nom: "reponse", label: accepte ? "Un mot (facultatif)" : "Motif du refus", type: "textarea", rows: 2, large: true,
+                exemple: accepte ? "Bonnes vacances !" : "Remise du dossier X cette semaine-là…" })
+      ])
+    ]);
+    ouvre({ surtitre: "Demande de congé", titre: accepte ? "Accepter" : "Refuser", corps: corps, boutons: [
+      { label: "Annuler" },
+      { label: accepte ? "Accepter" : "Refuser", or: accepte, rouge: !accepte, entree: true, action: function () {
+        var rep = lit(corps).reponse || "";
+        return D.decideConge(c.id, accepte, rep).then(function () {
+          toast(accepte ? "Congé accepté, inscrit au planning." : "Congé refusé.");
+          if (surChange) surChange();
+        }).catch(function (e) { toast(e.message); return false; });
+      } }
+    ] });
+  }
+
   /* ------------------------------------------------ menu du clic droit
      Le même menu partout (05.11.2026, demande de Tony) : tâches, affaires,
      membres. Un appui long au doigt l'ouvre aussi (événement contextmenu).
@@ -3381,6 +3449,7 @@
     choixJours: choixJours, joursTravailles: joursTravailles,
     formulaireTache: formulaireTache, ficheTache: ficheTache, imprime: imprime,
     menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte,
+    demandesConge: demandesConge, decideConge: decideConge,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,
     recherche: recherche, correspond: correspond, surligne: surligne,
     foin: foin, contient: contient, paquets: paquets,

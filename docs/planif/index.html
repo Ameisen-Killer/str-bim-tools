@@ -263,7 +263,9 @@
   }
   function badgeConges() {
     var n = D.congesAValider().length;
-    pastille("absences", n, n + (n > 1 ? " congés à valider" : " congé à valider"));
+    var ia = pastille("absences", n, n + (n > 1 ? " congés à valider" : " congé à valider"));
+    // Des congés attendent : l'icône mène droit à la liste des demandes, en tête de page
+    if (ia) ia.href = n ? "/planif/absences/#a-valider" : "/planif/absences/";
     // Les messages du tchat arrivés depuis ma dernière visite
     if (window.Tchat) Tchat.nonLus().then(function (nm) {
       var ico = pastille("communication", nm, nm + (nm > 1 ? " nouveaux messages au tchat" : " nouveau message au tchat"));

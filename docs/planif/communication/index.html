@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <script src="/planif/assets/echelle.js?v=1"></script>
 <link rel="stylesheet" href="/planif/assets/planif.css?v=108">
-<link rel="stylesheet" href="/planif/assets/habillage.css?v=25">
+<link rel="stylesheet" href="/planif/assets/habillage.css?v=26">
 <link rel="stylesheet" href="/planif/assets/communication.css?v=13">
 </head>
 <body class="large">
@@ -47,6 +47,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   </div>
 <script>window.planifSousNav&&planifSousNav();</script>
   <div class="wrap" data-bandeau></div>
+  <!-- Les demandes de congé qui attendent ma décision, en tête (05.11.2026, UI.demandesConge) -->
+  <div class="wrap" id="a-valider" hidden></div>
   <div class="wrap">
     <!-- En haut : le bureau aujourd'hui, compacté à gauche ; les news du bureau
          à droite (13.10.2026 : le tchat est passé dans une fenêtre volante) -->
@@ -100,7 +102,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=85"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=19"></script>
-<script src="/planif/assets/ui.js?v=121"></script>
+<script src="/planif/assets/ui.js?v=122"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/news.js?v=4"></script>
@@ -221,6 +223,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* ================================================================ rendu */
 
   function rend() {
+    UI.demandesConge(document.getElementById("a-valider"), rend);
     bureau();
     agenda();
     conges();
@@ -337,20 +340,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       hote.appendChild(ul);
     }
 
-    bloc("À valider" + " (" + aValider.length + ")", aValider.map(function (c) {
-      var m = D.membre(c.membreId);
-      return el("li", { class: "cm-demande" }, [
-        el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
-        el("span", { class: "cm-lib" }, [
-          el("span", { class: "cm-titre", text: nom(m) + " — " + c.motif }),
-          el("span", { class: "cm-detail", text: periode(c) + " · " + jours(c) + (c.commentaire ? " · « " + c.commentaire + " »" : "") })
-        ]),
-        el("span", { class: "cm-boutons" }, [
-          el("button", { type: "button", class: "btn btn-or", text: "Accepter", onclick: function () { decide(c, true); } }),
-          el("button", { type: "button", class: "btn btn-rouge", text: "Refuser", onclick: function () { decide(c, false); } })
-        ])
-      ]);
-    }), "a-valider");
+    // Les demandes à valider sont en tête de page (UI.demandesConge, 05.11.2026)
 
     bloc("Mes demandes", miennes.map(function (c) {
       var juge = c.validePar ? D.membre(c.validePar) : null;

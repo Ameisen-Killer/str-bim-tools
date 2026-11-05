@@ -362,3 +362,21 @@
 /* Priorité et parts terminées côte à côte dans le formulaire de tâche */
 :root[data-version="v2"] .champ-priorite .priorite-ligne input[type=range]{flex:1 1 110px}
 :root[data-version="v2"] .champ-priorite .priorite-lib{min-width:0;font-size:var(--t-petit)}
+
+/* Demandes de congé à valider (UI.demandesConge), en tête des pages Le bureau
+   aujourd'hui et Absences et congés : impossible à manquer */
+.dc-panneau{margin:6px 0 16px;padding:14px 18px 8px;border-radius:10px;background:#FDF0DC;border:1px solid #F2D9AE;box-shadow:var(--ab-ombre)}
+.dc-titre{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-size:var(--t-texte,15px);font-weight:650;color:#6B4600}
+.dc-nombre{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:var(--alerte);color:#fff;font-size:13px;font-weight:700;line-height:26px;font-feature-settings:"tnum","case"}
+.dc-liste{list-style:none;margin:0;padding:0}
+.dc-ligne{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;align-items:center;gap:6px 16px;padding:9px 0;border-top:1px solid rgba(138,90,0,.15);font-size:var(--t-texte,15px)}
+.dc-qui{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-qui b{font-weight:600}
+.dc-quand{min-width:0;color:var(--texte-doux);font-size:var(--t-doux,14px)}
+.dc-boutons{display:flex;gap:8px;justify-content:flex-end}
+.dc-boutons .btn{padding:6px 14px}
+@media (max-width:640px){
+  .dc-ligne{grid-template-columns:minmax(0,1fr)}
+  .dc-boutons{justify-content:flex-start}
+}
+@media print{.dc-panneau{display:none}}
