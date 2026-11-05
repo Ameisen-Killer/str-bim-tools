@@ -357,7 +357,7 @@
   }
 
   function lire() {
-    var f = fenetre("Boîte à idées", "", "ab-id-lire");
+    var f = fenetre("Boîte à idées / Problèmes", "", "ab-id-lire");
     var filtres = el("div", { class: "ab-id-filtres", role: "group", "aria-label": "Filtre" });
     var liste = el("div", { class: "ab-id-liste", "aria-live": "polite" });
     f.corps.appendChild(filtres);
