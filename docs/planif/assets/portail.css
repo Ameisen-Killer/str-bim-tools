@@ -295,7 +295,7 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-lib { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ab-quand { color: var(--faible); white-space: nowrap; text-align: right; display: flex; align-items: center; gap: 8px; }
 .ab-quand.rouge { color: var(--rouge-texte); }
-.ab-periode { color: var(--faible); white-space: nowrap; }
+.ab-periode { color: var(--faible); white-space: nowrap; text-align: left; justify-self: start; font-variant-numeric: tabular-nums; }
 .ab-prio {
   display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 12px; font-weight: 600;
   background: var(--m-pale); color: var(--vert-texte);

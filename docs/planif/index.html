@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/portail.css?v=47">
+<link rel="stylesheet" href="/planif/assets/portail.css?v=48">
 </head>
 <body>
 
@@ -130,8 +130,9 @@
 
   function auj() { return C.isoAuj(); }
   function deux(n) { return (n < 10 ? "0" : "") + n; }
-  /** « 06.10 » */
-  function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + "." + deux(d.getMonth() + 1) : "—"; }
+  /** « 02 nov. » (05.11.2026, demande de Tony : plus lisible que « 02.11 ») */
+  var MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+  function jj(iso) { var d = C.dt(iso); return d ? deux(d.getDate()) + " " + MOIS[d.getMonth()] : "—"; }
 
   /* « Bonjour » puis prénom et nom, en vert ; le nom un ton plus clair. */
   function salut(id) {
