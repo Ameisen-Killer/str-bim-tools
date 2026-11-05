@@ -121,7 +121,7 @@
      pages qui les ont gardées en main voient donc les bons noms. */
   var GROUPES_DEFAUT = [
     { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
-      droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "voir_conges_equipe", "voir_absences_avenir"] },
+      droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "page_affaires", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
       droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "conges_tous",
                "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
