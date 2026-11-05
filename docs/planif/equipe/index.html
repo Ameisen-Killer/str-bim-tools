@@ -287,7 +287,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         entree(hote, k, d === "_" ? "Secteur non renseigné" : D.DISCIPLINES[d], discs[d], succ.length ? 1 : 0, cle === k, choisit);
       });
     });
-    // Affaire : qui y est rattaché ou y porte une tâche
+    // Affaire : son responsable et l'équipe de sa fiche
     var aff = D.affaires({ tous: true }).filter(dansSuccursales);
     if (filtres.affaires.length && !aff.some(function (a) { return a.id === filtres.affaires[0]; })) filtres.affaires = [];
     if (aff.length) {
@@ -351,8 +351,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       });
   }
 
-  // Est « dans l'affaire » son responsable, qui y est rattaché dans la fiche affaire, ou qui y porte
-  // une tâche en cours (les tâches terminées ne comptent plus, 05.11.2026) ;
+  // Est « dans l'affaire » son responsable et l'équipe inscrite dans la fiche affaire, rien d'autre :
+  // les tâches n'y font plus entrer personne (05.11.2026, demande de Tony) ;
   // plusieurs affaires cochées : dans l'une au moins
   function membresAffaires(ids) {
     var dans = Object.create(null);
@@ -361,10 +361,6 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       if (!a) return;
       if (a.responsableId) dans[a.responsableId] = true;
       a.ingenieurs.concat(a.dessinateurs).forEach(function (i) { dans[i] = true; });
-      D.taches({ affaireId: id, sansTerminees: true }).forEach(function (t) {
-        if (t.ingenieurId) dans[t.ingenieurId] = true;
-        if (t.dessinateurId) dans[t.dessinateurId] = true;
-      });
     });
     return dans;
   }
