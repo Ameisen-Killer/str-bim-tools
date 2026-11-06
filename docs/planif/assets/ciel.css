@@ -1,0 +1,11 @@
+/* Planification — ciel du jour (06.11.2026, idée de Tony), avec ciel.js.
+   Un voile fixe derrière toute la page, en dégradé vertical, posé sur le fond
+   de la marque (le fond du body reste --m-fond). Les teintes viennent de
+   ciel.js (--ciel-haut, --ciel-bas) ; sans script, rien ne change.
+   Pas à l'impression : le papier reste blanc. */
+@media screen {
+  :root[data-ciel] body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(180deg, var(--ciel-haut, transparent) 0%, var(--ciel-bas, transparent) 100%);
+  }
+}
