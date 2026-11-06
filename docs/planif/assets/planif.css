@@ -463,6 +463,8 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-course.actif{color:var(--or)}
 .ico-modifier{--ico:url(/planif/icons/clipboard_edit.svg?v=1)}
 .ico-supprimer{--ico:url(/planif/icons/trash.svg?v=1)}
+.ico-archiver{--ico:url(/planif/icons/archive.svg?v=1)}
+.ico-desarchiver{--ico:url(/planif/icons/desarchive.svg?v=1)}
 .ico-supprimer:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.45);background-color:rgba(var(--alerte-rvb),.07)}
 /* icône devant le libellé d'un bouton (Nouvelle tâche, Nouvelle absence) : couleur du bouton */
 .ico-txt{

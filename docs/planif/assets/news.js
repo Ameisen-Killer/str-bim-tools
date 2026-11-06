@@ -335,14 +335,15 @@
     var modifiee = n.majLe && n.creeLe && (new Date(n.majLe) - new Date(n.creeLe)) > 60000;
     var actions = el("div", { class: "nw-actions" }, [
       peutModifier(n) ? UI.boutonIcone("modifier", "Modifier", n.titre, function () { editeur(n); }) : null,
-      peutArchiver() ? el("button", { type: "button", class: "btn btn-nu nw-archiver", text: n.archiveLe ? "Remettre en ligne" : "Archiver",
-        onclick: function () {
+      // Icône de caisse d'archives, flèche qui entre ou qui ressort (06.11.2026)
+      peutArchiver() ? UI.boutonIcone(n.archiveLe ? "desarchiver" : "archiver", n.archiveLe ? "Remettre en ligne" : "Archiver", n.titre,
+        function () {
           var b = this; b.disabled = true;
           modifie(n.id, { archive: !n.archiveLe }).then(function () {
             UI.toast(n.archiveLe ? "News remise en ligne." : "News archivée.");
             dessine();
           }).catch(function (e) { b.disabled = false; UI.toast(e.message); });
-        } }) : null,
+        }) : null,
       peutSupprimer() ? UI.boutonIcone("supprimer", "Supprimer", n.titre, function () {
         UI.confirme("Supprimer cette news ?", "« " + n.titre + " » disparaîtra pour tout le bureau, archives comprises.", "Supprimer", true).then(function (ok) {
           if (!ok) return;
