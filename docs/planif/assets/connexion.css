@@ -63,8 +63,8 @@ body { min-height: calc(100vh * var(--vhk,1)); min-height: calc(100dvh * var(--v
 
 /* Pied commun (footer.pied-outil de portail.css) : en bas de l'écran, toute la largeur,
    la carte reste centrée dans l'espace au-dessus */
-.cx-carte { margin-top: auto; }
-.cx-pied-outil { align-self: stretch; margin-top: auto; padding-left: 8px; padding-right: 8px; }
+.cx-carte { margin-top: auto; margin-bottom: auto; }
+footer.pied-outil.cx-pied-outil { align-self: stretch; margin-top: 24px; padding-left: 8px; padding-right: 8px; }
 
 @media (max-width: 700px) {
   .cx { justify-content: flex-start; }
