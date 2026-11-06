@@ -426,6 +426,7 @@
     if (c) $("#chantier").value = c.id;
   }
   function ouvre(c) {
+    if (!CUR || CUR.id !== c.id) { PILE = []; majAnnuler(); }
     delete c._code; delete c._nom; CUR = c; CONF = normalise(copie(c.config)); SALE = false; lsSet("org.chantier", c.id);
     if (SEL && !plageDe(SEL)) SEL = "";
     return rechargeDonnees();
@@ -601,6 +602,22 @@
     $("#arbre").innerHTML = h;
     dessineDetail();
   }
+  // « Aller au n° » : un n° (ou un code de document complet, dont on prend le dernier nombre)
+  // ouvre la plage la plus fine qui le contient et fait clignoter sa case
+  var CHERCHE = null;
+  function chercheN(montre) {
+    var v = $("#p-cherche").value, m = /(\d+)\D*$/.exec(v), info = $("#p-cherche-i");
+    if (!m) { info.textContent = ""; CHERCHE = null; return; }
+    var n = parseInt(m[1], 10), x = plageDuBloc(n, n), occ = occupation(ESPACE)[n], o = occ || {};
+    info.textContent = pad(n) + " · " + (o.pl && o.pl.length ? "émis" : o.r ? (o.r.statut === "emis" ? "émis" : "réservé") + " : " + (o.r.titre || o.r.type) : "libre") + " · " + (x ? x.chemin : "hors plage");
+    info.title = info.textContent;
+    if (!montre) return;
+    if (!x) { CHERCHE = null; toast("N° " + pad(n) + " hors des plages du chantier."); return; }
+    CHERCHE = n; SEL = x.cle; dessinePlages();
+  }
+  $("#p-cherche").addEventListener("input", function () { chercheN(false); });
+  $("#p-cherche").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); chercheN(true); } else if (e.key === "Escape") { this.value = ""; chercheN(false); } });
+  $("#p-aller").addEventListener("click", function () { chercheN(true); });
   $("#arbre").addEventListener("click", function (e) { var b = e.target.closest(".lot"); if (!b) return; SEL = b.dataset.k; dessinePlages(); });
 
   function dessineDetail() {
@@ -624,6 +641,7 @@
       cases += '<button type="button" class="' + c + '" data-n="' + n + '" title="' + esc(t) + '">' + pad(n).slice(-3) + "</button>";
     }
     var dedans = RES.filter(function (r) { return r.de <= p.a && p.de <= r.a; }).sort(function (a, b) { return a.de - b.de; });
+    var trouve = CHERCHE; CHERCHE = null;
     D.innerHTML = "<h2>" + esc(p.lib) + '</h2><div class="sous-t">' + esc(x.chemin) + " · n° " + pad(p.de) + " à " + pad(p.a) +
       (p.types.length ? " · réservée aux types " + esc(p.types.join(", ")) : " · tous types") + "</div>" +
       '<div class="compte"><span><b>' + s.libre + "</b>libres</span><span><b>" + s.r + "</b>réservés</span><span><b>" + s.e + "</b>émis</span></div>" +
@@ -632,6 +650,10 @@
       '<span class="legende"><span style="--c:var(--c-libre)">Libre</span><span class="l-r">Réservé</span><span class="l-e">Émis</span><span class="l-h">Émis sans réservation</span></span></div>' +
       '<div class="grille">' + cases + "</div>" +
       (dedans.length ? '<table><thead><tr><th>N°</th><th>Code</th><th>Titre</th><th>État</th></tr></thead><tbody>' + dedans.map(ligneRes).join("") + "</tbody></table>" : '<p class="vide" style="padding:0">Aucune réservation dans cette plage.</p>');
+    if (trouve != null) {
+      var c = D.querySelector('.case[data-n="' + trouve + '"]');
+      if (c) { c.classList.add("trouve"); c.scrollIntoView({ block: "center" }); c.focus({ preventScroll: true }); setTimeout(function () { c.classList.remove("trouve"); }, 2600); }
+    }
   }
   $("#detail").addEventListener("click", function (e) {
     if (e.target.closest("#d-res")) { ouvreRes(null, { plage: SEL, type: ESPACE !== "*" ? ESPACE : "" }); return; }
@@ -697,7 +719,7 @@
     if (a === "reserver") { ouvreRes(null, { plage: SEL, de: n, type: ESPACE !== "*" ? ESPACE : "" }); return; }
     if (!r) return;
     if (a === "modifier") { ouvreRes(r); return; }
-    var q;
+    var q, crees = [];
     if (a === "statut") q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", prefer: "return=representation", corps: { statut: r.statut === "emis" ? "reserve" : "emis", modifie_par: moi() } });
     else if (a === "supprimer" || (a === "liberer" && r.de === r.a)) {
       if (a === "supprimer" && r.a > r.de && !window.confirm("Supprimer la réservation " + pad(r.de) + "–" + pad(r.a) + " (" + (r.a - r.de + 1) + " n°) ?")) return;
@@ -708,9 +730,12 @@
     else {   // au milieu : la réservation est coupée en deux autour du n° libéré
       var suite = {}; ["chantier", "type", "discipline", "phase", "batiment", "niveau", "zone", "titre", "par", "echeance", "statut", "remarque"].forEach(function (k) { suite[k] = r[k]; });
       suite.de = n + 1; suite.a = r.a; suite.modifie_par = moi();
-      q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: { a: n - 1, modifie_par: moi() } }).then(function () { return appel("doc_reservations", { methode: "POST", corps: suite }); });
+      q = appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: { a: n - 1, modifie_par: moi() } })
+        .then(function () { return appel("doc_reservations", { methode: "POST", prefer: "return=representation", corps: suite }); })
+        .then(function (l) { if (l && l[0]) crees.push(l[0].id); });
     }
-    q.then(function () { toast(a === "statut" ? "État changé." : a === "supprimer" ? "Réservation supprimée." : "N° " + pad(n) + " libéré."); return rechargeDonnees(true); }).catch(function (err) { toast(err.message, 5000); rechargeDonnees(true); });
+    q.then(function () {
+      retiens(a === "statut" ? "changement d'état de " + blocTxt(r) : a === "supprimer" ? "suppression de " + blocTxt(r) : "libération du n° " + pad(n), [r], crees); toast(a === "statut" ? "État changé." : a === "supprimer" ? "Réservation supprimée." : "N° " + pad(n) + " libéré."); return rechargeDonnees(true); }).catch(function (err) { toast(err.message, 5000); rechargeDonnees(true); });
   });
   $("#detail").addEventListener("change", function (e) { if (e.target.id === "d-esp") { ESPACE = e.target.value; dessineDetail(); } });
 
@@ -741,6 +766,46 @@
   }
   ["#r-cherche", "#r-type", "#r-statut"].forEach(function (s) { $(s).addEventListener("input", dessineRes); });
   $("#r-corps").addEventListener("click", function (e) { var tr = e.target.closest("tr[data-id]"); if (tr) ouvreRes(RES.filter(function (r) { return r.id === tr.dataset.id; })[0]); });
+
+  // ------------------------------------------------------------------ annuler
+  // Chaque réservation, modification, suppression ou libération garde l'état d'avant des réservations
+  // touchées (avant) et les réservations créées (crees). Annuler supprime les créées et remet les autres.
+  var CHAMPS_R = ["chantier", "de", "a", "type", "discipline", "phase", "batiment", "niveau", "zone", "titre", "par", "echeance", "statut", "remarque"];
+  var PILE = [];
+  function retiens(lib, avant, crees) {
+    PILE.push({ lib: lib, avant: (avant || []).filter(Boolean).map(copie), crees: (crees || []).filter(Boolean), ch: CUR && CUR.id });
+    if (PILE.length > 30) PILE.shift();
+    majAnnuler();
+  }
+  function majAnnuler() {
+    var b = $("#b-annuler"), d = PILE[PILE.length - 1]; if (!b) return;
+    b.disabled = !d; b.title = d ? "Annuler : " + d.lib + " (Ctrl+Z)" : "Rien à annuler";
+  }
+  function annule() {
+    var d = PILE.pop(); majAnnuler();
+    if (!d) { toast("Rien à annuler."); return; }
+    if (!CUR || d.ch !== CUR.id) { PILE = []; majAnnuler(); toast("Rien à annuler sur ce chantier."); return; }
+    var q = Promise.resolve();
+    d.crees.forEach(function (id) { q = q.then(function () { return appel("doc_reservations?id=eq." + id, { methode: "DELETE" }); }); });
+    d.avant.forEach(function (r) {
+      var corps = { modifie_par: moi() }; CHAMPS_R.forEach(function (k) { corps[k] = r[k]; });
+      q = q.then(function () {
+        return RES.some(function (x) { return x.id === r.id; })
+          ? appel("doc_reservations?id=eq." + r.id, { methode: "PATCH", corps: corps })
+          : appel("doc_reservations", { methode: "POST", corps: Object.assign({ id: r.id }, corps) });
+      });
+    });
+    q.then(function () { toast("Annulé : " + d.lib + "."); return rechargeDonnees(true); })
+      .catch(function (e) { toast("Annulation impossible : " + e.message, 6000); rechargeDonnees(true); });
+  }
+  $("#b-annuler").addEventListener("click", annule);
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || (e.key !== "z" && e.key !== "Z")) return;
+    var t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;   // Ctrl+Z du champ
+    if (!$("#voile").hidden || !$("#voile-ch").hidden || !$("#voile-fi").hidden || !PILE.length) return;
+    e.preventDefault(); annule();
+  });
+  function blocTxt(r) { return pad(r.de) + (r.a > r.de ? "–" + pad(r.a) : ""); }
 
   // ------------------------------------------------------------------ fenêtre de réservation
   var FR = $("#fr"), EDITE = null;
@@ -849,6 +914,7 @@
       : (r.chantier = CUR.id, appel("doc_reservations", { methode: "POST", prefer: "return=representation", corps: r }));
     q.then(function (l) {
       var n = l && l[0]; if (!n) throw new Error("La base n'a rien renvoyé.");
+      retiens(EDITE ? "modification de " + blocTxt(EDITE) : "réservation de " + blocTxt(n), EDITE ? [EDITE] : [], EDITE ? [] : [n.id]);
       if (EDITE) RES = RES.map(function (x) { return x.id === n.id ? n : x; }); else RES.push(n);
       $("#voile").hidden = true; toast(EDITE ? "Réservation enregistrée." : "N° " + pad(n.de) + (n.a > n.de ? " à " + pad(n.a) : "") + " réservé(s)."); dessine();
     }).catch(function (err) { avert(err.message); rechargeDonnees(true); }).then(function () { b.disabled = false; });
@@ -857,7 +923,7 @@
     var b = this; if (!EDITE) return;
     if (!b.dataset.arme) { b.dataset.arme = "1"; b.textContent = "Confirmer la suppression"; return; }
     appel("doc_reservations?id=eq." + EDITE.id, { methode: "DELETE" }).then(function () {
-      var id = EDITE.id; RES = RES.filter(function (x) { return x.id !== id; }); $("#voile").hidden = true; toast("Réservation supprimée."); dessine();
+      var id = EDITE.id; retiens("suppression de " + blocTxt(EDITE), [EDITE], []); RES = RES.filter(function (x) { return x.id !== id; }); $("#voile").hidden = true; toast("Réservation supprimée."); dessine();
     }).catch(function (err) { avert(err.message); });
   });
   $("#fr-fermer").addEventListener("click", function () { $("#voile").hidden = true; });
