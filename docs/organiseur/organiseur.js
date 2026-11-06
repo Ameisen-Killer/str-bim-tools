@@ -77,13 +77,37 @@
     } else throw new Error("Ce fichier n'est pas un fichier de l'organiseur.");
     return { chantiers: [c], reservations: res.map(function (r) { return Object.assign({}, r, { chantier: c.id, id: r.id || nouvelId() }); }) };
   }
+  // les écritures passent l'une après l'autre (deux createWritable en même temps se marchent dessus)
+  var ECRIT = Promise.resolve();
   function ecritFichier() {
-    if (!FI.h || FI.droit !== "granted") return Promise.resolve();
-    return FI.h.createWritable().then(function (w) { return w.write(contenuFichier()).then(function () { return w.close(); }); }).then(function () {
-      FI.quand = new Date(); FI.err = ""; lsSet("org.exporte", new Date().toISOString()); majFichier();
-    }).catch(function (e) { FI.err = e.message || "écriture refusée"; majFichier(); });
+    clearTimeout(fichierPlanifie.t); fichierPlanifie.t = null;
+    ECRIT = ECRIT.then(function () {
+      if (!FI.h || FI.droit !== "granted") return;
+      var h = FI.h;
+      return h.createWritable().then(function (w) { return w.write(contenuFichier()).then(function () { return w.close(); }); }).then(function () {
+        if (FI.h !== h) return;
+        FI.quand = new Date(); FI.err = ""; lsSet("org.exporte", new Date().toISOString()); majFichier();
+      }).catch(function (e) { FI.err = e.message || "écriture refusée"; majFichier(); });
+    });
+    return ECRIT;
   }
   function fichierPlanifie() { if (!FI.h) return; clearTimeout(fichierPlanifie.t); fichierPlanifie.t = setTimeout(ecritFichier, 400); }
+  // fichier repris (au démarrage ou après « cliquer pour reprendre ») : s'il a été modifié ailleurs
+  // (autre poste, OneDrive) après la dernière écriture d'ici, c'est lui qui gagne ; sinon on l'écrit
+  function synchro() {
+    if (!FI.h || FI.droit !== "granted") return Promise.resolve();
+    var h = FI.h;
+    return h.getFile().then(function (f) {
+      var ici = Math.max(Date.parse(lsGet("org.exporte") || "") || 0, Date.parse(lsGet("org.modifie") || "") || 0);
+      if (!f.size || f.lastModified <= ici + 2000) return ecritFichier();
+      return f.text().then(function (t) {
+        var doc = versDocument(JSON.parse(t));
+        ecritLocal(doc); toast(h.name + " a changé ailleurs : chantier " + doc.chantiers[0].code + " rechargé depuis le fichier.", 5000); return charge();
+      });
+    }).catch(function (e) { FI.err = e.message || "lecture refusée"; majFichier(); });
+  }
+  // page qu'on quitte ou qu'on cache : l'écriture en attente part tout de suite
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden" && fichierPlanifie.t) ecritFichier(); });
   function majFichier() {
     var b = $("#b-fichier"), n = $("#fichier-nom");
     b.classList.toggle("lie", !!FI.h && FI.droit === "granted" && !FI.err);
@@ -98,7 +122,7 @@
       if (p !== "granted" && !lire) throw new Error("Accès au fichier refusé.");
       FI.h = h; FI.droit = p; FI.err = "";
       idb("readwrite", function (s) { return s.put(h, "fichier"); }).catch(function () {});
-      if (!lire) return ecritFichier();
+      if (!lire) return p === "granted" && lire === null ? synchro() : ecritFichier();
       return h.getFile().then(function (f) { return f.text(); }).then(function (t) {
         if (!t.trim()) return ecritFichier();
         var doc = versDocument(JSON.parse(t));
@@ -131,7 +155,7 @@
     $("#voile-fi").hidden = false;
   }
   $("#b-fichier").addEventListener("click", function () {
-    if (FI.h && FI.droit !== "granted") { lie(FI.h, false); return; }
+    if (FI.h && FI.droit !== "granted") { lie(FI.h, null); return; }
     fenFichier();
   });
   $("#voile-fi").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
@@ -141,12 +165,12 @@
     if (a === "sous") window.showSaveFilePicker({ suggestedName: (CUR ? CUR.code : "chantier") + ".json", types: TYPES_FI }).then(function (h) { return lie(h, false); }).catch(function () {});
     else if (a === "ouvrir") ouvrirFichier();
     else if (a === "nveau") ouvreNouveau();
-    else if (a === "reprendre") lie(FI.h, false);
+    else if (a === "reprendre") lie(FI.h, null);
     else if (a === "delie") { delie(); toast("Fichier délié : le chantier reste dans ce navigateur."); rechargeDonnees(true); }
   });
   if (LOCAL && FI_OK) idb("readonly", function (s) { return s.get("fichier"); }).then(function (h) {
     if (!h) return; FI.h = h;
-    return h.queryPermission({ mode: "readwrite" }).then(function (p) { FI.droit = p; if (p === "granted") ecritFichier(); });
+    return h.queryPermission({ mode: "readwrite" }).then(function (p) { FI.droit = p; majFichier(); if (p === "granted") return synchro(); });
   }).catch(function () {}).then(majFichier);
   function refus(m, code) { var e = new Error(m); e.code = code; return e; }
   // les quelques appels de l'outil, rejoués sur les données du navigateur (mêmes règles que la base)
@@ -314,8 +338,18 @@
   }
   function libZone(bat, c) { var x = zonesDe(bat).concat(zonesDe("")).filter(function (z) { return U(z.c) === U(c); })[0]; return x ? x.lib : ""; }
   function libNiv(bat, c) { var x = niveauxDe(bat).concat(niveauxDe("")).filter(function (n) { return U(n.c) === U(c); })[0]; return x ? x.lib : ""; }
-  function propres() { var m = {}; CONF.types.forEach(function (t) { if (t.propre) m[U(t.c)] = 1; }); return m; }
-  function espace(t) { return propres()[U(t)] ? U(t) : "*"; }
+  // calculs repris tant que réservations, plans et types ne changent pas (un rendu en demandait des dizaines)
+  var MEMO = {};
+  function memo() {
+    var pr = CONF.types.map(function (t) { return t.propre ? U(t.c) : ""; }).join("|");
+    if (MEMO.res !== RES || MEMO.nb !== RES.length || MEMO.plans !== PLANS || MEMO.pr !== pr) {
+      var m = {}; CONF.types.forEach(function (t) { if (t.propre) m[U(t.c)] = 1; });
+      MEMO = { res: RES, nb: RES.length, plans: PLANS, pr: pr, prop: m, occ: {} };
+    }
+    return MEMO;
+  }
+  function propres() { return memo().prop; }
+  function espace(t) { return memo().prop[U(t)] ? U(t) : "*"; }
   function valeurs(r, n) {
     var v = { projet: CUR ? (CUR._code != null ? String(CUR._code).trim() : CUR.code) : "", discipline: r.discipline, emetteur: CONF.fixes.emetteur, phase: r.phase, type: r.type,
       batiment: r.batiment, niveau: r.niveau, zone: r.zone, numero: n == null ? "" : pad(n) };
@@ -336,25 +370,24 @@
   }
   function plageDe(cle) { return aplat().filter(function (x) { return x.cle === cle; })[0] || null; }
   // la plage la plus fine qui contient tout le bloc
-  function plageDuBloc(de, a) { var b = null; aplat().forEach(function (x) { if (+x.p.de <= de && a <= +x.p.a) b = x; }); return b; }
+  function plageDuBloc(de, a, L) { var b = null; (L || aplat()).forEach(function (x) { if (+x.p.de <= de && a <= +x.p.a) b = x; }); return b; }
   function actives() { return RES.filter(function (r) { return r.statut !== "annule"; }); }
   // occupation d'une suite de numéros : n → { r: réservation, pl: [plans émis] }
   function occupation(esp) {
-    var m = {};
+    var M = memo(); if (M.occ[esp]) return M.occ[esp];
+    var m = M.occ[esp] = {};
     actives().forEach(function (r) { if (espace(r.type) !== esp) return; for (var n = r.de; n <= r.a; n++) (m[n] = m[n] || { pl: [] }).r = r; });
     PLANS.forEach(function (p) { var n = parseInt(p.numero, 10); if (isNaN(n) || espace(p.type) !== esp) return; (m[n] = m[n] || { pl: [] }).pl.push(p); });
     return m;
   }
   function premierBloc(de, a, nb, esp, sauf) {
-    var occ = occupation(esp);
-    if (sauf) for (var k = sauf.de; k <= sauf.a; k++) if (occ[k] && occ[k].r === sauf && !occ[k].pl.length) delete occ[k];
-    var suite = 0;
-    for (var n = de; n <= a; n++) { if (occ[n]) suite = 0; else if (++suite === nb) return n - nb + 1; }
+    var occ = occupation(esp), suite = 0;   // la réservation qu'on modifie ne se gêne pas elle-même
+    for (var n = de; n <= a; n++) { var o = occ[n]; if (o && (o.pl.length || o.r !== sauf)) suite = 0; else if (++suite === nb) return n - nb + 1; }
     return null;
   }
   function emisDans(r) {
-    var esp = espace(r.type), n = 0;
-    PLANS.forEach(function (p) { var k = parseInt(p.numero, 10); if (k >= r.de && k <= r.a && espace(p.type) === esp) n++; });
+    var occ = occupation(espace(r.type)), n = 0;
+    for (var k = r.de; k <= r.a; k++) if (occ[k] && occ[k].pl.length) n++;
     return n;
   }
   function statutDe(r) {
@@ -380,8 +413,8 @@
       if (!c) { CUR = null; ecranVide(); etat("Aucun chantier", "ok"); return; }
       return ouvre(c);
     }).catch(function (e) {
-      etat("Base indisponible", "ko"); CUR = null;
-      ecranVide(e.manque ? "La base n'est pas encore prête" : "Base indisponible", e.message, e.manque);
+      etat(LOCAL ? "Erreur" : "Base indisponible", "ko"); CUR = null;
+      ecranVide(e.manque ? "La base n'est pas encore prête" : LOCAL ? "Chantier illisible" : "Base indisponible", e.message, e.manque);
     });
   }
   function remplitChantiers(c) {
@@ -408,9 +441,10 @@
     ]).then(function (r) {
       if (!CUR || CUR.id !== id) return;
       RES = r[0]; PLANS = dernierIndice(r[1]);
+      MEMO = {};
       etat(RES.length + " réservation(s)" + (CONF.liste_plans ? " · " + PLANS.length + " plans" : "") + (LOCAL ? (FI.h ? "" : " · dans ce navigateur seulement" + (aExporter() ? ", pense à lier un fichier" : "")) : " · base partagée"), LOCAL && !FI.h && aExporter() ? "" : "ok");
-      dessine();
-    }).catch(function (e) { etat("Base indisponible", "ko"); toast(e.message, 5000); });
+      if (VUE !== "ref" || !silence) dessine();
+    }).catch(function (e) { etat(LOCAL ? "Erreur de lecture" : "Base indisponible", "ko"); toast(e.message, 5000); });
   }
   // un livrable = type-niveau-zone-n° ; seul l'indice le plus récent compte
   function dernierIndice(l) {
@@ -460,7 +494,7 @@
   $("#fc").addEventListener("submit", function (e) {
     e.preventDefault(); var F = this, code = F.elements.code.value.trim(), nom = F.elements.nom.value.trim(), mod = F.elements.modele.value;
     if (!LOCAL) {
-      if (CH.some(function (x) { return U(x.code) === code; })) { toast("Ce code de chantier existe déjà."); return; }
+      if (CH.some(function (x) { return U(x.code) === U(code); })) { toast("Ce code de chantier existe déjà."); return; }
       $("#voile-ch").hidden = true; creeChantier(code, nom, mod); return;
     }
     // mode fichier : le nouveau chantier remplace celui qui est ouvert et part dans son propre fichier
@@ -527,8 +561,8 @@
     var h = '<div class="bande-t"><span><span class="gros">' + T.e + "</span>émis<span class=\"gros\" style=\"margin-left:14px\">" + T.r + '</span>réservés</span><span class="tt">' + pad(d0) + " – " + pad(d1) + '</span><span>libres<span class="gros">' + T.l + "</span></span></div>";
     // la barre : une case par plage sans sous-plage, émis hachurés, réservés pleins, libres pâles
     h += '<div class="barre-p">';
-    var tri = hauts.slice().sort(function (a, b) { return a.p.de - b.p.de; }), fin = d0 - 1;
-    tri.forEach(function (x) { if (+x.p.de > fin + 1) h += '<span class="trou" style="left:' + pc(fin + 1).toFixed(3) + "%;width:" + ((+x.p.de - fin - 1) / tot * 100).toFixed(3) + '%" title="' + pad(fin + 1) + "–" + pad(+x.p.de - 1) + ' : hors plage"></span>'; fin = Math.max(fin, +x.p.a); });
+    var tri = hauts.slice().sort(function (a, b) { return a.p.de - b.p.de; }), fin = d0 - 1, trous = 0;
+    tri.forEach(function (x) { if (+x.p.de > fin + 1 && ++trous) h += '<span class="trou" style="left:' + pc(fin + 1).toFixed(3) + "%;width:" + ((+x.p.de - fin - 1) / tot * 100).toFixed(3) + '%" title="' + pad(fin + 1) + "–" + pad(+x.p.de - 1) + ' : hors plage"></span>'; fin = Math.max(fin, +x.p.a); });
     var dansSel = function (k) { return SEL && (k === SEL || k.indexOf(SEL + ".") === 0); };
     L.filter(function (x) { return !(x.p.sous || []).length; }).forEach(function (x) {
       var s = stats(x.p, "*");
@@ -546,7 +580,7 @@
       return '<span class="' + (i === 0 ? "g" : i === rep.length - 1 ? "d" : "") + '" style="left:' + (i === rep.length - 1 ? "100" : q.toFixed(3)) + '%">' + pad(n) + "</span>";
     }).join("") + "</div>";
     h += '<div class="legende-p"><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,transparent 2px 4px)">Émis</span><span style="--m:repeating-linear-gradient(135deg,var(--texte-doux) 0 2px,rgba(var(--encre),.3) 2px 5px)">Réservés</span><span style="--m:rgba(var(--encre),.18)">Libres</span>' +
-      (rep.length && T ? '<span style="--m:repeating-linear-gradient(135deg,rgba(var(--encre),.25) 0 2px,transparent 2px 5px)">Hors plage</span>' : "") + "</div>";
+      (trous ? '<span style="--m:repeating-linear-gradient(135deg,rgba(var(--encre),.25) 0 2px,transparent 2px 5px)">Hors plage</span>' : "") + "</div>";
     B.innerHTML = h;
   }
   $("#bande").addEventListener("click", function (e) { var b = e.target.closest("button[data-k]"); if (!b) return; SEL = SEL === b.dataset.k ? "" : b.dataset.k; dessinePlages(); });
@@ -562,7 +596,7 @@
         '<span class="jauge" style="' + vars(x.cle) + '"><i class="e" style="width:' + pe + '%"></i><i class="r" style="width:' + pr + '%"></i></span>' +
         "<small>" + s.libre + " libre(s) · " + s.r + " réservé(s) · " + s.e + " émis" + (x.p.types.length ? " · " + esc(x.p.types.join(", ")) : "") + "</small></button>";
     });
-    var hors = RES.filter(function (r) { return r.statut !== "annule" && !plageDuBloc(r.de, r.a); }).length;
+    var hors = RES.filter(function (r) { return r.statut !== "annule" && !plageDuBloc(r.de, r.a, L); }).length;
     if (hors) h += '<div class="titre-arbre">' + hors + " réservation(s) hors plage</div>";
     $("#arbre").innerHTML = h;
     dessineDetail();
@@ -637,7 +671,7 @@
   });
 
   // menu du clic droit sur une case
-  function fermeMenu() { $("#menu-ctx").hidden = true; }
+  function fermeMenu() { var M = $("#menu-ctx"); if (!M.hidden) M.hidden = true; }
   $("#detail").addEventListener("contextmenu", function (e) {
     var c = e.target.closest(".case"); if (!c) return;
     e.preventDefault();
@@ -656,8 +690,7 @@
   });
   document.addEventListener("pointerdown", function (e) { if (!e.target.closest("#menu-ctx")) fermeMenu(); });
   window.addEventListener("blur", fermeMenu); window.addEventListener("resize", fermeMenu);
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermeMenu(); });
-  document.addEventListener("scroll", fermeMenu, true);
+  document.addEventListener("scroll", fermeMenu, { capture: true, passive: true });
   $("#menu-ctx").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-mc]"); if (!b) return;
     var M = this, n = +M.dataset.n, r = RES.filter(function (x) { return x.id === M.dataset.id; })[0], a = b.dataset.mc; fermeMenu();
@@ -714,7 +747,6 @@
   function options(liste, vide) {
     return (vide ? '<option value="">' + esc(vide) + "</option>" : "") + liste.map(function (x) { return '<option value="' + esc(x.c) + '">' + esc(x.c + (x.lib ? " · " + x.lib : "")) + "</option>"; }).join("");
   }
-  function filtreBat(liste) { var b = FR.elements.batiment.value; return liste.filter(function (x) { return !x.bat || !b || U(x.bat).split(/[\s,;]+/).indexOf(U(b)) >= 0; }); }
   function remplitLieux() {
     var nv = FR.elements.niveau.value, z = FR.elements.zone.value;
     $("#fr-niv").innerHTML = options(niveauxDe(FR.elements.batiment.value), "—"); FR.elements.niveau.value = nv; if (FR.elements.niveau.value !== nv) FR.elements.niveau.value = "";
@@ -830,7 +862,7 @@
   });
   $("#fr-fermer").addEventListener("click", function () { $("#voile").hidden = true; });
   $("#b-reserver").addEventListener("click", function () { if (!CUR) { toast("Crée d'abord un chantier."); return; } ouvreRes(null, { plage: SEL }); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { $("#voile").hidden = true; $("#voile-ch").hidden = true; $("#voile-fi").hidden = true; } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { fermeMenu(); $("#voile").hidden = true; $("#voile-ch").hidden = true; $("#voile-fi").hidden = true; } });
 
   // ------------------------------------------------------------------ référentiels
   // ------------------------------------------------------------------ maquette filaire
@@ -864,6 +896,7 @@
       return { i: i, b: b, X: X, Y: Y, L: L, W: W, niv: niv, haut: niv.length ? niv[niv.length - 1].z + niv[niv.length - 1].h : 0, bas: niv.length ? Math.min.apply(null, niv.map(function (x) { return x.z; })) : 0 };
     });
   }
+  function maquetteBientot() { if (MQ.raf) return; MQ.raf = requestAnimationFrame(function () { MQ.raf = 0; dessineMaquette(); }); }
   function dessineMaquette() {
     var svg = $("#mq"); if (!svg) return;
     var M = modeleBat(), ct = Math.cos(MQ.th), st = Math.sin(MQ.th), sp = Math.sin(MQ.ph), cp = Math.cos(MQ.ph);
@@ -942,11 +975,11 @@
     var g = null;
     $("#ref").addEventListener("pointerdown", function (e) { var s = e.target.closest("#mq"); if (!s) return; e.preventDefault(); s.setPointerCapture(e.pointerId); g = { x: e.clientX, y: e.clientY }; });
     $("#ref").addEventListener("pointermove", function (e) {
-      if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; dessineMaquette();
+      if (!g) return; MQ.th += (e.clientX - g.x) * 0.01; MQ.ph = Math.max(0.12, Math.min(1.45, MQ.ph + (e.clientY - g.y) * 0.006)); g = { x: e.clientX, y: e.clientY }; maquetteBientot();
     });
     ["pointerup", "pointercancel"].forEach(function (t) { $("#ref").addEventListener(t, function () { g = null; }); });
-    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; if (d.l === "niv" || d.l === "zon") NIVB = +d.b; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; dessineMaquette(); } });
-    window.addEventListener("resize", function () { if (VUE === "ref") dessineMaquette(); });
+    $("#ref").addEventListener("focusin", function (e) { var d = e.target.dataset || {}; if (d.l === "niv" || d.l === "zon") NIVB = +d.b; var f = (d.l === "batiments" || d.l === "niv") ? { l: d.l, i: +d.i } : null; if (JSON.stringify(f) !== JSON.stringify(MQ.foc)) { MQ.foc = f; maquetteBientot(); } });
+    window.addEventListener("resize", function () { if (VUE === "ref") maquetteBientot(); });
   })();
 
   var NIVB = 0;   // bâtiment dont on édite les niveaux
@@ -981,8 +1014,7 @@
       toast((nv.lib || nv.c || "Niveau") + " rangé à son altitude.");
       return;
     }
-    if (e.target.id === "niv-bat") { NIVB = +e.target.value; MQ.foc = null; dessineRef(); }
-    else if (e.target.dataset.copie != null && e.target.value !== "") {
+    if (e.target.dataset.copie != null && e.target.value !== "") {
       var src = CONF.batiments[+e.target.value], dst = CONF.batiments[+e.target.dataset.copie];
       if (dst.niveaux.length && !window.confirm("Remplacer les " + dst.niveaux.length + " niveaux de " + (dst.c || "ce bâtiment") + " par ceux de " + (src.c || "l'autre") + " ?")) { e.target.value = ""; return; }
       dst.niveaux = copie(src.niveaux); marque(); dessineRef();
@@ -992,8 +1024,7 @@
     { k: "disciplines", t: "Disciplines", aide: "Code court qui entre dans le code du document (ex. STR).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "phases", t: "Phases", aide: "Phases du projet (ex. SIA 112 : 51 projet d'exécution).", cols: [["c", "Code", 110], ["lib", "Libellé"]] },
     { k: "types", t: "Types de document", aide: "Plans, détails, notes de calcul, fiches, rapports… Coche « n° propres » pour un type qui a sa propre suite de numéros (ex. ARM et LIS, qui reprennent le n° de l'ouvrage) ; les autres partagent la numérotation commune.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["propre", "N° propres", 90, "case"]] },
-    { k: "batiments", t: "Bâtiments", aide: "Un ou plusieurs bâtiments. Longueur et largeur dessinent l'emprise (20 × 15 m si vide) ; X et Y placent le bâtiment sur le site (sinon côte à côte).", cols: [["c", "Code", 90], ["lib", "Nom"], ["lg", "Long. (m)", 76, "nb"], ["la", "Larg. (m)", 76, "nb"], ["x", "X (m)", 64, "nb"], ["y", "Y (m)", 64, "nb"]] },
-    { k: "niv", t: "Niveaux du bâtiment", aide: "Chaque bâtiment a ses niveaux, du plus bas au plus haut. Hauteur d'étage : 3 m si vide. Altitude : facultative, sinon les niveaux s'empilent. « Hors maquette » pour un niveau fictif (ex. 000 tous niveaux).", cols: [["c", "Code", 76], ["lib", "Libellé"], ["h", "Haut. (m)", 72, "nb"], ["alt", "Alt. (m)", 72, "nb"], ["fictif", "Hors maq.", 62, "case"]] },
+    { k: "batiments" },   // place du tableau des bâtiments, niveaux et zones (blocBatiments)
     { k: "zones", t: "Zones du chantier (regroupements entre bâtiments)", aide: "Une zone qui en regroupe d'autres sur plusieurs bâtiments. « Regroupe » : codes de bâtiments (tout le bâtiment) ou de zones, séparés par une virgule ; * = tout le chantier. Les zones d'un bâtiment se saisissent sous ce bâtiment.", cols: [["c", "Code", 110], ["lib", "Libellé"], ["regroupe", "Regroupe", 200]] }
   ];
   function dessineRef() {
@@ -1006,14 +1037,13 @@
       '<label>Chiffres du n°<input class="champ mono" data-g="chiffres" type="number" min="1" max="6" value="' + CONF.chiffres + '"></label>' +
       '<label>Séparateur<select class="champ" data-g="separateur">' + [["-", "tiret  -"], ["_", "souligné  _"], [".", "point  ."], [" ", "espace"], ["", "aucun"]].map(function (o) { return '<option value="' + esc(o[0]) + '"' + (CONF.separateur === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>Liste de plans liée<select class="champ" data-g="liste_plans"><option value="">Aucune (état à la main)</option><option value="fgh_plans"' + (CONF.liste_plans === "fgh_plans" ? " selected" : "") + ">Liste des plans Fairmont (/fgh/pln/)</option></select></label></div>" +
-      "</div></div>";
+      "</div>";
     h += '<div class="bloc"><h3>Plages de numéros</h3><p>Construis ton arbre : un lot par ligne (ex. NDC 1–99, Démolition, Reconstruction…), avec des sous-plages dans un lot. « Types » : codes séparés par une virgule pour réserver la plage à certains types (vide = tous).</p>' +
       '<table><thead><tr><th>Libellé</th><th style="width:96px">Du n°</th><th style="width:96px">Au n°</th><th style="width:150px">Types</th><th style="width:136px"></th></tr></thead><tbody id="ref-plages">' + lignesPlages() + "</tbody></table>" +
       '<button class="btn ajout" data-ajout-plage="">+ Ajouter un lot</button><div class="avert" id="ref-avert" style="color:var(--rouge);font-size:12.5px;margin-top:6px"></div></div>';
     LISTES.forEach(function (L) {
-      if (L.k === "niv") return;
       if (L.k === "batiments") { h += '<div class="ref-bat"><div class="ref-bat-l">' + blocBatiments(); return; }
-      h += (L.k === "niv" ? "" : '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + "</p><table>") + '<thead><tr>' + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
+      h += '<div class="bloc"><h3>' + L.t + "</h3><p>" + esc(L.aide) + "</p><table><thead><tr>" + L.cols.map(function (c) { return '<th' + (c[2] ? ' style="width:' + c[2] + 'px"' : "") + ">" + c[1] + "</th>"; }).join("") + '<th style="width:100px"></th></tr></thead><tbody>' +
         liste(L.k).map(function (e, i) {
           return "<tr>" + L.cols.map(function (c) {
             return c[3] === "case" ? '<td><input type="checkbox" data-l="' + L.k + '" data-i="' + i + '" data-c="' + c[0] + '"' + (e[c[0]] ? " checked" : "") + "></td>"
@@ -1123,8 +1153,7 @@
     } else if (d.l) {
       if (d.l === "niv" || d.l === "zon") NIVB = +d.b;
       liste(d.l)[+d.i][d.c] = d.c === "c" ? v.trim() : /^(lg|la|x|y|h|alt)$/.test(d.c) ? nombre(v) : v;
-      if (d.l === "batiments" || d.l === "niv") dessineMaquette();
-      if (d.l === "batiments" && (d.c === "c" || d.c === "lib")) { var sb = $("#niv-bat"); if (sb && sb.options[+d.i]) sb.options[+d.i].textContent = (CONF.batiments[+d.i].c || "?") + (CONF.batiments[+d.i].lib ? " · " + CONF.batiments[+d.i].lib : ""); }
+      if (d.l === "batiments" || d.l === "niv") maquetteBientot();
     } else if (d.p) {
       var x = plageDe(d.p).p;
       if (d.c === "types") x.types = v.split(/[\s,;]+/).filter(Boolean);
@@ -1268,7 +1297,10 @@
     document.documentElement.setAttribute("data-theme", c); lsSet("org.theme", c);
     document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
   });
-  // les réservations des autres arrivent toutes les minutes quand la page est visible
-  setInterval(function () { if (document.visibilityState === "visible" && CUR && $("#voile").hidden) rechargeDonnees(true); }, 60000);
+  // base partagée ou liste de plans liée : les nouveautés arrivent toutes les minutes quand la page est visible
+  // (en mode fichier sans liste liée, rien ne change ailleurs : pas de relecture)
+  setInterval(function () { if (document.visibilityState === "visible" && CUR && (!LOCAL || CONF.liste_plans) && $("#voile").hidden) rechargeDonnees(true); }, 60000);
+  // mode fichier : un autre onglet de l'organiseur a changé les données de ce navigateur
+  window.addEventListener("storage", function (e) { if (LOCAL && e.key === "org.donnees" && !SALE && $("#voile").hidden) charge(); });
   charge();
 })();
