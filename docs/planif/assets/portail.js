@@ -118,8 +118,10 @@
     return d ? "Version du " + d.getDate() + " " + C.MOIS[d.getMonth()] + " " + d.getFullYear() : "";
   }
   function pied() {
-    var p = document.getElementById("pied"), v = versionPubliee();
-    if (p) p.textContent = D.nomEspace() + (v ? " · " + v : "");
+    // Même pied que les pages de l'outil (UI.pied), demande de Tony du 06.11.2026
+    var e = document.getElementById("pied-espace"), v = document.getElementById("pied-version");
+    if (e) e.textContent = D.nomEspace();
+    if (v) v.textContent = versionPubliee();
   }
 
   /* Marque de l'espace : posée sur <html>, retenue pour ce compte, icône de l'onglet. */

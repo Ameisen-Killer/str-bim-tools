@@ -309,8 +309,19 @@ a.ab-ligne:hover .ab-lib { color: var(--vert-texte); }
 .ab-plus:hover { color: var(--vert-texte); }
 
 /* ------------------------------------------------------------ pied */
-.ab-pied { margin-top: 26px; text-align: center; color: var(--faible); font-size: 13px; }
-.ab-pied a { color: var(--faible); }
+/* Pied commun à toutes les pages de l'outil (copie de footer.pied-outil de
+   planif.css + habillage.css, pour l'accueil et la connexion qui ne les chargent pas) */
+footer.pied-outil {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 20px;
+  margin-top: 40px; padding: 20px 0 max(22px, env(safe-area-inset-bottom));
+  font-size: 13px; color: var(--faible); text-transform: none; letter-spacing: normal;
+}
+footer.pied-outil a { color: inherit; text-decoration: none; transition: color .3s; }
+footer.pied-outil a:hover { color: var(--texte, #1E2226); }
+footer.pied-outil .droite { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+footer.pied-outil .lien-site { font-size: 12px; opacity: .75; }
+footer.pied-outil .lien-site:hover { opacity: 1; }
+@media (max-width: 760px) { footer.pied-outil .maj { display: none; } }
 /* Lien discret vers le site principal, en bas à droite */
 .ab-site { margin: 6px 0 0; text-align: right; font-size: 12px; }
 .ab-site a { color: var(--faible); text-decoration: none; opacity: .75; transition: opacity .2s; }

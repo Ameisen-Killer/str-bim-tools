@@ -61,10 +61,10 @@ body { min-height: calc(100vh * var(--vhk,1)); min-height: calc(100dvh * var(--v
 .cx-bas button:hover { color: var(--vert-texte); text-decoration-color: currentColor; }
 .cx-bas button[disabled] { opacity: .5; cursor: default; }
 
-.cx-pied { margin: 22px 0 0; font-size: 13px; color: var(--faible); text-align: center; }
-.cx-site { margin: 8px 0 0; font-size: 12px; text-align: center; }
-.cx-site a { color: var(--faible); text-decoration: none; opacity: .75; transition: opacity .2s; }
-.cx-site a:hover { opacity: 1; text-decoration: underline; }
+/* Pied commun (footer.pied-outil de portail.css) : en bas de l'écran, toute la largeur,
+   la carte reste centrée dans l'espace au-dessus */
+.cx-carte { margin-top: auto; }
+.cx-pied-outil { align-self: stretch; margin-top: auto; padding-left: 8px; padding-right: 8px; }
 
 @media (max-width: 700px) {
   .cx { justify-content: flex-start; }
