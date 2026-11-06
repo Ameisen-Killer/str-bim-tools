@@ -267,9 +267,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     });
 
     D.surRechargement(rend);
-    // À l'ouverture : sa succursale et son secteur (les administrateurs sur « Administrateurs »)
+    // À l'ouverture : « Mes absences » (06.11.2026, demande de Tony)
     var moi = D.monMembre();
-    if (moi) cle = estAdmin(moi) ? "admin" : "d:" + (moi.succursale || "_") + "|" + (moi.discipline || "_");
+    if (moi) { cle = "moi"; if (!dansAffaire(moi)) vue.affaires = []; }
     if (cle !== "tous" && !D.membres().some(dansCle)) cle = "tous";
     if (new URLSearchParams(location.search).get("q")) cle = "tous";
     // La personne visée ne doit pas être cachée par les filtres
@@ -287,7 +287,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
      remplace les menus à cases. Une entrée d'équipe à la fois (Tous,
      Administrateurs, une succursale, un de ses secteurs), une affaire, et
      « Masquer qui n'a rien ». */
-  var cle = "tous";                  // tous | admin | s:<succursale> | d:<succursale>|<discipline>
+  var cle = "tous";                  // moi | tous | admin | s:<succursale> | d:<succursale>|<discipline>
   var CLE_REPLIE = "planif.absences.replie";
   if (!Array.isArray(vue.affaires)) vue.affaires = [];
   delete vue.succursales; delete vue.metiers;
@@ -298,6 +298,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function dansCle(m) {
     if (!m) return false;
     if (cle === "tous") return true;
+    if (cle === "moi") { var moi = D.monMembre(); return !!moi && m.id === moi.id; }
     if (cle === "admin") return estAdmin(m);
     if (cle.indexOf("s:") === 0) return (m.succursale || "_") === cle.slice(2);
     var p = cle.slice(2).split("|");
@@ -354,6 +355,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var tous = toute.filter(dansAffaire);
     function compte(f) { return tous.filter(f).length; }
     function choisit(k) { cle = k; memorise(); rend(); }
+    if (D.monMembre()) entree(hote, "moi", "Mes absences", null, 0, cle === "moi", choisit);
     entree(hote, "tous", "Tous", tous.length, 0, cle === "tous", choisit);
     if (toute.some(estAdmin)) entree(hote, "admin", "Administrateurs", compte(estAdmin), 0, cle === "admin", choisit);
     var succ = Object.keys(D.SUCCURSALES);
@@ -518,6 +520,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function libelleMetier(court) {
     var t;
     if (cle === "tous") t = "Toute l'équipe";
+    else if (cle === "moi") { var moi = D.monMembre(); t = moi ? moi.prenom + " " + moi.nom : "Mes absences"; }
     else if (cle === "admin") t = "Administrateurs";
     else if (cle.indexOf("s:") === 0) t = cle.slice(2) === "_" ? "Sans succursale" : D.SUCCURSALES[cle.slice(2)];
     else { var p = cle.slice(2).split("|"); t = (p[1] === "_" ? "Secteur non renseigné" : D.DISCIPLINES[p[1]]) + (court ? "" : " · " + (p[0] === "_" ? "sans succursale" : D.SUCCURSALES[p[0]])); }
