@@ -75,16 +75,44 @@
     return NUIT;
   }
 
+  /* Sur téléphone, la barre du navigateur (meta theme-color) prend la teinte
+     du haut du ciel, posée sur le fond de la marque : couleur opaque. */
+  var barre = "";
+  function fondMarque() {
+    var v = getComputedStyle(document.documentElement).getPropertyValue("--m-fond").trim();
+    var m = /^#([0-9a-f]{6})$/i.exec(v);
+    if (!m) return [246, 242, 234];
+    var n = parseInt(m[1], 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255];
+  }
+  function hex(c) {
+    return "#" + c.map(function (x) { return ("0" + Math.round(x).toString(16)).slice(-2); }).join("");
+  }
+  function poseBarre() {
+    var meta = document.querySelector("meta[name=theme-color]");
+    if (meta && barre && meta.getAttribute("content") !== barre) meta.setAttribute("content", barre);
+  }
+
   function pose() {
     var c = teintes(new Date());
     var r = document.documentElement;
     r.style.setProperty("--ciel-haut", rvba(c[0]));
     r.style.setProperty("--ciel-bas", rvba(c[1]));
     r.setAttribute("data-ciel", "");
+    var f = fondMarque(), a = c[0][3];
+    barre = hex([0, 1, 2].map(function (i) { return f[i] + (c[0][i] - f[i]) * a; }));
+    poseBarre();
   }
 
   pose();
   setInterval(pose, 60000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) pose(); });
+  /* ui.js remet la couleur de la marque dans theme-color : on la reprend. */
+  document.addEventListener("DOMContentLoaded", function () {
+    pose();
+    var meta = document.querySelector("meta[name=theme-color]");
+    if (meta && global.MutationObserver) new MutationObserver(poseBarre).observe(meta, { attributes: true, attributeFilter: ["content"] });
+  });
+  global.addEventListener("load", pose);
   global.Ciel = { pose: pose, soleil: soleil };
 })(window);
