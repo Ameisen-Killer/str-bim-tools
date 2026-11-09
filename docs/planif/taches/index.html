@@ -525,6 +525,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           type: "button",
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
           "aria-pressed": p.fini ? "true" : "false",
+          "data-membre": p.membre || "a-affecter",
           "data-anim": "p|" + t.id + "|" + p.role, "data-anim-etat": p.fini ? "fini" : "",
           // Pas de bulle du navigateur : celle de la ligne (UI.bulleTache) suffit
           "aria-label": (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
@@ -607,7 +608,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       rangee.addEventListener("contextmenu", function (ev) {
         if (ev.target.closest("a, input, select, textarea")) return;
         var ecrit = D.peutEcrireTache(t), fini = t.statut === "termine";
+        /* 09.11.2026 (demande de Tony) : clic droit sur une pastille de personne,
+           sa liste de tâches en tête du menu (même filtre que « Voir ses tâches »
+           d'Équipe : l'entrée de la personne dans le bandeau, toutes affaires). */
+        var pastille = ev.target.closest(".etiq[data-membre]"), qui = pastille && pastille.getAttribute("data-membre");
+        var pm = qui && qui !== "a-affecter" ? D.membre(qui) : null;
+        var voirListe = !qui ? null : qui === "a-affecter"
+          ? { label: "Liste des tâches à affecter", action: function () {
+              cle = "a_affecter"; filtres.membre = "a-affecter"; filtres.affaire = ""; dessine(); } }
+          : pm ? { label: "Liste des tâches de " + pm.prenom, action: function () {
+              var moi = D.monMembre();
+              cle = moi && moi.id === pm.id ? "miennes" : "m:" + pm.id;
+              filtres.membre = pm.id; filtres.affaire = ""; dessine(); } }
+          : null;
         UI.menuContexte(ev, { titre: t.titre, items: [
+          voirListe, voirListe ? { sep: true } : null,
           { label: "Ouvrir la fiche", action: function () { fiche(t.id); } },
           { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { formulaire(t.id); } },
           ecrit ? { label: fini ? "Rouvrir la tâche" : "Marquer la tâche terminée", action: function () {
