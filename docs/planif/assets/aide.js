@@ -1,4 +1,4 @@
-/* Aide de la planification (09.11.2026, demande de Tony)
+/* Charlie, l'aide de la planification (09.11.2026, demande de Tony ; le nom aussi)
    ---------------------------------------------------------------------------
    Un assistant SANS IA : un bouton rond « ? » en bas à droite de chaque page
    de l'outil ouvre un panneau façon tchat. On y pose sa question avec ses
@@ -347,7 +347,7 @@
 
   function monte() {
     if (document.querySelector(".aide-bouton")) return;
-    bouton = el("button", { type: "button", class: "aide-bouton", title: "Aide (F1)", "aria-label": "Aide : poser une question sur l'outil",
+    bouton = el("button", { type: "button", class: "aide-bouton", title: "Charlie, l'aide (F1)", "aria-label": "Charlie, l'aide : poser une question sur l'outil",
                             "aria-expanded": "false", onclick: function () { bascule(); } }, [
       el("span", { class: "aide-ico", "aria-hidden": "true" })
     ]);
@@ -366,12 +366,12 @@
       clearTimeout(attente);
       attente = setTimeout(proposePistes, 140);
     });
-    panneau = el("section", { class: "aide-panneau", role: "dialog", "aria-label": "Aide de la planification", hidden: true }, [
+    panneau = el("section", { class: "aide-panneau", role: "dialog", "aria-label": "Charlie, l'aide de la planification", hidden: true }, [
       el("header", { class: "aide-tete" }, [
         el("span", { class: "aide-ico aide-ico-tete", "aria-hidden": "true" }),
         el("div", { class: "aide-titres" }, [
-          el("b", { text: "Aide" }),
-          el("span", { text: "Page : " + PAGES[ICI].nom })
+          el("b", { text: "Charlie" }),
+          el("span", { text: "L'aide · page " + PAGES[ICI].nom })
         ]),
         el("button", { type: "button", class: "aide-vider", title: "Effacer la conversation", onclick: function () { ecritFil([]); dessineFil(); saisie.focus(); } }, ["Effacer"]),
         el("button", { type: "button", class: "aide-fermer", "aria-label": "Fermer l'aide", title: "Fermer (Échap)", onclick: function () { bascule(false); } }, ["×"])
@@ -422,7 +422,7 @@
     var p = prenom();
     var l = frequentes(ICI, 6);
     return bulleAide([
-      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Je réponds aux questions sur le fonctionnement de l'outil. Écris avec tes mots, par exemple « comment décaler une tâche ? »."]),
+      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Moi, c'est Charlie. Je réponds aux questions sur le fonctionnement de l'outil. Écris avec tes mots, par exemple « comment décaler une tâche ? »."]),
       l.length ? el("p", { class: "aide-intro" }, ["Ici, sur ", el("b", { text: PAGES[ICI].nom }), ", on me demande souvent :"]) : null,
       l.length ? el("div", { class: "aide-puces" }, l.map(function (f) { return puce(f, ICI); })) : null
     ], "aide-accueil");

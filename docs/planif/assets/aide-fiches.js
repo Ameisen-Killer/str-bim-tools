@@ -41,7 +41,7 @@
 (function (global) {
   "use strict";
 
-  var MAJ = "2026-11-09";
+  var MAJ = "2026-11-09";   // Charlie
 
   /* Expressions de plusieurs mots soudées avant la recherche (mises à plat :
      sans accents ni apostrophes). Le mot soudé peut ensuite avoir des synonymes. */
@@ -150,10 +150,10 @@
       voir: ["nav-barre", "aide-utiliser"] },
 
     { id: "aide-utiliser", pages: [],
-      question: "Comment utiliser l'aide ?",
-      aussi: ["comment te poser une question", "qui es-tu", "tu es qui", "tu es une IA", "comment tu marches"],
-      mots: "aide assistant question repondre fiche",
-      reponse: "Écris ta question avec tes mots : je la compare à mes fiches et je réponds avec la plus proche. Je ne suis pas une IA : je ne connais que ce qui est écrit dans mes fiches, mais elles suivent chaque modification du site.\n- Mes réponses s'adaptent à la page où tu es, et **Me montrer** éclaire le bouton dont je parle.\n- **F1** m'ouvre ou me ferme, **Échap** me ferme.\n- Si je ne sais pas répondre, tu peux envoyer ta question à la boîte à idées pour qu'on complète mes fiches." },
+      question: "Qui est Charlie, et comment lui poser une question ?",
+      aussi: ["comment te poser une question", "qui es-tu", "tu es qui", "tu es une IA", "comment tu marches", "qui est Charlie", "c'est quoi Charlie"],
+      mots: "aide assistant question repondre fiche charlie",
+      reponse: "Je suis **Charlie**, l'aide de la planification. Écris ta question avec tes mots : je la compare à mes fiches et je réponds avec la plus proche. Je ne suis pas une IA : je ne connais que ce qui est écrit dans mes fiches, mais elles suivent chaque modification du site.\n- Mes réponses s'adaptent à la page où tu es, et **Me montrer** éclaire le bouton dont je parle.\n- **F1** m'ouvre ou me ferme, **Échap** me ferme.\n- Si je ne sais pas répondre, tu peux envoyer ta question à la boîte à idées pour qu'on complète mes fiches." },
 
     { id: "nav-barre", pages: ["accueil", "communication", "taches", "tableau"],
       question: "Comment passer d'une page à l'autre ?",
@@ -1183,7 +1183,7 @@
       question: "Bonjour",
       aussi: ["salut", "hello", "coucou"],
       mots: "bonjour salut hello coucou",
-      reponse: "Bonjour ! Pose-moi ta question sur l'outil : une page, un bouton, une règle…" },
+      reponse: "Bonjour, c'est Charlie ! Pose-moi ta question sur l'outil : une page, un bouton, une règle…" },
 
     { id: "dlg-merci", pages: [], cachee: true,
       question: "Merci",
