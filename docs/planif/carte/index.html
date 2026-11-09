@@ -75,10 +75,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -230,6 +230,20 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       }, [el("i", { "aria-hidden": "true" }), el("b", { text: a.code || a.nom })]);
       b.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
       b.addEventListener("click", function (ev) { ev.stopPropagation(); ouvreBulle(a); });
+      // Clic droit (09.11.2026, demande de Tony) : les actions de l'affaire
+      b.addEventListener("contextmenu", function (ev) {
+        ev.stopPropagation();
+        var resp = a.responsableId ? D.membre(a.responsableId) : null;
+        UI.menuContexte(ev, { titre: D.libelleAffaire(a), items: [
+          { label: "Détails", action: function () { ouvreBulle(a); } },
+          !D.pagePermise || D.pagePermise("affaires") ? { label: "Voir l'affaire", lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null,
+          { label: "Tâches de l'affaire", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" },
+          a.adresse ? { label: "Voir sur Google Maps", lien: D.lienCarte(a), nouvelOnglet: true } : null,
+          resp ? { sep: true } : null,
+          resp ? { label: "Responsable : " + resp.prenom + " " + resp.nom, action: function () {
+            UI.menuContexte(ev, { titre: resp.prenom + " " + resp.nom, items: UI.itemsPersonne(resp) }); } } : null
+        ] });
+      });
       hotePoints.appendChild(b);
     });
     placeBulle();
@@ -448,7 +462,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

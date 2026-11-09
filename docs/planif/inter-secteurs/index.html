@@ -137,10 +137,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -310,7 +310,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var s = D.suiviVeille(v.id), delai = v.delai ? new Date(v.delai) : null;
       var jours = delai ? Math.ceil((delai - maintenant) / 864e5) : null;
       var aff = s && s.affaireId ? D.affaire(s.affaireId) : null;
-      ul.appendChild(el("li", { class: "is-pub" + (s ? " " + s.etat : "") }, [
+      // Clic droit (09.11.2026, demande de Tony) : les actions de la publication
+      var menuPub = function (e) {
+        if (e.target.closest("a")) return;
+        UI.menuContexte(e, { titre: v.titre, items: [
+          v.lien ? { label: "Ouvrir la publication sur simap.ch", lien: v.lien, nouvelOnglet: true } : null,
+          { sep: true },
+          s && s.etat === "retenue" && aff ? { label: "Ouvrir " + (aff.code || "l'AO"), action: function () { formAO(aff.id); } } : null,
+          !s && D.aDroit("affaires_creer") ? { label: "Créer l'AO", action: function () { creeDepuisVeille(v); } } : null,
+          s ? { label: s.etat === "retenue" ? "Remettre en veille" : "Rétablir", action: function () { marque(v, null); } }
+            : { label: "Écarter", action: function () { marque(v, "ecartee"); } }
+        ] });
+      };
+      ul.appendChild(el("li", { class: "is-pub" + (s ? " " + s.etat : ""), oncontextmenu: menuPub }, [
         el("div", { class: "is-pub-tete" }, [
           el("span", { class: "etiq is-canton", text: v.canton || "—" }),
           el("span", { class: "is-pub-type", text: [TYPES_PUB[v.typePublication], PROCEDURES[v.procedure]].filter(Boolean).join(" · ") }),
@@ -387,7 +399,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var n = a.echeance ? C.diff(auj(), a.echeance) : null;
       var tr = el("tr", { class: "cliquable", tabindex: "0", "data-anim": "t|" + a.id,
         onclick: function (e) { if (!e.target.closest("a")) formAO(a.id); },
-        onkeydown: function (e) { if (e.key === "Enter") formAO(a.id); }
+        onkeydown: function (e) { if (e.key === "Enter") formAO(a.id); },
+        // Clic droit (09.11.2026) : l'AO, un rendez-vous, le demandeur, son responsable
+        oncontextmenu: function (e) {
+          if (e.target.closest("a")) return;
+          var resp = a.responsableId ? D.membre(a.responsableId) : null;
+          UI.menuContexte(e, { titre: D.libelleAffaire(a), items: [
+            { label: "Ouvrir l'appel d'offres", action: function () { formAO(a.id); } },
+            enCours(a) ? { label: "Ajouter un rendez-vous", action: function () { formEvenement(null, { affaireId: a.id }); } } : null,
+            demandeur && (!D.pagePermise || D.pagePermise("annuaire")) ? { label: "Le demandeur dans l'annuaire", lien: "/planif/annuaire/?q=" + encodeURIComponent(demandeur.societe || demandeur.nom) } : null,
+            a.adresse ? { label: "Voir sur Google Maps", lien: D.lienCarte(a), nouvelOnglet: true } : null,
+            resp ? { sep: true } : null,
+            resp ? { label: "Responsable : " + resp.prenom + " " + resp.nom, action: function () {
+              UI.menuContexte(e, { titre: resp.prenom + " " + resp.nom, items: UI.itemsPersonne(resp, { surChange: rend }) }); } } : null
+          ] });
+        }
       }, [
         el("td", {}, [pastilleAffaire(a), a.aoType ? null : el("span", { class: "etiq is-a-classer", title: "Ouvre l'AO pour choisir public ou privé", text: "type à préciser" })]),
         el("td", {}, [demandeur ? el("a", { class: "lien-doux", href: "/planif/annuaire/?q=" + encodeURIComponent(demandeur.societe || demandeur.nom), text: nomContact(demandeur) }) : el("span", { class: "is-faible", text: "—" })]),
@@ -436,7 +462,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var d = C.dt(r.jour), passe = r.jour < auj();
       ul.appendChild(el("li", {}, [el("button", {
         type: "button", class: "is-rdv" + (passe ? " passe" : "") + (r.genre === "remise" ? " remise" : ""),
-        onclick: function () { formEvenement(r.id, {}); }
+        onclick: function () { formEvenement(r.id, {}); },
+        // Clic droit (09.11.2026) : le rendez-vous et son appel d'offres
+        oncontextmenu: function (e) {
+          UI.menuContexte(e, { titre: r.titre || "Rendez-vous", items: [
+            { label: "Ouvrir le rendez-vous", action: function () { formEvenement(r.id, {}); } },
+            a ? { label: "Ouvrir l'appel d'offres", action: function () { formAO(a.id); } } : null,
+            a ? { label: "Autre rendez-vous sur cet AO", action: function () { formEvenement(null, { affaireId: a.id }); } } : null
+          ] });
+        }
       }, [
         el("span", { class: "is-cal", "aria-hidden": "true" }, [
           el("b", { text: String(d.getDate()) }),
@@ -584,7 +618,18 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         function ouvre() { Mandat.saisie(a.id, { discipline: code, surEnregistrement: rend }); }
         bloc.appendChild(el("div", { class: "fa-affaire", tabindex: "0", role: "button",
           "aria-label": "Avancement et facturation de " + D.libelleAffaire(a),
-          onclick: ouvre, onkeydown: function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvre(); } } }, [
+          onclick: ouvre, onkeydown: function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvre(); } },
+          // Clic droit (09.11.2026) : la saisie, l'affaire, son responsable
+          oncontextmenu: function (e) {
+            UI.menuContexte(e, { titre: D.libelleAffaire(a), items: [
+              { label: "Avancement et facturation", action: ouvre },
+              !D.pagePermise || D.pagePermise("affaires") ? { label: "Voir l'affaire", lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null,
+              { label: "Tâches de l'affaire", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" },
+              resp ? { sep: true } : null,
+              resp ? { label: "Responsable : " + resp.prenom + " " + resp.nom, action: function () {
+                UI.menuContexte(e, { titre: resp.prenom + " " + resp.nom, items: UI.itemsPersonne(resp, { surChange: rend }) }); } } : null
+            ] });
+          } }, [
           el("div", { class: "fa-aff-nom" }, [
             pastilleAffaire(a),
             el("div", { class: "fa-aff-sous", text: [resp ? "Responsable : " + resp.prenom + " " + resp.nom : "",
@@ -720,6 +765,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       } });
     }
     if (a) boutons.push({ label: "Ajouter un rendez-vous", gauche: true, action: function () { setTimeout(function () { formEvenement(null, { affaireId: a.id }); }, 0); } });
+    // Sans le droit « Modifier les affaires » (ni la responsabilité de l'AO) : en consultation (09.11.2026)
+    if (a && !D.peutModifierAffaire(a)) {
+      [].forEach.call(corps.querySelectorAll("input, select, textarea"), function (c) { c.disabled = true; });
+      boutons = boutons.filter(function (b) { return b.gauche; });
+      boutons.push({ label: "Fermer" });
+      return UI.ouvre({ surtitre: "Appel d'offres · consultation", titre: D.libelleAffaire(a), corps: corps, compacte: true, boutons: boutons });
+    }
     boutons.push({ label: "Annuler" });
     boutons.push({ label: "Enregistrer", or: true, entree: true, action: function () {
       var v = UI.lit(corps);
@@ -778,7 +830,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

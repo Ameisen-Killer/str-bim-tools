@@ -204,18 +204,27 @@
       },
       montre: ["#bd-bandeau", "#eq-bandeau"] },
 
-    { id: "clic-droit", pages: ["taches", "tableau", "affaires", "equipe", "annuaire", "absences"],
+    { id: "clic-droit", pages: ["taches", "tableau", "affaires", "equipe", "annuaire", "absences", "charge", "communication", "carte", "veille", "ao_publics", "ao_prives", "agenda_ao", "facturation", "console"],
       question: "Qu'est-ce que je peux faire au clic droit ?",
       aussi: ["menu du clic droit", "menu contextuel", "raccourcis sur une ligne"],
       mots: "clicdroit menu ligne barre raccourci",
-      reponse: "Un **clic droit** sur une ligne ou une barre ouvre un petit menu avec ses actions : ouvrir, modifier, voir ses tâches, supprimer… Il existe sur Tâches, le tableau de bord, Affaires, Équipe, l'Annuaire et Absences.",
+      reponse: "Un **clic droit** sur une ligne, une barre ou une personne ouvre un petit menu avec ses actions : ouvrir, modifier, supprimer… Partout où l'on clique sur **une personne**, le menu est le même : **Ses tâches**, **Ses affaires**, **Ses absences**, **Ses jours travaillés**, puis ses téléphones. Il existe sur toutes les pages de l'outil, sauf l'accueil et Mon profil.",
       ici: {
-        taches: "Sur une tâche : ouvrir la fiche, modifier, terminer ta part (ou la tâche), nouvelle tâche sur cette affaire, toutes les tâches de l'affaire, voir l'affaire, supprimer. Sur une pastille de personne : sa liste de tâches en tête du menu.",
-        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, aller à l'autre part (du calcul au dessin et retour), terminer ou rouvrir la part, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire.",
-        affaires: "Sur une affaire : la modifier, nouvelle tâche sur cette affaire, voir ses tâches, avancement (et facturation si tu y as droit), Google Maps, supprimer. Sur un membre de l'équipe d'une affaire : le désigner responsable.",
-        equipe: "Sur une personne : voir ses tâches, voir ses affaires, ses absences, ses jours travaillés, et « Modifier la fiche » si tu en as le droit.",
+        taches: "Sur une tâche : ouvrir la fiche, modifier, terminer ta part (ou la tâche), nouvelle tâche sur cette affaire, toutes les tâches de l'affaire, voir l'affaire, supprimer. Sur une pastille de personne : le menu de la personne (**Ses tâches** filtre la page sur elle), puis **Terminer le calcul / le dessin** de cette tâche.",
+        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, aller à l'autre part (du calcul au dessin et retour), terminer ou rouvrir la part, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire. Sur un nom ou un jour vide : son planning seul, puis le menu de la personne.",
+        affaires: "Sur une affaire : la modifier (ou la consulter), nouvelle tâche sur cette affaire, tâches de l'affaire, avancement (et facturation si tu y as droit), Google Maps, supprimer. Sur un membre de l'équipe d'une affaire : le désigner responsable (si tu peux modifier l'affaire), puis le menu de la personne.",
+        equipe: "Sur une personne : ses tâches, ses affaires, ses absences, ses jours travaillés, « Modifier la fiche » si tu en as le droit, et ses téléphones.",
         annuaire: "Sur une fiche : lui écrire (si elle a une adresse), la modifier, la supprimer.",
-        absences: "Sur une personne ou une absence : modifier (ou voir) ses absences, ses jours travaillés, voir ses tâches, retirer cette absence."
+        absences: "Sur une absence : le menu de la personne, puis retirer cette absence. Sur un nom ou un jour vide : poser une absence ce jour-là, puis le menu de la personne.",
+        charge: "Sur un nom : le menu de la personne. Sur une case : le détail de la semaine, puis le menu de la personne.",
+        communication: "Sur une personne absente ou une demande de congé : le menu de la personne (et accepter ou refuser la demande). Sur un rendez-vous : l'ouvrir, en noter un autre le même jour.",
+        carte: "Sur un losange : les détails, voir l'affaire, ses tâches, Google Maps, son responsable.",
+        veille: "Sur une publication : l'ouvrir sur simap.ch, créer l'AO, écarter ou remettre en veille.",
+        ao_publics: "Sur un appel d'offres : l'ouvrir, ajouter un rendez-vous, le demandeur dans l'annuaire, Google Maps, son responsable.",
+        ao_prives: "Sur un appel d'offres : l'ouvrir, ajouter un rendez-vous, le demandeur dans l'annuaire, Google Maps, son responsable.",
+        agenda_ao: "Sur un rendez-vous : l'ouvrir, ouvrir son appel d'offres, en ajouter un autre.",
+        facturation: "Sur une affaire : avancement et facturation, voir l'affaire, ses tâches, son responsable.",
+        console: "Sur un utilisateur : ouvrir sa fiche, envoyer un lien de connexion, le menu de la personne, supprimer."
       } },
 
     { id: "rafraichir", pages: ["taches", "tableau", "communication"],
@@ -403,7 +412,7 @@
       question: "Comment terminer une tâche ?",
       aussi: ["marquer terminé", "j'ai fini ma part", "cocher une tâche", "le pouce", "rouvrir une tâche"],
       mots: "terminer pouce fini part rouvrir cocher",
-      reponse: "Le **pouce** de la ligne termine **ta part** : ton calcul si tu es l'ingénieur, ton dessin si tu es le dessinateur, les deux si tu portes tout. Quelqu'un qui n'est sur aucune part clôt la tâche entière. Un nouveau clic la rouvre.\nLes **étiquettes de personnes** de la colonne Affectations sont aussi des bascules : elles ferment la part de la personne nommée.",
+      reponse: "Le **pouce** de la ligne termine **ta part** : ton calcul si tu es l'ingénieur, ton dessin si tu es le dessinateur, les deux si tu portes tout. Quelqu'un qui n'est sur aucune part clôt la tâche entière. Un nouveau clic la rouvre.\nSur Tâches, un **clic droit sur l'étiquette d'une personne** (colonne Affectations) › **Terminer le calcul / le dessin** ferme la part de la personne nommée. Un clic gauche sur l'étiquette ouvre la fiche de la tâche.",
       ici: {
         tableau: "Ouvre la barre (clic) : dans la fiche, **Terminé** ne ferme que **cette part** (cette barre est celle d'un métier). Ou clic droit › **Terminer le calcul / le dessin**. La barre reste dessinée chez la personne, en demi-teinte avec une coche, mais ne pèse plus sur sa charge.",
         accueil: "Dans **Mes tâches prioritaires**, le **pouce** termine ta part d'un clic ; « Annuler » la ramène. La tâche passe « Terminé » à la dernière part fermée."
@@ -475,14 +484,14 @@
       question: "Comment voir les tâches d'un collègue ?",
       aussi: ["mes tâches", "tâches d'une personne", "voir ses tâches"],
       mots: "taches collegue personne mes voir",
-      reponse: "Sur Tâches, le bandeau de gauche : **Mes tâches**, ou une personne. Depuis Équipe : clic droit sur la personne › **Voir ses tâches**. Sur Tâches, un clic droit sur la pastille d'une personne propose aussi sa liste.",
+      reponse: "Sur Tâches, le bandeau de gauche : **Mes tâches**, ou une personne. Partout ailleurs : clic droit sur la personne › **Ses tâches**. Sur Tâches, un clic droit sur la pastille d'une personne › **Ses tâches** filtre la page sur elle.",
       lien: "taches" },
 
     { id: "tache-affaire", pages: ["taches", "affaires"],
       question: "Comment voir toutes les tâches d'une affaire ?",
       aussi: ["tâches d'un projet", "filtrer par affaire"],
       mots: "taches affaire filtrer projet",
-      reponse: "Sur Tâches, choisis l'affaire dans le menu **Affaire** du bandeau. Depuis Affaires : clic droit › **Voir ses tâches**. Si l'affaire a un mandat, ses phases et son avancement s'affichent en tête, et le responsable de l'affaire peut y saisir l'avancement.",
+      reponse: "Sur Tâches, choisis l'affaire dans le menu **Affaire** du bandeau. Depuis Affaires : clic droit › **Tâches de l'affaire**. Si l'affaire a un mandat, ses phases et son avancement s'affichent en tête, et le responsable de l'affaire peut y saisir l'avancement.",
       lien: "taches", voir: ["mandat-avancement"] },
 
     { id: "tache-droits", selonDroit: { taches_autrui: ["Toi, tu as ce droit : si une tâche reste en lecture seule, c'est sans doute une question de page ou de connexion (essaie Ctrl+F5).", ""] },
@@ -588,19 +597,21 @@
       lien: "affaires", montre: "Nouvelle affaire", droit: "affaires_creer",
       voir: ["aff-mandat", "aff-responsable"] },
 
-    { id: "aff-modifier", selonDroit: { affaires_creer: ["Ton groupe peut aussi **supprimer** une affaire.", "Supprimer une affaire n'est pas ouvert à ton groupe (droit « Ouvrir une affaire »)."] },
+    { id: "aff-modifier", selonDroit: {
+        affaires_modifier: ["", "Ton groupe n'a pas le droit **« Modifier les affaires »** : tu les **consultes** (la fiche s'ouvre en lecture seule), sauf celles dont tu es le **responsable**, que tu modifies toujours."],
+        affaires_creer: ["Ton groupe peut aussi **supprimer** une affaire.", "Supprimer une affaire n'est pas ouvert à ton groupe (droit « Ouvrir une affaire »)."] },
       pages: ["affaires"],
       question: "Comment modifier ou supprimer une affaire ?",
       aussi: ["changer une affaire", "terminer une affaire", "suspendre une affaire", "supprimer une affaire"],
       mots: "modifier supprimer affaire statut suspendre terminer",
-      reponse: "Clic droit sur l'affaire › **Modifier l'affaire** (ou l'icône de la ligne). Le **statut** la met active, suspendue ou terminée : une affaire terminée sort de la liste (case « Voir les affaires terminées » du bandeau).\n**Supprimer l'affaire** (clic droit) efface aussi ses tâches : préfère le statut « Terminée ». La suppression demande le droit « Ouvrir une affaire ».",
+      reponse: "Clic droit sur l'affaire › **Modifier l'affaire** (ou l'icône de la ligne). Il faut le droit **« Modifier les affaires »**, ou être le responsable de l'affaire. Le **statut** la met active, suspendue ou terminée : une affaire terminée sort de la liste (case « Voir les affaires terminées » du bandeau).\n**Supprimer l'affaire** (clic droit) efface aussi ses tâches : préfère le statut « Terminée ». La suppression demande le droit « Ouvrir une affaire ».",
       voir: ["aff-creer"] },
 
     { id: "aff-responsable", pages: ["affaires"],
       question: "Comment désigner le responsable d'une affaire ?",
       aussi: ["responsable d'affaire", "chef de projet de l'affaire"],
       mots: "responsable affaire designer chefprojet",
-      reponse: "Dans le formulaire de l'affaire, le champ **Responsable d'affaire**. Ou, plus vite : **clic droit sur un membre de l'équipe** de l'affaire › **Désigner** responsable. Il n'y en a qu'un : l'ancien est remplacé. Le responsable saisit toujours l'avancement de son affaire." },
+      reponse: "Dans le formulaire de l'affaire, le champ **Responsable d'affaire**. Ou, plus vite : **clic droit sur un membre de l'équipe** de l'affaire › **Désigner responsable de l'affaire** (droit « Modifier les affaires », ou être déjà le responsable). Il n'y en a qu'un : l'ancien est remplacé. Le responsable saisit toujours l'avancement de son affaire." },
 
     { id: "aff-equipe", pages: ["affaires", "equipe"],
       question: "Comment ajouter quelqu'un à l'équipe d'une affaire ?",
@@ -816,7 +827,7 @@
       question: "Comment modifier ou retirer une absence ?",
       aussi: ["supprimer une absence", "corriger une absence", "annuler une absence"],
       mots: "absence modifier retirer supprimer annuler",
-      reponse: "Clic droit sur l'absence › **Retirer cette absence**, ou **Modifier ses absences** : la fenêtre liste les périodes de la personne, à corriger ou retirer. Une demande de congé qui attend s'annule depuis Le bureau aujourd'hui." },
+      reponse: "Clic droit sur l'absence › **Retirer cette absence**, ou **Ses absences** : la fenêtre liste les périodes de la personne, à corriger ou retirer. Une demande de congé qui attend s'annule depuis Le bureau aujourd'hui." },
 
     { id: "abs-lire", pages: ["absences"], frequente: true,
       question: "Comment lire le calendrier des absences ?",
@@ -1094,7 +1105,7 @@
       question: "Comment voir les affaires d'un collègue ?",
       aussi: ["sur quoi travaille-t-il", "ses affaires"],
       mots: "affaire collegue travaille ses",
-      reponse: "Sur Équipe : clic droit sur la personne › **Voir ses affaires** (page Affaires réduite à ses affaires) ou **Voir ses tâches**. Le tableau de charge montre aussi sur quoi elle est occupée, semaine par semaine." },
+      reponse: "Clic droit sur la personne (Équipe, Absences, Tâches, tableau de bord, charge…) › **Ses affaires** (page Affaires réduite à ses affaires) ou **Ses tâches**. Le tableau de charge montre aussi sur quoi elle est occupée, semaine par semaine." },
 
     { id: "groupes-quoi", perso: "groupes",
       pages: ["equipe", "console", "accueil"],

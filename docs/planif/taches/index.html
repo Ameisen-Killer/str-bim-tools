@@ -144,10 +144,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -607,24 +607,30 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         if (ev.target.closest("a, input, select, textarea")) return;
         var ecrit = D.peutEcrireTache(t), fini = t.statut === "termine";
         /* 09.11.2026 (demande de Tony) : clic droit sur une pastille de personne,
-           sa liste de tâches en tête du menu (même filtre que « Voir ses tâches »
-           d'Équipe : l'entrée de la personne dans le bandeau, toutes affaires). */
+           le menu commun d'une personne (UI.itemsPersonne) ; « Ses tâches » filtre
+           ici même (l'entrée de la personne dans le bandeau, toutes affaires),
+           puis terminer ou rouvrir sa part et ouvrir la fiche de la tâche. */
         var pastille = ev.target.closest(".etiq[data-membre]"), qui = pastille && pastille.getAttribute("data-membre");
-        var pm = qui && qui !== "a-affecter" ? D.membre(qui) : null;
-        var voirListe = !qui ? null : qui === "a-affecter"
-          ? { label: "Liste des tâches à affecter", action: function () {
-              cle = "a_affecter"; filtres.membre = "a-affecter"; filtres.affaire = ""; dessine(); } }
-          : pm ? { label: "Liste des tâches de " + pm.prenom, action: function () {
-              var moi = D.monMembre();
-              cle = moi && moi.id === pm.id ? "miennes" : "m:" + pm.id;
-              filtres.membre = pm.id; filtres.affaire = ""; dessine(); } }
-          : null;
         var role = pastille && pastille.getAttribute("data-role"), part = role && D.PARTS[role];
         var partFinie = part && !!t[part.fini];
         var bascPart = part && ecrit ? { label: (partFinie ? "Rouvrir le " : "Terminer le ") + part.label.toLowerCase(),
           action: function () { terminePart(t.id, role, !partFinie); } } : null;
+        var pm = qui && qui !== "a-affecter" ? D.membre(qui) : null;
+        if (qui) {
+          var tete = pm
+            ? UI.itemsPersonne(pm, { surChange: dessine, taches: function () {
+                var moi = D.monMembre();
+                cle = moi && moi.id === pm.id ? "miennes" : "m:" + pm.id;
+                filtres.membre = pm.id; filtres.affaire = ""; dessine(); } })
+            : [{ label: "Toutes les tâches à affecter", action: function () {
+                cle = "a_affecter"; filtres.membre = "a-affecter"; filtres.affaire = ""; dessine(); } }];
+          UI.menuContexte(ev, { titre: pm ? pm.prenom + " " + pm.nom : "À affecter", items: tete.concat([
+            { sep: true }, bascPart,
+            { label: "Ouvrir la fiche de la tâche", action: function () { fiche(t.id); } }
+          ]) });
+          return;
+        }
         UI.menuContexte(ev, { titre: t.titre, items: [
-          voirListe, bascPart, voirListe || bascPart ? { sep: true } : null,
           { label: "Ouvrir la fiche", action: function () { fiche(t.id); } },
           { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { formulaire(t.id); } },
           ecrit ? { label: fini ? "Rouvrir la tâche" : "Marquer la tâche terminée", action: function () {
@@ -916,7 +922,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

@@ -122,10 +122,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -660,7 +660,17 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         ]));
       }
       var b = Calc.bilan(m, jours, rep[m.id], canton);
-      plan.appendChild(el("div", { class: "pl-nom", "data-anim": "n|" + m.id }, [
+      /* Clic droit sur le nom ou un jour vide (09.11.2026, demande de Tony) :
+         son planning seul, puis le menu commun d'une personne (UI.itemsPersonne). */
+      var menuPersonne = function (e) {
+        if (e.target.closest("[role=button]")) return;
+        if (document.body.classList.contains("glisse-en-cours")) { e.preventDefault(); return; }
+        UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: [
+          vue.cle !== "m:" + m.id ? { label: "Son planning seul", action: function () { vue.cle = "m:" + m.id; memorise(); rend(); } } : null,
+          { sep: true }
+        ].concat(UI.itemsPersonne(m, { surChange: rend })) });
+      };
+      plan.appendChild(el("div", { class: "pl-nom", "data-anim": "n|" + m.id, oncontextmenu: menuPersonne }, [
         el("div", { class: "pl-membre" }, [
           el("div", {}, [
             el("div", { class: "n", text: m.prenom + " " + m.nom }),
@@ -688,6 +698,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       });
 
       var zone = el("div", { class: "pl-zone", "data-anim": "z|" + m.id, dataset: { membre: m.id, role: D.cote(m.metier) } }, [fond, piste, bilan]);
+      zone.addEventListener("contextmenu", menuPersonne);
       plan.appendChild(zone);
     });
   }
@@ -1326,7 +1337,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

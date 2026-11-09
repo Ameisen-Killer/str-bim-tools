@@ -24,20 +24,6 @@
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
 <link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 <style>
-/* Menu du clic droit sur un membre de l'équipe (responsable d'affaire, 28.10.2026) */
-.menu-resp{
-  position:fixed;z-index:200;min-width:220px;max-width:calc(100vw - 16px);
-  display:flex;flex-direction:column;padding:6px;
-  background:#fff;border:1px solid var(--ligne-faible);border-radius:10px;
-  box-shadow:var(--ab-ombre-haute);animation:monte .16s cubic-bezier(.2,.7,.2,1);
-}
-.menu-resp-titre{padding:6px 12px 6px;font-size:12px;font-weight:600;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.menu-resp button{
-  display:flex;align-items:center;gap:12px;width:100%;text-align:left;border-radius:6px;
-  min-height:36px;padding:8px 12px;margin:0;color:var(--texte);background:none;border:0;cursor:pointer;font:inherit;font-size:var(--t-doux,14px);
-}
-.menu-resp button:hover,.menu-resp button:focus-visible{background:var(--m-pale);outline:none}
-.menu-resp .coche{width:6px;height:6px;border:1px solid currentColor;transform:rotate(45deg);flex:0 0 auto}
 .etiq[title]{cursor:context-menu}
 </style>
 </head>
@@ -83,10 +69,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -273,8 +259,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var nom = cherche ? m.prenom + " " + m.nom : m.prenom + " " + m.nom.charAt(0) + ".";
         var resp = m.id === a.responsableId;
         var n = el("span", { class: "etiq " + classe + (resp ? " resp" : ""),
-          title: resp ? "Responsable d'affaire · clic droit pour changer" : "Clic droit : désigner responsable" }, [UI.surligne(nom, mots)]);
-        n.addEventListener("contextmenu", function (e) { e.preventDefault(); e.stopPropagation(); menuResponsable(a, m, e.clientX, e.clientY); });
+          title: resp ? "Responsable d'affaire · clic droit : ses actions" : D.peutModifierAffaire(a) ? "Clic droit : désigner responsable, ses actions" : "Clic droit : ses actions" }, [UI.surligne(nom, mots)]);
+        n.addEventListener("contextmenu", function (e) { e.stopPropagation(); menuResponsable(a, m, e); });
         return n;
       }
       // Ingénieurs puis dessinateurs, par ordre alphabétique dans chaque groupe
@@ -322,7 +308,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
             ? UI.boutonIcone("avancement", D.voitFacturation() ? "Avancement et facturation" : "Avancement", D.libelleAffaire(a),
                 function () { Mandat.saisie(a.id, { surEnregistrement: dessine, detail: function () { formulaire(a.id); } }); })
             : null,
-          UI.boutonIcone("modifier", "Modifier", D.libelleAffaire(a), function () { formulaire(a.id); }),
+          UI.boutonIcone("modifier", D.peutModifierAffaire(a) ? "Modifier" : "Consulter", D.libelleAffaire(a), function () { formulaire(a.id); }),
           // Retirer une affaire emporte ses tâches : le même droit que pour l'ouvrir.
           D.aDroit("affaires_creer")
             ? UI.boutonIcone("supprimer", "Supprimer", D.libelleAffaire(a), function () { supprime(a, taches.length); })
@@ -333,9 +319,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       rangee.addEventListener("contextmenu", function (e) {
         if (e.target.closest("a, input, select, textarea")) return;
         UI.menuContexte(e, { titre: D.libelleAffaire(a), items: [
-          { label: "Modifier l'affaire", action: function () { formulaire(a.id); } },
+          { label: D.peutModifierAffaire(a) ? "Modifier l'affaire" : "Consulter l'affaire", action: function () { formulaire(a.id); } },
           { label: "Nouvelle tâche sur cette affaire", action: function () { UI.formulaireTache(null, { affaireId: a.id, surEnregistrement: dessine }); } },
-          { label: "Voir ses tâches", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" },
+          { label: "Tâches de l'affaire", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" },
           D.phasesMandat(a).length ? { label: D.voitFacturation() ? "Avancement et facturation" : "Avancement", action: function () {
             Mandat.saisie(a.id, { surEnregistrement: dessine, detail: function () { formulaire(a.id); } }); } } : null,
           a.adresse ? { label: "Voir sur Google Maps", lien: D.lienCarte(a), nouvelOnglet: true } : null,
@@ -453,6 +439,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ])
     ]);
 
+    /* Sans le droit « Modifier les affaires » (ni la responsabilité de
+       l'affaire) : la fiche en consultation, champs grisés (09.11.2026). */
+    if (a && !D.peutModifierAffaire(a)) {
+      [].forEach.call(corps.querySelectorAll("input, select, textarea, button"), function (c) { c.disabled = true; });
+      return UI.ouvre({ surtitre: "Consultation", titre: D.libelleAffaire(a), corps: corps, boutons: [{ label: "Fermer" }] });
+    }
     UI.ouvre({
       surtitre: a ? "Modifier" : "Nouvelle affaire",
       titre: a ? D.libelleAffaire(a) : "Affaire",
@@ -477,50 +469,29 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* ------------------------------------------------ responsable au clic droit */
 
   /* Demande de Tony (28.10.2026) : clic droit sur un membre de l'équipe pour le
-     désigner responsable de l'affaire ; un seul responsable, l'ancien est remplacé. */
-  var menuResp = null;
-
-  function fermeMenuResp() {
-    if (menuResp && menuResp.parentNode) menuResp.parentNode.removeChild(menuResp);
-    menuResp = null;
-  }
-  document.addEventListener("click", function (e) { if (menuResp && !menuResp.contains(e.target)) fermeMenuResp(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") fermeMenuResp(); });
-  window.addEventListener("scroll", fermeMenuResp, true);
-  window.addEventListener("resize", fermeMenuResp);
-
-  function menuResponsable(a, m, x, y) {
-    fermeMenuResp();
+     désigner responsable de l'affaire ; un seul responsable, l'ancien est remplacé.
+     09.11.2026 : le menu commun (UI.menuContexte), suivi des entrées de la personne. */
+  function menuResponsable(a, m, e) {
     var estResp = m.id === a.responsableId;
     var ancien = a.responsableId && !estResp ? D.membre(a.responsableId) : null;
     var nom = m.prenom + " " + m.nom;
     var choix = estResp
-      ? { label: "Retirer " + nom + " comme responsable", resp: null, dit: "Plus de responsable désigné." }
-      : { label: "Désigner " + nom + " responsable", resp: m.id,
+      ? { label: "Retirer comme responsable", resp: null, dit: "Plus de responsable désigné." }
+      : { label: "Désigner responsable de l'affaire", resp: m.id,
           dit: nom + " est responsable de l'affaire" + (ancien ? " (à la place de " + ancien.prenom + " " + ancien.nom + ")." : ".") };
-    var bouton = el("button", { type: "button", role: "menuitem" }, [
-      el("span", { class: "coche", "aria-hidden": "true" }), el("span", { text: choix.label })
-    ]);
-    bouton.addEventListener("click", function () {
-      fermeMenuResp();
-      // Les champs de base seulement : ce que le formulaire ne porte pas (mandat, appel d'offres…) reste tel quel
-      D.majAffaire(a.id, {
-        code: a.code, nom: a.nom, note: a.note, teinte: a.teinte, statut: a.statut, echeance: a.echeance,
-        phase: a.phase, adresse: a.adresse, ingenieurs: a.ingenieurs, dessinateurs: a.dessinateurs,
-        responsableId: choix.resp
-      }).then(function () { dessine(); UI.toast(choix.dit); })
-        .catch(function (e) { UI.toast(e.message); });
-    });
-    menuResp = el("div", { class: "menu-resp", role: "menu" }, [
-      el("div", { class: "menu-resp-titre", text: D.libelleAffaire(a) }), bouton
-    ]);
-    document.body.appendChild(menuResp);
-    // Collé au pointeur, sans déborder de l'écran
-    var r = menuResp.getBoundingClientRect();
-    var k = window.Echelle ? Echelle.k() : 1;   // le zoom de la page (echelle.js)
-    menuResp.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) / k + "px";
-    menuResp.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) / k + "px";
-    bouton.focus();
+    UI.menuContexte(e, { titre: nom + " · " + D.libelleAffaire(a), items: [
+      // Droit « Modifier les affaires » ou responsable de l'affaire (09.11.2026)
+      !D.peutModifierAffaire(a) ? null : { label: choix.label, action: function () {
+        // Les champs de base seulement : ce que le formulaire ne porte pas (mandat, appel d'offres…) reste tel quel
+        D.majAffaire(a.id, {
+          code: a.code, nom: a.nom, note: a.note, teinte: a.teinte, statut: a.statut, echeance: a.echeance,
+          phase: a.phase, adresse: a.adresse, ingenieurs: a.ingenieurs, dessinateurs: a.dessinateurs,
+          responsableId: choix.resp
+        }).then(function () { dessine(); UI.toast(choix.dit); })
+          .catch(function (x) { UI.toast(x.message); });
+      } },
+      { sep: true }
+    ].concat(UI.itemsPersonne(m, { surChange: dessine })) });
   }
 
   /** Le choix de la succursale ; absent quand le bureau n'a aucune succursale. */
@@ -551,7 +522,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

@@ -94,10 +94,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -400,7 +400,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         groupe = cote;
         hote.appendChild(el("div", { class: "cc-groupe", "data-anim": "g|" + cote, text: cote === "dessinateur" ? "Dessinateurs" : "Ingénieurs" }));
       }
-      hote.appendChild(el("div", { class: "cc-nom", "data-anim": "n|" + l.m.id, "data-ligne": r, role: "rowheader" }, [
+      // Clic droit sur le nom (09.11.2026) : le menu commun d'une personne (UI.itemsPersonne)
+      hote.appendChild(el("div", { class: "cc-nom", "data-anim": "n|" + l.m.id, "data-ligne": r, role: "rowheader",
+        oncontextmenu: function (e) { UI.menuContexte(e, { titre: l.m.prenom + " " + l.m.nom, items: UI.itemsPersonne(l.m, { surChange: rend }) }); } }, [
         el("span", { class: "n", text: l.m.prenom + " " + l.m.nom }),
         el("span", { class: "r", text: D.libelleMetier(l.m.metier) + (l.m.capacite && l.m.capacite < 5 ? " · " + Math.round(l.m.capacite / 5 * 100) + " %" : "") })
       ]));
@@ -446,7 +448,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       type: "button", class: "cc-case " + c.palier, "data-col": k, "data-ligne": r, style: "--i:" + (k + r * 0.35).toFixed(2),
       "data-anim": "c|" + c.m.id + "|" + c.s.jours[0], "data-cle": c.m.id + "|" + c.s.jours[0],
       role: "gridcell", "aria-label": etiquette,
-      onclick: function () { ouvreSemaine(c); }
+      onclick: function () { ouvreSemaine(c); },
+      // Clic droit sur une semaine (09.11.2026) : son détail, puis le menu commun de la personne
+      oncontextmenu: function (e) {
+        UI.menuContexte(e, { titre: c.m.prenom + " " + c.m.nom + " · S" + c.s.num, items: [
+          { label: "Détail de la semaine " + c.s.num, action: function () { ouvreSemaine(c); } }, { sep: true }
+        ].concat(UI.itemsPersonne(c.m, { surChange: rend })) });
+      }
     }, [
       c.palier === "trop" ? el("i", { class: "cc-alerte", "aria-hidden": "true", text: "!" }) : null,
       el("span", { class: "val", text: val })
@@ -620,7 +628,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

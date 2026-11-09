@@ -119,10 +119,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -524,19 +524,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           UI.boutonIcone("absence", "Absences", m.prenom + " " + m.nom, function () { UI.absences(m.id, dessine); })
         ])
       ]);
-      // Clic droit sur la ligne (05.11.2026) : les actions sur la personne
+      // Clic droit sur la ligne : le menu commun d'une personne (UI.itemsPersonne, 09.11.2026)
       rangee.addEventListener("contextmenu", function (e) {
         if (e.target.closest("a, input, select, textarea")) return;
-        var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
-        UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: [
-          { label: "Voir ses tâches", lien: "/planif/taches/?membre=" + encodeURIComponent(m.id) },
-          { label: "Voir ses affaires", lien: "/planif/affaires/?membre=" + encodeURIComponent(m.id) },
-          { label: "Absences", action: function () { UI.absences(m.id, dessine); } },
-          { label: D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", action: function () { UI.joursTravailles(m.id, dessine); } },
-          D.aDroit("membres_modifier") ? { label: "Modifier la fiche", action: function () { ficheMembre(m.id); } } : null,
-          { sep: true },
-          tel("Appeler le natel", m.telNatel), tel("Appeler la ligne directe", m.telExterne)
-        ] });
+        var l = UI.itemsPersonne(m, { surChange: dessine });
+        if (D.aDroit("membres_modifier")) l.push({ sep: true }, { label: "Modifier la fiche", action: function () { ficheMembre(m.id); } });
+        UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: l });
       });
       corps.appendChild(suivi.marque(rangee, m.id));
     });
@@ -558,7 +551,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

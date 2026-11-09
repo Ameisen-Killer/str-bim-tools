@@ -123,13 +123,13 @@
     { code: "tous", nom: "Tout le monde", parent: null, ordre: 0,
       droits: ["page_tableau", "page_equipe", "page_absences", "page_annuaire", "page_affaires", "voir_conges_equipe", "voir_absences_avenir"] },
     { code: "administrateur", nom: "Administrateur", parent: null, ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_inter", "conges_tous",
+      droits: ["affaires_creer", "affaires_modifier", "taches_autrui", "absences_autrui", "page_inter", "conges_tous",
                "news_rediger", "news_archiver", "news_supprimer", "page_facturation", "facturation_saisir", "avancement_tous"] },
     { code: "chef_secteur", nom: "Chef de secteur", parent: "administrateur", ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui", "page_affaires", "page_charge",
+      droits: ["affaires_creer", "affaires_modifier", "taches_autrui", "absences_autrui", "page_affaires", "page_charge",
                "planning_equipe", "taches_a_affecter", "conges_secteur", "avancement_secteur"] },
     { code: "chef_projet", nom: "Chef de projet", parent: "chef_secteur", ordre: 0,
-      droits: ["affaires_creer", "taches_autrui", "absences_autrui"] }
+      droits: ["affaires_creer", "affaires_modifier", "taches_autrui", "absences_autrui"] }
   ];
   // Intitulés des trois groupes d'origine, tant qu'ils gardent leur nom
   var COURTS_ORIGINE = { administrateur: "Admin.", chef_secteur: "Secteur", chef_projet: "Projet" };
@@ -239,7 +239,7 @@
                                "page_affaires", "page_charge", "page_inter",
                                "page_facturation"] },
     { titre: "Ce qu'on voit", droits: ["planning_equipe", "taches_a_affecter", "voir_conges_equipe", "voir_absences_avenir"] },
-    { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "taches_autrui", "absences_autrui",
+    { titre: "Ce qu'on peut faire", droits: ["affaires_creer", "affaires_modifier", "taches_autrui", "absences_autrui",
                                              "membres_modifier", "conges_secteur", "conges_tous", "tchat_moderer"] },
     { titre: "Avancement et facturation", droits: ["avancement_secteur", "avancement_tous", "facturation_saisir"] },
     { titre: "News du bureau", droits: ["news_rediger", "news_archiver", "news_supprimer"] }
@@ -284,7 +284,11 @@
     },
     affaires_creer: {
       titre: "Ouvrir une affaire",
-      aide: "Créer une nouvelle affaire (et un appel d'offres), et la retirer. Sans ce droit, on travaille normalement sur les affaires existantes."
+      aide: "Créer une nouvelle affaire (et un appel d'offres), et la retirer."
+    },
+    affaires_modifier: {
+      titre: "Modifier les affaires",
+      aide: "Modifier une affaire existante : numéro, nom, adresse, statut, équipe, responsable, mandat, appel d'offres. Le responsable d'une affaire modifie toujours la sienne. Sans ce droit, on consulte les affaires sans les changer ; les tâches, elles, restent ouvertes à chacun selon ses droits."
     },
     taches_autrui: {
       titre: "Créer des tâches pour les autres",
@@ -1394,6 +1398,14 @@
      *  dont on ne connaît pas encore les parts — seul le droit tranche.) */
     peutEcrireTache: function (t) {
       return D.aDroit("taches_autrui") || D.meConcerne(t);
+    },
+
+    /** Puis-je modifier cette affaire ? Droit « Modifier les affaires », ou en
+     *  être le responsable (09.11.2026, même règle qu'en base). */
+    peutModifierAffaire: function (a) {
+      if (D.aDroit("affaires_modifier")) return true;
+      var moi = D.monMembre();
+      return !!(a && moi && a.responsableId && a.responsableId === moi.id);
     },
 
     /** Puis-je poser, modifier ou retirer les absences de ce membre ? */

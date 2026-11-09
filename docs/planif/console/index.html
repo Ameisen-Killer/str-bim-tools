@@ -215,8 +215,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script>
 (function () {
@@ -929,7 +929,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         UI.boutonIcone("modifier", "Ouvrir la fiche", nomDe(p), function () { formulaireUtilisateur(p); }),
         p.superAdmin ? null : UI.boutonIcone("supprimer", "Supprimer", nomDe(p), function () { supprimeUtilisateur(p); })
       ]));
-      corps.appendChild(suivi.marque(el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, cellules), p.id || p.email));
+      // Clic droit (09.11.2026, demande de Tony) : la fiche, le lien, le menu commun d'une personne, supprimer
+      var tr = el("tr", { class: p.actif && (!p.email || p.accesActif) ? "" : "suspendu" }, cellules);
+      tr.addEventListener("contextmenu", function (e) {
+        if (e.target.closest("a, input, select, textarea")) return;
+        var m = p.id ? D.membre(p.id) : null;
+        UI.menuContexte(e, { titre: nomDe(p), items: [
+          { label: "Ouvrir la fiche", action: function () { formulaireUtilisateur(p); } },
+          p.email && p.accesActif ? { label: "Envoyer un lien de connexion", action: function () { envoieLien(p); } } : null,
+          { sep: true }
+        ].concat(m ? UI.itemsPersonne(m) : [], [
+          { sep: true },
+          p.superAdmin ? null : { label: "Supprimer", rouge: true, action: function () { supprimeUtilisateur(p); } }
+        ]) });
+      });
+      corps.appendChild(suivi.marque(tr, p.id || p.email));
     });
     var entetes = ["Utilisateur", "Succursale", "Discipline", "Métier", "Statuts", "j/sem.", "Accès", "Dernière connexion", ""];
     if (plusieursBureaux) entetes.splice(1, 0, "Bureau");
@@ -1697,7 +1711,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

@@ -175,10 +175,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -752,6 +752,17 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           poser(jours[colonne(e)]);
         });
       }
+      /* Clic droit sur la ligne d'une personne (09.11.2026) : poser une absence
+         ce jour-là, puis le menu commun de la personne (UI.itemsPersonne). */
+      var menuLigne = function (e, jour) {
+        var l = peut ? [{ label: jour ? "Poser une absence le " + C.fmtCourt(jour) : "Poser une absence", action: function () { poser(jour); } }, { sep: true }] : [];
+        UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: l.concat(UI.itemsPersonne(m, { surChange: rend })) });
+      };
+      nom.addEventListener("contextmenu", function (e) { menuLigne(e); });
+      zone.addEventListener("contextmenu", function (e) {
+        if (e.target.closest(".bt")) return;
+        menuLigne(e, colonne ? jours[colonne(e)] : null);
+      });
       plan.appendChild(zone);
     });
 
@@ -802,13 +813,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     ]);
 
     n.addEventListener("click", function () { UI.absences(m.id, rend); });
-    // Clic droit (05.11.2026) : les absences de la personne, ses jours, sa fiche équipe, retirer celle-ci
+    // Clic droit : le menu commun de la personne (UI.itemsPersonne, 09.11.2026), puis retirer celle-ci
     n.addEventListener("contextmenu", function (e) {
+      e.stopPropagation();
       var peut = D.peutAbsences(m.id);
-      UI.menuContexte(e, { titre: m.prenom + " " + m.nom + " · " + a.motif + " · " + C.fmtCourt(a.debut) + (fin !== a.debut ? " → " + C.fmtCourt(fin) : ""), items: [
-        { label: peut ? "Modifier ses absences" : "Voir ses absences", action: function () { UI.absences(m.id, rend); } },
-        { label: D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", action: function () { UI.joursTravailles(m.id, rend); } },
-        { label: "Voir ses tâches", lien: "/planif/taches/?membre=" + encodeURIComponent(m.id) },
+      UI.menuContexte(e, { titre: m.prenom + " " + m.nom + " · " + a.motif + " · " + C.fmtCourt(a.debut) + (fin !== a.debut ? " → " + C.fmtCourt(fin) : ""), items: UI.itemsPersonne(m, { surChange: rend }).concat([
         { sep: true },
         peut && a.id ? { label: "Retirer cette absence", rouge: true, action: function () {
           UI.confirme("Retirer cette absence ?", m.prenom + " " + m.nom + " · " + a.motif + " · " + C.fmtCH(a.debut) + " → " + C.fmtCH(fin), "Retirer", true)
@@ -818,7 +827,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
                 .catch(function (x) { UI.toast(x.message); });
             });
         } } : null
-      ] });
+      ]) });
     });
     n.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); UI.absences(m.id, rend); }
@@ -844,7 +853,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     periodes.forEach(function (p) {
       var m = p.membre, a = p.absence, fin = a.fin || a.debut;
       var ouvres = Calc.joursTravaillesEntre(m, a.debut, fin, canton);
-      corps.appendChild(el("tr", {}, [
+      var tr = corps.appendChild(el("tr", {}, [
         el("td", {}, [
           el("div", { class: "principal", text: m.prenom + " " + m.nom }),
           el("div", { class: "secondaire", text: D.libelleMetier(m.metier) })
@@ -856,6 +865,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           UI.boutonIcone("modifier", "Modifier", m.prenom + " " + m.nom + " · " + a.motif, function () { UI.absences(m.id, rend); })
         ])
       ]));
+      // Clic droit (09.11.2026) : le menu commun de la personne
+      tr.addEventListener("contextmenu", function (e) {
+        UI.menuContexte(e, { titre: m.prenom + " " + m.nom + " · " + a.motif, items: UI.itemsPersonne(m, { surChange: rend }) });
+      });
     });
 
     hote.appendChild(el("table", { class: "liste" }, [
@@ -879,7 +892,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

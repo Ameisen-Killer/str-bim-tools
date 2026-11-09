@@ -971,18 +971,18 @@ begin
     (p_bureau, 'tous', 'Tout le monde', null, 0,
      array['page_tableau', 'page_equipe', 'page_absences', 'page_annuaire', 'page_affaires', 'voir_conges_equipe', 'voir_absences_avenir']),
     (p_bureau, 'administrateur', 'Administrateur', null, 0,
-     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_inter', 'conges_tous',
+     array['affaires_creer', 'affaires_modifier', 'taches_autrui', 'absences_autrui', 'page_inter', 'conges_tous',
            'news_rediger', 'news_archiver', 'news_supprimer',
            'page_facturation', 'facturation_saisir', 'avancement_tous'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'chef_secteur', 'Chef de secteur', 'administrateur', 0,
-     array['affaires_creer', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge',
+     array['affaires_creer', 'affaires_modifier', 'taches_autrui', 'absences_autrui', 'page_affaires', 'page_charge',
            'planning_equipe', 'taches_a_affecter', 'conges_secteur', 'avancement_secteur'])
   on conflict (bureau_id, statut) do nothing;
   insert into public.droits_groupes (bureau_id, statut, nom, parent, ordre, droits) values
     (p_bureau, 'chef_projet', 'Chef de projet', 'chef_secteur', 0,
-     array['affaires_creer', 'taches_autrui', 'absences_autrui'])
+     array['affaires_creer', 'affaires_modifier', 'taches_autrui', 'absences_autrui'])
   on conflict (bureau_id, statut) do nothing;
 end $$;
 revoke all on function public.groupes_par_defaut(uuid) from public, anon, authenticated;
@@ -1021,6 +1021,20 @@ returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.est_super_admin() or p_droit = any (public.mes_droits());
 $$;
+
+-- Puis-je modifier cette affaire (et son équipe) ? Le droit « Modifier les
+-- affaires », celui d'en ouvrir une (l'équipe s'écrit juste après la création),
+-- ou en être le responsable (09.11.2026).
+create or replace function public.peut_modifier_affaire(p_affaire uuid)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.a_droit('affaires_modifier') or public.a_droit('affaires_creer')
+      or exists (select 1 from public.affaires a
+                  where a.id = p_affaire and a.responsable_id is not null
+                    and a.responsable_id = public.mon_membre());
+$$;
+revoke all on function public.peut_modifier_affaire(uuid) from public, anon;
+grant execute on function public.peut_modifier_affaire(uuid) to authenticated;
 
 do $$
 declare t text;
@@ -1094,11 +1108,15 @@ begin
     execute format('drop policy %I on public.%I', p.policyname, p.tablename);
   end loop;
 
-  -- L'équipe d'une affaire suit l'affaire : rien de plus que le bureau.
+  -- L'équipe d'une affaire suit l'affaire : lue par le bureau, écrite par qui
+  -- peut modifier l'affaire (droit, responsable) ou en ouvrir une (09.11.2026).
   execute
-    'create policy "bureau courant" on public.affaire_membres for all to authenticated
-       using (bureau_id = (select public.bureau_courant()))
-       with check (bureau_id = (select public.bureau_courant()))';
+    'create policy "bureau courant (lecture)" on public.affaire_membres for select to authenticated
+       using (bureau_id = (select public.bureau_courant()))';
+  execute
+    'create policy "droit de modifier" on public.affaire_membres for all to authenticated
+       using (bureau_id = (select public.bureau_courant()) and public.peut_modifier_affaire(affaire_id))
+       with check (bureau_id = (select public.bureau_courant()) and public.peut_modifier_affaire(affaire_id))';
 end $$;
 
 -- ------------------------------------------------ ce que chacun peut écrire ---
@@ -1106,12 +1124,15 @@ end $$;
 -- de ce qui nous concerne. Qui ne porte aucun statut est un utilisateur
 -- « lambda » : il mène son travail, pas celui des autres.
 
--- Affaires : travailler sur les existantes pour tous ; en ouvrir une — ou la
--- retirer, ce qui emporte ses tâches — demande le droit.
+-- Affaires : les lire, tout le bureau ; les modifier, le droit « Modifier les
+-- affaires » ou en être le responsable (09.11.2026) ; en ouvrir une — ou la
+-- retirer, ce qui emporte ses tâches — demande le droit d'ouvrir.
 create policy "bureau courant (lecture)" on public.affaires for select to authenticated
   using (bureau_id = (select public.bureau_courant()));
-create policy "bureau courant (modification)" on public.affaires for update to authenticated
-  using (bureau_id = (select public.bureau_courant()))
+create policy "droit de modifier" on public.affaires for update to authenticated
+  using (bureau_id = (select public.bureau_courant())
+         and ((select public.a_droit('affaires_modifier'))
+              or (responsable_id is not null and responsable_id = (select public.mon_membre()))))
   with check (bureau_id = (select public.bureau_courant()));
 create policy "droit de créer" on public.affaires for insert to authenticated
   with check (bureau_id = (select public.bureau_courant())

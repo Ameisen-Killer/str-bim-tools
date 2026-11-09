@@ -100,10 +100,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=85"></script>
+<script src="/planif/assets/donnees.js?v=86"></script>
 <script src="/planif/assets/calculs.js?v=16"></script>
 <script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=124"></script>
+<script src="/planif/assets/ui.js?v=125"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/news.js?v=5"></script>
@@ -250,7 +250,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       manque.forEach(function (x) {
         var enCours = x.avis && x.avis.debut <= maintenant() && maintenant() < x.avis.fin;
         // Vers la page Absences, à la ligne de la personne (13.10.2026)
+        // Clic droit (09.11.2026) : le menu commun de la personne (UI.itemsPersonne)
         ul.appendChild(el("li", {}, [el("a", { class: "cm-personne cm-lien " + x.genre, href: versAbsences(x.membre.id, a),
+          oncontextmenu: function (e) { UI.menuContexte(e, { titre: nom(x.membre), items: [
+            { label: "Voir dans le calendrier des absences", lien: versAbsences(x.membre.id, a) }, { sep: true }
+          ].concat(UI.itemsPersonne(x.membre, { surChange: rend })) }); },
           title: "Voir " + nom(x.membre) + " dans le calendrier des absences" }, [
           el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(x.membre) }),
           el("span", { class: "cm-lib" }, [
@@ -278,6 +282,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var gens = r.participants.map(function (i) { return D.membre(i); }).filter(Boolean);
     return el("button", { type: "button", class: "cm-rdv" + (compact ? " compact" : "") + (r.source === "outlook" ? " outlook" : ""),
       onclick: function () { formRdv(r.id, {}); },
+      // Clic droit (09.11.2026) : le rendez-vous, un autre le même jour
+      oncontextmenu: function (e) { UI.menuContexte(e, { titre: r.titre, items: [
+        { label: "Ouvrir le rendez-vous", action: function () { formRdv(r.id, {}); } },
+        { label: "Nouveau rendez-vous ce jour-là", action: function () { formRdv(null, { jour: r.jour }); } }
+      ] }); },
       title: r.titre + (r.lieu ? " — " + r.lieu : "") + (gens.length ? "\n" + gens.map(nom).join(", ") : "") + (r.note ? "\n" + r.note : "")
     }, [
       el("span", { class: "cm-heure", text: heures(r) }),
@@ -367,7 +376,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Droit « Voir les demandes de l'équipe en attente » (13.10.2026)
     if (D.aDroit("voir_conges_equipe")) bloc("Demandes de l'équipe en attente", attente.map(function (c) {
       var m = D.membre(c.membreId);
-      return el("li", { class: "cm-demande" }, [
+      return el("li", { class: "cm-demande", oncontextmenu: m ? function (e) {
+        UI.menuContexte(e, { titre: nom(m) + " · " + c.motif, items: UI.itemsPersonne(m, { surChange: rend }) }); } : null }, [
         el("span", { class: "cm-init", "aria-hidden": "true", text: initiales(m) }),
         el("span", { class: "cm-lib" }, [
           el("span", { class: "cm-titre", text: nom(m) + " — " + c.motif }),
@@ -576,7 +586,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=3"></script>
+<script src="/planif/assets/aide-fiches.js?v=4"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

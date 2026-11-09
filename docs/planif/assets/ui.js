@@ -2746,7 +2746,14 @@
     l.forEach(function (c) {
       var m = D.membre(c.membreId);
       var n = global.Calc ? global.Calc.joursTravaillesEntre(m, c.debut, c.fin, canton) : null;
-      ul.appendChild(el("li", { class: "dc-ligne" }, [
+      // Clic droit (09.11.2026) : accepter, refuser, puis le menu commun de la personne
+      ul.appendChild(el("li", { class: "dc-ligne", oncontextmenu: function (e) {
+        menuContexte(e, { titre: (m ? m.prenom + " " + m.nom + " · " : "") + c.motif, items: [
+          { label: "Accepter la demande", action: function () { decideConge(c, true, surChange); } },
+          { label: "Refuser la demande", rouge: true, action: function () { decideConge(c, false, surChange); } },
+          { sep: true }
+        ].concat(itemsPersonne(m, { surChange: surChange })) });
+      } }, [
         el("span", { class: "dc-qui" }, [
           el("b", { text: m ? m.prenom + " " + m.nom : "—" }),
           el("span", { text: " · " + c.motif })
@@ -2795,6 +2802,30 @@
        menuContexte(e, { titre, items: [{ label, action | lien, rouge, sep }] })
      Une entrée nulle est ignorée ; { sep: true } trace un filet. Échap, un clic
      ailleurs, le défilement ou un redimensionnement le ferment. */
+  /* Les entrées d'une personne (09.11.2026, demande de Tony) : les mêmes, dans
+     le même ordre, sur toutes les pages où l'on clique sur quelqu'un.
+       itemsPersonne(m, { surChange, taches, affaires, telephones })
+     taches / affaires : une action propre à la page à la place du lien (la page
+     filtre sur place) ; telephones: false retire les numéros. */
+  function itemsPersonne(m, o) {
+    o = o || {};
+    if (typeof m === "string") m = D.membre(m);
+    if (!m) return [];
+    var permise = function (p) { return !D.pagePermise || D.pagePermise(p); };
+    var id = encodeURIComponent(m.id);
+    var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
+    var l = [
+      permise("taches") ? (o.taches ? { label: "Ses tâches", action: o.taches } : { label: "Ses tâches", lien: "/planif/taches/?membre=" + id }) : null,
+      permise("affaires") ? (o.affaires ? { label: "Ses affaires", action: o.affaires } : { label: "Ses affaires", lien: "/planif/affaires/?membre=" + id }) : null,
+      { label: "Ses absences", action: function () { absences(m.id, o.surChange); } },
+      { label: "Ses jours travaillés", action: function () { joursTravailles(m.id, o.surChange); } }
+    ];
+    if (o.telephones !== false && (m.telNatel || m.telExterne)) {
+      l.push({ sep: true }, tel("Appeler le natel", m.telNatel), tel("Appeler la ligne directe", m.telExterne));
+    }
+    return l;
+  }
+
   var menuCtx = null;
   function fermeMenuContexte() {
     if (!menuCtx) return;
@@ -3450,7 +3481,7 @@
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
     formulaireTache: formulaireTache, ficheTache: ficheTache, imprime: imprime,
-    menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte,
+    menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte, itemsPersonne: itemsPersonne,
     demandesConge: demandesConge, decideConge: decideConge,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,
     recherche: recherche, correspond: correspond, surligne: surligne,
