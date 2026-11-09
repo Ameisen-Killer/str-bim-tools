@@ -422,7 +422,10 @@
     var p = prenom();
     var l = frequentes(ICI, 6);
     return bulleAide([
-      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Moi, c'est Charlie. Je réponds aux questions sur le fonctionnement de l'outil. Écris avec tes mots, par exemple « comment décaler une tâche ? »."]),
+      /* Charlie se présente à chaque ouverture (09.11.2026, demande de Tony) */
+      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Je suis ", el("b", { text: "Charlie" }), ", l'aide de la planification."]),
+      el("p", { text: "Je connais chaque page de l'outil et je réponds selon la page où tu es et selon tes droits. Je ne suis pas une IA : je cherche dans mes fiches, tenues à jour à chaque évolution du site." }),
+      el("p", { text: "Écris ta question avec tes mots, par exemple « comment décaler une tâche ? ». Si je ne sais pas, je te proposerai de l'envoyer à la boîte à idées." }),
       l.length ? el("p", { class: "aide-intro" }, ["Ici, sur ", el("b", { text: PAGES[ICI].nom }), ", on me demande souvent :"]) : null,
       l.length ? el("div", { class: "aide-puces" }, l.map(function (f) { return puce(f, ICI); })) : null
     ], "aide-accueil");
