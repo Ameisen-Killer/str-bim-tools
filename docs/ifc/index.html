@@ -300,6 +300,10 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .poignee.tiree{cursor:grabbing;box-shadow:0 0 0 6px rgba(var(--or-rvb),.3),0 2px 8px rgba(0,0,0,.35)}
 .vue-outils .btn{background:rgba(var(--fond-rvb),.7)}
 .vue-outils .btn[aria-pressed="true"]{border-color:rgb(var(--or-rvb));color:rgb(var(--or-rvb));background:rgba(var(--or-rvb),.14)}
+/* bascule Solide / Filaire : deux boutons accolés, un seul enfoncé */
+.vue-outils .bascule{display:flex}
+.vue-outils .bascule .btn+.btn{margin-left:-1px}
+.vue-outils .bascule .btn[aria-pressed="true"]{position:relative;z-index:1}
 /* cube de navigation (ifc-cube.js), sous les boutons de la vue */
 .p-vue canvas.cube{inset:auto;right:6px;top:50px;width:150px;height:150px;z-index:3;cursor:default;opacity:.85;transition:opacity .15s ease}
 .p-vue canvas.cube:hover{opacity:1}
@@ -507,6 +511,9 @@ body.edition .vue-outils{gap:2px;padding:4px;border-radius:8px;background:rgba(v
 body.edition .vue-outils .btn{background:transparent;border-color:transparent}
 body.edition .vue-outils .btn:hover{background:var(--controle-survol)}
 body.edition .vue-outils .btn[aria-pressed="true"]{background:var(--or);border-color:transparent;color:var(--sur-accent)}
+body.edition .vue-outils .bascule{margin-left:4px;padding:2px;gap:2px;border-radius:6px;background:rgba(var(--encre),.07);box-shadow:inset 0 0 0 1px rgba(var(--encre),.06)}
+body.edition .vue-outils .bascule .btn{min-height:28px;padding:3px 10px;margin-left:0}
+body.edition .vue-outils .bascule .btn[aria-pressed="true"]{box-shadow:0 1px 3px rgba(0,0,0,.25)}
 body.edition .p-vue canvas.cube{top:56px}
 body.edition .vue-aide,body.edition .vue-info{font-family:var(--sans);font-size:12px;letter-spacing:0}
 body.edition .mesures text{font-family:var(--sans)}
@@ -764,6 +771,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           <button type="button" class="btn petit" id="b-boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
           <button type="button" class="btn petit" id="b-dxf" title="Plan DXF des axes des murs, poteaux et ossatures et du contour des dalles, dans la boîte de coupe">DXF</button>
           <button type="button" class="btn petit" id="b-lissage" aria-pressed="true" title="Lisser les bords des pièces (plus lent sur un gros modèle)">Lissage</button>
+          <div class="bascule" role="group" aria-label="Rendu de la vue 3D">
+            <button type="button" class="btn petit" id="b-solide" aria-pressed="true" title="Pièces pleines, ombrées">Solide</button>
+            <button type="button" class="btn petit" id="b-filaire" aria-pressed="false" title="Arêtes seules : celles de devant nettes, celles de derrière en transparence">Filaire</button>
+          </div>
         </div>
         <div class="vue-aide" id="vue-aide">Glisser : tourner autour du point visé · Maj + glisser ou deux doigts : déplacer · Molette ou pincement : zoom · Clic : sélectionner · Clic droit : menu</div>
       </div>
@@ -871,10 +882,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=9"></script>
-<script src="/ifc/ifc-vue.js?v=35"></script>
+<script src="/ifc/ifc-vue.js?v=36"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
-<script src="/ifc/ifc-moteurs.js?v=4"></script>
-<script src="/ifc/ifc-app.js?v=36"></script>
+<script src="/ifc/ifc-moteurs.js?v=5"></script>
+<script src="/ifc/ifc-app.js?v=37"></script>
 <script src="/assets/menu.js?v=30"></script>
 </body>
 </html>

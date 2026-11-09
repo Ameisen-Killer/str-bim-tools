@@ -1211,6 +1211,9 @@
   // Arêtes vives : bord libre, ou angle marqué entre les deux faces qui la partagent. Les facettes
   // d'un rond ou d'une face triangulée ne montrent donc plus leurs coutures.
   var COS_VIF = Math.cos(28*Math.PI/180);
+  // Mode filaire : arêtes vues renforcées, arêtes cachées à 28 % de leur force, faces voilées à 7 %
+  var CACHEES_FIL = .28, VOILE_FIL = .07;
+  function alphaFil(a){ return Math.min(255, Math.round(a*2.2 + 30)); }
   function aretesVives(geo){
     if (geo.A) return geo.A;
     var faces = geo.faces, q = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
@@ -1566,7 +1569,7 @@
       "void main(){gl_Position=uM*vec4(aP,1.0);float l=abs(dot(aN,uL));vC=aC*(0.34+0.66*l);vP=aP;}",
     fFaces: COUPE + "varying vec3 vC;void main(){coupe();gl_FragColor=vec4(vC,1.0);}",
     vLignes: "attribute vec3 aP;attribute vec4 aC;uniform mat4 uM;varying vec4 vC;varying vec3 vP;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;vP=aP;}",
-    fLignes: COUPE + "varying vec4 vC;void main(){coupe();gl_FragColor=vC;}",
+    fLignes: COUPE + "uniform float uA;varying vec4 vC;void main(){coupe();gl_FragColor=vec4(vC.rgb,vC.a*uA);}",
     vId: "attribute vec3 aP;attribute vec3 aC;uniform mat4 uM;varying vec3 vC;varying vec3 vP;void main(){gl_Position=uM*vec4(aP,1.0);vC=aC;vP=aP;}",
     fId: COUPE + "varying vec3 vC;void main(){coupe();gl_FragColor=vec4(vC,1.0);}"
   };
@@ -1593,7 +1596,7 @@
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
       return { p: p, uM: gl.getUniformLocation(p, "uM"), uL: gl.getUniformLocation(p, "uL"),
-        uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR") };
+        uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR"), uA: gl.getUniformLocation(p, "uA") };
     }
     var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, fermes = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     function init(){
@@ -1705,7 +1708,7 @@
     function teinter(liste, sel, actif, coul){
       kad = coul.cadreRGBA; krouge = coul.coupeRGB;
       var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
-      var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA;
+      var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA, fil = !!coul.filaire;
       liste.forEach(function(it, e){
         var pl = plages[e];
         if (!pl) return;
@@ -1713,7 +1716,8 @@
         // contour doré seulement pour la sélection ; l'élément actif non sélectionné garde un contour neutre renforcé
         var s1 = sel.has(it.id), c = s1 ? OR : t ? t.piece : it.rgb || P1, l = s1 ? (it.id === actif ? act : aro) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : ar;
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
-        for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
+        var la = fil ? alphaFil(l[3]) : l[3];
+        for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = la; }
       });
       remplir(B.col, col, gl.DYNAMIC_DRAW);
       remplir(B.lcol, lcol, gl.DYNAMIC_DRAW);
@@ -1747,34 +1751,60 @@
       gl.disable(gl.POLYGON_OFFSET_FILL);
       return M;
     }
+    // arêtes vives : k = force (multiplie l'alpha), test = comparaison de profondeur (LEQUAL vues, GREATER cachées)
+    function lignes(M, k, test){
+      gl.useProgram(P.lignes.p);
+      gl.uniformMatrix4fv(P.lignes.uM, false, M);
+      gl.uniform1f(P.lignes.uA, k);
+      decoupe(P.lignes, true);
+      attrib(0, B.lpos, 3, gl.FLOAT);
+      gl.disableVertexAttribArray(1);
+      attrib(2, B.lcol, 4, gl.UNSIGNED_BYTE, true);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+      gl.depthFunc(test);
+      tracer(gl.LINES, true);
+      gl.depthFunc(gl.LEQUAL);
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
+    }
     function dessiner(c){
       if (gl.isContextLost()) return;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, cv.width, cv.height);
-      gl.clearColor(0, 0, 0, 0);
+      // filaire : fond peint (les transparences se mélangent alors juste), sinon fond transparent
+      var F = c.filaire && c.fond;
+      if (F) gl.clearColor(F[0], F[1], F[2], 1); else gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LEQUAL);
-      var M = faces(c, P.faces, B.col);
-      if (nLig && !c.vite){         // pendant un mouvement : sans les arêtes
-        gl.useProgram(P.lignes.p);
-        gl.uniformMatrix4fv(P.lignes.uM, false, M);
-        decoupe(P.lignes, true);
-        attrib(0, B.lpos, 3, gl.FLOAT);
-        gl.disableVertexAttribArray(1);
-        attrib(2, B.lcol, 4, gl.UNSIGNED_BYTE, true);
+      var M;
+      if (c.filaire){
+        // 1) profondeur seule : les faces cachent sans se montrer
+        gl.colorMask(false, false, false, false);
+        M = faces(c, P.faces, B.col);
+        gl.colorMask(true, true, true, true);
+        // 2) voile de verre très léger sur les faces vues (même profondeur, donc seule la face de devant)
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendColor(0, 0, 0, VOILE_FIL);
+        gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
         gl.depthMask(false);
-        tracer(gl.LINES, true);
+        faces(c, P.faces, B.col);
         gl.depthMask(true);
         gl.disable(gl.BLEND);
+        // 3) arêtes cachées en transparence, 4) arêtes vues nettes par-dessus (aussi pendant un mouvement)
+        if (nLig){ lignes(M, CACHEES_FIL, gl.GREATER); lignes(M, 1, gl.LEQUAL); }
+      } else {
+        M = faces(c, P.faces, B.col);
+        if (nLig && !c.vite) lignes(M, 1, gl.LEQUAL);       // pendant un mouvement : sans les arêtes
       }
       if (coupe && !c.vite) remplirCoupes(c, M);
       if (coupe && !c.sansCadre){
         // arêtes de la boîte de coupe, en or, visibles à travers les pièces
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        gl.uniform1f(P.lignes.uA, 1);
         decoupe(P.lignes, false);
         attrib(0, B.cadre, 3, gl.FLOAT);
         gl.disableVertexAttribArray(1);
@@ -1816,6 +1846,7 @@
         remplir(B.quad, new Float32Array(faceBoite(coupe, ax, max, origine)), gl.DYNAMIC_DRAW);
         gl.useProgram(P.lignes.p);
         gl.uniformMatrix4fv(P.lignes.uM, false, M);
+        gl.uniform1f(P.lignes.uA, 1);
         decoupe(P.lignes, false);
         attrib(0, B.quad, 3, gl.FLOAT); gl.disableVertexAttribArray(2);
         gl.vertexAttrib4f(2, krouge[0]/255, krouge[1]/255, krouge[2]/255, 1);
@@ -2195,6 +2226,11 @@
       }
       return t;
     }
+    function voile(base, fd){         // 90 % fond, 10 % teinte de la pièce
+      var cle = "v" + base.join(",") + "/" + fd.join(","), t = teintes[cle];
+      if (!t) t = teintes[cle] = "rgb(" + [0, 1, 2].map(function(i){ return Math.round(fd[i]*.9 + base[i]*.1); }).join(",") + ")";
+      return t;
+    }
     function dessiner(c){
       ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
       ctx.clearRect(0, 0, c.W, c.H);
@@ -2238,6 +2274,9 @@
       }
       dessin.sort(function(a, b){ return b.z - a.z; });
       var detail = !(c.vite && dessin.length > 12000), L = c.lumiereVue;
+      // filaire : chaque face est un voile couleur du fond (avec un soupçon de sa teinte) qui estompe les
+      // arêtes de derrière ; les arêtes vives sont tracées plus franches
+      var fil = !!c.filaire, fd = fil && c.fond ? c.fond.map(function(x){ return 255*x; }) : null;
       ctx.lineJoin = "round";
       for (var i = 0; i < dessin.length; i++){
         var F = dessin[i], it = liste[F.el], n = F.n;
@@ -2253,10 +2292,17 @@
           for (var q = 2; q < P.length; q += 2) ctx.lineTo(P[q], P[q+1]);
           ctx.closePath();
         }
-        ctx.fillStyle = fond;
-        ctx.fill("evenodd");
-        if (detail){ ctx.strokeStyle = fond; ctx.lineWidth = .8; ctx.stroke(); }     // bouche les joints entre facettes
-        if ((detail || estActif) && (F.s3 ? F.s3.length : F.ar && F.ar.length)){
+        if (fd){
+          ctx.fillStyle = voile(choisi ? OR : pa ? pa.piece : it.rgb || coul.piece, fd);
+          ctx.globalAlpha = .74;
+          ctx.fill("evenodd");
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = fond;
+          ctx.fill("evenodd");
+          if (detail){ ctx.strokeStyle = fond; ctx.lineWidth = .8; ctx.stroke(); }     // bouche les joints entre facettes
+        }
+        if ((detail || estActif || fil) && (F.s3 ? F.s3.length : F.ar && F.ar.length)){
           ctx.beginPath();
           if (F.s3) F.s3.forEach(function(g){
             for (var u = 0; u < 6; u += 3){
@@ -2268,8 +2314,8 @@
             var Q = F.p[F.ar[r]], a = F.ar[r+1], m = Q.length/2, z = (a + 1) % m;
             ctx.moveTo(Q[2*a], Q[2*a+1]); ctx.lineTo(Q[2*z], Q[2*z+1]);
           }
-          ctx.strokeStyle = choisi ? (estActif ? coul.actif : coul.areteOr) : estActif ? coul.areteActive : pa ? pa.arete : coul.arete;
-          ctx.lineWidth = estActif ? 1.1 : .6;
+          ctx.strokeStyle = choisi ? (estActif ? coul.actif : coul.areteOr) : estActif ? coul.areteActive : pa ? pa.arete : fil ? coul.areteFil : coul.arete;
+          ctx.lineWidth = estActif ? 1.1 : fil ? .85 : .6;
           ctx.stroke();
         }
       }
@@ -2398,7 +2444,7 @@
     }
     var yaw = -0.65, pitch = 0.5, zoom = 1, px = 0, py = 0, centre = [0,0,0], rayon = 1, origine = null, prof = 1;
     var DEMI_PI = Math.PI/2, anim = null;       // plongée bornée à la verticale ; vue animée en cours (cube)
-    var W = 0, H = 0, dpr = 1, kpx = 0, lisse = false, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
+    var W = 0, H = 0, dpr = 1, kpx = 0, lisse = false, filaire = false, attente = false, vite = false, coul = {}, coupe = null, cadreMasque = false;
     var LUM = (function(){ var l = Math.hypot(-.45, .6, .66); return [-.45/l, .6/l, .66/l]; })();
 
     function rvb(nom, defaut){
@@ -2419,7 +2465,8 @@
         texte: "rgba(" + a.join(",") + ",.45)",
         areteActive: "rgba(" + a.join(",") + ",.85)", areteActiveRGBA: [a[0], a[1], a[2], 215],
         cadre: clair ? "rgba(0,95,184,.8)" : "rgba(96,205,255,.75)", cadreRGBA: clair ? [0, 95, 184, 205] : [96, 205, 255, 190],   // accent Windows 11, comme /fgh/
-        coupeRGB: clair ? [204, 44, 38] : [196, 48, 42]
+        coupeRGB: clair ? [204, 44, 38] : [196, 48, 42],
+        filaire: filaire, areteFil: "rgba(" + a.join(",") + "," + (clair ? .82 : .56) + ")"      // canvas 2D en filaire
       };
       // couleur d'une maquette (teinte 0–360) : remplissage très pastel, arêtes pastel un peu plus soutenues
       var cache = {};
@@ -2459,8 +2506,14 @@
       ];
       return { ca: ca, sa: sa, cb: cb, sb: sb, s: Math.min(W, H)*.44/rayon*zoom, px: px, py: py, W: W, H: H, dpr: kpx || dpr,
         centre: centre, prof: prof, vite: vite, lumiere: lumiere, lumiereVue: LUM, sansCadre: cadreMasque,
+        filaire: filaire, fond: filaire ? fondVue() : null,
         // à la souris, la boîte s'atténue à 50 % hors survol et revient à 100 % au survol (avec les poignées)
         cadreAlpha: souris && !survol && !surPoignee && !tire ? .5 : 1 };
+    }
+    // couleur du fond de la vue (0–1), peinte par les moteurs en filaire
+    function fondVue(){
+      var m = /(\d+)\D+(\d+)\D+(\d+)/.exec(getComputedStyle(cv.parentNode).backgroundColor || "");
+      return m ? [m[1]/255, m[2]/255, m[3]/255] : [0, 0, 0];
     }
     function demander(){ if (!attente){ attente = true; requestAnimationFrame(rendre); } }
     function rendre(){
@@ -3001,6 +3054,11 @@
       angles: function(){ return { lacet: yaw, plongee: pitch }; },
       allerVers: allerVers,
       lissage: function(oui){ if (oui !== undefined){ lisse = !!oui; demander(); } return lisse; },
+      // affichage filaire (arêtes vives seules, cachées en transparence) ou solide
+      filaire: function(oui){
+        if (oui !== undefined && !!oui !== filaire){ filaire = coul.filaire = !!oui; M.teinter(liste, sel, actif, coul); demander(); }
+        return filaire;
+      },
       tourner: function(dl, dp){ anim = null; yaw += dl; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, pitch + dp)); enRotation = true; vite = true; demander(); },
       finTourner: function(){ enRotation = false; vite = false; demander(); },
       redessiner: function(){ taille(); },
@@ -3186,7 +3244,7 @@
   // Moteurs d'affichage : fabrique(canvas, outils) → moteur, promesse de moteur, ou null (indisponible).
   // WebGL et canvas 2D sont ici ; WebGPU et Three.js sont ajoutés par ifc-moteurs.js.
   var FABRIQUES = { webgl: function(cv){ return moteurGL(cv); }, canvas: function(cv){ return moteurCanvas(cv); } };
-  var OUTILS = { triangles: triangles, aretesVives: aretesVives, aretesBoite: aretesBoite, boiteRel: boiteRel, axeBoite: axeBoite, faceBoite: faceBoite, matriceVue: matriceVue, viserCPU: viserCPU, OR: OR };
+  var OUTILS = { triangles: triangles, aretesVives: aretesVives, aretesBoite: aretesBoite, boiteRel: boiteRel, axeBoite: axeBoite, faceBoite: faceBoite, matriceVue: matriceVue, viserCPU: viserCPU, OR: OR, alphaFil: alphaFil, CACHEES_FIL: CACHEES_FIL, VOILE_FIL: VOILE_FIL };
   global.IFCVue = {
     creer: creer,
     ajouterMoteur: function(cle, fabrique){ FABRIQUES[cle] = fabrique; },

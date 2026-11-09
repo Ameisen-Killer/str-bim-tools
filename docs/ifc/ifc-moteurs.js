@@ -17,7 +17,8 @@
       var c = s1 ? O.OR : t ? t.piece : it.rgb || coul.piece;     // couleur choisie, sinon celle du fichier (web-ifc)
       var l = s1 ? (it.id === actif ? coul.actifRGBA : coul.areteOrRGBA) : it.id === actif ? coul.areteActiveRGBA : t ? t.areteRGBA : coul.areteRGBA;
       for (var v = pl[0]; v < pl[1]; v++){ col[4*v] = c[0]; col[4*v+1] = c[1]; col[4*v+2] = c[2]; col[4*v+3] = 255; }
-      for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = l[3]; }
+      var la = coul.filaire ? O.alphaFil(l[3]) : l[3];       // filaire : arêtes renforcées
+      for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = la; }
     });
     return { col: col, lcol: lcol };
   }
@@ -58,7 +59,7 @@
     "@vertex fn vPos(@location(0) p: vec3<f32>) -> S {",
     "  var o: S; o.p = proj(p); o.c = vec4<f32>(0.0); o.w = p; return o; }",
     "@vertex fn vLignes(@location(0) p: vec3<f32>, @location(2) c: vec4<f32>) -> S {",
-    "  var o: S; o.p = proj(p); o.c = c; o.w = p; return o; }",
+    "  var o: S; o.p = proj(p); o.c = vec4<f32>(c.rgb, c.a * u.l.w); o.w = p; return o; }",
     "@fragment fn f(i: S) -> @location(0) vec4<f32> {",
     // boîte de coupe tournée autour de la verticale : point ramené dans son repère (k.y = cos, k.z = sin)
     "  let q = vec3<f32>(u.k.y * i.w.x + u.k.z * i.w.y, -u.k.z * i.w.x + u.k.y * i.w.y, i.w.z);",
@@ -79,14 +80,15 @@
         var bgl = dev.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } }] });
         var layout = dev.createPipelineLayout({ bindGroupLayouts: [bgl] });
         var MELANGE = { color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" }, alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" } };
+        var VOILE = { color: { srcFactor: "constant", dstFactor: "one-minus-constant", operation: "add" }, alpha: { srcFactor: "constant", dstFactor: "one-minus-constant", operation: "add" } };
         function pipe(vs, buffers, topo, o){
           return dev.createRenderPipeline({
             layout: layout,
             vertex: { module: mod, entryPoint: vs, buffers: buffers },
-            fragment: { module: mod, entryPoint: "f", targets: [{ format: format, blend: o.melange ? MELANGE : undefined, writeMask: o.muet ? 0 : GPUColorWrite.ALL }] },
+            fragment: { module: mod, entryPoint: "f", targets: [{ format: format, blend: o.voile ? VOILE : o.melange ? MELANGE : undefined, writeMask: o.muet ? 0 : GPUColorWrite.ALL }] },
             primitive: { topology: topo },
             depthStencil: {
-              format: "depth24plus-stencil8", depthWriteEnabled: !!o.ecrit, depthCompare: o.toujours ? "always" : "less-equal",
+              format: "depth24plus-stencil8", depthWriteEnabled: !!o.ecrit, depthCompare: o.toujours ? "always" : o.test || "less-equal",
               depthBias: o.biais || 0, depthBiasSlopeScale: o.biais ? 1 : 0,
               stencilFront: o.pochoir || {}, stencilBack: o.pochoir || {},
               stencilReadMask: o.masque || 0xff, stencilWriteMask: o.pochoir && o.pochoir.passOp === "invert" ? o.masque : 0
@@ -100,6 +102,10 @@
         var pFaces = pipe("vFaces", [bP, bN, bC], "triangle-list", { ecrit: true, biais: 1 });
         var pLignes = pipe("vLignes", [bP, bC], "line-list", { melange: true });
         var pCadre = pipe("vLignes", [bP, bC], "line-list", { melange: true, toujours: true });
+        // filaire : profondeur seule, voile léger sur les faces vues, arêtes cachées (derrière la profondeur)
+        var pMuet = pipe("vFaces", [bP, bN, bC], "triangle-list", { ecrit: true, biais: 1, muet: true });
+        var pVoile = pipe("vFaces", [bP, bN, bC], "triangle-list", { biais: 1, voile: true });
+        var pCachees = pipe("vLignes", [bP, bC], "line-list", { melange: true, test: "greater" });
         // Sections remplies en rouge (méthode du pochoir, comme le moteur WebGL) : un bit de pochoir par axe,
         // pour traiter les trois faces de la boîte tournées vers l'œil dans la même passe.
         // 1) la géométrie coupée par le seul plan de la face inverse le bit à chaque surface traversée ;
@@ -117,6 +123,8 @@
         var U2 = dev.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         var G1 = dev.createBindGroup({ layout: bgl, entries: [{ binding: 0, resource: { buffer: U1 } }] });
         var G2 = dev.createBindGroup({ layout: bgl, entries: [{ binding: 0, resource: { buffer: U2 } }] });
+        var U3 = dev.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        var G3 = dev.createBindGroup({ layout: bgl, entries: [{ binding: 0, resource: { buffer: U3 } }] });
         function tampon(data, usage){
           var b = dev.createBuffer({ size: Math.max(4, Math.ceil(data.byteLength/4)*4), usage: usage | GPUBufferUsage.COPY_DST });
           if (data.byteLength) dev.queue.writeBuffer(b, 0, data);
@@ -163,10 +171,10 @@
             c: dev.createTexture({ size: [w, h], sampleCount: ECH, format: format, usage: GPUTextureUsage.RENDER_ATTACHMENT }),
             d: dev.createTexture({ size: [w, h], sampleCount: ECH, format: "depth24plus-stencil8", usage: GPUTextureUsage.RENDER_ATTACHMENT }) };
         }
-        function uniformes(buf, M, c, oui, b0, b1){
+        function uniformes(buf, M, c, oui, b0, b1, force){
           var u = new Float32Array(32);
           u.set(M, 0);
-          u[16] = c.lumiere[0]; u[17] = c.lumiere[1]; u[18] = c.lumiere[2];
+          u[16] = c.lumiere[0]; u[17] = c.lumiere[1]; u[18] = c.lumiere[2]; u[19] = force == null ? 1 : force;     // force des arêtes
           u[20] = oui && coupe ? 1 : 0; u[21] = 1;
           if (coupe){
             var r = O.boiteRel(coupe, origine);
@@ -195,6 +203,8 @@
           textures();
           var M = O.matriceVue(c, origine);
           uniformes(U1, M, c, true); uniformes(U2, M, c, false);
+          var fil = !!c.filaire;
+          if (fil) uniformes(U3, M, c, true, null, null, O.CACHEES_FIL);
           var enc = dev.createCommandEncoder();
           var pass = enc.beginRenderPass({
             colorAttachments: [{ view: tex.c.createView(), resolveTarget: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "discard" }],
@@ -202,9 +212,19 @@
               stencilClearValue: 0, stencilLoadOp: "clear", stencilStoreOp: "discard" }
           });
           if (m.nv){
-            pass.setPipeline(pFaces); pass.setBindGroup(0, G1);
+            pass.setPipeline(fil ? pMuet : pFaces); pass.setBindGroup(0, G1);
             pass.setVertexBuffer(0, B.pos); pass.setVertexBuffer(1, B.nor); pass.setVertexBuffer(2, B.col);
             pass.draw(m.nv);
+            if (fil){
+              var k = O.VOILE_FIL;
+              pass.setPipeline(pVoile); pass.setBlendConstant({ r: k, g: k, b: k, a: k });
+              pass.draw(m.nv);
+            }
+          }
+          if (m.nl && fil){
+            pass.setPipeline(pCachees); pass.setBindGroup(0, G3);
+            pass.setVertexBuffer(0, B.lpos); pass.setVertexBuffer(1, B.lcol);
+            pass.draw(m.nl);
           }
           if (m.nl){
             pass.setPipeline(pLignes); pass.setBindGroup(0, G1);
@@ -260,6 +280,10 @@
       var plans = [0, 1, 2, 3, 4, 5].map(function(){ return new T.Plane(new T.Vector3(1, 0, 0), 0); });
       var matF = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: .62, metalness: .06, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
       var matL = new T.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
+      // filaire : faces en profondeur seule (matF sans couleur), voile léger, arêtes cachées en transparence
+      var matV = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, transparent: true, opacity: O.VOILE_FIL, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+      var matLC = new T.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: O.CACHEES_FIL, depthWrite: false, depthFunc: T.GreaterDepth });
       var matC = new T.LineBasicMaterial({ color: 0xd6a85c, transparent: true, opacity: .75, depthTest: false });
       // Sections remplies en rouge (pochoir, un bit par axe) : la géométrie coupée par le seul plan de la face
       // vue inverse le bit à chaque surface traversée, puis le rectangle de la face est peint là où il vaut 1
@@ -285,7 +309,7 @@
       var liste = [], origine = [0, 0, 0], m = { nv: 0, nl: 0, plages: [] }, objets = [], pochoirs = [], coupe = null, cadre = null, taille = [0, 0];
       function vider(){
         pochoirs.forEach(function(o){ scene.remove(o); }); pochoirs = [];
-        objets.forEach(function(o){ scene.remove(o); o.geometry.dispose(); }); objets = [];
+        objets.forEach(function(o){ scene.remove(o); o.geometry.dispose(); }); objets = [];       // dispose deux fois une géométrie partagée : sans effet
       }
       function charger(l, orig){
         liste = l; origine = orig;
@@ -298,11 +322,12 @@
         var gl = new T.BufferGeometry();
         gl.setAttribute("position", new T.BufferAttribute(m.lpos, 3));
         gl.setAttribute("color", new T.BufferAttribute(new Uint8Array(4*m.nl), 4, true));
-        var faces = new T.Mesh(gf, matF), aretes = new T.LineSegments(gl, matL);
-        faces.frustumCulled = aretes.frustumCulled = false;
-        aretes.renderOrder = 1;
-        objets = [faces, aretes];
-        scene.add(faces); scene.add(aretes);
+        var faces = new T.Mesh(gf, matF), aretes = new T.LineSegments(gl, matL), voile = new T.Mesh(gf, matV), cachees = new T.LineSegments(gl, matLC);
+        faces.frustumCulled = aretes.frustumCulled = voile.frustumCulled = cachees.frustumCulled = false;
+        aretes.renderOrder = 1; voile.renderOrder = .4; cachees.renderOrder = .7;
+        voile.visible = cachees.visible = false;
+        objets = [faces, aretes, voile, cachees];
+        objets.forEach(function(o){ scene.add(o); });
         pochoirs = matP.map(function(mat, a){
           var p = new T.Mesh(gf, mat);
           p.renderOrder = 2 + 2*a; p.frustumCulled = false; p.visible = false;
@@ -326,7 +351,9 @@
       function poserCoupe(b){
         coupe = b;
         if (cadre){ scene.remove(cadre); cadre.geometry.dispose(); cadre = null; }
-        if (!b){ matF.clippingPlanes = null; matL.clippingPlanes = null; matF.needsUpdate = matL.needsUpdate = true; return; }
+        var fils = [matV, matLC];
+        if (!b){ matF.clippingPlanes = null; matL.clippingPlanes = null; matF.needsUpdate = matL.needsUpdate = true;
+          fils.forEach(function(x){ x.clippingPlanes = null; x.needsUpdate = true; }); return; }
         var r = O.boiteRel(b, origine);
         for (var a = 0; a < 3; a++){
           var n = O.axeBoite(b, a);       // plan n·p + d ≥ 0 gardé ; coordonnée de p le long de n = r.b0/b1
@@ -334,6 +361,7 @@
           plans[2*a + 1].normal.set(-n[0], -n[1], -n[2]); plans[2*a + 1].constant = r.b1[a];
         }
         matF.clippingPlanes = plans; matL.clippingPlanes = plans; matF.needsUpdate = matL.needsUpdate = true;
+        fils.forEach(function(x){ x.clippingPlanes = plans; x.needsUpdate = true; });
         var g = new T.BufferGeometry();
         g.setAttribute("position", new T.BufferAttribute(new Float32Array(O.aretesBoite(b).map(function(v, k){ return v - origine[k % 3]; })), 3));
         cadre = new T.LineSegments(g, matC);
@@ -376,6 +404,9 @@
         soleil.target.updateMatrixWorld();
         sections(c);
         if (cadre) cadre.visible = !c.sansCadre;
+        var fil = !!c.filaire;
+        matF.colorWrite = !fil;
+        if (objets.length){ objets[2].visible = objets[3].visible = fil; }
         R.render(scene, cam);
       }
       return {
@@ -386,7 +417,7 @@
         liberer: function(){
           vider();
           quads.forEach(function(q){ q.geometry.dispose(); });
-          matP.concat(matR, [matF, matL, matC]).forEach(function(mat){ mat.dispose(); });
+          matP.concat(matR, [matF, matL, matC, matV, matLC]).forEach(function(mat){ mat.dispose(); });
           try { R.dispose(); R.forceContextLoss(); } catch (e){}
         }
       };

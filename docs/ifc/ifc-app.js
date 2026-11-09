@@ -1364,6 +1364,16 @@
   $("#b-lissage").addEventListener("click", function(){
     var on = !vue.lissage(); vue.lissage(on); this.setAttribute("aria-pressed", String(on)); garder("ifc.lissage", on ? "1" : "0");
   });
+  // Solide / Filaire : choix gardé dans ce navigateur
+  function rendu(fil){
+    vue.filaire(fil);
+    $("#b-solide").setAttribute("aria-pressed", String(!fil));
+    $("#b-filaire").setAttribute("aria-pressed", String(fil));
+    garder("ifc.rendu", fil ? "filaire" : "solide");
+  }
+  rendu(lire("ifc.rendu", ["solide", "filaire"]) === "filaire");
+  $("#b-solide").addEventListener("click", function(){ rendu(false); });
+  $("#b-filaire").addEventListener("click", function(){ rendu(true); });
 
   // ================= Export DXF : axes et contours, vue de dessus =================
   // Murs (axe), poteaux (axe ; croix au point d'un poteau vertical), ossatures (axe des poutres et membrures),
