@@ -509,9 +509,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       var retard = t.statut !== "termine" && t.echeance < auj;
       var reste = C.diff(auj, t.echeance);
 
-      // Une étiquette par métier, qui sert aussi de bascule : un clic termine
-      // cette part-là sans fermer l'autre (l'ingénieur qui boucle son calcul
-      // laisse le dessin au planning).
+      // Une étiquette par métier. 09.11.2026 (demande de Tony) : un clic gauche
+      // ne termine plus la part, il ouvre la fiche comme le reste de la ligne ;
+      // terminer ou rouvrir la part passe par le clic droit sur l'étiquette.
       var gens = el("div", { class: "gens-parts", style: "display:flex;flex-wrap:wrap;gap:6px;--tt:" + teinte });
       var etiquettes = {};
       [
@@ -524,12 +524,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         gens.appendChild(etiquettes[p.role] = el("button", {
           type: "button",
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
-          "aria-pressed": p.fini ? "true" : "false",
-          "data-membre": p.membre || "a-affecter",
+          "data-membre": p.membre || "a-affecter", "data-role": p.role,
           "data-anim": "p|" + t.id + "|" + p.role, "data-anim-etat": p.fini ? "fini" : "",
           // Pas de bulle du navigateur : celle de la ligne (UI.bulleTache) suffit
-          "aria-label": (p.fini ? "Rouvrir le " : "Terminer le ") + label.toLowerCase() + " de « " + t.titre + " »",
-          onclick: function () { terminePart(t.id, p.role, !p.fini); }
+          "aria-label": label + (p.fini ? " terminé" : "") + " : " + nom + " · fiche de « " + t.titre + " »",
+          onclick: function () { fiche(t.id); }
         }, [
           el("i", { class: "coche", "aria-hidden": "true" }),
           UI.surligne(nom, mots),
@@ -621,8 +620,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
               cle = moi && moi.id === pm.id ? "miennes" : "m:" + pm.id;
               filtres.membre = pm.id; filtres.affaire = ""; dessine(); } }
           : null;
+        var role = pastille && pastille.getAttribute("data-role"), part = role && D.PARTS[role];
+        var partFinie = part && !!t[part.fini];
+        var bascPart = part && ecrit ? { label: (partFinie ? "Rouvrir le " : "Terminer le ") + part.label.toLowerCase(),
+          action: function () { terminePart(t.id, role, !partFinie); } } : null;
         UI.menuContexte(ev, { titre: t.titre, items: [
-          voirListe, voirListe ? { sep: true } : null,
+          voirListe, bascPart, voirListe || bascPart ? { sep: true } : null,
           { label: "Ouvrir la fiche", action: function () { fiche(t.id); } },
           { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { formulaire(t.id); } },
           ecrit ? { label: fini ? "Rouvrir la tâche" : "Marquer la tâche terminée", action: function () {
@@ -644,7 +647,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
          l'étiquette du calcul à celle du dessin (UI.fil), qui s'entourent. */
       // Et, après un court arrêt, la même bulle qu'au tableau de bord (UI.bulleTache)
       var relie = etiquettes.ingenieur && etiquettes.dessinateur;
-      var aide = "Clic : fiche de la tâche · étiquette : terminer la part";
+      var aide = "Clic : fiche de la tâche · clic droit sur une étiquette : terminer la part";
       var fil = function () { if (relie) montreLien(gens, etiquettes.ingenieur, etiquettes.dessinateur, teinte); };
       rangee.addEventListener("pointerenter", function (ev) {
         if (ev.pointerType === "touch") return;
@@ -729,7 +732,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   // Bouton à bascule : l'icône est pâle tant que le travail est ouvert, dorée une
   // fois fini. Il ferme ce qui me revient — ma part seule si je n'en porte qu'une ;
-  // les étiquettes d'affectation, elles, ferment n'importe quelle part.
+  // le clic droit sur une étiquette d'affectation ferme n'importe quelle part.
   function coche(t) {
     var miennes = mesParts(t);
     var fini = miennes.length
