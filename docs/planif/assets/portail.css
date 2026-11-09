@@ -430,6 +430,8 @@ footer.pied-outil .lien-site:hover { opacity: 1; }
   display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 6px 18px;
   margin: 20px calc(var(--marge) * -.4) 0; padding: 18px 22px;
 }
+/* Pied collé sous la boîte à idées (09.11.2026) */
+.ab-idees + footer.pied-outil { margin-top: 0; padding-top: 14px; }
 .ab-idees-icone { width: 52px; height: 52px; }
 .ab-idees h3 { margin: 0; font-size: 21px; font-weight: 600; }
 .ab-idees-texte p { margin: 4px 0 0; color: var(--faible); font-size: 15px; }
