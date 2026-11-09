@@ -942,6 +942,14 @@
       if (p === null) { nav.appendChild(el("span", { class: "nav-trait", "aria-hidden": "true" })); return; }
       // Version 2 : l'accueil est la maison, en tête de la barre des pages
       if (VERSION_AB && p.cle === "accueil") {
+        /* La flèche de retour à gauche de la maison (09.11.2026, demande de Tony) :
+           la page précédente de l'outil, sinon l'accueil. */
+        nav.appendChild(el("a", { class: "nav-maison nav-retour", href: chemin(p.href), title: "Page précédente", "aria-label": "Page précédente",
+          onclick: function (e) {
+            var vientDuSite = false;
+            try { vientDuSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (x) {}
+            if (vientDuSite && history.length > 1) { e.preventDefault(); history.back(); }
+          } }, [dessinAB("0 0 24 24", '<path class="ab-retour" d="M20 12H5M11 5l-7 7 7 7"/>')]));
         nav.appendChild(el("a", { class: "nav-maison", href: chemin(p.href), title: p.nom, "aria-label": p.nom,
           "aria-current": p.cle === actif ? "page" : null }, [dessinAB("0 0 24 24", MAISON)]));
         return;

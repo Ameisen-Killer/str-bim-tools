@@ -83,6 +83,8 @@
   :root[data-version="v2"] .barre-centre .btn-palette kbd{margin-left:auto}
 }
 :root[data-version="v2"] .ab-maison{fill:var(--m-maison)}
+:root[data-version="v2"] .ab-retour{fill:none;stroke:var(--m-maison);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+:root[data-version="v2"] .nav-outil a.nav-retour{padding:6px 4px 6px 8px;margin-right:-4px}
 /* La maison, première entrée de la barre des pages */
 :root[data-version="v2"] .nav-outil a.nav-maison{display:inline-flex;align-items:center;padding:6px 12px}
 :root[data-version="v2"] .nav-maison svg{width:22px;height:22px;display:block}
