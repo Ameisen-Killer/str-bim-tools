@@ -223,8 +223,8 @@
   /** Les fiches classées pour une question : [{ fiche, note }], la meilleure d'abord. */
   function cherche(question, page) {
     var q = mots(question);
-    if (!q.length) return [];
     var plate = aplat(question);
+    if (!q.length && !plate) return [];
     var res = INDEX.map(function (x) {
       var total = 0, trouves = 0;
       q.forEach(function (m) {
@@ -236,9 +236,15 @@
         });
         if (meilleur) { total += meilleur; trouves++; }
       });
-      if (!total) return { fiche: x.fiche, note: 0 };
-      var note = total * (0.45 + 0.55 * trouves / q.length);
-      if (plate.length >= 6 && x.phrases.some(function (p) { return p === plate || (p.length >= 8 && plate.indexOf(p) >= 0); })) note += 3;
+      /* Une question faite de petits mots seulement (« qui es-tu ? ») n'a plus
+         rien à chercher une fois ceux-ci tombés : elle se reconnaît alors à sa
+         phrase entière, comparée aux questions et variantes des fiches. */
+      var phrase = plate.length >= 6 && x.phrases.some(function (p) {
+        return p === plate || (p.length >= 8 && (" " + plate + " ").indexOf(" " + p + " ") >= 0);
+      });
+      if (!total && !phrase) return { fiche: x.fiche, note: 0 };
+      var note = q.length ? total * (0.45 + 0.55 * trouves / q.length) : 0;
+      if (phrase) note += 3;
       if (sur(x.fiche, page)) note *= 1.3;
       if (horsDePortee(x.fiche)) note *= 0.8;          // ce que la personne peut faire passe devant
       return { fiche: x.fiche, note: note };

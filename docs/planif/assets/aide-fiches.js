@@ -151,8 +151,8 @@
 
     { id: "aide-utiliser", pages: [],
       question: "Qui est Charlie, et comment lui poser une question ?",
-      aussi: ["comment te poser une question", "qui es-tu", "tu es qui", "tu es une IA", "comment tu marches", "qui est Charlie", "c'est quoi Charlie"],
-      mots: "aide assistant question repondre fiche charlie",
+      aussi: ["comment te poser une question", "qui es-tu", "tu es qui", "tu es une IA", "comment tu marches", "qui est Charlie", "c'est quoi Charlie", "qui es tu", "t'es qui", "c'est qui", "qui êtes-vous", "tu t'appelles comment", "comment tu t'appelles", "quel est ton nom", "présente-toi", "que sais-tu faire", "tu sers à quoi", "tu fais quoi"],
+      mots: "aide assistant question repondre fiche charlie appelle nom presente robot chatbot",
       reponse: "Je suis **Charlie**, l'aide de la planification. Écris ta question avec tes mots : je la compare à mes fiches et je réponds avec la plus proche. Je ne suis pas une IA : je ne connais que ce qui est écrit dans mes fiches, mais elles suivent chaque modification du site.\n- Mes réponses s'adaptent à la page où tu es, et **Me montrer** éclaire le bouton dont je parle.\n- **F1** m'ouvre ou me ferme, **Échap** me ferme.\n- Si je ne sais pas répondre, tu peux envoyer ta question à la boîte à idées pour qu'on complète mes fiches." },
 
     { id: "nav-barre", pages: ["accueil", "communication", "taches", "tableau"],
