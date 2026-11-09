@@ -241,7 +241,7 @@
 :root[data-version="v2"] .toast-action{color:var(--ab-vert-logo)}
 
 /* --------------------------------------------------------- pied */
-:root[data-version="v2"] footer.pied-outil{font-size:13px;border-top:0;color:var(--texte-faible)}
+:root[data-version="v2"] footer.pied-outil{font-size:13px;border-top:0;margin-top:0;padding-top:14px;color:var(--texte-faible)}
 :root[data-version="v2"] footer.pied-outil .lien-site{font-size:12px;opacity:.75}
 :root[data-version="v2"] footer.pied-outil .lien-site:hover{opacity:1}
 
