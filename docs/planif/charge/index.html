@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <link rel="stylesheet" href="/planif/assets/marque.css?v=3">
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
+<link rel="stylesheet" href="/planif/assets/aide.css?v=1">
 <script src="/planif/assets/echelle.js?v=1"></script>
 <link rel="stylesheet" href="/planif/assets/ciel.css?v=1">
 <script src="/planif/assets/ciel.js?v=2"></script>
@@ -620,5 +621,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function exportePdf() { UI.imprime("Tableau de charge " + C.fmtCH(C.isoAuj())); }
 })();
 </script>
+<!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
+<script src="/planif/assets/aide-fiches.js?v=1"></script>
+<script src="/planif/assets/aide.js?v=1"></script>
 </body>
 </html>
