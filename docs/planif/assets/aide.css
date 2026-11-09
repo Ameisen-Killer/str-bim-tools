@@ -22,8 +22,8 @@
 
 .aide-panneau{
   position:fixed;z-index:58;right:20px;bottom:calc(max(20px,env(safe-area-inset-bottom)) + 60px);
-  width:min(410px,calc(100vw - 32px));
-  height:min(600px,calc(calc(100vh * var(--vhk,1)) - 150px));
+  width:min(460px,calc(100vw - 32px));
+  height:min(760px,calc(calc(100vh * var(--vhk,1)) - 110px));
   display:flex;flex-direction:column;overflow:hidden;
   background:#fff;color:#22262A;border-radius:12px;
   box-shadow:0 22px 60px rgba(30,34,38,.24),0 2px 8px rgba(30,34,38,.08);
@@ -48,7 +48,10 @@
 .aide-fermer{font-size:24px;line-height:1;width:32px;height:32px}
 .aide-vider:hover,.aide-fermer:hover{background:rgba(30,34,38,.06);color:#22262A}
 
-.aide-fil{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
+/* Pas d'ascenseur visible (consigne de Tony) : le fil défile à la molette ou au doigt */
+.aide-fil{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain;
+  position:relative;scrollbar-width:none}
+.aide-fil::-webkit-scrollbar{display:none}
 .aide-msg{max-width:92%;border-radius:12px;padding:9px 12px;word-wrap:break-word}
 .aide-msg p{margin:0}
 .aide-msg p + p,.aide-msg p + ul,.aide-msg ul + p{margin-top:6px}

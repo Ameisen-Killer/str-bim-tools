@@ -426,12 +426,13 @@
 
   function accueil() {
     var p = prenom();
-    var l = frequentes(ICI, 6);
+    var l = frequentes(ICI, 4);
     return bulleAide([
-      /* Charlie se présente à chaque ouverture (09.11.2026, demande de Tony) */
-      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Je suis ", el("b", { text: "Charlie" }), ", l'aide de la planification."]),
-      el("p", { text: "Je connais chaque page de l'outil et je réponds selon la page où tu es et selon tes droits. Je ne suis pas une IA : je cherche dans mes fiches, tenues à jour à chaque évolution du site." }),
-      el("p", { text: "Écris ta question avec tes mots, par exemple « comment décaler une tâche ? ». Si je ne sais pas, je te proposerai de l'envoyer à la boîte à idées." }),
+      /* Charlie se présente à chaque ouverture (09.11.2026, demande de Tony) ;
+         texte court : tout doit se lire sans faire défiler */
+      el("p", {}, [(p ? "Bonjour " + p + " ! " : "Bonjour ! ") + "Je suis ", el("b", { text: "Charlie" }),
+        ", l'aide de la planification. Je réponds selon la page où tu es et selon tes droits (je ne suis pas une IA : je cherche dans mes fiches)."]),
+      el("p", { text: "Écris ta question avec tes mots, par exemple « comment décaler une tâche ? »." }),
       l.length ? el("p", { class: "aide-intro" }, ["Ici, sur ", el("b", { text: PAGES[ICI].nom }), ", on me demande souvent :"]) : null,
       l.length ? el("div", { class: "aide-puces" }, l.map(function (f) { return puce(f, ICI); })) : null
     ], "aide-accueil");
@@ -440,8 +441,11 @@
   function dessineFil() {
     while (zoneFil.firstChild) zoneFil.removeChild(zoneFil.firstChild);
     zoneFil.appendChild(accueil());
-    litFil().forEach(function (x) { zoneFil.appendChild(rendEntree(x)); });
-    zoneFil.scrollTop = zoneFil.scrollHeight;
+    var dernier = null;
+    litFil().forEach(function (x) { var n = rendEntree(x); zoneFil.appendChild(n); if (x.moi !== undefined) dernier = n; });
+    /* Le début de la dernière réponse sous les yeux (09.11.2026 : défiler
+       jusqu'en bas cachait le début du message) ; fil vide : la présentation. */
+    zoneFil.scrollTop = dernier ? Math.max(0, dernier.offsetTop - 8) : 0;
   }
 
   function rendEntree(x) {
