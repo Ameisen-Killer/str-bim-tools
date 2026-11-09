@@ -131,6 +131,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     if (cle === "miennes" && !D.monMembre()) cle = "tous";
     // ?q= (lien d'une autre page) : la recherche porte sur toutes les affaires
     if (new URL(location.href).searchParams.get("q")) cle = "tous";
+    /* ?membre=<id> (clic droit d'Équipe, 09.11.2026) : les affaires d'une personne,
+       comme « Mes affaires » ; ce choix n'est pas retenu sur l'appareil. */
+    var demande = D.membre(new URL(location.href).searchParams.get("membre") || "");
+    if (demande) cle = "m:" + demande.id;
     D.surRechargement(dessine);
     dessine();
 
@@ -168,12 +172,16 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function dansCle(a, k) {
     if (!k || k === "tous") return true;
     if (k === "miennes") { var moi = D.monMembre(); return !!moi && gensDe(a).indexOf(moi.id) >= 0; }
+    if (k.indexOf("m:") === 0) return gensDe(a).indexOf(k.slice(2)) >= 0;
     if (k.indexOf("s:") === 0) return (a.succursale || "_") === k.slice(2);
     return gensDe(a).some(function (id) { return Bandeau.dansEquipe(D.membre(id), k); });
   }
   function choisit(k) {
     cle = k;
     try { localStorage.setItem(CLE_VUE, k); } catch (e) {}
+    // Quitter la vue d'une personne : l'adresse ne la rappelle plus
+    var u = new URL(location.href);
+    if (u.searchParams.has("membre")) { u.searchParams.delete("membre"); history.replaceState(null, "", u.pathname + u.search + u.hash); }
     dessine();
   }
   /* Le bandeau (02.11.2026, demande de Tony) : mes affaires, les succursales et
@@ -214,8 +222,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     UI.vide(hote);
     suivi.debut();
     if (barre) barre.compte(affaires.length, selection({ sansTexte: true }).length);
+    var qui = cle.indexOf("m:") === 0 ? D.membre(cle.slice(2)) : null;
     document.getElementById("titre-liste").textContent =
-      affaires.length + (affaires.length > 1 ? " affaires" : " affaire");
+      affaires.length + (affaires.length > 1 ? " affaires" : " affaire") + (qui ? " de " + qui.prenom + " " + qui.nom : "");
 
     if (!affaires.length) {
       var q = barre ? barre.valeur().trim() : "";

@@ -531,6 +531,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
         UI.menuContexte(e, { titre: m.prenom + " " + m.nom, items: [
           { label: "Voir ses tâches", lien: "/planif/taches/?membre=" + encodeURIComponent(m.id) },
+          { label: "Voir ses affaires", lien: "/planif/affaires/?membre=" + encodeURIComponent(m.id) },
           { label: "Absences", action: function () { UI.absences(m.id, dessine); } },
           { label: D.peutJours(m.id) ? "Jours travaillés" : "Jours travaillés (consultation)", action: function () { UI.joursTravailles(m.id, dessine); } },
           D.aDroit("membres_modifier") ? { label: "Modifier la fiche", action: function () { ficheMembre(m.id); } } : null,
