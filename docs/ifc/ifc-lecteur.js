@@ -10,7 +10,7 @@ var module = null, rapport = null;
 function chargerRust(){
   if (!module){
     module = typeof WebAssembly !== "object" ? Promise.reject(new Error("WebAssembly absent")) :
-      fetch("/ifc/ifc-lecteur.wasm?v=1").then(function(r){
+      fetch("/ifc/ifc-lecteur.wasm?v=2").then(function(r){
         if (!r.ok) throw new Error("module introuvable (" + r.status + ")");
         return r.arrayBuffer();
       }).then(function(b){

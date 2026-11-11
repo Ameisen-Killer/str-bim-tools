@@ -11,6 +11,8 @@
 //! Code 99 : cas que ce lecteur ne traite pas lui-même (identifiant hors limites, classe non ASCII) :
 //! la page repasse alors par le lecteur JavaScript, qui fait foi.
 
+mod maillage;
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 

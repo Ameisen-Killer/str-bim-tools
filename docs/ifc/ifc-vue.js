@@ -1214,8 +1214,59 @@
   // Mode filaire : arêtes vues renforcées, arêtes cachées à 28 % de leur force, faces voilées à 7 %
   var CACHEES_FIL = .28, VOILE_FIL = .07;
   function alphaFil(a){ return Math.min(255, Math.round(a*2.2 + 30)); }
+  // Noyau Rust (ifc-lecteur.wasm, source outils/ifc-rust/src/maillage.rs) : mêmes arêtes vives et mêmes
+  // triangles que le code JavaScript ci-dessous, plusieurs fois plus vite (clés entières au lieu de chaînes).
+  // Chargé en arrière-plan ; tant qu'il manque, ou si on a choisi le lecteur JavaScript, ou s'il plante,
+  // le JavaScript fait le travail.
+  var RM = null;
+  (function(){
+    if (typeof WebAssembly !== "object" || typeof fetch !== "function") return;
+    try { if (localStorage.getItem("ifc.lecteur") === "js") return; } catch (e){}
+    fetch("/ifc/ifc-lecteur.wasm?v=2").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(function(b){ return WebAssembly.instantiate(b, { env: { progres: function(){} } }); })
+      .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; })
+      .catch(function(){});
+  })();
+  // mode : 1 arêtes vives (geo.A, geo.ferme, f.ar), 2 triangles (geo.T, geo.TF), 3 les deux
+  function mailRust(geo, mode){
+    try {
+      var faces = geo.faces, ni = 2, nf = 1, fi, k, b;
+      for (fi = 0; fi < faces.length; fi++){ b = faces[fi].b; ni += 1 + b.length; nf += 3; for (k = 0; k < b.length; k++) nf += b[k].length; }
+      RM.m_entree(ni, nf);
+      var mem = RM.memory.buffer, I = new Int32Array(mem, RM.m_ent_i(), ni), F = new Float64Array(mem, RM.m_ent_f(), nf), pi = 2, pf = 1;
+      I[0] = mode; I[1] = faces.length;
+      F[0] = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
+      for (fi = 0; fi < faces.length; fi++){
+        var f = faces[fi]; b = f.b;
+        I[pi++] = b.length;
+        for (k = 0; k < b.length; k++) I[pi++] = b[k].length/3;
+        F[pf] = f.n[0]; F[pf+1] = f.n[1]; F[pf+2] = f.n[2]; pf += 3;
+        for (k = 0; k < b.length; k++){ F.set(b[k], pf); pf += b[k].length; }
+      }
+      if (RM.m_calculer() !== 0) return false;
+      mem = RM.memory.buffer;
+      if (mode & 2){
+        geo.T = new Float64Array(mem, RM.m_sortie(0), RM.m_long(0)).slice();
+        geo.TF = new Int32Array(mem, RM.m_sortie(1), RM.m_long(1)).slice();
+      }
+      if (mode & 1){
+        var AR = new Int32Array(mem, RM.m_sortie(3), RM.m_long(3)), p = 0;
+        for (fi = 0; fi < faces.length; fi++){
+          var n = 2*AR[p++], ar = new Array(n);
+          for (k = 0; k < n; k++) ar[k] = AR[p + k];
+          p += n;
+          faces[fi].ar = ar;
+        }
+        geo.ferme = RM.m_ferme() === 1;
+        geo.A = new Float64Array(mem, RM.m_sortie(2), RM.m_long(2)).slice();
+      }
+      if (nf > 4e6) RM.m_liberer();                 // très gros élément : on rend la mémoire
+      return true;
+    } catch (err){ RM = null; return false; }     // module planté : JavaScript jusqu'au rechargement
+  }
   function aretesVives(geo){
     if (geo.A) return geo.A;
+    if (RM && geo.faces.length && mailRust(geo, geo.T ? 1 : 3)) return geo.A;
     var faces = geo.faces, q = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
     var tab = new Map();
     function cle(b, i){ return Math.round(b[i]/q) + "," + Math.round(b[i+1]/q) + "," + Math.round(b[i+2]/q); }
@@ -1378,6 +1429,7 @@
   // Triangles de tout l'élément, en coordonnées monde, et indice de face de chaque triangle
   function triangles(geo){
     if (geo.T) return geo.T;
+    if (RM && geo.faces.length && mailRust(geo, geo.A ? 2 : 3)) return geo.T;
     var pos = [], fac = [];
     geo.faces.forEach(function(f, fi){
       var ix = trianguler(f), P = [];
