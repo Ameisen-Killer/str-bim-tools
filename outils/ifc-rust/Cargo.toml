@@ -1,0 +1,17 @@
+[package]
+name = "ifc-lecteur"
+version = "1.0.0"
+edition = "2021"
+description = "Lecteur IFC (STEP) de str-bim-tools.com/ifc/, compilé en WebAssembly"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

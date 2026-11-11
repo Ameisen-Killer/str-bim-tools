@@ -200,6 +200,8 @@
   // Lecture d'un fichier : en arrière-plan dans un Web Worker (ifc-lecteur.js), la page reste vivante ;
   // progres(0–1). Sans worker possible, lecture d'un coup comme avant.
   var avecWorker = typeof Worker !== "undefined";
+  // découpe du fichier : module Rust compilé en WebAssembly (par défaut) ou lecteur JavaScript
+  var lecteurVoulu = lire("ifc.lecteur", ["rust", "js"]);
   function lireClassique(fic){
     return octetsIfc(fic).then(function(x){ return pause().then(function(){ return IFC.lire(x.buf, x.nom); }); });
   }
@@ -209,7 +211,7 @@
       var buf = x.buf;
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=3"); }
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=4"); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
@@ -219,7 +221,10 @@
           // la page reconstruit le texte et fige les entités par tranches
           IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), x.nom, function(p, etape){
             progres(etape === "texte" ? .7 + .1*p : .8 + .2*p);
-          }).then(ok, ko);
+          }).then(function(m){
+            m.lecteur = d.resultat.lecteur; m.noteLecteur = d.resultat.noteLecteur; m.msLecteur = d.resultat.msLecteur;
+            ok(m);
+          }, ko);
         };
         w.onerror = function(e){
           // worker indisponible ou tombé (script bloqué, mémoire) : les octets lui ont été transférés,
@@ -228,7 +233,7 @@
           w.terminate(); avecWorker = false;
           lireClassique(fic).then(ok, ko);
         };
-        w.postMessage({ buffer: buf }, [buf]);
+        w.postMessage({ buffer: buf, lecteur: lecteurVoulu }, [buf]);
       });
     });
   }
@@ -362,7 +367,11 @@
     modeles.forEach(function(m){ ent += m.nbOrigine; });
     var nom = modeles.length === 1 ? "« " + modeles[0].nom + " »" : pluriel(modeles.length, "fichier");
     var doublons = modeles.filter(function(m){ return m.doublons; }).length;
-    etat(nom + " lu" + (modeles.length > 1 ? "s" : "") + " : " + pluriel(ent, "entité") + ", en " + Math.max(1, Math.round(ms)) + " ms" +
+    var lect = modeles.map(function(m){ return m.lecteur; }).filter(Boolean), notes = modeles.map(function(m){ return m.noteLecteur; }).filter(Boolean);
+    var decoupe = modeles.reduce(function(t, m){ return t + (m.msLecteur || 0); }, 0);
+    var parLecteur = lect.length ? " · découpe " + (lect.every(function(x){ return x === "rust"; }) ? "Rust" : lect.every(function(x){ return x === "js"; }) ? "JavaScript" : "Rust et JavaScript") +
+      " en " + fmtN(Math.max(1, decoupe)) + " ms" + (notes.length ? " (" + notes[0] + ")" : "") : "";
+    etat(nom + " lu" + (modeles.length > 1 ? "s" : "") + " : " + pluriel(ent, "entité") + ", en " + fmtN(Math.max(1, Math.round(ms))) + " ms" + parLecteur +
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
     if (premier) window.scrollTo(0, 0);
@@ -1134,6 +1143,7 @@
     ["meme-type", "meme-materiau", "meme-nom"].forEach(function(c){ activerCmd(c, a); });
     var nEd = ciblesEdition().length;
     ["deplacer", "copier", "tourner", "deplacer-points", "copier-points", "etage", "dimensions", "attributs", "classe"].forEach(function(c){ activerCmd(c, nEd > 0); });
+    [].forEach.call(document.querySelectorAll("[data-lecteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-lecteur") === lecteurVoulu)); });
     [].forEach.call(document.querySelectorAll("[data-colorer]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-colorer") === colorer)); });
     activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
@@ -2239,6 +2249,10 @@
     attributs: seulEd(ouvrirAttrs),
     classe: seulEd(ouvrirClasse),
     mode: function(){ poserMode(!modeEd); annoncerMode(); },
+    lecteur: function(b){
+      lecteurVoulu = b.getAttribute("data-lecteur"); garder("ifc.lecteur", lecteurVoulu); maj();
+      etat("Lecture des prochains fichiers : " + (lecteurVoulu === "rust" ? "module Rust (WebAssembly)." : "lecteur JavaScript.") + " Rouvre le fichier pour comparer les temps.");
+    },
     colorer: function(b){ poserColorer(b ? b.getAttribute("data-colorer") : ""); },
     mesurer: function(){ outil("mesure"); },
     coordonnees: function(){ outil("point"); },

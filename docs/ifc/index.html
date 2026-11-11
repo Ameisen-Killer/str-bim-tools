@@ -777,6 +777,17 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
               </div>
             </div>
             <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Lecture des fichiers</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="rust" aria-checked="true"
+                  data-aide="Découpe du fichier par un module écrit en Rust et compilé en WebAssembly, hébergé sur ce site (34 Ko). Plusieurs fois plus rapide et plus sobre en mémoire que le lecteur JavaScript, même résultat."
+                  data-alerte="Nouveau : si le module manque ou échoue, le lecteur JavaScript prend le relais tout seul."><span>Rust · WebAssembly (recommandé)</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="js" aria-checked="false"
+                  data-aide="Lecteur d'origine, écrit en JavaScript. Sert de référence et de secours."
+                  data-alerte=""><span>JavaScript</span><kbd></kbd></button>
+              </div>
+            </div>
+            <div class="mb-sm">
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Géométrie</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
                 <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="maison" aria-checked="false"
@@ -1085,12 +1096,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
-<script src="/ifc/ifc-core.js?v=9"></script>
+<script src="/ifc/ifc-core.js?v=10"></script>
 <script src="/ifc/ifc-vue.js?v=37"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=40"></script>
+<script src="/ifc/ifc-app.js?v=41"></script>
 <script src="/assets/menu.js?v=31"></script>
 </body>
 </html>

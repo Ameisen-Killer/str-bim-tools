@@ -219,13 +219,31 @@
   // Première étape de la lecture, faisable dans un Web Worker (ifc-lecteur.js) : contrôle du fichier et
   // découpage des entités sous une forme compacte (tableaux typés, positions dans le texte) qui passe
   // d'un fil à l'autre sans copie. Le texte complet est rendu à part (r.txt), il ne voyage pas.
-  function analyser(octets, progres){
+  // Contrôles d'entrée communs aux deux lecteurs ; rend le texte (un caractère par octet)
+  function controler(octets){
     if (octets.length < 20) throw erreur("Le fichier est vide ou tronqué.");
     if (octets[0] === 0x50 && octets[1] === 0x4B) throw erreur("Ce fichier est compressé (.ifczip ou .zip). Décompresse-le d'abord, puis ouvre le .ifc qu'il contient.");
     var txt = versTexte(octets);
     var debut = txt.slice(0, 4000);
     if (/^\s*<\?xml/.test(debut) || /<ifcXML|iso_10303_28/i.test(debut)) throw erreur("Ce fichier est un ifcXML : seul le format texte .ifc (STEP) est pris en charge.");
     if (debut.indexOf("ISO-10303-21") < 0) throw erreur("Ce fichier n'est pas un IFC valide : la ligne d'ouverture « ISO-10303-21; » est absente.");
+    return txt;
+  }
+  function schemaDe(entetes){
+    var schema = "";
+    entetes.forEach(function(h){
+      if (/^FILE_SCHEMA\s*\(/i.test(h)){
+        var s = toutesChaines(valeur(h.slice(h.indexOf("("))));
+        if (s.length) schema = s[0].toUpperCase().trim();
+      }
+    });
+    if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
+    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    return schema;
+  }
+  function analyser(octets, progres){
+    var txt = controler(octets);
+    var debut = txt.slice(0, 4000);
 
     // tableaux qui grandissent par doublement
     var cap = 1024, nb = 0, ids = new Int32Array(cap), deb = new Int32Array(cap), fin = new Int32Array(cap), typ = new Int32Array(cap), rdeb = new Int32Array(cap + 1);
@@ -282,15 +300,7 @@
     if (etat === 3) throw erreur("Fichier tronqué : la section DATA ne se termine pas (ENDSEC manquant). Le téléchargement ou l'export a peut-être été interrompu.");
     if (!nb) throw erreur("Le fichier ne contient aucune entité.");
 
-    var schema = "";
-    entetes.forEach(function(h){
-      if (/^FILE_SCHEMA\s*\(/i.test(h)){
-        var s = toutesChaines(valeur(h.slice(h.indexOf("("))));
-        if (s.length) schema = s[0].toUpperCase().trim();
-      }
-    });
-    if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
-    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    var schema = schemaDe(entetes);
     rdeb[nb] = nr;
 
     return {
@@ -299,6 +309,74 @@
       nb: nb, ids: ids.slice(0, nb), deb: deb.slice(0, nb), fin: fin.slice(0, nb), typ: typ.slice(0, nb),
       rdeb: rdeb.slice(0, nb + 1), refs: refs.slice(0, nr), types: types, speciaux: speciaux
     };
+  }
+
+  // Même résultat qu'analyser, la découpe étant faite par le module WebAssembly compilé depuis Rust
+  // (docs/ifc/ifc-lecteur.wasm, source outils/ifc-rust). W : ses fonctions exportées. Rend null quand le
+  // module confie le fichier au lecteur JavaScript (cas rares qu'il ne traite pas lui-même).
+  // Texte d'une instruction qui contient un commentaire : txt[a..b[ sans les /* */ (hors chaînes), sans blancs autour
+  function sansCommentaires(txt, a, b){
+    var out = [], d = a, i = a, c;
+    while (i < b){
+      c = txt.charCodeAt(i);
+      if (c === 39){
+        i++;
+        while (i < b){ if (txt.charCodeAt(i) === 39){ if (txt.charCodeAt(i + 1) === 39){ i += 2; continue; } break; } i++; }
+        i++; continue;
+      }
+      if (c === 47 && txt.charCodeAt(i + 1) === 42){
+        out.push(txt.slice(d, i));
+        var f = txt.indexOf("*/", i + 2);
+        if (f < 0 || f >= b) { d = b; break; }
+        i = f + 2; d = i; continue;
+      }
+      i++;
+    }
+    out.push(txt.slice(d, b));
+    return out.join("").trim();
+  }
+  function analyserRust(octets, W){
+    var txt = controler(octets);
+    var p = W.reserver(octets.length);
+    new Uint8Array(W.memory.buffer, p, octets.length).set(octets);
+    var code = W.analyser(octets.length);
+    try {
+      if (code === 99) return null;
+      if (code){
+        var s = W.res_err(1) < W.res_err(2) ? sansCommentaires(txt, W.res_err(1), W.res_err(2)).slice(0, 60) : "";
+        throw erreur(({
+          1: "Fichier illisible : une chaîne de caractères n'est jamais refermée (apostrophe manquante).",
+          2: "Fichier illisible : un commentaire /* n'est jamais refermé.",
+          3: "Entité illisible dans la section DATA : « " + s + " ».",
+          4: "Entité #" + W.res_err(3) + " incomplète : parenthèses mal fermées.",
+          5: "Ligne inattendue dans la section DATA : « " + s + " ».",
+          6: "Ce fichier n'est pas un IFC valide : il doit commencer par « ISO-10303-21; ».",
+          7: "Ce fichier n'est pas un IFC valide : la section HEADER est absente.",
+          8: "Ce fichier n'est pas un IFC valide : la section DATA est absente."
+        })[code] || "Fichier illisible (code " + code + ").");
+      }
+      var etat = W.res_etat(), nb = W.res_nb(), nr = W.res_nr();
+      if (etat < 3) throw erreur("Ce fichier n'est pas un IFC valide : la section DATA est absente.");
+      if (etat === 3) throw erreur("Fichier tronqué : la section DATA ne se termine pas (ENDSEC manquant). Le téléchargement ou l'export a peut-être été interrompu.");
+      if (!nb) throw erreur("Le fichier ne contient aucune entité.");
+      function tab(k, n){ return new Int32Array(W.memory.buffer, W.res_tableau(k), n).slice(); }
+      var ids = tab(0, nb), deb = tab(1, nb), fin = tab(2, nb), typ = tab(3, nb), rdeb = tab(4, nb + 1), refs = tab(5, nr);
+      var ne = W.res_nb_entetes(), et = tab(6, ne*3);
+      var types = versTexte(new Uint8Array(W.memory.buffer, W.res_types(), W.res_types_long())).split("\n");
+      types.pop();
+      // une position négative signale une instruction avec commentaire : texte refait ici, comme analyser
+      function texte(d, f, avecComm){ return avecComm ? sansCommentaires(txt, -d - 2, f) : txt.slice(d, f); }
+      var speciaux = {}, entetes = [];
+      for (var k = 0; k < nb; k++) if (deb[k] < 0){ speciaux[k] = sansCommentaires(txt, -deb[k] - 2, fin[k]); deb[k] = fin[k] = -1; }
+      for (var j = 0; j < ne; j++) entetes.push(texte(et[3*j], et[3*j + 1], et[3*j + 2]));
+      var dataDecl = texte(W.res_data(0), W.res_data(1), W.res_data(2)) || "DATA";
+      var schema = schemaDe(entetes), debut = txt.slice(0, 4000);
+      return {
+        txt: txt, taille: octets.length, schema: schema, eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
+        entetes: entetes, dataDecl: dataDecl, maxId: W.res_max_id(), doublons: W.res_doublons(),
+        nb: nb, ids: ids, deb: deb, fin: fin, typ: typ, rdeb: rdeb, refs: refs, types: types, speciaux: speciaux
+      };
+    } finally { W.liberer(); }
   }
 
   // Deuxième étape : les entités figées, par tranches [k0, k1[ (pour rendre la main entre deux tranches)
@@ -1059,7 +1137,7 @@
 
   global.IFC = {
     planPurge: planPurge, statsPsets: statsPsets, planFusion: planFusion,
-    lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
+    lire: lire, analyser: analyser, analyserRust: analyserRust, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
     fusionner: fusionner,
