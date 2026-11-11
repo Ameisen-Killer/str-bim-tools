@@ -1851,6 +1851,23 @@
    * posée sur un jour chômé glisse au prochain jour ouvré, dans le sens du
    * déplacement. `apres` : à rappeler pour redessiner la page.
    */
+  /** Supprimer une tâche, après confirmation (11.11.2026 : commun à Tâches et
+   *  au tableau de bord). Ses dépendances partent avec elle : la question le dit.
+   *  Le droit est celui de toujours : ses tâches, ou « Créer des tâches pour
+   *  les autres » (console) ; la base applique la même règle. */
+  function supprimeTache(t, apres) {
+    if (!t) return;
+    var n = D.dependances(t.id).length;
+    var detail = t.titre + (n ? " — avec " + (n > 1 ? "ses " + n + " dépendances" : "sa dépendance") : "");
+    return confirme("Supprimer la tâche ?", detail, "Supprimer", true).then(function (ok) {
+      if (!ok) return;
+      return D.suppTache(t.id).then(function () {
+        if (apres) apres();
+        toast(n ? "Tâche supprimée, avec " + (n > 1 ? "ses dépendances." : "sa dépendance.") : "Tâche supprimée.");
+      }).catch(function (e) { if (apres) apres(); toast(e.message); });
+    });
+  }
+
   /** « Dépendance décalée de +2 j, tâche principale repoussée de +1 j pour la suivre » (D.decalePart). */
   function texteDecalageDep(r) {
     var j = function (n) { return (n > 0 ? "+" : "") + n + " j"; };
@@ -3643,7 +3660,7 @@
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
-    formulaireTache: formulaireTache, ficheTache: ficheTache, texteDecalageDep: texteDecalageDep, imprime: imprime,
+    formulaireTache: formulaireTache, ficheTache: ficheTache, texteDecalageDep: texteDecalageDep, supprimeTache: supprimeTache, imprime: imprime,
     menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte, itemsPersonne: itemsPersonne,
     demandesConge: demandesConge, decideConge: decideConge,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,

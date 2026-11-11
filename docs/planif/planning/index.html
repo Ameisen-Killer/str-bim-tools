@@ -126,7 +126,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/donnees.js?v=87"></script>
 <script src="/planif/assets/calculs.js?v=17"></script>
 <script src="/planif/assets/version.js?v=23"></script>
-<script src="/planif/assets/ui.js?v=126"></script>
+<script src="/planif/assets/ui.js?v=127"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -1003,7 +1003,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         a ? { label: "Nouvelle tâche sur cette affaire", action: function () { UI.formulaireTache(null, { affaireId: a.id, surEnregistrement: rend }); } } : null,
         a ? { label: "Tâches de cette affaire", lien: "/planif/taches/?affaire=" + encodeURIComponent(a.id) + "&membre=" } : null,
         a && (!D.pagePermise || D.pagePermise("affaires")) ? { label: "Voir l'affaire",
-          lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null
+          lien: "/planif/affaires/?q=" + encodeURIComponent(a.code || a.nom) + "&affaire=" + encodeURIComponent(a.id) } : null,
+        // 11.11.2026 (demande de Tony) : mêmes règles que sur Tâches — ses tâches, ou le droit de la console
+        ecrit ? { sep: true } : null,
+        ecrit ? { label: "Supprimer la tâche", rouge: true, action: function () { UI.supprimeTache(t, rend); } } : null
       ] });
     });
     n.addEventListener("pointerdown", function () { cacheLien(); UI.cacheBulle(); });
@@ -1401,7 +1404,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=5"></script>
+<script src="/planif/assets/aide-fiches.js?v=6"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

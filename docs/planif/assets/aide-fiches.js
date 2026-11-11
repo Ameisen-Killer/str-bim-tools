@@ -211,7 +211,7 @@
       reponse: "Un **clic droit** sur une ligne, une barre ou une personne ouvre un petit menu avec ses actions : ouvrir, modifier, supprimer… Partout où l'on clique sur **une personne**, le menu est le même : **Ses tâches**, **Ses affaires**, **Ses absences**, **Ses jours travaillés**, puis ses téléphones. Il existe sur toutes les pages de l'outil, sauf l'accueil et Mon profil.",
       ici: {
         taches: "Sur une tâche : ouvrir la fiche, modifier, terminer ta part (ou la tâche), nouvelle tâche sur cette affaire, toutes les tâches de l'affaire, voir l'affaire, supprimer. Sur une pastille de personne : le menu de la personne (**Ses tâches** filtre la page sur elle), puis **Terminer la tâche** (sur une ancienne tâche à deux parts : **Terminer le calcul / le dessin**).",
-        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, ajouter une dépendance (ou, sur une dépendance, ouvrir la tâche principale), terminer ou rouvrir la tâche, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire. Sur un nom ou un jour vide : son planning seul, **Nouvelle tâche pour …**, puis le menu de la personne. **Double-clic sur un jour vide** : nouvelle tâche pour cette personne, ce jour en échéance.",
+        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, ajouter une dépendance (ou, sur une dépendance, ouvrir la tâche principale), terminer ou rouvrir la tâche, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire, supprimer la tâche. Sur un nom ou un jour vide : son planning seul, **Nouvelle tâche pour …**, puis le menu de la personne. **Double-clic sur un jour vide** : nouvelle tâche pour cette personne, ce jour en échéance.",
         affaires: "Sur une affaire : la modifier (ou la consulter), nouvelle tâche sur cette affaire, tâches de l'affaire, avancement (et facturation si tu y as droit), Google Maps, supprimer. Sur un membre de l'équipe d'une affaire : le désigner responsable (si tu peux modifier l'affaire), puis le menu de la personne.",
         equipe: "Sur une personne : ses tâches, ses affaires, ses absences, ses jours travaillés, « Modifier la fiche » si tu en as le droit, et ses téléphones.",
         annuaire: "Sur une fiche : lui écrire (si elle a une adresse), la modifier, la supprimer.",
@@ -454,11 +454,13 @@
       ici: { tableau: "Un **clic sur une barre** ouvre sa fiche rapide (statut, avancement, affectation, note, décalage) ; **Modifier en détail** ouvre le formulaire complet. Tu peux aussi **glisser** la barre pour la décaler ou la réaffecter." },
       voir: ["tache-droits", "tache-decaler"] },
 
-    { id: "tache-supprimer", pages: ["taches"],
+    { id: "tache-supprimer", pages: ["taches", "tableau"],
+      selonDroit: { taches_autrui: ["Ton groupe peut supprimer les tâches de tout le monde.", "Sans le droit « Créer des tâches pour les autres », tu ne supprimes que **tes** tâches (et leurs dépendances)."] },
       question: "Comment supprimer une tâche ?",
-      aussi: ["effacer une tâche", "retirer une tâche"],
-      mots: "supprimer tache effacer corbeille",
-      reponse: "Clic droit sur la tâche › **Supprimer la tâche** (ou la corbeille de la ligne), puis confirme. Une tâche supprimée ne revient pas : pour la garder dans l'historique, marque-la plutôt **terminée**.",
+      aussi: ["effacer une tâche", "retirer une tâche", "supprimer une barre"],
+      mots: "supprimer tache effacer corbeille barre",
+      reponse: "Clic droit sur la tâche › **Supprimer la tâche** (ou la corbeille de la ligne), puis confirme. Ses **dépendances** partent avec elle (la question le dit). « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite ; pour la garder dans l'historique, marque-la plutôt **terminée**.",
+      ici: { tableau: "Clic droit sur la barre › **Supprimer la tâche**, puis confirme. Ses **dépendances** partent avec elle. « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite." },
       voir: ["tache-terminer"] },
 
     { id: "tache-decaler", pages: ["tableau", "taches"], frequente: true,
