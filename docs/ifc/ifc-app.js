@@ -1357,6 +1357,35 @@
     replier(c, lire("ifc.replie." + c, ["0", "1"]) === "1");
     $("#rep-" + c).addEventListener("click", function(){ replier(c, !$(".panneaux").classList.contains("sans-" + c)); });
   });
+  // poignées : largeur des panneaux Éléments (g) et Propriétés (d), gardée dans ce navigateur
+  ["g", "d"].forEach(function(c){
+    var poi = $("#poi-" + c), pan = $(c === "g" ? "#p-liste" : "#p-props"), autre = $(c === "g" ? "#p-props" : "#p-liste"), pp = $(".panneaux");
+    var nomVar = c === "g" ? "--lg" : "--ld", cleL = "ifc.largeur." + c, x0 = 0, l0 = 0, id = null;
+    function borner(l){
+      var reste = pp.getBoundingClientRect().width - (autre.offsetParent ? autre.getBoundingClientRect().width : 0) - 320;
+      return Math.round(Math.max(200, Math.min(l, Math.max(200, reste))));
+    }
+    function poser(l){ if (l) pp.style.setProperty(nomVar, l + "px"); else pp.style.removeProperty(nomVar); }
+    try { var v = +localStorage.getItem(cleL); if (v >= 200 && v <= 2000) poser(v); } catch (e){}
+    poi.addEventListener("pointerdown", function(e){
+      if (e.button !== 0) return;
+      e.preventDefault();
+      id = e.pointerId; x0 = e.clientX; l0 = pan.getBoundingClientRect().width;
+      poi.setPointerCapture(id); poi.classList.add("tire"); document.body.classList.add("redim");
+    });
+    poi.addEventListener("pointermove", function(e){
+      if (e.pointerId !== id) return;
+      poser(borner(l0 + (c === "g" ? 1 : -1) * (e.clientX - x0)));
+    });
+    function fin(e){
+      if (e.pointerId !== id) return;
+      id = null; poi.classList.remove("tire"); document.body.classList.remove("redim");
+      garder(cleL, String(Math.round(pan.getBoundingClientRect().width)));
+    }
+    poi.addEventListener("pointerup", fin);
+    poi.addEventListener("pointercancel", fin);
+    poi.addEventListener("dblclick", function(){ poser(0); try { localStorage.removeItem(cleL); } catch (e){} etat("Largeur de départ rétablie."); });
+  });
   // « Boîte de coupe » : enfoncé tant qu'une boîte est posée, un clic l'enlève ; sinon boîte autour de la
   // sélection, ou de tout ce qui est affiché
   $("#b-boite").addEventListener("click", function(){

@@ -209,7 +209,7 @@ body.edition{overflow:hidden}
 .etat:empty::before{content:""}
 
 .onglets{display:none}
-.panneaux{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr) minmax(260px,340px)}
+.panneaux{flex:1;min-height:0;display:grid;grid-template-columns:var(--lg,minmax(260px,320px)) minmax(0,1fr) var(--ld,minmax(260px,340px))}
 .panneau{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--noir)}
 .p-liste{border-right:1px solid var(--ligne)}
 .p-props{border-left:1px solid var(--ligne)}
@@ -376,9 +376,20 @@ footer a:hover{color:var(--or)}
 .replier:hover{background:var(--couche-2,var(--noir-3));color:var(--texte);width:20px}
 .replier.g{left:0;border-left:0;border-radius:0 6px 6px 0}
 .replier.d{right:0;border-right:0;border-radius:6px 0 0 6px}
-.panneaux.sans-g{grid-template-columns:minmax(0,1fr) minmax(260px,340px)}.panneaux.sans-g .p-liste{display:none}
-.panneaux.sans-d{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}.panneaux.sans-d .p-props{display:none}
+.panneaux.sans-g{grid-template-columns:minmax(0,1fr) var(--ld,minmax(260px,340px))}.panneaux.sans-g .p-liste{display:none}
+.panneaux.sans-d{grid-template-columns:var(--lg,minmax(260px,320px)) minmax(0,1fr)}.panneaux.sans-d .p-props{display:none}
 .panneaux.sans-g.sans-d{grid-template-columns:minmax(0,1fr)}
+/* poignées : élargir ou rétrécir les panneaux Éléments et Propriétés en tirant leur bord (double-clic : largeur de départ) */
+.poignee{display:none}
+@media (min-width:900px){
+  .p-liste,.p-props{position:relative}
+  .poignee{display:block;position:absolute;top:0;bottom:0;width:8px;z-index:6;cursor:col-resize;touch-action:none}
+  .poignee.g{right:0}
+  .poignee.d{left:0}
+  .poignee::after{content:"";position:absolute;top:8px;bottom:8px;left:3px;width:2px;border-radius:2px;background:transparent;transition:background .15s}
+  .poignee:hover::after,.poignee.tire::after{background:var(--or)}
+  body.redim,body.redim *{cursor:col-resize!important;user-select:none!important}
+}
 @media (max-width:899px){.replier{display:none}.panneaux.sans-g .p-liste,.panneaux.sans-d .p-props{display:flex}}
 
 /* ================= Éditeur : habillage inspiré de Windows 11 (Fluent), comme /fgh/ =================
@@ -763,6 +774,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           </div>
         </div>
         <div class="liste" id="liste" role="list"></div>
+        <div class="poignee g" id="poi-g" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Éléments" title="Tirer pour élargir · double-clic : largeur de départ"></div>
       </aside>
 
       <div class="panneau p-vue montre" id="p-vue">
@@ -787,6 +799,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
       <aside class="panneau p-props" id="p-props" aria-label="Propriétés de l'élément actif">
         <div class="p-titre">Propriétés</div>
         <div class="props" id="props"><p class="props-vide">Clique un élément dans la liste ou dans la vue 3D.</p></div>
+        <div class="poignee d" id="poi-d" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Propriétés" title="Tirer pour élargir · double-clic : largeur de départ"></div>
       </aside>
     </div>
   </div>
@@ -910,7 +923,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-vue.js?v=36"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
-<script src="/ifc/ifc-app.js?v=38"></script>
+<script src="/ifc/ifc-app.js?v=39"></script>
 <script src="/assets/menu.js?v=30"></script>
 </body>
 </html>
