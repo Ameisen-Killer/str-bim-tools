@@ -344,6 +344,10 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .purge-jeux label.coche span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .purge-jeux label.coche i{font-style:normal;color:var(--texte-faible)}
 .prefs label.coche b{font-family:var(--mono);font-weight:400;font-size:12.5px;color:var(--texte-faible)}
+.sim label.coche b{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.sim label.coche.vide{opacity:.45;cursor:default}
+.sim #sim-prop{margin-top:6px}
+.sim select.champ{text-overflow:ellipsis}
 .aide-table{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:6px;font-size:14px}
 .aide-table kbd{font-family:var(--mono);font-size:11.5px;color:var(--or);white-space:nowrap}
 .aide-table span{color:var(--texte-doux)}
@@ -633,6 +637,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <button type="button" role="menuitem" data-cmd="meme-type"><span>Même type</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="meme-materiau"><span>Même matériau</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="meme-nom"><span>Même nom</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="similaires"><span>Similaires, avec critères…</span><kbd></kbd></button>
           </div>
         </div>
         <div class="mb-gr">
@@ -834,6 +839,26 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </form>
 </dialog>
 
+<dialog id="similaires" class="prefs sim">
+  <form method="dialog">
+    <h2>Sélectionner similaires</h2>
+    <p id="sim-ref"></p>
+    <div id="sim-criteres"></div>
+    <label class="coche" id="sim-prop-ligne"><input type="checkbox" id="sim-prop-oui"><span>Même valeur de propriété</span></label>
+    <select class="champ" id="sim-prop" aria-label="Propriété à comparer"></select>
+    <fieldset>
+      <legend>Options</legend>
+      <label class="coche"><input type="checkbox" id="sim-visibles"><span>Seulement les éléments affichés</span></label>
+      <label class="coche"><input type="checkbox" id="sim-ajouter"><span>Ajouter à la sélection actuelle</span></label>
+    </fieldset>
+    <p class="pref-note" id="sim-bilan"></p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn" value="oui" id="sim-oui">Sélectionner</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="preferences" class="prefs">
   <form method="dialog">
     <h2>Préférences</h2>
@@ -885,7 +910,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-vue.js?v=36"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
-<script src="/ifc/ifc-app.js?v=37"></script>
+<script src="/ifc/ifc-app.js?v=38"></script>
 <script src="/assets/menu.js?v=30"></script>
 </body>
 </html>

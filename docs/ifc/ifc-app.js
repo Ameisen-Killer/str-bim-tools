@@ -881,6 +881,7 @@
       h.push(bouton("developper-tout", "Développer tout"), bouton("reduire-tout", "Réduire tout"));
     }
     if (noeud && l.i.supprimable) h.push("<hr>", bouton("selectionner", l.enfants ? "Sélectionner avec son contenu" : "Sélectionner"));
+    if (noeud && l.i.supprimable && l.i.genre !== "spatial") h.push(bouton("similaires", "Sélectionner similaires…"));
     if (choix.size) h.push(noeud && l.i.supprimable ? "" : "<hr>", bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")));
     c.cles = elementsDe([l].concat(sousLignes(c.k)).filter(function(x){ return x.i && x.f.visible; }).map(function(x){ return x.cle; }));
     if (c.cles.length) h.push("<hr>", '<div class="mb-sous">Vue 3D</div>', boutonsVue(c.cles, !noeud));
@@ -916,6 +917,7 @@
       h.push('<div class="ctx-titre">' + esc(c.length > 1 ? "Sélection : " + pluriel(c.length, "élément") : nomAff(i)) + "</div>");
       if (i.supprimable) h.push(bouton("basculer", choix.has(cl) ? "Retirer de la sélection" : "Ajouter à la sélection"));
       if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")));
+      if (i.supprimable && i.genre !== "spatial") h.push(bouton("similaires", "Sélectionner similaires…"));
       if (i.supprimable || choix.size) h.push("<hr>");
       h.push(boutonsVue(c));
       var ang = vue.angleSous(x, y);
@@ -979,6 +981,7 @@
     if (c.vue || a === "masquer" || a === "isoler" || a === "zoomer" || a === "coupe"){
       fermerCtx();
       if (a === "basculer"){ cliqueVue(c.cle); return; }
+      if (a === "similaires"){ similaires(c.cle); return; }
       if (a === "aligner"){ alignerCoupe(c.angle, c.cles); return; }
       if (!actionVue(a, c.cles) && COMMANDES[a]) COMMANDES[a]();
       return;
@@ -1002,6 +1005,7 @@
       cocher(l.cle, true); majLignes(); maj();
       etat("« " + nomAff(l.i) + " »" + (l.enfants ? " et son contenu ajoutés" : " ajouté") + " à la sélection.");
     }
+    else if (a === "similaires") similaires(l.cle);
     else if (a === "teinte") teinter(f, b.getAttribute("data-h") === "" ? null : +b.getAttribute("data-h"));
     else if (a === "teinte-phase") teinterPhase(f, b.getAttribute("data-q"), b.getAttribute("data-h") === "m" ? undefined : +b.getAttribute("data-h"));
     else if (a === "voir") basculerVisible(f);
@@ -1101,6 +1105,7 @@
     $("#cmd-retablir").textContent = aRefaire.length ? "Rétablir la " + aRefaire[aRefaire.length - 1].txt : "Rétablir";
     $("#cmd-exporter").textContent = fichiers.length > 1 ? "Exporter les fichiers modifiés" : "Exporter l'IFC";
     ["meme-type", "meme-materiau", "meme-nom"].forEach(function(c){ activerCmd(c, a); });
+    activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
     activerCmd("isoler", n > 0 || a);
     activerCmd("tout-afficher", caches.size > 0);
@@ -1628,6 +1633,118 @@
     majLignes(); maj();
     etat(n ? pluriel(n, "élément ajouté", "éléments ajoutés") + " à la sélection (" + quoi + " que « " + nomAff(r) + " »)." : "Aucun autre élément avec " + quoi + ".");
   }
+  // ================= Sélectionner similaires =================
+  // Fenêtre de critères (tous ceux cochés doivent correspondre), ouverte depuis un élément de référence.
+  function etageDe(m, id){
+    var I = IFC.index(m), x = id, n = 0;
+    while (x && n++ < 64){
+      var e = m.ent.get(x);
+      if (e && e.type === "IFCBUILDINGSTOREY") return nomAff(IFC.infos(m, x));
+      x = I.parent.get(x) || I.conteneur.get(x) || I.perce.get(x);
+    }
+    return "";
+  }
+  function typeRelie(m, id){
+    var t = IFC.index(m).typeObjet.get(id), i = t && m.ent.has(t) ? IFC.infos(m, t) : null;
+    return i ? i.nom || i.typeLib : "";
+  }
+  // [code, libellé, valeur comparée, valeur affichée]
+  var CRITERES_SIM = [
+    ["type", "Type IFC", function(f, id, i){ return i.type; }, function(f, id, i){ return i.typeLib; }],
+    ["type-relie", "Type", function(f, id){ return typeRelie(f.m, id); }],
+    ["type-objet", "Famille : type", function(f, id, i){ return i.objectType; }],
+    ["nom", "Nom", function(f, id, i){ return i.nom; }],
+    ["etage", "Étage", function(f, id){ return etageDe(f.m, id); }],
+    ["materiau", "Matériau", function(f, id, i){ return i.materiau; }],
+    ["maquette", "Maquette", function(f){ return fichiers.length > 1 ? String(f.uid) : ""; }, function(f){ return f.m.nom; }]
+  ];
+  var simRef = null, simProps = [], simCoches = (function(){
+    try { var v = JSON.parse(localStorage.getItem("ifc.similaires") || "null"); if (Array.isArray(v)) return v; } catch (e){}
+    return ["type", "type-objet"];
+  })();
+  function valeurPropriete(m, id, jeu, nom){
+    var out = null;
+    IFC.proprietes(m, id).some(function(p){
+      if (p.nom !== jeu) return false;
+      return p.props.some(function(x){ if (x[0] === nom){ out = x[1]; return true; } return false; });
+    });
+    return out;
+  }
+  function similaires(c){
+    var d = $("#similaires");
+    if (!c || !existe(c) || typeof d.showModal !== "function") return;
+    var r = lireCle(c), i = IFC.infos(r.f.m, r.id);
+    simRef = { cle: c, f: r.f, id: r.id, i: i };
+    $("#sim-ref").textContent = "Comme « " + nomAff(i) + " » : tous les critères cochés doivent correspondre.";
+    $("#sim-criteres").innerHTML = CRITERES_SIM.map(function(k){
+      var v = k[2](r.f, r.id, i), aff = v ? (k[3] ? k[3](r.f, r.id, i) : v) : "—";
+      return '<label class="coche' + (v ? "" : " vide") + '" title="' + esc(k[1] + " : " + aff) + '"><input type="checkbox" data-sim="' + k[0] + '"' +
+        (v ? (simCoches.indexOf(k[0]) >= 0 ? " checked" : "") : " disabled") + "><span>" + esc(k[1]) + "</span><b>" + esc(aff) + "</b></label>";
+    }).join("");
+    // propriétés de la référence portant une valeur lisible
+    simProps = [];
+    IFC.proprietes(r.f.m, r.id).forEach(function(p){
+      p.props.forEach(function(x){ if (x[1] && x[1] !== "—" && x[1] !== "(tableau)") simProps.push({ jeu: p.nom, nom: x[0], v: x[1] }); });
+    });
+    var sel = $("#sim-prop");
+    sel.innerHTML = simProps.length ? simProps.map(function(p, k){
+      return '<option value="' + k + '">' + esc(p.jeu + " › " + p.nom + " = " + p.v) + "</option>";
+    }).join("") : "<option>Aucune propriété lisible</option>";
+    $("#sim-prop-oui").checked = false;
+    $("#sim-prop-oui").disabled = sel.disabled = !simProps.length;
+    $("#sim-prop-ligne").classList.toggle("vide", !simProps.length);
+    $("#sim-ajouter").checked = false;
+    d.returnValue = "";
+    d.showModal();
+    bilanSimilaires();
+  }
+  function cochesSim(){ return [].map.call(document.querySelectorAll("#sim-criteres input:checked"), function(x){ return x.getAttribute("data-sim"); }); }
+  function trouverSimilaires(){
+    var ref = simRef, codes = cochesSim(), tests = CRITERES_SIM.filter(function(k){ return codes.indexOf(k[0]) >= 0; }), attendu = {};
+    tests.forEach(function(k){ attendu[k[0]] = k[2](ref.f, ref.id, ref.i); });
+    var prop = $("#sim-prop-oui").checked ? simProps[+$("#sim-prop").value] : null, affiches = $("#sim-visibles").checked, out = [];
+    if (!tests.length && !prop) return out;
+    lignes.forEach(function(l){
+      if (!l.i || !l.i.supprimable || l.i.genre === "spatial") return;
+      if (affiches && (!l.f.visible || caches.has(l.cle))) return;
+      for (var k = 0; k < tests.length; k++) if (tests[k][2](l.f, l.id, l.i) !== attendu[tests[k][0]]) return;
+      if (prop && valeurPropriete(l.f.m, l.id, prop.jeu, prop.nom) !== prop.v) return;
+      out.push(l.cle);
+    });
+    return out;
+  }
+  var minuteSim = 0;
+  function bilanSimilaires(){
+    clearTimeout(minuteSim);
+    $("#sim-bilan").textContent = "Calcul…";
+    minuteSim = setTimeout(function(){
+      if (!simRef) return;
+      var n = trouverSimilaires().length;
+      $("#sim-bilan").textContent = !cochesSim().length && !$("#sim-prop-oui").checked ? "Coche au moins un critère." :
+        n ? pluriel(n, "élément correspond", "éléments correspondent") + " (référence comprise)." : "Aucun élément ne correspond.";
+      $("#sim-oui").disabled = !n;
+    }, 20);
+  }
+  $("#similaires").addEventListener("change", function(e){
+    if (e.target.id === "sim-prop") $("#sim-prop-oui").checked = true;
+    if (e.target.id !== "sim-ajouter") bilanSimilaires();
+  });
+  $("#similaires").addEventListener("close", function(){
+    var ref = simRef;
+    if ($("#similaires").returnValue !== "oui" || !ref){ simRef = null; return; }
+    simCoches = cochesSim();
+    garder("ifc.similaires", JSON.stringify(simCoches));
+    var t = trouverSimilaires(), ajout = $("#sim-ajouter").checked, avant = choix.size;
+    simRef = null;
+    if (!ajout) choix.clear();
+    t.forEach(function(x){ choix.add(x); });
+    actif = choix.has(ref.cle) ? ref.cle : actif;
+    majLignes(); afficherProps(); maj();
+    var crit = simCoches.map(function(c){ return CRITERES_SIM.filter(function(k){ return k[0] === c; })[0][1].toLowerCase(); });
+    if ($("#sim-prop-oui").checked) crit.push("propriété");
+    etat(pluriel(t.length, "élément similaire", "éléments similaires") + " à « " + nomAff(ref.i) + " » (" + crit.join(", ") + ")" +
+      (ajout ? " : " + pluriel(choix.size - avant, "ajouté", "ajoutés") + " à la sélection." : " sélectionnés."));
+  });
   function aide(titre, html){
     $("#aide-titre").textContent = titre;
     $("#aide-corps").innerHTML = html;
@@ -1662,6 +1779,7 @@
     inverser: function(){ $("#sel-inv").click(); },
     "meme-type": function(){ comme(function(i, r){ return i.type === r.type; }, "le même type"); },
     "meme-materiau": function(){ comme(function(i, r){ return !!r.materiau && i.materiau === r.materiau; }, "le même matériau"); },
+    similaires: function(){ if (actif) similaires(actif); },
     "meme-nom": function(){ comme(function(i, r){ return !!r.nom && i.nom === r.nom; }, "le même nom"); },
     recadrer: function(){ vue.recadrer(); },
     "vue-iso": function(){ vue.orienter(-Math.PI/4, Math.atan(Math.SQRT1_2)); },
@@ -1723,7 +1841,7 @@
         ["C", "Coordonnées d'un point (X Y Z ; sur une face : Z seul)"],
         ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
-        ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe"]
+        ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe, sélectionner similaires"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
