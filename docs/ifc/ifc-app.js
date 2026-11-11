@@ -2446,6 +2446,8 @@
 
   // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
+    // sur l'accueil, Ctrl+O ouvre directement le choix des fichiers
+    if (!$("#accueil").hidden && (e.ctrlKey || e.metaKey) && (e.key || "").toLowerCase() === "o"){ e.preventDefault(); choisir(); return; }
     if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || document.querySelector("dialog[open]")) return;
     var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
     var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
@@ -2501,7 +2503,7 @@
   window.addEventListener("dragenter", function(e){
     if (!deposeFichiers(e)) return;
     e.preventDefault(); profondeur++;
-    $("#depot").classList.add("survol");
+    $("#depot").classList.add("survol"); document.body.classList.add("glisse");
   });
   window.addEventListener("dragover", function(e){
     if (!deposeFichiers(e)) return;
@@ -2509,12 +2511,12 @@
   });
   window.addEventListener("dragleave", function(e){
     if (!deposeFichiers(e)) return;
-    if (--profondeur <= 0){ profondeur = 0; $("#depot").classList.remove("survol"); }
+    if (--profondeur <= 0){ profondeur = 0; $("#depot").classList.remove("survol"); document.body.classList.remove("glisse"); }
   });
   window.addEventListener("drop", function(e){
     if (!deposeFichiers(e)) return;
     e.preventDefault(); profondeur = 0;
-    $("#depot").classList.remove("survol");
+    $("#depot").classList.remove("survol"); document.body.classList.remove("glisse");
     if (e.dataTransfer.files && e.dataTransfer.files.length) charger(e.dataTransfer.files);
   });
 

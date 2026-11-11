@@ -54,6 +54,7 @@
   --vue-arete:40,34,26;
 }
 :root[data-theme="sombre"]{color-scheme:dark}
+@property --c{syntax:"<length>";inherits:false;initial-value:16px}
 *{box-sizing:border-box}
 html{overflow-x:hidden}
 body{
@@ -105,22 +106,69 @@ button,input,select{font:inherit;color:inherit}
 /* ---------- Accueil : chargement du fichier ---------- */
 /* accueil et pied de page tiennent ensemble dans la hauteur de l'écran (pas d'ascenseur) */
 body:not(.edition){display:flex;flex-direction:column;min-height:100vh;min-height:100svh}
-body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column}
-.accueil{flex:1 0 auto;width:100%;display:grid;grid-template-rows:minmax(220px,1fr) auto;padding:calc(var(--haut-barre) + 12px) var(--g) clamp(28px,6vh,64px);max-width:1360px;margin-inline:auto}
-.accueil-scene{position:relative;min-height:300px}
+body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.accueil{position:relative;flex:1 0 auto;width:100%;display:grid;grid-template-rows:minmax(280px,1fr) auto;padding:calc(var(--haut-barre) + 12px) var(--g) clamp(28px,5vh,56px);max-width:1440px;margin-inline:auto}
+/* lumière : halo doré qui respire derrière le profilé, voile sombre sur les bords */
+.accueil-fond{position:absolute;inset:-10% -30%;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 38% 46% at 68% 48%,rgba(var(--or-rvb),.16),rgba(var(--or-rvb),.05) 45%,transparent 70%),
+             radial-gradient(ellipse 60% 40% at 20% 100%,rgba(var(--or-rvb),.05),transparent 70%);
+  animation:respire 9s ease-in-out infinite alternate}
+@keyframes respire{from{opacity:.7;transform:scale(1)}to{opacity:1;transform:scale(1.06)}}
+:root[data-theme="clair"] .accueil-fond{opacity:.8}
+.accueil-scene,.accueil-texte{position:relative;z-index:1}
+.accueil-scene{min-height:300px}
 .accueil-scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
 .accueil-scene canvas:active{cursor:grabbing}
-.surtitre{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
-.accueil h1{margin:14px 0 0;font-weight:200;font-size:clamp(64px,13vw,168px);line-height:.88;letter-spacing:.04em}
-.chapeau{margin:22px 0 0;max-width:32em;font-size:clamp(16px,1.9vw,20px);color:var(--texte-doux)}
+.surtitre{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--or)}
+.surtitre::before{content:"";width:28px;height:1px;background:currentColor}
+/* titre : reflet doré qui glisse lentement sur les lettres */
+.accueil h1{margin:12px 0 0;font-weight:200;font-size:clamp(76px,11vw,176px);line-height:.86;letter-spacing:.03em}
+.accueil h1 span{display:inline-block;padding-right:.04em;color:var(--texte);
+  background:linear-gradient(105deg,var(--texte) 0%,var(--texte) 38%,var(--or) 48%,#F3D79C 50%,var(--or) 52%,var(--texte) 62%,var(--texte) 100%);
+  background-size:320% 100%;background-position:100% 0;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:reflet 8s cubic-bezier(.45,0,.2,1) 2.2s infinite}
+:root[data-theme="clair"] .accueil h1 span{background-image:linear-gradient(105deg,var(--texte) 0%,var(--texte) 38%,var(--or) 48%,#B8862E 50%,var(--or) 52%,var(--texte) 62%,var(--texte) 100%)}
+@keyframes reflet{0%{background-position:100% 0}45%,100%{background-position:0 0}}
+.accroche{margin:16px 0 0;font-size:clamp(20px,2.3vw,30px);font-weight:200;letter-spacing:.01em}
+.accroche b{font-weight:300;color:var(--or)}
+.chapeau{margin:12px 0 0;max-width:34em;font-size:clamp(15px,1.4vw,17px);color:var(--texte-doux)}
+/* zone de dépôt : coins d'accroche dorés qui s'étirent au survol */
 .depot{
-  margin-top:32px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;
-  padding:26px clamp(18px,3vw,32px);border:1px dashed rgba(var(--encre),.3);background:rgba(var(--encre),.02);
-  transition:border-color .3s,background .3s;max-width:640px;
+  position:relative;margin-top:28px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px 20px;
+  padding:22px clamp(18px,2.4vw,28px);border:1px solid rgba(var(--encre),.12);max-width:640px;
+  background:linear-gradient(135deg,rgba(var(--or-rvb),.06),rgba(var(--encre),.015) 60%);
+  transition:border-color .3s,background .3s,transform .3s var(--courbe);
 }
-.depot.survol{border-color:var(--or);background:rgba(var(--or-rvb),.07)}
-.depot-titre{font-size:clamp(17px,2vw,21px);font-weight:300}
-.depot-note{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--texte-faible)}
+.depot::before{content:"";position:absolute;inset:-1px;pointer-events:none;--c:16px;
+  background:
+    linear-gradient(var(--or),var(--or)) left top/var(--c) 1px no-repeat,linear-gradient(var(--or),var(--or)) left top/1px var(--c) no-repeat,
+    linear-gradient(var(--or),var(--or)) right top/var(--c) 1px no-repeat,linear-gradient(var(--or),var(--or)) right top/1px var(--c) no-repeat,
+    linear-gradient(var(--or),var(--or)) left bottom/var(--c) 1px no-repeat,linear-gradient(var(--or),var(--or)) left bottom/1px var(--c) no-repeat,
+    linear-gradient(var(--or),var(--or)) right bottom/var(--c) 1px no-repeat,linear-gradient(var(--or),var(--or)) right bottom/1px var(--c) no-repeat;
+  transition:--c .4s}
+.depot:hover::before,.depot.survol::before{--c:36px}
+.depot.survol{border-color:rgba(var(--or-rvb),.6);background:rgba(var(--or-rvb),.1);transform:scale(1.015)}
+.depot-ico{grid-row:span 2;width:52px;height:52px;display:grid;place-items:center;border:1px solid rgba(var(--or-rvb),.45);border-radius:50%;color:var(--or)}
+.depot-ico svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;animation:monte 2.6s ease-in-out infinite}
+@keyframes monte{0%,100%{transform:translateY(2px)}50%{transform:translateY(-2px)}}
+.depot-titre{font-size:clamp(17px,1.8vw,20px);font-weight:300}
+.depot .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.depot-note{grid-column:1/-1;margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--texte-faible)}
+.depot kbd{font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:2px 6px;border:1px solid var(--ligne);border-bottom-width:2px;border-radius:3px;color:var(--texte-doux)}
+.depot .chargement{grid-column:1/-1}
+/* atouts : quatre chiffres clés sous la zone de dépôt */
+.atouts{list-style:none;margin:26px 0 0;padding:0;max-width:640px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ligne)}
+.atouts li{padding:14px 12px 0 0;display:flex;flex-direction:column;gap:3px}
+.atouts li+li{padding-left:14px;border-left:1px solid var(--ligne)}
+.atouts b{font-weight:300;font-size:clamp(17px,1.7vw,21px);color:var(--texte);white-space:nowrap}
+.atouts b i{font-style:normal;color:var(--or)}
+.atouts span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--texte-faible);line-height:1.45}
+@media (max-width:620px){.atouts{grid-template-columns:repeat(2,minmax(0,1fr))}.atouts li:nth-child(3){padding-left:0;border-left:0}.atouts li:nth-child(n+3){margin-top:12px}}
+/* fichiers glissés au-dessus de la page : voile doré plein écran */
+.voile-depot{position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .25s;
+  background:radial-gradient(circle at 50% 50%,rgba(var(--or-rvb),.18),rgba(var(--fond-rvb),.86) 70%);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.voile-depot span{padding:26px 40px;border:1px dashed var(--or);font-size:clamp(20px,3vw,32px);font-weight:200;color:var(--texte);letter-spacing:.02em}
+body.glisse:not(.edition) .voile-depot{opacity:1}
 .btn{
   display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:8px 16px;cursor:pointer;
   background:none;border:1px solid rgba(var(--encre),.28);color:var(--texte);
@@ -131,6 +179,9 @@ body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column}
 .btn:disabled{opacity:.38;cursor:default}
 .btn.plein{background:var(--or);border-color:var(--or);color:var(--noir)}
 .btn.plein:hover:not(:disabled),.btn.plein:focus-visible{background:transparent;color:var(--or)}
+.depot .btn.plein{min-height:44px;padding:10px 22px;box-shadow:0 0 0 0 rgba(var(--or-rvb),.5);animation:appel 3.2s ease-out 2.4s infinite}
+.depot .btn.plein:hover{animation:none}
+@keyframes appel{0%{box-shadow:0 0 0 0 rgba(var(--or-rvb),.45)}60%,100%{box-shadow:0 0 0 14px rgba(var(--or-rvb),0)}}
 .btn.danger{border-color:rgba(224,128,106,.55)}
 :root[data-theme="clair"] .btn.danger{border-color:rgba(162,59,34,.5)}
 .btn.danger:hover:not(:disabled),.btn.danger:focus-visible{border-color:var(--rouge);color:var(--rouge)}
@@ -141,10 +192,11 @@ body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column}
 .prog{height:2px;margin-top:10px;background:rgba(var(--encre),.12);overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--or);transition:width .25s ease}
 @media (min-width:1000px){
-  .accueil{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr;column-gap:32px}
-  .accueil-scene{grid-column:2;grid-row:1}
-  .accueil-texte{grid-column:1;grid-row:1;align-self:end}
+  .accueil{grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);grid-template-rows:1fr;column-gap:24px;align-items:center}
+  .accueil-scene{grid-column:2;grid-row:1;align-self:stretch;margin-right:calc(-1 * var(--g))}
+  .accueil-texte{grid-column:1;grid-row:1}
 }
+@media (max-width:560px){.depot{grid-template-columns:minmax(0,1fr)}.depot-ico{display:none}.depot kbd{display:none}}
 
 /* ---------- Éditeur ---------- */
 /* l'éditeur prend tout l'écran : le bandeau du site disparaît (thème et moteur sont dans Affichage) */
@@ -620,23 +672,34 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <main>
   <!-- ===== Avant chargement : dépôt du fichier ===== -->
   <section class="accueil" id="accueil">
+    <div class="accueil-fond" aria-hidden="true"></div>
     <div class="accueil-scene">
       <canvas id="scene" role="img" aria-label="Pied de poteau métallique en volumes : platine, poteau HEB, raidisseurs et tiges d'ancrage, qui s'assemblent puis tournent ; des cotes se posent puis s'effacent, des pièces passent en or, s'effacent et reviennent"></canvas>
     </div>
     <div class="accueil-texte">
-      <div class="surtitre rv" style="--d:.6s">STR Bim Tools · Éditeur</div>
-      <h1 class="rv" style="--d:.8s">IFC</h1>
-      <p class="chapeau rv" style="--d:1s">Ouvre une maquette IFC, coche les éléments en trop, supprime-les proprement et récupère le fichier réécrit.</p>
+      <div class="surtitre rv" style="--d:.6s">STR Bim Tools · Viewer et éditeur</div>
+      <h1 class="rv" style="--d:.8s"><span>IFC</span></h1>
+      <p class="accroche rv" style="--d:.95s">Ouvrir. Corriger. <b>Réécrire.</b></p>
+      <p class="chapeau rv" style="--d:1.05s">Explore une maquette IFC, corrige-la sur place (déplacer, aligner, changer d'étage, dimensions, propriétés, suppressions) et récupère un fichier IFC propre, sans rien installer.</p>
       <div class="depot rv" style="--d:1.2s" id="depot">
-        <div class="depot-titre">Dépose un ou plusieurs fichiers .ifc (ou .ifczip) ici</div>
+        <span class="depot-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/></svg></span>
+        <div class="depot-titre">Dépose tes fichiers .ifc ou .ifczip ici</div>
         <div class="actions">
           <button type="button" class="btn plein" id="choisir">Choisir des fichiers</button>
+          <span class="depot-note" style="margin:0">ou <kbd>Ctrl</kbd> + <kbd>O</kbd></span>
         </div>
-        <div class="depot-note">IFC2X3 ou IFC4 · plusieurs fichiers se superposent dans la même vue · rien ne quitte ton navigateur</div>
+        <div class="depot-note">Plusieurs fichiers se superposent dans la même vue</div>
         <div class="chargement" id="chargement" hidden><span id="chargement-txt">Lecture du fichier…</span><div class="prog" aria-hidden="true"><i id="prog"></i></div></div>
       </div>
+      <ul class="atouts rv" style="--d:1.4s">
+        <li><b>Rust</b><span>lecture en WebAssembly</span></li>
+        <li><b>2 <i>modes</i></b><span>Viewer et Éditeur</span></li>
+        <li><b>IFC2X3 · IFC4</b><span>multi-maquettes</span></li>
+        <li><b>100 % <i>local</i></b><span>rien ne quitte ton poste</span></li>
+      </ul>
       <div class="erreur" id="erreur" role="alert" hidden></div>
     </div>
+    <div class="voile-depot" aria-hidden="true"><span>Lâche tes fichiers IFC</span></div>
     <input type="file" id="fichier" accept=".ifc,.IFC,.ifczip,.IFCZIP,.zip" multiple hidden>
   </section>
 
@@ -1101,7 +1164,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=41"></script>
+<script src="/ifc/ifc-app.js?v=42"></script>
 <script src="/assets/menu.js?v=31"></script>
 </body>
 </html>
