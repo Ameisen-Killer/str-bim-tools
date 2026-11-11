@@ -2671,9 +2671,21 @@
           prendre([a[0] + t*(b[0] - a[0]), a[1] + t*(b[1] - a[1]), a[2] + t*(b[2] - a[2])], "arête", 2, Math.hypot(sa[0] + t*dx - x, sa[1] + t*dy - y), 8);
         }
       }
-      if (best) return best;
+      if (best){ best.cle = v.it.id; return best; }
+      return faceVisee(v);
+    }
+    function faceVisee(v){
       var T = v.T, t = v.t, n = norm(cross([T[t+3] - T[t], T[t+4] - T[t+1], T[t+5] - T[t+2]], [T[t+6] - T[t], T[t+7] - T[t+1], T[t+8] - T[t+2]]));
-      return { p: v.p, type: "face", n: n };
+      return { p: v.p, type: "face", n: n, cle: v.it.id };
+    }
+    // Saisie de points pour l'éditeur (déplacer, copier, aligner) : { faces : face visée sans accrochage,
+    // depuis : point de départ (trait d'aperçu), choisi(P), annule() }
+    var saisie = null;
+    function pointSaisi(x, y){
+      if (saisie && saisie.faces){ var v = viseeSous(x, y); return v ? faceVisee(v) : null; }
+      var P = accroche(x, y);
+      // en saisie, le trait d'aperçu relie les deux points tels quels (pas de perpendiculaire à la face)
+      return P && saisie ? { p: P.p, type: P.type, cle: P.cle } : P;
     }
     function el(type, attrs, parent){
       var n = document.createElementNS(SVG, type);
@@ -2729,11 +2741,17 @@
       var p = local(e), ici = cv;
       attenteMesure = setTimeout(function(){
         if (ici !== cv || ptrs.size || !W || !H || !mesure.actif) return;
-        mesure.survol = accroche(p.x, p.y);
+        mesure.survol = pointSaisi(p.x, p.y);
         demander();
       }, 40);
     }
     function cliqueMesure(x, y){
+      if (mesure.mode === "saisie"){
+        var Q = pointSaisi(x, y), s = saisie;
+        demander();
+        if (Q && s && s.choisi) s.choisi(Q);
+        return;
+      }
       var P = accroche(x, y);
       demander();
       if (!P) return;
@@ -3145,6 +3163,7 @@
       // Les mesures et coordonnées relevées restent affichées.
       outil: function(nom){
         if (nom !== undefined){
+          saisie = null;
           mesure.mode = nom || null; mesure.actif = !!mesure.mode; mesure.a = null; mesure.survol = null;
           cv.classList.toggle("mesure", mesure.actif);
           demander();
@@ -3153,10 +3172,22 @@
       },
       // Échap : abandonne le premier point posé, sinon quitte l'outil ; vrai si quelque chose a changé
       annulerMesure: function(){
+        if (mesure.mode === "saisie"){ var s = saisie; this.saisir(null); if (s && s.annule) s.annule(); return true; }
         if (mesure.a){ mesure.a = null; mesure.survol = null; demander(); return true; }
         if (mesure.actif){ this.outil(null); return true; }
         return false;
       },
+      // Saisie de points de l'éditeur (voir pointSaisi) ; null l'arrête
+      saisir: function(o){
+        saisie = o || null;
+        mesure.mode = o ? "saisie" : null; mesure.actif = !!o; mesure.survol = null;
+        mesure.a = o && o.depuis ? { p: o.depuis, type: o.typeDepuis || "sommet" } : null;
+        cv.classList.toggle("mesure", mesure.actif);
+        demander();
+      },
+      enSaisie: function(){ return !!saisie; },
+      // boîte englobante d'éléments affichés (clés) : { min, max } ou null
+      boite: function(cles){ return boiteDe(cles); },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
       effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
       // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }
@@ -3170,6 +3201,8 @@
         var G = Gs.get(m); if (!G) return;
         // une ouverture qui part ou revient change aussi la géométrie de son hôte
         ids.forEach(function(id){ G.cache.delete(id); if (G.hotes && G.hotes.has(id)) G.cache.delete(G.hotes.get(id)); });
+        // placements et points réécrits sur place par l'éditeur : relus
+        G.plac.clear(); G.pts.clear();
         G.externe = null;
       },
       // Orientation de la boîte (radians autour de la verticale) ; la boîte en place tourne autour de son centre

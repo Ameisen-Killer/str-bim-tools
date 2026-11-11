@@ -344,6 +344,40 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .purge-jeux label.coche span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .purge-jeux label.coche i{font-style:normal;color:var(--texte-faible)}
 .prefs label.coche b{font-family:var(--mono);font-weight:400;font-size:12.5px;color:var(--texte-faible)}
+/* bascule Viewer / Éditeur */
+.mode{display:flex;border:1px solid var(--ligne);border-radius:6px;overflow:hidden}
+.mode button{background:none;border:0;padding:5px 14px;cursor:pointer;font:inherit;font-size:13px;color:var(--texte-doux)}
+.mode button+button{border-left:1px solid var(--ligne)}
+.mode button[aria-pressed="true"]{background:rgba(var(--or-rvb),.16);color:var(--or);font-weight:600}
+body:not(.mode-ed) [data-ed]{display:none!important}
+body.mode-ed .p-props .p-titre::after{content:" · modifiables";font-weight:400;color:var(--or)}
+/* fenêtres de l'éditeur */
+.ed fieldset .trois{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ed .trois label{grid-template-columns:1fr;gap:4px;margin-top:4px}
+.ed .trois label.large{grid-column:span 2}
+.ed .trois label.coche{grid-column:span 2;grid-template-columns:auto 1fr;align-self:end;margin-bottom:8px}
+.ed legend .unite{font-weight:400;color:var(--texte-faible)}
+.ed .dims-gr{margin-top:12px}
+.ed .dims-gr .trois label{margin-top:4px}
+.ed .dims-titre{font-size:13px;font-weight:600;color:var(--texte)}
+.ed .dims-titre i{font-style:normal;font-weight:400;color:var(--texte-faible)}
+/* propriétés modifiables (mode Éditeur) */
+.props dd input.pv{width:100%;min-height:26px;padding:2px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--texte);font:inherit}
+.props dd input.pv:hover{border-color:var(--ligne)}
+.props dd input.pv:focus{border-color:var(--or);background:var(--controle,var(--noir-3));outline:none}
+.props .ed-note{margin-top:8px;font-size:12px;color:var(--texte-faible)}
+/* légende des couleurs par critère */
+.legende{position:absolute;left:12px;top:34px;z-index:4;max-width:min(300px,calc(100% - 24px));padding:8px 10px;border:1px solid var(--ligne);border-radius:8px;background:rgba(var(--fond-rvb),.82);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);box-shadow:var(--ombre-legere);font-size:12.5px}
+.legende-titre{display:flex;justify-content:space-between;gap:12px;font-weight:600;margin-bottom:4px}
+.legende-titre button{background:none;border:0;padding:0 2px;cursor:pointer;color:var(--texte-faible);font-size:15px;line-height:1}
+.legende ul{list-style:none;margin:0;padding:0}
+.legende li button{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;background:none;border:0;padding:2px 2px;border-radius:4px;cursor:pointer;color:var(--texte);font:inherit;text-align:left}
+.legende li button:hover{background:rgba(var(--or-rvb),.13)}
+.legende li i{width:12px;height:12px;border-radius:3px;background:var(--t)}
+.legende li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legende li b{font-weight:400;color:var(--texte-faible)}
+.legende .autres{margin-top:2px;color:var(--texte-faible)}
+@media (max-width:899px){.mode button{padding:4px 10px}}
 .sim label.coche b{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
 .sim label.coche.vide{opacity:.45;cursor:default}
 .sim #sim-prop{margin-top:6px}
@@ -616,25 +650,43 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="ouvrir"><span>Ouvrir…</span><kbd>Ctrl+O</kbd></button>
             <button type="button" role="menuitem" data-cmd="ajouter"><span>Ajouter un IFC…</span><kbd>Ctrl+Maj+O</kbd></button>
-            <button type="button" role="menuitem" data-cmd="fusionner"><span id="cmd-fusionner">Fusionner les maquettes</span><kbd></kbd></button>
-            <button type="button" role="menuitem" data-cmd="retailler"><span>Retailler selon la boîte de coupe…</span><kbd></kbd></button>
-            <button type="button" role="menuitem" data-cmd="purger"><span>Purger…</span><kbd></kbd></button>
-            <hr>
-            <button type="button" role="menuitem" data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
-            <button type="button" role="menuitem" data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-ed data-cmd="fusionner"><span id="cmd-fusionner">Fusionner les maquettes</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-ed data-cmd="retailler"><span>Retailler selon la boîte de coupe…</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-ed data-cmd="purger"><span>Purger…</span><kbd></kbd></button>
+            <hr data-ed>
+            <button type="button" role="menuitem" data-ed data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
+            <button type="button" role="menuitem" data-ed data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-axes"><span>Exporter le plan des axes en DXF</span><kbd></kbd></button>
-            <div data-dyn="exports"></div>
+            <div data-dyn="exports" data-ed></div>
             <hr>
             <button type="button" role="menuitem" data-cmd="fermer-tout"><span>Tout fermer</span><kbd></kbd></button>
           </div>
         </div>
-        <div class="mb-gr">
+        <div class="mb-gr" data-ed>
           <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Édition</button>
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="annuler"><span id="cmd-annuler">Annuler</span><kbd>Ctrl+Z</kbd></button>
             <button type="button" role="menuitem" data-cmd="retablir"><span id="cmd-retablir">Rétablir</span><kbd>Ctrl+Y</kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="supprimer" class="danger"><span id="cmd-supprimer">Supprimer la sélection</span><kbd>Suppr</kbd></button>
+          </div>
+        </div>
+        <div class="mb-gr" data-ed>
+          <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Modifier</button>
+          <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="deplacer"><span>Déplacer…</span><kbd>D</kbd></button>
+            <button type="button" role="menuitem" data-cmd="deplacer-points"><span>Déplacer par deux points</span><kbd>Maj+D</kbd></button>
+            <button type="button" role="menuitem" data-cmd="copier"><span>Copier…</span><kbd>K</kbd></button>
+            <button type="button" role="menuitem" data-cmd="copier-points"><span>Copier par deux points</span><kbd>Maj+K</kbd></button>
+            <button type="button" role="menuitem" data-cmd="tourner"><span>Rotation…</span><kbd>R</kbd></button>
+            <button type="button" role="menuitem" data-cmd="aligner-face"><span>Aligner sur une face</span><kbd>A</kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="etage"><span>Changer d'étage…</span><kbd>L</kbd></button>
+            <button type="button" role="menuitem" data-cmd="dimensions"><span>Dimensions (extrusion, profil)…</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="attributs"><span>Attributs et propriétés…</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="classe"><span>Classe IFC…</span><kbd></kbd></button>
+            <hr>
+            <button type="button" role="menuitem" data-cmd="supprimer" class="danger"><span>Supprimer la sélection</span><kbd>Suppr</kbd></button>
           </div>
         </div>
         <div class="mb-gr">
@@ -677,6 +729,17 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
                 <button type="button" role="menuitem" data-cmd="equerre-coupe"><span>Remettre d'équerre</span><kbd></kbd></button>
                 <button type="button" role="menuitem" data-cmd="figer-coupe"><span id="cmd-figer">Figer la boîte de coupe</span><kbd></kbd></button>
                 <button type="button" role="menuitem" data-cmd="sans-coupe"><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
+              </div>
+            </div>
+            <div class="mb-sm">
+              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Couleurs</span><kbd>▸</kbd></button>
+              <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="" aria-checked="true"><span>Par maquette</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="type" aria-checked="false"><span>Par type IFC</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="famille" aria-checked="false"><span>Par famille : type</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="etage" aria-checked="false"><span>Par étage</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="materiau" aria-checked="false"><span>Par matériau</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="maquette" aria-checked="false"><span>Par fichier</span><kbd></kbd></button>
               </div>
             </div>
             <div class="mb-sm">
@@ -746,6 +809,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           </div>
         </div>
       </nav>
+      <div class="mode" role="group" aria-label="Mode de travail">
+        <button type="button" data-mode="viewer" aria-pressed="true" title="Consulter : naviguer, sélectionner, mesurer, couper, colorier (E pour basculer)">Viewer</button>
+        <button type="button" data-mode="editeur" aria-pressed="false" title="Modifier : déplacer, copier, aligner, changer d'étage, dimensions, attributs, supprimer (E pour basculer)">Éditeur</button>
+      </div>
       <div class="fichier">
         <span class="fichier-nom" id="f-nom">—</span>
         <span class="fichier-bilan" id="f-bilan"></span>
@@ -783,6 +850,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <button type="button" class="replier d" id="rep-d" title="Réduire les propriétés">›</button>
         <canvas class="cube" id="cube" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
         <div class="vue-info" id="vue-info"></div>
+        <div class="legende" id="legende" hidden></div>
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
           <button type="button" class="btn petit" id="b-boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
@@ -872,6 +940,104 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </form>
 </dialog>
 
+<dialog id="transfo" class="prefs ed">
+  <form method="dialog">
+    <h2 id="transfo-titre">Déplacer</h2>
+    <p id="transfo-cible"></p>
+    <fieldset>
+      <legend>Translation <span class="unite" data-unite></span></legend>
+      <div class="trois">
+        <label><span>ΔX</span><input class="champ" id="tr-dx" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label><span>ΔY</span><input class="champ" id="tr-dy" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label><span>ΔZ</span><input class="champ" id="tr-dz" inputmode="decimal" autocomplete="off" value="0"></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Rotation autour de la verticale</legend>
+      <div class="trois">
+        <label><span>Angle (°)</span><input class="champ" id="tr-angle" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label class="large"><span>Centre</span><select class="champ" id="tr-centre"><option value="sel">Centre de la sélection</option><option value="chacun">Centre de chaque élément</option></select></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Copie</legend>
+      <div class="trois">
+        <label class="coche"><input type="checkbox" id="tr-copier"><span>Copier au lieu de déplacer</span></label>
+        <label><span>Nombre</span><input class="champ" id="tr-nb" inputmode="numeric" autocomplete="off" value="1"></label>
+      </div>
+    </fieldset>
+    <p class="pref-note" id="tr-note"></p>
+    <div class="actions">
+      <button type="submit" class="btn" value="points" title="Choisir le vecteur en cliquant deux points dans la vue (sommets, milieux et arêtes accrochés)">Par deux points…</button>
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui" id="tr-oui">Appliquer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="etage" class="prefs ed">
+  <form method="dialog">
+    <h2>Changer d'étage</h2>
+    <p id="etage-cible"></p>
+    <label><span>Étage</span><select class="champ" id="etage-liste"></select></label>
+    <label class="coche"><input type="radio" name="etage-pos" id="etage-garder" checked><span>Garder la position (seul le rattachement change)</span></label>
+    <label class="coche"><input type="radio" name="etage-pos" id="etage-suivre"><span>Suivre l'étage (décalé en hauteur de la différence d'altitude)</span></label>
+    <p class="pref-note" id="etage-note"></p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui">Appliquer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dims" class="prefs ed">
+  <form method="dialog">
+    <h2>Dimensions</h2>
+    <p id="dims-cible"></p>
+    <div id="dims-corps"></div>
+    <label class="coche" id="dims-tous-l"><input type="checkbox" id="dims-tous"><span id="dims-tous-t">Appliquer à toute la sélection</span></label>
+    <p class="pref-note">Seules les valeurs changées sont écrites. Ce qui est partagé avec d'autres objets (type Revit, solide commun) est copié avant : seuls les éléments visés changent. Les quantités (Qto) ne sont pas recalculées.</p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui" id="dims-oui">Appliquer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="attrs" class="prefs ed">
+  <form method="dialog">
+    <h2>Attributs et propriétés</h2>
+    <p id="attrs-cible"></p>
+    <label><span>Nom</span><input class="champ" id="at-2" autocomplete="off"></label>
+    <label><span>Description</span><input class="champ" id="at-3" autocomplete="off"></label>
+    <label><span>Famille : type</span><input class="champ" id="at-4" autocomplete="off"></label>
+    <label><span>Repère</span><input class="champ" id="at-7" autocomplete="off"></label>
+    <fieldset>
+      <legend>Propriété</legend>
+      <label><span>Laquelle</span><select class="champ" id="at-prop"></select></label>
+      <label><span>Valeur</span><input class="champ" id="at-val" autocomplete="off"></label>
+    </fieldset>
+    <p class="pref-note">Un champ laissé tel quel ne change rien ; vidé, il efface la valeur.</p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui">Appliquer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="classe" class="prefs ed">
+  <form method="dialog">
+    <h2>Classe IFC</h2>
+    <p id="classe-cible"></p>
+    <label><span>Nouvelle classe</span><select class="champ" id="classe-liste"></select></label>
+    <p class="pref-note">Nom, placement, forme, matériau et propriétés sont gardés ; le type prédéfini repart à « non défini ». Portes et fenêtres perdent leurs dimensions propres.</p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui">Appliquer</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="preferences" class="prefs">
   <form method="dialog">
     <h2>Préférences</h2>
@@ -920,10 +1086,11 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=9"></script>
-<script src="/ifc/ifc-vue.js?v=36"></script>
+<script src="/ifc/ifc-vue.js?v=37"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
-<script src="/ifc/ifc-app.js?v=39"></script>
-<script src="/assets/menu.js?v=30"></script>
+<script src="/ifc/ifc-edition.js?v=1"></script>
+<script src="/ifc/ifc-app.js?v=40"></script>
+<script src="/assets/menu.js?v=31"></script>
 </body>
 </html>

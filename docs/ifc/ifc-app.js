@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.1.0";
+  var VERSION = "1.2.0";
   (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
@@ -528,6 +528,7 @@
     caches.forEach(function(c){ if (!existe(c)) caches.delete(c); });
     plies.forEach(function(c){ if (!existe(c)) plies.delete(c); });
     if (actif && !existe(actif)) actif = "";
+    calculerCouleurs();
     remplirTypes();
     rendreListe();
     infoVue(vue.afficher(itemsVue()));
@@ -803,6 +804,7 @@
   function neufs(f){ if (!f.neufs) f.neufs = neufsDe(f.m); return f.neufs; }
   // teinte d'un élément : celle de sa phase si elle est choisie, sinon celle de la maquette
   function teinteElement(f, id){
+    if (teintesCat){ var hc = teintesCat.get(cle(f, id)); return hc === undefined ? null : hc; }
     var p = f.phases;
     if (p){ var t = neufs(f).has(id) ? p.neuf : p.existant; if (t !== undefined) return t; }
     return f.teinte;
@@ -922,13 +924,19 @@
       h.push(boutonsVue(c));
       var ang = vue.angleSous(x, y);
       if (ang != null) h.push(bouton("aligner", vue.aCoupe() ? "Aligner la boîte de coupe sur cette face" : "Boîte de coupe alignée sur cette face"));
+      if (modeEd && c.some(editable)){
+        var q = c.length > 1 ? " (" + fmtN(c.length) + ")" : "";
+        h.push("<hr>", '<div class="mb-sous">Modifier</div>', bouton("deplacer", "Déplacer, copier, tourner…"), bouton("aligner-face", "Aligner sur une face"),
+          bouton("etage", "Changer d'étage…"), bouton("dimensions", "Dimensions…"), bouton("attributs", "Attributs et propriétés…"), bouton("classe", "Classe IFC…"),
+          bouton("supprimer", "Supprimer" + q, "danger"));
+      }
       h.push("<hr>");
     }
     else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
     if (vue.aCoupe()) h.push(bouton("cadre-coupe", vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe"),
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
-    if (vue.aCoupe()) h.push(bouton("retailler", "Retailler l'IFC selon la boîte…"));
+    if (vue.aCoupe() && modeEd) h.push(bouton("retailler", "Retailler l'IFC selon la boîte…"));
     h.push("<hr>", bouton("mesurer", vue.outil() === "mesure" ? "Arrêter de mesurer" : "Mesurer"),
       bouton("coordonnees", vue.outil() === "point" ? "Arrêter les coordonnées" : "Coordonnées d'un point"));
     if (vue.nbMesures()) h.push(bouton("effacer-mesures", "Effacer les mesures et coordonnées (" + fmtN(vue.nbMesures()) + ")"));
@@ -983,7 +991,11 @@
       if (a === "basculer"){ cliqueVue(c.cle); return; }
       if (a === "similaires"){ similaires(c.cle); return; }
       if (a === "aligner"){ alignerCoupe(c.angle, c.cles); return; }
-      if (!actionVue(a, c.cles) && COMMANDES[a]) COMMANDES[a]();
+      if (a === "supprimer" && c.cle && !choix.has(c.cle)){ choix = new Set([c.cle]); majLignes(); maj(); }
+      if (!actionVue(a, c.cles) && COMMANDES[a]){
+        ciblesCtx = c.cles && c.cles.length ? c.cles : null;
+        try { COMMANDES[a](); } finally { ciblesCtx = null; }
+      }
       return;
     }
     var f = c.f, l = c.l, noeud = !l.fichier, sous = sousLignes(c.k);
@@ -1067,14 +1079,19 @@
     var d = lireCle(actif), m = d.f.m, id = d.id, i = IFC.infos(m, id), I = IFC.index(m);
     var enf = (I.enfants.get(id) || []).length, ouv = (I.ouvertures.get(id) || []).length;
     var parent = I.parent.get(id) || I.conteneur.get(id) || I.perce.get(id), pi = parent && m.ent.has(parent) ? IFC.infos(m, parent) : null;
+    // mode Éditeur : nom, type d'objet, description, repère et propriétés simples de l'élément modifiables sur place
+    var ed = modeEd;
+    function champ(dt, k, v){
+      return "<dt>" + esc(dt) + '</dt><dd><input class="pv" data-attr="' + k + '" data-lib="' + esc(dt) + '" data-v0="' + esc(v || "") + '" value="' + esc(v || "") + '" autocomplete="off" spellcheck="false"></dd>';
+    }
     var h = '<div class="type">' + esc(i.typeLib) + " · #" + i.id + "</div><h3>" + esc(nomAff(i)) + "</h3><dl>" +
       ligne("Fichier", fichiers.length > 1 ? m.nom : "") +
       ligne("GlobalId", i.globalId, true) +
-      ligne("Nom", i.nom) +
+      (ed ? champ("Nom", 2, i.nom) : ligne("Nom", i.nom)) +
       ligne("Type IFC", i.type, true) +
-      ligne("Type d'objet", i.objectType) +
-      ligne("Description", i.description) +
-      ligne("Repère", i.tag) +
+      (ed ? champ("Type d'objet", 4, i.objectType) : ligne("Type d'objet", i.objectType)) +
+      (ed ? champ("Description", 3, i.description) : ligne("Description", i.description)) +
+      (ed && i.genre !== "spatial" ? champ("Repère", 7, i.tag) : ligne("Repère", i.tag)) +
       ligne("Nom long", i.nomLong) +
       ligne("Matériau", i.materiau || (i.genre === "spatial" ? "" : "—")) +
       ligne("Dans", pi ? nomAff(pi) + " (" + pi.typeLib + ")" : "") +
@@ -1082,11 +1099,21 @@
       ligne("Ouvertures", ouv ? fmtN(ouv) : "") +
       ligne("Sélection", !i.supprimable ? "Structure spatiale, non supprimable" : choix.has(actif) ? "Cochée" : "") +
       "</dl>";
+    var modif = new Map();
+    if (ed) IFCEdition.proprietesEditables(m, id).forEach(function(p){ modif.set(p.jeu + "\u0000" + p.nom, p.texte); });
     IFC.proprietes(m, id).forEach(function(p){
       h += '<div class="pset"><div class="pset-nom">' + esc(p.nom) + (p.origine ? " · " + esc(p.origine) : "") + "</div><dl>" +
-        (p.props.length ? p.props.map(function(x){ return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") : "<dt>—</dt><dd>Aucune valeur lisible</dd>") +
+        (p.props.length ? p.props.map(function(x){
+          var k = p.nom + "\u0000" + x[0];
+          if (!p.origine && modif.has(k)){
+            var t = modif.get(k);
+            return "<dt>" + esc(x[0]) + '</dt><dd><input class="pv" data-jeu="' + esc(p.nom) + '" data-prop="' + esc(x[0]) + '" data-v0="' + esc(t) + '" value="' + esc(t) + '" autocomplete="off" spellcheck="false"></dd>';
+          }
+          return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>";
+        }).join("") : "<dt>—</dt><dd>Aucune valeur lisible</dd>") +
         "</dl></div>";
     });
+    if (ed) h += '<p class="ed-note">Clique une valeur pour la modifier, Entrée pour valider, Échap pour revenir. Les propriétés du type restent en lecture.</p>';
     z.innerHTML = h;
     z.scrollTop = 0;
   }
@@ -1105,6 +1132,9 @@
     $("#cmd-retablir").textContent = aRefaire.length ? "Rétablir la " + aRefaire[aRefaire.length - 1].txt : "Rétablir";
     $("#cmd-exporter").textContent = fichiers.length > 1 ? "Exporter les fichiers modifiés" : "Exporter l'IFC";
     ["meme-type", "meme-materiau", "meme-nom"].forEach(function(c){ activerCmd(c, a); });
+    var nEd = ciblesEdition().length;
+    ["deplacer", "copier", "tourner", "deplacer-points", "copier-points", "etage", "dimensions", "attributs", "classe"].forEach(function(c){ activerCmd(c, nEd > 0); });
+    [].forEach.call(document.querySelectorAll("[data-colorer]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-colorer") === colorer)); });
     activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
     activerCmd("isoler", n > 0 || a);
@@ -1662,6 +1692,415 @@
     majLignes(); maj();
     etat(n ? pluriel(n, "élément ajouté", "éléments ajoutés") + " à la sélection (" + quoi + " que « " + nomAff(r) + " »)." : "Aucun autre élément avec " + quoi + ".");
   }
+  // ================= Mode Viewer / Éditeur =================
+  // Viewer : consulter (naviguer, sélectionner, mesurer, couper, colorier). Éditeur : en plus, modifier la
+  // maquette (menus Édition et Modifier, commandes du clic droit, propriétés modifiables, export de l'IFC).
+  var modeEd = lire("ifc.mode", ["viewer", "editeur"]) === "editeur", ciblesCtx = null;
+  function poserMode(ed){
+    modeEd = !!ed;
+    garder("ifc.mode", modeEd ? "editeur" : "viewer");
+    document.body.classList.toggle("mode-ed", modeEd);
+    [].forEach.call(document.querySelectorAll("[data-mode]"), function(b){ b.setAttribute("aria-pressed", String((b.getAttribute("data-mode") === "editeur") === modeEd)); });
+    if (!modeEd && vue.enSaisie()) vue.saisir(null);
+    afficherProps(); maj();
+  }
+  function annoncerMode(){
+    etat(modeEd ? "Mode Éditeur : menus Édition et Modifier, clic droit « Modifier », propriétés modifiables dans le panneau. Ctrl+Z annule."
+      : "Mode Viewer : consultation seule, la maquette ne peut pas être modifiée.");
+  }
+  [].forEach.call(document.querySelectorAll("[data-mode]"), function(b){
+    b.addEventListener("click", function(){
+      var ed = b.getAttribute("data-mode") === "editeur";
+      if (ed !== modeEd){ poserMode(ed); annoncerMode(); }
+    });
+  });
+  // une commande de modification n'agit qu'en mode Éditeur
+  function seulEd(fn){
+    return function(b){
+      if (!modeEd){ etat("Passe en mode Éditeur (bouton en haut, ou touche E) pour modifier la maquette."); return; }
+      fn(b);
+    };
+  }
+
+  // ================= Éditeur : cibles, application, annulation =================
+  function editable(c){ var d = lireCle(c), i = d.f && d.f.m.ent.has(d.id) && IFC.infos(d.f.m, d.id); return !!(i && i.supprimable && i.genre !== "spatial"); }
+  // éléments visés : ceux du clic droit, sinon la sélection, sinon l'élément actif
+  function ciblesEdition(){
+    var l = ciblesCtx || (choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []);
+    return l.filter(editable);
+  }
+  function nomCle(c){ var d = lireCle(c); return nomAff(IFC.infos(d.f.m, d.id)); }
+  function decrire(cles){ return cles.length === 1 ? "« " + nomCle(cles[0]) + " »" : pluriel(cles.length, "élément"); }
+  function sansCible(){ etat("Sélectionne d'abord un ou plusieurs éléments (clic dans la vue 3D ou dans la liste)."); }
+  function groupesFichiers(cles){
+    var g = new Map();
+    cles.forEach(function(c){ var d = lireCle(c); if (!d.f) return; var l = g.get(d.f); if (!l) g.set(d.f, l = []); l.push(d.id); });
+    return g;
+  }
+  // faire(f, ids, app) rend un résultat d'IFCEdition, ou en applique plusieurs à la suite par app(résultat) ;
+  // le tout fait une seule entrée d'annulation (txt : « Annuler la … »)
+  function editer(txt, cles, faire){
+    var parts = [], tot = { nb: 0, ignores: 0, refuse: 0, copies: [], fait: false };
+    function app(f, r){
+      if (!r) return;
+      tot.nb += r.nb || 0; tot.ignores += r.ignores || 0; tot.refuse += r.refuse || 0;
+      (r.copies || []).forEach(function(id){ tot.copies.push(cle(f, id)); });
+      if (!r.changement) return;
+      IFC.appliquer(f.m, r.changement);
+      if (r.ids && r.ids.length) vue.oublier(f.m, r.ids);
+      parts.push({ f: f, ch: r.changement, ids: r.ids && r.ids.length ? r.ids : null });
+    }
+    groupesFichiers(cles).forEach(function(ids, f){
+      var r = faire(f, ids, function(x){ app(f, x); });
+      if (r) app(f, r);
+    });
+    if (parts.length){
+      var n = 0;
+      parts.forEach(function(p){ n += p.ch.avant.length + p.ch.apres.length; });
+      histo.push({ parts: parts, txt: txt, e: n });
+      aRefaire = [];
+      reconstruire();
+      if (parts.some(function(p){ return p.ids; })) calculerWebIfc();
+      tot.fait = true;
+    }
+    return tot;
+  }
+  var FIN_EDITION = " Ctrl+Z pour annuler ; exporte l'IFC pour garder le résultat.";
+  function bilanIgnores(n, pourquoi){ return n ? " " + pluriel(n, "élément ignoré", "éléments ignorés") + " (" + pourquoi + ")." : ""; }
+
+  // ================= Unités de saisie =================
+  function uniteSaisie(){ var u0 = fichiers[0].unite; return prefs.lu === "auto" || !UNITES[prefs.lu] ? u0 : { nom: prefs.lu, f: UNITES[prefs.lu] }; }
+  function nombreSaisi(v){ var t = String(v).replace(/[\s']/g, "").replace(",", "."); if (t === "") return 0; var x = Number(t); return isFinite(x) ? x : NaN; }
+  function texteNombre(v){ return String(Math.round(v*1e6)/1e6).replace(".", ","); }
+  function unitesAffichees(){ var n = uniteSaisie().nom; [].forEach.call(document.querySelectorAll("[data-unite]"), function(s){ s.textContent = n ? "(" + n + ")" : ""; }); return n; }
+  function ouvrirFenetre(d, champ){
+    d.returnValue = "";
+    d.showModal();
+    if (champ) setTimeout(function(){ champ.focus(); if (champ.select) champ.select(); }, 30);
+  }
+
+  // ================= Déplacer, copier, tourner =================
+  var transfoCibles = [];
+  function ouvrirTransfo(mode){
+    var cles = ciblesEdition(), d = $("#transfo");
+    if (!cles.length){ sansCible(); return; }
+    if (typeof d.showModal !== "function") return;
+    transfoCibles = cles;
+    $("#transfo-titre").textContent = mode === "copier" ? "Copier" : mode === "tourner" ? "Rotation" : "Déplacer";
+    $("#transfo-cible").textContent = decrire(cles) + ". Rotation, puis translation ; le tout peut être copié plusieurs fois (chaque copie décalée de la précédente).";
+    unitesAffichees();
+    ["#tr-dx", "#tr-dy", "#tr-dz", "#tr-angle"].forEach(function(s){ $(s).value = "0"; });
+    $("#tr-copier").checked = mode === "copier";
+    $("#tr-nb").value = "1";
+    $("#tr-note").textContent = "Les ouvertures suivent leur mur, les pièces d'un assemblage suivent l'assemblage.";
+    ouvrirFenetre(d, $(mode === "tourner" ? "#tr-angle" : "#tr-dx"));
+  }
+  $("#transfo").addEventListener("close", function(){
+    var v = $("#transfo").returnValue, cles = transfoCibles.filter(existe);
+    transfoCibles = [];
+    if (!cles.length) return;
+    var copie = $("#tr-copier").checked, nb = copie ? Math.max(1, Math.min(200, parseInt($("#tr-nb").value, 10) || 1)) : 0;
+    if (v === "points"){ deuxPoints(copie, cles, nb); return; }
+    if (v !== "oui") return;
+    var u = uniteSaisie(), dx = nombreSaisi($("#tr-dx").value), dy = nombreSaisi($("#tr-dy").value), dz = nombreSaisi($("#tr-dz").value), ang = nombreSaisi($("#tr-angle").value);
+    if ([dx, dy, dz, ang].some(isNaN)){ etat("Valeur illisible : écris des nombres (virgule ou point)."); return; }
+    if (!dx && !dy && !dz && !ang && !copie){ etat("Rien à faire : translation et rotation sont à 0."); return; }
+    transformerCles(cles, function(f){ var k = u.f/f.unite.f; return [dx*k, dy*k, dz*k]; }, ang*Math.PI/180, $("#tr-centre").value, nb);
+  });
+  // vecteur(f) : déplacement dans les unités du fichier f ; angle en radians autour de la verticale passant par le
+  // centre de la sélection ("sel") ou de chaque élément ("chacun") ; nb copies (0 : déplacer)
+  function transformerCles(cles, vecteur, angle, centre, nb, txt, quoi){
+    var bSel = angle && centre !== "chacun" ? vue.boite(cles) : null;
+    if (angle && centre !== "chacun" && !bSel){ etat("Rotation impossible : les éléments visés ne sont pas affichés dans la vue 3D."); return; }
+    function milieu(b){ return [(b.min[0] + b.max[0])/2, (b.min[1] + b.max[1])/2, 0]; }
+    function faire(f, ids, T){ return nb ? IFCEdition.copier(f.m, ids, T, nb) : IFCEdition.transformer(f.m, ids, T); }
+    var r = editer(txt || (nb ? "copie" : angle ? "rotation" : "translation"), cles, function(f, ids, app){
+      var D = IFCEdition.translation(vecteur(f));
+      if (!angle) return faire(f, ids, D);
+      if (centre !== "chacun") return faire(f, ids, IFCEdition.mul(D, IFCEdition.rotationZ(angle, milieu(bSel))));
+      ids.forEach(function(id){
+        var b = vue.boite([cle(f, id)]);
+        if (b) app(faire(f, [id], IFCEdition.mul(D, IFCEdition.rotationZ(angle, milieu(b)))));
+      });
+      return null;
+    });
+    if (!r.fait){ etat("Rien n'a été modifié." + bilanIgnores(r.ignores, "sans placement local modifiable")); return; }
+    if (nb && r.copies.length){
+      choix = new Set(r.copies.filter(function(c){ var d = lireCle(c), i = IFC.infos(d.f.m, d.id); return i && i.genre === "element"; }));
+      actif = choix.size ? choix.values().next().value : actif;
+      majLignes(); afficherProps(); maj();
+    }
+    etat((quoi || (nb ? (nb > 1 ? fmtN(nb) + " copies de " : "Copie de ") + decrire(cles) + " faite" + (nb > 1 ? "s" : "") + " (copies sélectionnées)."
+      : (angle ? "Rotation de " : "Translation de ") + decrire(cles) + " faite.")) + bilanIgnores(r.ignores, "sans placement local modifiable") + FIN_EDITION);
+  }
+  // Vecteur choisi en cliquant deux points accrochés (sommets, milieux, arêtes) dans la vue
+  function deuxPoints(copie, cles, nb){
+    cles = cles || ciblesEdition();
+    if (!cles.length){ sansCible(); return; }
+    var quoi = copie ? "Copier" : "Déplacer";
+    function fini(){ etat(quoi + " : annulé."); maj(); }
+    vue.saisir({ annule: fini, choisi: function(A){
+      etat(quoi + " : clique le point d'arrivée (Échap pour annuler).");
+      vue.saisir({ depuis: A.p, typeDepuis: A.type, annule: fini, choisi: function(B){
+        vue.saisir(null);
+        var d = [B.p[0] - A.p[0], B.p[1] - A.p[1], B.p[2] - A.p[2]];
+        if (!d[0] && !d[1] && !d[2]){ etat(quoi + " : les deux points sont confondus, rien à faire."); maj(); return; }
+        transformerCles(cles.filter(existe), function(){ return d; }, 0, null, copie ? (nb || 1) : 0);
+      } });
+    } });
+    etat(quoi + " " + decrire(cles) + " : clique le point de départ (sommets, milieux et arêtes accrochés ; Échap pour annuler).");
+    maj();
+  }
+  // Aligner : une face de référence, puis les faces à amener dessus (à la suite, jusqu'à Échap)
+  function alignerFace(){
+    if (!fichiers.length) return;
+    function fini(){ etat("Aligner : terminé."); maj(); }
+    vue.saisir({ faces: true, annule: fini, choisi: function(Ref){
+      if (!Ref.n) return;
+      etat("Aligner : clique la face de l'élément à amener sur la référence (plusieurs à la suite ; Échap pour terminer).");
+      vue.saisir({ faces: true, annule: fini, choisi: function(F){ alignerSur(Ref, F); } });
+    } });
+    etat("Aligner : clique d'abord la face de référence, celle qui ne bouge pas (Échap pour annuler).");
+    maj();
+  }
+  function alignerSur(Ref, F){
+    var n = Ref.n, k = n[0]*(Ref.p[0] - F.p[0]) + n[1]*(Ref.p[1] - F.p[1]) + n[2]*(Ref.p[2] - F.p[2]);
+    if (!F.cle || !editable(F.cle)){ etat("Aligner : cet élément ne peut pas être déplacé (structure spatiale). Clique une autre face, ou Échap."); return; }
+    if (Math.abs(k) < 1e-9){ etat("Aligner : déjà sur la référence. Clique une autre face, ou Échap."); return; }
+    var cles = choix.has(F.cle) ? Array.from(choix).filter(editable) : [F.cle], d = [n[0]*k, n[1]*k, n[2]*k];
+    var paral = !F.n || Math.abs(n[0]*F.n[0] + n[1]*F.n[1] + n[2]*F.n[2]) > .999;
+    transformerCles(cles, function(){ return d; }, 0, null, 0, "mise en alignement",
+      "Aligné : " + decrire(cles) + " déplacé" + (cles.length > 1 ? "s" : "") + " de " + formatsMesure().longueur(Math.abs(k)) +
+      (paral ? "" : " perpendiculairement à la référence (faces non parallèles)") + ". Clique une autre face à aligner, ou Échap.");
+  }
+
+  // ================= Changer d'étage =================
+  var etageCibles = [];
+  function ouvrirEtage(){
+    var cles = ciblesEdition(), d = $("#etage");
+    if (!cles.length){ sansCible(); return; }
+    var r = lireCle(cles[0]), ets = IFCEdition.etages(r.f.m);
+    if (!ets.length){ etat("Cette maquette n'a pas d'étage (IfcBuildingStorey)."); return; }
+    etageCibles = cles;
+    var actuel = IFC.index(r.f.m).conteneur.get(r.id), k = r.f.unite.f/fichiers[0].unite.f, lg = formatsMesure().longueur;
+    $("#etage-liste").innerHTML = ets.map(function(e){
+      var z = e.elevation != null ? e.elevation : e.z;
+      return '<option value="' + e.id + '"' + (e.id === actuel ? " selected" : "") + ">" + esc(e.nom + " (" + lg(z*k) + ")" + (e.id === actuel ? " · actuel" : "")) + "</option>";
+    }).join("");
+    $("#etage-cible").textContent = decrire(cles) + (fichiers.length > 1 ? ". Dans les autres maquettes, l'étage du même nom est utilisé." : ".");
+    $("#etage-note").textContent = "Seuls les éléments rattachés directement à un étage changent ; leurs ouvertures et leurs pièces d'assemblage suivent.";
+    ouvrirFenetre(d, $("#etage-liste"));
+  }
+  $("#etage").addEventListener("close", function(){
+    var cles = etageCibles.filter(existe);
+    etageCibles = [];
+    if ($("#etage").returnValue !== "oui" || !cles.length) return;
+    var fRef = lireCle(cles[0]).f, id = +$("#etage-liste").value, suivre = $("#etage-suivre").checked;
+    var nomE = (IFCEdition.etages(fRef.m).filter(function(e){ return e.id === id; })[0] || {}).nom;
+    var r = editer("mise à l'étage", cles, function(f, ids){
+      var cible = f === fRef ? id : (IFCEdition.etages(f.m).filter(function(e){ return e.nom === nomE; })[0] || {}).id;
+      if (!cible) return { changement: null, nb: 0, ignores: ids.length };
+      return IFCEdition.changerEtage(f.m, ids, cible, suivre);
+    });
+    etat(r.fait ? decrire(cles) + " rattaché" + (cles.length > 1 ? "s" : "") + " à « " + nomE + " »" + (suivre ? ", décalé" + (cles.length > 1 ? "s" : "") + " en hauteur avec l'étage" : ", position gardée") + "." +
+      bilanIgnores(r.ignores, "pas rattachés directement à un étage, ou étage absent de leur maquette") + FIN_EDITION
+      : "Rien n'a changé : les éléments sont déjà à cet étage." + bilanIgnores(r.ignores, "pas rattachés directement à un étage"));
+  });
+
+  // ================= Dimensions des extrusions =================
+  var dimsEtat = null;
+  function ouvrirDims(){
+    var cles = ciblesEdition(), d = $("#dims");
+    if (!cles.length){ sansCible(); return; }
+    var ref = cles.indexOf(actif) >= 0 ? actif : cles[0], r = lireCle(ref), ex = IFCEdition.extrusions(r.f.m, r.id);
+    if (!ex.length){ etat("« " + nomCle(ref) + " » : pas d'extrusion modifiable (forme maillée ou balayage). Seuls placement, attributs et propriétés peuvent changer."); return; }
+    var u = uniteSaisie(), k = r.f.unite.f/u.f, montre = ex.slice(0, 4);
+    dimsEtat = { cles: cles, ref: ref, u: u };
+    $("#dims-cible").textContent = "« " + nomCle(ref) + " » : " + pluriel(ex.length, "solide extrudé", "solides extrudés") + (ex.length > 4 ? " (les 4 premiers montrés)" : "") + ". Valeurs en " + (u.nom || "unités du fichier") + ".";
+    $("#dims-corps").innerHTML = montre.map(function(x, n){
+      function champ(cleV, lib, v){
+        var t = texteNombre(v*k);
+        return '<label><span>' + esc(lib) + '</span><input class="champ" inputmode="decimal" autocomplete="off" data-n="' + n + '" data-k="' + cleV + '" data-v0="' + t + '" value="' + t + '"></label>';
+      }
+      return '<div class="dims-gr"><div class="dims-titre">Extrusion ' + (n + 1) + (x.typeProfil ? " <i>· profil " + esc(x.typeProfil) + "</i>" : "") + '</div><div class="trois">' +
+        champ("prof", "Longueur d'extrusion", x.profondeur) + x.params.map(function(p){ return champ(p.k, p.nom, p.v); }).join("") + "</div></div>";
+    }).join("");
+    $("#dims-tous-l").hidden = cles.length < 2;
+    $("#dims-tous").checked = false;
+    $("#dims-tous-t").textContent = "Appliquer aussi aux " + pluriel(cles.length - 1, "autre élément sélectionné", "autres éléments sélectionnés") + " (même extrusion)";
+    ouvrirFenetre(d, $("#dims-corps input"));
+  }
+  $("#dims").addEventListener("close", function(){
+    var s = dimsEtat;
+    dimsEtat = null;
+    if ($("#dims").returnValue !== "oui" || !s || !existe(s.ref)) return;
+    var chg = [], faux = false;
+    [].forEach.call($("#dims-corps").querySelectorAll("input"), function(i){
+      if (i.value.trim() === i.getAttribute("data-v0")) return;
+      var v = nombreSaisi(i.value), n = +i.getAttribute("data-n"), c = i.getAttribute("data-k");
+      if (!(v > 0)){ faux = true; return; }
+      var x = chg[n] || (chg[n] = { prof: null, params: {} });
+      if (c === "prof") x.prof = v; else x.params[c] = v;
+    });
+    if (faux){ etat("Dimensions : chaque valeur doit être un nombre positif. Rien n'a été modifié."); return; }
+    if (!chg.some(Boolean)){ etat("Dimensions : aucune valeur changée."); return; }
+    var cles = $("#dims-tous").checked ? s.cles.filter(existe) : [s.ref];
+    var r = editer("modification des dimensions", cles, function(f, ids, app){
+      var k = s.u.f/f.unite.f;
+      chg.forEach(function(x, n){
+        if (!x) return;
+        var p = {};
+        Object.keys(x.params).forEach(function(c){ p[c] = x.params[c]*k; });
+        app(IFCEdition.dimensionner(f.m, ids, n, x.prof != null ? x.prof*k : null, p));
+      });
+      return null;
+    });
+    etat(r.fait ? "Dimensions modifiées : " + decrire(cles) + "." + bilanIgnores(r.ignores, "sans cette extrusion") + " Les quantités (Qto) du fichier ne sont pas recalculées." + FIN_EDITION
+      : "Dimensions : rien n'a pu être modifié." + bilanIgnores(r.ignores, "sans cette extrusion"));
+  });
+
+  // ================= Attributs et propriétés de la sélection =================
+  var attrsEtat = null, ATTRS = { 2: "nom", 3: "description", 4: "objectType", 7: "tag" };
+  function ouvrirAttrs(){
+    var cles = ciblesEdition(), d = $("#attrs");
+    if (!cles.length){ sansCible(); return; }
+    var infos = cles.map(function(c){ var x = lireCle(c); return IFC.infos(x.f.m, x.id); });
+    Object.keys(ATTRS).forEach(function(k){
+      var vals = infos.map(function(i){ return i[ATTRS[k]] || ""; }), meme = vals.every(function(v){ return v === vals[0]; }), inp = $("#at-" + k);
+      inp.value = meme ? vals[0] : "";
+      inp.placeholder = meme ? "" : "(valeurs différentes : inchangé)";
+      inp.setAttribute("data-v0", meme ? vals[0] : "\u0000");
+    });
+    var ref = cles.indexOf(actif) >= 0 ? actif : cles[0], r = lireCle(ref), props = IFCEdition.proprietesEditables(r.f.m, r.id);
+    attrsEtat = { cles: cles, props: props };
+    $("#at-prop").innerHTML = '<option value="">(aucune)</option>' + props.map(function(p, k){ return '<option value="' + k + '">' + esc(p.jeu + " › " + p.nom) + "</option>"; }).join("");
+    $("#at-val").value = ""; $("#at-val").disabled = true;
+    $("#attrs-cible").textContent = decrire(cles) + (props.length ? "" : ". Pas de propriété simple modifiable sur « " + nomCle(ref) + " ».");
+    ouvrirFenetre(d, $("#at-2"));
+  }
+  $("#at-prop").addEventListener("change", function(){
+    var p = attrsEtat && attrsEtat.props[+this.value];
+    $("#at-val").disabled = !p;
+    $("#at-val").value = p ? p.texte : "";
+  });
+  $("#attrs").addEventListener("close", function(){
+    var s = attrsEtat;
+    attrsEtat = null;
+    if ($("#attrs").returnValue !== "oui" || !s) return;
+    var valeurs = {}, cles = s.cles.filter(existe);
+    Object.keys(ATTRS).forEach(function(k){
+      var inp = $("#at-" + k), v0 = inp.getAttribute("data-v0"), v = inp.value;
+      if (v0 === "\u0000" ? v !== "" : v !== v0) valeurs[k] = v;
+    });
+    var p = $("#at-prop").value !== "" ? s.props[+$("#at-prop").value] : null, val = $("#at-val").value;
+    if (p && val === p.texte) p = null;
+    if (!Object.keys(valeurs).length && !p){ etat("Attributs : rien n'a changé."); return; }
+    var r = editer(p && !Object.keys(valeurs).length ? "modification de propriété" : "modification des attributs", cles, function(f, ids, app){
+      if (Object.keys(valeurs).length) app(IFCEdition.attributs(f.m, ids, valeurs));
+      if (p) app(IFCEdition.propriete(f.m, ids, p.jeu, p.nom, val));
+      return null;
+    });
+    etat(r.refuse ? "Valeur refusée pour « " + p.nom + " » : elle doit garder son type (nombre, oui/non…)." + (r.fait ? " Le reste est modifié." : "")
+      : r.fait ? "Attributs modifiés : " + decrire(cles) + "." + (p && r.ignores ? " " + pluriel(r.ignores, "élément n'a", "éléments n'ont") + " pas la propriété « " + p.nom + " »." : "") + FIN_EDITION
+      : "Rien n'a changé.");
+  });
+  // Propriétés modifiables dans le panneau (mode Éditeur, un élément) : validées à la sortie du champ ou par Entrée
+  $("#props").addEventListener("change", function(e){
+    var t = e.target;
+    if (!t.classList || !t.classList.contains("pv") || !modeEd || !actif || !existe(actif)) return;
+    var c = actif, r;
+    if (t.hasAttribute("data-attr")){
+      var v = {}; v[t.getAttribute("data-attr")] = t.value;
+      r = editer("modification des attributs", [c], function(f, ids){ return IFCEdition.attributs(f.m, ids, v); });
+    } else r = editer("modification de propriété", [c], function(f, ids){ return IFCEdition.propriete(f.m, ids, t.getAttribute("data-jeu"), t.getAttribute("data-prop"), t.value); });
+    if (r.refuse){ etat("Valeur refusée : elle doit garder son type (nombre, oui/non…)."); afficherProps(); }
+    else if (r.fait) etat("« " + (t.getAttribute("data-prop") || t.getAttribute("data-lib")) + " » modifié." + FIN_EDITION);
+  });
+  $("#props").addEventListener("keydown", function(e){
+    var t = e.target;
+    if (!t.classList || !t.classList.contains("pv")) return;
+    if (e.key === "Enter"){ e.preventDefault(); t.blur(); }
+    else if (e.key === "Escape"){ e.preventDefault(); t.value = t.getAttribute("data-v0") || ""; t.blur(); }
+  });
+
+  // ================= Classe IFC =================
+  var classeCibles = [];
+  function ouvrirClasse(){
+    var cles = ciblesEdition(), d = $("#classe");
+    if (!cles.length){ sansCible(); return; }
+    classeCibles = cles;
+    var r = lireCle(cles[0]), t = r.f.m.ent.get(r.id).type, C = IFCEdition.CLASSES;
+    $("#classe-liste").innerHTML = Object.keys(C).sort(function(a, b){ return C[a][0].localeCompare(C[b][0]); }).map(function(k){
+      return '<option value="' + k + '"' + (k === t ? " selected" : "") + ">" + esc(C[k][0] + " (" + IFC.nomType(k) + ")") + "</option>";
+    }).join("");
+    $("#classe-cible").textContent = decrire(cles) + " · classe actuelle : " + IFC.nomType(t) + (cles.length > 1 ? " (premier élément)" : "") + ".";
+    ouvrirFenetre(d, $("#classe-liste"));
+  }
+  $("#classe").addEventListener("close", function(){
+    var cles = classeCibles.filter(existe);
+    classeCibles = [];
+    if ($("#classe").returnValue !== "oui" || !cles.length) return;
+    var t = $("#classe-liste").value;
+    var r = editer("modification de classe IFC", cles, function(f, ids){ return IFCEdition.changerClasse(f.m, ids, t); });
+    etat(r.fait ? pluriel(r.nb, "élément passé", "éléments passés") + " en " + IFC.nomType(t) + "." + bilanIgnores(r.ignores, "déjà de cette classe, ou ouverture") + FIN_EDITION
+      : "Rien n'a changé (déjà de cette classe).");
+  });
+
+  // ================= Couleurs selon un critère (légende cliquable) =================
+  var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette"]), teintesCat = null, catsLegende = [], catDe = null;
+  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier" };
+  function categorie(l){
+    if (colorer === "type") return l.i.typeLib;
+    if (colorer === "famille") return l.i.objectType || "(sans famille : type)";
+    if (colorer === "etage") return etageDe(l.f.m, l.id) || "(sans étage)";
+    if (colorer === "materiau") return l.i.materiau || "(sans matériau)";
+    if (colorer === "maquette") return l.f.m.nom;
+    return "";
+  }
+  function calculerCouleurs(){
+    var leg = $("#legende");
+    if (!colorer || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
+    var compte = new Map(), teinte = new Map();
+    catDe = new Map();
+    lignes.forEach(function(l){
+      if (!l.i || !l.i.vue3D) return;
+      var c = categorie(l);
+      catDe.set(l.cle, c);
+      compte.set(c, (compte.get(c) || 0) + 1);
+    });
+    catsLegende = Array.from(compte.keys()).sort(function(a, b){ return compte.get(b) - compte.get(a) || a.localeCompare(b); });
+    // teintes réparties à l'angle d'or : voisines bien distinctes ; au-delà de 36 catégories, couleur par défaut
+    catsLegende.forEach(function(c, k){ if (k < 36) teinte.set(c, Math.round((k*137.508 + 210) % 360)); });
+    teintesCat = new Map();
+    catDe.forEach(function(c, k){ teintesCat.set(k, teinte.has(c) ? teinte.get(c) : null); });
+    var MAX = 14;
+    leg.innerHTML = '<div class="legende-titre"><span>' + esc(NOMS_COLORER[colorer]) + '</span><button type="button" data-leg-fermer title="Revenir aux couleurs des maquettes" aria-label="Fermer la légende">×</button></div><ul>' +
+      catsLegende.slice(0, MAX).map(function(c, k){
+        return '<li><button type="button" data-cat="' + k + '" title="Sélectionner ces éléments"><i style="--t:' + (teinte.has(c) ? pastille(teinte.get(c)) : "var(--texte-faible)") + '"></i><span>' + esc(c) + "</span><b>" + fmtN(compte.get(c)) + "</b></button></li>";
+      }).join("") + "</ul>" + (catsLegende.length > MAX ? '<div class="autres">+ ' + pluriel(catsLegende.length - MAX, "autre catégorie", "autres catégories") + "</div>" : "");
+    leg.hidden = false;
+  }
+  function poserColorer(v){
+    colorer = v || "";
+    garder("ifc.colorer", colorer);
+    calculerCouleurs();
+    majVue();
+    if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
+  }
+  $("#legende").addEventListener("click", function(e){
+    if (e.target.closest("[data-leg-fermer]")){ poserColorer(""); etat("Couleurs des maquettes rétablies."); return; }
+    var b = e.target.closest("[data-cat]");
+    if (!b || !catDe) return;
+    var c = catsLegende[+b.getAttribute("data-cat")], n = 0;
+    choix = new Set();
+    catDe.forEach(function(x, k){ if (x === c && supprimable(k)){ choix.add(k); n++; } });
+    actif = n ? choix.values().next().value : "";
+    majLignes(); afficherProps(); maj();
+    etat("« " + c + " » : " + pluriel(n, "élément sélectionné", "éléments sélectionnés") + ".");
+  });
+
+  poserMode(modeEd);
+
   // ================= Sélectionner similaires =================
   // Fenêtre de critères (tous ceux cochés doivent correspondre), ouverte depuis un élément de référence.
   function etageDe(m, id){
@@ -1786,9 +2225,21 @@
       remplacer = true; choisir();
     },
     ajouter: function(){ remplacer = false; choisir(); },
-    fusionner: fusionnerTout,
-    retailler: retailler,
-    purger: purger,
+    fusionner: seulEd(fusionnerTout),
+    retailler: seulEd(retailler),
+    purger: seulEd(purger),
+    deplacer: seulEd(function(){ ouvrirTransfo("deplacer"); }),
+    copier: seulEd(function(){ ouvrirTransfo("copier"); }),
+    tourner: seulEd(function(){ ouvrirTransfo("tourner"); }),
+    "deplacer-points": seulEd(function(){ deuxPoints(false); }),
+    "copier-points": seulEd(function(){ deuxPoints(true); }),
+    "aligner-face": seulEd(alignerFace),
+    etage: seulEd(ouvrirEtage),
+    dimensions: seulEd(ouvrirDims),
+    attributs: seulEd(ouvrirAttrs),
+    classe: seulEd(ouvrirClasse),
+    mode: function(){ poserMode(!modeEd); annoncerMode(); },
+    colorer: function(b){ poserColorer(b ? b.getAttribute("data-colorer") : ""); },
     mesurer: function(){ outil("mesure"); },
     coordonnees: function(){ outil("point"); },
     "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures et coordonnées effacées."); maj(); },
@@ -1802,7 +2253,7 @@
       modeEditeur(false);
       etat(""); window.scrollTo(0, 0);
     },
-    annuler: annuler, retablir: retablir, supprimer: supprimer,
+    annuler: annuler, retablir: retablir, supprimer: seulEd(supprimer),
     tout: function(){ $("#sel-tout").click(); },
     rien: function(){ var n = choix.size; choix.clear(); oublierActif(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
     inverser: function(){ $("#sel-inv").click(); },
@@ -1869,12 +2320,16 @@
         ["M", "Mesurer (deux clics ; Échap : annuler le point, puis quitter)"],
         ["C", "Coordonnées d'un point (X Y Z ; sur une face : Z seul)"],
         ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
+        ["E", "Basculer Viewer / Éditeur"],
+        ["D · Maj+D", "Déplacer (valeurs, ou deux points accrochés)"], ["K · Maj+K", "Copier (valeurs, ou deux points accrochés)"],
+        ["R", "Rotation autour de la verticale"], ["A", "Aligner : face de référence, puis faces à amener dessus"], ["L", "Changer d'étage"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
-        ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe, sélectionner similaires"]
+        ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe, sélectionner similaires ; en Éditeur : modifier"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
       aide("Éditeur IFC", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
+        "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
         "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>");
     }
@@ -1967,14 +2422,17 @@
     }
     else if (e.key === "ArrowRight" || e.key === "ArrowLeft"){
       e.preventDefault();
-      ouvrirMenu(groupes[(gi + (e.key === "ArrowRight" ? 1 : -1) + groupes.length) % groupes.length], true);
+      // menus masqués en mode Viewer (Édition, Modifier) sautés
+      var pas = e.key === "ArrowRight" ? 1 : -1, j = gi;
+      for (var n = 0; n < groupes.length; n++){ j = (j + pas + groupes.length) % groupes.length; if (groupes[j].offsetParent) break; }
+      ouvrirMenu(groupes[j], true);
     }
     else if (e.key === "Escape"){ e.preventDefault(); var t = ouvert.titre; fermerMenu(); t.focus(); }
   });
 
   // ================= Raccourcis clavier =================
   document.addEventListener("keydown", function(e){
-    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || $("#confirmer").open || $("#aide").open || $("#preferences").open || $("#purge").open) return;
+    if (!fichiers.length || $("#editeur").hidden || ouvert || !ctx.hidden || document.querySelector("dialog[open]")) return;
     var t = e.target.tagName, saisie = t === "INPUT" || t === "SELECT" || t === "TEXTAREA";
     var k = (e.key || "").toLowerCase(), mod = e.ctrlKey || e.metaKey, c = null;
     if (mod && k === "o") c = e.shiftKey ? "ajouter" : "ouvrir";
@@ -1984,7 +2442,8 @@
     else if (mod && (k === "y" || (k === "z" && e.shiftKey))) c = "retablir";
     else if (mod && k === "a") c = "tout";
     else if (mod || e.altKey) return;
-    else if (e.key === "Delete" && choix.size) c = "supprimer";
+    else if (e.key === "Delete" && choix.size && modeEd) c = "supprimer";
+    else if (e.key === "Escape" && vue.enSaisie()){ e.preventDefault(); vue.annulerMesure(); maj(); return; }
     else if (e.key === "Escape" && vue.annulerMesure()){ e.preventDefault(); etat(vue.outil() ? "Point de départ annulé." : "Outil terminé."); maj(); return; }
     else if (e.key === "Escape" && choix.size) c = "rien";
     else if (k === "m") c = "mesurer";
@@ -1998,6 +2457,12 @@
     else if (k === "i") c = "isoler";
     else if (k === "z") c = "zoomer";
     else if (k === "b") c = e.shiftKey ? "sans-coupe" : "coupe";
+    else if (k === "e") c = "mode";
+    else if (k === "d") c = e.shiftKey ? "deplacer-points" : "deplacer";
+    else if (k === "k") c = e.shiftKey ? "copier-points" : "copier";
+    else if (k === "r") c = "tourner";
+    else if (k === "a") c = "aligner-face";
+    else if (k === "l") c = "etage";
     else if (e.key === "?") c = "raccourcis";
     if (!c) return;
     e.preventDefault();
