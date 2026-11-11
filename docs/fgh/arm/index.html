@@ -290,7 +290,6 @@ main{max-width:640px;margin:0 auto;padding:0 20px 20px}
   <div class="mh"><h2 id="sTitle">Chercher un plan</h2><button class="btn s w" data-close="mSearch">Fermer</button></div>
   <label class="fld"><span>Mots-clés (ex. noyau C rinf, SS-2, triangle 2b)</span><input id="qKw" autocomplete="off"></label>
   <div class="chips" id="qTypes"></div>
-  <label class="muted" style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" id="qCtl"> Inclure les plans déjà contrôlés</label>
   <p class="muted">⚠ Le dossier 51 - Execution contient parfois un indice plus récent que la liste : vérifier le dernier PDF.</p>
   <div id="qRes"></div>
 </div></div>
@@ -597,10 +596,10 @@ function openSearch(field){
   if(!$('#qKw').value)$('#qKw').value=CUR.description||CUR.localisation||'';openModal('mSearch');runSearch();
 }
 $('#qTypes').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=b.dataset.ty;SRCH.types=SRCH.types.includes(t)?SRCH.types.filter(x=>x!==t):[...SRCH.types,t];b.classList.toggle('on');runSearch();};
-$('#qKw').oninput=()=>{clearTimeout(runSearch.t);runSearch.t=setTimeout(runSearch,200);};$('#qCtl').onchange=runSearch;
+$('#qKw').oninput=()=>{clearTimeout(runSearch.t);runSearch.t=setTimeout(runSearch,200);};
 function runSearch(){
-  const kws=norm($('#qKw').value).split(/[\s\-–]+/).filter(Boolean),inc=$('#qCtl').checked;
-  let res=latestByLivrable(PLANS.rows).filter(r=>{if(SRCH.types.length&&!SRCH.types.includes(String(r.type).toUpperCase()))return false;if(!inc&&norm(r.controle)==='oui')return false;
+  const kws=norm($('#qKw').value).split(/[\s\-–]+/).filter(Boolean);
+  let res=latestByLivrable(PLANS.rows).filter(r=>{if(SRCH.types.length&&!SRCH.types.includes(String(r.type).toUpperCase()))return false;
     const hay=norm([r.titre,r.chapitre,r.etage,r.zone,r.type,r.numero,r.code].join(' '));return kws.every(k=>hay.includes(k));});
   res.sort((a,b)=>(a.type+a.numero).localeCompare(b.type+b.numero,undefined,{numeric:true}));const n=res.length;res=res.slice(0,40);
   $('#qRes').innerHTML=(n?`<p class="muted">${n} livrable(s)${n>40?' – préciser les mots-clés':''}</p>`:'<p class="muted">Aucun résultat : essayer moins de mots-clés (« SS-2 » au lieu de « SS2 », « Rez inf » pour Rinf).</p>')+
@@ -758,7 +757,7 @@ function sugCtx(){
 function suggestPlans(field){
   if(!PLANS||!CUR)return[];const c=sugCtx();if(!c.et.length&&!c.zo.length&&!c.words.length)return[];
   const types=TYPESETS[field];
-  const cands=latestByLivrable(PLANS.rows).filter(r=>types.includes(String(r.type).toUpperCase())&&norm(r.controle)!=='oui');
+  const cands=latestByLivrable(PLANS.rows).filter(r=>types.includes(String(r.type).toUpperCase()));
   const sc=r=>{let s=0;const t=norm(r.titre+' '+r.chapitre);if(c.et.includes(r.etage))s+=5;else if(c.et.length)s-=3;if(c.zo.includes(r.zone))s+=3;
     c.words.forEach(w=>{if(t.includes(w))s+=1.5;});
     const used=(mem().plansByEtage||{})[c.et[0]+'|'+field];if(used&&used.includes(r.numero))s+=2;return s;};
@@ -771,7 +770,7 @@ function autoProposePlans(){ // pré-remplit si une proposition se détache nett
   if(n){save();toast(n+' plan(s) proposé(s) d\'après l\'étage – à confirmer');}
 }
 function scoreGap(field){const c=sugCtx();const types=TYPESETS[field];
-  const S2=latestByLivrable(PLANS.rows).filter(r=>types.includes(String(r.type).toUpperCase())&&norm(r.controle)!=='oui').map(r=>{let s=0;const t=norm(r.titre+' '+r.chapitre);if(c.et.includes(r.etage))s+=5;else if(c.et.length)s-=3;if(c.zo.includes(r.zone))s+=3;c.words.forEach(w=>{if(t.includes(w))s+=1.5;});return s;}).sort((a,b)=>b-a);
+  const S2=latestByLivrable(PLANS.rows).filter(r=>types.includes(String(r.type).toUpperCase())).map(r=>{let s=0;const t=norm(r.titre+' '+r.chapitre);if(c.et.includes(r.etage))s+=5;else if(c.et.length)s-=3;if(c.zo.includes(r.zone))s+=3;c.words.forEach(w=>{if(t.includes(w))s+=1.5;});return s;}).sort((a,b)=>b-a);
   return (S2[0]||0)-(S2[1]||0);}
 function rememberPlans(c){const ctx=sugCtx();if(!ctx.et.length)return;const M=mem();M.plansByEtage=M.plansByEtage||{};
   (c.plans||[]).forEach(p=>{const k=ctx.et[0]+'|'+p.field;const L=(M.plansByEtage[k]||[]).filter(x=>x!==p.numero);L.unshift(p.numero);M.plansByEtage[k]=L.slice(0,5);});}
