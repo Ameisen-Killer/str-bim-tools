@@ -1851,6 +1851,12 @@
    * posée sur un jour chômé glisse au prochain jour ouvré, dans le sens du
    * déplacement. `apres` : à rappeler pour redessiner la page.
    */
+  /** « Dépendance décalée de +2 j, tâche principale repoussée de +1 j pour la suivre » (D.decalePart). */
+  function texteDecalageDep(r) {
+    var j = function (n) { return (n > 0 ? "+" : "") + n + " j"; };
+    return "Dépendance décalée de " + j(r.dependance) +
+      (r.principale ? ", tâche principale repoussée de " + j(r.principale) + " pour la suivre" : "");
+  }
   function decaleTache(id, jours, apres, role) {
     var t = D.tache(id);
     if (!t) return Promise.resolve();
@@ -1860,7 +1866,8 @@
       if (apres) apres();
       if (!r) return;
       var j = function (n) { return (n > 0 ? "+" : "") + n + " j"; };
-      if (!calculSeul) toast("Tâche décalée de " + j(r.dessin) + ".");
+      if (r.dependance != null) toast(texteDecalageDep(r) + ".");
+      else if (!calculSeul) toast("Tâche décalée de " + j(r.dessin) + ".");
       else if (r.dessin) toast("Calcul décalé de " + j(r.calcul) + ", dessin repoussé de " + j(r.dessin) + " pour le suivre.");
       else toast(r.calcul < 0 ? "Calcul avancé de " + (-r.calcul) + " j, le dessin ne bouge pas." : "Calcul décalé de " + j(r.calcul) + ".");
     }).catch(function (e) { if (apres) apres(); toast(e.message); });
@@ -1886,6 +1893,7 @@
     var a = D.affaire(t.affaireId), canton = D.canton();
     var lectureSeule = !D.peutEcrireTache(t);
 
+    var unePart = !(t.chargeInge > 0 && t.chargeDessin > 0);
     // Les parts que cette fiche mène : celle de la barre cliquée, sinon toutes celles qui portent une charge
     var roles = ["ingenieur", "dessinateur"].filter(function (r) {
       return o.role ? o.role === r : t[D.PARTS[r].charge] > 0;
@@ -1926,7 +1934,8 @@
       var p = D.PARTS[r];
       var input = el("input", { type: "checkbox", name: "fini", value: p.fini });
       input.checked = t[p.fini] === true;
-      return { role: r, part: p, input: input, etiquette: el("label", { class: "case" }, [input, p.label + " terminé"]) };
+      // Tâche d'une seule part (11.11.2026) : plus de « calcul » ni de « dessin », la tâche tout court
+      return { role: r, part: p, input: input, etiquette: el("label", { class: "case" }, [input, unePart ? "Tâche terminée" : p.label + " terminé"]) };
     });
     function toutesCochees() {
       return coches.length > 0 && coches.every(function (c) { return c.input.checked; });
@@ -1972,7 +1981,7 @@
       el("div", { class: "champ" }, [el("label", { text: "Avancement (%)" }), avancement])
     ].concat(confies.map(function (c) {
       return el("div", { class: "champ" }, [
-        el("label", { text: (c.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), c.select
+        el("label", { text: unePart ? "Personne désignée" : (c.role === "ingenieur" ? "Ingénieur" : "Dessinateur") + " affecté" }), c.select
       ]);
     }));
     if (coches.length) {
@@ -1996,10 +2005,28 @@
     var note = boiteNote.querySelector("textarea");
     champs.push(boiteNote);
 
+    // Une seule part : la personne désignée ; une tâche d'avant les dépendances garde ses deux lignes
+    var rolePart = t.chargeInge > 0 ? "ingenieur" : "dessinateur", P1 = D.PARTS[rolePart];
+    var lignesParts = unePart ? [
+      ligne("Personne", (t[P1.membre] ? D.nomMembre(t[P1.membre]) : "À affecter") + " · " + C.fmtJours(t[P1.charge]) + " j" +
+        (t[P1.fini] ? "  ·  terminée" : periode(t[P1.charge], t[P1.membre], rolePart)))
+    ] : null;
+    // Dépendances (11.11.2026) : ce que la tâche attend, ou la tâche qu'elle précède
+    var princ = D.principale(t), deps = D.dependances(t.id);
+    var lignesDeps = [
+      princ ? ligne("Avant", "« " + princ.titre + " » · " + D.nomMembre(Calc.porteur(princ))) : null,
+      deps.length ? ligne(deps.length > 1 ? "Dépendances" : "Dépendance", deps.map(function (d) {
+        var id = Calc.porteur(d);
+        return (id ? D.nomMembre(id) : "À affecter") + " · " + C.fmtJours(Calc.chargeTotale(d)) + " j" +
+          (d.statut === "termine" ? " · rendue" : " · à rendre le " + C.fmtCourt(d.echeance));
+      }).join(" ; ")) : null
+    ];
     var corps = el("div", {}, [
-      ligne("Affaire", a ? D.libelleAffaire(a) : "—"),
+      ligne("Affaire", a ? D.libelleAffaire(a) : "—")
+    ].concat(lignesParts || [
       ligne("Ingénieur", t.chargeInge > 0 ? (t.ingenieurId ? D.nomMembre(t.ingenieurId) : "À affecter") + " · " + C.fmtJours(t.chargeInge) + " j" + (t.finiInge ? "  ·  terminé" : periode(t.chargeInge, t.ingenieurId, "ingenieur")) : "—"),
-      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId, "dessinateur")) : "—"),
+      ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId, "dessinateur")) : "—")
+    ]).concat(lignesDeps).concat([
       ligne("Échéance", C.fmtLong(t.echeance)),
       lectureSeule
         ? el("p", { class: "aide", style: "margin-top:20px;font-size:14px;color:var(--texte-doux)", text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier." })
@@ -2010,7 +2037,7 @@
         decaleBouton("− 1 sem.", -7), decaleBouton("− 1 j", -1),
         decaleBouton("+ 1 j", 1), decaleBouton("+ 1 sem.", 7)
       ])
-    ]);
+    ]));
 
     /* Tâche d'un collègue, sans le droit : on la lit, on n'y touche pas
        (la base applique la même règle). */
@@ -2058,11 +2085,6 @@
     });
   }
 
-  /**
-   * formulaireTache(idTache, o) — idTache nul pour une nouvelle tâche.
-   * o.affaireId : affaire proposée pour une nouvelle tâche
-   * o.surEnregistrement : appelée après l'enregistrement, pour redessiner la page
-   */
   /* Priorité (06.10.2026) : départage les tâches de même
      échéance. Curseur de 1, la plus importante, à 5, par défaut. */
   var NIVEAUX_PRIORITE = { 1: "la plus importante", 2: "haute", 3: "moyenne", 4: "basse", 5: "normale, par défaut" };
@@ -2091,6 +2113,65 @@
     ]);
   }
 
+  /**
+   * formulaireTache(idTache, o) — idTache nul pour une nouvelle tâche.
+   * o.affaireId : affaire proposée pour une nouvelle tâche
+   * o.membreId : personne désignée d'office (double-clic au tableau de bord,
+   *              « Nouvelle tâche pour … » du menu d'une personne)
+   * o.aAffecter : "ingenieur" ou "dessinateur" — tâche neuve à affecter
+   * o.echeance : échéance proposée (le jour double-cliqué)
+   * o.surEnregistrement : appelée après l'enregistrement, pour redessiner la page
+   *
+   * 11.11.2026, demande de Tony : plus de « calcul / dessin » dans le
+   * formulaire. Une tâche a une personne désignée et sa charge, puis, au
+   * besoin, des dépendances : d'autres tâches, chacune avec sa personne et sa
+   * charge, à rendre avant le début de la tâche principale (donnees.js). En
+   * base, la charge d'une tâche va dans la part du métier de sa personne
+   * (ingénieur ou dessinateur) ; une tâche d'avant, qui a les deux parts, se
+   * lit comme sa part dessin précédée d'une dépendance, sa part calcul, et
+   * se range ainsi au premier enregistrement.
+   */
+  /** Valeur d'une personne dans les menus : son identifiant, ou « @métier » à affecter. */
+  function partsDe(valeur, charge) {
+    var o = { ingenieurId: null, chargeInge: 0, dessinateurId: null, chargeDessin: 0 };
+    var m = valeur && valeur.charAt(0) !== "@" ? D.membre(valeur) : null;
+    var cote = m ? (D.cote(m.metier) || "ingenieur") : (valeur === "@dessinateur" ? "dessinateur" : "ingenieur");
+    if (cote === "dessinateur") { o.dessinateurId = m ? m.id : null; o.chargeDessin = charge; }
+    else { o.ingenieurId = m ? m.id : null; o.chargeInge = charge; }
+    return o;
+  }
+  /** Valeur de menu de la personne qui porte une tâche d'une seule part. */
+  function valeurPersonne(t, role) {
+    role = role || (t.chargeInge > 0 ? "ingenieur" : "dessinateur");
+    var id = role === "ingenieur" ? t.ingenieurId : t.dessinateurId;
+    return id || "@" + role;
+  }
+  /** Menu d'une personne : à affecter, puis l'équipe de l'affaire, les ingénieurs, les dessinateurs. */
+  function selPersonne(nom, valeur, affaireId) {
+    var sel = el("select", { name: nom, id: "c-" + nom });
+    sel.appendChild(el("option", { value: "@ingenieur" }, ["— À affecter (ingénieur) —"]));
+    sel.appendChild(el("option", { value: "@dessinateur" }, ["— À affecter (dessinateur) —"]));
+    var aff = affaireId ? D.affaire(affaireId) : null;
+    var idsEquipe = aff ? aff.ingenieurs.concat(aff.dessinateurs) : [];
+    var tous = D.membres({ planifies: true, tous: true }).filter(function (m) { return m.actif || m.id === valeur; });
+    function option(m, metier) {
+      return el("option", { value: m.id }, [m.prenom + " " + m.nom + (metier ? " · " + D.libelleMetier(m.metier).toLowerCase() : "") + (m.actif ? "" : " (inactif)")]);
+    }
+    function groupe(label, liste, metier) {
+      if (!liste.length) return;
+      var g = el("optgroup", { label: label });
+      liste.forEach(function (m) { g.appendChild(option(m, metier)); });
+      sel.appendChild(g);
+    }
+    groupe("Équipe de l'affaire", tous.filter(function (m) { return idsEquipe.indexOf(m.id) >= 0; }), true);
+    var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
+    groupe("Ingénieurs", autres.filter(function (m) { return D.cote(m.metier) === "ingenieur"; }));
+    groupe("Dessinateurs", autres.filter(function (m) { return D.cote(m.metier) === "dessinateur"; }));
+    sel.value = valeur || "@ingenieur";
+    if (sel.value !== valeur) sel.value = "@ingenieur";
+    return sel;
+  }
+
   function formulaireTache(idTache, o) {
     o = o || {};
     var Calc = global.Calc;
@@ -2108,13 +2189,12 @@
     }
 
     /* Droits. Sans « créer des tâches pour les autres », on ne mène que les
-       tâches dont une part chargée est la sienne. À la création, sa propre part
-       est verrouillée sur soi, l'autre reste libre (un ingénieur confie le
-       dessin, un dessinateur nomme son ingénieur). Sur une tâche déjà là, rien
-       n'est verrouillé : on peut passer la main, c'est-à-dire confier sa part à
-       un collègue du même métier ou la remettre à affecter — la tâche quitte
-       alors son planning, et on n'y revient plus. Une tâche qui ne nous
-       concerne pas s'ouvre en lecture seule. La base applique les mêmes règles. */
+       tâches dont on est la personne désignée, et leurs dépendances. À la
+       création, la personne désignée, c'est soi ; les dépendances, elles,
+       vont à qui l'on veut. Sur une tâche déjà là, on peut passer la main :
+       désigner un collègue, ou la remettre à affecter — la tâche quitte
+       alors son planning. Une tâche qui ne nous concerne pas s'ouvre en
+       lecture seule. La base applique les mêmes règles. */
     var libre = D.aDroit("taches_autrui");
     var moi = libre ? null : D.monMembre();
     var maCote = libre ? "" : D.cote(moi && moi.metier);
@@ -2123,177 +2203,210 @@
         ? "Ton métier n'est pas encore désigné : demande-le à l'administrateur de l'outil, ou fais-toi donner le droit de créer des tâches pour les autres."
         : "Aucune fiche d'équipe n'est rattachée à ton adresse : demande à l'administrateur de l'outil.");
     }
-    var lectureSeule = !libre && !!t && !D.meConcerne(t);
-
-    /* La part que je tiens dans cette tâche : celle que je peux passer à
-       quelqu'un d'autre. Vide quand j'ai le droit, ou que la tâche est neuve. */
-    var maPart = "";
-    if (!libre && t && moi) {
-      if (t.ingenieurId === moi.id && t.chargeInge > 0) maPart = "ingenieur";
-      else if (t.dessinateurId === moi.id && t.chargeDessin > 0) maPart = "dessinateur";
+    if (!libre && !t && o.membreId && moi && o.membreId !== moi.id) {
+      return toast("Sans le droit de créer des tâches pour les autres, une tâche que tu crées est la tienne : tu peux en revanche confier ses dépendances à des collègues.");
     }
+    var lectureSeule = !libre && !!t && !D.meConcerne(t);
+    var actives = D.dependancesActives();
+
+    // La tâche principale, quand celle-ci est une dépendance
+    var principale = t ? D.principale(t) : null;
+    // Tâche d'avant les dépendances, avec ses deux parts : le dessin devient la tâche, le calcul sa dépendance
+    var deuxParts = !!t && t.chargeInge > 0 && t.chargeDessin > 0;
 
     // Mes affaires en tête, puis les autres (Donnees.optionsAffaires)
     var optionsAffaires = D.optionsAffaires(affaires, function (a) { return { valeur: a.id, label: D.libelleAffaire(a) }; });
     var lesMiennes = affaires.filter(function (a) { return D.mesAffaires()[a.id]; });
     var affaireDefaut = (lesMiennes[0] || affaires[0]).id;
-
-    var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : affaireDefaut);
+    var affaireInit = t ? t.affaireId : (D.affaire(o.affaireId) ? o.affaireId : (D.affaire(b.affaireId) ? b.affaireId : affaireDefaut));
 
     var chAffaire = champ({
       nom: "affaireId", label: "Affaire", type: "select", valeur: affaireInit, large: true,
       options: optionsAffaires
     });
+    // Une dépendance suit l'affaire de sa tâche principale
+    if (principale) chAffaire.querySelector("select").disabled = true;
 
-    var boiteIng = el("div", { class: "champ" }, [el("label", { for: "c-ingenieurId", text: "Ingénieur" })]);
-    var boiteDes = el("div", { class: "champ" }, [el("label", { for: "c-dessinateurId", text: "Dessinateur" })]);
-    function rebranche() {
-      var aff = chAffaire.querySelector("select").value;
-      var vi = boiteIng.querySelector("select") ? boiteIng.querySelector("select").value : (t ? t.ingenieurId : (b.ingenieurId || ""));
-      var vd = boiteDes.querySelector("select") ? boiteDes.querySelector("select").value : (t ? t.dessinateurId : (b.dessinateurId || ""));
-      [boiteIng, boiteDes].forEach(function (b) {
-        var s = b.querySelector("select"); if (s) s.remove();
-        var a = b.querySelector(".aide"); if (a) a.remove();
-      });
-      // Ma part reste la mienne : le menu est posé sur moi et ne s'ouvre pas.
-      if (maCote === "ingenieur" && !t) vi = moi.id;
-      if (maCote === "dessinateur" && !t) vd = moi.id;
-      boiteIng.appendChild(selMembres("ingenieurId", "ingenieur", vi, aff));
-      boiteDes.appendChild(selMembres("dessinateurId", "dessinateur", vd, aff));
-      if (maCote && !t) {
-        var sien = (maCote === "ingenieur" ? boiteIng : boiteDes).querySelector("select");
-        sien.value = moi.id;
-        sien.disabled = true;
-        sien.title = "Sans le droit de créer des tâches pour les autres, cette part est la tienne.";
-      } else if (maPart) {
-        (maPart === "ingenieur" ? boiteIng : boiteDes).appendChild(el("div", {
-          class: "aide",
-          text: "Ta part : désigne quelqu'un d'autre pour lui passer la main."
-        }));
-      }
+    /* La personne désignée et sa charge, au départ */
+    var persInit, chargeInit;
+    if (t) {
+      persInit = deuxParts ? valeurPersonne(t, "dessinateur") : valeurPersonne(t);
+      chargeInit = deuxParts ? t.chargeDessin : (t.chargeInge || t.chargeDessin);
+    } else {
+      var bDeux = (b.chargeInge > 0) && (b.chargeDessin > 0);
+      if (o.membreId && D.membre(o.membreId)) persInit = o.membreId;
+      else if (moi && maCote) persInit = moi.id;
+      else if (o.aAffecter) persInit = "@" + o.aAffecter;
+      else if (bDeux || b.chargeDessin > 0) persInit = b.dessinateurId || "@dessinateur";
+      else persInit = b.ingenieurId || "@ingenieur";
+      chargeInit = bDeux ? b.chargeDessin : (b.chargeInge || b.chargeDessin || "");
     }
-    rebranche();
-    chAffaire.querySelector("select").addEventListener("change", rebranche);
 
-    /* Les deux parts se terminent séparément : ces cases font foi, le statut
-       n'en est que la synthèse (donnees.js les remet d'accord à l'écriture).
-       Une part sans charge ne se coche pas : sa case se grise à la frappe. */
-    var parts = [
-      { cle: "finiInge", charge: "chargeInge", label: "Calcul terminé" },
-      { cle: "finiDessin", charge: "chargeDessin", label: "Dessin terminé" }
-    ].map(function (p) {
-      var input = el("input", { type: "checkbox", name: "parts", value: p.cle });
-      input.checked = !!(t && t[p.cle]);
-      p.input = input;
-      p.etiquette = el("label", { class: "case" }, [input, p.label]);
-      return p;
+    var boitePers = el("div", { class: "champ" }, [el("label", { for: "c-personne", text: "Personne désignée" })]);
+    var chCharge = champ({
+      nom: "charge", label: "Charge (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
+      valeur: chargeInit, exemple: "0"
     });
-    var casesParts = el("div", { class: "cases" }, parts.map(function (p) { return p.etiquette; }));
 
-    /* Le dessin attend-il le calcul ? Cochée, la part calcul doit être rendue la
-       veille du jour où le dessin commence (Calc.finPart). Une tâche neuve l'est
-       d'office. N'a de sens qu'avec les deux charges. */
-    var entreeEnchaine = el("input", { type: "checkbox", name: "enchaine", value: "1" });
-    entreeEnchaine.checked = t ? !!t.enchaine : !("enchaine" in b) || !!b.enchaine;
-    var caseEnchaine = el("label", {
-      class: "case", title: "Décoché : calcul et dessin avancent en parallèle jusqu'à l'échéance."
-    }, [entreeEnchaine, "Le dessin commence quand le calcul est rendu"]);
-    function partsPortees() { return parts.filter(function (p) { return !p.input.disabled; }); }
-    /** Toutes les parts qui existent sont cochées — et il en existe au moins une. */
-    function partsFinies() {
-      var portees = partsPortees();
-      return portees.length > 0 && portees.every(function (p) { return p.input.checked; });
+    /* ---- les dépendances : une ligne chacune ---- */
+    var lignesDeps = [];
+    var listeDeps = el("div", { class: "deps-liste" });
+    var nDep = 0;
+    function ajouteLigne(d) {
+      d = d || {};
+      var k = ++nDep;
+      var ligne = { id: d.id || null, echeance: d.echeance || null, statut: d.statut || "a_faire", avancement: d.avancement || 0, priorite: d.priorite };
+      var boite = el("div", { class: "champ" }, [el("label", { for: "c-dep-p" + k, text: "À faire avant par" })]);
+      ligne.boite = boite;
+      ligne.valeur = d.personne || (moi && maCote && !libre ? "@" + (maCote === "ingenieur" ? "dessinateur" : "ingenieur") : "@ingenieur");
+      var chC = champ({ nom: "dep-c" + k, label: "Charge (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal", valeur: d.charge || "", exemple: "0" });
+      var chT = champ({ nom: "dep-t" + k, label: "Libellé", valeur: d.titre || "", exemple: "Même libellé que la tâche" });
+      ligne.charge = chC.querySelector("input");
+      ligne.titre = chT.querySelector("input");
+      ligne.fini = ligne.statut === "termine";
+      var retire = boutonIcone("supprimer", "Retirer cette dépendance", d.titre || "", function () {
+        lignesDeps.splice(lignesDeps.indexOf(ligne), 1);
+        ligne.noeud.remove();
+        recalcule();
+      });
+      ligne.noeud = el("div", { class: "dep-ligne" + (ligne.fini ? " finie" : "") }, [boite, chC, chT, el("div", { class: "dep-retire" }, [retire])]);
+      lignesDeps.push(ligne);
+      listeDeps.appendChild(ligne.noeud);
+      branchePersonnes();
+      return ligne;
+    }
+    var boutonDep = el("button", {
+      class: "btn btn-nu dep-ajoute", type: "button",
+      onclick: function () { var l = ajouteLigne(); recalcule(); l.boite.querySelector("select").focus(); }
+    }, ["+ Ajouter une dépendance"]);
+
+    // Les dépendances déjà enregistrées, ou la part calcul d'une tâche d'avant
+    if (t && !principale) {
+      D.dependances(t.id).forEach(function (d) {
+        ajouteLigne({ id: d.id, personne: valeurPersonne(d), charge: d.chargeInge || d.chargeDessin,
+          titre: d.titre === t.titre ? "" : d.titre, echeance: d.echeance, statut: d.statut, avancement: d.avancement, priorite: d.priorite });
+      });
+      if (deuxParts) {
+        ajouteLigne({ personne: valeurPersonne(t, "ingenieur"), charge: t.chargeInge,
+          echeance: Calc.finPart(t, "ingenieur", D.canton()), statut: t.finiInge ? "termine" : "a_faire" });
+      }
+    } else if (!t && b.chargeInge > 0 && b.chargeDessin > 0) {
+      ajouteLigne({ personne: b.ingenieurId || "@ingenieur", charge: b.chargeInge });
     }
 
-    // Début recalculé à chaque frappe : durée, échéance ou intervenant
-    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:7px" });
-    function recalcule() {
-      var v = lit(corps);
-      vide(apercu);
-
-      parts.forEach(function (p) {
-        var porte = (parseFloat(String(v[p.charge]).replace(",", ".")) || 0) > 0;
-        p.input.disabled = !porte;
-        if (!porte) p.input.checked = false;
-        p.etiquette.style.opacity = porte ? "" : ".4";
+    /** (Re)pose les menus de personne : l'affaire choisie en tête. */
+    function branchePersonnes() {
+      var aff = chAffaire.querySelector("select").value;
+      var vp = boitePers.querySelector("select") ? boitePers.querySelector("select").value : persInit;
+      var s = boitePers.querySelector("select"); if (s) s.remove();
+      var a = boitePers.querySelector(".aide"); if (a) a.remove();
+      var sel = selPersonne("personne", vp, aff);
+      boitePers.insertBefore(sel, boitePers.children[1] || null);
+      // Sans le droit, une tâche que je crée est la mienne : le menu est posé sur moi
+      if (!libre && !t && moi) {
+        sel.value = moi.id;
+        sel.disabled = true;
+        sel.title = "Sans le droit de créer des tâches pour les autres, la tâche que tu crées est la tienne. Ses dépendances, elles, vont à qui tu veux.";
+      } else if (!libre && t && moi && D.meConcerne(t) && !principale && Calc.porteur(t) === moi.id) {
+        boitePers.appendChild(el("div", { class: "aide", text: "C'est toi : désigne quelqu'un d'autre pour lui passer la main." }));
+      }
+      lignesDeps.forEach(function (l, i) {
+        var ancien = l.boite.querySelector("select");
+        var v = ancien ? ancien.value : l.valeur;
+        if (ancien) ancien.remove();
+        var sd = selPersonne("dep-p" + (i + 1), v, aff);
+        sd.id = "c-dep-p" + l.boite.querySelector("label").getAttribute("for").slice(7);
+        l.boite.appendChild(sd);
       });
-      var deuxParts = parts.every(function (p) { return !p.input.disabled; });
-      caseEnchaine.style.opacity = deuxParts ? "" : ".4";
-      entreeEnchaine.disabled = !deuxParts;
-      // Une charge ramenée à zéro peut suffire à terminer la tâche, ou la rouvrir.
-      // Sans aucune charge, il n'y a pas encore de part : rien à conclure (une tâche
-      // neuve s'ouvrait « Terminé », toutes ses parts… inexistantes étant finies).
-      if (selStatut && partsPortees().length) {
-        if (partsFinies()) selStatut.value = "termine";
-        else if (selStatut.value === "termine") selStatut.value = "en_cours";
-      }
+    }
+    branchePersonnes();
+    chAffaire.querySelector("select").addEventListener("change", branchePersonnes);
 
-      if (!v.echeance) {
-        apercu.appendChild(el("span", { class: "aide", text: "Saisis l'échéance." }));
-        return;
+    // Début recalculé à chaque frappe : charge, échéance ou personne
+    var apercu = el("div", { style: "font-size:14px;line-height:1.5;padding-top:7px" });
+    function nombre(x) { return parseFloat(String(x).replace(",", ".")) || 0; }
+    /** La tâche principale telle que le formulaire la dit, pour les calculs. */
+    function brouillonPrincipal() {
+      var v = lit(corps);
+      var p = partsDe(boitePers.querySelector("select").value, nombre(v.charge));
+      p.echeance = v.echeance || null;
+      p.statut = "a_faire";
+      return p;
+    }
+    function brouillonDep(l) {
+      return partsDe(l.boite.querySelector("select").value, nombre(l.charge.value));
+    }
+    function ligneApercu(role, x, debut, fin, ouvres, idM, rendu) {
+      return el("div", {}, [
+        el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: role + " " }),
+        el("span", { class: "or", text: C.fmtLong(debut) }),
+        el("span", { class: "aide", text: "  " + C.fmtJours(x) + " j sur " + C.fmtJours(ouvres) + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") +
+          (rendu ? " · rendu le " + C.fmtCourt(fin) : "") + (idM ? "" : " · à affecter") })
+      ]);
+    }
+    function recalcule() {
+      vide(apercu);
+      var p = brouillonPrincipal();
+      if (!p.echeance) { apercu.appendChild(el("span", { class: "aide", text: "Saisis l'échéance." })); return; }
+      var charge = p.chargeInge || p.chargeDessin;
+      if (!charge) { apercu.appendChild(el("span", { class: "aide", text: "Saisis une charge." })); return; }
+      var idP = Calc.porteur(p), mP = idP ? D.membre(idP) : null;
+      var fin = p.echeance;
+      // Une dépendance ne finit pas après la veille du début de sa tâche principale
+      if (principale) {
+        var lim = Calc.limiteDependance(principale, p, D.canton());
+        if (lim && fin > lim) fin = lim;
       }
-      var lignes = [
-        { role: "Ingénieur", charge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0, id: v.ingenieurId },
-        { role: "Dessin", charge: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0, id: v.dessinateurId }
-      ].filter(function (x) { return x.charge > 0; });
-      if (!lignes.length) {
-        apercu.appendChild(el("span", { class: "aide", text: "Saisis une charge." }));
-        return;
-      }
-      // Même règle que le planning : la part calcul d'une tâche enchaînée finit
-      // la veille du début du dessin
-      var brouillon = {
-        echeance: v.echeance, enchaine: entreeEnchaine.checked,
-        chargeInge: parseFloat(String(v.chargeInge).replace(",", ".")) || 0,
-        chargeDessin: parseFloat(String(v.chargeDessin).replace(",", ".")) || 0,
-        dessinateurId: v.dessinateurId || null, statut: "a_faire",
-        finiDessin: parts[1].input.checked
-      };
-      lignes.forEach(function (x) {
-        var m = x.id ? D.membre(x.id) : null;
-        var fin = Calc.finPart(brouillon, x.role === "Ingénieur" ? "ingenieur" : "dessinateur", D.canton());
-        var debut = Calc.debutPour(x.charge, fin, m, D.canton());
-        var ouvres = Calc.joursTravaillesEntre(m, debut, fin, D.canton());
-        apercu.appendChild(el("div", {}, [
-          el("span", { class: "mono", style: "font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)", text: x.role + " " }),
-          el("span", { class: "or", text: C.fmtLong(debut) }),
-          el("span", { class: "aide", text: "  " + C.fmtJours(x.charge) + " j sur " + C.fmtJours(ouvres) + (ouvres > 1 ? " jours ouvrés" : " jour ouvré") +
-            (fin !== v.echeance ? " · rendu le " + C.fmtCourt(fin) : "") + (m ? "" : " · à affecter") })
-        ]));
+      var debut = Calc.debutPour(charge, fin, mP, D.canton());
+      apercu.appendChild(ligneApercu(principale ? "Dépendance" : "Tâche", charge, debut, fin,
+        Calc.joursTravaillesEntre(mP, debut, fin, D.canton()), idP, fin !== p.echeance));
+      lignesDeps.forEach(function (l, i) {
+        var d = brouillonDep(l), cd = d.chargeInge || d.chargeDessin;
+        if (!cd || l.fini) return;
+        var idD = Calc.porteur(d), mD = idD ? D.membre(idD) : null;
+        var limD = Calc.limiteDependance(p, d, D.canton());
+        var finD = l.echeance && l.echeance < limD ? l.echeance : limD;
+        var debD = Calc.debutPour(cd, finD, mD, D.canton());
+        apercu.appendChild(ligneApercu("Dépendance " + (i + 1), cd, debD, finD, Calc.joursTravaillesEntre(mD, debD, finD, D.canton()), idD, true));
       });
     }
 
     // Affaire puis libellé sur toute la largeur, le reste sur deux colonnes (une sur téléphone) :
     // voir .compacte dans planif.css
+    var blocDeps = null;
+    if (!principale) {
+      blocDeps = el("fieldset", { class: "deps" }, [
+        el("div", { class: "legende", text: "Dépendances" }),
+        el("div", { class: "aide deps-aide", text: actives
+          ? "À faire avant la tâche : chaque dépendance est rendue la veille du jour où la tâche commence."
+          : "Les dépendances seront disponibles dès que la base aura été mise à jour (migration-dependances.sql)." }),
+        listeDeps,
+        actives ? boutonDep : null
+      ]);
+    }
+    var echInit = t ? t.echeance : (o.echeance || b.echeance || "");
+    var aideEcheance = "C'est la date qui fait foi : le début s'en déduit.";
+    if (principale) {
+      var limP = Calc.limiteDependance(principale, t, D.canton());
+      aideEcheance = "Au plus tard le " + C.fmtCourt(limP) + ", veille du début de la tâche principale.";
+    }
     var corps = el("div", {}, [
+      principale ? el("p", { class: "aide dep-de", style: "margin:0 0 14px;font-size:14px;color:var(--texte-doux)" }, [
+        "Dépendance de « ", el("b", { text: principale.titre }), " » (" + D.nomMembre(Calc.porteur(principale)) + ") : elle doit être rendue avant que cette tâche commence."
+      ]) : null,
       el("div", { class: "grille-champs" }, [
         chAffaire,
         champ({ nom: "titre", label: "Libellé de la tâche", valeur: t ? t.titre : (b.titre || ""), exemple: "Plans de coffrage niveau 1", large: true })
       ]),
       el("fieldset", {}, [
-        el("div", { class: "legende", text: "Charges estimées et affectations" }),
-        // Une ligne par métier : la personne, puis sa charge
-        el("div", { class: "grille-champs" }, [
-          boiteIng,
-          champ({
-            nom: "chargeInge", label: "Charge ingénieur (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeInge : (b.chargeInge || ""), exemple: "0"
-          }),
-          boiteDes,
-          champ({
-            nom: "chargeDessin", label: "Charge dessin (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
-            valeur: t ? t.chargeDessin : (b.chargeDessin || ""), exemple: "0"
-          }),
-          el("div", { class: "champ large" }, [caseEnchaine])
-        ])
+        el("div", { class: "legende", text: "Personne désignée et charge" }),
+        el("div", { class: "grille-champs" }, [boitePers, chCharge])
       ]),
+      blocDeps,
       el("fieldset", {}, [
         el("div", { class: "legende", text: "Dates" }),
         el("div", { class: "grille-champs" }, [
-          champ({
-            nom: "echeance", label: "Échéance", type: "date", valeur: t ? t.echeance : (b.echeance || ""),
-            aide: "C'est la date qui fait foi : le début s'en déduit."
-          }),
+          champ({ nom: "echeance", label: "Échéance", type: "date", valeur: echInit, aide: aideEcheance }),
           el("div", { class: "champ" }, [
             el("span", { class: "legende", text: "Début calculé" }),
             apercu
@@ -2304,35 +2417,15 @@
         el("div", { class: "legende", text: "Suivi" }),
         el("div", { class: "grille-champs" }, [
           champ({
-            nom: "statut", label: "Statut", type: "select", valeur: t ? t.statut : "a_faire",
+            nom: "statut", label: "Statut", type: "select", valeur: t ? (deuxParts ? (t.finiDessin ? "termine" : (t.statut === "termine" ? "en_cours" : t.statut)) : t.statut) : "a_faire",
             options: Object.keys(D.STATUTS_TACHE).map(function (k) { return { valeur: k, label: D.STATUTS_TACHE[k] }; })
           }),
           champ({ nom: "avancement", label: "Avancement (%)", type: "number", pas: "5", min: "0", max: "100", inputmode: "numeric", valeur: t ? t.avancement : 0 }),
           VERSION_AB ? curseurPriorite(t ? t.priorite : (b.priorite || 5)) : null,
-          el("div", { class: "champ" }, [
-            el("span", { class: "legende", text: "Parts terminées" }),
-            casesParts
-          ]),
           champ({ nom: "note", label: "Note", type: "textarea", rows: 2, valeur: t ? t.note : "", large: true, exemple: "Hypothèses, éléments en attente…" })
         ])
       ])
     ]);
-
-    // Statut et parts restent d'accord sous les doigts : choisir « Terminé »
-    // coche les parts portées, cocher la dernière passe le statut à « Terminé ».
-    var selStatut = corps.querySelector("select[name=statut]");
-    corps.addEventListener("change", function (e) {
-      var toutes = partsFinies;
-      if (e.target === selStatut) {
-        var fini = selStatut.value === "termine";
-        if (fini || toutes()) {
-          parts.forEach(function (p) { if (!p.input.disabled) p.input.checked = fini; });
-        }
-      } else if (e.target.name === "parts") {
-        if (toutes()) selStatut.value = "termine";
-        else if (selStatut.value === "termine") selStatut.value = "en_cours";
-      }
-    });
 
     corps.addEventListener("input", recalcule);
     corps.addEventListener("change", recalcule);
@@ -2342,63 +2435,104 @@
     if (lectureSeule) {
       corps.insertBefore(el("p", {
         class: "aide", style: "margin-bottom:16px;font-size:14px;color:var(--texte-doux)",
-        text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier. Il faut pour cela en tenir une part, ou avoir reçu le droit de créer des tâches pour les autres."
+        text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier. Il faut pour cela en être la personne désignée, tenir sa tâche principale, ou avoir reçu le droit de créer des tâches pour les autres."
       }), corps.firstChild);
-      [].forEach.call(corps.querySelectorAll("input,select,textarea"), function (n) { n.disabled = true; });
+      [].forEach.call(corps.querySelectorAll("input,select,textarea,button"), function (n) { n.disabled = true; });
     }
 
-    function nombre(x) { return parseFloat(String(x).replace(",", ".")) || 0; }
-
-    /* Sans le droit, une tâche neuve doit porter sa part : on ne crée pas du
-       travail pour les autres. Le contrôle est refait par la base. */
-    function resteMienne(v) {
-      if (libre) return true;
-      var id = moi && moi.id;
-      return !!id && ((v.ingenieurId === id && nombre(v.chargeInge) > 0) ||
-                      (v.dessinateurId === id && nombre(v.chargeDessin) > 0));
+    /** Message quand je lâche une tâche qui était la mienne (sans le droit, je n'y reviens plus). */
+    function passageDeMain(p) {
+      if (libre || !t || !moi || principale || Calc.porteur(t) !== moi.id) return null;
+      var id = Calc.porteur(p);
+      if (id === moi.id) return null;
+      return id ? "Tâche confiée à " + D.nomMembre(id) + " : elle quitte ton planning."
+                : "Tâche remise à affecter : elle quitte ton planning.";
     }
 
-    /* Passer la main : la part que je tenais change de mains, retourne à
-       affecter, ou perd sa charge. La tâche quitte mon planning — et, sans le
-       droit, je ne pourrai plus y revenir. Renvoie le message à annoncer. */
-    function passageDeMain(v) {
-      if (!maPart || resteMienne(v)) return null;   // tant qu'une part me reste, je n'ai rien lâché
-      var cle = maPart === "ingenieur" ? "ingenieurId" : "dessinateurId";
-      var charge = nombre(maPart === "ingenieur" ? v.chargeInge : v.chargeDessin);
-      if (charge <= 0) return "Ta part n'a plus de charge : la tâche quitte ton planning.";
-      return v[cle]
-        ? "Tâche confiée à " + D.nomMembre(v[cle]) + " : elle quitte ton planning."
-        : "Ta part est remise à affecter : la tâche quitte ton planning.";
+    function enregistre() {
+      var v = lit(corps);
+      var charge = nombre(v.charge);
+      if (!(charge > 0)) { toast("Indique la charge de la personne désignée (0,1 j au minimum)."); return false; }
+      var p = partsDe(boitePers.querySelector("select").value, charge);
+      var champs = {
+        affaireId: principale ? principale.affaireId : v.affaireId, titre: v.titre, note: v.note,
+        echeance: v.echeance, statut: v.statut, avancement: v.avancement, enchaine: false,
+        ingenieurId: p.ingenieurId, chargeInge: p.chargeInge, dessinateurId: p.dessinateurId, chargeDessin: p.chargeDessin
+      };
+      if (v.priorite != null) champs.priorite = v.priorite;
+      if (t && deuxParts) champs.finCalcul = null;
+
+      // Les dépendances : chacune une tâche, rattachée à celle-ci
+      var deps = [];
+      for (var i = 0; i < lignesDeps.length; i++) {
+        var l = lignesDeps[i], cd = nombre(l.charge.value);
+        if (!(cd > 0)) { toast("Indique la charge de la dépendance " + (i + 1) + ", ou retire-la."); return false; }
+        deps.push({ ligne: l, parts: partsDe(l.boite.querySelector("select").value, cd) });
+      }
+      if (deps.length && !actives) {
+        toast("Les dépendances ne peuvent pas encore être enregistrées : la base doit d'abord être mise à jour (migration-dependances.sql).");
+        return false;
+      }
+      var echBrouillon = {};
+      Object.keys(champs).forEach(function (k) { echBrouillon[k] = champs[k]; });
+      function champsDep(dp, idPrincipale) {
+        var l = dp.ligne;
+        var lim = Calc.limiteDependance(echBrouillon, dp.parts, D.canton());
+        // Avancée à la main, une dépendance garde sa date tant qu'elle tient avant la tâche
+        var ech = l.echeance && lim && l.echeance < lim ? l.echeance : lim;
+        var c = {
+          affaireId: champs.affaireId, titre: (l.titre.value || "").trim() || champs.titre, note: "",
+          echeance: ech, statut: l.statut, avancement: l.avancement, enchaine: false, avant: idPrincipale,
+          ingenieurId: dp.parts.ingenieurId, chargeInge: dp.parts.chargeInge,
+          dessinateurId: dp.parts.dessinateurId, chargeDessin: dp.parts.chargeDessin
+        };
+        if (l.priorite) c.priorite = l.priorite;
+        return c;
+      }
+      var passe = passageDeMain(p);
+      var retirees = t && !principale ? D.dependances(t.id).filter(function (d) {
+        return !lignesDeps.some(function (l) { return l.id === d.id; });
+      }) : [];
+
+      var suite;
+      if (!t) {
+        // La tâche d'abord : ses dépendances portent son identifiant
+        suite = D.ajouteTache(champs).then(function (n) {
+          return deps.reduce(function (s, dp) {
+            return s.then(function () { return D.ajouteTache(champsDep(dp, n.id)); });
+          }, Promise.resolve());
+        });
+      } else {
+        /* Les dépendances d'abord, la tâche ensuite : sans le droit, qui passe
+           la main sur la tâche ne pourrait plus toucher à ses dépendances. */
+        suite = retirees.reduce(function (s, d) {
+          return s.then(function () { return D.suppTache(d.id); });
+        }, Promise.resolve());
+        deps.forEach(function (dp) {
+          suite = suite.then(function () {
+            var c = champsDep(dp, t.id);
+            return dp.ligne.id ? D.majTache(dp.ligne.id, c) : D.ajouteTache(c);
+          });
+        });
+        suite = suite.then(function () { return D.majTache(t.id, champs); });
+      }
+      return suite.then(function () {
+        if (o.surEnregistrement) o.surEnregistrement();
+        toast(passe || (t ? "Tâche modifiée." : (deps.length ? "Tâche créée, avec " + deps.length + (deps.length > 1 ? " dépendances." : " dépendance.") : "Tâche créée.")));
+      }).catch(function (e) { toast(e.message); if (o.surEnregistrement) o.surEnregistrement(); return false; });
     }
 
     return ouvre({
-      surtitre: t ? (lectureSeule ? "Tâche" : "Modifier la tâche") : "Nouvelle tâche",
-      titre: t ? t.titre : "Tâche",
+      surtitre: t ? (lectureSeule ? (principale ? "Dépendance" : "Tâche") : (principale ? "Modifier la dépendance" : "Modifier la tâche")) : "Nouvelle tâche",
+      titre: t ? t.titre : (o.membreId && D.membre(o.membreId) ? "Tâche pour " + D.nomMembre(o.membreId) : "Tâche"),
       corps: corps,
       compacte: true,
       boutons: lectureSeule ? [{ label: "Fermer" }] : [
+        principale ? { label: "Ouvrir la tâche principale", gauche: true, action: function () {
+          setTimeout(function () { formulaireTache(principale.id, o); }, 0);
+        } } : null,
         { label: "Annuler" },
-        {
-          label: "Enregistrer", or: true, entree: true, action: function () {
-            var v = lit(corps);
-            v.finiInge = (v.parts || []).indexOf("finiInge") >= 0;
-            v.finiDessin = (v.parts || []).indexOf("finiDessin") >= 0;
-            // Case grisée (une seule part) : on garde le choix, il resservira si la seconde revient
-            v.enchaine = entreeEnchaine.checked;
-            if (!t && !resteMienne(v)) {
-              toast(maCote === "dessinateur"
-                ? "Une tâche que tu crées porte ta part : saisis une charge de dessin, et laisse-toi comme dessinateur."
-                : "Une tâche que tu crées porte ta part : saisis une charge de calcul, et laisse-toi comme ingénieur.");
-              return false;
-            }
-            var passe = t ? passageDeMain(v) : null;
-            var p = t ? D.majTache(t.id, v) : D.ajouteTache(v);
-            return p.then(function () {
-              if (o.surEnregistrement) o.surEnregistrement();
-              toast(passe || (t ? "Tâche modifiée." : "Tâche créée."));
-            }).catch(function (e) { toast(e.message); return false; });
-          }
-        }
+        { label: "Enregistrer", or: true, entree: true, action: enregistre }
       ]
     });
   }
@@ -2671,6 +2805,8 @@
   function construitBulle(t, o) {
     var Calc = global.Calc, a = D.affaire(t.affaireId), auj = C.isoAuj(), canton = D.canton();
     var parts = [], alertes = [];
+    // Une seule part (11.11.2026) : « Tâche », plus « Calcul » ni « Dessin »
+    var seule = !(t.chargeInge > 0 && t.chargeDessin > 0);
     ["ingenieur", "dessinateur"].forEach(function (role) {
       var P = D.PARTS[role];
       if (!(t[P.charge] > 0)) return;
@@ -2682,7 +2818,7 @@
         : retard ? el("span", { class: "etat retard", text: "En retard" }) : null;
       parts.push(el("div", { class: "part" + (ici ? " ici" : "") }, [
         el("div", { class: "l1" }, [
-          el("span", { class: "metier", text: P.label }),
+          el("span", { class: "metier", text: seule ? (t.avant ? "Dépendance" : "Tâche") : P.label }),
           el("span", { class: "qui" + (t[P.membre] ? "" : " vide"), text: t[P.membre] ? D.nomMembre(t[P.membre]) : "À affecter" }),
           el("span", { class: "j", text: C.fmtJours(t[P.charge]) + " j" })
         ]),
@@ -2696,6 +2832,24 @@
     });
     if (!t.finiInge && Calc.enchainee(t))
       alertes.push(el("div", { text: "Calcul à rendre avant le dessin, échéance de la tâche le " + C.fmtCH(t.echeance) }));
+    // Dépendances : ce que la tâche attend, chacune avec sa personne
+    D.dependances(t.id).forEach(function (d) {
+      var id = Calc.porteur(d), fini = d.statut === "termine";
+      var retard = !fini && d.echeance && d.echeance < auj;
+      parts.push(el("div", { class: "part" }, [
+        el("div", { class: "l1" }, [
+          el("span", { class: "metier", text: "Avant" }),
+          el("span", { class: "qui" + (id ? "" : " vide"), text: id ? D.nomMembre(id) : "À affecter" }),
+          el("span", { class: "j", text: C.fmtJours(Calc.chargeTotale(d)) + " j" })
+        ]),
+        el("div", { class: "l2" }, [
+          (d.titre !== t.titre ? d.titre + " · " : "") + "à rendre le " + C.fmtCH(d.echeance),
+          fini ? el("span", { class: "etat fini", text: "Rendue" }) : retard ? el("span", { class: "etat retard", text: "En retard" }) : null
+        ])
+      ]));
+    });
+    var princ = D.principale(t);
+    if (princ) alertes.push(el("div", { text: "À rendre avant « " + princ.titre + " » (" + D.nomMembre(Calc.porteur(princ)) + ")" }));
 
     return el("div", { class: "bt-bulle", role: "tooltip", style: "--tt:" + teinte(a ? a.teinte : 1) }, [
       el("div", { class: "aff" }, [
@@ -2814,7 +2968,16 @@
     var permise = function (p) { return !D.pagePermise || D.pagePermise(p); };
     var id = encodeURIComponent(m.id);
     var tel = function (lib, n) { return n ? { label: lib + " · " + n, lien: "tel:" + String(n).replace(/[^\d+]/g, "") } : null; };
+    /* 11.11.2026 (demande de Tony) : une tâche se crée depuis la personne,
+       qui en est d'office la personne désignée. Sans le droit de créer des
+       tâches pour les autres, seulement depuis soi. */
+    var moi = D.monMembre();
+    var creer = !!global.Calc && m.actif && D.PLANIFIES[m.metier] && (D.aDroit("taches_autrui") || (moi && moi.id === m.id));
     var l = [
+      creer ? { label: "Nouvelle tâche pour " + m.prenom, action: function () {
+        formulaireTache(null, { membreId: m.id, surEnregistrement: function () { (o.surChange || D.redessine || function () {})(); } });
+      } } : null,
+      creer ? { sep: true } : null,
       permise("taches") ? (o.taches ? { label: "Ses tâches", action: o.taches } : { label: "Ses tâches", lien: "/planif/taches/?membre=" + id }) : null,
       permise("affaires") ? (o.affaires ? { label: "Ses affaires", action: o.affaires } : { label: "Ses affaires", lien: "/planif/affaires/?membre=" + id }) : null,
       { label: "Ses absences", action: function () { absences(m.id, o.surChange); } },
@@ -3480,7 +3643,7 @@
     colleSousBarre: colleSousBarre,
     absences: absences, nouvelleAbsence: nouvelleAbsence,
     choixJours: choixJours, joursTravailles: joursTravailles,
-    formulaireTache: formulaireTache, ficheTache: ficheTache, imprime: imprime,
+    formulaireTache: formulaireTache, ficheTache: ficheTache, texteDecalageDep: texteDecalageDep, imprime: imprime,
     menuContexte: menuContexte, fermeMenuContexte: fermeMenuContexte, itemsPersonne: itemsPersonne,
     demandesConge: demandesConge, decideConge: decideConge,
     session: session, echec: echec, avecBase: avecBase, chemin: chemin, versionAB: VERSION_AB,

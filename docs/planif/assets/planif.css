@@ -591,6 +591,17 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .compacte fieldset{margin-top:18px}
 .compacte fieldset > .legende{display:flex;align-items:center;gap:12px}
 .compacte fieldset > .legende::after{content:"";flex:1 1 auto;height:1px;background:var(--ligne-faible)}
+/* Dépendances d'une tâche (11.11.2026) : une ligne par dépendance — personne, charge, libellé, retirer */
+.deps .deps-aide{margin:2px 0 10px}
+.deps-liste{display:flex;flex-direction:column;gap:10px}
+.dep-ligne{display:grid;grid-template-columns:minmax(0,1.25fr) 96px minmax(0,1.25fr) auto;gap:12px 14px;align-items:end}
+.dep-ligne.finie{opacity:.6}
+.dep-ligne .dep-retire{display:flex;align-items:center;height:36px}
+.dep-ajoute{margin-top:10px;color:var(--or)}
+@media (max-width:640px){
+  .dep-ligne{grid-template-columns:minmax(0,1fr) 96px auto;padding-bottom:10px;border-bottom:1px solid var(--ligne-faible)}
+  .dep-ligne > .champ:nth-child(3){grid-column:1 / -1;grid-row:2}
+}
 .compacte .legende + .grille-champs{margin-top:10px}
 .compacte .modale-pied{margin-top:18px;padding-top:14px}
 

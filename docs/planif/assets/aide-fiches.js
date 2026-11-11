@@ -41,7 +41,7 @@
 (function (global) {
   "use strict";
 
-  var MAJ = "2026-11-09";   // Charlie
+  var MAJ = "2026-11-11";   // Charlie
 
   /* Expressions de plusieurs mots soudées avant la recherche (mises à plat :
      sans accents ni apostrophes). Le mot soudé peut ensuite avoir des synonymes. */
@@ -210,8 +210,8 @@
       mots: "clicdroit menu ligne barre raccourci",
       reponse: "Un **clic droit** sur une ligne, une barre ou une personne ouvre un petit menu avec ses actions : ouvrir, modifier, supprimer… Partout où l'on clique sur **une personne**, le menu est le même : **Ses tâches**, **Ses affaires**, **Ses absences**, **Ses jours travaillés**, puis ses téléphones. Il existe sur toutes les pages de l'outil, sauf l'accueil et Mon profil.",
       ici: {
-        taches: "Sur une tâche : ouvrir la fiche, modifier, terminer ta part (ou la tâche), nouvelle tâche sur cette affaire, toutes les tâches de l'affaire, voir l'affaire, supprimer. Sur une pastille de personne : le menu de la personne (**Ses tâches** filtre la page sur elle), puis **Terminer le calcul / le dessin** de cette tâche.",
-        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, aller à l'autre part (du calcul au dessin et retour), terminer ou rouvrir la part, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire. Sur un nom ou un jour vide : son planning seul, puis le menu de la personne.",
+        taches: "Sur une tâche : ouvrir la fiche, modifier, terminer ta part (ou la tâche), nouvelle tâche sur cette affaire, toutes les tâches de l'affaire, voir l'affaire, supprimer. Sur une pastille de personne : le menu de la personne (**Ses tâches** filtre la page sur elle), puis **Terminer la tâche** (sur une ancienne tâche à deux parts : **Terminer le calcul / le dessin**).",
+        tableau: "Sur une barre : ouvrir la fiche, modifier la tâche, ajouter une dépendance (ou, sur une dépendance, ouvrir la tâche principale), terminer ou rouvrir la tâche, nouvelle tâche sur cette affaire, tâches de l'affaire, voir l'affaire. Sur un nom ou un jour vide : son planning seul, **Nouvelle tâche pour …**, puis le menu de la personne. **Double-clic sur un jour vide** : nouvelle tâche pour cette personne, ce jour en échéance.",
         affaires: "Sur une affaire : la modifier (ou la consulter), nouvelle tâche sur cette affaire, tâches de l'affaire, avancement (et facturation si tu y as droit), Google Maps, supprimer. Sur un membre de l'équipe d'une affaire : le désigner responsable (si tu peux modifier l'affaire), puis le menu de la personne.",
         equipe: "Sur une personne : ses tâches, ses affaires, ses absences, ses jours travaillés, « Modifier la fiche » si tu en as le droit, et ses téléphones.",
         annuaire: "Sur une fiche : lui écrire (si elle a une adresse), la modifier, la supprimer.",
@@ -363,59 +363,85 @@
       mots: "pastille chiffre badge notification nombre",
       reponse: "Elles comptent ce qui t'attend :\n- sur **Absences et congés** : les demandes de congé à valider (si tu décides) ;\n- sur **Le bureau aujourd'hui** : les messages du tchat non lus ;\n- sur **Veille simap.ch** : les nouvelles publications pas encore traitées.\nLe détail s'affiche au survol. Dans la barre du haut, Communication porte aussi la pastille du tchat." },
 
-    { id: "acc-a-affecter", sansDroit: "Une tâche est **à affecter** quand une de ses parts chargées (calcul ou dessin) n'a encore personne. Ce sont les chefs de secteur (et au-delà) qui les suivent et les confient : l'encadré de l'accueil n'est pas ouvert à ton groupe. Sur la page Tâches, l'entrée **À affecter** du bandeau les liste.",
+    { id: "acc-a-affecter", sansDroit: "Une tâche est **à affecter** quand elle n'a pas encore de personne désignée (« À affecter (ingénieur) » ou « (dessinateur) » dans le formulaire). Ce sont les chefs de secteur (et au-delà) qui les suivent et les confient : l'encadré de l'accueil n'est pas ouvert à ton groupe. Sur la page Tâches, l'entrée **À affecter** du bandeau les liste.",
       pages: ["accueil", "taches", "tableau"],
       question: "Que sont les tâches à affecter ?",
       aussi: ["tâches sans personne", "qui doit prendre cette tâche", "attribuer les tâches libres"],
       mots: "aaffecter affecter libre personne tache",
-      reponse: "Une tâche est **à affecter** quand une de ses parts chargées (calcul ou dessin) n'a encore personne. On les retrouve :\n- sur l'accueil, encadré **Tâches à affecter** (droit « Tâches à affecter ») ;\n- sur Tâches, entrée **À affecter** du bandeau ;\n- au tableau de bord, en haut : une ligne par métier ; **glisse une barre sur une personne** pour la lui confier.",
+      reponse: "Une tâche est **à affecter** quand elle n'a pas encore de personne désignée (« À affecter (ingénieur) » ou « (dessinateur) » dans le formulaire). On les retrouve :\n- sur l'accueil, encadré **Tâches à affecter** (droit « Tâches à affecter ») ;\n- sur Tâches, entrée **À affecter** du bandeau ;\n- au tableau de bord, en haut : une ligne par métier ; **glisse une barre sur une personne** pour la lui confier.",
       ici: { tableau: "Tout en haut du tableau de bord, la ligne **À affecter** (une par métier) montre les charges sans personne, semaine par semaine. **Glisse une barre sur la ligne d'une personne** pour la lui confier, ou clique pour ouvrir la fiche et choisir quelqu'un." },
       droit: "taches_a_affecter", voir: ["tache-affecter"] },
 
     /* ================================================================ tâches */
 
-    { id: "tache-creer", selonDroit: { taches_autrui: ["Ton groupe peut créer et mener les tâches de tout le monde.", "Ton groupe ne crée que des tâches **dont une part est la tienne** : tu choisis librement qui tient l'autre part. Pour une tâche entièrement à un collègue, demande à ton chef de projet ou de secteur."] },
-      pages: ["taches", "tableau", "affaires"], frequente: true,
+    { id: "tache-creer", selonDroit: { taches_autrui: ["Ton groupe peut créer des tâches pour tout le monde.", "Ton groupe ne crée que des tâches **dont tu es la personne désignée** ; ses **dépendances**, elles, vont à qui tu veux. Pour une tâche entièrement à un collègue, demande à ton chef de projet ou de secteur."] },
+      pages: ["taches", "tableau", "affaires", "equipe", "charge"], frequente: true,
       question: "Comment créer une tâche ?",
-      aussi: ["ajouter une tâche", "nouvelle tâche", "créer un travail"],
-      mots: "creer tache nouvelle ajouter formulaire",
-      reponse: "Bouton **Nouvelle tâche** à droite du titre (sur téléphone, le bouton rond en bas). Remplis :\n- l'**affaire** puis le **libellé** ;\n- la **charge** de chaque part en jours (pas de 0,5) et la personne qui la porte : ingénieur pour le calcul, dessinateur pour le dessin (vide = à affecter) ;\n- l'**échéance** : c'est elle qui fait foi, le début se calcule ;\n- la priorité, le statut, l'avancement et une note si besoin.\n**Entrée** enregistre.",
+      aussi: ["ajouter une tâche", "nouvelle tâche", "créer un travail", "créer une tâche pour quelqu'un"],
+      mots: "creer tache nouvelle ajouter formulaire personne designee",
+      reponse: "Bouton **Nouvelle tâche** à droite du titre (sur téléphone, le bouton rond en bas), ou clic droit sur une personne › **Nouvelle tâche pour …**. Remplis :\n- l'**affaire** puis le **libellé** ;\n- la **personne désignée** et sa **charge** en jours (pas de 0,5) ; « À affecter » si personne n'est encore choisi ;\n- au besoin, des **dépendances** : **+ Ajouter une dépendance**, une ligne par personne qui doit rendre quelque chose avant ;\n- l'**échéance** : c'est elle qui fait foi, le début se calcule ;\n- la priorité, le statut, l'avancement et une note si besoin.\n**Entrée** enregistre.",
       ici: {
         affaires: "Depuis Affaires, le plus rapide : clic droit sur l'affaire › **Nouvelle tâche sur cette affaire** — l'affaire est déjà choisie. Sinon, bouton **Nouvelle tâche** de la page Tâches.",
-        tableau: "Bouton **Nouvelle tâche** à droite du titre, ou clic droit sur une barre › **Nouvelle tâche sur cette affaire**. Remplis l'affaire, le libellé, la charge de chaque part et la personne, puis l'**échéance** (le début se calcule)."
+        tableau: "Le plus rapide : **double-clic sur un jour** de la ligne d'une personne — elle est désignée d'office et ce jour devient l'échéance. Sinon, bouton **Nouvelle tâche**, clic droit sur une personne › **Nouvelle tâche pour …**, ou clic droit sur une barre › **Nouvelle tâche sur cette affaire**.",
+        taches: "Bouton **Nouvelle tâche** : si une personne est choisie dans le bandeau de gauche, elle est **désignée d'office**. Clic droit sur une personne › **Nouvelle tâche pour …** fait de même.",
+        equipe: "Clic droit sur la personne › **Nouvelle tâche pour …** : le formulaire s'ouvre avec elle comme personne désignée."
       },
       lien: "taches", montre: "Nouvelle tâche",
-      voir: ["tache-echeance", "palette-phrase", "tache-droits"] },
+      voir: ["tache-dependances", "tb-double-clic", "tache-echeance", "tache-droits"] },
+
+    { id: "tb-double-clic", pages: ["tableau"], frequente: true,
+      question: "Comment créer une tâche directement sur le planning ?",
+      aussi: ["double-clic sur une date", "double clic sur un jour", "créer une tâche pour une personne au tableau de bord"],
+      mots: "double clic doubleclic jour date creer tache planning ligne",
+      reponse: "**Double-clic sur un jour vide** de la ligne d'une personne : le formulaire **Nouvelle tâche** s'ouvre avec cette personne désignée et ce jour comme **échéance** (une tâche de 1 j tombe pile dessus, une plus longue remonte avant). Sur la ligne **À affecter**, la tâche s'ouvre sans personne.",
+      selonDroit: { taches_autrui: ["", "Sans le droit « Créer des tâches pour les autres », le double-clic ne marche que sur **ta** ligne ; à un collègue, tu peux en revanche confier une **dépendance** de ta tâche."] },
+      lien: "tableau", voir: ["tache-creer", "tache-dependances"] },
+
+    { id: "personne-nouvelle-tache", pages: ["equipe", "taches", "tableau", "charge", "absences", "annuaire", "communication"],
+      question: "Comment créer une tâche pour une personne ?",
+      aussi: ["nouvelle tâche pour", "donner une tâche à quelqu'un", "tâche depuis la liste des membres"],
+      mots: "nouvelle tache pour personne membre designee clicdroit",
+      reponse: "Clic droit sur la personne (partout où elle paraît) › **Nouvelle tâche pour …** : elle est la **personne désignée** d'office. Sur Tâches, choisir la personne dans le bandeau puis **Nouvelle tâche** revient au même ; au tableau de bord, **double-clic sur un jour** de sa ligne.",
+      selonDroit: { taches_autrui: ["", "Sans le droit « Créer des tâches pour les autres », l'entrée **Nouvelle tâche pour …** n'apparaît que sur toi. Pour faire travailler un collègue sur ta tâche, ajoute-lui une **dépendance**."] },
+      voir: ["tache-creer", "tache-dependances"] },
 
     { id: "tache-echeance", pages: ["taches", "tableau"], frequente: true,
       question: "Comment est calculé le début d'une tâche ?",
       aussi: ["pourquoi la date de début change", "l'échéance fait foi", "date de début calculée"],
       mots: "debut calcul echeance date capacite ferie",
-      reponse: "L'**échéance fait foi**. En remontant depuis elle, la charge remplit la capacité réelle de la personne : rien le week-end, les jours fériés du canton, pendant ses absences et ses jours non travaillés ; sa capacité hebdomadaire est répartie sur sa semaine type. Le formulaire montre le début calculé de chaque part pendant la saisie.\nUne charge sans personne s'étale sur les jours ouvrés.",
-      voir: ["tache-enchainee", "jours-travailles"] },
+      reponse: "L'**échéance fait foi**. En remontant depuis elle, la charge remplit la capacité réelle de la personne : rien le week-end, les jours fériés du canton, pendant ses absences et ses jours non travaillés ; sa capacité hebdomadaire est répartie sur sa semaine type. Le formulaire montre le début calculé de la tâche et de chaque dépendance pendant la saisie.\nUne charge sans personne s'étale sur les jours ouvrés.",
+      voir: ["tache-dependances", "jours-travailles"] },
 
-    { id: "tache-enchainee", pages: ["taches", "tableau"],
-      question: "Le dessin commence-t-il après le calcul ?",
-      aussi: ["calcul puis dessin", "tâche enchaînée", "calcul et dessin en parallèle", "calcul en retard"],
-      mots: "enchainee calcul dessin parallele avant apres",
-      reponse: "Ça dépend de la case **« Le dessin commence quand le calcul est rendu »** du formulaire (cochée par défaut) :\n- **cochée** : le calcul doit être rendu avant que le dessin démarre ; s'il déborde, l'alerte « Calcul en retard » prévient ;\n- **décochée** : calcul et dessin avancent en parallèle jusqu'à l'échéance.\nAu tableau de bord, avancer le calcul ne touche pas au dessin ; le pousser au-delà repousse le dessin.",
-      voir: ["tb-alertes"] },
+    { id: "tache-dependances", pages: ["taches", "tableau"], frequente: true,
+      question: "C'est quoi une dépendance ?",
+      aussi: ["dépendance d'une tâche", "à faire avant", "plusieurs personnes sur une tâche", "le calcul avant le dessin", "le dessin commence-t-il après le calcul", "tâche enchaînée"],
+      mots: "dependance avant plusieurs personnes calcul dessin enchainee attendre",
+      reponse: "Une tâche a **une personne désignée**. Si d'autres doivent rendre quelque chose avant qu'elle commence, ajoute des **dépendances** dans le formulaire (**+ Ajouter une dépendance**) : une ligne par personne, avec sa charge et, si tu veux, son propre libellé. Tu peux en mettre **autant que nécessaire**.\n- chaque dépendance est **à rendre la veille du jour où la tâche commence** : sa date se calcule toute seule et suit la tâche quand elle bouge ;\n- avancée à la main, une dépendance garde sa date ; retardée jusque sur la tâche, elle **repousse la tâche** juste assez ;\n- chaque dépendance est une tâche à part entière : sa barre chez sa personne, sa fiche, son « Terminé » ;\n- supprimer la tâche supprime ses dépendances.\nLa coche « Le dessin commence quand le calcul est rendu » a disparu : une dépendance est toujours faite avant.",
+      selonDroit: { taches_autrui: ["", "Sans le droit « Créer des tâches pour les autres », tu mènes les dépendances des tâches dont tu es la personne désignée, et tu les confies à qui tu veux."] },
+      voir: ["tache-creer", "tache-anciennes", "tache-fil"] },
+
+    { id: "tache-anciennes", pages: ["taches", "tableau"],
+      question: "Que deviennent les tâches avec un calcul et un dessin ?",
+      aussi: ["ancienne tâche à deux parts", "charge ingénieur et charge dessin", "calcul et dessin dans la même tâche"],
+      mots: "ancienne calcul dessin deux parts ingenieur dessinateur charge",
+      reponse: "Les tâches créées avant les dépendances gardent leurs **deux parts** (calcul et dessin) tant qu'on ne les modifie pas. À l'ouverture du formulaire, le **dessin devient la tâche** et le **calcul sa dépendance** ; à l'enregistrement, elles sont rangées ainsi pour de bon (une tâche où calcul et dessin avançaient en parallèle passe alors en « calcul avant »).",
+      voir: ["tache-dependances"] },
 
     { id: "tache-parts", pages: ["taches", "tableau"],
-      question: "C'est quoi les deux parts d'une tâche ?",
-      aussi: ["part calcul et part dessin", "charge ingénieur et charge dessin", "ingénieur et dessinateur sur la même tâche"],
-      mots: "part calcul dessin ingenieur dessinateur charge",
-      reponse: "Une tâche a jusqu'à **deux parts** : le **calcul** (ingénieur) et le **dessin** (dessinateur), chacune avec sa charge en jours et sa personne. Une part existe si sa charge est supérieure à 0. Chaque part se termine **séparément** : une part finie quitte la charge du planning ; la tâche passe « Terminé » quand toutes ses parts le sont.",
-      voir: ["tache-terminer"] },
+      question: "Qui porte une tâche ?",
+      aussi: ["personne désignée", "c'est quoi les deux parts d'une tâche", "part calcul et part dessin"],
+      mots: "personne designee porte part calcul dessin ingenieur dessinateur charge",
+      reponse: "Une tâche a **une personne désignée**, ingénieur ou dessinateur, et **sa charge** en jours. Ceux qui doivent rendre quelque chose avant ont chacun leur **dépendance**. Seules les anciennes tâches gardent encore deux parts (calcul et dessin), jusqu'à leur prochaine modification.",
+      voir: ["tache-dependances", "tache-anciennes", "tache-terminer"] },
 
     { id: "tache-terminer", pages: ["taches", "tableau", "accueil"], frequente: true,
       question: "Comment terminer une tâche ?",
       aussi: ["marquer terminé", "j'ai fini ma part", "cocher une tâche", "le pouce", "rouvrir une tâche"],
       mots: "terminer pouce fini part rouvrir cocher",
-      reponse: "Le **pouce** de la ligne termine **ta part** : ton calcul si tu es l'ingénieur, ton dessin si tu es le dessinateur, les deux si tu portes tout. Quelqu'un qui n'est sur aucune part clôt la tâche entière. Un nouveau clic la rouvre.\nSur Tâches, un **clic droit sur l'étiquette d'une personne** (colonne Affectations) › **Terminer le calcul / le dessin** ferme la part de la personne nommée. Un clic gauche sur l'étiquette ouvre la fiche de la tâche.",
+      reponse: "Le **pouce** de la ligne termine la tâche (sur une ancienne tâche à deux parts : **ta part**). Un nouveau clic la rouvre. Une **dépendance** se termine de la même façon, sur sa propre ligne.\nSur Tâches, un **clic droit sur l'étiquette d'une personne** › **Terminer la tâche** fait de même. Un clic gauche sur l'étiquette ouvre la fiche de la tâche.",
       ici: {
-        tableau: "Ouvre la barre (clic) : dans la fiche, **Terminé** ne ferme que **cette part** (cette barre est celle d'un métier). Ou clic droit › **Terminer le calcul / le dessin**. La barre reste dessinée chez la personne, en demi-teinte avec une coche, mais ne pèse plus sur sa charge.",
-        accueil: "Dans **Mes tâches prioritaires**, le **pouce** termine ta part d'un clic ; « Annuler » la ramène. La tâche passe « Terminé » à la dernière part fermée."
+        tableau: "Ouvre la barre (clic) : dans la fiche, coche **Tâche terminée**. Ou clic droit › **Terminer la tâche**. La barre reste dessinée chez la personne, en demi-teinte avec une coche, mais ne pèse plus sur sa charge.",
+        accueil: "Dans **Mes tâches prioritaires**, le **pouce** termine la tâche d'un clic ; « Annuler » la ramène."
       },
       voir: ["tache-parts", "tache-masquer-terminees"] },
 
@@ -450,8 +476,8 @@
       pages: ["tableau", "taches"],
       question: "Comment confier une tâche à quelqu'un ?",
       aussi: ["réaffecter une tâche", "changer la personne d'une tâche", "attribuer une tâche", "passer la main"],
-      mots: "affecter reaffecter personne confier attribuer",
-      reponse: "Dans la fiche rapide ou le formulaire, choisis la personne de chaque part (ingénieur, dessinateur). Au **tableau de bord**, glisse la barre sur la ligne d'une autre personne (ou sur la ligne « À affecter » pour la libérer).\nSans le droit « Créer des tâches pour les autres », tu ne mènes que les tâches dont une part est la tienne, mais tu choisis librement qui tient l'autre part et tu peux passer la main à un collègue.",
+      mots: "affecter reaffecter personne confier attribuer designee",
+      reponse: "Dans la fiche rapide ou le formulaire, choisis la **personne désignée** (ingénieur ou dessinateur, peu importe). Au **tableau de bord**, glisse la barre sur la ligne d'une autre personne, ingénieur ou dessinateur (ou sur la ligne « À affecter » pour la libérer).\nSans le droit « Créer des tâches pour les autres », tu ne mènes que les tâches dont tu es la personne désignée et leurs dépendances ; tu peux passer la main à un collègue.",
       voir: ["acc-a-affecter", "tache-droits"] },
 
     { id: "tache-priorite", pages: ["taches", "accueil"],
@@ -499,14 +525,14 @@
       question: "Pourquoi je ne peux pas modifier cette tâche ?",
       aussi: ["tâche en lecture seule", "je ne peux pas créer de tâche pour un collègue"],
       mots: "droit lecture seule modifier collegue bloque",
-      reponse: "Sans le droit **« Créer des tâches pour les autres »**, tu ne crées et ne modifies que les tâches dont **une part chargée est la tienne** ; les autres s'ouvrent en lecture seule. Tu peux quand même désigner qui tient l'autre part. Le droit se donne par groupe dans la console.",
+      reponse: "Sans le droit **« Créer des tâches pour les autres »**, tu ne crées et ne modifies que les tâches **dont tu es la personne désignée**, et leurs **dépendances** ; les autres s'ouvrent en lecture seule. Tu confies librement ces dépendances à des collègues. Le droit se donne par groupe dans la console.",
       droit: "taches_autrui" },
 
     { id: "tache-fil", pages: ["taches", "tableau"],
       question: "C'est quoi le trait entre deux barres ?",
-      aussi: ["fil entre calcul et dessin", "lien entre les étiquettes"],
-      mots: "fil trait lien survol calcul dessin",
-      reponse: "Au survol d'une tâche à deux parts, un **fil** relie le calcul à son dessin (au tableau de bord, d'une ligne à l'autre ; sur Tâches, entre les deux étiquettes), et l'autre part s'entoure. Au tableau de bord, un **clic droit › Aller au calcul / au dessin** y saute." },
+      aussi: ["fil entre une tâche et ses dépendances", "fil entre calcul et dessin", "lien entre les étiquettes"],
+      mots: "fil trait lien survol dependance calcul dessin",
+      reponse: "Au tableau de bord, au survol d'une barre, un **fil** relie chaque **dépendance** à sa tâche (d'une ligne à l'autre), et les barres reliées s'entourent. Sur une ancienne tâche à deux parts, il relie le calcul à son dessin. Clic droit sur une dépendance › **Ouvrir la tâche principale** ; sur une tâche › **Ajouter une dépendance**." },
 
     /* ================================================================ tableau de bord */
 
@@ -539,7 +565,7 @@
       question: "Que veulent dire les alertes ?",
       aussi: ["alertes du tableau de bord", "en retard", "échéance proche", "sans ingénieur"],
       mots: "alerte retard proche sans ingenieur dessinateur",
-      reponse: "Sous le planning, les **Alertes** listent :\n- **En retard** : échéance passée ;\n- **Calcul en retard** : le calcul doit être rendu à temps pour que le dessin tienne l'échéance ;\n- **Échéance proche** ;\n- **Sans ingénieur / Sans dessinateur** : charge non affectée.\nUn clic ouvre la tâche.",
+      reponse: "Sous le planning, les **Alertes** listent :\n- **En retard** : échéance passée ;\n- **Calcul en retard** (anciennes tâches à deux parts) : le calcul doit être rendu à temps pour que le dessin tienne l'échéance ;\n- **Échéance proche** ;\n- **Sans ingénieur / Sans dessinateur** : tâche sans personne désignée.\nUn clic ouvre la tâche.",
       lien: "tableau", montre: ["#titre-alertes"] },
 
     { id: "tb-mon-planning", sansDroit: "Ton groupe n'a pas le droit **« Planning de toute l'équipe »** : le tableau de bord ne te montre que **tes tâches** et les personnes qui en portent l'autre part. C'est voulu ; pour voir l'équipe entière, demande ce droit à un administrateur.", selonDroit: { planning_equipe: ["Toi, tu as ce droit : choisis « Tous » ou une équipe dans le bandeau de gauche. Si tu ne vois que toi, l'entrée **Mon planning** est sélectionnée.", ""] },
@@ -552,9 +578,10 @@
 
     { id: "tb-clic-droit-autre-part", pages: ["tableau"],
       question: "Comment passer du calcul au dessin d'une même tâche ?",
-      aussi: ["aller à l'autre part", "trouver le dessin d'un calcul"],
-      mots: "autre part calcul dessin aller sauter",
-      reponse: "Clic droit sur la barre › **Aller au dessin** (ou **Aller au calcul**) : les filtres suivent (personne, métier, période) et l'autre barre est amenée sous les yeux, éclairée et reliée." },
+      aussi: ["aller à l'autre part", "trouver le dessin d'un calcul", "aller à la tâche principale"],
+      mots: "autre part calcul dessin aller sauter principale",
+      reponse: "Sur une ancienne tâche à deux parts : clic droit sur la barre › **Aller au dessin** (ou **Aller au calcul**) : les filtres suivent (personne, métier, période) et l'autre barre est amenée sous les yeux, éclairée et reliée.\nSur une **dépendance** : clic droit › **Ouvrir la tâche principale**.",
+      voir: ["tache-dependances"] },
 
     /* ================================================================ tableau de charge */
 

@@ -243,15 +243,42 @@
     if (!t.echeance) return null;
     trouve = trouve || membreParDefaut;
     var debutDessin = debutPour(t.chargeDessin, t.echeance, t.dessinateurId ? trouve(t.dessinateurId) : null, canton);
-    var veille = C.ajoute(debutDessin, -1);
     var inge = t.ingenieurId ? trouve(t.ingenieurId) : null;
-    if (inge && !inge.actif) inge = null;
-    var cur = veille;
+    return dernierJourAvant(debutDessin, inge, canton);
+  }
+
+  /** Le dernier jour où la personne travaille avant `jour` (le calendrier du
+   *  canton pour une charge sans personne). */
+  function dernierJourAvant(jour, membre, canton) {
+    if (membre && !membre.actif) membre = null;
+    var veille = C.ajoute(jour, -1), cur = veille;
     for (var garde = 0; garde < 60; garde++) {
-      if ((inge ? capaciteJour(inge, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0)) > 0) return cur;
+      if ((membre ? capaciteJour(membre, cur, canton) : (C.estOuvre(cur, canton) ? 1 : 0)) > 0) return cur;
       cur = C.ajoute(cur, -1);
     }
     return veille;
+  }
+
+  /** Personne qui porte une tâche (la part chargée ; l'ingénieur d'abord pour
+   *  une tâche d'avant les dépendances qui en a deux). */
+  function porteur(t) {
+    if (!t) return null;
+    if (t.chargeInge > 0) return t.ingenieurId || null;
+    return t.dessinateurId || null;
+  }
+
+  /**
+   * Dépendances (11.11.2026, demande de Tony) : une tâche peut en attendre
+   * d'autres, chacune portée par sa personne. Une dépendance doit être rendue
+   * au plus tard le dernier jour où sa personne travaille avant le début de la
+   * tâche principale.
+   */
+  function limiteDependance(principale, dep, canton, trouve) {
+    if (!principale || !principale.echeance) return null;
+    trouve = trouve || membreParDefaut;
+    var debut = debutEffectif(principale, canton, trouve);
+    var id = porteur(dep);
+    return dernierJourAvant(debut, id ? trouve(id) : null, canton);
   }
 
   /** Début de l'affectation d'un membre sur une tâche. */
@@ -466,6 +493,9 @@
     fenetre: fenetre,
     enchainee: enchainee,
     finCalculMax: finCalculMax,
+    limiteDependance: limiteDependance,
+    dernierJourAvant: dernierJourAvant,
+    porteur: porteur,
     premierJourApres: premierJourApres,
     finDepuis: finDepuis,
     finPart: finPart,

@@ -374,6 +374,10 @@ create table if not exists public.taches (
   fin_calcul     date,
   -- Priorité entre tâches de même échéance : 1 la plus importante, 5 par défaut.
   priorite       smallint not null default 5 check (priorite between 1 and 5),
+  -- Dépendance (11.11.2026) : la tâche principale que celle-ci doit précéder,
+  -- rendue la veille de son début. Vide : tâche principale. Supprimer la tâche
+  -- principale supprime ses dépendances.
+  avant          uuid references public.taches (id) on delete cascade,
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),
@@ -392,6 +396,7 @@ create index if not exists taches_affaire   on public.taches (affaire_id);
 create index if not exists taches_echeance  on public.taches (echeance);
 create index if not exists taches_ingenieur on public.taches (ingenieur_id);
 create index if not exists taches_dessin    on public.taches (dessinateur_id);
+create index if not exists taches_avant     on public.taches (avant);
 
 comment on column public.taches.debut is
   'Facultatif. Vide, l''interface cale la tâche au plus tard avant son échéance.';
@@ -1141,16 +1146,30 @@ create policy "droit de retirer" on public.affaires for delete to authenticated
   using (bureau_id = (select public.bureau_courant())
          and (select public.a_droit('affaires_creer')));
 
--- Tâches : « me concerner », c'est tenir une part chargée — l'ingénieur d'une
--- tâche qui a du calcul, le dessinateur d'une tâche qui a du dessin. Se mettre
--- au calcul d'une tâche sans calcul ne serait pas s'y mettre.
+-- Tâches : « me concerner », c'est tenir une part chargée — la personne
+-- désignée d'une tâche qui a de la charge. Qui tient une tâche principale mène
+-- aussi ses dépendances (11.11.2026) : tient_tache.
+create or replace function public.tient_tache(p_tache uuid)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.taches t
+     where t.id = p_tache
+       and t.bureau_id = public.bureau_courant()
+       and ((t.ingenieur_id   = public.mon_membre() and t.charge_inge   > 0)
+         or (t.dessinateur_id = public.mon_membre() and t.charge_dessin > 0)));
+$$;
+revoke all on function public.tient_tache(uuid) from public, anon;
+grant execute on function public.tient_tache(uuid) to authenticated;
+
 create policy "bureau courant (lecture)" on public.taches for select to authenticated
   using (bureau_id = (select public.bureau_courant()));
 create policy "droit ou ma tâche (création)" on public.taches for insert to authenticated
   with check (bureau_id = (select public.bureau_courant()) and (
     (select public.a_droit('taches_autrui'))
     or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
-    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)
+    or (avant is not null and public.tient_tache(avant))));
 -- Une part chargée que personne ne tient reste prenable par tout le monde :
 -- c'est le geste du tableau de bord, « glisser une barre à affecter sur un
 -- membre ». Le USING dit ce qu'on peut toucher ; le WITH CHECK ne garde que le
@@ -1162,13 +1181,15 @@ create policy "droit ou ma tâche (modification)" on public.taches for update to
     or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
     or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)
     or (ingenieur_id   is null and charge_inge   > 0)
-    or (dessinateur_id is null and charge_dessin > 0)))
+    or (dessinateur_id is null and charge_dessin > 0)
+    or (avant is not null and public.tient_tache(avant))))
   with check (bureau_id = (select public.bureau_courant()));
 create policy "droit ou ma tâche (suppression)" on public.taches for delete to authenticated
   using (bureau_id = (select public.bureau_courant()) and (
     (select public.a_droit('taches_autrui'))
     or (ingenieur_id   = (select public.mon_membre()) and charge_inge   > 0)
-    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)));
+    or (dessinateur_id = (select public.mon_membre()) and charge_dessin > 0)
+    or (avant is not null and public.tient_tache(avant))));
 
 -- Absences : les siennes, ou le droit d'en poser pour les autres.
 create policy "bureau courant (lecture)" on public.absences for select to authenticated

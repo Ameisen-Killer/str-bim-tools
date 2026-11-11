@@ -391,6 +391,9 @@
 
   /* ------------------------------------------------- traduction des champs */
 
+  // La base porte-t-elle la colonne taches.avant ? (voir la lecture des tâches)
+  var colonneAvant = false;
+
   function vide(v) { return v === "" ? null : v; }
 
 
@@ -436,6 +439,8 @@
       // Fin propre de la part calcul d'une tâche enchaînée (12.10.2026)
       o.fin_calcul = t.finCalcul || null;
       o.priorite = Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5));
+      // Dépendance : la tâche principale qu'elle précède (11.11.2026)
+      if (colonneAvant) o.avant = t.avant || null;
       return o;
     },
     /* Un avis porte une heure : l'écran la garde en heure locale
@@ -550,7 +555,17 @@
     absences: function () { return litTout("absences", "id"); },
     affaires: function () { return litTout("affaires", "id"); },
     affaire_membres: function () { return litTout("affaire_membres", "affaire_id,membre_id"); },
-    taches: function () { return litTout("taches", "id"); },
+    /* La colonne « avant » (dépendances, 11.11.2026) n'existe qu'une fois
+       migration-dependances.sql exécutée : on la cherche dans ce qu'on lit
+       (une table vide la fait demander à part). Sans elle, on ne l'écrit pas. */
+    taches: function () {
+      return litTout("taches", "id").then(function (l) {
+        if (l.length) { colonneAvant = "avant" in l[0]; return l; }
+        return requete("taches?select=avant&limit=1")
+          .then(function () { colonneAvant = true; }, function () { colonneAvant = false; })
+          .then(function () { return l; });
+      });
+    },
     reglages: function () { return litTout("reglages", "id"); },
     contacts: function () { return litTout("contacts", "id"); },
     avis: litAvis,
@@ -667,6 +682,7 @@
           enchaine: t.enchaine === true,
           finCalcul: t.fin_calcul || null,
           priorite: t.priorite,
+          avant: t.avant || null,
           cree: t.cree_le, maj: t.maj_le
         };
       }),
@@ -951,6 +967,8 @@
     projet: function () { return { url: URL_BASE, cle: CLE }; },
     presence: presence,
     reglagesAuth: reglagesAuth,
+    /** Les dépendances entre tâches peuvent-elles s'enregistrer ? (migration-dependances.sql) */
+    dependances: function () { return colonneAvant; },
     ADAPT: {
       nom: "supabase",
       semeSiVide: false,

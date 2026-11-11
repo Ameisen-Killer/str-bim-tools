@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=109">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=110">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
@@ -143,11 +143,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=86"></script>
-<script src="/planif/assets/calculs.js?v=16"></script>
-<script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=125"></script>
+<script src="/planif/assets/supabase.js?v=62"></script>
+<script src="/planif/assets/donnees.js?v=87"></script>
+<script src="/planif/assets/calculs.js?v=17"></script>
+<script src="/planif/assets/version.js?v=23"></script>
+<script src="/planif/assets/ui.js?v=126"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -512,6 +512,15 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       // ne termine plus la part, il ouvre la fiche comme le reste de la ligne ;
       // terminer ou rouvrir la part passe par le clic droit sur l'étiquette.
       var gens = el("div", { class: "gens-parts", style: "display:flex;flex-wrap:wrap;gap:6px;--tt:" + teinte });
+      var seule = !(t.chargeInge > 0 && t.chargeDessin > 0);
+      // Dépendances (11.11.2026) : la tâche qu'elle précède, ou ce qu'elle attend
+      var princ = D.principale(t), deps = D.dependances(t.id);
+      var depOuvertes = deps.filter(function (d) { return d.statut !== "termine"; }).length;
+      var lienDep = princ ? "Avant « " + princ.titre + " » · " + D.nomMembre(Calc.porteur(princ))
+        : deps.length ? deps.length + (deps.length > 1 ? " dépendances" : " dépendance") +
+          (depOuvertes ? " (" + depOuvertes + " à rendre) : " : " rendues : ") +
+          deps.map(function (d) { var id = Calc.porteur(d); return id ? D.nomMembre(id) : "à affecter"; }).join(", ")
+        : "";
       var etiquettes = {};
       [
         { role: "ingenieur", classe: "ing", charge: t.chargeInge, membre: t.ingenieurId, fini: t.finiInge },
@@ -519,7 +528,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       ].forEach(function (p) {
         if (!(p.charge > 0)) return;
         var nom = p.membre ? D.nomMembre(p.membre) : "À affecter";
-        var label = D.PARTS[p.role].label;
+        // Une seule part (11.11.2026) : c'est la tâche, plus « calcul » ni « dessin »
+        var label = seule ? "Tâche" : D.PARTS[p.role].label;
         gens.appendChild(etiquettes[p.role] = el("button", {
           type: "button",
           class: "etiq " + p.classe + (p.membre ? "" : " a-affecter") + (p.fini ? " finie" : ""),
@@ -553,6 +563,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
               el("span", { class: "num", style: "color:" + teinte + ";font-size:11.5px;letter-spacing:.08em;white-space:nowrap" }, [UI.surligne((a && a.code) || "—", mots)]),
               a ? el("span", {}, [UI.surligne(a.nom, mots)]) : null
             ]),
+            lienDep ? el("div", { class: "secondaire dep-info", style: "font-size:13px;color:var(--texte-doux)", text: (princ ? "↳ " : "⇠ ") + lienDep }) : null,
             t.note ? el("div", { class: "secondaire" }, [UI.surligne(t.note, mots)]) : null
           ])
         ])]),
@@ -613,7 +624,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         var pastille = ev.target.closest(".etiq[data-membre]"), qui = pastille && pastille.getAttribute("data-membre");
         var role = pastille && pastille.getAttribute("data-role"), part = role && D.PARTS[role];
         var partFinie = part && !!t[part.fini];
-        var bascPart = part && ecrit ? { label: (partFinie ? "Rouvrir le " : "Terminer le ") + part.label.toLowerCase(),
+        var seuleP = !(t.chargeInge > 0 && t.chargeDessin > 0);
+        var bascPart = part && ecrit ? { label: seuleP ? (partFinie ? "Rouvrir la tâche" : "Terminer la tâche") : (partFinie ? "Rouvrir le " : "Terminer le ") + part.label.toLowerCase(),
           action: function () { terminePart(t.id, role, !partFinie); } } : null;
         var pm = qui && qui !== "a-affecter" ? D.membre(qui) : null;
         if (qui) {
@@ -809,9 +821,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       delete avantFin[id];
     }
     var label = D.PARTS[role].label;
+    var seule = !(t.chargeInge > 0 && t.chargeDessin > 0);
     D.retoucheTache(id, champs).then(function () {
       dessine();
       var apres = D.tache(id);
+      if (seule) return UI.toast(fait ? "Tâche terminée." : "Tâche rouverte.");
       UI.toast(fait ? label + " terminé." + (apres && apres.statut === "termine" ? " Tâche terminée." : "")
                     : label + " rouvert.");
     }).catch(function (e) { dessine(); UI.toast(e.message); });
@@ -893,7 +907,13 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   // Formulaire commun avec le tableau de bord (ui.js) : il s'ouvre sur place des deux côtés
   function formulaire(idTache) {
-    UI.formulaireTache(idTache, { affaireId: filtres.affaire, surEnregistrement: dessine });
+    /* 11.11.2026 (demande de Tony) : une personne choisie dans la liste des
+       membres est d'office la personne désignée d'une nouvelle tâche ; la
+       ligne « À affecter » donne une tâche sans personne. */
+    var pm = !idTache && filtres.membre && filtres.membre !== "a-affecter" ? D.membre(filtres.membre) : null;
+    var o = { affaireId: filtres.affaire, surEnregistrement: dessine };
+    if (pm && D.PLANIFIES[pm.metier] && (D.aDroit("taches_autrui") || (D.monMembre() || {}).id === pm.id)) o.membreId = pm.id;
+    UI.formulaireTache(idTache, o);
   }
 
   /* Fiche rapide, elle aussi commune au tableau de bord : la tâche entière,
@@ -922,7 +942,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=4"></script>
+<script src="/planif/assets/aide-fiches.js?v=5"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

@@ -832,6 +832,8 @@
         // 1 la plus importante, 5 par défaut. Réglée par le curseur du formulaire
         // de tâche ; colonne taches.priorite en base.
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
+        // Dépendance (11.11.2026) : la tâche principale qu'elle précède ; vide pour une tâche principale
+        avant: texte(t.avant) || null,
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
         // À la lecture, « Terminé » prime : une tâche d'avant les parts, ou
@@ -1143,7 +1145,51 @@
     // Priorité entre tâches de même échéance (1 la plus importante, 5 par défaut) :
     // seulement quand le formulaire la porte (module Inter-secteurs), sinon elle reste telle quelle
     if (o.priorite != null && o.priorite !== "") v.priorite = Math.min(5, Math.max(1, parseInt(o.priorite, 10) || 5));
+    // Dépendance : seulement quand l'écriture la nomme (une dépendance le reste)
+    if ("avant" in o) {
+      v.avant = texte(o.avant) || null;
+      if (v.avant && !etat.taches.some(function (x) { return x.id === v.avant; })) throw erreur("La tâche principale de cette dépendance n'existe plus.");
+    }
     return v;
+  }
+
+  /* ------------------------------------------------------- dépendances
+     11.11.2026, demande de Tony : une tâche a une personne désignée et, au
+     besoin, des dépendances — d'autres tâches, chacune avec sa personne et sa
+     charge, à rendre avant que la tâche principale commence. Une dépendance
+     porte l'identifiant de sa tâche principale (« avant »). Son échéance suit
+     le début de la tâche principale : la veille travaillée de sa personne
+     (Calc.limiteDependance). Avancée à la main, elle garde sa date tant que la
+     tâche principale ne la rattrape pas. */
+  function dependancesDe(i) {
+    return i ? etat.taches.filter(function (x) { return x.avant === i; }) : [];
+  }
+  function limitesDeps(t) {
+    var Calc = global.Calc, out = {};
+    if (!Calc || !t) return out;
+    dependancesDe(t.id).forEach(function (d) { out[d.id] = Calc.limiteDependance(t, d, D.canton()); });
+    return out;
+  }
+  /** Après un changement de la tâche principale t : ses dépendances ouvertes
+   *  qui la suivaient la suivent encore ; celles qui la dépasseraient reculent. */
+  function recaleDeps(t, avant) {
+    var Calc = global.Calc;
+    if (!Calc || !t) return;
+    dependancesDe(t.id).forEach(function (d) {
+      if (d.statut === "termine") return;
+      var lim = Calc.limiteDependance(t, d, D.canton());
+      if (!lim) return;
+      if ((avant && d.echeance === avant[d.id]) || d.echeance > lim) {
+        if (d.echeance !== lim) { d.echeance = lim; d.finCalcul = null; d.maj = new Date().toISOString(); }
+      }
+    });
+  }
+  /** Une dépendance ne finit pas après sa limite. */
+  function bornePrincipale(d) {
+    var Calc = global.Calc;
+    if (!Calc || !d || !d.avant) return;
+    var lim = Calc.limiteDependance(etat.taches.filter(function (x) { return x.id === d.avant; })[0], d, D.canton());
+    if (lim && d.echeance > lim) d.echeance = lim;
   }
 
   /* ------------------------------------------------------------ API publique */
@@ -1390,8 +1436,12 @@
     meConcerne: function (t) {
       var moi = D.monMembre();
       if (!moi || !t) return false;
-      return (t.ingenieurId === moi.id && t.chargeInge > 0) ||
-             (t.dessinateurId === moi.id && t.chargeDessin > 0);
+      if ((t.ingenieurId === moi.id && t.chargeInge > 0) ||
+          (t.dessinateurId === moi.id && t.chargeDessin > 0)) return true;
+      // Qui tient la tâche principale mène aussi ses dépendances (11.11.2026)
+      var p = t.avant ? D.tache(t.avant) : null;
+      return !!p && ((p.ingenieurId === moi.id && p.chargeInge > 0) ||
+                     (p.dessinateurId === moi.id && p.chargeDessin > 0));
     },
 
     /** Puis-je créer ou modifier cette tâche ? (t nul : une tâche à créer,
@@ -1635,6 +1685,16 @@
       });
     },
     tache: function (i) { return idx().taches[i] || null; },
+    /** Dépendances d'une tâche principale, de la plus tôt rendue à la plus tard. */
+    dependances: function (i) {
+      return dependancesDe(i).slice().sort(function (a, b) { return (a.echeance || "") < (b.echeance || "") ? -1 : 1; });
+    },
+    /** La tâche principale d'une dépendance, ou null. */
+    principale: function (t) { return t && t.avant ? D.tache(t.avant) : null; },
+    /** Les dépendances peuvent-elles s'enregistrer ? Base sans migration-dependances.sql : non. */
+    dependancesActives: function () {
+      return !(global.Sb && global.Sb.configure && ADAPTATEUR === global.Sb.ADAPT) || !!(global.Sb.dependances && global.Sb.dependances());
+    },
     /** Numéro de version de l'état : change à chaque enregistrement. Sert de clé aux calculs mis en cache. */
     version: function () { return version; },
 
@@ -1642,6 +1702,7 @@
       return Promise.resolve().then(function () {
         var v = accordeParts(valideTache(o), partsNommees(o), false);
         if (!v.priorite) v.priorite = 5;
+        bornePrincipale(v);
         v.id = id(); v.cree = new Date().toISOString(); v.maj = v.cree;
         etat.taches.push(v);
         return sauve().then(function () { return v; });
@@ -1651,9 +1712,11 @@
       return Promise.resolve().then(function () {
         var t = D.tache(i); if (!t) throw erreur("Tâche introuvable.");
         var etait = t.statut === "termine";
-        var v = valideTache(o);
+        var v = valideTache(o), limites = limitesDeps(t);
         Object.keys(v).forEach(function (k) { t[k] = v[k]; });
         accordeParts(t, partsNommees(o), etait);
+        bornePrincipale(t);
+        recaleDeps(t, limites);
         t.maj = new Date().toISOString();
         return sauve().then(function () { return t; });
       });
@@ -1662,9 +1725,11 @@
     retoucheTache: function (i, champs) {
       return Promise.resolve().then(function () {
         var t = D.tache(i); if (!t) throw erreur("Tâche introuvable.");
-        var etait = t.statut === "termine";
+        var etait = t.statut === "termine", limites = limitesDeps(t);
         Object.keys(champs).forEach(function (k) { if (k in t || k === "finCalcul") t[k] = champs[k]; });
         accordeParts(t, partsNommees(champs), etait);
+        bornePrincipale(t);
+        recaleDeps(t, limites);
         t.maj = new Date().toISOString();
         return sauve().then(function () { return t; });
       });
@@ -1689,6 +1754,27 @@
           var pas = jours > 0 ? 1 : -1, garde = 0;
           while (C.chome(d, canton) && garde++ < 30) d = C.ajoute(d, pas);
           return d;
+        }
+        /* Une dépendance (11.11.2026) : avancée, elle seule bouge ; retardée
+           jusque sur sa tâche principale, elle repousse celle-ci juste assez
+           pour qu'elle commence le jour travaillé qui suit. */
+        var p = Calc && t.avant ? D.tache(t.avant) : null;
+        if (p) {
+          var cibleDep = glisse(C.ajoute(t.echeance, jours)), dDep = C.diff(t.echeance, cibleDep);
+          if (!dDep) return null;
+          var lim = Calc.limiteDependance(p, t, canton);
+          if (!lim || cibleDep <= lim) {
+            return D.retoucheTache(i, { echeance: cibleDep, debut: null })
+              .then(function () { return { dependance: dDep, principale: 0 }; });
+          }
+          var idP = Calc.porteur(p), mP = idP ? D.membre(idP) : null;
+          var chargeP = p.chargeInge > 0 && p.chargeDessin > 0 ? p.chargeDessin : (p.chargeInge || p.chargeDessin);
+          var echP = Calc.finDepuis(chargeP, Calc.premierJourApres(cibleDep, mP, canton), mP, canton);
+          if (echP < p.echeance) echP = p.echeance;
+          var avantP = p.echeance;
+          return D.retoucheTache(p.id, { echeance: echP, debut: null })
+            .then(function () { return D.retoucheTache(i, { echeance: cibleDep, debut: null }); })
+            .then(function () { return { dependance: dDep, principale: C.diff(avantP, echP) }; });
         }
         if (role !== "ingenieur" || !Calc || !Calc.enchainee(t)) {
           var ech = glisse(C.ajoute(t.echeance, jours)), delta = C.diff(t.echeance, ech);
@@ -1722,7 +1808,8 @@
     },
     suppTache: function (i) {
       return Promise.resolve().then(function () {
-        etat.taches = etat.taches.filter(function (t) { return t.id !== i; });
+        // Ses dépendances partent avec elle (la base fait de même, en cascade)
+        etat.taches = etat.taches.filter(function (t) { return t.id !== i && t.avant !== i; });
         return sauve();
       });
     },
@@ -2231,11 +2318,15 @@
   annulable("ajouteTache", null,
     function (o) { return "création de « " + texte(o.titre) + " »"; },
     function (t) { return [{ coll: "taches", id: t.id, avant: null }]; });
-  annulable("majTache", function (i) { return [photo("taches", i)]; },
+  // Une tâche principale emporte ses dépendances : elles reviennent avec elle
+  function photosFamille(i) {
+    return [photo("taches", i)].concat(dependancesDe(i).map(function (d) { return photo("taches", d.id); }));
+  }
+  annulable("majTache", photosFamille,
     function (i) { return "modification de " + nomTache(i); });
-  annulable("retoucheTache", function (i) { return [photo("taches", i)]; },
+  annulable("retoucheTache", photosFamille,
     function (i) { return "modification de " + nomTache(i); });
-  annulable("suppTache", function (i) { return [photo("taches", i)]; },
+  annulable("suppTache", photosFamille,
     function (i) { return "suppression de " + nomTache(i); });
 
   annulable("ajouteAffaire", null,

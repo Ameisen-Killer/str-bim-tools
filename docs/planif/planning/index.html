@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=109">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=110">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 </head>
@@ -99,7 +99,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         <span><i class="ret" aria-hidden="true"></i> En retard</span>
         <span><i class="dash" aria-hidden="true"></i> Charge ingénieur</span>
         <span><i class="coche" aria-hidden="true"></i> Part terminée</span>
-        <span class="seul-souris"><i class="fil" aria-hidden="true"></i> Survol : calcul ↔ dessin</span>
+        <span class="seul-souris"><i class="fil" aria-hidden="true"></i> Survol : tâche ↔ dépendances</span>
+        <span class="seul-souris">Double-clic sur un jour : nouvelle tâche</span>
         <span><span class="pastille" style="color:var(--texte-faible)" aria-hidden="true"></span> Teinte de l'affaire</span>
         <span>Fond hachuré : absence</span>
         <span><i class="off" aria-hidden="true"></i> Jour non travaillé</span>
@@ -121,11 +122,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
-<script src="/planif/assets/supabase.js?v=61"></script>
-<script src="/planif/assets/donnees.js?v=86"></script>
-<script src="/planif/assets/calculs.js?v=16"></script>
-<script src="/planif/assets/version.js?v=22"></script>
-<script src="/planif/assets/ui.js?v=125"></script>
+<script src="/planif/assets/supabase.js?v=62"></script>
+<script src="/planif/assets/donnees.js?v=87"></script>
+<script src="/planif/assets/calculs.js?v=17"></script>
+<script src="/planif/assets/version.js?v=23"></script>
+<script src="/planif/assets/ui.js?v=126"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
 <script src="/planif/assets/palette.js?v=23"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
@@ -176,11 +177,19 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var moi = D.monMembre(), p = { moi: moi ? moi.id : null, taches: Object.create(null), gens: Object.create(null) };
     if (!moi) return p;
     p.gens[moi.id] = true;
-    D.taches({ sansTerminees: false }).forEach(function (t) {
-      if (t.ingenieurId !== moi.id && t.dessinateurId !== moi.id) return;
+    function prend(t) {
+      if (!t || p.taches[t.id]) return;
       p.taches[t.id] = true;
       if (t.ingenieurId) p.gens[t.ingenieurId] = true;
       if (t.dessinateurId) p.gens[t.dessinateurId] = true;
+    }
+    D.taches({ sansTerminees: false }).forEach(function (t) {
+      if (t.ingenieurId !== moi.id && t.dessinateurId !== moi.id) return;
+      prend(t);
+      // Dépendances (11.11.2026) : la tâche principale et ses dépendances se voient ensemble
+      var p0 = D.principale(t) || t;
+      prend(p0);
+      D.dependances(p0.id).forEach(prend);
     });
     return p;
   }
@@ -630,7 +639,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
           ])
         ]));
         // data-membre vide : la ligne reçoit aussi les charges qu'on veut remettre à affecter
-        plan.appendChild(el("div", { class: "pl-zone a-affecter", "data-anim": "z|libre|" + r, dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r]), bilanLibres(libres[r], r, canton)]));
+        var zoneLibre = el("div", { class: "pl-zone a-affecter", "data-anim": "z|libre|" + r, dataset: { membre: "", role: r } }, [fondDe(null), pisteDe(libres[r]), bilanLibres(libres[r], r, canton)]);
+        zoneLibre.addEventListener("dblclick", function (e) { nouvelleAuJour(e, zoneLibre, { aAffecter: r }); });
+        plan.appendChild(zoneLibre);
       });
     }
 
@@ -699,7 +710,29 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
       var zone = el("div", { class: "pl-zone", "data-anim": "z|" + m.id, dataset: { membre: m.id, role: D.cote(m.metier) } }, [fond, piste, bilan]);
       zone.addEventListener("contextmenu", menuPersonne);
+      zone.addEventListener("dblclick", function (e) { nouvelleAuJour(e, zone, { membreId: m.id }); });
       plan.appendChild(zone);
+    });
+  }
+
+  /* ---- Double-clic sur un jour d'une ligne (11.11.2026, demande de Tony) :
+     nouvelle tâche, la personne de la ligne désignée d'office et le jour
+     cliqué pour échéance. Sur une barre ou le bilan : rien. Sur « À
+     affecter » : une tâche sans personne, du métier de la ligne. */
+  function nouvelleAuJour(e, zone, o) {
+    if (e.target.closest(".bt, .pl-bilan, [role=button]")) return;
+    var cases = zone.querySelectorAll(".pl-fond > i"), jour = null;
+    [].some.call(cases, function (c, k) {
+      var r = c.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX < r.right) { jour = jours[k]; return true; }
+      return false;
+    });
+    if (!jour) return;
+    e.preventDefault();
+    if (window.getSelection) { try { window.getSelection().removeAllRanges(); } catch (x) {} }
+    UI.formulaireTache(null, {
+      membreId: o.membreId, aAffecter: o.aAffecter, echeance: jour,
+      affaireId: vue.affaires.length === 1 ? vue.affaires[0] : "", surEnregistrement: rend
     });
   }
 
@@ -892,9 +925,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     // Le filet d'or marque l'échéance : une part reportée ne finit pas à la sienne
     if (!info.reportee && C.diff(jours[0], info.fin) + 1 <= jours.length) classes.push("fin");
     var etirable = !info.fini && t.statut !== "termine" && D.peutEcrireTache(t);
-    // Tâche à deux parts : le clic droit mène à l'autre (vaAutrePart)
+    // Tâche à deux parts (d'avant les dépendances) : le clic droit mène à l'autre (vaAutrePart)
     var autre = info.role === "ingenieur" ? "dessinateur" : "ingenieur";
     var jumelee = t[D.PARTS[autre].charge] > 0;
+    // Dépendances (11.11.2026) : la tâche principale d'une dépendance, les dépendances d'une tâche
+    var principale = D.principale(t), deps = D.dependances(t.id);
+    var nomPart = jumelee ? D.PARTS[info.role].label.toLowerCase() : "tâche";
     var versAutre = " · clic droit : actions";
 
     var n = el("div", {
@@ -908,7 +944,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       "aria-label": (a ? a.code + " · " : "") + t.titre + "\n" +
              D.METIERS[info.role] + " · " + C.fmtJours(info.charge) + " j\n" +
              C.fmtCH(info.debut) + " → " + C.fmtCH(info.fin) +
-             (info.fini && t.statut !== "termine" ? "\n" + D.PARTS[info.role].label + " terminé" : "") +
+             (info.fini && t.statut !== "termine" ? "\n" + (jumelee ? D.PARTS[info.role].label + " terminé" : "Tâche terminée") : "") +
+             (principale ? "\nDépendance : à rendre avant « " + principale.titre + " »" : "") +
+             (deps.length ? "\n" + deps.length + (deps.length > 1 ? " dépendances à rendre avant" : " dépendance à rendre avant") : "") +
              (info.reportee ? "\nEn retard : échéance du " + C.fmtCH(info.echeancePart || t.echeance) + " dépassée, charge reprise dès le " + C.fmtCH(info.debut)
                : t.statut !== "termine" && !info.fini && t.echeance < auj ? "\nEn retard" : "") +
              (info.role === "ingenieur" && !info.fini && Calc.enchainee(t)
@@ -955,7 +993,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         { label: "Ouvrir la fiche", action: function () { fiche(info); } },
         { label: ecrit ? "Modifier la tâche" : "Voir la tâche", action: function () { UI.formulaireTache(t.id, { surEnregistrement: rend }); } },
         jumelee ? { label: autre === "ingenieur" ? "Aller au calcul" : "Aller au dessin", action: function () { vaAutrePart(info); } } : null,
-        ecrit && t.statut !== "termine" ? { label: (info.fini ? "Rouvrir le " : "Terminer le ") + D.PARTS[info.role].label.toLowerCase(), action: function () {
+        principale ? { label: "Ouvrir la tâche principale", action: function () { UI.formulaireTache(principale.id, { surEnregistrement: rend }); } } : null,
+        ecrit && !principale && !jumelee ? { label: deps.length ? "Ajouter ou modifier une dépendance" : "Ajouter une dépendance", action: function () { UI.formulaireTache(t.id, { surEnregistrement: rend }); } } : null,
+        ecrit && t.statut !== "termine" ? { label: jumelee ? (info.fini ? "Rouvrir le " : "Terminer le ") + nomPart : (info.fini ? "Rouvrir la tâche" : "Terminer la tâche"), action: function () {
           var ch = {}; ch[champFini] = !info.fini;
           D.retoucheTache(t.id, ch).then(rend).catch(function (x) { UI.toast(x.message); });
         } } : null,
@@ -1001,28 +1041,36 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     cacheLien();
     if (document.body.classList.contains("glisse-en-cours") || n.classList.contains("etire")) return;
     var t = info.tache, autre = info.role === "ingenieur" ? "dessinateur" : "ingenieur";
-    var P = D.PARTS[autre];
-    if (!(t[P.charge] > 0)) return;                    // tâche d'un seul métier : rien à relier
     var plan = document.getElementById("plan");
     if (!plan.contains(n)) return;
-    var cle = "b|" + t.id + "|" + autre, jumelle = null;
-    [].some.call(plan.querySelectorAll(".bt"), function (b) {
-      if (b.getAttribute("data-anim") === cle) { jumelle = b; return true; }
-      return false;
-    });
+    /* Ce que la barre relie : l'autre part d'une tâche d'avant (calcul → dessin),
+       et, depuis le 11.11.2026, les dépendances vers leur tâche principale. */
+    var paires = [];                                    // [barre de départ, barre d'arrivée] dans le sens du travail
+    function barresDe(id) {
+      return [].filter.call(plan.querySelectorAll(".bt"), function (b) {
+        return (b.getAttribute("data-anim") || "").indexOf("b|" + id + "|") === 0;
+      });
+    }
+    if (t[D.PARTS[autre].charge] > 0) {
+      var cle = "b|" + t.id + "|" + autre;
+      barresDe(t.id).forEach(function (b) {
+        if (b.getAttribute("data-anim") === cle) paires.push(info.role === "ingenieur" ? [n, b] : [b, n]);
+      });
+    }
+    var p = D.principale(t);
+    if (p) barresDe(p.id).forEach(function (b) { paires.push([n, b]); });
+    D.dependances(t.id).forEach(function (d) { barresDe(d.id).forEach(function (b) { paires.push([b, n]); }); });
 
     var teinte = n.style.getPropertyValue("--tt");
     lien = { noeuds: [], barres: [n] };
     n.classList.add("lie");
-
-    // L'autre part masquée (filtre, autre période) : pas de fil, la bulle dit qui la porte
-    if (!jumelle) return;
-
-    jumelle.classList.add("jumelle");
-    lien.barres.push(jumelle);
-    // Toujours du calcul vers le dessin : le fil se lit dans le sens du travail
-    var svg = info.role === "ingenieur" ? UI.fil(plan, n, jumelle, teinte) : UI.fil(plan, jumelle, n, teinte);
-    lien.noeuds.push(svg);
+    // Les autres barres masquées (filtre, autre période) : pas de fil, la bulle dit qui les porte
+    paires.forEach(function (pr) {
+      var jumelle = pr[0] === n ? pr[1] : pr[0];
+      jumelle.classList.add("jumelle");
+      lien.barres.push(jumelle);
+      lien.noeuds.push(UI.fil(plan, pr[0], pr[1], teinte));
+    });
   }
   // La mise en page change : le fil ne tomberait plus juste
   window.addEventListener("resize", cacheLien);
@@ -1241,11 +1289,26 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var reaffecte = null, libere = false;
     var champ = info.role === "ingenieur" ? "ingenieurId" : "dessinateurId";
     var actuel = t[champ];
+    /* Tâche d'une seule part (11.11.2026) : elle va à n'importe quelle
+       personne ; sa charge change de côté avec le métier de qui la reçoit. */
+    var autreRole = info.role === "ingenieur" ? "dessinateur" : "ingenieur";
+    var seule = !(t[D.PARTS[autreRole].charge] > 0);
+    var roleDecale = info.role;
+    function versCote(cote, id) {
+      var P = D.PARTS[info.role], Q = D.PARTS[cote];
+      champs[P.membre] = null; champs[P.charge] = 0; champs[P.fini] = false;
+      champs[Q.membre] = id; champs[Q.charge] = t[P.charge]; champs[Q.fini] = !!t[P.fini];
+      roleDecale = cote;
+    }
     if (membreCible === "") {
       if (roleCible === info.role && actuel) { champs[champ] = null; libere = true; }
+      else if (seule && roleCible && roleCible !== info.role) { versCote(roleCible, null); libere = true; }
     } else if (membreCible) {
       var m = D.membre(membreCible);
-      if (m && m.id !== actuel) {
+      if (m && m.id !== actuel && seule && D.cote(m.metier) && D.cote(m.metier) !== info.role) {
+        versCote(D.cote(m.metier), m.id);
+        reaffecte = m.prenom + " " + m.nom;
+      } else if (m && m.id !== actuel) {
         if (D.cote(m.metier) !== info.role) {
           UI.toast("Une charge " + (info.role === "ingenieur" ? "ingénieur" : "dessin") +
                    " ne peut aller qu'à un " + (info.role === "ingenieur" ? "ingénieur" : "dessinateur") + ".");
@@ -1258,11 +1321,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     }
     if (!Object.keys(champs).length && !delta) return;
     (Object.keys(champs).length ? D.retoucheTache(t.id, champs) : Promise.resolve())
-      .then(function () { return delta ? D.decalePart(t.id, info.role, delta) : null; })
+      .then(function () { return delta ? D.decalePart(t.id, roleDecale, delta) : null; })
       .then(function (r) {
         rend();
         var dits = [];
-        if (r && calculSeul) dits.push(texteDecalage(r));
+        if (r && r.dependance != null) dits.push(UI.texteDecalageDep(r));
+        else if (r && calculSeul) dits.push(texteDecalage(r));
         else if (r) dits.push("Tâche décalée de " + (r.dessin > 0 ? "+" : "") + r.dessin + " j");
         if (reaffecte) dits.push((dits.length ? "" : "Tâche ") + "confiée à " + reaffecte);
         if (libere) dits.push((dits.length ? "" : "Tâche ") + "remise à affecter");
@@ -1337,7 +1401,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=4"></script>
+<script src="/planif/assets/aide-fiches.js?v=5"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>
