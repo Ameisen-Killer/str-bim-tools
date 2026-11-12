@@ -1220,7 +1220,7 @@
   // triangles que le code JavaScript ci-dessous, plusieurs fois plus vite (clés entières au lieu de chaînes).
   // Chargé en arrière-plan ; tant qu'il manque, ou si on a choisi le lecteur JavaScript, ou s'il plante,
   // le JavaScript fait le travail.
-  var RM = null, AR_VIDE = new Int32Array(0);
+  var RM = null, AR_VIDE = new Int32Array(0), RM_ERR = "";   // RM_ERR : raison d'un arrêt du module
   (function(){
     if (typeof WebAssembly !== "object" || typeof fetch !== "function") return;
     try { if (localStorage.getItem("ifc.lecteur") === "js") return; } catch (e){}
@@ -1264,7 +1264,7 @@
       }
       if (nf > 4e6) RM.m_liberer();                 // très gros élément : on rend la mémoire
       return true;
-    } catch (err){ RM = null; return false; }     // module planté : JavaScript jusqu'au rechargement
+    } catch (err){ RM = null; RM_ERR = String(err && err.message || err); return false; }     // module planté : JavaScript jusqu'au rechargement
   }
   // ================= Cache de la géométrie (fichier rouvert) =================
   // Tout ce que G.cache contient (géométries, ouvertures comprises, triangles, arêtes vives) mis à plat dans
@@ -1366,7 +1366,7 @@
       }
       if (s.length > 4e6) RM.t_liberer();
       return true;
-    } catch (err){ RM = null; return false; }
+    } catch (err){ RM = null; RM_ERR = String(err && err.message || err); return false; }
   }
   function aretesVives(geo){
     if (geo.A) return geo.A;
@@ -3451,6 +3451,7 @@
     // géométrie venue d'ailleurs (web-ifc) : triangles à plat (9 nombres par triangle) → objet géométrie de l'aperçu
     geoTriangles: geoTriangles,
     // module Rust chargé et en service (lecture des faces, maillage)
-    rustActif: function(){ return !!RM; }
+    rustActif: function(){ return !!RM; },
+    rustErreur: function(){ return RM_ERR; }
   };
 })(window);

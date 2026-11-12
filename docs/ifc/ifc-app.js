@@ -2482,9 +2482,11 @@
   };
   // Temps de chaque étape de la dernière ouverture (Aide > À propos)
   function tempsOuverture(){
-    var rust = vue.rustActif ? vue.rustActif() : false;
+    var rust = IFCVue.rustActif(), panne = IFCVue.rustErreur();
     var h = "<h3 class=\"apropos-t\">Module Rust</h3><p>" + (rust ? "En service : découpe du fichier, faces triangulées et polygonales, triangles et arêtes."
-      : lecteurVoulu === "js" ? "Mis de côté : lecture JavaScript choisie dans Affichage > Lecture des fichiers." : "Pas (encore) chargé : le JavaScript fait le travail.") + "</p>";
+      : lecteurVoulu === "js" ? "Mis de côté : lecture JavaScript choisie dans Affichage > Lecture des fichiers."
+      : panne ? "Arrêté après une erreur (" + esc(panne) + ") : le JavaScript fait le travail jusqu'au rechargement de la page."
+      : "Pas encore chargé : le JavaScript fait le travail.") + "</p>";
     if (!derniere) return h + "<p>Ouvre un fichier pour voir le temps de chaque étape.</p>";
     function ms(v){ return v === undefined ? null : fmtN(Math.max(0, Math.round(v))) + " ms"; }
     derniere.temps.forEach(function(t, i){
