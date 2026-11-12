@@ -193,22 +193,34 @@
   var avecWorker = typeof Worker !== "undefined";
   function lireFichier(f){ return f.arrayBuffer ? f.arrayBuffer() : new Promise(function(ok, ko){ var r = new FileReader(); r.onload = function(){ ok(r.result); }; r.onerror = function(){ ko(r.error); }; r.readAsArrayBuffer(f); }); }
   function lireClassique(f){ return lireFichier(f).then(function(b){ return pause().then(function(){ return IFC.lire(b, f.name); }); }); }
+  // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
+  // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé. Découpe par le module Rust de /ifc/,
+  // le lecteur JavaScript reprend la main s'il manque ou échoue.
+  var URL_LECTEUR = "/fgh/rsv/fgh-lecteur.js?v=4", chaud = null;
+  function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
+  function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
+  if (avecWorker) setTimeout(function(){
+    try { if (!chaud){ chaud = new Worker(URL_LECTEUR); chaud.postMessage({ prechauffer: true, lecteur: "rust" }); } } catch (e){ chaud = null; }
+  }, 300);
   function lecture(f, progres){
     if (!avecWorker) return lireClassique(f);
     return lireFichier(f).then(function(buf){
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/fgh/rsv/fgh-lecteur.js?v=3"); }
+        try { w = prendreWorker(); }
         catch (e){ avecWorker = false; lireClassique(f).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
           if (d.progres !== undefined){ progres(.7*d.progres); return; }
-          w.terminate();
+          rendreWorker(w);
           if (d.erreur){ var err = new Error(d.erreur); err.ifc = d.ifc; ko(err); return; }
-          IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), f.name, function(p, etape){ progres(etape === "texte" ? .7 + .1*p : .8 + .2*p); }).then(ok, ko);
+          IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), f.name, function(p, etape){ progres(etape === "texte" ? .7 + .1*p : .8 + .2*p); }).then(function(m){
+            m.lecteur = d.resultat.lecteur; m.noteLecteur = d.resultat.noteLecteur; m.msLecteur = d.resultat.msLecteur;
+            ok(m);
+          }, ko);
         };
         w.onerror = function(e){ if (e && e.preventDefault) e.preventDefault(); w.terminate(); avecWorker = false; lireClassique(f).then(ok, ko); };
-        w.postMessage({ buffer: buf }, [buf]);
+        w.postMessage({ buffer: buf, lecteur: "rust" }, [buf]);
       });
     });
   }

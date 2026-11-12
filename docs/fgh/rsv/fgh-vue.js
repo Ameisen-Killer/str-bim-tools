@@ -1,4 +1,4 @@
-// Copie de /ifc/ifc-vue.js pour /fgh/rsv/ (validation des réservations), avec trois ajouts repérés « FGH » :
+// Copie de /ifc/ifc-vue.js pour /fgh/rsv/ (validation des réservations ; noyau Rust de /ifc/ repris le 12.11.2026), avec trois ajouts repérés « FGH » :
 // géométrie ramenée en mètres (maquettes STR et RES exportées dans des unités différentes), boîte de coupe
 // posée par ses coordonnées (coupe par niveau), teintes changées sans tout recharger.
 // Aperçu 3D de /ifc/ : rendu maison, sans bibliothèque. WebGL écrit à la main (tampon de profondeur,
@@ -1122,6 +1122,8 @@
   function item(G, id, M, out, prof){
     var e = G.m.ent.get(id);
     if (!e || prof > 12) return;
+    // faces triangulées et polygonales : lues par le module Rust si possible (texte STEP lu directement)
+    if (RM && (e.type === "IFCTRIANGULATEDFACESET" || e.type === "IFCPOLYGONALFACESET") && tessRust(G, e, M, out)) return;
     var a = C(e);
     switch (e.type){
       case "IFCFACETEDBREP": case "IFCFACETEDBREPWITHVOIDS":
@@ -1227,8 +1229,88 @@
   // Arêtes vives : bord libre, ou angle marqué entre les deux faces qui la partagent. Les facettes
   // d'un rond ou d'une face triangulée ne montrent donc plus leurs coutures.
   var COS_VIF = Math.cos(28*Math.PI/180);
+  // Noyau Rust de /ifc/ (ifc-lecteur.wasm, source outils/ifc-rust/src/maillage.rs) : mêmes arêtes vives et mêmes
+  // triangles que le code JavaScript ci-dessous, plusieurs fois plus vite (clés entières au lieu de chaînes).
+  // Chargé en arrière-plan ; tant qu'il manque, ou s'il plante,
+  // le JavaScript fait le travail.
+  var RM = null, AR_VIDE = new Int32Array(0), RM_ERR = "";   // RM_ERR : raison d'un arrêt du module
+  var RM_PRET = (function(){
+    if (typeof WebAssembly !== "object" || typeof fetch !== "function") return Promise.resolve(null);
+    return fetch("/ifc/ifc-lecteur.wasm?v=4").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(function(b){ return WebAssembly.instantiate(b, { env: { progres: function(){} } }); })
+      .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; return RM; })
+      .catch(function(){ return null; });
+  })();
+  // mode : 1 arêtes vives (geo.A, geo.ferme, f.ar), 2 triangles (geo.T, geo.TF), 3 les deux
+  function mailRust(geo, mode){
+    try {
+      var faces = geo.faces, ni = 2, nf = 1, fi, k, b;
+      for (fi = 0; fi < faces.length; fi++){ b = faces[fi].b; ni += 1 + b.length; nf += 3; for (k = 0; k < b.length; k++) nf += b[k].length; }
+      RM.m_entree(ni, nf);
+      var mem = RM.memory.buffer, I = new Int32Array(mem, RM.m_ent_i(), ni), F = new Float64Array(mem, RM.m_ent_f(), nf), pi = 2, pf = 1;
+      I[0] = mode; I[1] = faces.length;
+      F[0] = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
+      for (fi = 0; fi < faces.length; fi++){
+        var f = faces[fi]; b = f.b;
+        I[pi++] = b.length;
+        for (k = 0; k < b.length; k++) I[pi++] = b[k].length/3;
+        F[pf] = f.n[0]; F[pf+1] = f.n[1]; F[pf+2] = f.n[2]; pf += 3;
+        for (k = 0; k < b.length; k++){ F.set(b[k], pf); pf += b[k].length; }
+      }
+      if (RM.m_calculer() !== 0) return false;
+      mem = RM.memory.buffer;
+      if (mode & 2){
+        geo.T = new Float64Array(mem, RM.m_sortie(0), RM.m_long(0)).slice();
+        geo.TF = new Int32Array(mem, RM.m_sortie(1), RM.m_long(1)).slice();
+      }
+      if (mode & 1){
+        // f.ar n'est que lu (moteur canvas) : vues dans un seul tableau, une vue vide partagée sinon
+        var AR = new Int32Array(mem, RM.m_sortie(3), RM.m_long(3)).slice(), p = 0;
+        for (fi = 0; fi < faces.length; fi++){
+          var n = 2*AR[p++];
+          faces[fi].ar = n ? AR.subarray(p, p + n) : AR_VIDE;
+          p += n;
+        }
+        geo.ferme = RM.m_ferme() === 1;
+        geo.A = new Float64Array(mem, RM.m_sortie(2), RM.m_long(2)).slice();
+      }
+      if (nf > 4e6) RM.m_liberer();                 // très gros élément : on rend la mémoire
+      return true;
+    } catch (err){ RM = null; RM_ERR = String(err && err.message || err); return false; }     // module planté : JavaScript jusqu'au rechargement
+  }
+  // Faces triangulées et polygonales par le module Rust (src/tess.rs, copie de tessellation + ajouterFace) :
+  // le texte des entités part tel quel, les faces reviennent en coordonnées monde. false = au JavaScript.
+  var ENC = typeof TextEncoder === "function" ? new TextEncoder() : null;
+  function tessRust(G, e, M, out){
+    if (!ENC || !RM.t_calculer) return false;
+    try {
+      var tri = e.type === "IFCTRIANGULATEDFACESET", r0 = e.refs[0] || 0, pl = r0 ? G.m.ent.get(r0) : null;
+      var ids = [e.id, r0], txts = [e.src, pl ? pl.src : ""], i;
+      if (!tri) for (i = 1; i < e.refs.length; i++){ var fe = G.m.ent.get(e.refs[i]); ids.push(e.refs[i]); txts.push(fe ? fe.src : ""); }
+      var s = txts.join(""), nt = txts.length;
+      RM.t_entree(s.length, nt);
+      var mem = RM.memory.buffer, r = ENC.encodeInto(s, new Uint8Array(mem, RM.t_octets(), s.length));
+      if (r.read !== s.length || r.written !== s.length) return false;     // caractère hors ASCII : JavaScript
+      var I = new Int32Array(mem, RM.t_ent(), 1 + 3*nt), d = 0;
+      I[0] = tri ? 1 : 0;
+      for (i = 0; i < nt; i++){ I[1 + 3*i] = d; I[2 + 3*i] = txts[i].length; I[3 + 3*i] = ids[i]; d += txts[i].length; }
+      new Float64Array(mem, RM.t_mat(), 12).set(M);
+      if (RM.t_calculer() !== 0) return false;
+      mem = RM.memory.buffer;
+      var SF = new Float64Array(mem, RM.t_sortie(0), RM.t_long(0)).slice(), SI = new Int32Array(mem, RM.t_sortie(1), RM.t_long(1));
+      for (var p = 0, q = 0; p < SI.length;){
+        var nb = SI[p++], bs = new Array(nb), n = [SF[q], SF[q+1], SF[q+2]];
+        q += 3;
+        for (var k = 0; k < nb; k++){ var l = 3*SI[p++]; bs[k] = SF.subarray(q, q + l); q += l; }
+        out.push({ b: bs, n: n, p: null, z: 0, el: 0, x0: 0, x1: 0, y0: 0, y1: 0 });
+      }
+      if (s.length > 4e6) RM.t_liberer();
+      return true;
+    } catch (err){ RM = null; RM_ERR = String(err && err.message || err); return false; }
+  }
   function aretesVives(geo){
     if (geo.A) return geo.A;
+    if (RM && geo.faces.length && mailRust(geo, geo.T ? 1 : 3)) return geo.A;
     var faces = geo.faces, q = Math.max(1e-9, Math.hypot(geo.max[0] - geo.min[0], geo.max[1] - geo.min[1], geo.max[2] - geo.min[2])*1e-6);
     var tab = new Map();
     function cle(b, i){ return Math.round(b[i]/q) + "," + Math.round(b[i+1]/q) + "," + Math.round(b[i+2]/q); }
@@ -1246,9 +1328,14 @@
       });
     });
     var seg = [];
+    // fermé : chaque arête sert un nombre pair de fois (un terrain ou une surface ouverte a des bords libres)
+    geo.ferme = true;
     tab.forEach(function(l){
-      var vive = l.length !== 6;
-      if (!vive) vive = Math.abs(dot(faces[l[0]].n, faces[l[3]].n)) < COS_VIF;
+      if ((l.length/3) % 2) geo.ferme = false;
+      // bord libre, ou faces qui ne sont pas toutes dans le même plan (une surface sans épaisseur, dessus et
+      // dessous confondus, partage chaque arête entre quatre faces sans pour autant faire un angle)
+      var vive = l.length < 6;
+      for (var r0 = 3; !vive && r0 < l.length; r0 += 3) vive = Math.abs(dot(faces[l[0]].n, faces[l[r0]].n)) < COS_VIF;
       if (!vive) return;
       for (var r = 0; r < l.length; r += 3) faces[l[r]].ar.push(l[r+1], l[r+2]);
       var b = faces[l[0]].b[l[1]], i = l[2], j = (i + 1) % (b.length/3);
@@ -1386,6 +1473,7 @@
   // Triangles de tout l'élément, en coordonnées monde, et indice de face de chaque triangle
   function triangles(geo){
     if (geo.T) return geo.T;
+    if (RM && geo.faces.length && mailRust(geo, geo.A ? 2 : 3)) return geo.T;
     var pos = [], fac = [];
     geo.faces.forEach(function(f, fi){
       var ix = trianguler(f), P = [];
@@ -3069,6 +3157,9 @@
     creer: creer,
     ajouterMoteur: function(cle, fabrique){ FABRIQUES[cle] = fabrique; },
     // géométrie venue d'ailleurs (web-ifc) : triangles à plat (9 nombres par triangle) → objet géométrie de l'aperçu
-    geoTriangles: geoTriangles
+    geoTriangles: geoTriangles,
+    // module Rust de /ifc/ chargé et en service (lecture des faces, maillage), ou raison de son arrêt
+    rustActif: function(){ return !!RM; },
+    rustErreur: function(){ return RM_ERR; }
   };
 })(window);

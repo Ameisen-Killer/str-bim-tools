@@ -1,4 +1,5 @@
-// Copie de /ifc/ifc-core.js pour /fgh/rsv/ (validation des réservations), sans changement.
+// Copie de /ifc/ifc-core.js pour /fgh/rsv/ (validation des réservations). Lecture reprise de /ifc/ le 12.11.2026 :
+// découpe par le module Rust (analyserRust), texte décodé en natif quand c'est sans risque.
 // Noyau IFC de /ifc/ : lecture STEP (ISO 10303-21), index des éléments, suppression propre, export.
 // Aussi chargé par le Web Worker ifc-lecteur.js (lecture en arrière-plan) : rien ici ne touche à la page.
 // - Le fichier est lu octet par octet (un caractère = un octet) : tout ce qui n'est pas touché
@@ -16,7 +17,17 @@
   function erreur(msg){ var e = new Error(msg); e.ifc = true; return e; }
 
   // ================= Octets <-> texte =================
+  // Décodeur natif windows-1252 : identique à « un octet = un caractère » pour tous les octets sauf 0x80–0x9F
+  // (€, guillemets typographiques…) ; utilisé quand le fichier n'en contient aucun, trois fois plus rapide.
+  var DEC = null;
+  try { DEC = new TextDecoder("windows-1252"); } catch (e){ DEC = null; }
+  function decodable(octets){
+    if (!DEC) return false;
+    for (var i = 0, n = octets.length; i < n; i++){ var c = octets[i]; if (c >= 0x80 && c <= 0x9f) return false; }
+    return true;
+  }
   function versTexte(octets){
+    if (octets.length > 65536 && decodable(octets)) return DEC.decode(octets);
     var parts = [], PAS = 0x8000;
     for (var i = 0; i < octets.length; i += PAS) parts.push(String.fromCharCode.apply(null, octets.subarray(i, i + PAS)));
     return parts.join("");
@@ -220,13 +231,31 @@
   // Première étape de la lecture, faisable dans un Web Worker (ifc-lecteur.js) : contrôle du fichier et
   // découpage des entités sous une forme compacte (tableaux typés, positions dans le texte) qui passe
   // d'un fil à l'autre sans copie. Le texte complet est rendu à part (r.txt), il ne voyage pas.
-  function analyser(octets, progres){
+  // Contrôles d'entrée communs aux deux lecteurs ; rend le texte (un caractère par octet)
+  // partiel : seuls les premiers caractères sont convertis (le lecteur Rust n'a pas besoin du texte entier)
+  function controler(octets, partiel){
     if (octets.length < 20) throw erreur("Le fichier est vide ou tronqué.");
     if (octets[0] === 0x50 && octets[1] === 0x4B) throw erreur("Ce fichier est compressé (.ifczip ou .zip). Décompresse-le d'abord, puis ouvre le .ifc qu'il contient.");
-    var txt = versTexte(octets);
-    var debut = txt.slice(0, 4000);
+    var debut = versTexte(octets.subarray(0, 4000)), txt = partiel ? null : versTexte(octets);
     if (/^\s*<\?xml/.test(debut) || /<ifcXML|iso_10303_28/i.test(debut)) throw erreur("Ce fichier est un ifcXML : seul le format texte .ifc (STEP) est pris en charge.");
     if (debut.indexOf("ISO-10303-21") < 0) throw erreur("Ce fichier n'est pas un IFC valide : la ligne d'ouverture « ISO-10303-21; » est absente.");
+    return txt;
+  }
+  function schemaDe(entetes){
+    var schema = "";
+    entetes.forEach(function(h){
+      if (/^FILE_SCHEMA\s*\(/i.test(h)){
+        var s = toutesChaines(valeur(h.slice(h.indexOf("("))));
+        if (s.length) schema = s[0].toUpperCase().trim();
+      }
+    });
+    if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
+    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    return schema;
+  }
+  function analyser(octets, progres){
+    var txt = controler(octets);
+    var debut = txt.slice(0, 4000);
 
     // tableaux qui grandissent par doublement
     var cap = 1024, nb = 0, ids = new Int32Array(cap), deb = new Int32Array(cap), fin = new Int32Array(cap), typ = new Int32Array(cap), rdeb = new Int32Array(cap + 1);
@@ -283,15 +312,7 @@
     if (etat === 3) throw erreur("Fichier tronqué : la section DATA ne se termine pas (ENDSEC manquant). Le téléchargement ou l'export a peut-être été interrompu.");
     if (!nb) throw erreur("Le fichier ne contient aucune entité.");
 
-    var schema = "";
-    entetes.forEach(function(h){
-      if (/^FILE_SCHEMA\s*\(/i.test(h)){
-        var s = toutesChaines(valeur(h.slice(h.indexOf("("))));
-        if (s.length) schema = s[0].toUpperCase().trim();
-      }
-    });
-    if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
-    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    var schema = schemaDe(entetes);
     rdeb[nb] = nr;
 
     return {
@@ -300,6 +321,78 @@
       nb: nb, ids: ids.slice(0, nb), deb: deb.slice(0, nb), fin: fin.slice(0, nb), typ: typ.slice(0, nb),
       rdeb: rdeb.slice(0, nb + 1), refs: refs.slice(0, nr), types: types, speciaux: speciaux
     };
+  }
+
+  // Même résultat qu'analyser, la découpe étant faite par le module WebAssembly compilé depuis Rust
+  // (docs/ifc/ifc-lecteur.wasm, source outils/ifc-rust). W : ses fonctions exportées. Rend null quand le
+  // module confie le fichier au lecteur JavaScript (cas rares qu'il ne traite pas lui-même).
+  // Texte d'une instruction qui contient un commentaire : txt[a..b[ sans les /* */ (hors chaînes), sans blancs autour
+  function sansCommentaires(txt, a, b){
+    var out = [], d = a, i = a, c;
+    while (i < b){
+      c = txt.charCodeAt(i);
+      if (c === 39){
+        i++;
+        while (i < b){ if (txt.charCodeAt(i) === 39){ if (txt.charCodeAt(i + 1) === 39){ i += 2; continue; } break; } i++; }
+        i++; continue;
+      }
+      if (c === 47 && txt.charCodeAt(i + 1) === 42){
+        out.push(txt.slice(d, i));
+        var f = txt.indexOf("*/", i + 2);
+        if (f < 0 || f >= b) { d = b; break; }
+        i = f + 2; d = i; continue;
+      }
+      i++;
+    }
+    out.push(txt.slice(d, b));
+    return out.join("").trim();
+  }
+  function analyserRust(octets, W){
+    controler(octets, true);
+    // le texte n'est tiré des octets que là où il sert (en-têtes, entités avec commentaire, messages d'erreur) :
+    // convertir tout le fichier coûtait plus cher que la découpe Rust elle-même
+    function bout(a, b){ return versTexte(octets.subarray(a, b)); }
+    function sansComm(a, b){ return sansCommentaires(bout(a, Math.min(octets.length, b + 2)), 0, b - a); }
+    var p = W.reserver(octets.length);
+    new Uint8Array(W.memory.buffer, p, octets.length).set(octets);
+    var code = W.analyser(octets.length);
+    try {
+      if (code === 99) return null;
+      if (code){
+        var s = W.res_err(1) < W.res_err(2) ? sansComm(W.res_err(1), W.res_err(2)).slice(0, 60) : "";
+        throw erreur(({
+          1: "Fichier illisible : une chaîne de caractères n'est jamais refermée (apostrophe manquante).",
+          2: "Fichier illisible : un commentaire /* n'est jamais refermé.",
+          3: "Entité illisible dans la section DATA : « " + s + " ».",
+          4: "Entité #" + W.res_err(3) + " incomplète : parenthèses mal fermées.",
+          5: "Ligne inattendue dans la section DATA : « " + s + " ».",
+          6: "Ce fichier n'est pas un IFC valide : il doit commencer par « ISO-10303-21; ».",
+          7: "Ce fichier n'est pas un IFC valide : la section HEADER est absente.",
+          8: "Ce fichier n'est pas un IFC valide : la section DATA est absente."
+        })[code] || "Fichier illisible (code " + code + ").");
+      }
+      var etat = W.res_etat(), nb = W.res_nb(), nr = W.res_nr();
+      if (etat < 3) throw erreur("Ce fichier n'est pas un IFC valide : la section DATA est absente.");
+      if (etat === 3) throw erreur("Fichier tronqué : la section DATA ne se termine pas (ENDSEC manquant). Le téléchargement ou l'export a peut-être été interrompu.");
+      if (!nb) throw erreur("Le fichier ne contient aucune entité.");
+      function tab(k, n){ return new Int32Array(W.memory.buffer, W.res_tableau(k), n).slice(); }
+      var ids = tab(0, nb), deb = tab(1, nb), fin = tab(2, nb), typ = tab(3, nb), rdeb = tab(4, nb + 1), refs = tab(5, nr);
+      var ne = W.res_nb_entetes(), et = tab(6, ne*3);
+      var types = versTexte(new Uint8Array(W.memory.buffer, W.res_types(), W.res_types_long())).split("\n");
+      types.pop();
+      // une position négative signale une instruction avec commentaire : texte refait ici, comme analyser
+      function texte(d, f, avecComm){ return avecComm ? sansComm(-d - 2, f) : d < f ? bout(d, f) : ""; }
+      var speciaux = {}, entetes = [];
+      for (var k = 0; k < nb; k++) if (deb[k] < 0){ speciaux[k] = sansComm(-deb[k] - 2, fin[k]); deb[k] = fin[k] = -1; }
+      for (var j = 0; j < ne; j++) entetes.push(texte(et[3*j], et[3*j + 1], et[3*j + 2]));
+      var dataDecl = texte(W.res_data(0), W.res_data(1), W.res_data(2)) || "DATA";
+      var schema = schemaDe(entetes), debut = bout(0, 4000);
+      return {
+        taille: octets.length, schema: schema, eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
+        entetes: entetes, dataDecl: dataDecl, maxId: W.res_max_id(), doublons: W.res_doublons(),
+        nb: nb, ids: ids, deb: deb, fin: fin, typ: typ, rdeb: rdeb, refs: refs, types: types, speciaux: speciaux
+      };
+    } finally { W.liberer(); }
   }
 
   // Deuxième étape : les entités figées, par tranches [k0, k1[ (pour rendre la main entre deux tranches)
@@ -341,6 +434,7 @@
   function pause(){ return new Promise(function(ok){ setTimeout(ok, 0); }); }
   function lireParEtapes(r, octets, nom, progres){
     var parts = [], PAS = 0x8000, i = 0, ent = new Map(), ordre = [], k = 0;
+    if (decodable(octets)){ parts.push(DEC.decode(octets)); i = octets.length; }     // d'un coup, en natif
     function texte(){
       var t0 = performance.now();
       while (i < octets.length && performance.now() - t0 < 40){
@@ -878,7 +972,7 @@
   }
 
   global.IFC = {
-    lire: lire, analyser: analyser, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
+    lire: lire, analyser: analyser, analyserRust: analyserRust, lireParEtapes: lireParEtapes, index: index, arbre: arbre, descendants: descendants, infos: infos, proprietes: proprietes,
     planifier: planifier, appliquer: appliquer, ecrire: ecrire, taille: taille, nomExport: nomExport, versOctets: versOctets,
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
     fusionner: fusionner,
