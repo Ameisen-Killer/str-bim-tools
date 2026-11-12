@@ -9,7 +9,7 @@
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},
     {href:"/can241/", nom:"CAN 241", desc:"Métré béton coulé sur place"},
     {href:"/a-propos/", nom:"À propos", desc:"de Tony Varin"},
-    {href:"/atelier/", nom:"Atelier", desc:"Tous les outils web, façon bureau"},
+    {href:"/ifc/", nom:"IFC Studio", desc:"Voir et corriger des IFC dans le navigateur"},
     {href:"/mentions-legales/", nom:"Mentions légales", desc:"Éditeur, hébergeur, données"}
   ];
 
