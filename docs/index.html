@@ -541,8 +541,20 @@ h1{
 
     inclL += (incl - inclL) * Math.min(1, dt*4);
     dessiner(T, th + inclL);
-    requestAnimationFrame(frame);
+    dernier = now;
+    if (actif()) requestAnimationFrame(frame); else enPause = true;
   }
+  // En pause quand la maquette sort de l'écran ou que l'onglet passe en arrière-plan (batterie des téléphones) ;
+  // elle reprend là où elle en était, sans sauter la construction
+  var dansEcran = true, enPause = false, dernier = 0;
+  function actif(){ return dansEcran && !document.hidden; }
+  function reprendre(){
+    if (!enPause || !actif()) return;
+    enPause = false;
+    requestAnimationFrame(function(now){ if (t0 !== null) t0 += now - dernier - 16; frame(now); });
+  }
+  if ("IntersectionObserver" in window) new IntersectionObserver(function(e){ dansEcran = e[0].isIntersecting; reprendre(); }).observe(cv);
+  document.addEventListener("visibilitychange", reprendre);
   requestAnimationFrame(frame);
 
   // Sur téléphone, pencher l'appareil à gauche ou à droite fait pivoter un peu la vue
