@@ -112,6 +112,26 @@
 
   // ================= Messages =================
   function etat(msg){ $("#etat").textContent = msg || ""; }
+  // Types sans occurrence (souvent laissés par une suppression, avec toute leur géométrie) : s'ils pèsent
+  // lourd, la barre d'état le signale et renvoie vers Fichier > Purger…. Appelé un peu après le message
+  // principal, qu'il complète.
+  function conseilPurge(ms){
+    setTimeout(function(){
+      var o = 0, n = 0, taille = 0;
+      try {
+        ms.forEach(function(m){
+          taille += IFC.taille ? IFC.taille(m) : (m.taille || 0);
+          if (!IFC.planPurge(m, { types: true, compter: true }).cats.types) return;
+          var p = IFC.planPurge(m, { types: true });
+          o += p.octets; n += p.cats.types;
+        });
+      } catch (e){ return; }
+      if (!(o > 1048576 && o > .2*taille)) return;
+      var el = $("#etat");
+      el.textContent += " " + pluriel(n, "type sans occurrence", "types sans occurrence") + " pèse" + (n > 1 ? "nt" : "") + " encore " + fmtTaille(o) +
+        " (" + Math.round(100*o/Math.max(1, taille)) + " % du fichier) : Fichier > Purger… les retire" + (modeEd ? "." : " (mode Éditeur).");
+    }, 250);
+  }
   function erreur(msg){
     var b = $("#erreur");
     if (!msg){ b.hidden = true; b.innerHTML = ""; return; }
@@ -211,7 +231,7 @@
       var buf = x.buf;
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=5"); }
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=6"); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
@@ -374,6 +394,7 @@
     etat(nom + " lu" + (modeles.length > 1 ? "s" : "") + " : " + pluriel(ent, "entité") + ", en " + fmtN(Math.max(1, Math.round(ms))) + " ms" + parLecteur +
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
+    conseilPurge(modeles);
     if (premier) window.scrollTo(0, 0);
     if (geoVoulue === "webifc") calculerWebIfc();
   }
@@ -1252,6 +1273,7 @@
       reconstruire();
       etat(pluriel(nbEl, "élément supprimé", "éléments supprimés") + ", " + pluriel(nbEnt, "entité retirée", "entités retirées") +
         (nbMod ? ", " + pluriel(nbMod, "relation raccourcie", "relations raccourcies") : "") + ".");
+      conseilPurge(plans.map(function(x){ return x.f.m; }));
     });
   }
   // Retaille selon la boîte de coupe, fichier par fichier (maquettes affichées) : les éléments hors de la boîte

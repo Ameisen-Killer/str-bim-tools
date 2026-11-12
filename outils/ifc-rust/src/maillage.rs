@@ -13,6 +13,22 @@
 //! `m_ferme()` : 1 si chaque arête sert un nombre pair de fois.
 
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// hachage rapide (type FxHash) : les clés sont des entiers, pas besoin de la protection de SipHash
+#[derive(Default)]
+struct Rapide(u64);
+impl Hasher for Rapide {
+    #[inline]
+    fn finish(&self) -> u64 { self.0 }
+    #[inline]
+    fn write(&mut self, o: &[u8]) { for &b in o { self.write_u64(b as u64); } }
+    #[inline]
+    fn write_u64(&mut self, x: u64) { self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95); }
+    #[inline]
+    fn write_i64(&mut self, x: i64) { self.write_u64(x as u64); }
+}
+type Table<K, V> = HashMap<K, V, BuildHasherDefault<Rapide>>;
 
 const COS_VIF: f64 = 0.882_947_592_858_926_9; // cos 28°
 
@@ -149,7 +165,7 @@ fn aretes(ef: &[f64], faces: &[Face], q: f64, seg: &mut Vec<f64>, ar_out: &mut V
     type Cle = (i64, i64, i64);
     let cle = |i: usize| -> Cle { (rond(ef[i] / q), rond(ef[i + 1] / q), rond(ef[i + 2] / q)) };
     // tableau des arêtes dans l'ordre où elles apparaissent (comme une Map JavaScript)
-    let mut index: HashMap<(Cle, Cle), usize> = HashMap::new();
+    let mut index: Table<(Cle, Cle), usize> = Table::default();
     let mut listes: Vec<Vec<u32>> = Vec::new();
     for (fi, f) in faces.iter().enumerate() {
         let mut d = f.deb;

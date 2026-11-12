@@ -4,13 +4,13 @@
 // copie) ou { erreur, ifc }. Aucune requête réseau hors de ce site : le fichier ne quitte pas le navigateur.
 // lecteur "rust" : découpe par le module WebAssembly compilé depuis Rust (ifc-lecteur.wasm, source
 // outils/ifc-rust), plusieurs fois plus rapide ; le lecteur JavaScript reprend la main s'il manque ou échoue.
-importScripts("/ifc/ifc-core.js?v=10");
+importScripts("/ifc/ifc-core.js?v=11");
 
 var module = null, rapport = null;
 function chargerRust(){
   if (!module){
     module = typeof WebAssembly !== "object" ? Promise.reject(new Error("WebAssembly absent")) :
-      fetch("/ifc/ifc-lecteur.wasm?v=2").then(function(r){
+      fetch("/ifc/ifc-lecteur.wasm?v=3").then(function(r){
         if (!r.ok) throw new Error("module introuvable (" + r.status + ")");
         return r.arrayBuffer();
       }).then(function(b){

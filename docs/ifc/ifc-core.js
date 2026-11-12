@@ -220,11 +220,11 @@
   // découpage des entités sous une forme compacte (tableaux typés, positions dans le texte) qui passe
   // d'un fil à l'autre sans copie. Le texte complet est rendu à part (r.txt), il ne voyage pas.
   // Contrôles d'entrée communs aux deux lecteurs ; rend le texte (un caractère par octet)
-  function controler(octets){
+  // partiel : seuls les premiers caractères sont convertis (le lecteur Rust n'a pas besoin du texte entier)
+  function controler(octets, partiel){
     if (octets.length < 20) throw erreur("Le fichier est vide ou tronqué.");
     if (octets[0] === 0x50 && octets[1] === 0x4B) throw erreur("Ce fichier est compressé (.ifczip ou .zip). Décompresse-le d'abord, puis ouvre le .ifc qu'il contient.");
-    var txt = versTexte(octets);
-    var debut = txt.slice(0, 4000);
+    var debut = versTexte(octets.subarray(0, 4000)), txt = partiel ? null : versTexte(octets);
     if (/^\s*<\?xml/.test(debut) || /<ifcXML|iso_10303_28/i.test(debut)) throw erreur("Ce fichier est un ifcXML : seul le format texte .ifc (STEP) est pris en charge.");
     if (debut.indexOf("ISO-10303-21") < 0) throw erreur("Ce fichier n'est pas un IFC valide : la ligne d'ouverture « ISO-10303-21; » est absente.");
     return txt;
@@ -336,14 +336,18 @@
     return out.join("").trim();
   }
   function analyserRust(octets, W){
-    var txt = controler(octets);
+    controler(octets, true);
+    // le texte n'est tiré des octets que là où il sert (en-têtes, entités avec commentaire, messages d'erreur) :
+    // convertir tout le fichier coûtait plus cher que la découpe Rust elle-même
+    function bout(a, b){ return versTexte(octets.subarray(a, b)); }
+    function sansComm(a, b){ return sansCommentaires(bout(a, Math.min(octets.length, b + 2)), 0, b - a); }
     var p = W.reserver(octets.length);
     new Uint8Array(W.memory.buffer, p, octets.length).set(octets);
     var code = W.analyser(octets.length);
     try {
       if (code === 99) return null;
       if (code){
-        var s = W.res_err(1) < W.res_err(2) ? sansCommentaires(txt, W.res_err(1), W.res_err(2)).slice(0, 60) : "";
+        var s = W.res_err(1) < W.res_err(2) ? sansComm(W.res_err(1), W.res_err(2)).slice(0, 60) : "";
         throw erreur(({
           1: "Fichier illisible : une chaîne de caractères n'est jamais refermée (apostrophe manquante).",
           2: "Fichier illisible : un commentaire /* n'est jamais refermé.",
@@ -365,14 +369,14 @@
       var types = versTexte(new Uint8Array(W.memory.buffer, W.res_types(), W.res_types_long())).split("\n");
       types.pop();
       // une position négative signale une instruction avec commentaire : texte refait ici, comme analyser
-      function texte(d, f, avecComm){ return avecComm ? sansCommentaires(txt, -d - 2, f) : txt.slice(d, f); }
+      function texte(d, f, avecComm){ return avecComm ? sansComm(-d - 2, f) : d < f ? bout(d, f) : ""; }
       var speciaux = {}, entetes = [];
-      for (var k = 0; k < nb; k++) if (deb[k] < 0){ speciaux[k] = sansCommentaires(txt, -deb[k] - 2, fin[k]); deb[k] = fin[k] = -1; }
+      for (var k = 0; k < nb; k++) if (deb[k] < 0){ speciaux[k] = sansComm(-deb[k] - 2, fin[k]); deb[k] = fin[k] = -1; }
       for (var j = 0; j < ne; j++) entetes.push(texte(et[3*j], et[3*j + 1], et[3*j + 2]));
       var dataDecl = texte(W.res_data(0), W.res_data(1), W.res_data(2)) || "DATA";
-      var schema = schemaDe(entetes), debut = txt.slice(0, 4000);
+      var schema = schemaDe(entetes), debut = bout(0, 4000);
       return {
-        txt: txt, taille: octets.length, schema: schema, eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
+        taille: octets.length, schema: schema, eol: debut.indexOf("\r\n") >= 0 ? "\r\n" : "\n",
         entetes: entetes, dataDecl: dataDecl, maxId: W.res_max_id(), doublons: W.res_doublons(),
         nb: nb, ids: ids, deb: deb, fin: fin, typ: typ, rdeb: rdeb, refs: refs, types: types, speciaux: speciaux
       };

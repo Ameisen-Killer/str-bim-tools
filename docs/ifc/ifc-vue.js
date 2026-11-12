@@ -1218,11 +1218,11 @@
   // triangles que le code JavaScript ci-dessous, plusieurs fois plus vite (clés entières au lieu de chaînes).
   // Chargé en arrière-plan ; tant qu'il manque, ou si on a choisi le lecteur JavaScript, ou s'il plante,
   // le JavaScript fait le travail.
-  var RM = null;
+  var RM = null, AR_VIDE = new Int32Array(0);
   (function(){
     if (typeof WebAssembly !== "object" || typeof fetch !== "function") return;
     try { if (localStorage.getItem("ifc.lecteur") === "js") return; } catch (e){}
-    fetch("/ifc/ifc-lecteur.wasm?v=2").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    fetch("/ifc/ifc-lecteur.wasm?v=3").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
       .then(function(b){ return WebAssembly.instantiate(b, { env: { progres: function(){} } }); })
       .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; })
       .catch(function(){});
@@ -1250,12 +1250,12 @@
         geo.TF = new Int32Array(mem, RM.m_sortie(1), RM.m_long(1)).slice();
       }
       if (mode & 1){
-        var AR = new Int32Array(mem, RM.m_sortie(3), RM.m_long(3)), p = 0;
+        // f.ar n'est que lu (moteur canvas) : vues dans un seul tableau, une vue vide partagée sinon
+        var AR = new Int32Array(mem, RM.m_sortie(3), RM.m_long(3)).slice(), p = 0;
         for (fi = 0; fi < faces.length; fi++){
-          var n = 2*AR[p++], ar = new Array(n);
-          for (k = 0; k < n; k++) ar[k] = AR[p + k];
+          var n = 2*AR[p++];
+          faces[fi].ar = n ? AR.subarray(p, p + n) : AR_VIDE;
           p += n;
-          faces[fi].ar = ar;
         }
         geo.ferme = RM.m_ferme() === 1;
         geo.A = new Float64Array(mem, RM.m_sortie(2), RM.m_long(2)).slice();
