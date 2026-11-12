@@ -192,7 +192,22 @@
   // ================= Lecture des fichiers =================
   var avecWorker = typeof Worker !== "undefined";
   function lireFichier(f){ return f.arrayBuffer ? f.arrayBuffer() : new Promise(function(ok, ko){ var r = new FileReader(); r.onload = function(){ ok(r.result); }; r.onerror = function(){ ko(r.error); }; r.readAsArrayBuffer(f); }); }
-  function lireClassique(f){ return lireFichier(f).then(function(b){ return pause().then(function(){ return IFC.lire(b, f.name); }); }); }
+  function lireClassique(f){
+    return lireFichier(f).then(function(b){ return pause().then(function(){
+      var t0 = performance.now(), m = IFC.lire(b, f.name);
+      m.lecteur = "js"; m.noteLecteur = ""; m.msLecteur = performance.now() - t0;
+      return marquer(m, b, f.name);
+    }); });
+  }
+  // Empreinte d'un fichier (nom, taille, octets échantillonnés + fin complète) : clé du cache de géométrie
+  function empreinte(buf, nom){
+    var u = new Uint8Array(buf), n = u.length, h = 0x811c9dc5, pas = Math.max(1, Math.floor(n/262144)), i;
+    for (i = 0; i < n; i += pas){ h ^= u[i]; h = Math.imul(h, 0x01000193); }
+    for (i = Math.max(0, n - 65536); i < n; i++){ h ^= u[i]; h = Math.imul(h, 0x01000193); }
+    return [CACHE_GEO, nom, n, (h >>> 0).toString(16)].join("|");
+  }
+  // octets gardés le temps du calcul de la géométrie (workers), puis lâchés
+  function marquer(m, buf, nom){ m.octets = buf; m.cleCache = empreinte(buf, nom); return m; }
   // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
   // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé. Découpe par le module Rust de /ifc/,
   // le lecteur JavaScript reprend la main s'il manque ou échoue.
@@ -216,7 +231,7 @@
           if (d.erreur){ var err = new Error(d.erreur); err.ifc = d.ifc; ko(err); return; }
           IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), f.name, function(p, etape){ progres(etape === "texte" ? .7 + .1*p : .8 + .2*p); }).then(function(m){
             m.lecteur = d.resultat.lecteur; m.noteLecteur = d.resultat.noteLecteur; m.msLecteur = d.resultat.msLecteur;
-            ok(m);
+            ok(marquer(m, d.buffer, f.name));
           }, ko);
         };
         w.onerror = function(e){ if (e && e.preventDefault) e.preventDefault(); w.terminate(); avecWorker = false; lireClassique(f).then(ok, ko); };
@@ -283,7 +298,7 @@
             var r = reservationsDe(m);
             var fi = { uid: uidF++, m: m, nom: f.name, role: r ? "res" : "str", res: r, neufs: r ? null : neufsDe(m) };
             fi.ids = r ? r.map(function(x){ return x.id; }) : elementsDe(m);
-            fi.chrono = { taille: f.size || 0, lecture: performance.now() - tl, geo: 0, n: fi.ids.length };
+            fi.chrono = { taille: f.size || 0, lecture: performance.now() - tl, geo: 0, n: fi.ids.length, lecteur: m.lecteur || "", decoupe: m.msLecteur || 0, note: m.noteLecteur || "" };
             nouveaux.push(fi);
           });
         });
@@ -299,7 +314,7 @@
       vue.modeles(fichiers.map(function(x){ return x.m; }));
       var s = Promise.resolve();
       fichiers.forEach(function(fi){
-        s = s.then(function(){ tmp.g = performance.now(); return vue.preparer(fi.m, fi.ids, function(p){ progres("Géométrie 3D de « " + fi.nom + " » : " + Math.round(100*p) + " %", p); }); })
+        s = s.then(function(){ tmp.g = performance.now(); return geometrie(fi, nouveaux.indexOf(fi) >= 0); })
           .then(function(){ if (fi.chrono && nouveaux.indexOf(fi) >= 0) fi.chrono.geo = performance.now() - tmp.g; });
       });
       return s;
@@ -311,6 +326,7 @@
       etat(fichiers.map(function(x){ return (x.role === "res" ? "Réservations : " : "Structure : ") + x.nom; }).join(" · ") +
         (nRes ? "" : " · Il manque l'IFC des réservations (…_RES.ifc, exporté par « Export IFC RES »)."));
       if (apres) apres();
+      rangerCache(nouveaux);
       // chronomètre de l'ouverture : synthèse une fois tout affiché (demande de Tony)
       var fin = performance.now();
       requestAnimationFrame(function(){ syntheseChrono(nouveaux, fin - ta, performance.now() - t0); });
@@ -321,6 +337,111 @@
     });
   }
 
+  // ================= Géométrie 3D avant l'affichage =================
+  // Reprise du cache si le même fichier a déjà été ouvert ; sinon, gros fichier : plusieurs workers en parallèle
+  // (fgh-geo.js), chacun relit le fichier et calcule sa part ; sinon (ou si un worker échoue) la page calcule
+  // elle-même, par tranches. Même code de géométrie partout (fgh-vue.js), donc même résultat.
+  function geometrie(fi, neuf){
+    var m = fi.m, c = fi.chrono || {}, nom = "« " + fi.nom + " »";
+    function ecrire(t){ return function(p){ progres("Géométrie 3D de " + nom + (t ? " (" + t + ")" : "") + " : " + Math.round(100*p) + " %", p); }; }
+    if (!neuf || !m.octets) return vue.preparer(m, fi.ids, ecrire(""));
+    return cacheLire(m.cleCache).then(function(x){
+      if (x && vue.deballer(m, x)){ c.cache = true; m.octets = null; return; }
+      var k = nbWorkersGeo(m, fi.ids.length);
+      c.paralleles = k;
+      return (k ? enParallele(m, fi.ids, k, ecrire(k + " workers")) : vue.preparer(m, fi.ids, ecrire("")))
+        .then(function(){ m.octets = null; m.aCacher = true; });
+    });
+  }
+  var URL_GEO = "/fgh/rsv/fgh-geo.js?v=1";
+  function nbWorkersGeo(m, n){
+    if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
+    var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
+    var k = Math.min(4, coeurs, memoire, Math.ceil(n/300));
+    return k >= 2 ? k : 0;
+  }
+  function enParallele(m, ids, k, progres){
+    return new Promise(function(ok){
+      var lots = [], ws = [], restants = k, fait = [], fini = false;
+      for (var j = 0; j < k; j++){ lots.push([]); fait.push(0); }
+      // blocs de 64 éléments distribués à tour de rôle : charge équilibrée entre workers
+      for (var i = 0; i < ids.length; i++) lots[Math.floor(i/64) % k].push(ids[i]);
+      function arreter(){ fini = true; ws.forEach(function(w){ w.terminate(); }); }
+      function secours(){
+        if (fini) return;
+        arreter();
+        vue.preparer(m, ids, progres).then(ok);     // ce qui est déjà arrivé est gardé ; la page calcule le reste
+      }
+      lots.forEach(function(lot, j){
+        if (fini) return;
+        var w;
+        try { w = new Worker(URL_GEO); } catch (e){ secours(); return; }
+        ws.push(w);
+        w.onmessage = function(e){
+          if (fini) return;
+          var d = e.data;
+          if (d.erreur || !vue.deballer(m, d, true)){ secours(); return; }
+          fait[j] = d.fait || 0;
+          progres(Math.min(1, fait.reduce(function(a, b){ return a + b; }, 0)/ids.length));
+          if (d.fini){ w.terminate(); if (--restants === 0){ fini = true; ok(); } }
+        };
+        w.onerror = function(ev){ if (ev && ev.preventDefault) ev.preventDefault(); secours(); };
+        w.postMessage({ buffer: m.octets, nom: m.nom, ids: lot });
+      });
+    });
+  }
+
+  // ================= Cache de la géométrie (IndexedDB, dans ce navigateur seulement) =================
+  // Clé : version du code de géométrie, nom, taille et empreinte du fichier ; les 4 derniers fichiers gardés
+  // (structure et réservations du jour).
+  var CACHE_GEO = (function(){
+    var sc = document.querySelector('script[src*="fgh-vue.js"]'), v = sc && /[?&]v=(\d+)/.exec(sc.getAttribute("src"));
+    return "vue" + (v ? v[1] : "0");
+  })(), CACHE_MAX = 4, CACHE_OCTETS = 400*1048576;
+  function baseCache(){
+    if (!baseCache.p){
+      baseCache.p = new Promise(function(ok, ko){
+        if (!window.indexedDB){ ko(new Error("IndexedDB absent")); return; }
+        var r = indexedDB.open("fgh-rsv-cache", 1);
+        r.onupgradeneeded = function(){ if (!r.result.objectStoreNames.contains("geo")) r.result.createObjectStore("geo"); };
+        r.onsuccess = function(){ ok(r.result); };
+        r.onerror = function(){ ko(r.error); };
+      });
+      baseCache.p.catch(function(){ baseCache.p = null; });
+    }
+    return baseCache.p;
+  }
+  function cacheTx(mode, f){
+    return baseCache().then(function(db){
+      return new Promise(function(ok){
+        var tx = db.transaction("geo", mode), r = f(tx.objectStore("geo"));
+        tx.oncomplete = function(){ ok(r && r.result !== undefined ? r.result : null); };
+        tx.onerror = tx.onabort = function(){ ok(null); };
+      });
+    }).catch(function(){ return null; });
+  }
+  function cacheCles(){ try { var l = JSON.parse(localStorage.getItem("fgh.cache.cles") || "[]"); return Array.isArray(l) ? l : []; } catch (e){ return []; } }
+  function cacheLire(cle){ return cle && cacheCles().indexOf(cle) >= 0 ? cacheTx("readonly", function(o){ return o.get(cle); }) : Promise.resolve(null); }
+  function cacheEcrire(cle, x){
+    var l = cacheCles().filter(function(k){ return k !== cle; }), vieux = l.slice(CACHE_MAX - 1);
+    l = [cle].concat(l.slice(0, CACHE_MAX - 1));
+    return cacheTx("readwrite", function(o){ vieux.forEach(function(k){ o.delete(k); }); return o.put(x, cle); })
+      .then(function(r){ if (r !== null) lsSet("fgh.cache.cles", JSON.stringify(l)); });
+  }
+  // après l'ouverture, au calme : géométrie des fichiers ouverts rangée pour la prochaine fois
+  function rangerCache(liste){
+    setTimeout(function(){
+      liste.forEach(function(fi){
+        var m = fi.m;
+        if (!m.aCacher || !m.cleCache) return;
+        m.aCacher = false;
+        var x = vue.emballer(m);
+        if (!x || x.I.byteLength + x.F.byteLength > CACHE_OCTETS) return;
+        cacheEcrire(m.cleCache, x);
+      });
+    }, 1500);
+  }
+
   // Synthèse des temps d'ouverture : lecture (fichier + analyse IFC), géométrie 3D, affichage
   function duree(ms){ return ms < 1000 ? Math.round(ms) + " ms" : ms < 60000 ? (ms/1000).toFixed(1).replace(".", ",") + " s" : Math.floor(ms/60000) + " min " + String(Math.round(ms % 60000 / 1000)).padStart(2, "0") + " s"; }
   function mo(o){ return o ? (o/1048576).toFixed(1).replace(".", ",") + " Mo" : ""; }
@@ -329,13 +450,15 @@
     var lignes = nv.map(function(fi){
       var c = fi.chrono;
       return "<tr><td title=\"" + esc(fi.nom) + "\">" + esc(fi.nom) + "<small>" + (fi.role === "res" ? "Réservations" : "Structure") + " · " + mo(c.taille) + " · " + c.n + " élément" + (c.n > 1 ? "s" : "") + "</small></td>" +
-        "<td>" + duree(c.lecture) + "</td><td>" + duree(c.geo) + "</td><td><b>" + duree(c.lecture + c.geo) + "</b></td></tr>";
+        "<td>" + duree(c.lecture) + "<small" + (c.note ? ' title="' + esc(c.note) + '"' : "") + ">" + (c.lecteur === "rust" ? "Rust" : "JS") + " · " + duree(c.decoupe) + "</small></td>" +
+        "<td>" + duree(c.geo) + "<small>" + (c.cache ? "cache" : c.paralleles ? c.paralleles + " workers" : "page") + "</small></td>" +
+        "<td><b>" + duree(c.lecture + c.geo) + "</b></td></tr>";
     }).join("");
     e.innerHTML = '<div class="chrono-tete"><b>Temps d\'ouverture</b><button type="button" class="ferme" title="Fermer">✕</button></div>' +
       "<table><thead><tr><th>Maquette</th><th>Lecture</th><th>3D</th><th>Total</th></tr></thead><tbody>" + lignes + "</tbody></table>" +
-      '<div class="chrono-pied">Affichage : ' + duree(affichage) + " · <b>Total : " + duree(total) + "</b></div>";
+      '<div class="chrono-pied">Module Rust : ' + (IFCVue.rustActif() ? "actif" : "inactif") + " · Affichage : " + duree(affichage) + " · <b>Total : " + duree(total) + "</b></div>";
     e.hidden = false;
-    if (window.console) console.table(nv.map(function(fi){ return { maquette: fi.nom, taille: mo(fi.chrono.taille), elements: fi.chrono.n, lecture_ms: Math.round(fi.chrono.lecture), geometrie_ms: Math.round(fi.chrono.geo) }; }));
+    if (window.console) console.table(nv.map(function(fi){ return { maquette: fi.nom, taille: mo(fi.chrono.taille), elements: fi.chrono.n, lecture_ms: Math.round(fi.chrono.lecture), lecteur: fi.chrono.lecteur, decoupe_ms: Math.round(fi.chrono.decoupe), geometrie_ms: Math.round(fi.chrono.geo), geometrie: fi.chrono.cache ? "cache" : fi.chrono.paralleles ? fi.chrono.paralleles + " workers" : "page", rust: IFCVue.rustActif() }; }));
   }
   document.addEventListener("click", function(ev){ if (ev.target.closest && ev.target.closest("#chrono .ferme")) $("#chrono").hidden = true; });
 
