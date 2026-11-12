@@ -3,7 +3,7 @@
 // page, donc mêmes identifiants), calcule avec le même code que la page (ifc-vue.js : formes, ouvertures,
 // triangles, arêtes vives) et renvoie au fil de l'eau { paquet, fini, fait } : géométries mises à plat
 // (format du cache, tableaux transférés sans copie), puis les bilans. { erreur } si quelque chose casse.
-importScripts("/ifc/ifc-core.js?v=12", "/ifc/ifc-vue.js?v=43");
+importScripts("/ifc/ifc-core.js?v=12", "/ifc/ifc-vue.js?v=44");
 
 onmessage = function(e){
   var d = e.data;

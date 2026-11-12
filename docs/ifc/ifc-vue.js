@@ -1723,7 +1723,7 @@
     return res;
   }
   // Segment à plat coupé par la boîte (repère tourné de la boîte, en plan seulement) ; null s'il est dehors
-  function couperPlan(x1, y1, x2, y2, B){
+  function couperSegmentBoite(x1, y1, x2, y2, B){
     if (!B) return [x1, y1, x2, y2];
     var la = versBoite(B, x1, y1), lb = versBoite(B, x2, y2), t0 = 0, t1 = 1;
     for (var ax = 0; ax < 2; ax++){
@@ -3331,7 +3331,7 @@
           }
           var pm = G.parM || 1, k = 1/pm, ok = false;
           function seg(cal, p, q){
-            var s = couperPlan(p[0], p[1], q[0], q[1], b);
+            var s = couperSegmentBoite(p[0], p[1], q[0], q[1], b);
             if (!s || Math.abs(s[2] - s[0]) + Math.abs(s[3] - s[1]) < 1e-4*pm) return;
             r[cal].push(s[0]*k, s[1]*k, s[2]*k, s[3]*k); ok = true;
           }
