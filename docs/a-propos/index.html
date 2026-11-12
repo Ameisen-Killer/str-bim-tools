@@ -145,6 +145,12 @@ section{padding-block:clamp(88px,15vh,170px);border-top:1px solid var(--ligne)}
 .maillon a:hover{border-color:var(--or)}
 .maillon.ouvert::before{border-style:dashed;border-color:rgba(236,232,224,.4)}
 .maillon.ouvert h3{color:var(--texte-faible)}
+/* lien commun aux maillons 01 à 03 : une accolade dorée qui les relie, puis le lien */
+.commun{grid-column:1/4;grid-row:2;position:relative;margin-top:18px;padding-top:18px;opacity:0;transition:opacity .9s ease var(--d)}
+.vu .commun{opacity:1}
+.commun::before{content:"";position:absolute;left:6px;top:0;width:66.667%;height:8px;border:1px solid rgba(214,168,92,.45);border-top:0}
+.commun a{display:inline-block;margin-left:6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--or);text-decoration:none;border-bottom:1px solid rgba(214,168,92,.4);padding-bottom:3px}
+.commun a:hover{border-color:var(--or)}
 
 /* ---------- fin ---------- */
 .fin{text-align:center;padding-block:clamp(120px,24vh,260px);border-top:1px solid var(--ligne)}
@@ -176,6 +182,9 @@ footer a:hover{color:var(--or)}
   .maillon{padding-top:0}
   .maillon::before{left:-34px;top:.35em}
   .maillon p{max-width:none}
+  .commun{grid-column:auto;grid-row:auto;margin-top:-20px;padding-top:0}
+  .commun::before{display:none}
+  .commun a{margin-left:0}
 }
 @media (max-width:560px){
 }
@@ -254,6 +263,7 @@ footer a:hover{color:var(--or)}
       <li class="maillon" style="--d:.5s"><span class="n">01</span><h3>Modélisation</h3><p>Produire une maquette juste, plus vite.</p></li>
       <li class="maillon" style="--d:.9s"><span class="n">02</span><h3>Coordination</h3><p>Faire parler les disciplines entre elles.</p></li>
       <li class="maillon" style="--d:1.3s"><span class="n">03</span><h3>Contrôle</h3><p>Vérifier avant de livrer.</p></li>
+      <li class="commun" style="--d:1.5s"><a href="/ifc/">IFC Studio →</a></li>
       <li class="maillon actif" style="--d:1.7s"><span class="n">04</span><h3>Chiffrage</h3><p>Métrer directement depuis la maquette.</p><a href="/can241/">CAN 241 →</a></li>
       <li class="maillon ouvert" style="--d:2.2s"><span class="n">05</span><h3>etc.</h3><p>La suite s'écrit.</p></li>
     </ol>

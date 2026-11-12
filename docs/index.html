@@ -98,7 +98,7 @@ h1{
 
 <script>
 (function(){
-  var cv = document.getElementById("bat"), ctx = cv.getContext("2d");
+  var cv = document.getElementById("bat");
   var page = document.getElementById("page");
   // Choix assumé : l'animation complète est jouée même si le système demande de réduire les mouvements
 
@@ -189,6 +189,14 @@ h1{
             if (fort && j>0) L(f, 0,t-.6, W,t-.6, "vf", dep + .4 + j*.2, 1.2);
           }
           L(f, 0,T_HAUT, W,T_HAUT, "v", dep + .3 + T_NIV*.2 + .2, 1.4);
+          // nez de dalle derrière le verre : un bandeau bleuté à chaque niveau
+          for (var js=1;js<T_NIV;js++){
+            var qs = Q(f, 0, W, js*T_ETAGE-.5, js*T_ETAGE+.3, .1, dep + .5 + js*.2, 1.2);
+            qs.coul = [170,192,214];
+          }
+          // couronnement : les deux derniers niveaux ont des lames verticales deux fois plus serrées
+          for (var kc=0;kc<nm;kc++) L(f, (kc+.5)*mw,T_HAUT-2*T_ETAGE-1.2, (kc+.5)*mw,T_HAUT, "vf", dep + .3 + T_NIV*.2 + kc*.02, 1.2);
+          L(f, 0,T_HAUT-2*T_ETAGE-1.2, W,T_HAUT-2*T_ETAGE-1.2, "v", dep + .3 + T_NIV*.2, 1.2);
           // bureaux : plateaux éclairés par tronçons, en blanc froid très pâle
           for (var jb=0;jb<T_NIV;jb++){
             var sb = 0;
@@ -196,7 +204,7 @@ h1{
               var fb = Math.min(W, sb + mw*(2 + Math.floor(rnd(graine++)*4))), r = rnd(graine++), r2 = rnd(graine++);
               var qb = Q(f, sb+.3, fb-.3, jb*T_ETAGE+.5, (jb+1)*T_ETAGE-.7,
                 r < .22 ? .45 + r2*.4 : .02 + r2*.03, dep + 1.3 + jb*.2 + r2*1.2, 1.4, true);
-              qb.coul = "rgb(214,226,240)"; qb.k = .3;
+              qb.coul = [214,226,240]; qb.k = .3;
               sb = fb;
             }
           }
@@ -235,9 +243,19 @@ h1{
         var dalleTour = [[6.4,22.4],[31.6,22.4],[31.6,47.6],[6.4,47.6]];
         var poteauxTour = grille([6.5,12.75,19,25.25,31.5], [22.5,28.75,35,41.25,47.5], true);
         var noyau = [[16,32],[22,32],[22,38],[16,38]];
+        // poteaux intérieurs et poutres qui les relient d'une façade à l'autre, en évitant le noyau
+        var poteauxInt = [[12.75,28.75],[25.25,28.75],[12.75,41.25],[25.25,41.25]];
+        var poutres = [[12.75,22.4,12.75,47.6],[25.25,22.4,25.25,47.6],[6.4,28.75,31.6,28.75],[6.4,41.25,31.6,41.25]];
         for (var jt=1;jt<=T_NIV;jt++){
-          niveau(dalleTour, poteauxTour, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
-          niveau(noyau, noyau, (jt-1)*T_ETAGE, jt*T_ETAGE, .5 + (jt-1)*.11, .14);
+          var dt0 = .5 + (jt-1)*.11, yt = jt*T_ETAGE;
+          niveau(dalleTour, poteauxTour.concat(poteauxInt), (jt-1)*T_ETAGE, yt, dt0, .14);
+          niveau(noyau, noyau, (jt-1)*T_ETAGE, yt, dt0, .14);
+          poutres.forEach(function(b){ os([b[0],yt,b[1]], [b[2],yt,b[3]], "sf", dt0 + .1, .5) });
+          // épaisseur de la dalle : son nez inférieur
+          for (var ie=0;ie<dalleTour.length;ie++){
+            var ea = dalleTour[ie], eb = dalleTour[(ie+1)%dalleTour.length];
+            os([ea[0],yt-.35,ea[1]], [eb[0],yt-.35,eb[1]], "sf", dt0 + .12, .5);
+          }
         }
 
         // Corps principal, à l'angle : fente dorée puis mur-rideau sur la façade est
@@ -306,51 +324,225 @@ h1{
   })();
 
   var W = 0, H = 0, dpr = 1, S = 1, CX = 0, CY = 0;
-  var rcv = document.createElement("canvas"), rctx = rcv.getContext("2d"), principal = ctx;   // reflet au sol
   var RECUL = .8;                           // < 1 : caméra plus éloignée, bâtiment plus petit dans le cadre
   function taille(){
     var r = cv.getBoundingClientRect();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = r.width; H = r.height;
-    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
-    rcv.width = cv.width; rcv.height = cv.height;
+    P.taille(W, H, dpr);
     S = RECUL * Math.min(W*.94/(2*ext.x), H*.94/(ext.y1-ext.y0));
     CX = W/2; CY = H/2 - S*(ext.y0+ext.y1)/2;
   }
   function ecran(p){ var q = proj(p); return [CX + S*q[0], CY + S*q[1]] }
 
-  var COUL = {"":"236,232,224", f:"236,232,224", v:"170,192,214", vf:"170,192,214"};
+  var COUL = {"":[236,232,224], f:[236,232,224], v:[170,192,214], vf:[170,192,214]};
   var ALPHA = {"":.62, f:.2, v:.5, vf:.16};
   var OSS = {s:.6, sf:.32};
 
+  // ---------- Pinceaux : WebGL (carte graphique, un seul envoi par image) ou canvas 2D en secours ----------
+  // Même interface : taille, refletDebut / refletFin (maquette retournée, fondue vers le bas), fond, fin,
+  // poly (aplat), polyLin (dégradé à deux couleurs), traits (segments de 1 px), radial (halo elliptique).
+  // Couleurs [r, g, b, alpha] (0–255, alpha 0–1).
+  function rgba(c){ return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (+c[3]).toFixed(3) + ")"; }
+  function Pinceau2D(){
+    var c = cv.getContext("2d"), rc = document.createElement("canvas"), r = rc.getContext("2d"), x = c, reflet = false, w = 0, h = 0, d = 1;
+    function chemin(p){ x.beginPath(); x.moveTo(p[0][0], p[0][1]); for (var i=1;i<p.length;i++) x.lineTo(p[i][0], p[i][1]); x.closePath(); }
+    function reglages(){ x.setTransform(d,0,0,d,0,0); x.lineWidth = 1; x.lineCap = "butt"; x.lineJoin = "miter"; }
+    return {
+      nom: "canvas",
+      taille: function(W2, H2, D2){ w = W2; h = H2; d = D2; cv.width = Math.round(w*d); cv.height = Math.round(h*d); rc.width = cv.width; rc.height = cv.height; },
+      refletDebut: function(){ x = r; x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,rc.width,rc.height); reglages(); },
+      refletFin: function(y0, y1){
+        reflet = y1 > y0 + 4;
+        if (reflet){
+          var g = x.createLinearGradient(0, y0, 0, y1);
+          g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+          x.globalCompositeOperation = "destination-in"; x.fillStyle = g; x.fillRect(0, 0, w, h);
+          x.globalCompositeOperation = "source-over";
+        }
+        x = c;
+      },
+      fond: function(){
+        x = c; reglages();
+        x.fillStyle = "#050505"; x.fillRect(0, 0, w, h);
+        if (reflet){ x.setTransform(1,0,0,1,0,0); x.globalAlpha = .32; x.drawImage(rc, 0, 0); x.globalAlpha = 1; reglages(); }
+      },
+      fin: function(){},
+      poly: function(p, col){ chemin(p); x.fillStyle = rgba(col); x.fill(); },
+      polyLin: function(p, ax, ay, bx, by, c0, c1){
+        var g = x.createLinearGradient(ax, ay, bx, by);
+        g.addColorStop(0, rgba(c0)); g.addColorStop(1, rgba(c1));
+        chemin(p); x.fillStyle = g; x.fill();
+      },
+      traits: function(sg, col){
+        x.beginPath();
+        for (var i=0;i<sg.length;i+=4){ x.moveTo(sg[i], sg[i+1]); x.lineTo(sg[i+2], sg[i+3]); }
+        x.strokeStyle = rgba(col); x.stroke();
+      },
+      radial: function(cx, cy, rx, ry, arrets){
+        x.save(); x.translate(cx, cy); x.scale(1, ry/rx);
+        var g = x.createRadialGradient(0,0,0, 0,0,rx);
+        arrets.forEach(function(a){ g.addColorStop(a[0], rgba(a[1])); });
+        x.fillStyle = g; x.beginPath(); x.arc(0, 0, rx, 0, Math.PI*2); x.fill();
+        x.restore();
+      }
+    };
+  }
+  function PinceauGL(){
+    var gl = null;
+    try { gl = cv.getContext("webgl", {antialias:true, alpha:false, depth:false, stencil:false, premultipliedAlpha:false, powerPreference:"low-power"}); } catch (e){ gl = null; }
+    if (!gl) return null;
+    function programme(vs, fs){
+      var p = gl.createProgram();
+      [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]].forEach(function(x){
+        var sh = gl.createShader(x[0]); gl.shaderSource(sh, x[1]); gl.compileShader(sh); gl.attachShader(p, sh);
+      });
+      gl.linkProgram(p);
+      return gl.getProgramParameter(p, gl.LINK_STATUS) ? p : null;
+    }
+    // traits et aplats : sommets en pixels CSS, couleur par sommet, sortie prémultipliée
+    var pT = programme(
+      "attribute vec2 p;attribute vec4 c;uniform vec2 t;varying vec4 v;" +
+      "void main(){v=c;gl_Position=vec4(p.x/t.x*2.-1.,1.-p.y/t.y*2.,0.,1.);}",
+      "precision mediump float;varying vec4 v;void main(){gl_FragColor=vec4(v.rgb*v.a,v.a);}");
+    // reflet : texture de la maquette retournée, fondue entre y0 et y1 (pixels de l'écran, depuis le haut)
+    var pR = programme(
+      "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}",
+      "precision mediump float;uniform sampler2D x;uniform vec2 r;uniform float k,y0,y1;" +
+      "void main(){vec4 c=texture2D(x,gl_FragCoord.xy/r);float y=r.y-gl_FragCoord.y;" +
+      "gl_FragColor=c*k*clamp((y1-y)/max(1.,y1-y0),0.,1.);}");
+    if (!pT || !pR) return null;
+    var aP = gl.getAttribLocation(pT, "p"), aC = gl.getAttribLocation(pT, "c"), uT = gl.getUniformLocation(pT, "t");
+    var bP = gl.getAttribLocation(pR, "p"), uX = gl.getUniformLocation(pR, "x"), uR = gl.getUniformLocation(pR, "r");
+    var uK = gl.getUniformLocation(pR, "k"), uY0 = gl.getUniformLocation(pR, "y0"), uY1 = gl.getUniformLocation(pR, "y1");
+    var tampon = gl.createBuffer(), plein = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, plein);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    var tex = gl.createTexture(), fbo = gl.createFramebuffer(), fboOk = false;
+    var V = new Float32Array(6*6*8192), n = 0, w = 0, h = 0, d = 1, wd = 1, hd = 1, reflet = false, ry0 = 0, ry1 = 0;
+    gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    function place(k){
+      if (n + k <= V.length) return;
+      var N = new Float32Array(Math.max(V.length*2, n + k)); N.set(V.subarray(0, n)); V = N;
+    }
+    function som(x, y, c){ V[n++] = x; V[n++] = y; V[n++] = c[0]/255; V[n++] = c[1]/255; V[n++] = c[2]/255; V[n++] = c[3]; }
+    function envoyer(){
+      if (!n) return;
+      gl.useProgram(pT);
+      gl.bindBuffer(gl.ARRAY_BUFFER, tampon);
+      gl.bufferData(gl.ARRAY_BUFFER, V.subarray(0, n), gl.STREAM_DRAW);
+      gl.enableVertexAttribArray(aP); gl.enableVertexAttribArray(aC);
+      gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 24, 0);
+      gl.vertexAttribPointer(aC, 4, gl.FLOAT, false, 24, 8);
+      gl.uniform2f(uT, w, h);
+      gl.drawArrays(gl.TRIANGLES, 0, n/6);
+      gl.disableVertexAttribArray(aP); gl.disableVertexAttribArray(aC);
+      n = 0;
+    }
+    function melange(c0, c1, t){ t = t < 0 ? 0 : t > 1 ? 1 : t; return [c0[0] + (c1[0]-c0[0])*t, c0[1] + (c1[1]-c0[1])*t, c0[2] + (c1[2]-c0[2])*t, c0[3] + (c1[3]-c0[3])*t]; }
+    return {
+      nom: "webgl",
+      gl: gl,
+      taille: function(W2, H2, D2){
+        w = W2; h = H2; d = D2;
+        cv.width = wd = Math.max(1, Math.round(w*d)); cv.height = hd = Math.max(1, Math.round(h*d));
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, wd, hd, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        fboOk = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      },
+      refletDebut: function(){
+        n = 0;
+        if (!fboOk) return;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, wd, hd);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      },
+      refletFin: function(y0, y1){
+        if (fboOk) envoyer(); else n = 0;
+        reflet = fboOk && y1 > y0 + 4; ry0 = y0*d; ry1 = y1*d;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      },
+      fond: function(){
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, wd, hd);
+        gl.clearColor(5/255, 5/255, 5/255, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+        n = 0;
+        if (!reflet) return;
+        gl.useProgram(pR);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.uniform1i(uX, 0); gl.uniform2f(uR, wd, hd); gl.uniform1f(uK, .32); gl.uniform1f(uY0, ry0); gl.uniform1f(uY1, ry1);
+        gl.bindBuffer(gl.ARRAY_BUFFER, plein);
+        gl.enableVertexAttribArray(bP); gl.vertexAttribPointer(bP, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disableVertexAttribArray(bP);
+      },
+      fin: envoyer,
+      poly: function(p, col){
+        place(18*(p.length - 2));
+        for (var i=1;i+1<p.length;i++){ som(p[0][0], p[0][1], col); som(p[i][0], p[i][1], col); som(p[i+1][0], p[i+1][1], col); }
+      },
+      polyLin: function(p, ax, ay, bx, by, c0, c1){
+        var ux = bx - ax, uy = by - ay, l2 = ux*ux + uy*uy || 1, cs = p.map(function(q){ return melange(c0, c1, ((q[0]-ax)*ux + (q[1]-ay)*uy)/l2); });
+        place(18*(p.length - 2));
+        for (var i=1;i+1<p.length;i++){ som(p[0][0], p[0][1], cs[0]); som(p[i][0], p[i][1], cs[i]); som(p[i+1][0], p[i+1][1], cs[i+1]); }
+      },
+      // segment de 1 px CSS de large (quadrilatère), bouts francs comme le canvas
+      traits: function(sg, col){
+        place(9*sg.length);
+        for (var i=0;i<sg.length;i+=4){
+          var x0 = sg[i], y0 = sg[i+1], x1 = sg[i+2], y1 = sg[i+3], dx = x1 - x0, dy = y1 - y0, l = Math.sqrt(dx*dx + dy*dy);
+          if (l < 1e-6) continue;
+          var nx = -dy/l*.5, ny = dx/l*.5;
+          som(x0+nx, y0+ny, col); som(x1+nx, y1+ny, col); som(x1-nx, y1-ny, col);
+          som(x0+nx, y0+ny, col); som(x1-nx, y1-ny, col); som(x0-nx, y0-ny, col);
+        }
+      },
+      radial: function(cx, cy, rx, ry, arrets){
+        var N = 48;
+        place(36*N*arrets.length);
+        for (var a=0;a+1<arrets.length;a++){
+          var t0 = arrets[a][0], t1 = arrets[a+1][0], c0 = arrets[a][1], c1 = arrets[a+1][1];
+          for (var i=0;i<N;i++){
+            var u = i/N*Math.PI*2, v = (i+1)/N*Math.PI*2, cu = Math.cos(u), su = Math.sin(u), cw = Math.cos(v), sw = Math.sin(v);
+            var A0 = [cx + rx*t0*cu, cy + ry*t0*su], B0 = [cx + rx*t0*cw, cy + ry*t0*sw], A1 = [cx + rx*t1*cu, cy + ry*t1*su], B1 = [cx + rx*t1*cw, cy + ry*t1*sw];
+            som(A1[0], A1[1], c1); som(B1[0], B1[1], c1); som(B0[0], B0[1], c0);
+            if (t0 > 0){ som(A1[0], A1[1], c1); som(B0[0], B0[1], c0); som(A0[0], A0[1], c0); }
+          }
+        }
+      }
+    };
+  }
+  // WebGL d'abord (?moteur=canvas pour comparer) ; un canvas pris par WebGL ne peut plus servir au 2D : remplacé au besoin
+  var P = null;
+  if (!/[?&]moteur=canvas/.test(location.search)) P = PinceauGL();
+  if (!P){
+    var neuf = cv.cloneNode(false);
+    cv.parentNode.replaceChild(neuf, cv); cv = neuf;
+    P = Pinceau2D();
+  }
+  cv.setAttribute("data-moteur", P.nom);
+  if (P.nom === "webgl"){
+    cv.addEventListener("webglcontextlost", function(e){ e.preventDefault(); P.perdu = true; });
+    cv.addEventListener("webglcontextrestored", function(){ var q = PinceauGL(); if (q){ P = q; taille(); } });
+  }
+
   function dessiner(T, th){
+    if (P.perdu) return;
     camera(th);
 
     // reflet : la maquette retournée, dessinée à part puis fondue vers le bas
-    ctx = rctx; MIROIR = true;
-    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,rcv.width,rcv.height);
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+    P.refletDebut(); MIROIR = true;
     maquette(T);
     MIROIR = false;
     var y0 = ecran(CENTRE)[1], y1 = Math.min(H - 2, ecran([CENTRE[0], -.45*hmax, CENTRE[2]])[1]);
-    if (y1 > y0 + 4){
-      var fondu = ctx.createLinearGradient(0, y0, 0, y1);
-      fondu.addColorStop(0, "rgba(0,0,0,1)"); fondu.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.fillStyle = fondu; ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = "source-over";
-    }
-    ctx = principal;
-
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.fillStyle = "#050505"; ctx.fillRect(0,0,W,H);
-    ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
-    if (y1 > y0 + 4){
-      ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = .32;
-      ctx.drawImage(rcv, 0, 0);
-      ctx.globalAlpha = 1; ctx.setTransform(dpr,0,0,dpr,0,0);
-    }
+    P.refletFin(y0, y1);
+    P.fond();
 
     // halo au sol : la lumière des loggias du socle qui retombe autour du bâtiment
     var lum = 0, nl = 0;
@@ -362,44 +554,39 @@ h1{
         var ha = hi/24*Math.PI*2, he = ecran([42 + 58*Math.cos(ha), 0, 17 + 46*Math.sin(ha)]);
         hx0 = Math.min(hx0, he[0]); hx1 = Math.max(hx1, he[0]); hy0 = Math.min(hy0, he[1]); hy1 = Math.max(hy1, he[1]);
       }
-      var hrx = (hx1-hx0)/2, hry = Math.max(1, (hy1-hy0)/2);
-      ctx.save();
-      ctx.translate((hx0+hx1)/2, (hy0+hy1)/2); ctx.scale(1, hry/hrx);
-      var hg = ctx.createRadialGradient(0,0,0, 0,0,hrx);
-      hg.addColorStop(0, "rgba(214,168,92," + (.6*lum).toFixed(3) + ")");
-      hg.addColorStop(.5, "rgba(214,168,92," + (.26*lum).toFixed(3) + ")");
-      hg.addColorStop(1, "rgba(214,168,92,0)");
-      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, hrx, 0, Math.PI*2); ctx.fill();
-      ctx.restore();
+      var hrx = Math.max(1, (hx1-hx0)/2), hry = Math.max(1, (hy1-hy0)/2);
+      P.radial((hx0+hx1)/2, (hy0+hy1)/2, hrx, hry, [[0, [214,168,92,.6*lum]], [.5, [214,168,92,.26*lum]], [1, [214,168,92,0]]]);
     }
 
     // ligne de sol : cercle d'implantation
     var ps = ease(clamp((T-.1)/2.4));
     if (ps > 0){
-      ctx.beginPath();
+      var sc = [], pr = null;
       for (var i=0;i<=96*ps;i++){
         var an = TH0 - Math.PI/2 + i/96*Math.PI*2;
         var e = ecran([CENTRE[0] + RAYON*Math.cos(an), 0, CENTRE[2] + RAYON*Math.sin(an)]);
-        i ? ctx.lineTo(e[0],e[1]) : ctx.moveTo(e[0],e[1]);
+        if (pr) sc.push(pr[0], pr[1], e[0], e[1]);
+        pr = e;
       }
-      ctx.strokeStyle = "rgba(236,232,224,.13)"; ctx.stroke();
+      if (sc.length) P.traits(sc, [236,232,224,.13]);
     }
 
     maquette(T);
+    P.fin();
   }
 
   function maquette(T){
     // ossature en or, dessinée sous les façades qui la recouvrent en montant
     for (var oc in OSS){
-      ctx.beginPath(); var no = 0;
+      var so = [];
       for (var oi=0;oi<ossature.length;oi++){
         var ol = ossature[oi]; if (ol.c !== oc) continue;
         var op = ease(clamp((T - ol.d)/ol.t)); if (op <= 0) continue;
         var ob = [ol.a[0]+(ol.b[0]-ol.a[0])*op, ol.a[1]+(ol.b[1]-ol.a[1])*op, ol.a[2]+(ol.b[2]-ol.a[2])*op];
         var oe0 = ecran(ol.a), oe1 = ecran(ob);
-        ctx.moveTo(oe0[0],oe0[1]); ctx.lineTo(oe1[0],oe1[1]); no++;
+        so.push(oe0[0], oe0[1], oe1[0], oe1[1]);
       }
-      if (no){ ctx.strokeStyle = "rgba(214,168,92," + OSS[oc] + ")"; ctx.stroke(); }
+      if (so.length) P.traits(so, [214,168,92,OSS[oc]]);
     }
 
     // faces visibles, de la plus lointaine à la plus proche
@@ -418,12 +605,9 @@ h1{
       // la façade ne masque l'ossature qu'à mesure qu'elle monte
       var hf = f.monte ? f.H*ease(clamp((T - f.dep)/f.monte)) : f.H;
       var c0 = ecran(f.P(0,0)), c1 = ecran(f.P(f.W,0)), c2 = ecran(f.P(f.W,hf)), c3 = ecran(f.P(0,hf)), ch = ecran(f.P(0,f.H));
-      ctx.beginPath(); ctx.moveTo(c0[0],c0[1]); ctx.lineTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.closePath();
+      var contour = [c0, c1, c2, c3];
       // pendant la montée, la façade reste translucide : l'ossature se devine derrière, puis la façade se ferme
-      if (hf > .01){
-        ctx.globalAlpha = f.monte ? .45 + .55*ease(clamp((T - f.dep - f.monte + .4)/1.8)) : 1;
-        ctx.fillStyle = "#050505"; ctx.fill(); ctx.globalAlpha = 1;
-      }
+      if (hf > .01) P.poly(contour, [5,5,5, f.monte ? .45 + .55*ease(clamp((T - f.dep - f.monte + .4)/1.8)) : 1]);
 
       var lam = Math.max(0, f.n[0]*LUM[0] + f.n[2]*LUM[2]);
       var eclat = .72 + .4*lam;
@@ -434,24 +618,19 @@ h1{
           var vv = norm([cam.eye[0]-f.c[0], 0, cam.eye[2]-f.c[2]]);
           var hv = norm([LUM[0]+vv[0], 0, LUM[2]+vv[2]]);
           var spec = Math.pow(Math.max(0, f.n[0]*hv[0] + f.n[2]*hv[2]), 10);
-          var g = ctx.createLinearGradient(0, ch[1], 0, c0[1]);
-          g.addColorStop(0, "rgba(200,216,232," + ((.05 + .2*spec)*ap).toFixed(3) + ")");
-          g.addColorStop(1, "rgba(159,182,204," + ((.01 + .04*spec)*ap).toFixed(3) + ")");
-          ctx.fillStyle = g; ctx.fill();
+          P.polyLin(contour, 0, ch[1], 0, c0[1], [200,216,232,(.05 + .2*spec)*ap], [159,182,204,(.01 + .04*spec)*ap]);
 
           // reflet qui glisse : une bande de lumière dont la place sur la façade suit l'angle de vue
           var u = .5 + 1.6*(hv[0]*f.a[0] + hv[2]*f.a[2]), face = Math.max(0, f.n[0]*hv[0] + f.n[2]*hv[2]);
-          var bw = .16*f.W, sc = u*f.W;
-          if (face > .05 && sc > -bw && sc < f.W + bw){
-            var s0 = Math.max(0, sc - bw), s1 = Math.min(f.W, sc + bw);
-            var b0 = ecran(f.P(s0,0)), b1 = ecran(f.P(s1,0)), b2 = ecran(f.P(s1,hf)), b3 = ecran(f.P(s0,hf));
-            var gl = ecran(f.P(sc - bw,0)), gr = ecran(f.P(sc + bw,0));
-            var gb = ctx.createLinearGradient(gl[0], gl[1], gr[0], gr[1]), fort = (.16*face*ap).toFixed(3);
-            gb.addColorStop(0, "rgba(220,232,244,0)");
-            gb.addColorStop(.5, "rgba(220,232,244," + fort + ")");
-            gb.addColorStop(1, "rgba(220,232,244,0)");
-            ctx.beginPath(); ctx.moveTo(b0[0],b0[1]); ctx.lineTo(b1[0],b1[1]); ctx.lineTo(b2[0],b2[1]); ctx.lineTo(b3[0],b3[1]); ctx.closePath();
-            ctx.fillStyle = gb; ctx.fill();
+          var bw = .16*f.W, sc2 = u*f.W;
+          if (face > .05 && sc2 > -bw && sc2 < f.W + bw){
+            var fort = .16*face*ap, sm = Math.max(0, Math.min(f.W, sc2));
+            var gl0 = ecran(f.P(sc2 - bw,0)), gm = ecran(f.P(sc2,0)), gr = ecran(f.P(sc2 + bw,0));
+            var vide = [220,232,244,0], plein2 = [220,232,244,fort];
+            // deux moitiés : du bord transparent vers le milieu lumineux, puis l'inverse
+            var sa = Math.max(0, sc2 - bw), sb = Math.min(f.W, sc2 + bw);
+            if (sm > sa) P.polyLin([ecran(f.P(sa,0)), ecran(f.P(sm,0)), ecran(f.P(sm,hf)), ecran(f.P(sa,hf))], gl0[0], gl0[1], gm[0], gm[1], vide, plein2);
+            if (sb > sm) P.polyLin([ecran(f.P(sm,0)), ecran(f.P(sb,0)), ecran(f.P(sb,hf)), ecran(f.P(sm,hf))], gm[0], gm[1], gr[0], gr[1], plein2, vide);
           }
         }
       }
@@ -460,23 +639,20 @@ h1{
         var q = f.quads[qi];
         var a = clamp((T - q.d)/q.t) * q.cur;
         if (a < .01) continue;
-        var p0 = ecran(q.p[0]), p1 = ecran(q.p[1]), p2 = ecran(q.p[2]), p3 = ecran(q.p[3]);
-        ctx.globalAlpha = a*(.8 + .25*lam)*(q.k || 1);
-        ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.lineTo(p3[0],p3[1]); ctx.closePath();
-        ctx.fillStyle = q.coul || "#D6A85C"; ctx.fill();
+        var qc = q.coul || [214,168,92];
+        P.poly([ecran(q.p[0]), ecran(q.p[1]), ecran(q.p[2]), ecran(q.p[3])], [qc[0], qc[1], qc[2], Math.min(1, a*(.8 + .25*lam)*(q.k || 1))]);
       }
-      ctx.globalAlpha = 1;
 
       for (var cls in COUL){
-        ctx.beginPath(); var n = 0;
+        var st = [];
         for (var li=0;li<f.lines.length;li++){
           var l = f.lines[li]; if (l.c !== cls) continue;
           var p = ease(clamp((T - l.d)/l.t)); if (p <= 0) continue;
           var b = [l.a[0]+(l.b[0]-l.a[0])*p, l.a[1]+(l.b[1]-l.a[1])*p, l.a[2]+(l.b[2]-l.a[2])*p];
           var e0 = ecran(l.a), e1 = ecran(b);
-          ctx.moveTo(e0[0],e0[1]); ctx.lineTo(e1[0],e1[1]); n++;
+          st.push(e0[0], e0[1], e1[0], e1[1]);
         }
-        if (n){ ctx.strokeStyle = "rgba(" + COUL[cls] + "," + Math.min(1, ALPHA[cls]*eclat).toFixed(3) + ")"; ctx.stroke(); }
+        if (st.length){ var cc = COUL[cls]; P.traits(st, [cc[0], cc[1], cc[2], Math.min(1, ALPHA[cls]*eclat)]); }
       }
     }
 
@@ -492,12 +668,8 @@ h1{
         });
         feux.forEach(function(p, i){
           if (i === loin) return;
-          var e = ecran(p), r = 7;
-          var g = ctx.createRadialGradient(e[0],e[1],0, e[0],e[1],r);
-          g.addColorStop(0, "rgba(255,90,70," + fl.toFixed(3) + ")");
-          g.addColorStop(.3, "rgba(230,40,30," + (.6*fl).toFixed(3) + ")");
-          g.addColorStop(1, "rgba(230,40,30,0)");
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e[0], e[1], r, 0, Math.PI*2); ctx.fill();
+          var e = ecran(p);
+          P.radial(e[0], e[1], 7, 7, [[0, [255,90,70,fl]], [.3, [230,40,30,.6*fl]], [1, [230,40,30,0]]]);
         });
       }
     }
