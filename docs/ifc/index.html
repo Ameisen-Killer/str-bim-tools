@@ -489,15 +489,18 @@ footer a:hover{color:var(--or)}
 .panneaux.sans-g{grid-template-columns:minmax(0,1fr) var(--ld,minmax(260px,340px))}.panneaux.sans-g .p-liste{display:none}
 .panneaux.sans-d{grid-template-columns:var(--lg,minmax(260px,320px)) minmax(0,1fr)}.panneaux.sans-d .p-props{display:none}
 .panneaux.sans-g.sans-d{grid-template-columns:minmax(0,1fr)}
-/* poignées : élargir ou rétrécir les panneaux Éléments et Propriétés en tirant leur bord (double-clic : largeur de départ) */
-.poignee{display:none}
+/* bords des panneaux : élargir ou rétrécir les panneaux Éléments et Propriétés en tirant leur bord (double-clic : largeur de départ) */
+.bord-panneau{display:none}
 @media (min-width:900px){
   .p-liste,.p-props{position:relative}
-  .poignee{display:block;position:absolute;top:0;bottom:0;width:8px;z-index:6;cursor:col-resize;touch-action:none}
-  .poignee.g{right:0}
-  .poignee.d{left:0}
-  .poignee::after{content:"";position:absolute;top:8px;bottom:8px;left:3px;width:2px;border-radius:2px;background:transparent;transition:background .15s}
-  .poignee:hover::after,.poignee.tire::after{background:var(--or)}
+  /* zone invisible sur toute la hauteur du bord ; le curseur change au survol, un trait doré suit pendant qu'on tire */
+  .bord-panneau{display:block;position:absolute;top:0;bottom:0;width:7px;z-index:6;cursor:col-resize;touch-action:none;outline:none}
+  .bord-panneau.g{right:0}
+  .bord-panneau.d{left:0}
+  .bord-panneau::after{content:"";position:absolute;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
+  .bord-panneau.g::after{right:0}
+  .bord-panneau.d::after{left:0}
+  .bord-panneau.tire::after{background:var(--or)}
   body.redim,body.redim *{cursor:col-resize!important;user-select:none!important}
 }
 @media (max-width:899px){.replier{display:none}.panneaux.sans-g .p-liste,.panneaux.sans-d .p-props{display:flex}}
@@ -944,7 +947,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           </div>
         </div>
         <div class="liste" id="liste" role="list"></div>
-        <div class="poignee g" id="poi-g" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Éléments" title="Tirer pour élargir · double-clic : largeur de départ"></div>
+        <div class="bord-panneau g" id="poi-g" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Éléments" title="Tirer pour élargir · double-clic : largeur de départ"></div>
       </aside>
 
       <div class="panneau p-vue montre" id="p-vue">
@@ -970,7 +973,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
       <aside class="panneau p-props" id="p-props" aria-label="Propriétés de l'élément actif">
         <div class="p-titre">Propriétés</div>
         <div class="props" id="props"><p class="props-vide">Clique un élément dans la liste ou dans la vue 3D.</p></div>
-        <div class="poignee d" id="poi-d" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Propriétés" title="Tirer pour élargir · double-clic : largeur de départ"></div>
+        <div class="bord-panneau d" id="poi-d" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Propriétés" title="Tirer pour élargir · double-clic : largeur de départ"></div>
       </aside>
     </div>
   </div>
