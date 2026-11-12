@@ -243,6 +243,14 @@
     var t0 = performance.now();
     return octetsMarques(fic).then(function(x){ return pause().then(function(){ var t1 = performance.now(); return marquer(IFC.lire(x.buf, x.nom), x, t0, t1); }); });
   }
+  // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
+  // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé.
+  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=8", chaud = null;
+  function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
+  function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
+  if (avecWorker) setTimeout(function(){
+    try { if (!chaud){ chaud = new Worker(URL_LECTEUR); chaud.postMessage({ prechauffer: true, lecteur: lecteurVoulu }); } } catch (e){ chaud = null; }
+  }, 300);
   function lecture(fic, progres){
     if (!avecWorker) return lireClassique(fic);
     var t0 = performance.now();
@@ -250,12 +258,12 @@
       var buf = x.buf, t1 = performance.now();
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=7"); }
+        try { w = prendreWorker(); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
           if (d.progres !== undefined){ progres(.7*d.progres); return; }
-          w.terminate();
+          rendreWorker(w);
           if (d.erreur){ var err = new Error(d.erreur); err.ifc = d.ifc; ko(err); return; }
           // la page reconstruit le texte et fige les entités par tranches
           IFC.lireParEtapes(d.resultat, new Uint8Array(d.buffer), x.nom, function(p, etape){
@@ -2470,7 +2478,7 @@
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
-      aide("Éditeur IFC", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
+      aide("IFC Studio", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
         "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
         "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +

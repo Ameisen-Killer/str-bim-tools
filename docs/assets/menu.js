@@ -3,7 +3,7 @@
 // - La date du pied de page suit seule chaque publication ; MISE_A_JOUR n'est qu'un plancher (AAAA-MM-JJ).
 (function(){
   "use strict";
-  var MISE_A_JOUR = "2026-11-11";
+  var MISE_A_JOUR = "2026-11-12";
 
   var PAGES = [
     {href:"/", nom:"Accueil", desc:"STR Bim Tools"},

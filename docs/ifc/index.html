@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>IFC · STR Bim Tools</title>
+<title>IFC Studio · STR Bim Tools</title>
 <meta name="description" content="Ouvre un fichier IFC dans le navigateur, sélectionne des éléments, supprime-les proprement et réécris l'IFC. Le fichier ne quitte jamais ton poste.">
 <meta name="theme-color" content="#050505">
 <script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("ifc.theme")||"sombre";if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F0E8");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
@@ -129,6 +129,7 @@ body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column;positio
   animation:reflet 8s cubic-bezier(.45,0,.2,1) 2.2s infinite}
 :root[data-theme="clair"] .accueil h1 span{background-image:linear-gradient(105deg,var(--texte) 0%,var(--texte) 38%,var(--or) 48%,#B8862E 50%,var(--or) 52%,var(--texte) 62%,var(--texte) 100%)}
 @keyframes reflet{0%{background-position:100% 0}45%,100%{background-position:0 0}}
+.accueil h1 em{display:block;margin-top:.14em;font-style:normal;font-weight:200;font-size:.36em;letter-spacing:.34em;text-transform:uppercase;color:var(--or);padding-left:.08em}
 .accroche{margin:16px 0 0;font-size:clamp(20px,2.3vw,30px);font-weight:200;letter-spacing:.01em}
 .accroche b{font-weight:300;color:var(--or)}
 .chapeau{margin:12px 0 0;max-width:34em;font-size:clamp(15px,1.4vw,17px);color:var(--texte-doux)}
@@ -683,8 +684,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
       <canvas id="scene" role="img" aria-label="Pied de poteau métallique en volumes : platine, poteau HEB, raidisseurs et tiges d'ancrage, qui s'assemblent puis tournent ; des cotes se posent puis s'effacent, des pièces passent en or, s'effacent et reviennent"></canvas>
     </div>
     <div class="accueil-texte">
-      <div class="surtitre rv" style="--d:.6s">STR Bim Tools · Viewer et éditeur</div>
-      <h1 class="rv" style="--d:.8s"><span>IFC</span></h1>
+      <div class="surtitre rv" style="--d:.6s">STR Bim Tools · Viewer et éditeur IFC</div>
+      <h1 class="rv" style="--d:.8s"><span>IFC</span><em>Studio</em></h1>
       <p class="accroche rv" style="--d:.95s">Ouvrir. Corriger. <b>Réécrire.</b></p>
       <p class="chapeau rv" style="--d:1.05s">Explore une maquette IFC, corrige-la sur place (déplacer, aligner, changer d'étage, dimensions, propriétés, suppressions) et récupère un fichier IFC propre, sans rien installer.</p>
       <div class="depot rv" style="--d:1.2s" id="depot">
@@ -884,7 +885,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="raccourcis"><span>Raccourcis clavier</span><kbd>?</kbd></button>
             <button type="button" role="menuitem" data-cmd="vider-cache"><span>Vider le cache de géométrie</span><kbd></kbd></button>
-            <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos de l'éditeur (temps d'ouverture)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos d'IFC Studio (temps d'ouverture)</span><kbd></kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="site"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
           </div>
@@ -1167,12 +1168,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
-<script src="/ifc/ifc-core.js?v=11"></script>
+<script src="/ifc/ifc-core.js?v=12"></script>
 <script src="/ifc/ifc-vue.js?v=42"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=47"></script>
-<script src="/assets/menu.js?v=31"></script>
+<script src="/ifc/ifc-app.js?v=49"></script>
+<script src="/assets/menu.js?v=32"></script>
 </body>
 </html>

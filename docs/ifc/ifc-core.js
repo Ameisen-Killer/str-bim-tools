@@ -15,7 +15,17 @@
   function erreur(msg){ var e = new Error(msg); e.ifc = true; return e; }
 
   // ================= Octets <-> texte =================
+  // Décodeur natif windows-1252 : identique à « un octet = un caractère » pour tous les octets sauf 0x80–0x9F
+  // (€, guillemets typographiques…) ; utilisé quand le fichier n'en contient aucun, trois fois plus rapide.
+  var DEC = null;
+  try { DEC = new TextDecoder("windows-1252"); } catch (e){ DEC = null; }
+  function decodable(octets){
+    if (!DEC) return false;
+    for (var i = 0, n = octets.length; i < n; i++){ var c = octets[i]; if (c >= 0x80 && c <= 0x9f) return false; }
+    return true;
+  }
   function versTexte(octets){
+    if (octets.length > 65536 && decodable(octets)) return DEC.decode(octets);
     var parts = [], PAS = 0x8000;
     for (var i = 0; i < octets.length; i += PAS) parts.push(String.fromCharCode.apply(null, octets.subarray(i, i + PAS)));
     return parts.join("");
@@ -422,6 +432,7 @@
   function pause(){ return new Promise(function(ok){ setTimeout(ok, 0); }); }
   function lireParEtapes(r, octets, nom, progres){
     var parts = [], PAS = 0x8000, i = 0, ent = new Map(), ordre = [], k = 0;
+    if (decodable(octets)){ parts.push(DEC.decode(octets)); i = octets.length; }     // d'un coup, en natif
     function texte(){
       var t0 = performance.now();
       while (i < octets.length && performance.now() - t0 < 40){
