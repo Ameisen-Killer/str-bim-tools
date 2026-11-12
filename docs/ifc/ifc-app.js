@@ -307,7 +307,7 @@
   // Après la lecture : fiches des éléments (nom, type, matériau) puis géométrie 3D, avec la barre de
   // progression ; l'ouverture n'a ensuite plus qu'à assembler ce qui est prêt.
   // Géométrie déjà calculée pour le même fichier (ouvert tel quel dans ce navigateur) : reprise du cache.
-  // fond : la géométrie n'est pas calculée ici mais après l'ouverture, au fil de l'eau (geometrieDeFond)
+  // fond : la géométrie n'est pas calculée ici mais juste après, en parallèle si possible (geometrieAvant)
   function preparer(modeles, fond){
     var suite = Promise.resolve();
     modeles.forEach(function(m, n){
@@ -497,7 +497,9 @@
     });
     suite.then(function(){
       if (!ajoutes.length) return;
-      return preparer(ajoutes, true).then(function(){
+      // géométrie calculée avant l'ouverture (en parallèle si le fichier est gros) : la maquette s'affiche
+      // d'un bloc, complète (choix de Tony, pas d'affichage au fil du calcul)
+      return preparer(ajoutes, true).then(function(){ return geometrieAvant(ajoutes); }).then(function(){
         progresLecture("Affichage…", 1);
         return pause();
       });
@@ -505,15 +507,13 @@
       $("#chargement").hidden = true;
       if (ajoutes.length && remplacer) vider();
       remplacer = false;
-      var premier = !fichiers.length;
-      if (ajoutes.length){ ouvrir(ajoutes, performance.now() - t0, refus); geometrieDeFond(ajoutes, premier); }
+      if (ajoutes.length) ouvrir(ajoutes, performance.now() - t0, refus);
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
       else erreur(refus.join(" "));
     });
   }
 
-  // ================= Géométrie après l'ouverture, au fil de l'eau =================
-  // La maquette s'ouvre tout de suite ; la géométrie se calcule ensuite et la vue se complète par vagues.
+  // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
   var URL_GEO = "/ifc/ifc-geo.js?v=1";
@@ -523,38 +523,18 @@
     var k = Math.min(4, coeurs, memoire, Math.ceil(n/300));
     return k >= 2 ? k : 0;
   }
-  function geometrieDeFond(modeles, premier){
-    var suite = Promise.resolve(), t0 = performance.now(), base = $("#etat").textContent, cadre = premier;
-    var dernier = 0, cout = 0;
-    function rafraichir(force){
-      var t = performance.now();
-      if (!force && t - dernier < Math.max(800, 4*cout)) return;
-      dernier = t;
-      var b = vue.afficher(itemsVue());
-      infoVue(b);
-      cout = performance.now() - t;
-      // première vague dessinée : vue de départ cadrée sur elle (l'ouverture n'avait encore rien à cadrer)
-      if (cadre && b.elements){ cadre = false; vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); }
-    }
-    modeles.forEach(function(m){
+  function geometrieAvant(modeles){
+    var suite = Promise.resolve();
+    modeles.forEach(function(m, n){
       if (!m.idsGeo){ m.octets = null; return; }
-      suite = suite.then(function(){ return calculerGeo(m, function(p){
-        etat("Géométrie 3D de « " + m.nom + " » : " + Math.floor(100*p) + " %…");
-        rafraichir(false);
-      }); });
+      var nom = "« " + m.nom + " »" + (modeles.length > 1 ? " (" + (n + 1) + "/" + modeles.length + ")" : "");
+      suite = suite.then(function(){
+        return calculerGeo(m, function(p){
+          progresLecture("Géométrie 3D de " + nom + (m.temps && m.temps.paralleles ? " (" + m.temps.paralleles + " workers)" : "") + " : " + Math.floor(100*p) + " %", p);
+        });
+      }).then(function(){ m.idsGeo = null; });
     });
-    return suite.then(function(){
-      var calcule = modeles.filter(function(m){ return m.idsGeo; });
-      if (!calcule.length) return;
-      rafraichir(true);
-      if (premier) vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); else vue.recadrer();
-      var par = calcule.map(function(m){ return m.temps.paralleles; }).filter(Boolean);
-      etat(base + " Géométrie 3D en " + fmtN(Math.round(performance.now() - t0)) + " ms" + (par.length ? " (" + Math.max.apply(null, par) + " workers en parallèle)" : "") + ".");
-      if (derniere) derniere.fond = performance.now() - t0;
-      conseilPurge(calcule);
-      calcule.forEach(function(m){ m.idsGeo = null; });
-      rangerCache(calcule);
-    });
+    return suite;
   }
   function calculerGeo(m, progres){
     var ids = m.idsGeo, v0 = m.version, t0 = performance.now(), k = nbWorkersGeo(m, ids.length), t = m.temps || (m.temps = {});
@@ -632,7 +612,7 @@
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
     conseilPurge(modeles);
-    rangerCache(modeles);           // (rien pour une géométrie calculée au fil de l'eau : rangée à la fin)
+    rangerCache(modeles);
     derniere = { noms: modeles.map(function(m){ return m.nom; }), ms: ms, temps: modeles.map(function(m){ return m.temps || {}; }),
       lecteurs: modeles.map(function(m){ return m.lecteur || ""; }) };
     if (premier) window.scrollTo(0, 0);
@@ -2653,7 +2633,7 @@
       h += "<h3 class=\"apropos-t\">Dernière ouverture : " + esc(derniere.noms[i]) + "</h3><table class=\"apropos-temps\">" +
         lignes.map(function(l){ return "<tr><td>" + l[0] + "</td><td>" + l[1] + "</td></tr>"; }).join("") + "</table>";
     });
-    return h + "<p>Maquette ouverte en " + ms(derniere.ms) + (derniere.fond ? ", géométrie complète " + ms(derniere.fond) + " plus tard (calculée au fil de l'eau, la maquette se complète à l'écran)" : "") + ".</p>";
+    return h + "<p>Total, affichage compris : " + ms(derniere.ms) + ".</p>";
   }
   function activerCmd(c, ok){ [].forEach.call(document.querySelectorAll('[data-cmd="' + c + '"]'), function(b){ b.disabled = !ok; }); }
 
