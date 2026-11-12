@@ -1221,13 +1221,14 @@
   // Chargé en arrière-plan ; tant qu'il manque, ou si on a choisi le lecteur JavaScript, ou s'il plante,
   // le JavaScript fait le travail.
   var RM = null, AR_VIDE = new Int32Array(0), RM_ERR = "";   // RM_ERR : raison d'un arrêt du module
-  (function(){
-    if (typeof WebAssembly !== "object" || typeof fetch !== "function") return;
-    try { if (localStorage.getItem("ifc.lecteur") === "js") return; } catch (e){}
-    fetch("/ifc/ifc-lecteur.wasm?v=4").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+  // (aussi chargé dans les workers de géométrie, ifc-geo.js : pas de localStorage là-bas)
+  var RM_PRET = (function(){
+    if (typeof WebAssembly !== "object" || typeof fetch !== "function") return Promise.resolve(null);
+    try { if (localStorage.getItem("ifc.lecteur") === "js") return Promise.resolve(null); } catch (e){}
+    return fetch("/ifc/ifc-lecteur.wasm?v=4").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
       .then(function(b){ return WebAssembly.instantiate(b, { env: { progres: function(){} } }); })
-      .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; })
-      .catch(function(){});
+      .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; return RM; })
+      .catch(function(){ return null; });
   })();
   // mode : 1 arêtes vives (geo.A, geo.ferme, f.ar), 2 triangles (geo.T, geo.TF), 3 les deux
   function mailRust(geo, mode){
@@ -1273,9 +1274,11 @@
   // fermé (-1 inconnu, 0, 1), longueur de T (-1 absent), longueur de A (-1 absent), arêtes par face (0/1),
   // puis par face : nb boucles, taille de chaque boucle (en réels), [nb d'arêtes ×2, arêtes], puis TF].
   // Réels : par géométrie : min, max, puis par face : normale, points des boucles ; puis T et A.
-  function emballer(G){
+  function emballer(G, entrees){
+    // entrees : [[id, géométrie], …] (par défaut tout le cache) ; un paquet partiel ne porte que des géométries
+    var partiel = !!entrees, E = entrees ? new Map(entrees) : G.cache;
     var ni = 1, nf = 0;
-    G.cache.forEach(function(g){
+    E.forEach(function(g){
       ni += 2;
       if (!g) return;
       ni += 5; nf += 6;
@@ -1288,8 +1291,8 @@
       if (g.A) nf += g.A.length;
     });
     var I = new Int32Array(ni), F = new Float64Array(nf), pi = 0, pf = 0;
-    I[pi++] = G.cache.size;
-    G.cache.forEach(function(g, id){
+    I[pi++] = E.size;
+    E.forEach(function(g, id){
       I[pi++] = id; I[pi++] = g ? 1 : 0;
       if (!g) return;
       var avecAr = !!g.A;
@@ -1306,6 +1309,7 @@
       if (g.T){ F.set(g.T, pf); pf += g.T.length; for (var t = 0; t < g.TF.length; t++) I[pi++] = g.TF[t]; }
       if (g.A){ F.set(g.A, pf); pf += g.A.length; }
     });
+    if (partiel) return { I: I, F: F, partiel: true };
     var hotes = [];
     if (G.hotes) G.hotes.forEach(function(h, o){ hotes.push(o, h); });
     return { I: I, F: F, nonLus: G.nonLus, erreurs: G.erreurs, hotes: hotes };
@@ -1334,8 +1338,36 @@
       G.cache.set(id, g);
     }
     if (pi !== I.length || pf !== F.length) throw new Error("cache incohérent");
-    G.nonLus = x.nonLus || {}; G.erreurs = x.erreurs || 0;
-    if (x.hotes && x.hotes.length){ G.hotes = new Map(); for (var h = 0; h < x.hotes.length; h += 2) G.hotes.set(x.hotes[h], x.hotes[h+1]); }
+    if (x.partiel) return;
+    // bilans : ajoutés à ceux déjà là (plusieurs workers versent chacun le leur)
+    var nl = x.nonLus || {};
+    Object.keys(nl).forEach(function(k){ G.nonLus[k] = (G.nonLus[k] || 0) + nl[k]; });
+    G.erreurs += x.erreurs || 0;
+    if (x.hotes && x.hotes.length){ if (!G.hotes) G.hotes = new Map(); for (var h = 0; h < x.hotes.length; h += 2) G.hotes.set(x.hotes[h], x.hotes[h+1]); }
+  }
+  // Calcul de la géométrie de ids dans un worker (ifc-geo.js) : envoyer(paquet, fini) reçoit, toutes les
+  // ~250 ms, les géométries nouvelles (paquet partiel), puis à la fin les bilans (paquet complet sans géométrie).
+  function calculerPour(m, ids, envoyer){
+    var G = Contexte(m), i = 0, vus = 0;
+    function nouveaux(){
+      var tout = Array.from(G.cache), n = tout.slice(vus);
+      vus = tout.length;
+      return n.filter(function(x){ return !x[1] || x[1].faces; });
+    }
+    (function tranche(){
+      var t0 = Date.now();
+      while (i < ids.length && Date.now() - t0 < 250){
+        var g = geometrie(G, ids[i++]);
+        if (g){ triangles(g); aretesVives(g); }
+      }
+      var n = nouveaux();
+      if (n.length) envoyer(emballer(G, n), false, i);
+      if (i < ids.length){ setTimeout(tranche, 0); return; }
+      // ouvertures et autres entrées sans triangles calculés : envoyées telles quelles ; puis les bilans
+      var hotes = [];
+      if (G.hotes) G.hotes.forEach(function(h, o){ hotes.push(o, h); });
+      envoyer({ I: new Int32Array([0]), F: new Float64Array(0), nonLus: G.nonLus, erreurs: G.erreurs, hotes: hotes }, true, i);
+    })();
   }
 
   // Faces triangulées et polygonales par le module Rust (src/tess.rs, copie de tessellation + ajouterFace) :
@@ -3200,12 +3232,23 @@
       // cache de la géométrie : contenu à ranger (après preparer), ou reprise d'un contenu rangé (au lieu de
       // preparer) ; false si le contenu ne colle pas (le calcul normal reprend alors)
       emballer: function(m){ var G = Gs.get(m) || prets.get(m); return G ? emballer(G) : null; },
-      deballer: function(m, x){
-        var G = Contexte(m);
+      // ajout : versé dans la géométrie déjà là (calcul en parallèle) au lieu de repartir de zéro
+      deballer: function(m, x, ajout){
+        var G = ajout ? Gs.get(m) || prets.get(m) : null;
+        if (!G){ G = Contexte(m); prets.set(m, G); }
+        else if (!ajout) prets.set(m, G);
         try { deballer(G, x); } catch (err){ return false; }
-        prets.set(m, G);
         return true;
       },
+      // attente : la vue ne dessine que les géométries déjà prêtes (calcul en cours ailleurs) ; sans attente,
+      // ce qui manque est calculé à la demande comme avant
+      attente: function(m, oui){
+        var G = Gs.get(m) || prets.get(m);
+        if (!G){ G = Contexte(m); prets.set(m, G); }
+        G.attente = !!oui;
+      },
+      // nombre de géométries prêtes (éléments et ouvertures)
+      nbPrets: function(m){ var G = Gs.get(m) || prets.get(m); return G ? G.cache.size : 0; },
       // Éléments à dessiner : [{ cle, m, id }] ; renvoie le bilan de lecture
       afficher: function(items){
         liste = [];
@@ -3213,14 +3256,15 @@
         items.forEach(function(it){
           var G = Gs.get(it.m), g = null, rgb = null;
           if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
-          if (G && !g) g = geometrie(G, it.id);
+          if (G && !g) g = G.attente && !G.cache.has(it.id) ? null : geometrie(G, it.id);
           if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb, m: it.m, e: it.id }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
-        if (!origine){ origine = b ? b.c : [0,0,0]; prof = 1; }
+        // (rien encore à dessiner, géométrie en cours de calcul : l'origine attend le premier élément prêt)
+        if (!origine && b){ origine = b.c; prof = 1; }
         if (b) prof = Math.max(prof, (Math.hypot(b.c[0] - origine[0], b.c[1] - origine[1], b.c[2] - origine[2]) + b.r)*3);
-        M.charger(liste, origine);
+        M.charger(liste, origine || [0,0,0]);
         M.teinter(liste, sel, actif, coul);
         demander();
         var nonLus = {}, erreurs = 0;
@@ -3452,6 +3496,9 @@
     geoTriangles: geoTriangles,
     // module Rust chargé et en service (lecture des faces, maillage)
     rustActif: function(){ return !!RM; },
+    // promesse du module Rust (ou null) ; calcul pour un worker de géométrie
+    rustPret: function(){ return RM_PRET; },
+    calculerPour: calculerPour,
     rustErreur: function(){ return RM_ERR; }
   };
-})(window);
+})(typeof window !== "undefined" ? window : self);

@@ -129,6 +129,7 @@
       } catch (e){ return; }
       if (!(o > 1048576 && o > .2*taille)) return;
       var el = $("#etat");
+      if (el.textContent.indexOf("sans occurrence") >= 0) return;
       el.textContent += " " + pluriel(n, "type sans occurrence", "types sans occurrence") + " pèse" + (n > 1 ? "nt" : "") + " encore " + fmtTaille(o) +
         " (" + Math.round(100*o/Math.max(1, taille)) + " % du fichier) : Fichier > Purger… les retire" + (modeEd ? "." : " (mode Éditeur).");
     }, 250);
@@ -230,8 +231,9 @@
     for (i = Math.max(0, n - 65536); i < n; i++){ h ^= u[i]; h = Math.imul(h, 0x01000193); }
     return [CACHE_GEO, nom, n, (h >>> 0).toString(16)].join("|");
   }
-  function marquer(m, x, t0, t1){
+  function marquer(m, x, t0, t1, buf){
     m.cleCache = x.cle;
+    m.octets = buf || x.buf;        // gardés le temps du calcul de la géométrie (workers), puis lâchés
     m.temps = { fichier: x.ms, decoupe: m.msLecteur || 0, assemblage: Math.max(0, performance.now() - t1 - (m.msLecteur || 0)), debut: t0 };
     return m;
   }
@@ -270,7 +272,7 @@
             progres(etape === "texte" ? .7 + .1*p : .8 + .2*p);
           }).then(function(m){
             m.lecteur = d.resultat.lecteur; m.noteLecteur = d.resultat.noteLecteur; m.msLecteur = d.resultat.msLecteur;
-            ok(marquer(m, x, t0, t1));
+            ok(marquer(m, x, t0, t1, d.buffer));
           }, ko);
         };
         w.onerror = function(e){
@@ -305,7 +307,8 @@
   // Après la lecture : fiches des éléments (nom, type, matériau) puis géométrie 3D, avec la barre de
   // progression ; l'ouverture n'a ensuite plus qu'à assembler ce qui est prêt.
   // Géométrie déjà calculée pour le même fichier (ouvert tel quel dans ce navigateur) : reprise du cache.
-  function preparer(modeles){
+  // fond : la géométrie n'est pas calculée ici mais après l'ouverture, au fil de l'eau (geometrieDeFond)
+  function preparer(modeles, fond){
     var suite = Promise.resolve();
     modeles.forEach(function(m, n){
       var nom = "« " + m.nom + " »" + (modeles.length > 1 ? " (" + (n + 1) + "/" + modeles.length + ")" : ""), ids = [], t = m.temps || (m.temps = {}), tf = 0, tc = 0;
@@ -330,6 +333,7 @@
           if (ok){ t.cache = performance.now() - tc; return; }
         }
         t.cacheLu = performance.now() - tc;
+        if (fond){ m.idsGeo = ids; vue.attente(m, true); return; }
         return vue.preparer(m, ids, function(p){ progresLecture("Géométrie 3D de " + nom + " : " + pluriel(Math.round(p*ids.length), "élément") + " sur " + fmtN(ids.length), p); })
           .then(function(r){ t.geometrie = r ? r.geometrie : 0; t.maillage = r ? r.maillage : 0; m.aCacher = !!m.cleCache && cacheVoulu; });
       });
@@ -348,8 +352,10 @@
     if (!baseCache.p){
       baseCache.p = new Promise(function(ok, ko){
         if (!window.indexedDB){ ko(new Error("IndexedDB absent")); return; }
-        var r = indexedDB.open("ifc-cache", 1);
-        r.onupgradeneeded = function(){ r.result.createObjectStore("geo"); };
+        var r = indexedDB.open("ifc-cache", 2);
+        r.onupgradeneeded = function(){
+          ["geo", "fichiers"].forEach(function(n){ if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); });
+        };
         r.onsuccess = function(){ ok(r.result); };
         r.onerror = function(){ ko(r.error); };
       });
@@ -357,10 +363,11 @@
     }
     return baseCache.p;
   }
-  function cacheTx(mode, f){
+  function cacheTx(mode, f, magasin){
+    magasin = magasin || "geo";
     return baseCache().then(function(db){
       return new Promise(function(ok){
-        var tx = db.transaction("geo", mode), r = f(tx.objectStore("geo"));
+        var tx = db.transaction(magasin, mode), r = f(tx.objectStore(magasin));
         tx.oncomplete = function(){ ok(r && r.result !== undefined ? r.result : null); };
         tx.onerror = tx.onabort = function(){ ok(null); };
       });
@@ -373,6 +380,46 @@
     l = [cle].concat(l.slice(0, CACHE_MAX - 1));
     return cacheTx("readwrite", function(o){ vieux.forEach(function(k){ o.delete(k); }); return o.put(x, cle); })
       .then(function(r){ if (r !== null) garder("ifc.cache.cles", JSON.stringify(l)); });
+  }
+  // ================= Fichiers récents (accueil) : les fichiers eux-mêmes, gardés dans ce navigateur =================
+  var RECENTS_MAX = 3, RECENT_OCTETS = 500*1048576;
+  function recents(){ try { var l = JSON.parse(localStorage.getItem("ifc.recents") || "[]"); return Array.isArray(l) ? l : []; } catch (e){ return []; } }
+  function memoriserRecent(fic){
+    if (!fic || !(fic instanceof Blob) || !fic.size || fic.size > RECENT_OCTETS) return;
+    var cle = [fic.name, fic.size, fic.lastModified || 0].join("|"), l = recents(), deja = l.some(function(r){ return r.cle === cle; });
+    var reste = l.filter(function(r){ return r.cle !== cle; }), vieux = reste.slice(RECENTS_MAX - 1);
+    var neuf = [{ cle: cle, nom: fic.name, taille: fic.size, quand: Date.now() }].concat(reste.slice(0, RECENTS_MAX - 1));
+    if (deja){ garder("ifc.recents", JSON.stringify(neuf)); afficherRecents(); return; }      // déjà rangé : juste remonté
+    cacheTx("readwrite", function(o){ vieux.forEach(function(r){ o.delete(r.cle); }); return o.put(fic, cle); }, "fichiers")
+      .then(function(r){ if (r !== null){ garder("ifc.recents", JSON.stringify(neuf)); afficherRecents(); } });
+  }
+  function retirerRecent(cle){
+    garder("ifc.recents", JSON.stringify(recents().filter(function(r){ return r.cle !== cle; })));
+    cacheTx("readwrite", function(o){ return o.delete(cle); }, "fichiers");
+    afficherRecents();
+  }
+  function afficherRecents(){
+    var l = recents(), bloc = $("#recents");
+    if (!bloc) return;
+    bloc.hidden = !l.length;
+    $("#recents-liste").innerHTML = l.map(function(r){
+      var d = new Date(r.quand), date = String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+      return '<li><button type="button" class="recent" data-recent="' + esc(r.cle) + '" title="Rouvrir ' + esc(r.nom) + '"><span class="r-nom">' + esc(r.nom) +
+        '</span><span class="r-info">' + fmtTaille(r.taille) + " · " + date + '</span></button><button type="button" class="r-x" data-retirer="' + esc(r.cle) + '" title="Retirer de la liste" aria-label="Retirer ' + esc(r.nom) + ' de la liste">×</button></li>';
+    }).join("");
+  }
+  if ($("#recents")){
+    $("#recents").addEventListener("click", function(e){
+      var x = e.target.closest("[data-retirer]"), b = e.target.closest("[data-recent]");
+      if (x){ retirerRecent(x.getAttribute("data-retirer")); return; }
+      if (!b) return;
+      var cle = b.getAttribute("data-recent"), r = recents().filter(function(z){ return z.cle === cle; })[0];
+      cacheTx("readonly", function(o){ return o.get(cle); }, "fichiers").then(function(blob){
+        if (!blob){ retirerRecent(cle); erreur("Ce fichier n'est plus gardé dans le navigateur : choisis-le à nouveau."); return; }
+        charger([blob instanceof File ? blob : new File([blob], r ? r.nom : "modele.ifc")]);
+      });
+    });
+    afficherRecents();
   }
   function cacheVider(){
     garder("ifc.cache.cles", "[]");
@@ -441,6 +488,7 @@
         progresLecture(quoi + "…", 0);
         return lecture(fic, function(p){ progresLecture(quoi + " : " + Math.floor(100*p) + " %", p); }).then(function(m){
           ajoutes.push(m);
+          memoriserRecent(fic);
         }).catch(function(err){
           if (window.console) console.error(err);
           refus.push("« " + fic.name + " » : " + (err && err.ifc ? err.message : "lecture impossible (" + (err && err.message || err) + ")"));
@@ -449,7 +497,7 @@
     });
     suite.then(function(){
       if (!ajoutes.length) return;
-      return preparer(ajoutes).then(function(){
+      return preparer(ajoutes, true).then(function(){
         progresLecture("Affichage…", 1);
         return pause();
       });
@@ -457,9 +505,103 @@
       $("#chargement").hidden = true;
       if (ajoutes.length && remplacer) vider();
       remplacer = false;
-      if (ajoutes.length) ouvrir(ajoutes, performance.now() - t0, refus);
+      var premier = !fichiers.length;
+      if (ajoutes.length){ ouvrir(ajoutes, performance.now() - t0, refus); geometrieDeFond(ajoutes, premier); }
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
       else erreur(refus.join(" "));
+    });
+  }
+
+  // ================= Géométrie après l'ouverture, au fil de l'eau =================
+  // La maquette s'ouvre tout de suite ; la géométrie se calcule ensuite et la vue se complète par vagues.
+  // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
+  // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
+  var URL_GEO = "/ifc/ifc-geo.js?v=1";
+  function nbWorkersGeo(m, n){
+    if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
+    var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
+    var k = Math.min(4, coeurs, memoire, Math.ceil(n/300));
+    return k >= 2 ? k : 0;
+  }
+  function geometrieDeFond(modeles, premier){
+    var suite = Promise.resolve(), t0 = performance.now(), base = $("#etat").textContent, cadre = premier;
+    var dernier = 0, cout = 0;
+    function rafraichir(force){
+      var t = performance.now();
+      if (!force && t - dernier < Math.max(800, 4*cout)) return;
+      dernier = t;
+      var b = vue.afficher(itemsVue());
+      infoVue(b);
+      cout = performance.now() - t;
+      // première vague dessinée : vue de départ cadrée sur elle (l'ouverture n'avait encore rien à cadrer)
+      if (cadre && b.elements){ cadre = false; vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); }
+    }
+    modeles.forEach(function(m){
+      if (!m.idsGeo){ m.octets = null; return; }
+      suite = suite.then(function(){ return calculerGeo(m, function(p){
+        etat("Géométrie 3D de « " + m.nom + " » : " + Math.floor(100*p) + " %…");
+        rafraichir(false);
+      }); });
+    });
+    return suite.then(function(){
+      var calcule = modeles.filter(function(m){ return m.idsGeo; });
+      if (!calcule.length) return;
+      rafraichir(true);
+      if (premier) vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); else vue.recadrer();
+      var par = calcule.map(function(m){ return m.temps.paralleles; }).filter(Boolean);
+      etat(base + " Géométrie 3D en " + fmtN(Math.round(performance.now() - t0)) + " ms" + (par.length ? " (" + Math.max.apply(null, par) + " workers en parallèle)" : "") + ".");
+      if (derniere) derniere.fond = performance.now() - t0;
+      conseilPurge(calcule);
+      calcule.forEach(function(m){ m.idsGeo = null; });
+      rangerCache(calcule);
+    });
+  }
+  function calculerGeo(m, progres){
+    var ids = m.idsGeo, v0 = m.version, t0 = performance.now(), k = nbWorkersGeo(m, ids.length), t = m.temps || (m.temps = {});
+    function fin(r){
+      vue.attente(m, false);
+      m.octets = null;
+      t.geometrie = performance.now() - t0;
+      t.maillage = r && r.maillage !== undefined ? r.maillage : undefined;
+      if (r && r.maillage !== undefined) t.geometrie = r.geometrie;
+      // gardée en cache seulement si rien n'a bougé pendant le calcul
+      m.aCacher = !!m.cleCache && cacheVoulu && m.version === v0;
+    }
+    function surPage(){
+      t.paralleles = 0;
+      return vue.preparer(m, ids, progres).then(fin);
+    }
+    if (!k) return surPage();
+    t.paralleles = k;
+    return new Promise(function(ok){
+      var lots = [], ws = [], restants = k, fait = [], fini = false;
+      for (var j = 0; j < k; j++){ lots.push([]); fait.push(0); }
+      // blocs de 64 éléments distribués à tour de rôle : charge équilibrée entre workers
+      for (var i = 0; i < ids.length; i++) lots[Math.floor(i/64) % k].push(ids[i]);
+      function arreter(){ fini = true; ws.forEach(function(w){ w.terminate(); }); }
+      function secours(){
+        if (fini) return;
+        arreter();
+        surPage().then(ok);               // ce qui est déjà arrivé est gardé ; la page calcule le reste
+      }
+      lots.forEach(function(lot, j){
+        var w;
+        try { w = new Worker(URL_GEO); } catch (e){ secours(); return; }
+        ws.push(w);
+        w.onmessage = function(e){
+          if (fini) return;
+          var d = e.data;
+          if (d.erreur){ secours(); return; }
+          // maquette modifiée pendant le calcul : on s'arrête, le reste se calculera à la demande
+          if (m.version !== v0){ arreter(); fin(); ok(); return; }
+          vue.deballer(m, d, true);
+          fait[j] = d.fait || 0;
+          progres(Math.min(1, fait.reduce(function(a, b){ return a + b; }, 0)/ids.length));
+          if (d.fini){ w.terminate(); if (--restants === 0){ fini = true; fin(); ok(); } }
+        };
+        w.onerror = function(ev){ if (ev && ev.preventDefault) ev.preventDefault(); secours(); };
+        w.postMessage({ buffer: m.octets, nom: m.nom, ids: lot, lecteur: lecteurVoulu });
+      });
     });
   }
 
@@ -490,7 +632,7 @@
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
     conseilPurge(modeles);
-    rangerCache(modeles);
+    rangerCache(modeles);           // (rien pour une géométrie calculée au fil de l'eau : rangée à la fin)
     derniere = { noms: modeles.map(function(m){ return m.nom; }), ms: ms, temps: modeles.map(function(m){ return m.temps || {}; }),
       lecteurs: modeles.map(function(m){ return m.lecteur || ""; }) };
     if (premier) window.scrollTo(0, 0);
@@ -2503,13 +2645,15 @@
         ["Découpe des entités" + (derniere.lecteurs[i] ? " (" + (derniere.lecteurs[i] === "rust" ? "Rust" : "JavaScript") + ")" : ""), ms(t.decoupe)],
         ["Assemblage des entités", ms(t.assemblage)],
         ["Liste des éléments", ms(t.fiches)],
-        t.cache !== undefined ? ["Géométrie 3D reprise du cache", ms(t.cache)] : ["Géométrie 3D (lecture des formes)", ms(t.geometrie)],
-        t.cache !== undefined ? null : ["Triangles et arêtes vives", ms(t.maillage)]
+        t.cache !== undefined ? ["Géométrie 3D reprise du cache", ms(t.cache)]
+          : t.paralleles ? ["Géométrie 3D, triangles et arêtes (" + t.paralleles + " workers en parallèle)", ms(t.geometrie)]
+          : ["Géométrie 3D (lecture des formes)", ms(t.geometrie)],
+        t.cache !== undefined || t.paralleles ? null : ["Triangles et arêtes vives", ms(t.maillage)]
       ].filter(function(l){ return l && l[1] !== null; });
       h += "<h3 class=\"apropos-t\">Dernière ouverture : " + esc(derniere.noms[i]) + "</h3><table class=\"apropos-temps\">" +
         lignes.map(function(l){ return "<tr><td>" + l[0] + "</td><td>" + l[1] + "</td></tr>"; }).join("") + "</table>";
     });
-    return h + "<p>Total, affichage compris : " + ms(derniere.ms) + ".</p>";
+    return h + "<p>Maquette ouverte en " + ms(derniere.ms) + (derniere.fond ? ", géométrie complète " + ms(derniere.fond) + " plus tard (calculée au fil de l'eau, la maquette se complète à l'écran)" : "") + ".</p>";
   }
   function activerCmd(c, ok){ [].forEach.call(document.querySelectorAll('[data-cmd="' + c + '"]'), function(b){ b.disabled = !ok; }); }
 

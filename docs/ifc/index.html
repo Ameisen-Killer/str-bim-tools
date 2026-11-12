@@ -157,6 +157,23 @@ body:not(.edition)>main{flex:1 0 auto;display:flex;flex-direction:column;positio
 .depot-note{grid-column:1/-1;margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--texte-faible)}
 .depot kbd{font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:2px 6px;border:1px solid var(--ligne);border-bottom-width:2px;border-radius:3px;color:var(--texte-doux)}
 .depot .chargement{grid-column:1/-1}
+/* fichiers récents : rouverts d'un clic (fichier gardé dans IndexedDB, géométrie reprise du cache) */
+.recents{max-width:640px;margin-top:18px}
+.recents-titre{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--or);margin-bottom:6px}
+.recents-titre span{color:var(--texte-faible);letter-spacing:.08em;text-transform:none;margin-left:8px}
+.recents ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.recents li{display:flex;align-items:stretch;border:1px solid var(--ligne);transition:border-color .25s,background .25s}
+.recents li:hover{border-color:rgba(var(--or-rvb),.6);background:rgba(var(--or-rvb),.05)}
+.recent{flex:1;min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:7px 12px;background:none;border:0;cursor:pointer;text-align:left;color:var(--texte)}
+.r-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.r-info{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--texte-faible)}
+.recent:hover .r-nom,.recent:focus-visible .r-nom{color:var(--or)}
+.recent:focus-visible{outline:none}
+.r-x{flex:none;width:32px;background:none;border:0;border-left:1px solid var(--ligne);cursor:pointer;color:var(--texte-faible);font-size:16px}
+.r-x:hover{color:var(--rouge)}
+@media (max-width:560px){.r-info{display:none}}
+/* écran bas : la liste des récents prend la place des atouts, l'accueil tient sans défilement */
+@media (min-width:1000px) and (max-height:860px){.recents:not([hidden]) ~ .atouts{display:none}}
 /* atouts : quatre chiffres clés sous la zone de dépôt */
 .atouts{list-style:none;margin:26px 0 0;padding:0;max-width:640px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ligne)}
 .atouts li{padding:14px 12px 0 0;display:flex;flex-direction:column;gap:3px}
@@ -698,6 +715,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <div class="depot-note">Plusieurs fichiers se superposent dans la même vue</div>
         <div class="chargement" id="chargement" hidden><span id="chargement-txt">Lecture du fichier…</span><div class="prog" aria-hidden="true"><i id="prog"></i></div></div>
       </div>
+      <div class="recents rv" style="--d:1.3s" id="recents" hidden>
+        <div class="recents-titre">Fichiers récents <span>gardés dans ce navigateur</span></div>
+        <ul id="recents-liste"></ul>
+      </div>
       <ul class="atouts rv" style="--d:1.4s">
         <li><b>Rust</b><span>lecture en WebAssembly</span></li>
         <li><b>2 <i>modes</i></b><span>Viewer et Éditeur</span></li>
@@ -1169,11 +1190,11 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=12"></script>
-<script src="/ifc/ifc-vue.js?v=42"></script>
+<script src="/ifc/ifc-vue.js?v=43"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=49"></script>
+<script src="/ifc/ifc-app.js?v=50"></script>
 <script src="/assets/menu.js?v=32"></script>
 </body>
 </html>
