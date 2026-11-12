@@ -388,6 +388,10 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .prefs label{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:12px;margin-top:8px;font-size:14px;color:var(--texte-doux)}
 .prefs p.pref-note{margin-top:10px;font-size:12.5px;color:var(--texte-faible)}
 .prefs p.pref-note:empty{display:none}
+.apropos-t{margin:14px 0 4px;font-size:13px;font-weight:500}
+.apropos-temps{border-collapse:collapse;font-size:13px;width:100%}
+.apropos-temps td{padding:2px 0;border-bottom:1px solid var(--ligne)}
+.apropos-temps td+td{text-align:right;font-family:var(--mono);white-space:nowrap;padding-left:16px}
 .suppr-types{display:flex;align-items:center;gap:10px;margin:10px 0 2px;cursor:pointer}
 .suppr-types input{accent-color:var(--or);width:16px;height:16px;margin:0;flex:none}
 .prefs label.coche{grid-template-columns:auto 1fr auto;gap:10px;cursor:pointer}
@@ -879,7 +883,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Aide</button>
           <div class="mb-liste" role="menu" hidden>
             <button type="button" role="menuitem" data-cmd="raccourcis"><span>Raccourcis clavier</span><kbd>?</kbd></button>
-            <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos de l'éditeur</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="vider-cache"><span>Vider le cache de géométrie</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos de l'éditeur (temps d'ouverture)</span><kbd></kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="site"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
           </div>
@@ -1163,11 +1168,11 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=11"></script>
-<script src="/ifc/ifc-vue.js?v=40"></script>
+<script src="/ifc/ifc-vue.js?v=41"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=45"></script>
+<script src="/ifc/ifc-app.js?v=46"></script>
 <script src="/assets/menu.js?v=31"></script>
 </body>
 </html>

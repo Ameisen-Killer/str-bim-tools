@@ -112,6 +112,7 @@
 
   // ================= Messages =================
   function etat(msg){ $("#etat").textContent = msg || ""; }
+  var derniere = null;          // temps de la dernière ouverture, montrés dans Aide > À propos
   // Types sans occurrence (souvent laissés par une suppression, avec toute leur géométrie) : s'ils pèsent
   // lourd, la barre d'état le signale et renvoie vers Fichier > Purger…. Appelé un peu après le message
   // principal, qu'il complète.
@@ -222,13 +223,31 @@
   var avecWorker = typeof Worker !== "undefined";
   // découpe du fichier : module Rust compilé en WebAssembly (par défaut) ou lecteur JavaScript
   var lecteurVoulu = lire("ifc.lecteur", ["rust", "js"]);
+  // Empreinte d'un fichier (nom, taille, octets échantillonnés + fin complète) : clé du cache de géométrie
+  function empreinte(buf, nom){
+    var u = new Uint8Array(buf), n = u.length, h = 0x811c9dc5, pas = Math.max(1, Math.floor(n/262144)), i;
+    for (i = 0; i < n; i += pas){ h ^= u[i]; h = Math.imul(h, 0x01000193); }
+    for (i = Math.max(0, n - 65536); i < n; i++){ h ^= u[i]; h = Math.imul(h, 0x01000193); }
+    return [CACHE_GEO, nom, n, (h >>> 0).toString(16)].join("|");
+  }
+  function marquer(m, x, t0, t1){
+    m.cleCache = x.cle;
+    m.temps = { fichier: x.ms, decoupe: m.msLecteur || 0, assemblage: Math.max(0, performance.now() - t1 - (m.msLecteur || 0)), debut: t0 };
+    return m;
+  }
+  function octetsMarques(fic){
+    var t0 = performance.now();
+    return octetsIfc(fic).then(function(x){ x.ms = performance.now() - t0; x.cle = empreinte(x.buf, x.nom); return x; });
+  }
   function lireClassique(fic){
-    return octetsIfc(fic).then(function(x){ return pause().then(function(){ return IFC.lire(x.buf, x.nom); }); });
+    var t0 = performance.now();
+    return octetsMarques(fic).then(function(x){ return pause().then(function(){ var t1 = performance.now(); return marquer(IFC.lire(x.buf, x.nom), x, t0, t1); }); });
   }
   function lecture(fic, progres){
     if (!avecWorker) return lireClassique(fic);
-    return octetsIfc(fic).then(function(x){
-      var buf = x.buf;
+    var t0 = performance.now();
+    return octetsMarques(fic).then(function(x){
+      var buf = x.buf, t1 = performance.now();
       return new Promise(function(ok, ko){
         var w;
         try { w = new Worker("/ifc/ifc-lecteur.js?v=7"); }
@@ -243,7 +262,7 @@
             progres(etape === "texte" ? .7 + .1*p : .8 + .2*p);
           }).then(function(m){
             m.lecteur = d.resultat.lecteur; m.noteLecteur = d.resultat.noteLecteur; m.msLecteur = d.resultat.msLecteur;
-            ok(m);
+            ok(marquer(m, x, t0, t1));
           }, ko);
         };
         w.onerror = function(e){
@@ -277,24 +296,91 @@
   }
   // Après la lecture : fiches des éléments (nom, type, matériau) puis géométrie 3D, avec la barre de
   // progression ; l'ouverture n'a ensuite plus qu'à assembler ce qui est prêt.
+  // Géométrie déjà calculée pour le même fichier (ouvert tel quel dans ce navigateur) : reprise du cache.
   function preparer(modeles){
     var suite = Promise.resolve();
     modeles.forEach(function(m, n){
-      var nom = "« " + m.nom + " »" + (modeles.length > 1 ? " (" + (n + 1) + "/" + modeles.length + ")" : ""), ids = [];
+      var nom = "« " + m.nom + " »" + (modeles.length > 1 ? " (" + (n + 1) + "/" + modeles.length + ")" : ""), ids = [], t = m.temps || (m.temps = {}), tf = 0, tc = 0;
       suite = suite.then(function(){
         progresLecture("Liste des éléments de " + nom + "…", 0);
         return pause();
       }).then(function(){
         var a = IFC.arbre(m);
+        tf = performance.now();
         return parTranches(a.length, function(k){
           var i = IFC.infos(m, a[k].id);
           if (i && i.vue3D) ids.push(a[k].id);
         }, function(p){ progresLecture("Liste des éléments de " + nom + " : " + Math.floor(100*p) + " %", p); });
       }).then(function(){
-        return vue.preparer(m, ids, function(p){ progresLecture("Géométrie 3D de " + nom + " : " + pluriel(Math.round(p*ids.length), "élément") + " sur " + fmtN(ids.length), p); });
+        t.fiches = performance.now() - tf;
+        tc = performance.now();
+        return m.cleCache && cacheVoulu ? cacheLire(m.cleCache) : null;
+      }).then(function(x){
+        if (x){
+          progresLecture("Géométrie 3D de " + nom + " : reprise du cache…", .5);
+          var ok = vue.deballer(m, x);
+          if (ok){ t.cache = performance.now() - tc; return; }
+        }
+        t.cacheLu = performance.now() - tc;
+        return vue.preparer(m, ids, function(p){ progresLecture("Géométrie 3D de " + nom + " : " + pluriel(Math.round(p*ids.length), "élément") + " sur " + fmtN(ids.length), p); })
+          .then(function(r){ t.geometrie = r ? r.geometrie : 0; t.maillage = r ? r.maillage : 0; m.aCacher = !!m.cleCache && cacheVoulu; });
       });
     });
     return suite;
+  }
+
+  // ================= Cache de la géométrie (IndexedDB, dans ce navigateur seulement) =================
+  // Clé : version du code de géométrie, nom, taille et empreinte du fichier ; les 3 derniers fichiers gardés.
+  var CACHE_GEO = (function(){
+    var sc = document.querySelector('script[src*="ifc-vue.js"]'), v = sc && /[?&]v=(\d+)/.exec(sc.getAttribute("src"));
+    return "vue" + (v ? v[1] : "0");
+  })();
+  var cacheVoulu = lire("ifc.cache", ["oui", "non"]) === "oui", CACHE_MAX = 3, CACHE_OCTETS = 400*1048576;
+  function baseCache(){
+    if (!baseCache.p){
+      baseCache.p = new Promise(function(ok, ko){
+        if (!window.indexedDB){ ko(new Error("IndexedDB absent")); return; }
+        var r = indexedDB.open("ifc-cache", 1);
+        r.onupgradeneeded = function(){ r.result.createObjectStore("geo"); };
+        r.onsuccess = function(){ ok(r.result); };
+        r.onerror = function(){ ko(r.error); };
+      });
+      baseCache.p.catch(function(){ baseCache.p = null; });
+    }
+    return baseCache.p;
+  }
+  function cacheTx(mode, f){
+    return baseCache().then(function(db){
+      return new Promise(function(ok){
+        var tx = db.transaction("geo", mode), r = f(tx.objectStore("geo"));
+        tx.oncomplete = function(){ ok(r && r.result !== undefined ? r.result : null); };
+        tx.onerror = tx.onabort = function(){ ok(null); };
+      });
+    }).catch(function(){ return null; });
+  }
+  function cacheCles(){ try { return JSON.parse(localStorage.getItem("ifc.cache.cles") || "[]"); } catch (e){ return []; } }
+  function cacheLire(cle){ return cacheCles().indexOf(cle) >= 0 ? cacheTx("readonly", function(o){ return o.get(cle); }) : Promise.resolve(null); }
+  function cacheEcrire(cle, x){
+    var l = cacheCles().filter(function(k){ return k !== cle; }), vieux = l.slice(CACHE_MAX - 1);
+    l = [cle].concat(l.slice(0, CACHE_MAX - 1));
+    return cacheTx("readwrite", function(o){ vieux.forEach(function(k){ o.delete(k); }); return o.put(x, cle); })
+      .then(function(r){ if (r !== null) garder("ifc.cache.cles", JSON.stringify(l)); });
+  }
+  function cacheVider(){
+    garder("ifc.cache.cles", "[]");
+    return cacheTx("readwrite", function(o){ return o.clear(); });
+  }
+  // après l'ouverture, au calme : géométrie des fichiers ouverts tels quels rangée pour la prochaine fois
+  function rangerCache(modeles){
+    setTimeout(function(){
+      modeles.forEach(function(m){
+        if (!m.aCacher || m.version !== 0) return;
+        m.aCacher = false;
+        var x = vue.emballer(m);
+        if (!x || x.I.byteLength + x.F.byteLength > CACHE_OCTETS) return;
+        cacheEcrire(m.cleCache, x);
+      });
+    }, 1500);
   }
 
   // Toutes les maquettes ouvertes (modifications comprises) deviennent une seule, à exporter ensuite
@@ -391,10 +477,14 @@
     var decoupe = modeles.reduce(function(t, m){ return t + (m.msLecteur || 0); }, 0);
     var parLecteur = lect.length ? " · découpe " + (lect.every(function(x){ return x === "rust"; }) ? "Rust" : lect.every(function(x){ return x === "js"; }) ? "JavaScript" : "Rust et JavaScript") +
       " en " + fmtN(Math.max(1, decoupe)) + " ms" + (notes.length ? " (" + notes[0] + ")" : "") : "";
+    if (modeles.some(function(m){ return m.temps && m.temps.cache !== undefined; })) parLecteur += " · géométrie reprise du cache";
     etat(nom + " lu" + (modeles.length > 1 ? "s" : "") + " : " + pluriel(ent, "entité") + ", en " + fmtN(Math.max(1, Math.round(ms))) + " ms" + parLecteur +
       (doublons ? " (attention : identifiants en double dans " + pluriel(doublons, "fichier") + ", seule la première entité a été gardée)" : "") + "." +
       (refus && refus.length ? " Refusé" + (refus.length > 1 ? "s" : "") + " : " + refus.join(" ") : ""));
     conseilPurge(modeles);
+    rangerCache(modeles);
+    derniere = { noms: modeles.map(function(m){ return m.nom; }), ms: ms, temps: modeles.map(function(m){ return m.temps || {}; }),
+      lecteurs: modeles.map(function(m){ return m.lecteur || ""; }) };
     if (premier) window.scrollTo(0, 0);
     if (geoVoulue === "webifc") calculerWebIfc();
   }
@@ -2383,9 +2473,34 @@
       aide("Éditeur IFC", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
         "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
-        "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>");
+        "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +
+        tempsOuverture());
+    },
+    "vider-cache": function(){
+      cacheVider().then(function(){ etat("Cache de géométrie vidé : les prochains fichiers seront recalculés à l'ouverture."); });
     }
   };
+  // Temps de chaque étape de la dernière ouverture (Aide > À propos)
+  function tempsOuverture(){
+    var rust = vue.rustActif ? vue.rustActif() : false;
+    var h = "<h3 class=\"apropos-t\">Module Rust</h3><p>" + (rust ? "En service : découpe du fichier, faces triangulées et polygonales, triangles et arêtes."
+      : lecteurVoulu === "js" ? "Mis de côté : lecture JavaScript choisie dans Affichage > Lecture des fichiers." : "Pas (encore) chargé : le JavaScript fait le travail.") + "</p>";
+    if (!derniere) return h + "<p>Ouvre un fichier pour voir le temps de chaque étape.</p>";
+    function ms(v){ return v === undefined ? null : fmtN(Math.max(0, Math.round(v))) + " ms"; }
+    derniere.temps.forEach(function(t, i){
+      var lignes = [
+        ["Lecture du fichier (disque, décompression)", ms(t.fichier)],
+        ["Découpe des entités" + (derniere.lecteurs[i] ? " (" + (derniere.lecteurs[i] === "rust" ? "Rust" : "JavaScript") + ")" : ""), ms(t.decoupe)],
+        ["Assemblage des entités", ms(t.assemblage)],
+        ["Liste des éléments", ms(t.fiches)],
+        t.cache !== undefined ? ["Géométrie 3D reprise du cache", ms(t.cache)] : ["Géométrie 3D (lecture des formes)", ms(t.geometrie)],
+        t.cache !== undefined ? null : ["Triangles et arêtes vives", ms(t.maillage)]
+      ].filter(function(l){ return l && l[1] !== null; });
+      h += "<h3 class=\"apropos-t\">Dernière ouverture : " + esc(derniere.noms[i]) + "</h3><table class=\"apropos-temps\">" +
+        lignes.map(function(l){ return "<tr><td>" + l[0] + "</td><td>" + l[1] + "</td></tr>"; }).join("") + "</table>";
+    });
+    return h + "<p>Total, affichage compris : " + ms(derniere.ms) + ".</p>";
+  }
   function activerCmd(c, ok){ [].forEach.call(document.querySelectorAll('[data-cmd="' + c + '"]'), function(b){ b.disabled = !ok; }); }
 
   // ================= Barre de menus =================

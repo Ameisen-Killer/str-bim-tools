@@ -1266,6 +1266,78 @@
       return true;
     } catch (err){ RM = null; return false; }     // module planté : JavaScript jusqu'au rechargement
   }
+  // ================= Cache de la géométrie (fichier rouvert) =================
+  // Tout ce que G.cache contient (géométries, ouvertures comprises, triangles, arêtes vives) mis à plat dans
+  // deux tableaux typés, rangés par la page dans IndexedDB ; relu tel quel à la réouverture du même fichier.
+  // Entiers : [nb entrées, puis par entrée : id, 0 (pas de géométrie) | 1, et pour une géométrie : nb faces,
+  // fermé (-1 inconnu, 0, 1), longueur de T (-1 absent), longueur de A (-1 absent), arêtes par face (0/1),
+  // puis par face : nb boucles, taille de chaque boucle (en réels), [nb d'arêtes ×2, arêtes], puis TF].
+  // Réels : par géométrie : min, max, puis par face : normale, points des boucles ; puis T et A.
+  function emballer(G){
+    var ni = 1, nf = 0;
+    G.cache.forEach(function(g){
+      ni += 2;
+      if (!g) return;
+      ni += 5; nf += 6;
+      var avecAr = !!g.A;
+      g.faces.forEach(function(f){
+        ni += 1 + f.b.length + (avecAr ? 1 + (f.ar ? f.ar.length : 0) : 0); nf += 3;
+        for (var k = 0; k < f.b.length; k++) nf += f.b[k].length;
+      });
+      if (g.T){ nf += g.T.length; ni += g.TF.length; }
+      if (g.A) nf += g.A.length;
+    });
+    var I = new Int32Array(ni), F = new Float64Array(nf), pi = 0, pf = 0;
+    I[pi++] = G.cache.size;
+    G.cache.forEach(function(g, id){
+      I[pi++] = id; I[pi++] = g ? 1 : 0;
+      if (!g) return;
+      var avecAr = !!g.A;
+      I[pi++] = g.faces.length; I[pi++] = g.ferme === undefined ? -1 : g.ferme ? 1 : 0;
+      I[pi++] = g.T ? g.T.length : -1; I[pi++] = g.A ? g.A.length : -1; I[pi++] = avecAr ? 1 : 0;
+      F.set(g.min, pf); F.set(g.max, pf + 3); pf += 6;
+      g.faces.forEach(function(f){
+        I[pi++] = f.b.length;
+        for (var k = 0; k < f.b.length; k++){ I[pi++] = f.b[k].length; }
+        if (avecAr){ var n = f.ar ? f.ar.length : 0; I[pi++] = n; for (k = 0; k < n; k++) I[pi++] = f.ar[k]; }
+        F[pf] = f.n[0]; F[pf+1] = f.n[1]; F[pf+2] = f.n[2]; pf += 3;
+        for (k = 0; k < f.b.length; k++){ F.set(f.b[k], pf); pf += f.b[k].length; }
+      });
+      if (g.T){ F.set(g.T, pf); pf += g.T.length; for (var t = 0; t < g.TF.length; t++) I[pi++] = g.TF[t]; }
+      if (g.A){ F.set(g.A, pf); pf += g.A.length; }
+    });
+    var hotes = [];
+    if (G.hotes) G.hotes.forEach(function(h, o){ hotes.push(o, h); });
+    return { I: I, F: F, nonLus: G.nonLus, erreurs: G.erreurs, hotes: hotes };
+  }
+  function deballer(G, x){
+    var I = x.I, F = x.F, pi = 0, pf = 0, n = I[pi++];
+    for (var e = 0; e < n; e++){
+      var id = I[pi++];
+      if (!I[pi++]){ G.cache.set(id, null); continue; }
+      var nfa = I[pi++], fe = I[pi++], nT = I[pi++], nA = I[pi++], avecAr = I[pi++], faces = new Array(nfa);
+      var g = { faces: faces, min: [F[pf], F[pf+1], F[pf+2]], max: [F[pf+3], F[pf+4], F[pf+5]] };
+      pf += 6;
+      for (var i = 0; i < nfa; i++){
+        var nb = I[pi++], tailles = I.subarray(pi, pi + nb), bs = new Array(nb), ar = null;
+        pi += nb;
+        if (avecAr){ var na = I[pi++]; ar = na ? I.subarray(pi, pi + na) : AR_VIDE; pi += na; }
+        var f = { b: bs, n: [F[pf], F[pf+1], F[pf+2]], p: null, z: 0, el: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
+        pf += 3;
+        for (var k = 0; k < nb; k++){ bs[k] = F.subarray(pf, pf + tailles[k]); pf += tailles[k]; }
+        if (ar) f.ar = ar;
+        faces[i] = f;
+      }
+      if (fe >= 0) g.ferme = fe === 1;
+      if (nT >= 0){ g.T = F.subarray(pf, pf + nT); pf += nT; g.TF = I.subarray(pi, pi + nT/9); pi += nT/9; }
+      if (nA >= 0){ g.A = F.subarray(pf, pf + nA); pf += nA; }
+      G.cache.set(id, g);
+    }
+    if (pi !== I.length || pf !== F.length) throw new Error("cache incohérent");
+    G.nonLus = x.nonLus || {}; G.erreurs = x.erreurs || 0;
+    if (x.hotes && x.hotes.length){ G.hotes = new Map(); for (var h = 0; h < x.hotes.length; h += 2) G.hotes.set(x.hotes[h], x.hotes[h+1]); }
+  }
+
   // Faces triangulées et polygonales par le module Rust (src/tess.rs, copie de tessellation + ajouterFace) :
   // le texte des entités part tel quel, les faces reviennent en coordonnées monde. false = au JavaScript.
   var ENC = typeof TextEncoder === "function" ? new TextEncoder() : null;
@@ -3108,20 +3180,31 @@
       },
       // Géométrie calculée à l'avance, par tranches, pour que la page ne gèle pas à l'ouverture d'un gros
       // fichier : ids des éléments du modèle, progres(0–1) ; promesse résolue quand tout est prêt.
+      // Promesse résolue avec les temps passés : { geometrie, maillage } en ms.
       preparer: function(m, ids, progres){
-        var G = Gs.get(m) || prets.get(m), i = 0;
+        var G = Gs.get(m) || prets.get(m), i = 0, tg = 0, tm = 0;
         if (!G){ G = Contexte(m); prets.set(m, G); }
         return new Promise(function(ok){
           (function tranche(){
             var t0 = performance.now();
             while (i < ids.length && performance.now() - t0 < 40){
-              var g = geometrie(G, ids[i++]);
-              if (g){ triangles(g); aretesVives(g); }
+              var a = performance.now(), g = geometrie(G, ids[i++]), b = performance.now();
+              tg += b - a;
+              if (g){ triangles(g); aretesVives(g); tm += performance.now() - b; }
             }
             if (progres) progres(ids.length ? i/ids.length : 1);
-            if (i < ids.length) setTimeout(tranche, 0); else ok();
+            if (i < ids.length) setTimeout(tranche, 0); else ok({ geometrie: tg, maillage: tm });
           })();
         });
+      },
+      // cache de la géométrie : contenu à ranger (après preparer), ou reprise d'un contenu rangé (au lieu de
+      // preparer) ; false si le contenu ne colle pas (le calcul normal reprend alors)
+      emballer: function(m){ var G = Gs.get(m) || prets.get(m); return G ? emballer(G) : null; },
+      deballer: function(m, x){
+        var G = Contexte(m);
+        try { deballer(G, x); } catch (err){ return false; }
+        prets.set(m, G);
+        return true;
       },
       // Éléments à dessiner : [{ cle, m, id }] ; renvoie le bilan de lecture
       afficher: function(items){
@@ -3366,6 +3449,8 @@
     creer: creer,
     ajouterMoteur: function(cle, fabrique){ FABRIQUES[cle] = fabrique; },
     // géométrie venue d'ailleurs (web-ifc) : triangles à plat (9 nombres par triangle) → objet géométrie de l'aperçu
-    geoTriangles: geoTriangles
+    geoTriangles: geoTriangles,
+    // module Rust chargé et en service (lecture des faces, maillage)
+    rustActif: function(){ return !!RM; }
   };
 })(window);
