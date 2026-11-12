@@ -185,6 +185,7 @@ svg.ill.drag{cursor:grabbing}
 .temps li b{font-weight:400}
 .temps li span{display:block;font-size:14px;color:var(--texte-doux)}
 .deux-temps{margin-top:clamp(40px,6vh,64px);max-width:44em;color:var(--texte-doux)}
+.deux-temps a{color:var(--or);text-decoration:none;border-bottom:1px solid rgba(214,168,92,.4)}.deux-temps a:hover{border-color:var(--or)}
 
 /* 06 — livrables */
 .livre{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(32px,6vw,96px);margin-top:clamp(48px,8vh,88px);align-items:start}
@@ -444,6 +445,7 @@ footer a:hover{color:var(--or)}
         <li class="rv" style="--d:.16s"><b>Dashboard de contrôle</b><span>Éléments conformes, incomplets ou non renseignés, avant de livrer.</span></li>
         <li class="rv" style="--d:.24s"><b>Vues 3D colorées</b><span>Par genre, par type de coffrage, par type de béton.</span></li>
         <li class="rv" style="--d:.32s"><b>Sur chaque élément</b><span>Articles et quantités écrits dans ses paramètres, consultables à tout moment.</span></li>
+        <li class="rv" style="--d:.4s"><b>Export PDF illustré, au format CAN</b><span>Le métré présenté article par article dans l'ordre du catalogue, chaque poste accompagné d'une vue des éléments qu'il compte.</span></li>
       </ul>
       <div class="chiffres">
         <div class="rv"><b data-n="9">0</b><span>outils</span></div>
@@ -458,7 +460,26 @@ footer a:hover{color:var(--or)}
 <!-- 07 -->
 <section>
   <div class="wrap" data-vu>
-    <div class="num rv">07 — Périmètre</div>
+    <div class="num rv">07 — La passerelle IFC</div>
+    <h2 class="rv" style="--d:.1s">L'ingénieur et le modeleur, sur la même maquette.</h2>
+    <div class="perimetre">
+      <div class="rv" style="--d:.1s">
+        <div class="etiq o">Modeleur</div>
+        <p>Il exporte sa maquette en IFC. Les paramètres #STR_CAN_* partent avec chaque élément : genre, type de béton, type de coffrage, étayage, articles et quantités.</p>
+      </div>
+      <div class="rv" style="--d:.25s">
+        <div class="etiq o">Ingénieur</div>
+        <p>Il ouvre l'IFC sans Revit, contrôle le classement et les quantités élément par élément, et renvoie ses remarques par le même fichier. Chacun reste dans son outil, la maquette fait le lien.</p>
+      </div>
+    </div>
+    <p class="deux-temps rv"><a href="/ifc/">IFC Studio</a> lit ces paramètres directement dans le navigateur, sans installation.</p>
+  </div>
+</section>
+
+<!-- 08 -->
+<section>
+  <div class="wrap" data-vu>
+    <div class="num rv">08 — Périmètre</div>
     <h2 class="rv" style="--d:.1s">Le bâtiment, en structure neuve.</h2>
     <div class="perimetre">
       <div class="rv" style="--d:.1s">
