@@ -231,7 +231,7 @@
       var buf = x.buf;
       return new Promise(function(ok, ko){
         var w;
-        try { w = new Worker("/ifc/ifc-lecteur.js?v=6"); }
+        try { w = new Worker("/ifc/ifc-lecteur.js?v=7"); }
         catch (e){ avecWorker = false; lireClassique(fic).then(ok, ko); return; }
         w.onmessage = function(e){
           var d = e.data;
@@ -1227,6 +1227,7 @@
     $("#confirmer-texte").textContent = texte;
     $("#confirmer-titre").textContent = titre || "Supprimer la sélection ?";
     $("#confirmer-oui").textContent = bouton || "Supprimer";
+    $("#confirmer-types").hidden = true;          // case montrée par supprimer() seulement
     if (typeof d.showModal !== "function"){ if (window.confirm(texte)) ok(); return; }
     d.returnValue = "";
     d.addEventListener("close", function f(){
@@ -1259,6 +1260,8 @@
       " et " + pluriel(nbEnt, "entité") + " au total vont partir" + (plans.length > 1 ? " de " + pluriel(plans.length, "fichier") : " du fichier") +
       (nbMod ? " ; " + pluriel(nbMod, "relation") + " " + (nbMod > 1 ? "seront raccourcies" : "sera raccourcie") : "") + ".";
     confirmer(texte, function(){
+      var avecTypes = $("#suppr-types").checked;
+      garder("ifc.suppr.types", avecTypes ? "1" : "0");
       var parts = plans.map(function(x){
         // ouvertures supprimées : leurs hôtes sont à redessiner (relus aussi à l'annulation)
         var ouv = [];
@@ -1267,14 +1270,27 @@
       });
       plans.forEach(function(x){ IFC.appliquer(x.f.m, x.p.changement); });
       relire(parts);
+      // types sans occurrence (ceux que la suppression vient de libérer, et ceux qui l'étaient déjà) : retirés
+      // dans la même opération, donc annulés avec elle par Ctrl+Z
+      var nbTypes = 0, entTypes = 0, oTypes = 0;
+      if (avecTypes) plans.forEach(function(x){
+        var p = IFC.planPurge(x.f.m, { types: true });
+        if (!p.nbEntites && !p.nbModifiees) return;
+        IFC.appliquer(x.f.m, p.changement);
+        parts.push({ f: x.f, ch: p.changement });
+        nbTypes += p.cats.types; entTypes += p.nbEntites; oTypes += p.octets;
+      });
       var txt = "suppression de " + pluriel(nbEl, "élément");
-      histo.push({ parts: parts, txt: txt, e: nbEnt });
+      histo.push({ parts: parts, txt: txt, e: nbEnt + entTypes });
       aRefaire = [];
       reconstruire();
-      etat(pluriel(nbEl, "élément supprimé", "éléments supprimés") + ", " + pluriel(nbEnt, "entité retirée", "entités retirées") +
-        (nbMod ? ", " + pluriel(nbMod, "relation raccourcie", "relations raccourcies") : "") + ".");
-      conseilPurge(plans.map(function(x){ return x.f.m; }));
+      etat(pluriel(nbEl, "élément supprimé", "éléments supprimés") + ", " + pluriel(nbEnt + entTypes, "entité retirée", "entités retirées") +
+        (nbMod ? ", " + pluriel(nbMod, "relation raccourcie", "relations raccourcies") : "") +
+        (nbTypes ? ", dont " + pluriel(nbTypes, "type sans occurrence", "types sans occurrence") + " (" + fmtTaille(Math.max(0, oTypes)) + " de gagnés)" : "") + ".");
+      if (!avecTypes) conseilPurge(plans.map(function(x){ return x.f.m; }));
     });
+    $("#suppr-types").checked = lire("ifc.suppr.types", ["1", "0"]) !== "0";
+    $("#confirmer-types").hidden = false;
   }
   // Retaille selon la boîte de coupe, fichier par fichier (maquettes affichées) : les éléments hors de la boîte
   // partent (comme une suppression), ceux à cheval sont coupés net à la boîte par des découpes IFC

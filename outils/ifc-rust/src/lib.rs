@@ -12,6 +12,7 @@
 //! la page repasse alors par le lecteur JavaScript, qui fait foi.
 
 mod maillage;
+mod tess;
 
 use std::collections::HashMap;
 use std::collections::HashSet;

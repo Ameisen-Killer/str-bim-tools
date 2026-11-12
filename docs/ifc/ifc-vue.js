@@ -1119,6 +1119,8 @@
   function item(G, id, M, out, prof){
     var e = G.m.ent.get(id);
     if (!e || prof > 12) return;
+    // faces triangulées et polygonales : lues par le module Rust si possible (texte STEP lu directement)
+    if (RM && (e.type === "IFCTRIANGULATEDFACESET" || e.type === "IFCPOLYGONALFACESET") && tessRust(G, e, M, out)) return;
     var a = C(e);
     switch (e.type){
       case "IFCFACETEDBREP": case "IFCFACETEDBREPWITHVOIDS":
@@ -1222,7 +1224,7 @@
   (function(){
     if (typeof WebAssembly !== "object" || typeof fetch !== "function") return;
     try { if (localStorage.getItem("ifc.lecteur") === "js") return; } catch (e){}
-    fetch("/ifc/ifc-lecteur.wasm?v=3").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    fetch("/ifc/ifc-lecteur.wasm?v=4").then(function(r){ if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
       .then(function(b){ return WebAssembly.instantiate(b, { env: { progres: function(){} } }); })
       .then(function(x){ var W = x.instance.exports; if (W.m_calculer && W.memory) RM = W; })
       .catch(function(){});
@@ -1263,6 +1265,36 @@
       if (nf > 4e6) RM.m_liberer();                 // très gros élément : on rend la mémoire
       return true;
     } catch (err){ RM = null; return false; }     // module planté : JavaScript jusqu'au rechargement
+  }
+  // Faces triangulées et polygonales par le module Rust (src/tess.rs, copie de tessellation + ajouterFace) :
+  // le texte des entités part tel quel, les faces reviennent en coordonnées monde. false = au JavaScript.
+  var ENC = typeof TextEncoder === "function" ? new TextEncoder() : null;
+  function tessRust(G, e, M, out){
+    if (!ENC || !RM.t_calculer) return false;
+    try {
+      var tri = e.type === "IFCTRIANGULATEDFACESET", r0 = e.refs[0] || 0, pl = r0 ? G.m.ent.get(r0) : null;
+      var ids = [e.id, r0], txts = [e.src, pl ? pl.src : ""], i;
+      if (!tri) for (i = 1; i < e.refs.length; i++){ var fe = G.m.ent.get(e.refs[i]); ids.push(e.refs[i]); txts.push(fe ? fe.src : ""); }
+      var s = txts.join(""), nt = txts.length;
+      RM.t_entree(s.length, nt);
+      var mem = RM.memory.buffer, r = ENC.encodeInto(s, new Uint8Array(mem, RM.t_octets(), s.length));
+      if (r.read !== s.length || r.written !== s.length) return false;     // caractère hors ASCII : JavaScript
+      var I = new Int32Array(mem, RM.t_ent(), 1 + 3*nt), d = 0;
+      I[0] = tri ? 1 : 0;
+      for (i = 0; i < nt; i++){ I[1 + 3*i] = d; I[2 + 3*i] = txts[i].length; I[3 + 3*i] = ids[i]; d += txts[i].length; }
+      new Float64Array(mem, RM.t_mat(), 12).set(M);
+      if (RM.t_calculer() !== 0) return false;
+      mem = RM.memory.buffer;
+      var SF = new Float64Array(mem, RM.t_sortie(0), RM.t_long(0)).slice(), SI = new Int32Array(mem, RM.t_sortie(1), RM.t_long(1));
+      for (var p = 0, q = 0; p < SI.length;){
+        var nb = SI[p++], bs = new Array(nb), n = [SF[q], SF[q+1], SF[q+2]];
+        q += 3;
+        for (var k = 0; k < nb; k++){ var l = 3*SI[p++]; bs[k] = SF.subarray(q, q + l); q += l; }
+        out.push({ b: bs, n: n, p: null, z: 0, el: 0, x0: 0, x1: 0, y0: 0, y1: 0 });
+      }
+      if (s.length > 4e6) RM.t_liberer();
+      return true;
+    } catch (err){ RM = null; return false; }
   }
   function aretesVives(geo){
     if (geo.A) return geo.A;
