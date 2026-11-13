@@ -1796,6 +1796,41 @@
   var CALQUE_DE = { murs: { pied: "STR_MURS_PIEDS" }, poteaux: { axe: "STR_POTEAUX_AXES" }, poutres: { axe: "STR_POUTRES_AXES" },
     ossatures: { axe: "STR_OSSATURES_AXES" }, dalles: { contour: "STR_DALLES_CONTOURS", reservation: "STR_DALLES_RESERVATIONS" } };
   var dernierAnalytique = null;
+  // DXF Studio annonce qu'il est prêt, puis reçoit le texte du DXF
+  function envoyerStudio(w, nom, texte){
+    var envoye = false;
+    var ecoute = function(e){
+      if (e.source !== w || e.origin !== location.origin || !e.data || e.data.type !== "dxf-pret" || envoye) return;
+      envoye = true; window.removeEventListener("message", ecoute);
+      w.postMessage({ type: "dxf-ifc", nom: nom, texte: texte }, location.origin);
+    };
+    window.addEventListener("message", ecoute);
+    setTimeout(function(){ window.removeEventListener("message", ecoute); }, 60000);
+  }
+  // Après le téléchargement : bandeau « Ouvrir dans DXF Studio » (le même fichier, sans recalcul)
+  var minuteurStudio = 0;
+  function proposerStudio(nom, texte){
+    var b = $("#apres-dxf");
+    if (!b){
+      b = document.createElement("div"); b.id = "apres-dxf"; b.className = "apres-dxf"; b.setAttribute("role", "status");
+      b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.2 8.2l1.9 1.9 3.8-4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<div class="ad-txt"><b>DXF 3D exporté</b><span class="ad-nom"></span></div>' +
+        '<button type="button" class="btn plein ad-ouvrir">Ouvrir dans DXF Studio</button>' +
+        '<button type="button" class="ad-x" title="Fermer" aria-label="Fermer">×</button>';
+      document.body.appendChild(b);
+      b.querySelector(".ad-x").addEventListener("click", function(){ b.hidden = true; });
+    }
+    b.querySelector(".ad-nom").textContent = nom;
+    b.querySelector(".ad-ouvrir").onclick = function(){
+      var w = window.open("/dxf/#ifc", "_blank");
+      if (!w){ etat("Le navigateur a bloqué le nouvel onglet : autorise les fenêtres pour ce site."); return; }
+      envoyerStudio(w, nom, texte); b.hidden = true;
+      etat("« " + nom + " » ouvert dans DXF Studio.");
+    };
+    b.hidden = false;
+    clearTimeout(minuteurStudio);
+    minuteurStudio = setTimeout(function(){ b.hidden = true; }, 20000);
+  }
   function exporterDxf3D(versStudio){
     if (!fichiers.length){ etat("Ouvre d'abord un IFC."); return; }
     // onglet ouvert tout de suite, pendant le clic (sinon le navigateur le bloque)
@@ -1824,17 +1859,8 @@
     var f0 = fichiers.filter(function(f){ return f.visible; })[0] || fichiers[0];
     var nom = ("Analytique3D_" + f0.m.nom.replace(/\.ifc(zip)?$/i, "")).replace(/[^\w\-]+/g, "_") + ".dxf";
     var texte = DXF3D.ecrire(doc);
-    if (w){
-      // DXF Studio annonce qu'il est prêt, puis reçoit le texte du DXF
-      var envoye = false;
-      var ecoute = function(e){
-        if (e.source !== w || e.origin !== location.origin || !e.data || e.data.type !== "dxf-pret" || envoye) return;
-        envoye = true; window.removeEventListener("message", ecoute);
-        w.postMessage({ type: "dxf-ifc", nom: nom, texte: texte }, location.origin);
-      };
-      window.addEventListener("message", ecoute);
-      setTimeout(function(){ window.removeEventListener("message", ecoute); }, 60000);
-    } else DXF3D.telecharger(texte, nom);
+    if (w) envoyerStudio(w, nom, texte);
+    else { DXF3D.telecharger(texte, nom); proposerStudio(nom, texte); }
     var bilan = [pluriel(P.n.murs, "mur"), pluriel(P.n.poteaux, "poteau", "poteaux"), pluriel(P.n.poutres, "poutre"),
       pluriel(P.n.ossatures, "ossature"), pluriel(P.n.dalles, "dalle")].join(", ");
     etat((w ? "Ouvert dans DXF Studio, « " + nom + " » : " : "DXF 3D « " + nom + " » : ") + bilan + " (" + pluriel(doc.entites.length, "entité") + ")" + (vue.aCoupe() ? ", dans la boîte de coupe." : ".") +

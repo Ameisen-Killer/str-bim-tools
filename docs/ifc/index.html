@@ -726,6 +726,18 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   body.edition .onglets button[aria-selected="true"]::after{content:"";position:absolute;left:50%;bottom:2px;width:16px;height:3px;margin-left:-8px;border-radius:2px;background:var(--or)}
   body.edition .panneau{inset:0 8px 8px}
 }
+/* Bandeau après export DXF 3D : ouvrir dans DXF Studio */
+.apres-dxf{position:fixed;right:16px;bottom:44px;z-index:70;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 32px));padding:10px 10px 10px 14px;border-radius:8px;
+  background:var(--carte,var(--noir));color:var(--texte);border:1px solid var(--ligne);box-shadow:0 8px 24px rgba(0,0,0,.32);font-family:var(--sans);font-size:14px;animation:ad-entre .25s var(--courbe)}
+.apres-dxf[hidden]{display:none}
+.apres-dxf>svg{width:18px;height:18px;flex:none;color:var(--or)}
+.apres-dxf .ad-txt{display:flex;flex-direction:column;min-width:0;line-height:18px}
+.apres-dxf .ad-nom{color:var(--texte-doux);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.apres-dxf .btn{flex:none;white-space:nowrap}
+.apres-dxf .ad-x{flex:none;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--texte-doux);font-size:18px;cursor:pointer}
+.apres-dxf .ad-x:hover{background:var(--controle-survol,rgba(127,127,127,.15));color:var(--texte)}
+@keyframes ad-entre{from{opacity:0;transform:translateY(8px)}}
+@media (max-width:560px){.apres-dxf{flex-wrap:wrap;left:16px;right:16px}.apres-dxf .ad-txt{flex:1}}
 </style>
 <link rel="stylesheet" href="/assets/menu.css?v=5">
 </head>
@@ -1247,7 +1259,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=56"></script>
+<script src="/ifc/ifc-app.js?v=57"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
