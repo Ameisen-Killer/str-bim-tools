@@ -1814,10 +1814,43 @@
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
       P.id = programme(SOURCES.vId, SOURCES.fId, ["aP", null, "aC"]);
-      ["pos", "nor", "col", "ids", "lpos", "lcol", "cadre", "quad"].forEach(function(k){ B[k] = gl.createBuffer(); });
+      ["pos", "nor", "col", "ids", "lpos", "lcol", "cadre", "quad", "gros"].forEach(function(k){ B[k] = gl.createBuffer(); });
       fbo = null;
+      indexLarge = !!gl.getExtension("OES_element_index_uint");
     }
     try { init(); } catch (e){ if (window.console) console.warn("WebGL indisponible :", e); return { echec: true }; }
+
+    // Gros modèles, pendant un mouvement : les éléments plus petits que quelques pixels ne sont pas dessinés.
+    // Un index range les sommets du plus gros élément au plus petit ; il suffit alors d'en dessiner le début
+    // (un seul appel). grosTailles[k] = taille du k-ième élément, grosFins[k] = nombre de sommets jusqu'à lui.
+    var indexLarge = false, grosTailles = null, grosFins = null, SEUIL_GROS = 450000, PX_GROS = 4;
+    function indexerGros(nv){
+      grosTailles = grosFins = null;
+      if (!indexLarge || nv < SEUIL_GROS) return;
+      var n = plages.length, ordre = new Array(n), tailles = new Float32Array(n);
+      for (var e = 0; e < n; e++){
+        var o = 6*e;
+        tailles[e] = Math.max(boites[o+3] - boites[o], boites[o+4] - boites[o+1], boites[o+5] - boites[o+2]) || 0;
+        ordre[e] = e;
+      }
+      ordre.sort(function(a, b){ return tailles[b] - tailles[a]; });
+      var idx = new Uint32Array(nv), w = 0;
+      grosTailles = new Float32Array(n); grosFins = new Uint32Array(n);
+      ordre.forEach(function(e, k){
+        var pl = plages[e];
+        for (var v = pl[0]; v < pl[1]; v++) idx[w++] = v;
+        grosTailles[k] = tailles[e]; grosFins[k] = w;
+      });
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, B.gros);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    }
+    // nombre de sommets à dessiner pour ne garder que les éléments d'au moins « mini » (unités du modèle) ; 0 = tout
+    function sommetsGros(mini){
+      if (!grosTailles || morceaux) return 0;
+      var a = 0, b = grosTailles.length;
+      while (a < b){ var m = (a + b) >> 1; if (grosTailles[m] >= mini) a = m + 1; else b = m; }
+      return a && a < grosTailles.length ? grosFins[a - 1] : 0;
+    }
 
     var dernier = null;    // dernière liste chargée, pour reconstruire après une perte de contexte
     function remplir(buf, data, usage){ gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, data, usage || gl.STATIC_DRAW); }
@@ -1867,6 +1900,7 @@
       remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
       remplir(B.col, new Uint8Array(3*nv), gl.DYNAMIC_DRAW);
       remplir(B.lcol, new Uint8Array(4*nl), gl.DYNAMIC_DRAW);
+      indexerGros(nv);
       if (coupe) poserCoupe(coupe);
     }
 
@@ -1958,7 +1992,9 @@
       attrib(2, couleurBuf, 3, gl.UNSIGNED_BYTE, true);
       gl.enable(gl.POLYGON_OFFSET_FILL);
       gl.polygonOffset(1, 1);
-      tracer(gl.TRIANGLES, false);
+      var ng = c.vite && !c.filaire && prog === P.faces ? sommetsGros(PX_GROS/c.s) : 0;
+      if (ng){ gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, B.gros); gl.drawElements(gl.TRIANGLES, ng, gl.UNSIGNED_INT, 0); }
+      else tracer(gl.TRIANGLES, false);
       gl.disable(gl.POLYGON_OFFSET_FILL);
       return M;
     }

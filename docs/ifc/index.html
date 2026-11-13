@@ -443,6 +443,12 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .p-vue canvas.cube:hover{opacity:1}
 @media (max-width:760px){.p-vue canvas.cube{width:120px;height:120px}}
 .vue-aide{position:absolute;left:12px;bottom:10px;right:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
+/* géométrie calculée après l'ouverture : encart d'avancement au milieu de la vue */
+.vue-calcul{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;width:min(360px,calc(100% - 32px));display:flex;flex-direction:column;gap:6px;padding:16px 18px;
+  background:var(--noir-2);border:1px solid var(--ligne);border-radius:8px;box-shadow:0 8px 16px rgba(0,0,0,.26);font-size:13px;color:var(--texte-doux)}
+.vue-calcul b{font-size:14px;font-weight:600;color:var(--texte)}
+.vue-calcul small{font-size:12px;color:var(--texte-faible)}
+.vue-calcul .prog{margin:4px 0}
 .vue-info{position:absolute;left:12px;top:12px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--texte-faible);pointer-events:none}
 
 /* propriétés */
@@ -1032,6 +1038,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <button type="button" class="replier d" id="rep-d" title="Réduire les propriétés">›</button>
         <canvas class="cube" id="cube" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
         <div class="vue-info" id="vue-info"></div>
+        <div class="vue-calcul" id="vue-calcul" role="status" hidden><b>Géométrie 3D en cours de calcul</b><span id="vue-calcul-txt"></span><div class="prog" aria-hidden="true"><i id="vue-calcul-prog"></i></div><small>La liste des éléments et les propriétés sont déjà utilisables.</small></div>
         <div class="legende" id="legende" hidden></div>
         <div class="vue-outils">
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
@@ -1271,12 +1278,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
 <script src="/ifc/ifc-core.js?v=12"></script>
-<script src="/ifc/ifc-vue.js?v=45"></script>
+<script src="/ifc/ifc-vue.js?v=46"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=58"></script>
+<script src="/ifc/ifc-app.js?v=59"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

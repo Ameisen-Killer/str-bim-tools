@@ -289,6 +289,7 @@
   function progresLecture(texte, p){
     $("#chargement-txt").textContent = texte;
     $("#prog").style.width = Math.round(100*p) + "%";
+    if (calculFond && $("#vue-calcul")){ $("#vue-calcul-txt").textContent = texte; $("#vue-calcul-prog").style.width = Math.round(100*p) + "%"; }
     if (fichiers.length) etat(texte);
   }
 
@@ -475,7 +476,7 @@
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
   function charger(liste){
     liste = [].slice.call(liste || []);
-    if (!liste.length) return;
+    if (!liste.length || occupe()) return;
     erreur("");
     $("#chargement").hidden = false;
     progresLecture(liste.length > 1 ? "Lecture de " + liste.length + " fichiers…" : "Lecture du fichier…", 0);
@@ -499,7 +500,10 @@
       if (!ajoutes.length) return;
       // géométrie calculée avant l'ouverture (en parallèle si le fichier est gros) : la maquette s'affiche
       // d'un bloc, complète (choix de Tony, pas d'affichage au fil du calcul)
-      return preparer(ajoutes, true).then(function(){ return geometrieAvant(ajoutes); }).then(function(){
+      // La liste et les propriétés s'ouvrent dès qu'elles sont prêtes ; la géométrie qui n'est pas dans le cache
+      // se calcule ensuite (en parallèle si le fichier est gros) et la maquette apparaît d'un bloc, complète
+      // (choix de Tony : pas d'affichage au fil du calcul).
+      return preparer(ajoutes, true).then(function(){
         progresLecture("Affichage…", 1);
         return pause();
       });
@@ -507,7 +511,11 @@
       $("#chargement").hidden = true;
       if (ajoutes.length && remplacer) vider();
       remplacer = false;
-      if (ajoutes.length) ouvrir(ajoutes, performance.now() - t0, refus);
+      if (ajoutes.length){
+        var aCalculer = ajoutes.filter(function(m){ return !!m.idsGeo; }), vide = !fichiers.length;
+        ouvrir(ajoutes, performance.now() - t0, refus);
+        if (aCalculer.length) geometrieFond(aCalculer, vide);
+      }
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
       else erreur(refus.join(" "));
     });
@@ -522,6 +530,35 @@
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
     var k = Math.min(4, coeurs, memoire, Math.ceil(n/300));
     return k >= 2 ? k : 0;
+  }
+  // Calcul après l'ouverture : les fichiers concernés ne sont pas dessinés tant que leur géométrie n'est pas
+  // complète, un encart dans la vue montre l'avancement, et les commandes qui modifient ou ferment une maquette
+  // attendent la fin (occupe()).
+  var calculFond = false;
+  function occupe(){
+    if (!calculFond) return false;
+    etat("Géométrie 3D en cours de calcul : cette commande sera disponible dans un instant.");
+    return true;
+  }
+  function geometrieFond(modeles, vide){
+    var t0 = performance.now(), enc = $("#vue-calcul");
+    calculFond = true;
+    document.body.classList.add("calcul");
+    if (enc) enc.hidden = false;
+    function fin(){
+      calculFond = false;
+      document.body.classList.remove("calcul");
+      if (enc) enc.hidden = true;
+      fichiers.forEach(function(f){ if (modeles.indexOf(f.m) >= 0) f.enCalcul = false; });
+      if (!fichiers.length) return;
+      majVue();
+      if (vide) vue.orienter(angleProjet + Math.PI/4, PLONGEE_MAISON); else vue.recadrer();
+      rangerCache(modeles);
+      var s = (performance.now() - t0)/1000;
+      etat("Géométrie 3D prête en " + (s < 10 ? s.toFixed(1).replace(".", ",") : Math.round(s)) + " s : la maquette est affichée.");
+      conseilPurge(modeles);
+    }
+    geometrieAvant(modeles).then(fin, function(err){ if (window.console) console.error(err); fin(); });
   }
   function geometrieAvant(modeles){
     var suite = Promise.resolve();
@@ -589,7 +626,7 @@
     var premier = !fichiers.length;
     modeles.forEach(function(m){
       // arborescence réduite à l'ouverture (demande de Tony) : seule la ligne du fichier est affichée
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: true, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m) };
+      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: true, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m), enCalcul: !!m.idsGeo };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
@@ -673,6 +710,7 @@
   }
 
   function fermer(f){
+    if (occupe()) return;
     if (modifie(f) && !confirm("Les modifications non exportées de « " + f.m.nom + " » seront perdues. Fermer quand même ?")) return;
     fichiers = fichiers.filter(function(x){ return x !== f; });
     parUid.delete(f.uid);
@@ -1575,7 +1613,7 @@
   }
 
   function supprimer(){
-    if (!choix.size) return;
+    if (!choix.size || occupe()) return;
     // un plan de suppression par fichier
     var parFichier = new Map();
     choix.forEach(function(c){
@@ -1702,7 +1740,7 @@
     return oui;
   }
   function annuler(){
-    if (!histo.length) return;
+    if (!histo.length || occupe()) return;
     var h = histo.pop();
     h.parts.slice().reverse().forEach(function(p){ IFC.appliquer(p.f.m, p.ch, true); });
     var geo = relire(h.parts);
@@ -1991,7 +2029,7 @@
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
   function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && l.i.vue3D && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
+    lignes.forEach(function(l){ if (l.i && l.f.visible && !l.f.enCalcul && l.i.vue3D && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
     return items;
   }
   function majVue(){
@@ -2186,6 +2224,7 @@
   function seulEd(fn){
     return function(b){
       if (!modeEd){ etat("Passe en mode Éditeur (bouton en haut, ou touche E) pour modifier la maquette."); return; }
+      if (occupe()) return;
       fn(b);
     };
   }
@@ -2208,6 +2247,7 @@
   // faire(f, ids, app) rend un résultat d'IFCEdition, ou en applique plusieurs à la suite par app(résultat) ;
   // le tout fait une seule entrée d'annulation (txt : « Annuler la … »)
   function editer(txt, cles, faire){
+    if (occupe()) return { nb: 0, ignores: 0, refuse: 0, copies: [], fait: false };
     var parts = [], tot = { nb: 0, ignores: 0, refuse: 0, copies: [], fait: false };
     function app(f, r){
       if (!r) return;
@@ -2720,6 +2760,7 @@
     "exporter-zip": function(){ exporter(null, true); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
+      if (occupe()) return;
       if (fichiers.some(modifie) && !confirm("Les modifications non exportées seront perdues. Tout fermer ?")) return;
       vider();
       modeEditeur(false);
