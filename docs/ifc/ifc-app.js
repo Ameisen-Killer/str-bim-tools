@@ -770,7 +770,7 @@
       IFC.arbre(f.m).forEach(function(l){
         var i = IFC.infos(f.m, l.id);
         lignes.push({ cle: cle(f, l.id), f: f, id: l.id, niv: l.niv, i: i,
-          rech: [nomAff(i), i.typeLib, i.type, i.materiau, i.globalId, i.tag, i.objectType, "#" + i.id].join(" ").toLowerCase() });
+          rech: sansAccent([nomAff(i), i.typeLib, i.type, i.materiau, i.globalId, i.tag, i.objectType, "#" + i.id].join(" ")) });
       });
     });
     lignes.forEach(function(l, k){ var n = lignes[k + 1]; l.enfants = !l.fichier && !!n && !n.fichier && n.niv > l.niv; });
@@ -806,12 +806,124 @@
       '<button type="button" class="fermer" data-act="fermer" title="Fermer ce fichier" aria-label="Fermer ' + esc(m.nom) + '">×</button></span></div>';
   }
 
+  // ================= Recherche avancée (champ Rechercher du panneau Éléments) =================
+  // Mots simples : tous doivent se trouver dans le nom, le type, le matériau, le GlobalId, le repère ou #id.
+  // Critères : clé:texte (contient), clé=valeur (égal), clé!=valeur, clé>n, clé>=n, clé<n, clé<=n, !clé (absente
+  // ou vide), -mot (exclu). Clés connues : nom, type, matériau, étage, guid, tag, id, description ; toute autre
+  // clé est un nom de propriété ou de quantité (« Jeu.Propriété » pour préciser le jeu). Guillemets pour les
+  // espaces : étage:"Niveau 2". Sans accents ni majuscules. Les propriétés ne sont lues qu'à la demande.
+  function sansAccent(s){ return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  var CLES_RECH = { nom: "nom", name: "nom", type: "type", classe: "type", materiau: "materiau", etage: "etage", niveau: "etage",
+    guid: "guid", globalid: "guid", tag: "tag", repere: "tag", id: "id", description: "description", objecttype: "objecttype" };
+  function lireRequete(q){
+    var crit = [], jetons = q.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+    jetons.forEach(function(j){
+      var t = j.replace(/"/g, ""), x = /^([^=:<>!]+)(!=|>=|<=|=|:|>|<)(.*)$/.exec(t);
+      if (/^[=:<>!\-]*$/.test(t)) return;
+      if (x && x[1].trim()) crit.push({ k: sansAccent(x[1].trim()), op: x[2], v: sansAccent(x[3].trim()) });
+      else if (t.charAt(0) === "!" && t.length > 1) crit.push({ k: sansAccent(t.slice(1)), op: "vide" });
+      else if (t.charAt(0) === "-" && t.length > 1) crit.push({ op: "sans", v: sansAccent(t.slice(1)) });
+      else if (t) crit.push({ op: "mot", v: sansAccent(t) });
+    });
+    return crit;
+  }
+  function valeursRech(l, k){
+    var i = l.i, s = CLES_RECH[k];
+    if (s === "nom") return [sansAccent(nomAff(i))];
+    if (s === "type") return [sansAccent(i.typeLib), sansAccent(i.type)];
+    if (s === "materiau") return i.materiau ? [sansAccent(i.materiau)] : [];
+    if (s === "etage"){ if (l.et === undefined) l.et = sansAccent(etageDe(l.f.m, l.id)); return l.et ? [l.et] : []; }
+    if (s === "guid") return [sansAccent(i.globalId)];
+    if (s === "tag") return i.tag ? [sansAccent(i.tag)] : [];
+    if (s === "id") return [String(i.id)];
+    if (s === "description") return i.description ? [sansAccent(i.description)] : [];
+    if (s === "objecttype") return i.objectType ? [sansAccent(i.objectType)] : [];
+    if (!l.pr){
+      l.pr = [];
+      IFC.proprietes(l.f.m, l.id).forEach(function(p){
+        var jeu = sansAccent(p.nom);
+        p.props.forEach(function(x){ var n = sansAccent(x[0]); l.pr.push(n, jeu + "." + n, sansAccent(x[1])); });
+      });
+    }
+    var out = [], exact = [];
+    for (var a = 0; a < l.pr.length; a += 3){
+      if (l.pr[a] === k || l.pr[a+1] === k) exact.push(l.pr[a+2]);
+      else if (l.pr[a].indexOf(k) >= 0) out.push(l.pr[a+2]);
+    }
+    return exact.length ? exact : out;
+  }
+  function nombreRech(s){ var n = parseFloat(String(s).replace(/\s/g, "").replace(",", ".")); return isFinite(n) ? n : NaN; }
+  function correspond(l, crit){
+    for (var c = 0; c < crit.length; c++){
+      var x = crit[c];
+      if (x.op === "mot"){ if (l.rech.indexOf(x.v) < 0) return false; continue; }
+      if (x.op === "sans"){ if (l.rech.indexOf(x.v) >= 0) return false; continue; }
+      var vals = valeursRech(l, x.k), ok = false, a;
+      if (x.op === "vide"){ ok = !vals.some(function(v){ return v !== ""; }); }
+      else if (x.op === "!="){ ok = !vals.some(function(v){ return v === x.v; }); }
+      else if (x.op === ":"){ for (a = 0; a < vals.length && !ok; a++) ok = vals[a].indexOf(x.v) >= 0; }
+      else if (x.op === "="){
+        var nv = nombreRech(x.v);
+        for (a = 0; a < vals.length && !ok; a++) ok = vals[a] === x.v || (!isNaN(nv) && /^[-+0-9.,\s]+/.test(vals[a]) && nombreRech(vals[a]) === nv);
+      } else {
+        var n = nombreRech(x.v);
+        for (a = 0; a < vals.length && !ok && !isNaN(n); a++){
+          var w = nombreRech(vals[a]);
+          ok = !isNaN(w) && (x.op === ">" ? w > n : x.op === ">=" ? w >= n : x.op === "<" ? w < n : w <= n);
+        }
+      }
+      if (!ok) return false;
+    }
+    return true;
+  }
+
+  // Panneau « Filtres » : exemples à insérer, recherches enregistrées (gardées dans ce navigateur), isoler les résultats
+  var EXEMPLES_RECH = [["type:poteau", "tous les poteaux"], ["étage:2", "éléments d'un étage"], ["matériau:béton", "par matériau"],
+    ["LoadBearing=true", "valeur d'une propriété"], ["!FireRating", "propriété absente ou vide"], ["Volume>1.5", "quantité supérieure à"], ["-réservation", "exclure un mot"]];
+  function filtresGardes(){ try { var v = JSON.parse(localStorage.getItem("ifc.filtres") || "[]"); return Array.isArray(v) ? v.filter(function(x){ return typeof x === "string"; }) : []; } catch (e){ return []; } }
+  function lancerRecherche(q){ var c = $("#recherche"); c.value = q; rendreListe(); maj(); }
+  function rendreFiltres(){
+    var pop = $("#filtres-pop"), q = $("#recherche").value.trim(), g = filtresGardes();
+    pop.innerHTML = '<div class="ctx-titre">Recherche avancée</div>' +
+      EXEMPLES_RECH.map(function(x){ return '<button type="button" role="menuitem" data-ex="' + esc(x[0]) + '"><span>' + esc(x[0]) + "</span><kbd>" + esc(x[1]) + "</kbd></button>"; }).join("") +
+      '<p class="filtres-aide">Plusieurs critères à la suite : tous doivent correspondre. Guillemets pour un texte avec espaces, « Jeu.Propriété » pour préciser le jeu.</p><hr>' +
+      '<button type="button" role="menuitem" data-fa="isoler"' + (visibles.length && q ? "" : " disabled") + "><span>Isoler les résultats dans la vue 3D</span><kbd></kbd></button>" +
+      '<button type="button" role="menuitem" data-fa="garder"' + (q && g.indexOf(q) < 0 ? "" : " disabled") + "><span>Enregistrer cette recherche</span><kbd></kbd></button>" +
+      (g.length ? '<hr><div class="ctx-titre">Recherches enregistrées</div>' + g.map(function(x){
+        return '<div class="filtre-garde"><button type="button" role="menuitem" data-ex-seul="' + esc(x) + '"><span>' + esc(x) + '</span><kbd></kbd></button><button type="button" class="filtre-x" data-oublier="' + esc(x) + '" title="Retirer" aria-label="Retirer ' + esc(x) + '">×</button></div>';
+      }).join("") : "");
+  }
+  function ouvrirFiltres(oui){
+    var pop = $("#filtres-pop"), b = $("#filtres-btn");
+    pop.hidden = !oui; b.setAttribute("aria-expanded", String(oui));
+    if (!oui) return;
+    rendreFiltres();
+    var r = b.getBoundingClientRect(), k = pop.offsetWidth ? pop.getBoundingClientRect().width/pop.offsetWidth : 1;
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.getBoundingClientRect().width - 8))/k + "px";
+    pop.style.top = (r.bottom + 4)/k + "px";
+  }
+  if ($("#filtres-btn")){
+    $("#filtres-btn").addEventListener("click", function(e){ e.stopPropagation(); ouvrirFiltres($("#filtres-pop").hidden); });
+    document.addEventListener("click", function(e){ var pop = $("#filtres-pop"); if (!pop.hidden && !pop.contains(e.target)) ouvrirFiltres(false); });
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape" && !$("#filtres-pop").hidden){ ouvrirFiltres(false); $("#filtres-btn").focus(); } });
+    $("#filtres-pop").addEventListener("click", function(e){
+      var b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      var ex = b.getAttribute("data-ex"), seul = b.getAttribute("data-ex-seul"), oubli = b.getAttribute("data-oublier"), fa = b.getAttribute("data-fa"), c = $("#recherche");
+      if (ex !== null){ lancerRecherche((c.value.trim() ? c.value.trim() + " " : "") + ex); rendreFiltres(); c.focus(); return; }
+      if (seul !== null){ lancerRecherche(seul); ouvrirFiltres(false); return; }
+      if (oubli !== null){ garder("ifc.filtres", JSON.stringify(filtresGardes().filter(function(x){ return x !== oubli; }))); rendreFiltres(); return; }
+      if (fa === "garder"){ var g = filtresGardes(); g.unshift(c.value.trim()); garder("ifc.filtres", JSON.stringify(g.slice(0, 20))); rendreFiltres(); etat("Recherche enregistrée dans ce navigateur."); return; }
+      if (fa === "isoler"){ ouvrirFiltres(false); isolerCles(visibles.slice()); }
+    });
+  }
+
   // Lignes affichées : { f } pour un en-tête de fichier, { l, pli, plie, filtre } pour un élément.
   // Au-delà de VIRTUEL lignes, seule la partie visible (et une marge) existe dans la page : deux cales
   // vides tiennent la place du reste, et le défilement redessine la fenêtre.
   var visibles = [], rangs = [], VIRTUEL = 1500, MARGE = 800, hauts = { el: 46, fic: 62 }, fenetre = null, totalH = 0;
   function rendreListe(){
-    var q = $("#recherche").value.trim().toLowerCase(), t = $("#filtre-type").value, filtre = !!(q || t);
+    var q = $("#recherche").value.trim(), t = $("#filtre-type").value, filtre = !!(q || t), crit = q ? lireRequete(q) : [];
     var f = null, seuil = Infinity;
     visibles = []; rangs = [];
     lignes.forEach(function(l){
@@ -831,7 +943,7 @@
       if (filtre){
         if (!i.supprimable) return;
         if (t && i.type !== t) return;
-        if (q && l.rech.indexOf(q) < 0) return;
+        if (crit.length && !correspond(l, crit)) return;
       }
       if (i.supprimable) visibles.push(l.cle);
       rangs.push({ l: l, pli: pli, plie: !!pli && seuil === l.niv, filtre: filtre });
@@ -970,7 +1082,12 @@
     if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); if (e.target.checked) activer(c, false); else oublierActif(); return; }
     activer(c, false);
   });
-  $("#recherche").addEventListener("input", function(){ rendreListe(); maj(); });
+  var delaiRech = 0;
+  $("#recherche").addEventListener("input", function(){
+    clearTimeout(delaiRech);
+    if (/[=:<>!]/.test($("#recherche").value) && lignes.length > 4000) delaiRech = setTimeout(function(){ rendreListe(); maj(); }, 220);
+    else { rendreListe(); maj(); }
+  });
   $("#filtre-type").addEventListener("change", function(){ rendreListe(); maj(); });
   $("#sel-tout").addEventListener("click", function(){
     visibles.forEach(function(c){ cocher(c, true); });

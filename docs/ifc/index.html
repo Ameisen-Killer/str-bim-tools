@@ -342,6 +342,19 @@ body.edition{overflow:hidden}
 .champ:focus{outline:none;border-color:var(--or)}
 select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--texte-doux) 50%),linear-gradient(135deg,var(--texte-doux) 50%,transparent 50%);background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
 .ligne-btn{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* recherche avancée : bouton Filtres à côté du champ, panneau d'exemples et de recherches enregistrées */
+.rech-ligne{display:flex;gap:6px;align-items:stretch}
+.rech-ligne .champ{flex:1;min-width:0}
+.rech-ligne .btn{flex:none;min-height:0}
+.filtres-pop{width:340px;max-width:calc(100vw - 16px)}
+.filtres-pop button kbd{font-family:var(--sans);letter-spacing:0;white-space:nowrap}
+.filtres-pop button[data-ex] span{font-family:var(--mono);font-size:12.5px}
+.filtres-aide{margin:4px 12px 6px;font-size:12px;line-height:1.4;color:var(--texte-faible);white-space:normal}
+.filtre-garde{display:flex;align-items:stretch}
+.filtre-garde button:first-child{flex:1;min-width:0}
+.filtre-garde button:first-child span{font-family:var(--mono);font-size:12.5px}
+.filtres-pop .filtre-x{flex:none;width:30px;justify-content:center;padding:0;color:var(--texte-faible)}
+.filtres-pop .filtre-x:hover{color:var(--rouge)}
 .compte{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--texte-faible)}
 .liste{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 0 24px}
 .el{
@@ -997,7 +1010,10 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
       <aside class="panneau p-liste" id="p-liste" aria-label="Liste des éléments">
         <div class="p-titre">Éléments</div>
         <div class="filtres">
-          <input type="search" class="champ" id="recherche" placeholder="Rechercher un nom, un type, un matériau" autocomplete="off">
+          <div class="rech-ligne">
+            <input type="search" class="champ" id="recherche" placeholder="Rechercher : nom, type, étage:2, Volume>1.5…" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn petit" id="filtres-btn" aria-haspopup="menu" aria-expanded="false" title="Recherche avancée : critères, recherches enregistrées, isoler les résultats">Filtres</button>
+          </div>
           <select class="champ" id="filtre-type" aria-label="Filtrer par type"><option value="">Tous les types</option></select>
           <div class="ligne-btn">
             <button type="button" class="btn petit" id="sel-tout">Tout</button>
@@ -1044,6 +1060,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <!-- infobulle des menus (description et avertissements des moteurs) -->
 <div class="infobulle" id="infobulle" role="tooltip" hidden></div>
 <div class="ctx mb-liste" id="ctx" role="menu" aria-label="Actions de l'arborescence" hidden></div>
+<div class="ctx mb-liste filtres-pop" id="filtres-pop" role="menu" aria-label="Recherche avancée" hidden></div>
 <input type="color" id="teinte-libre" class="teinte-libre" value="#9ec5f0" tabindex="-1" aria-hidden="true">
 
 <dialog id="confirmer">
@@ -1259,7 +1276,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=57"></script>
+<script src="/ifc/ifc-app.js?v=58"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
