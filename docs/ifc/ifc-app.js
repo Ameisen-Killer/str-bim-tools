@@ -2879,7 +2879,7 @@
   // ================= Thème sombre / clair / système =================
   var choisirTheme = null;
   (function(){
-    var btn = $("#theme-btn"), menu = $("#menu-theme"), FOND = { clair: "#F3F0E8", sombre: "#050505" };
+    var btn = $("#theme-btn"), menu = $("#menu-theme"), FOND = { clair: "#F3F3F3", sombre: "#202020" };
     function choisi(){ try { return localStorage.getItem("ifc.theme") || "sombre"; } catch (e){ return "sombre"; } }
     function applique(c){
       var eff = c === "systeme" ? (matchMedia("(prefers-color-scheme: light)").matches ? "clair" : "sombre") : c;

@@ -111,7 +111,8 @@
     var s = getComputedStyle(document.documentElement);
     function rvb(n, d){ var v = s.getPropertyValue(n).trim().split(",").map(Number); return v.length === 3 && v.every(isFinite) ? v : d; }
     var clair = document.documentElement.getAttribute("data-theme") === "clair";
-    coul = { clair: clair, encre: rvb("--encre", [236,232,224]), fond: rvb("--fond-rvb", [5,5,5]), or: clair ? [150,104,30] : [214,168,92] };
+    // fond du panneau et accent : --scene-fond et --scene-or (accueil façon Windows 11), sinon la charte noir et or
+    coul = { clair: clair, encre: rvb("--encre", [236,232,224]), fond: rvb("--scene-fond", rvb("--fond-rvb", [5,5,5])), or: rvb("--scene-or", clair ? [150,104,30] : [214,168,92]) };
   }
   lireCouleurs();
   new MutationObserver(lireCouleurs).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -338,8 +339,8 @@
     if (!visible || document.hidden){ avant = now; return; }
     if (!W && !cadrer()) return;
     if (t0 === null){
-      // le montage attend que la fenêtre de l'aperçu soit apparue (après le démarrage, s'il est joué)
-      if (attente === null) attente = now + (document.documentElement.classList.contains("boot") ? 2300 : 900);
+      // le montage attend que la fenêtre de l'aperçu soit apparue (révélation de la carte)
+      if (attente === null) attente = now + (450);
       if (now < attente) return;
       t0 = now; avant = now;
     }
@@ -676,109 +677,6 @@
   function lache(){ if (!glisse) return; glisse = false; omega = elan; }
   cv.addEventListener("pointerup", lache);
   cv.addEventListener("pointercancel", lache);
-})();
-
-// ================= Bureau façon système : heure, démarrage, Dock, fenêtre de l'aperçu =================
-(function(){
-  "use strict";
-  var acc = document.getElementById("accueil");
-  if (!acc) return;
-  function $(s){ return document.querySelector(s); }
-  function $$(s){ return [].slice.call(document.querySelectorAll(s)); }
-
-  // heure de la barre de menus : « ven. 13 nov.  06:12 »
-  var heure = $("#os-heure");
-  function tic(){
-    if (!heure) return;
-    var d = new Date(), j = d.toLocaleDateString("fr-CH", { weekday: "short", day: "numeric", month: "short" });
-    heure.innerHTML = '<span class="j">' + j + "&nbsp;&nbsp;</span>" + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-    heure.setAttribute("datetime", d.toISOString());
-  }
-  tic(); setInterval(tic, 10000);
-
-  // démarrage : joué une fois par session, un clic le passe
-  var boot = $("#boot");
-  if (boot && document.documentElement.classList.contains("boot")){
-    try { sessionStorage.setItem("ifc.boot", "1"); } catch (e){}
-    var fini = false;
-    var finir = function(){
-      if (fini) return;
-      fini = true;
-      boot.classList.add("fin");
-      setTimeout(function(){ boot.hidden = true; }, 750);
-    };
-    boot.addEventListener("click", finir);
-    setTimeout(finir, 1650);
-  } else if (boot) boot.hidden = true;
-
-  // fenêtre de l'aperçu : réduire dans le Dock, agrandir sur l'écran (Échap pour revenir)
-  var fen = $("#fen-apercu"), dkApercu = $('[data-dk="apercu"]');
-  function recadre(){ window.dispatchEvent(new Event("resize")); }
-  function agrandir(oui){
-    if (!fen) return;
-    fen.classList.toggle("grande", oui);
-    var b = fen.querySelector('[data-fen="agrandir"]');
-    if (b) b.title = oui ? "Revenir à la taille normale (Échap)" : "Agrandir sur tout l'écran (Échap pour revenir)";
-    recadre();
-  }
-  function reduire(oui){
-    if (!fen) return;
-    fen.classList.add("anim");
-    if (oui) agrandir(false);
-    fen.classList.toggle("reduite", oui);
-    if (dkApercu) dkApercu.classList.toggle("actif", !oui);
-    if (!oui) setTimeout(recadre, 560);
-  }
-  function souligne(el){ if (el && el.animate) el.animate([{ transform: "scale(1)" }, { transform: "scale(1.015)" }, { transform: "scale(1)" }], { duration: 420 }); }
-  if (fen){
-    fen.addEventListener("click", function(e){
-      var b = e.target.closest("[data-fen]");
-      if (!b) return;
-      if (b.getAttribute("data-fen") === "reduire") reduire(true);
-      else agrandir(!fen.classList.contains("grande"));
-    });
-    fen.querySelector(".fen-barre").addEventListener("dblclick", function(e){
-      if (e.target.closest("[data-fen]") || window.innerWidth < 1000) return;
-      agrandir(!fen.classList.contains("grande"));
-    });
-    document.addEventListener("keydown", function(e){ if (e.key === "Escape" && fen.classList.contains("grande")) agrandir(false); });
-  }
-
-  // fichiers récents : la liste est remplie par ifc-app.js ; le Dock et le menu Récents suivent
-  var rec = $("#recents");
-  function premierRecent(){
-    var b = rec && !rec.hidden && rec.querySelector(".recent");
-    if (b){ b.focus(); souligne(rec); }
-  }
-  function majRecents(){
-    var vide = !rec || rec.hidden || !rec.querySelector(".recent");
-    $$('[data-dk="recents"],[data-os="recents"]').forEach(function(b){
-      b.disabled = vide;
-      if (b.hasAttribute("data-nom")) b.setAttribute("data-nom", vide ? "Aucun fichier récent" : "Fichiers récents");
-    });
-  }
-  if (rec && "MutationObserver" in window) new MutationObserver(majRecents).observe(rec, { attributes: true, childList: true, subtree: true });
-  setTimeout(majRecents, 0);
-
-  function ouvrir(){ var c = $("#choisir"); if (c) c.click(); }
-  function theme(){
-    var clair = document.documentElement.getAttribute("data-theme") === "clair";
-    var b = $('[data-choix-theme="' + (clair ? "sombre" : "clair") + '"]');
-    if (b) b.click();
-  }
-  function plein(){
-    var d = document;
-    if (d.fullscreenElement){ if (d.exitFullscreen) d.exitFullscreen(); }
-    else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function(){});
-  }
-  var ACTIONS = {
-    ouvrir: ouvrir, recents: premierRecent, theme: theme, plein: plein,
-    apercu: function(){ if (fen && fen.classList.contains("reduite")) reduire(false); else souligne(fen); }
-  };
-  $$("[data-dk],[data-os]").forEach(function(b){
-    var a = ACTIONS[b.getAttribute("data-dk") || b.getAttribute("data-os")];
-    if (a && b.tagName === "BUTTON") b.addEventListener("click", function(e){ e.stopPropagation(); a(); });
-  });
 })();
 
 // Liens des menus de l'éditeur vers une autre page du site (data-lien), ex. DXF Studio
