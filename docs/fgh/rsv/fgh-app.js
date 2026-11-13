@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.7.0";
+  var VERSION = "2.8.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -47,7 +47,7 @@
   var nivAuto = "";                        // niveau mis dans le filtre de la liste par la coupe par niveau
 
   var cube = null;
-  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); }, surCoupe: function(){ legende(); }, surDouble: function(cle){ return boiteMurs(cle); } });
+  var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMesure: etat, surCamera: function(l, p){ if (cube) cube.camera(l, p); }, surCoupe: function(){ legende(); }, surDouble: function(cle){ return boiteMurs(cle); }, surLasso: function(pts, o){ lassoSel(pts, o); } });
   vue.formats({
     longueur: function(v){ return (Math.round(v*1000)/1000).toFixed(3) + " m"; },
     point: function(p, zSeul){ return (zSeul ? ["Z"] : ["X", "Y", "Z"]).map(function(n){ return n + " " + p["XYZ".indexOf(n)].toFixed(3); }); }
@@ -353,7 +353,7 @@
         .then(function(){ m.octets = null; m.aCacher = true; });
     });
   }
-  var URL_GEO = "/fgh/rsv/fgh-geo.js?v=1";
+  var URL_GEO = "/fgh/rsv/fgh-geo.js?v=2";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -500,6 +500,7 @@
     niveaux = Array.from(parNom, function(x){ return { nom: x[0], z: x[1] }; }).sort(function(a, b){ return a.z - b.z; });
     chargerModifs();
     sel = new Set(); actif = null;
+    clash = null; isoleRien = false; boutonRien();
     remplirNiveaux();
     $("#accueil").hidden = fichiers.length > 0;
     $("#outils").hidden = $("#cube").hidden = !fichiers.length;
@@ -537,6 +538,7 @@
     var t = $("#f-txt").value.trim().toLowerCase(), n = $("#f-niv").value, s = $("#f-st").value, mots = t ? t.split(/\s+/) : [];
     return RES.filter(function(r){
       if (stMasques.size && stMasques.has(classe(valeur(r, P_ST)))) return false;
+      if (isoleRien && clash && !clash.rien.has(r.cle)) return false;
       if (n && r.niveau !== n) return false;
       if (s === "modif"){ if (!modifie(r)) return false; }
       else if (s === "attente"){ if (classe(valeur(r, P_ST)) !== "attente") return false; }
@@ -552,7 +554,7 @@
     var h = '<div class="res' + (sel.has(r.cle) ? " sel" : "") + '" data-cle="' + esc(r.cle) + '"><span class="pastille s-' + c + '"></span>' +
       '<span class="num">' + esc(r.num || "(sans N°)") + (modifie(r) ? '<i title="Modifiée ici">●</i>' : "") + "</span>" +
       '<span class="st">' + esc(st || "En attente") + "</span>" +
-      '<span class="sous">' + (r.horsSync ? '<b class="hs-l" title="Ignorée par « Sync Reservations » : ' + esc(r.horsSync) + '">hors synchro</b> · ' : "") +
+      '<span class="sous">' + (clash && clash.rien.has(r.cle) ? '<b class="nt-l" title="Détection de clash : son volume ne recoupe aucun élément de la structure">ne traverse rien</b> · ' : "") + (r.horsSync ? '<b class="hs-l" title="Ignorée par « Sync Reservations » : ' + esc(r.horsSync) + '">hors synchro</b> · ' : "") +
       esc([r.niveau, r.famille, r.p["Demandeur"]].filter(Boolean).join(" · ")) + "</span></div>";
     htmlLigne.set(r.cle, h);
     return h;
@@ -561,7 +563,7 @@
   function renduListe(){
     liste = trier(filtrees());
     $("#nb-res").textContent = RES.length;
-    $("#f-compte").textContent = RES.length ? liste.length + " / " + pluriel(RES.length, "réservation") : "";
+    $("#f-compte").textContent = RES.length ? liste.length + " / " + pluriel(RES.length, "réservation") + (isoleRien ? " · ne traversent rien" : "") : "";
     $("#liste").innerHTML = RES.length ? (liste.length ? liste.map(ligneRes).join("") : '<div class="vide-liste">Aucune réservation ne correspond au filtre.</div>') :
       '<div class="vide-liste">' + (fichiers.length ? "Aucune réservation : ouvre aussi l'IFC …_RES.ifc exporté par « Export IFC RES »." : "Ouvre les IFC pour voir les réservations.") + "</div>";
   }
@@ -580,7 +582,7 @@
   $("#f-txt").addEventListener("input", filtreChange);
   $("#f-niv").addEventListener("change", function(){ nivAuto = ""; filtreChange(); });
   $("#f-st").addEventListener("change", filtreChange);
-  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; nivAuto = ""; filtreChange(); });
+  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; nivAuto = ""; isoleRien = false; boutonRien(); filtreChange(); });
   $("#liste").addEventListener("click", function(e){
     var el = e.target.closest(".res");
     if (!el) return;
@@ -740,6 +742,7 @@
   $("#c-marge").addEventListener("input", function(){ var v = $("#c-niv").value; if (v !== "") boiteNiveau(+v); });
   function outil(nom){
     var cur = vue.outil(), nv = cur === nom ? null : nom;
+    if (nv && vue.lasso()) boutonLasso(false);
     vue.outil(nv);
     Array.prototype.forEach.call(document.querySelectorAll('[data-c="mesure"],[data-c="point"]'), function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-c") === nv)); });
     etat(nv === "mesure" ? "Mesure : clique deux points (sommets, milieux, arêtes ou faces). Échap pour sortir." : nv === "point" ? "Coordonnées : clique un point." : "");
@@ -765,12 +768,118 @@
     else if (c === "effacer"){ vue.effacerMesures(); etat(""); }
     else if (c === "structure"){ voirStructure = !voirStructure; b.setAttribute("aria-pressed", String(voirStructure)); afficher(); }
     else if (c === "res"){ voirRes = !voirRes; b.setAttribute("aria-pressed", String(voirRes)); afficher(); }
+    else if (c === "clash") lancerClash().then(function(x){ if (!x) return; renduListe(); renduFiche(); if (isoleRien) filtreChange(); etat(bilanClash()); });
+    else if (c === "rien"){
+      if (isoleRien){ isoleRien = false; boutonRien(); filtreChange(); etat(""); }
+      else (clash ? Promise.resolve(clash) : lancerClash()).then(function(x){ if (!x) return; isoleRien = true; boutonRien(); filtreChange(); renduFiche(); etat(bilanClash()); });
+    }
+    else if (c === "lasso"){
+      boutonLasso(!vue.lasso());
+      etat(vue.lasso() ? "Lasso : entoure des réservations, leur centre doit être dedans. Ctrl ou Maj : ajoute à la sélection. Clic droit glissé pour déplacer la vue, molette pour zoomer, Échap pour sortir." : "");
+    }
   });
   document.addEventListener("keydown", function(e){
     if (e.key !== "Escape" || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) return;
     if (vue.annulerMesure()){ if (!vue.outil()) outil(null); return; }
+    if (vue.lasso()){ boutonLasso(false); etat(""); return; }
     if (sel.size){ sel = new Set(); actif = null; vue.selection(sel, actif); renduListe(); renduFiche(); }
   });
+
+  // ================= Détection de clash STR / RES et lasso =================
+  // Réservations dont le volume ne recoupe aucun élément de la structure (fgh-clash.js) : isolées par le bouton
+  // « Ne traversent rien » (demande de Tony, 13.11.2026). Tous les fichiers de structure ouverts comptent, affichés
+  // ou non ; sont écartés les objets qui ne sont pas de la structure (espaces, portes, réseaux…) et ceux nommés
+  // comme une réservation (FGH_RES…).
+  var clash = null, isoleRien = false, clashEnCours = false;
+  var HORS_STR = /^IFC(SPACE|OPENINGELEMENT|VIRTUALELEMENT|ANNOTATION|GRID|FURNISH|FLOW|DISTRIBUTION|ELECTRIC|LIGHTFIXTURE|SANITARY|DOOR|WINDOW|RAILING|COVERING)/;
+  var PORTEUR = /^IFC(WALL|SLAB|BEAM|COLUMN|FOOTING|MEMBER|PILE|PLATE|STAIR|RAMP|ROOF)/;
+  var NOM_RES = /FGH_RES|r[ée]servation/i, RIEN = /ne\s+traverse\s+rien/i;
+  function boutonRien(){ var b = document.querySelector('[data-c="rien"]'); if (b) b.setAttribute("aria-pressed", String(isoleRien)); }
+  function boutonLasso(oui){ vue.lasso(oui); var b = document.querySelector('[data-c="lasso"]'); if (b) b.setAttribute("aria-pressed", String(vue.lasso())); }
+  function lancerClash(){
+    if (clashEnCours) return Promise.resolve(null);
+    var strs = fichiers.filter(function(x){ return x.role === "str"; });
+    if (!RES.length){ etat("Détection de clash : ouvre d'abord l'IFC des réservations (…_RES.ifc)."); return Promise.resolve(null); }
+    if (!strs.length){ etat("Détection de clash : ouvre aussi l'IFC de la structure (…_STR_light.ifc)."); return Promise.resolve(null); }
+    var res = [], str = [], ouv = [];
+    RES.forEach(function(r){ var g = vue.geo(r.f.m, r.id); if (g && g.T.length) res.push({ cle: r.cle, T: g.T }); });
+    strs.forEach(function(fi){
+      var I = IFC.index(fi.m);
+      fi.ids.forEach(function(id){
+        var i = IFC.infos(fi.m, id);
+        if (!i || HORS_STR.test(i.type) || NOM_RES.test(i.nom + " " + i.objectType)) return;
+        var g = vue.geo(fi.m, id);
+        if (!g || !g.T.length) return;
+        var cle = "s" + fi.uid + ":" + id;
+        str.push({ cle: cle, T: g.T, porteur: PORTEUR.test(i.type) });
+        // ouvertures de l'élément : celle qui a la taille d'une réservation est son trou déjà percé
+        (I.ouvertures.get(id) || []).forEach(function(o){ var go = vue.geo(fi.m, o); if (go && go.T.length) ouv.push({ hote: cle, T: go.T }); });
+      });
+    });
+    clashEnCours = true;
+    progres("Détection de clash…", 0);
+    return FGHClash.detecter(res, str, ouv, function(p){ progres("Détection de clash : " + Math.round(100*p) + " %", p); }).then(function(x){
+      $("#chargement").hidden = true;
+      clashEnCours = false;
+      var rien = new Set();
+      x.traverse.forEach(function(h, cle){ if (!h.length) rien.add(cle); });
+      clash = { traverse: x.traverse, rien: rien, ms: x.ms, nRes: res.length, nStr: str.length, sansGeo: RES.length - res.length };
+      return clash;
+    }, function(err){
+      $("#chargement").hidden = true;
+      clashEnCours = false;
+      etat("Détection de clash impossible : " + (err && err.message || err));
+      return null;
+    });
+  }
+  // bilan, avec le contrôle des commentaires « Ne traverse rien » déjà mis à la main
+  function bilanClash(){
+    var c = clash, oui = 0, non = 0;
+    RES.forEach(function(r){ if (!RIEN.test(valeur(r, P_COM))) return; if (c.rien.has(r.cle)) oui++; else non++; });
+    return "Clash STR / RES : " + pluriel(c.nRes, "réservation") + " contre " + pluriel(c.nStr, "élément") + " de structure en " + (c.ms/1000).toFixed(1).replace(".", ",") + " s · " +
+      c.rien.size + " ne traverse" + (c.rien.size > 1 ? "nt" : "") + " rien" +
+      (oui + non ? " · commentaire « Ne traverse rien » : " + oui + " confirmé" + (oui > 1 ? "s" : "") + ", " + non + " qui traverse" + (non > 1 ? "nt" : "") + " pourtant quelque chose" : "") +
+      (c.sansGeo ? " · " + c.sansGeo + " sans géométrie, non testée" + (c.sansGeo > 1 ? "s" : "") : "") + ".";
+  }
+  function libStr(cle){
+    var m = /^s(\d+):(\d+)$/.exec(cle), fi = m && fichiers.filter(function(x){ return x.uid === +m[1]; })[0], i = fi && IFC.infos(fi.m, +m[2]);
+    return i ? [i.typeLib, i.nom].filter(Boolean).join(" · ") : cle;
+  }
+  function blocClash(r){
+    if (!clash) return "";
+    var h = clash.traverse.get(r.cle);
+    return '<div class="bloc"><h3>Structure traversée</h3>' + (!h ? '<p class="note">Géométrie illisible : réservation non testée.</p>' :
+      !h.length ? '<p class="nt">Ne traverse rien</p>' : '<ul class="trav">' + h.map(function(c){ return "<li>" + esc(libStr(c)) + "</li>"; }).join("") + "</ul>") + "</div>";
+  }
+  function noteClash(rs){
+    if (!clash) return "";
+    var n = rs.filter(function(r){ return clash.rien.has(r.cle); }).length;
+    return '<div class="bloc"><h3>Structure traversée</h3><p class="note">' + (n === rs.length ? "Aucune ne traverse la structure." : n ? n + " sur " + rs.length + " ne traversent rien." : "Toutes traversent la structure.") + "</p></div>";
+  }
+  // Lasso : réservations affichées (filtre, statuts cochés, boîte de coupe) dont le centre est dans le tracé
+  function dansPoly(P, x, y){
+    var dedans = false;
+    for (var i = 0, j = P.length - 1; i < P.length; j = i++){
+      if ((P[i].y > y) !== (P[j].y > y) && x < (P[j].x - P[i].x)*(y - P[i].y)/(P[j].y - P[i].y) + P[i].x) dedans = !dedans;
+    }
+    return dedans;
+  }
+  function lassoSel(pts, o){
+    var D = vue.aCoupe() ? vue.dansCoupe() : null, pris = [];
+    if (voirRes) filtrees().forEach(function(r){
+      if (D && !D.has(r.cle)) return;
+      var g = vue.geo(r.f.m, r.id), q = g && vue.ecran([(g.min[0] + g.max[0])/2, (g.min[1] + g.max[1])/2, (g.min[2] + g.max[2])/2]);
+      if (q && dansPoly(pts, q[0], q[1])) pris.push(r.cle);
+    });
+    if (!o.ajout) sel = new Set();
+    pris.forEach(function(c){ sel.add(c); });
+    actif = pris.length ? pris[pris.length - 1] : (sel.size ? Array.from(sel)[sel.size - 1] : null);
+    vue.selection(sel, actif);
+    renduListe(); renduFiche();
+    if (sel.size && document.querySelector(".app").classList.contains("sans-d")) replier("d", false);
+    etat(pris.length ? pluriel(pris.length, "réservation") + " dans le lasso" + (o.ajout ? ", ajoutée" + (pris.length > 1 ? "s" : "") + " à la sélection" : "") + " · " + sel.size + " sélectionnée" + (sel.size > 1 ? "s" : "") + "." :
+      "Aucune réservation affichée n'a son centre dans le lasso.");
+  }
 
   // ================= Fiche =================
   function dl(lignes){ return "<dl>" + lignes.filter(function(l){ return l[1]; }).map(function(l){ return "<dt>" + esc(l[0]) + "</dt><dd>" + esc(l[1]) + "</dd>"; }).join("") + "</dl>"; }
@@ -834,7 +943,7 @@
         '<div class="bloc"><h3>Décision pour toutes</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(cl) +
         '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' +
         '<div class="actions"><button type="button" class="bt" data-a="com-multi"' + ro + '>Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
-        '<p class="note">La date de validation est mise à aujourd\'hui à chaque décision.</p></div>';
+        '<p class="note">La date de validation est mise à aujourd\'hui à chaque décision.</p></div>' + noteClash(rs);
       return;
     }
     var r = rs[0], p = r.p, st = valeur(r, P_ST), d = valeur(r, P_DATE);
@@ -845,7 +954,7 @@
       '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '">' +
       (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") + "</div>" +
       '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
-      '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' +
+      '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' + blocClash(r) +
       '<div class="bloc"><h3>Demande</h3>' + dl([
         ["Demandeur", p["Demandeur"]], ["Date", p["Date demande"]], ["Commentaire", p["Commentaire demande"]],
         ["Dimensions", dims(p)], ["Carottage", p["Carottage"]], ["Calfeutrement", p["Calfeutrement"]],

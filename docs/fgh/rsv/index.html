@@ -186,8 +186,9 @@ textarea.champ{height:auto;resize:vertical;min-height:72px;line-height:20px}
 /* ---------- Vue ---------- */
 .centre canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .centre canvas.tire{cursor:grabbing}
-.centre canvas.mesure{cursor:crosshair}
+.centre canvas.mesure,.centre canvas.lasso,.centre canvas.lasso.tire{cursor:crosshair}
 .mesures{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:hidden}
+.mesures .l-trait{fill:rgba(var(--or-rvb),.12);stroke:rgb(var(--or-rvb));stroke-width:1.5;stroke-dasharray:6 4;stroke-linejoin:round}
 .mesures .m-trait{stroke:rgb(var(--or-rvb));stroke-width:2}
 .mesures .m-trait.provisoire{stroke-dasharray:6 4}
 .mesures .m-aide{stroke:rgba(var(--or-rvb),.6);stroke-width:1;stroke-dasharray:2 3}
@@ -312,6 +313,10 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 .hs::before{content:"i";position:absolute;left:12px;top:11px;width:16px;height:16px;border-radius:50%;background:var(--or);color:var(--sur-accent);font-weight:700;font-size:11px;line-height:16px;text-align:center;font-style:italic}
 .hs b{color:var(--texte);font-weight:600}
 .res .sous .hs-l{color:var(--orange);font-weight:600}
+.res .sous .nt-l{color:var(--or);font-weight:600}
+.bloc .nt{margin:0;font-weight:600;color:var(--or)}
+.bloc .trav{margin:0;padding-left:18px;font-size:13px;color:var(--texte-doux)}
+.bloc .trav li{margin:2px 0}
 .ml{display:grid;grid-template-columns:1fr auto;gap:0 8px;padding:6px 8px;margin:0 -8px;border-radius:4px;font-size:13px;cursor:pointer}
 .ml:hover{background:var(--controle-survol)}
 .ml .q{font-weight:600}
@@ -385,6 +390,12 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
         <button type="button" class="bt" data-c="dxf" title="DXF de ce qui est affiché dans la boîte de coupe, vu comme à l'écran (dessus, élévation ou 3D)">DXF</button>
       </div>
       <div class="groupe">
+        <button type="button" class="bt" data-c="clash" title="Détection de clash : cherche ce que chaque réservation traverse dans la structure (résultat dans la liste et la fiche)">Clash</button><button type="button" class="bt" data-c="rien" aria-pressed="false" title="Isoler les réservations qui ne traversent rien et masquer les autres (lance la détection si besoin) ; un nouveau clic les remontre toutes">Ne traversent rien</button>
+      </div>
+      <div class="groupe">
+        <button type="button" class="bt" data-c="lasso" aria-pressed="false" title="Sélection au lasso : entoure des réservations (Ctrl ou Maj pour ajouter à la sélection, Échap pour sortir)">Lasso</button>
+      </div>
+      <div class="groupe">
         <button type="button" class="bt" data-c="mesure" aria-pressed="false" title="Mesurer entre deux points (Échap pour sortir)">Mesure</button>
         <button type="button" class="bt" data-c="point" aria-pressed="false" title="Coordonnées d'un point">XYZ</button>
         <button type="button" class="bt" data-c="effacer" title="Effacer les mesures">Effacer</button>
@@ -419,8 +430,9 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <input type="file" id="fichier" accept=".ifc" multiple hidden>
 
 <script src="/fgh/rsv/fgh-core.js?v=3"></script>
-<script src="/fgh/rsv/fgh-vue.js?v=21"></script>
+<script src="/fgh/rsv/fgh-vue.js?v=22"></script>
+<script src="/fgh/rsv/fgh-clash.js?v=1"></script>
 <script src="/fgh/rsv/fgh-cube.js?v=5"></script>
-<script src="/fgh/rsv/fgh-app.js?v=39"></script>
+<script src="/fgh/rsv/fgh-app.js?v=40"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // découpe que la page, donc mêmes identifiants), calcule avec le même code que la page (fgh-vue.js : formes,
 // ouvertures, mise en mètres, triangles, arêtes vives) et renvoie au fil de l'eau { paquet, fini, fait } :
 // géométries mises à plat (format du cache, tableaux transférés sans copie), puis les bilans. { erreur } si ça casse.
-importScripts("/fgh/rsv/fgh-core.js?v=3", "/fgh/rsv/fgh-vue.js?v=21");
+importScripts("/fgh/rsv/fgh-core.js?v=3", "/fgh/rsv/fgh-vue.js?v=22");
 
 onmessage = function(e){
   var d = e.data;

@@ -2600,6 +2600,18 @@
     cv.parentNode.appendChild(calque);
     // mode : "mesure" ou "point" (coordonnées) ; points : coordonnées relevées
     var mesure = { actif: false, mode: null, a: null, survol: null, liste: [], points: [] };
+    // FGH : sélection au lasso (tracé à main levée, bouton gauche ou doigt) ; le tracé a son propre calque
+    var lasso = { actif: false, pts: null, ajout: false }, calqueLasso = document.createElementNS(SVG, "svg");
+    calqueLasso.setAttribute("class", "mesures lasso");
+    cv.parentNode.appendChild(calqueLasso);
+    function dessinerLasso(){
+      while (calqueLasso.firstChild) calqueLasso.removeChild(calqueLasso.firstChild);
+      if (!lasso.pts || lasso.pts.length < 2) return;
+      var p = document.createElementNS(SVG, "path");
+      p.setAttribute("class", "l-trait");
+      p.setAttribute("d", "M" + lasso.pts.map(function(q){ return q.x.toFixed(1) + " " + q.y.toFixed(1); }).join("L") + "Z");
+      calqueLasso.appendChild(p);
+    }
     // Mise en forme fournie par l'application (unités et décimales des préférences) : longueur(v) → texte,
     // point(p, zSeul) → lignes de texte. Par défaut : nombres bruts du fichier.
     var formats = {
@@ -2880,6 +2892,8 @@
         ptrs.set(e.pointerId, local(e));
         if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; doigt = e.pointerType !== "mouse"; }
         else multi = true;
+        if (lasso.actif && ptrs.size === 1 && (e.button === 0 || e.pointerType !== "mouse")){ lasso.pts = [depart]; lasso.ajout = e.ctrlKey || e.metaKey || e.shiftKey; }
+        else if (lasso.pts){ lasso.pts = null; dessinerLasso(); }
         cv.classList.add("tire");
       });
       cv.addEventListener("pointermove", function(e){
@@ -2887,7 +2901,12 @@
         var p = ptrs.get(e.pointerId);
         if (!p){ if (e.pointerType === "mouse"){ if (mesure.actif) survolMesure(e); } return; }
         var n = local(e);
-        if (ptrs.size === 1){
+        if (ptrs.size === 1 && lasso.pts){
+          if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5) bouge = true;
+          var dl = lasso.pts[lasso.pts.length - 1];
+          if (Math.hypot(n.x - dl.x, n.y - dl.y) > 2){ lasso.pts.push(n); dessinerLasso(); }
+          p.x = n.x; p.y = n.y;
+        } else if (ptrs.size === 1){
           if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
           bouge = true;
           if (!(e.shiftKey || (e.buttons & 6))) pivoter(depart.x, depart.y);
@@ -2915,6 +2934,14 @@
         ptrs.delete(e.pointerId);
         if (ptrs.size) return;
         cv.classList.remove("tire");
+        if (lasso.pts){
+          var lp = lasso.pts, aj = lasso.ajout;
+          lasso.pts = null; dessinerLasso();
+          if (bouge && !multi && e.type === "pointerup" && lp.length > 2){
+            if (rappels.surLasso) rappels.surLasso(lp, { ajout: aj || e.ctrlKey || e.metaKey || e.shiftKey });
+            return;
+          }
+        }
         if (enRotation){ enRotation = false; demander(); }
         if (vite){ vite = false; demander(); }
         if (e.type === "pointerup" && !bouge && !multi && mesure.actif && (e.button === 0 || e.pointerType !== "mouse")){
@@ -3094,6 +3121,18 @@
         return false;
       },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
+      // FGH : lasso actif ou non (sans argument : l'état) ; le tracé fini part dans rappels.surLasso(points écran, { ajout })
+      lasso: function(oui){
+        if (oui !== undefined){ lasso.actif = !!oui; lasso.pts = null; cv.classList.toggle("lasso", lasso.actif); dessinerLasso(); }
+        return lasso.actif;
+      },
+      // FGH : point du monde (mètres) → position à l'écran (pixels du canevas), ou null avant le premier affichage
+      ecran: function(p){ return W && H ? ecran(camera(), p) : null; },
+      // FGH : géométrie d'un élément d'un modèle ouvert : { T (triangles à plat), min, max } en mètres, ou null
+      geo: function(m, id){
+        var G = Gs.get(m) || prets.get(m), g = G ? geometrie(G, id) : null;
+        return g ? { T: triangles(g), min: g.min, max: g.max } : null;
+      },
       effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
       // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }
       formats: function(f){ formats = f; demander(); },
