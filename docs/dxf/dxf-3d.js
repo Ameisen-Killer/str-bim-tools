@@ -5,7 +5,8 @@
  *   doc = { unite: "m", calques: [{ nom, couleur (ACI 1–255), type: nom du type de ligne, visible }],
  *           entites: [{ type: "LIGNE" | "POLYLIGNE" | "POINT", calque, pts: [[x, y, z]…], ferme, couleur?, info }],
  *           ignores: { TYPE: nombre } (lecture : objets d'autres types, non repris) }
- *   info : données libres attachées à l'entité (ex. { ifc: { gid, type, nom } }), gardées en mémoire, pas écrites.
+ *   info : données libres attachées à l'entité ; info.ifc ({ gid, type, nom }) est écrit en données étendues
+ *   (XDATA, application STR_IFC) pour retrouver l'élément IFC d'origine à la relecture (DXF Studio : choix par élément).
  *   couleur : ACI propre à l'entité (absente = DuCalque).
  *
  *   var doc = DXF3D.document();
@@ -78,6 +79,14 @@
     function g(code, v){ L.push(String(code), String(v)); }
     function xyz(p, d){ g(10 + (d || 0), nb(p[0])); g(20 + (d || 0), nb(p[1])); g(30 + (d || 0), nb(p[2])); }
     function coul(e){ if (e.couleur != null && e.couleur !== 256 && e.couleur > 0 && e.couleur < 256) g(62, e.couleur); }
+    // données étendues : élément IFC d'origine (texte limité à 255 caractères, sans fin de ligne)
+    function xdata(e){
+      var f = e.info && e.info.ifc;
+      if (!f || !f.gid) return;
+      function t(v){ return String(v == null ? "" : v).replace(/[\r\n]+/g, " ").slice(0, 250); }
+      g(1001, "STR_IFC"); g(1000, t(f.gid)); g(1000, t(f.type)); g(1000, t(f.nom));
+    }
+    var avecX = doc.entites.some(function(e){ return e.info && e.info.ifc && e.info.ifc.gid; });
     var E = etendue(doc);
     // calques utilisés par une entité mais absents de la table : ajoutés
     var noms = new Set(doc.calques.map(function(c){ return c.nom; })), cals = doc.calques.slice();
@@ -105,13 +114,15 @@
       g(0, "LAYER"); g(2, c.nom); g(70, 0); g(62, c.visible === false ? -col : col); g(6, TYPES_CONNUS[c.type] ? c.type : "CONTINUOUS");
     });
     g(0, "ENDTAB");
+    // table des applications (après les calques, dans l'ordre d'AutoCAD) : déclare STR_IFC pour les données étendues
+    if (avecX){ g(0, "TABLE"); g(2, "APPID"); g(70, 1); g(0, "APPID"); g(2, "STR_IFC"); g(70, 0); g(0, "ENDTAB"); }
     g(0, "ENDSEC");
     g(0, "SECTION"); g(2, "ENTITIES");
     doc.entites.forEach(function(e){
-      if (e.type === "LIGNE"){ g(0, "LINE"); g(8, e.calque); coul(e); xyz(e.pts[0]); xyz(e.pts[1], 1); }
-      else if (e.type === "POINT"){ g(0, "POINT"); g(8, e.calque); coul(e); xyz(e.pts[0]); }
+      if (e.type === "LIGNE"){ g(0, "LINE"); g(8, e.calque); coul(e); xyz(e.pts[0]); xyz(e.pts[1], 1); xdata(e); }
+      else if (e.type === "POINT"){ g(0, "POINT"); g(8, e.calque); coul(e); xyz(e.pts[0]); xdata(e); }
       else if (e.type === "POLYLIGNE"){
-        g(0, "POLYLINE"); g(8, e.calque); coul(e); g(66, 1); g(10, "0.0"); g(20, "0.0"); g(30, "0.0"); g(70, 8 | (e.ferme ? 1 : 0));
+        g(0, "POLYLINE"); g(8, e.calque); coul(e); g(66, 1); g(10, "0.0"); g(20, "0.0"); g(30, "0.0"); g(70, 8 | (e.ferme ? 1 : 0)); xdata(e);
         e.pts.forEach(function(p){ g(0, "VERTEX"); g(8, e.calque); xyz(p); g(70, 32); });
         g(0, "SEQEND"); g(8, e.calque);
       }
@@ -148,7 +159,16 @@
     function compter(t){ doc.ignores[t] = (doc.ignores[t] || 0) + 1; }
     function cal(o){ var nom = val(o, 8, "0"); if (!doc.calques.some(function(c){ return c.nom === nom; })) calque(doc, nom, 7); return nom; }
     function couleur(o){ var c = parseInt(val(o, 62, "256"), 10); return isFinite(c) && c > 0 && c < 256 ? c : null; }
-    function pousser(e, o){ var c = couleur(o); if (c != null) e.couleur = c; doc.entites.push(e); }
+    // élément IFC d'origine : données étendues STR_IFC (gid, type, nom)
+    function ifcDe(o){
+      for (var j = 0; j < o.g.length; j++) if (o.g[j][0] === 1001 && o.g[j][1] === "STR_IFC"){
+        var v = [];
+        for (var q = j + 1; q < o.g.length && o.g[q][0] !== 1001; q++) if (o.g[q][0] === 1000) v.push(o.g[q][1]);
+        return v[0] ? { gid: v[0], type: v[1] || "", nom: v[2] || "" } : null;
+      }
+      return null;
+    }
+    function pousser(e, o){ var c = couleur(o), f = ifcDe(o); if (c != null) e.couleur = c; if (f) e.info = { ifc: f }; doc.entites.push(e); }
     // repère objet (OCS) d'une polyligne 2D : seul le cas courant de l'extrusion −Z (miroir) est repris
     function ocsX(o){ return num(o, 230, 1) < 0 ? -1 : 1; }
     while (k < n){

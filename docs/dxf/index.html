@@ -150,6 +150,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .centre canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default}
 .centre canvas.tire{cursor:grabbing}
 .centre canvas.mesure{cursor:crosshair}
+.centre canvas.poignee{cursor:grab}
 .outils{position:absolute;left:24px;right:24px;top:10px;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none}
 .outils>*{pointer-events:auto}
 .groupe{display:flex;gap:2px;align-items:center;padding:4px;border-radius:8px;background:rgba(var(--fond-rvb),.72);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);box-shadow:var(--ombre-legere)}
@@ -186,15 +187,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .scene3d{position:absolute;inset:0}
 .centre .scene3d canvas.cube3d{inset:auto;right:10px;top:58px;width:140px;height:140px;z-index:4;cursor:default;opacity:.85;transition:opacity .15s ease}
 .centre .scene3d canvas.cube3d:hover{opacity:1}
-.outils3d{right:170px}
 .accueil p a{color:var(--or)}
 .calque .courant{font-size:11px;color:var(--or);margin-left:4px}
 .tbl.sommets input{height:26px;padding:2px 6px;font-size:12px}
 .tbl.sommets td{padding:2px 3px}
 .carte select.champ{margin-top:4px}
-.barre .bascule-mode{display:inline-flex;gap:2px;padding:2px;border-radius:6px;background:var(--controle);border:1px solid var(--bord-controle)}
-.barre .bascule-mode button{height:26px;padding:0 10px;font-size:12px}
-.barre .bascule-mode button[aria-pressed="true"]{background:var(--or);color:var(--sur-accent)}
 .barre .lien-ifc{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;color:var(--texte)}
 .barre .lien-ifc svg{width:16px;height:16px}
 .barre .lien-ifc:hover{background:var(--controle-survol);border-color:var(--bord-controle)}
@@ -206,7 +203,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .dlg3d .pied{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 .dlg3d .bt{border:1px solid var(--bord-controle);background:var(--controle)}
 .dlg3d .bt.prim{background:var(--or);color:var(--sur-accent)}
-@media (max-width:760px){.outils3d{right:130px}.centre .scene3d canvas.cube3d{width:110px;height:110px}.barre .lien-ifc span{display:none}}
+@media (max-width:760px){.centre .scene3d canvas.cube3d{width:110px;height:110px}.barre .lien-ifc span{display:none}}
 
 @media (max-width:1100px){.app{grid-template-columns:260px 1fr 300px}.app.sans-g{grid-template-columns:1fr 300px}.app.sans-d{grid-template-columns:260px 1fr}}
 @media (max-width:760px){
@@ -218,6 +215,86 @@ button,input,select,textarea{font:inherit;color:inherit}
   .replier{display:none}
   .app.sans-g .p-calques,.app.sans-d .p-props{display:flex}
 }
+
+/* ================= Après ouverture : interface façon IFC Studio (body.edition) ================= */
+body{display:flex;flex-direction:column}
+body.edition .barre{display:none}
+.app{flex:1;height:auto}
+.haut{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:4px 12px 6px;background:var(--mica);flex:none}
+.mb{display:flex;align-items:stretch;margin-left:-4px;gap:2px}
+.mb-gr{position:relative}
+.mb-titre{background:none;border:0;padding:5px 10px;margin:2px 0;border-radius:4px;cursor:pointer;font-size:14px;color:var(--texte)}
+.mb-titre:hover,.mb-titre:focus-visible,.mb-titre[aria-expanded="true"]{background:var(--controle-survol);outline:none}
+.mb-liste{position:absolute;left:0;top:calc(100% + 4px);z-index:50;min-width:250px;max-width:calc(100vw - 16px);padding:4px;display:flex;flex-direction:column;background:rgba(var(--fond-rvb),.86);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);border-radius:8px;box-shadow:var(--ombre)}
+.mb-liste[hidden]{display:none}
+.mb-liste button{display:flex;justify-content:space-between;align-items:baseline;gap:24px;background:none;border:0;text-align:left;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:14px;line-height:20px;color:var(--texte);white-space:nowrap}
+.mb-liste button:hover:not(:disabled),.mb-liste button:focus-visible{background:var(--controle-survol);outline:none}
+.mb-liste button:disabled{opacity:.36;cursor:default}
+.mb-liste button.danger{color:var(--rouge)}
+.mb-liste kbd{font-family:var(--sans);font-size:12px;color:var(--texte-faible)}
+.mb-liste hr{border:0;border-top:1px solid var(--ligne);margin:4px -4px}
+.mb-sous{font-size:12px;font-weight:600;color:var(--texte-faible);padding:8px 10px 2px}
+.mb-liste [role="menuitemradio"] span::before,.mb-liste [role="menuitemcheckbox"] span::before{content:"";display:inline-block;width:1.3em}
+.mb-liste [role="menuitemradio"][aria-checked="true"] span::before{content:"●";color:var(--or);font-size:9px;vertical-align:2px}
+.mb-liste [role="menuitemcheckbox"][aria-checked="true"] span::before{content:"✓";color:var(--or)}
+.mb-sm{position:relative}
+.mb-sm-titre{width:100%}
+.mb-sm>.mb-sl{display:none;left:100%;top:-5px;min-width:200px}
+.mb-sm:hover>.mb-sl,.mb-sm:focus-within>.mb-sl{display:flex}
+.mb-sm:hover>.mb-sm-titre{background:var(--controle-survol)}
+.mb-sl.a-gauche{left:auto;right:100%}
+.ctx{position:fixed;top:0;left:0;min-width:240px}
+.ctx .ctx-titre{font-size:12px;font-weight:600;color:var(--texte-doux);padding:6px 10px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.mode{display:flex;border:1px solid var(--ligne);border-radius:6px;overflow:hidden}
+.mode button{background:none;border:0;padding:5px 14px;cursor:pointer;font-size:13px;color:var(--texte-doux)}
+.mode button+button{border-left:1px solid var(--ligne)}
+.mode button[aria-pressed="true"]{background:rgba(var(--or-rvb),.16);color:var(--or);font-weight:600}
+.fichier{display:flex;flex-direction:column;min-width:0;flex:1 1 220px;padding-left:16px;border-left:1px solid var(--ligne)}
+.fichier-nom{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fichier-bilan{font-size:12px;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.signature{margin-left:auto;font-size:12px;color:var(--texte-doux);white-space:nowrap}
+.haut .etat{position:static;flex:1 1 100%;min-height:1.4em;font-size:12px;color:var(--texte-doux);text-shadow:none;pointer-events:auto}
+.haut .etat::before{content:"";display:inline-block;width:6px;height:6px;margin:0 8px 1px 2px;border-radius:50%;background:var(--or);vertical-align:middle}
+.haut .etat:empty::before{display:none}
+.accueil-etat{margin-top:10px;font-size:12px;color:var(--rouge)}
+.accueil-etat:empty{display:none}
+/* panneaux : titres comme IFC Studio */
+.p-titre{font-family:var(--titre);font-size:14px;font-weight:600;color:var(--texte);padding:12px 14px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.p-titre .n{font-family:var(--sans);font-weight:400;font-size:12px;color:var(--texte-faible)}
+.entete-p{padding:0 12px 8px}
+.p-props{display:flex;flex-direction:column}
+#props{flex:1;min-height:0}
+/* outils de la vue : verre, en haut à droite, cube dessous ; palette d'édition en haut à gauche */
+.vue-outils,.palette{position:absolute;top:10px;z-index:5;display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:4px;border-radius:8px;background:rgba(var(--fond-rvb),.72);-webkit-backdrop-filter:blur(30px) saturate(1.25);backdrop-filter:blur(30px) saturate(1.25);border:1px solid var(--ligne);box-shadow:var(--ombre-legere)}
+.vue-outils{right:10px}
+.palette{left:24px;max-width:calc(100% - 400px)}
+.vue-outils .bt,.palette .bt{min-height:28px;padding:3px 10px;font-size:13px}
+.palette .sep{width:1px;align-self:stretch;margin:3px 4px;background:var(--ligne)}
+.vue-outils .bascule{display:flex;margin:0 2px;padding:2px;gap:2px;border-radius:6px;background:rgba(var(--encre),.07);box-shadow:inset 0 0 0 1px rgba(var(--encre),.06)}
+.vue-outils .bascule .bt{min-height:24px;padding:2px 9px}
+.vue-aide{position:absolute;left:24px;bottom:10px;right:300px;z-index:5;font-size:12px;color:var(--texte-faible);pointer-events:none;text-shadow:0 0 4px var(--vue-fond);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.coord{bottom:10px}
+/* boîtes de dialogue : ContentDialog comme IFC Studio */
+.dlg3d{padding:0;overflow:hidden;min-width:340px;max-width:calc(100vw - 32px)}
+.dlg3d form{padding:24px 24px 0}
+.dlg3d h2{font-size:20px;line-height:28px;margin:0 0 14px}
+.dlg3d .pied{flex-direction:row-reverse;margin:24px -24px 0;padding:20px 24px;background:var(--couche);border-top:1px solid var(--ligne)}
+.dlg3d .pied .bt{flex:1;justify-content:center}
+.dlg3d .note{margin-top:10px}
+.dlg3d .niv{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.dlg3d .niv .bt{flex:none;min-height:28px;padding:3px 10px;font-size:12px}
+.aide-table{border-collapse:collapse;font-size:13px}
+.aide-table td{padding:3px 12px 3px 0;vertical-align:top}
+.aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 6px;border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);border-radius:4px;background:var(--controle);color:var(--texte);white-space:nowrap}
+@media (max-width:1100px){.palette{max-width:calc(100% - 330px)}}
+@media (max-width:760px){
+  .haut{gap:4px 8px}.fichier{padding-left:0;border-left:0;flex-basis:100%}.signature{display:none}
+  .mb-titre{padding:5px 7px}
+  .palette{left:8px;right:8px;top:auto;bottom:34px;max-width:none}
+  .vue-outils{right:8px}
+  .vue-aide{display:none}
+  .mb-sm>.mb-sl{position:static;display:flex;box-shadow:none;border:0;border-left:1px solid var(--ligne);margin:0 0 4px 14px;padding:2px 0;min-width:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
 </style>
 </head>
 <body>
@@ -225,22 +302,136 @@ button,input,select,textarea{font:inherit;color:inherit}
   <a class="logo" href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M6 24L14 8l6 10 6-4" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 26h20" stroke="currentColor" stroke-width="1.4"/></svg><span class="sous-titre">STR Bim Tools</span></a>
   <span class="titre"><b>DXF Studio</b></span>
   <span class="ver" id="version"></span>
-  <div class="bascule-mode" id="bascule" role="group" aria-label="Mode d'affichage" hidden>
-    <button type="button" data-mode="2d" aria-pressed="true" title="Plan à plat : tout le dessin (textes, hachures, blocs), en lecture">Plan 2D</button>
-    <button type="button" data-mode="3d" aria-pressed="false" title="Vue 3D et outils d'édition : lignes, polylignes et points">3D · édition</button>
-  </div>
   <span class="esp"></span>
   <a class="lien-ifc" href="/ifc/" title="IFC Studio : ouvrir et retravailler un IFC"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z M2 5l6 3.5L14 5 M8 8.5v6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>IFC Studio</span></a>
   <span class="sig">Tony VARIN</span>
   <button type="button" id="btn-ouvrir" title="Ouvrir un DXF ou un DWG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
-  <button type="button" id="btn-dxf" hidden title="Enregistrer le dessin en DXF"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>DXF</span></button>
-  <button type="button" id="btn-dwg" hidden title="Enregistrer le dessin en DWG (AutoCAD 2000)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>DWG</span></button>
   <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
 </header>
+
+<!-- Après ouverture d'un fichier : barre façon IFC Studio (menus, mode, fichier, signature, état) -->
+<div class="haut" id="haut" hidden>
+  <nav class="mb" id="mb" role="menubar" aria-label="Menus de DXF Studio">
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Fichier</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="ouvrir"><span>Ouvrir…</span><kbd>Ctrl+O</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-cmd="dxf"><span>Enregistrer en DXF</span><kbd>Ctrl+S</kbd></button>
+        <button type="button" role="menuitem" data-cmd="dwg"><span>Enregistrer en DWG (AutoCAD 2000)</span><kbd></kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-lien="/ifc/"><span>IFC Studio ↗</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-lien="/"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Édition</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="annuler" data-3d><span>Annuler</span><kbd>Ctrl+Z</kbd></button>
+        <button type="button" role="menuitem" data-cmd="retablir" data-3d><span>Rétablir</span><kbd>Ctrl+Y</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-cmd="supprimer" data-3d class="danger"><span>Supprimer la sélection</span><kbd>Suppr</kbd></button>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Modifier</button>
+      <div class="mb-liste" role="menu" hidden>
+        <div class="mb-sous">Axes et nœuds</div>
+        <button type="button" role="menuitem" data-cmd="aligner" data-3d><span>Aligner</span><kbd>A</kbd></button>
+        <button type="button" role="menuitem" data-cmd="prolonger" data-3d><span>Prolonger jusqu'à</span><kbd>P</kbd></button>
+        <button type="button" role="menuitem" data-cmd="coin" data-3d><span>Raccorder en coin</span><kbd>R</kbd></button>
+        <button type="button" role="menuitem" data-cmd="scinder" data-3d><span>Scinder en un point</span><kbd>S</kbd></button>
+        <button type="button" role="menuitem" data-cmd="noeuds" data-3d><span>Fusionner les nœuds proches…</span><kbd>N</kbd></button>
+        <div class="mb-sous">Sélection</div>
+        <button type="button" role="menuitem" data-cmd="deplacer" data-3d><span>Déplacer par deux points</span><kbd>D</kbd></button>
+        <button type="button" role="menuitem" data-cmd="copier" data-3d><span>Copier par deux points</span><kbd>C</kbd></button>
+        <button type="button" role="menuitem" data-cmd="deplacer-val" data-3d><span>Déplacer de…</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-cmd="copier-val" data-3d><span>Copier de…</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-cmd="cote-z" data-3d><span>Mettre à une cote Z…</span><kbd>Z</kbd></button>
+        <div class="mb-sous">Dessin</div>
+        <button type="button" role="menuitem" data-cmd="ligne" data-3d><span>Dessiner des lignes</span><kbd>L</kbd></button>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Sélection</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="tout" data-3d><span>Tout sélectionner</span><kbd>Ctrl+A</kbd></button>
+        <button type="button" role="menuitem" data-cmd="rien" data-3d><span>Ne rien sélectionner</span><kbd>Échap</kbd></button>
+        <button type="button" role="menuitem" data-cmd="inverser" data-3d><span>Inverser la sélection</span><kbd></kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-cmd="meme-calque" data-3d><span>Même calque</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-cmd="meme-element" data-3d><span>Élément IFC entier</span><kbd></kbd></button>
+        <hr>
+        <button type="button" role="menuitemcheckbox" data-cmd="par-element" data-3d aria-checked="true" title="Un clic choisit tout l'élément IFC (croix et axe d'un poteau, mur…) quand le DXF vient d'IFC Studio"><span>Choisir par élément IFC</span><kbd></kbd></button>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Affichage</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="cadrer"><span>Tout voir</span><kbd>F</kbd></button>
+        <div class="mb-sm">
+          <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true" data-3d><span>Vues</span><kbd>›</kbd></button>
+          <div class="mb-liste mb-sl" role="menu">
+            <button type="button" role="menuitem" data-cmd="vue-maison" data-3d><span>3D de départ</span><kbd>1</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-dessus" data-3d><span>Dessus</span><kbd>2</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-face" data-3d><span>Face</span><kbd>3</kbd></button>
+            <button type="button" role="menuitem" data-cmd="vue-cote" data-3d><span>Côté</span><kbd>4</kbd></button>
+          </div>
+        </div>
+        <div class="mb-sm">
+          <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true" data-3d><span>Boîte de coupe</span><kbd>›</kbd></button>
+          <div class="mb-liste mb-sl" role="menu">
+            <button type="button" role="menuitem" data-cmd="boite-poser" data-3d><span>Autour de la sélection (ou de tout)</span><kbd>B</kbd></button>
+            <button type="button" role="menuitemcheckbox" data-cmd="boite-cadre" data-3d aria-checked="true"><span>Afficher le cadre et les poignées</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="boite-retirer" data-3d><span>Retirer la boîte de coupe</span><kbd>Maj+B</kbd></button>
+          </div>
+        </div>
+        <button type="button" role="menuitem" data-cmd="niveaux" data-3d><span>Plage de cotes Z…</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-cmd="tous-niveaux" data-3d><span>Tous les niveaux</span><kbd></kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-cmd="calques-tous"><span>Afficher tous les calques</span><kbd></kbd></button>
+        <div class="mb-sm">
+          <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Thème</span><kbd>›</kbd></button>
+          <div class="mb-liste mb-sl" role="menu">
+            <button type="button" role="menuitemradio" data-cmd="theme" data-theme-choix="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
+            <button type="button" role="menuitemradio" data-cmd="theme" data-theme-choix="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Outils</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="mesure"><span>Mesurer</span><kbd>M</kbd></button>
+      </div>
+    </div>
+    <div class="mb-gr">
+      <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Aide</button>
+      <div class="mb-liste" role="menu" hidden>
+        <button type="button" role="menuitem" data-cmd="raccourcis"><span>Raccourcis clavier</span><kbd>?</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-lien="/ifc/"><span>IFC Studio ↗</span><kbd></kbd></button>
+        <button type="button" role="menuitem" data-lien="/"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
+      </div>
+    </div>
+  </nav>
+  <div class="mode" id="bascule" role="group" aria-label="Mode de travail">
+    <button type="button" data-mode="2d" aria-pressed="true" title="Plan à plat : tout le dessin (textes, hachures, blocs), en lecture (E pour basculer)">Plan 2D</button>
+    <button type="button" data-mode="3d" aria-pressed="false" title="Vue 3D et outils d'édition : lignes, polylignes et points (E pour basculer)">3D · édition</button>
+  </div>
+  <div class="fichier">
+    <span class="fichier-nom" id="f-nom">—</span>
+    <span class="fichier-bilan" id="f-bilan"></span>
+  </div>
+  <div class="signature">STR Bim Tools · <span id="version2"></span> · Tony VARIN</div>
+  <div class="etat" id="etat" role="status" aria-live="polite"></div>
+</div>
+
 <div class="app">
   <aside class="panneau p-calques">
+    <div class="p-titre">Calques <span class="n" id="n-calques"></span></div>
     <div class="entete-p">
-      <div class="l"><h3>Calques</h3><span class="n" id="n-calques"></span></div>
+      <select class="champ" id="niveau3d" aria-label="Niveau affiché" hidden></select>
       <input class="champ" id="f-calque" type="search" placeholder="Filtrer les calques" autocomplete="off">
       <div class="liens"><button type="button" id="tous">Tout afficher</button><button type="button" id="aucun">Tout masquer</button></div>
     </div>
@@ -253,62 +444,62 @@ button,input,select,textarea{font:inherit;color:inherit}
       <canvas id="vue3d"></canvas>
       <canvas class="cube3d" id="cube3d" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
     </div>
-    <div class="outils outils3d" id="outils3d" hidden>
-      <div class="groupe">
-        <button type="button" class="bt" data-c="cadrer" title="Tout voir (F ou double-clic)">⤢</button>
-        <button type="button" class="bt" data-c="dessus" title="Vue de dessus">Dessus</button>
-        <button type="button" class="bt" data-c="maison" title="Vue 3D de départ">3D</button>
-      </div>
-      <div class="groupe">
-        <button type="button" class="bt" data-o="aligner" aria-pressed="false" title="Aligner (A) : clique la référence, puis les lignes ou les croix de poteaux à amener dessus">Aligner</button>
-        <button type="button" class="bt" data-o="prolonger" aria-pressed="false" title="Prolonger jusqu'à (P) : clique la limite, puis le bout de chaque ligne à prolonger ou à couper">Prolonger</button>
-        <button type="button" class="bt" data-o="coin" aria-pressed="false" title="Raccorder en coin (R) : clique deux lignes du côté à garder">Coin</button>
-        <button type="button" class="bt" data-c="noeuds" title="Fusionner les nœuds proches (N) : extrémités recalées au point moyen, dans la sélection ou sur les calques visibles">Nœuds</button>
-      </div>
-      <div class="groupe">
-        <button type="button" class="bt" data-o="deplacer" aria-pressed="false" title="Déplacer par deux points (D) ; valeurs exactes dans le panneau de droite">Déplacer</button>
-        <button type="button" class="bt" data-o="copier" aria-pressed="false" title="Copier par deux points (C)">Copier</button>
-        <button type="button" class="bt" data-c="z" title="Mettre la sélection à une cote Z (Z)">Cote Z</button>
-        <button type="button" class="bt" data-o="ligne" aria-pressed="false" title="Dessiner des lignes sur le calque courant (L)">Ligne</button>
-        <button type="button" class="bt" data-c="supprimer" title="Supprimer la sélection (Suppr)">Supprimer</button>
-      </div>
-      <div class="groupe">
-        <button type="button" class="bt" data-o="mesure" aria-pressed="false" title="Mesurer en 3D entre deux points (M)">Mesure</button>
-        <button type="button" class="bt" data-c="annuler" title="Annuler (Ctrl+Z)">↶</button>
-        <button type="button" class="bt" data-c="retablir" title="Rétablir (Ctrl+Y)">↷</button>
-      </div>
+    <div class="vue-outils" id="outils" hidden>
+      <button type="button" class="bt" data-c="cadrer" title="Tout voir (double-clic ou F)">Tout voir</button>
+      <button type="button" class="bt" data-c="mesure" aria-pressed="false" title="Mesurer entre deux points (M ; Échap pour sortir)">Mesure</button>
     </div>
-    <div class="outils" id="outils" hidden>
-      <div class="groupe">
-        <button type="button" class="bt" data-c="cadrer" title="Tout voir (double-clic ou F)">⤢</button>
-        <button type="button" class="bt" data-c="mesure" aria-pressed="false" title="Mesurer entre deux points (Échap pour sortir)">Mesure</button>
+    <div class="vue-outils" id="outils3d" hidden>
+      <button type="button" class="bt" data-c="cadrer" title="Tout voir (F ou double-clic)">Tout voir</button>
+      <div class="bascule">
+        <button type="button" class="bt" data-c="dessus" title="Vue de dessus (2)">Dessus</button>
+        <button type="button" class="bt" data-c="maison" title="Vue 3D de départ (1)">3D</button>
       </div>
+      <button type="button" class="bt" data-c="boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève (B, Maj+B)">Boîte de coupe</button>
+      <button type="button" class="bt" data-o="mesure" aria-pressed="false" title="Mesurer en 3D entre deux points (M)">Mesure</button>
+    </div>
+    <div class="palette" id="palette3d" hidden aria-label="Outils d'édition">
+      <button type="button" class="bt" data-o="aligner" aria-pressed="false" title="Aligner (A) : clique la référence, puis les lignes ou les éléments à amener dessus">Aligner</button>
+      <button type="button" class="bt" data-o="prolonger" aria-pressed="false" title="Prolonger jusqu'à (P) : clique la limite, puis le bout de chaque ligne à prolonger ou à couper">Prolonger</button>
+      <button type="button" class="bt" data-o="coin" aria-pressed="false" title="Raccorder en coin (R) : clique deux lignes du côté à garder">Coin</button>
+      <button type="button" class="bt" data-o="scinder" aria-pressed="false" title="Scinder (S) : coupe une ligne en deux au point cliqué (intersections et milieux accrochés)">Scinder</button>
+      <button type="button" class="bt" data-c="noeuds" title="Fusionner les nœuds proches (N)">Nœuds</button>
+      <i class="sep"></i>
+      <button type="button" class="bt" data-o="deplacer" aria-pressed="false" title="Déplacer par deux points (D)">Déplacer</button>
+      <button type="button" class="bt" data-o="copier" aria-pressed="false" title="Copier par deux points (C)">Copier</button>
+      <button type="button" class="bt" data-c="z" title="Mettre la sélection à une cote Z (Z)">Cote Z</button>
+      <button type="button" class="bt" data-o="ligne" aria-pressed="false" title="Dessiner des lignes sur le calque courant (L)">Ligne</button>
+      <i class="sep"></i>
+      <button type="button" class="bt" data-c="annuler" title="Annuler (Ctrl+Z)">↶</button>
+      <button type="button" class="bt" data-c="retablir" title="Rétablir (Ctrl+Y)">↷</button>
+      <button type="button" class="bt" data-c="supprimer" title="Supprimer la sélection (Suppr)">Supprimer</button>
     </div>
     <button type="button" class="replier g" id="rep-g" title="Réduire les calques">‹</button>
     <button type="button" class="replier d" id="rep-d" title="Réduire les propriétés">›</button>
     <div class="coord" id="coord"></div>
-    <div class="etat" id="etat"></div>
+    <div class="vue-aide" id="vue-aide"></div>
     <div class="accueil" id="accueil">
       <div class="boite">
         <div class="icone"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 26L14 8l6 10 7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M4 28h24" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <h1><b>DXF</b> Studio</h1>
-        <p>Ouvre un plan DXF ou DWG : calques, propriétés, mesure avec accroche. Un modèle 3D (par exemple le modèle analytique exporté d'<a href="/ifc/">IFC Studio</a>) se retravaille en 3D : aligner, prolonger, raccorder en coin, fusionner les nœuds.</p>
+        <p>Ouvre un plan DXF ou DWG : calques, propriétés, mesure avec accroche. Un modèle 3D (par exemple le modèle analytique exporté d'<a href="/ifc/">IFC Studio</a>) se retravaille en 3D : aligner, prolonger, raccorder en coin, scinder, fusionner les nœuds.</p>
         <button type="button" class="bt prim" id="btn-ouvrir2">Ouvrir un DXF ou un DWG…</button>
         <div class="zone">ou glisse le fichier ici</div>
+        <div class="accueil-etat" id="etat0" role="status"></div>
         <div class="pied">Le fichier est lu dans ton navigateur, il ne quitte pas ton poste. Les DWG sont convertis par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a> (GPL 3), environ 10 Mo chargés au premier DWG.</div>
       </div>
     </div>
     <div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div></div>
   </main>
-  <aside class="panneau p-props" id="props"></aside>
+  <aside class="panneau p-props"><div class="p-titre">Propriétés</div><div class="props" id="props"></div></aside>
 </div>
+<div class="ctx mb-liste" id="ctx" role="menu" hidden></div>
 <input type="file" id="fichier" accept=".dxf,.dwg" hidden>
 <dialog class="dlg3d" id="dlg3d"></dialog>
 <script src="/dxf/dxf-lecteur.js?v=1"></script>
 <script src="/dxf/dxf-ecrivain.js?v=1"></script>
-<script src="/dxf/dxf-3d.js?v=1"></script>
+<script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
-<script src="/dxf/dxf-editeur.js?v=1"></script>
-<script src="/dxf/dxf-app.js?v=5"></script>
+<script src="/dxf/dxf-editeur.js?v=2"></script>
+<script src="/dxf/dxf-app.js?v=6"></script>
 </body>
 </html>

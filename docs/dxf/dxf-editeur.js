@@ -1,7 +1,9 @@
 /* STR Bim Tools · DXF Studio, mode 3D : vue 3D en fil de fer (projection orthogonale), cube de navigation
  * d'IFC Studio (/ifc/ifc-cube.js), sélection, accroche, et outils pour retravailler un modèle analytique :
- * aligner, prolonger jusqu'à, raccorder en coin, déplacer / copier, fusionner les nœuds, cote Z, ligne,
- * supprimer, changer de calque, coordonnées des sommets, annuler / rétablir.
+ * aligner, prolonger jusqu'à, raccorder en coin, scinder, déplacer / copier, fusionner les nœuds, cote Z, ligne,
+ * supprimer, changer de calque, coordonnées des sommets, annuler / rétablir ; choix par élément IFC (données
+ * étendues STR_IFC écrites par IFC Studio), accroche aux intersections, filtre par niveau (plage de cotes Z),
+ * menu clic droit. Les commandes des menus de dxf-app.js arrivent par Editeur3D.commande(nom).
  * Le dessin est un document DXF3D (dxf-3d.js) : lignes, polylignes et points ; le reste du fichier n'est pas repris.
  * Repère de la caméra comme IFC Studio : lacet autour de Z, plongée ; droite = [cos l, sin l, 0]. */
 (function(){
@@ -22,6 +24,11 @@
   var outil = null, et = null;   // outil en cours et son état
   var annul = [], retab = [];
   var calqueCourant = "0", zTravail = 0, filtre = "";
+  var parElement = true;         // un clic choisit tout l'élément IFC (même GlobalId)
+  var filtreZ = null;            // { a, b, nom } : objets dont le point le plus bas est dans [a, b[ ; null = tous
+  var niveaux = [];              // cotes des niveaux détectés (objets horizontaux)
+  var rappelChange = null;
+  var boite = null, cadreBoite = true, Bcur = null;   // boîte de coupe { min, max } (axes du dessin), cadre affiché, base de la vue en cours
 
   // ================= Couleurs =================
   function clair(){ return document.documentElement.getAttribute("data-theme") === "clair"; }
@@ -37,7 +44,46 @@
   function accent(){ return getComputedStyle(document.documentElement).getPropertyValue("--or").trim() || "#60CDFF"; }
   function calqueDe(nom){ for (var i = 0; i < doc.calques.length; i++) if (doc.calques[i].nom === nom) return doc.calques[i]; return null; }
   function couleurDe(e){ var c = calqueDe(e.calque); return couleurAci(e.couleur != null ? e.couleur : c ? c.couleur : 7); }
-  function visible(e){ var c = calqueDe(e.calque); return !c || c.visible !== false; }
+  function zMin(e){ var z = Infinity; e.pts.forEach(function(p){ if (p[2] < z) z = p[2]; }); return z; }
+  function visible(e){
+    var c = calqueDe(e.calque);
+    if (c && c.visible === false) return false;
+    if (filtreZ){ var z = zMin(e); if (z < filtreZ.a || z >= filtreZ.b) return false; }
+    if (boite && !toucheBoite(e)) return false;
+    return true;
+  }
+  // ---------- Boîte de coupe ----------
+  function dansBoite(p, tol){
+    tol = tol || 0;
+    for (var a = 0; a < 3; a++) if (p[a] < boite.min[a] - tol || p[a] > boite.max[a] + tol) return false;
+    return true;
+  }
+  // segment 3D coupé par la boîte : [t0, t1] gardé, ou null
+  function couper(p, q){
+    var t0 = 0, t1 = 1;
+    for (var a = 0; a < 3; a++){
+      var d = q[a] - p[a];
+      if (Math.abs(d) < 1e-12){ if (p[a] < boite.min[a] || p[a] > boite.max[a]) return null; continue; }
+      var u = (boite.min[a] - p[a])/d, v = (boite.max[a] - p[a])/d;
+      if (u > v){ var w = u; u = v; v = w; }
+      if (u > t0) t0 = u;
+      if (v < t1) t1 = v;
+      if (t0 > t1) return null;
+    }
+    return [t0, t1];
+  }
+  function toucheBoite(e){
+    if (e.type === "POINT") return dansBoite(e.pts[0]);
+    var n = e.pts.length, segs = n - 1 + (e.ferme ? 1 : 0);
+    for (var j = 0; j < segs; j++) if (couper(e.pts[j], e.pts[(j + 1) % n])) return true;
+    return false;
+  }
+  // élément IFC d'origine (GlobalId) et toutes ses parties
+  function gid(e){ return e.info && e.info.ifc && e.info.ifc.gid || null; }
+  function groupeDe(e){
+    var g = parElement && gid(e);
+    return g ? doc.entites.filter(function(f){ return gid(f) === g; }) : [e];
+  }
 
   // ================= Caméra =================
   function base(){
@@ -61,8 +107,8 @@
     if (E.vide) E = DXF3D.etendue(doc);
     C = [0, 1, 2].map(function(i){ return (E.min[i] + E.max[i])/2; });
     var B = base(), lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
-    doc.entites.forEach(function(e){
-      if (!visible(e)) return;
+    if (boite) C = [0, 1, 2].map(function(i){ return (boite.min[i] + boite.max[i])/2; });
+    (boite ? [{ pts: coinsBoite() }] : doc.entites.filter(visible)).forEach(function(e){
       e.pts.forEach(function(p){
         var d = [p[0] - C[0], p[1] - C[1], p[2] - C[2]], u = d[0]*B.r[0] + d[1]*B.r[1], v = d[0]*B.u[0] + d[1]*B.u[1] + d[2]*B.u[2];
         if (u < lo[0]) lo[0] = u; if (u > hi[0]) hi[0] = u; if (v < lo[1]) lo[1] = v; if (v > hi[1]) hi[1] = v;
@@ -126,9 +172,63 @@
     for (var j = 2; j < P.length; j += 2) ctx.lineTo(P[j], P[j + 1]);
     if (ferme) ctx.lineTo(P[0], P[1]);
   }
-  function traceEnt(e, P){
-    if (e.type === "POINT"){ ctx.moveTo(P[0] - 4, P[1]); ctx.lineTo(P[0] + 4, P[1]); ctx.moveTo(P[0], P[1] - 4); ctx.lineTo(P[0], P[1] + 4); }
-    else trace(P, e.ferme);
+  // tracé d'un objet (P : ses sommets à l'écran) ; avec une boîte de coupe, seulement ce qui est dedans
+  function traceEnt(e, P, sansCoupe){
+    if (e.type === "POINT"){ ctx.moveTo(P[0] - 4, P[1]); ctx.lineTo(P[0] + 4, P[1]); ctx.moveTo(P[0], P[1] - 4); ctx.lineTo(P[0], P[1] + 4); return; }
+    if (!boite || sansCoupe || !Bcur){ trace(P, e.ferme); return; }
+    var n = e.pts.length, segs = n - 1 + (e.ferme ? 1 : 0);
+    for (var j = 0; j < segs; j++){
+      var k = (j + 1) % n, c = couper(e.pts[j], e.pts[k]);
+      if (!c) continue;
+      var a = ecran(lerp(e.pts[j], e.pts[k], c[0]), Bcur), b = ecran(lerp(e.pts[j], e.pts[k], c[1]), Bcur);
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+  }
+  // cadre de la boîte et poignées (une par face) ; poignées = [{ a (axe), m (0 min, 1 max), x, y, dir (px par unité) }]
+  var poignees = [];
+  function coinsBoite(){ var c = []; for (var i = 0; i < 8; i++) c.push([i & 1 ? boite.max[0] : boite.min[0], i & 2 ? boite.max[1] : boite.min[1], i & 4 ? boite.max[2] : boite.min[2]]); return c; }
+  function dessinerBoite(B, ac){
+    poignees = [];
+    if (!boite || !cadreBoite) return;
+    var c = coinsBoite().map(function(p){ return ecran(p, B); });
+    ctx.strokeStyle = ac; ctx.globalAlpha = .7; ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]); ctx.beginPath();
+    [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]].forEach(function(r){ ctx.moveTo(c[r[0]][0], c[r[0]][1]); ctx.lineTo(c[r[1]][0], c[r[1]][1]); });
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    var m = [0, 1, 2].map(function(a){ return (boite.min[a] + boite.max[a])/2; });
+    for (var a = 0; a < 3; a++) for (var k = 0; k < 2; k++){
+      var p = m.slice(); p[a] = k ? boite.max[a] : boite.min[a];
+      var q = ecran(p, B), u = p.slice(); u[a] += 1;
+      var r = ecran(u, B), dir = [r[0] - q[0], r[1] - q[1]];
+      if (Math.hypot(dir[0], dir[1]) < 1e-9*s + 1e-12) continue;
+      // poignée presque de face (l'axe pointe vers l'œil) : pas de prise possible
+      if (Math.hypot(dir[0], dir[1])/s < .15) continue;
+      poignees.push({ a: a, m: k, x: q[0], y: q[1], dir: dir });
+      var sv = survolPoignee && survolPoignee.a === a && survolPoignee.m === k;
+      ctx.beginPath(); ctx.arc(q[0], q[1], sv ? 8 : 6, 0, 2*PI);
+      ctx.fillStyle = sv ? ac : getComputedStyle(document.documentElement).getPropertyValue("--vue-fond").trim() || "#1C1C1C";
+      ctx.fill(); ctx.strokeStyle = ac; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+  var survolPoignee = null;
+  function poigneeSous(x, y){ var best = null, bd = 11; poignees.forEach(function(h){ var d = Math.hypot(x - h.x, y - h.y); if (d < bd){ bd = d; best = h; } }); return best; }
+  function poserBoite(){
+    if (!doc) return;
+    var L = sel.size ? Array.from(sel) : doc.entites.filter(function(e){ var c = calqueDe(e.calque); return !c || c.visible !== false; });
+    if (!L.length){ etat("Rien à encadrer."); return; }
+    var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    L.forEach(function(e){ e.pts.forEach(function(p){ for (var a = 0; a < 3; a++){ if (p[a] < mn[a]) mn[a] = p[a]; if (p[a] > mx[a]) mx[a] = p[a]; } }); });
+    var marge = Math.max(Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])*.04, doc.unite === "mm" ? 100 : doc.unite === "cm" ? 10 : .1);
+    boite = { min: mn.map(function(v){ return v - marge; }), max: mx.map(function(v){ return v + marge; }) };
+    cadreBoite = true;
+    majBoite(); cadrer();
+    etat("Boîte de coupe posée autour " + (sel.size ? "de la sélection" : "de tout") + " : tire les poignées pour la retailler. Maj+B pour la retirer.");
+  }
+  function retirerBoite(){ boite = null; majBoite(); etat("Boîte de coupe retirée."); }
+  function majBoite(){
+    var b = $('#outils3d [data-c="boite"]');
+    if (b) b.setAttribute("aria-pressed", String(!!boite));
+    sel.forEach(function(x){ if (!visible(x)) sel.delete(x); });
+    calques(); proprietes(); demander();
   }
   function rendre(){
     besoin = false;
@@ -138,6 +238,7 @@
     if (cube) cube.camera(yaw, pitch);
     if (!doc) return;
     var B = base(), parCouleur = new Map();
+    Bcur = B;
     proj = new Array(doc.entites.length);
     doc.entites.forEach(function(e, i){
       if (!visible(e)) { proj[i] = null; return; }
@@ -171,14 +272,17 @@
       ctx.stroke();
     }
     if (survol && !sel.has(survol.e)){
-      var is = doc.entites.indexOf(survol.e);
-      if (is >= 0 && proj[is]){ ctx.strokeStyle = ac; ctx.globalAlpha = .55; ctx.lineWidth = 2.2; ctx.beginPath(); traceEnt(survol.e, proj[is]); ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = ac; ctx.globalAlpha = .55; ctx.lineWidth = 2.2; ctx.beginPath();
+      (outil ? [survol.e] : groupeDe(survol.e)).forEach(function(f){ var is = doc.entites.indexOf(f); if (is >= 0 && proj[is]) traceEnt(f, proj[is]); });
+      ctx.stroke(); ctx.globalAlpha = 1;
     }
+    dessinerBoite(B, ac);
     apercu(B, ac);
     if (accroche){
       var q = ecran(accroche.p, B);
       ctx.strokeStyle = ac; ctx.lineWidth = 1.6;
       if (accroche.type === "Milieu"){ ctx.beginPath(); ctx.moveTo(q[0], q[1] - 7); ctx.lineTo(q[0] + 7, q[1] + 6); ctx.lineTo(q[0] - 7, q[1] + 6); ctx.closePath(); ctx.stroke(); }
+      else if (accroche.type === "Intersection"){ ctx.beginPath(); ctx.moveTo(q[0] - 7, q[1] - 7); ctx.lineTo(q[0] + 7, q[1] + 7); ctx.moveTo(q[0] + 7, q[1] - 7); ctx.lineTo(q[0] - 7, q[1] + 7); ctx.stroke(); ctx.strokeRect(q[0] - 4, q[1] - 4, 8, 8); }
       else if (accroche.type === "Proche"){ ctx.beginPath(); ctx.moveTo(q[0] - 6, q[1] - 6); ctx.lineTo(q[0] + 6, q[1] + 6); ctx.moveTo(q[0] + 6, q[1] - 6); ctx.lineTo(q[0] - 6, q[1] + 6); ctx.stroke(); }
       else ctx.strokeRect(q[0] - 6, q[1] - 6, 12, 12);
     }
@@ -201,7 +305,7 @@
       sel.forEach(function(e){
         var P = [];
         e.pts.forEach(function(q){ var r = ecran([q[0] + d[0], q[1] + d[1], q[2] + d[2]], B); P.push(r[0], r[1]); });
-        traceEnt(e, P);
+        traceEnt(e, P, true);
       });
       var a = ecran(et.base, B), b = ecran(p, B);
       ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
@@ -237,7 +341,7 @@
       var n = e.pts.length, segs = n - 1 + (e.ferme ? 1 : 0);
       for (var j = 0; j < segs; j++){
         var k = (j + 1) % n, q = distSeg(x, y, P[2*j], P[2*j + 1], P[2*k], P[2*k + 1]);
-        if (q.d < bd){ bd = q.d; best = { e: e, seg: j, t: q.t }; }
+        if (q.d < bd && (!boite || dansBoite(lerp(e.pts[j], e.pts[k], q.t), 1e-6))){ bd = q.d; best = { e: e, seg: j, t: q.t }; }
       }
     });
     return best;
@@ -254,14 +358,37 @@
       var n = e.pts.length;
       for (var j = 0; j < n; j++){
         var d = Math.hypot(x - P[2*j], y - P[2*j + 1]);
-        if (d < bd){ bd = d; best = { p: e.pts[j].slice(), type: "Extrémité" }; }
+        if (d < bd && (!boite || dansBoite(e.pts[j], 1e-6))){ bd = d; best = { p: e.pts[j].slice(), type: "Extrémité" }; }
       }
       var segs = n - 1 + (e.ferme ? 1 : 0);
       for (j = 0; j < segs; j++){
         var k = (j + 1) % n, d2 = Math.hypot(x - (P[2*j] + P[2*k])/2, y - (P[2*j + 1] + P[2*k + 1])/2);
-        if (d2 < bd){ bd = d2; best = { p: lerp(e.pts[j], e.pts[k], .5), type: "Milieu" }; }
+        if (d2 < bd && (!boite || dansBoite(lerp(e.pts[j], e.pts[k], .5), 1e-6))){ bd = d2; best = { p: lerp(e.pts[j], e.pts[k], .5), type: "Milieu" }; }
       }
     });
+    if (best && best.type === "Extrémité") return best;
+    // intersection (vue à l'écran) de deux côtés proches du curseur ; point pris sur le premier côté
+    var proches = [];
+    doc.entites.forEach(function(e, i){
+      var P = proj[i];
+      if (!P || e.type === "POINT") return;
+      var n = e.pts.length, segs = n - 1 + (e.ferme ? 1 : 0);
+      for (var j = 0; j < segs; j++){
+        var k = (j + 1) % n;
+        if (distSeg(x, y, P[2*j], P[2*j + 1], P[2*k], P[2*k + 1]).d < 12) proches.push({ e: e, a: [P[2*j], P[2*j + 1]], b: [P[2*k], P[2*k + 1]], j: j, k: k });
+      }
+    });
+    var bi = null, bdi = 10;
+    for (var u = 0; u < proches.length && u < 60; u++) for (var w = u + 1; w < proches.length && w < 60; w++){
+      var A = proches[u], Bq = proches[w], r = [A.b[0] - A.a[0], A.b[1] - A.a[1]], q2 = [Bq.b[0] - Bq.a[0], Bq.b[1] - Bq.a[1]], den = r[0]*q2[1] - r[1]*q2[0];
+      if (Math.abs(den) < 1e-9) continue;
+      var t = ((Bq.a[0] - A.a[0])*q2[1] - (Bq.a[1] - A.a[1])*q2[0])/den, t2 = ((Bq.a[0] - A.a[0])*r[1] - (Bq.a[1] - A.a[1])*r[0])/den;
+      if (t < -1e-6 || t > 1 + 1e-6 || t2 < -1e-6 || t2 > 1 + 1e-6) continue;
+      var ix = A.a[0] + r[0]*t, iy = A.a[1] + r[1]*t, di = Math.hypot(x - ix, y - iy);
+      var pi = lerp(A.e.pts[A.j], A.e.pts[A.k], t);
+      if (di < bdi && (!boite || dansBoite(pi, 1e-6))){ bdi = di; bi = { p: pi, type: "Intersection" }; }
+    }
+    if (bi) return bi;
     if (best) return best;
     var v = viser(x, y, 7);
     if (v && v.e.type !== "POINT"){ var b = bout(v.e, v.seg); return { p: lerp(b[0], b[1], v.t), type: "Proche" }; }
@@ -286,7 +413,7 @@
   }
   function annuler(){ if (!annul.length){ etat("Rien à annuler."); return; } retab.push(instantane()); restaurer(annul.pop()); etat("Annulé."); }
   function retablir(){ if (!retab.length){ etat("Rien à rétablir."); return; } annul.push(instantane()); restaurer(retab.pop()); etat("Rétabli."); }
-  function majTout(){ calques(); proprietes(); demander(); }
+  function majTout(){ if (doc) detecterNiveaux(); calques(); proprietes(); demander(); if (rappelChange) rappelChange(); }
 
   // ================= Géométrie en plan =================
   function d2(a, b){ return [b[0] - a[0], b[1] - a[1]]; }
@@ -408,8 +535,10 @@
   function aligner(ref, cible){
     var a = bout(ref.e, ref.seg), ar = angleSeg(a[0], a[1]);
     if (long2(d2(a[0], a[1])) < 1e-9){ etat("La référence est verticale : choisis une ligne vue en plan."); return false; }
-    var groupe = sel.has(cible.e) ? Array.from(sel) : partenaires(cible.e), b = bout(cible.e, cible.seg), ang = ecartAngle(ar, angleSeg(b[0], b[1]));
-    var croix = groupe.length > 1 && !sel.has(cible.e);
+    var groupe = sel.has(cible.e) ? Array.from(sel) : gid(cible.e) ? groupeDe(cible.e) : partenaires(cible.e), b = bout(cible.e, cible.seg), ang = ecartAngle(ar, angleSeg(b[0], b[1]));
+    if (groupe.length === 1 && !sel.has(cible.e)) groupe = partenaires(cible.e);
+    // croix de poteau : le groupe contient un axe vertical, ou deux branches de même milieu ; il suit sans tourner
+    var croix = !sel.has(cible.e) && groupe.length > 1 && groupe.some(function(f){ return f.type === "LIGNE" && (long2(d2(f.pts[0], f.pts[1])) < 1e-3 || (f !== cible.e && proche(milieu(f), milieu(cible.e), 1e-3))); });
     if (long2(d2(b[0], b[1])) < 1e-9 || (Math.abs(ang) > 20*PI/180 && !croix)){
       etat("Aligne une ligne presque parallèle à la référence (moins de 20°), ou la croix d'un poteau.");
       return false;
@@ -467,6 +596,35 @@
     return true;
   }
 
+  // scinder : une ligne (ou polyligne) coupée en deux au point cliqué ; une polyligne fermée devient ouverte
+  function scinder(v, x, y){
+    var e = v.e;
+    if (e.type === "POINT"){ etat("Choisis une ligne ou une polyligne."); return false; }
+    var b = bout(e, v.seg), p = accroche && accroche.type !== "Extrémité" ? accroche.p : lerp(b[0], b[1], v.t);
+    var d = [b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2]], l2 = d[0]*d[0] + d[1]*d[1] + d[2]*d[2];
+    var t = l2 ? ((p[0] - b[0][0])*d[0] + (p[1] - b[0][1])*d[1] + (p[2] - b[0][2])*d[2])/l2 : 0;
+    if (t < 1e-6 || t > 1 - 1e-6){ etat("Clique à l'intérieur d'un côté, pas sur une extrémité."); return false; }
+    p = lerp(b[0], b[1], t);
+    memoriser();
+    var n = e.pts.length, j = v.seg, morceaux;
+    if (e.ferme){
+      var pts = [p];
+      for (var q = j + 1; q < n; q++) pts.push(e.pts[q]);
+      for (q = 0; q <= j; q++) pts.push(e.pts[q]);
+      pts.push(p.slice());
+      e.pts = pts; e.ferme = false;
+      majTout(); etat("Polyligne ouverte au point cliqué."); return true;
+    }
+    morceaux = [e.pts.slice(0, j + 1).concat([p]), [p.slice()].concat(e.pts.slice(j + 1))];
+    var copie = JSON.parse(JSON.stringify(e));
+    e.pts = morceaux[0]; e.type = e.pts.length === 2 ? "LIGNE" : "POLYLIGNE";
+    copie.pts = morceaux[1]; copie.type = copie.pts.length === 2 ? "LIGNE" : "POLYLIGNE";
+    doc.entites.splice(doc.entites.indexOf(e) + 1, 0, copie);
+    if (sel.has(e)) sel.add(copie);
+    majTout(); etat("Scindé en deux au point " + nb(p[0], 3) + " ; " + nb(p[1], 3) + " ; " + nb(p[2], 3) + ". Clique un autre point, ou Échap.");
+    return true;
+  }
+
   // ================= Outils (clics dans la vue) =================
   var AIDES = {
     mesure: "Mesure : clique deux points (accroche aux extrémités et milieux).",
@@ -475,6 +633,7 @@
     aligner: "Aligner : clique la ligne de référence, puis les lignes ou les croix de poteaux à aligner dessus.",
     prolonger: "Prolonger jusqu'à : clique la ligne limite, puis le bout de chaque ligne à prolonger ou à couper.",
     coin: "Raccorder en coin : clique la première ligne du côté à garder, puis la seconde.",
+    scinder: "Scinder : clique le point où couper la ligne (intersections et milieux accrochés).",
     ligne: "Ligne : clique les points les uns après les autres (calque courant) ; Échap pour finir."
   };
   function choisirOutil(o){
@@ -514,6 +673,7 @@
     }
     v = viser(x, y, 8);
     if (!v){ etat("Rien sous le curseur. " + AIDES[outil]); return; }
+    if (outil === "scinder"){ scinder(v, x, y); return; }
     if (outil === "aligner"){
       if (!et.ref){ if (v.e.type === "POINT") return; et.ref = v; etat("Référence choisie. Clique les lignes ou les croix à aligner dessus."); demander(); return; }
       if (v.e !== et.ref.e) aligner(et.ref, v);
@@ -549,7 +709,8 @@
     var p = local(e);
     ptrs.set(e.pointerId, p);
     anim = null;
-    tir = { x: p.x, y: p.y, x0: p.x, y0: p.y, bouton: e.button, bouge: false, ctrl: e.ctrlKey || e.metaKey, maj: e.shiftKey, pivot: false };
+    tir = { x: p.x, y: p.y, x0: p.x, y0: p.y, bouton: e.button, bouge: false, ctrl: e.ctrlKey || e.metaKey, maj: e.shiftKey, pivot: false,
+      poignee: e.button === 0 ? poigneeSous(p.x, p.y) : null };
     if (ptrs.size === 2){
       var P = Array.from(ptrs.values());
       tir.pince = { d: Math.hypot(P[0].x - P[1].x, P[0].y - P[1].y), m: [(P[0].x + P[1].x)/2, (P[0].y + P[1].y)/2] };
@@ -570,6 +731,15 @@
     if (tir && !tir.bouge && Math.abs(p.x - tir.x0) + Math.abs(p.y - tir.y0) > 3) tir.bouge = true;
     if (tir && tir.bouge){
       var dx = p.x - tir.x, dy = p.y - tir.y;
+      if (tir.poignee){
+        // poignée de la boîte : la face suit la souris le long de son axe
+        var h = tir.poignee, l2 = h.dir[0]*h.dir[0] + h.dir[1]*h.dir[1], du = (dx*h.dir[0] + dy*h.dir[1])/l2, a = h.a, ep = (boite.max[a] - boite.min[a])*1e-3 + 1e-6;
+        if (h.m) boite.max[a] = Math.max(boite.min[a] + ep, boite.max[a] + du);
+        else boite.min[a] = Math.min(boite.max[a] - ep, boite.min[a] + du);
+        tir.x = p.x; tir.y = p.y;
+        demander();
+        return;
+      }
       if (tir.ctrl && tir.bouton === 0){ cadre = { x0: tir.x0, y0: tir.y0, x1: p.x, y1: p.y }; }
       else if (tir.maj || tir.bouton === 1 || tir.bouton === 2){ px += dx; py += dy; cv.classList.add("tire"); }
       else {
@@ -586,8 +756,12 @@
       demander();
       return;
     }
+    // survol d'une poignée de la boîte de coupe
+    var hp = !tir ? poigneeSous(p.x, p.y) : null;
+    if ((hp && (!survolPoignee || hp.a !== survolPoignee.a || hp.m !== survolPoignee.m)) || (!hp && survolPoignee)){ survolPoignee = hp; demander(); }
+    cv.classList.toggle("poignee", !!hp);
     // survol : accroche (outils à points) ou objet sous le curseur
-    var aPoints = outil === "mesure" || outil === "deplacer" || outil === "copier" || outil === "ligne";
+    var aPoints = outil === "mesure" || outil === "deplacer" || outil === "copier" || outil === "ligne" || outil === "scinder";
     accroche = aPoints ? accrocher(p.x, p.y) : null;
     survol = aPoints ? null : viser(p.x, p.y, 7);
     var w = accroche ? accroche.p : aPoints ? monde(p.x, p.y, et && et.base ? et.base[2] : zTravail) : null;
@@ -604,13 +778,14 @@
     tir = null;
     cv.classList.remove("tire");
     if (cadre){ fenetre(cadre, t.maj); cadre = null; demander(); return; }
+    if (t.poignee){ if (t.bouge) majBoite(); return; }
     if (t.bouge || t.pince || e.type === "pointercancel") return;
-    if (t.bouton === 2){ if (outil) choisirOutil(null); return; }
+    if (t.bouton === 2){ if (outil) choisirOutil(null); else menuContexte(e.clientX, e.clientY, viser(p.x, p.y, 7)); return; }
     if (t.bouton !== 0) return;
     if (outil){ clicOutil(p.x, p.y); return; }
     var v = viser(p.x, p.y, 7);
-    if (t.ctrl || t.maj){ if (v){ if (sel.has(v.e)) sel.delete(v.e); else sel.add(v.e); } }
-    else { sel.clear(); if (v) sel.add(v.e); }
+    if (t.ctrl || t.maj){ if (v){ var g = groupeDe(v.e), dedans = sel.has(v.e); g.forEach(function(f){ if (dedans) sel.delete(f); else sel.add(f); }); } }
+    else { sel.clear(); if (v) groupeDe(v.e).forEach(function(f){ sel.add(f); }); }
     proprietes(); demander();
   }
   cv.addEventListener("pointerup", lacher);
@@ -654,31 +829,151 @@
     if (ctrl && (k === "y" || k === "Y" || ((k === "z" || k === "Z") && e.shiftKey))){ e.preventDefault(); retablir(); return; }
     if (ctrl && (k === "a" || k === "A")){ e.preventDefault(); sel = new Set(doc.entites.filter(visible)); proprietes(); demander(); return; }
     if (ctrl || e.altKey) return;
-    if (k === "Escape"){ if (outil){ if (et && (et.base || et.ref) && outil !== "aligner" && outil !== "prolonger"){ et = {}; demander(); } else choisirOutil(null); } else { sel.clear(); proprietes(); demander(); } return; }
+    if (k === "Escape"){ if (!$("#ctx").hidden){ fermerCtx(); return; } if (outil){ if (et && (et.base || et.ref) && outil !== "aligner" && outil !== "prolonger"){ et = {}; demander(); } else choisirOutil(null); } else { sel.clear(); proprietes(); demander(); } return; }
     if (k === "Delete" || k === "Backspace"){ e.preventDefault(); supprimer(); return; }
+    if (k === "B"){ e.preventDefault(); retirerBoite(); return; }
+    if (k === "b"){ e.preventDefault(); poserBoite(); return; }
     var c = { f: cadrer, m: function(){ choisirOutil("mesure"); }, d: function(){ choisirOutil("deplacer"); }, c: function(){ choisirOutil("copier"); },
       a: function(){ choisirOutil("aligner"); }, p: function(){ choisirOutil("prolonger"); }, r: function(){ choisirOutil("coin"); },
-      l: function(){ choisirOutil("ligne"); }, n: dlgNoeuds, z: dlgCoteZ }[k.toLowerCase()];
+      l: function(){ choisirOutil("ligne"); }, n: dlgNoeuds, z: dlgCoteZ, s: function(){ choisirOutil("scinder"); },
+      "1": vueMaison, "2": function(){ allerVers(0, DEMI, null, true); }, "3": function(){ allerVers(0, 0, null, true); }, "4": function(){ allerVers(DEMI, 0, null, true); } }[k.toLowerCase()];
     if (c){ e.preventDefault(); c(); }
   });
 
-  // ================= Barre d'outils 3D =================
-  $("#outils3d").addEventListener("click", function(e){
-    var b = e.target.closest("button");
-    if (!b || !doc) return;
-    var o = b.getAttribute("data-o"), c = b.getAttribute("data-c");
-    if (o){ choisirOutil(o); return; }
-    ({ cadrer: cadrer, dessus: function(){ allerVers(0, DEMI, null, true); }, maison: vueMaison, supprimer: supprimer,
-      annuler: annuler, retablir: retablir, deplacer: function(){ dlgDeplacer(false); }, copier: function(){ dlgDeplacer(true); },
-      noeuds: dlgNoeuds, z: dlgCoteZ }[c] || function(){})();
+  // ================= Commandes (barre de menus, outils de la vue, menu clic droit) =================
+  function choisirListe(l){ sel = new Set(l); proprietes(); demander(); etat(sel.size + " objet(s) sélectionné(s)."); }
+  var COMMANDES = {
+    cadrer: cadrer, maison: vueMaison, "vue-maison": vueMaison,
+    dessus: function(){ allerVers(0, DEMI, null, true); }, "vue-dessus": function(){ allerVers(0, DEMI, null, true); },
+    "vue-face": function(){ allerVers(0, 0, null, true); }, "vue-cote": function(){ allerVers(DEMI, 0, null, true); },
+    annuler: annuler, retablir: retablir, supprimer: supprimer,
+    aligner: function(){ choisirOutil("aligner"); }, prolonger: function(){ choisirOutil("prolonger"); }, coin: function(){ choisirOutil("coin"); },
+    scinder: function(){ choisirOutil("scinder"); }, ligne: function(){ choisirOutil("ligne"); }, mesure: function(){ choisirOutil("mesure"); },
+    deplacer: function(){ choisirOutil("deplacer"); }, copier: function(){ choisirOutil("copier"); },
+    "deplacer-val": function(){ dlgDeplacer(false); }, "copier-val": function(){ dlgDeplacer(true); },
+    noeuds: dlgNoeuds, z: dlgCoteZ, "cote-z": dlgCoteZ,
+    tout: function(){ choisirListe(doc.entites.filter(visible)); },
+    rien: function(){ choisirListe([]); },
+    inverser: function(){ choisirListe(doc.entites.filter(function(e){ return visible(e) && !sel.has(e); })); },
+    "meme-calque": function(){ var c = new Set(); sel.forEach(function(e){ c.add(e.calque); }); choisirListe(doc.entites.filter(function(e){ return visible(e) && c.has(e.calque); })); },
+    "meme-element": function(){
+      var g = new Set(); sel.forEach(function(e){ if (gid(e)) g.add(gid(e)); });
+      if (!g.size){ etat("Ces objets ne portent pas d'élément IFC (le DXF ne vient pas d'IFC Studio, ou d'une version d'avant le 13.11.2026)."); return; }
+      choisirListe(doc.entites.filter(function(e){ return g.has(gid(e)) || sel.has(e); }));
+    },
+    "par-element": function(){ parElement = !parElement; etat(parElement ? "Un clic choisit tout l'élément IFC." : "Un clic choisit un seul objet."); },
+    niveaux: dlgNiveaux, "tous-niveaux": function(){ appliquerNiveau(null); },
+    boite: function(){ if (boite) retirerBoite(); else poserBoite(); },
+    "boite-poser": poserBoite, "boite-retirer": retirerBoite,
+    "boite-cadre": function(){ if (boite){ cadreBoite = !cadreBoite; demander(); } },
+    "calques-tous": function(){ doc.calques.forEach(function(c){ c.visible = true; }); calques(); demander(); }
+  };
+  function lancer(c){ if (doc && COMMANDES[c]) COMMANDES[c](); }
+  [$("#outils3d"), $("#palette3d")].forEach(function(barre){
+    barre.addEventListener("click", function(e){
+      var b = e.target.closest("button");
+      if (!b || !doc) return;
+      var o = b.getAttribute("data-o"), c = b.getAttribute("data-c");
+      if (o){ choisirOutil(o); return; }
+      lancer(c);
+    });
   });
 
+  // ================= Menu clic droit =================
+  var ctxEl = $("#ctx");
+  function fermerCtx(){ ctxEl.hidden = true; }
+  document.addEventListener("pointerdown", function(e){ if (!ctxEl.hidden && !ctxEl.contains(e.target)) fermerCtx(); }, true);
+  function menuContexte(x, y, v){
+    if (v && !sel.has(v.e)){ sel.clear(); groupeDe(v.e).forEach(function(f){ sel.add(f); }); proprietes(); demander(); }
+    var n = sel.size, e0 = v ? v.e : null, info = e0 && e0.info && e0.info.ifc;
+    var titre = n ? (info ? info.type.replace(/^IFC/, "") + (info.nom ? " · " + info.nom : "") : n + " objet(s)" + (e0 ? " · " + e0.calque : "")) : "Vue 3D";
+    var L = n ? [
+      ["deplacer-val", "Déplacer de…"], ["copier-val", "Copier de…"], ["cote-z", "Mettre à une cote Z…"], null,
+      ["aligner", "Aligner…"], ["prolonger", "Prolonger jusqu'à…"], ["scinder", "Scinder en un point"], null,
+      ["meme-calque", "Sélectionner le même calque"], gid(e0 || {}) ? ["meme-element", "Sélectionner tout l'élément IFC"] : null,
+      ["masquer-calque", "Masquer le calque"], ["boite-poser", "Boîte de coupe autour"], null, ["supprimer", "Supprimer", true], null, ["cadrer", "Tout voir"]
+    ] : [["cadrer", "Tout voir"], ["vue-dessus", "Vue de dessus"], ["vue-maison", "Vue 3D de départ"], null, ["tout", "Tout sélectionner"], ["ligne", "Dessiner des lignes"], ["niveaux", "Plage de cotes Z…"],
+      null, boite ? ["boite-retirer", "Retirer la boîte de coupe"] : ["boite-poser", "Boîte de coupe autour de tout"]];
+    // séparateurs en double ou en bout retirés
+    var h = '<div class="ctx-titre">' + esc(titre) + "</div>", prec = true;
+    L.forEach(function(it, i){
+      if (!it){ if (!prec && L.slice(i + 1).some(Boolean)) h += "<hr>"; prec = true; return; }
+      h += '<button type="button" role="menuitem" data-k="' + it[0] + '"' + (it[2] ? ' class="danger"' : "") + "><span>" + esc(it[1]) + "</span><kbd></kbd></button>";
+      prec = false;
+    });
+    ctxEl.innerHTML = h;
+    ctxEl.hidden = false;
+    var r = ctxEl.getBoundingClientRect();
+    ctxEl.style.left = Math.max(4, Math.min(x, window.innerWidth - r.width - 4)) + "px";
+    ctxEl.style.top = Math.max(4, Math.min(y, window.innerHeight - r.height - 4)) + "px";
+  }
+  ctxEl.addEventListener("click", function(e){
+    var b = e.target.closest("[data-k]");
+    if (!b) return;
+    fermerCtx();
+    var k = b.getAttribute("data-k");
+    if (k === "masquer-calque"){ var c = new Set(); sel.forEach(function(f){ c.add(f.calque); }); doc.calques.forEach(function(q){ if (c.has(q.nom)) q.visible = false; }); sel.clear(); majTout(); return; }
+    lancer(k);
+  });
+
+  // ================= Niveaux : plage de cotes Z =================
+  // niveaux = cotes des objets horizontaux (pieds de murs, dalles, poutres à plat), regroupées à 2 cm près
+  function detecterNiveaux(){
+    var zs = [];
+    doc.entites.forEach(function(e){
+      if (e.type === "POINT") return;
+      var z0 = e.pts[0][2];
+      if (e.pts.every(function(p){ return Math.abs(p[2] - z0) < 1e-3; })) zs.push(z0);
+    });
+    zs.sort(function(a, b){ return a - b; });
+    var tol = doc.unite === "mm" ? 20 : doc.unite === "cm" ? 2 : .02, out = [];
+    zs.forEach(function(z){ if (!out.length || z - out[out.length - 1].max > tol) out.push({ min: z, max: z, n: 1, s: z }); else { var o = out[out.length - 1]; o.max = z; o.n++; o.s += z; } });
+    niveaux = out.map(function(o){ return o.s/o.n; });
+    remplirNiveaux();
+  }
+  function plageNiveau(i){
+    var tol = doc.unite === "mm" ? 10 : doc.unite === "cm" ? 1 : .01;
+    return { a: i === 0 ? -Infinity : niveaux[i] - tol, b: i + 1 < niveaux.length ? niveaux[i + 1] - tol : Infinity, nom: "Niveau " + nb(niveaux[i], 3) };
+  }
+  function remplirNiveaux(){
+    var s0 = $("#niveau3d");
+    s0.innerHTML = '<option value="">Tous les niveaux' + (niveaux.length ? " (" + niveaux.length + ")" : "") + "</option>" +
+      niveaux.map(function(z, i){ return '<option value="' + i + '">Niveau ' + esc(nb(z, 3)) + " " + esc(doc.unite) + "</option>"; }).join("") +
+      (filtreZ && filtreZ.libre ? '<option value="libre" selected>' + esc(filtreZ.nom) + "</option>" : "");
+    if (filtreZ && !filtreZ.libre) s0.value = String(filtreZ.i);
+    if (!filtreZ) s0.value = "";
+  }
+  function appliquerNiveau(f){
+    filtreZ = f;
+    sel.forEach(function(x){ if (!visible(x)) sel.delete(x); });
+    remplirNiveaux(); calques(); proprietes(); cadrer();
+    etat(f ? f.nom + " : objets dont le point le plus bas est entre " + (isFinite(f.a) ? nb(f.a, 3) : "−∞") + " et " + (isFinite(f.b) ? nb(f.b, 3) : "+∞") + "." : "Tous les niveaux affichés.");
+  }
+  $("#niveau3d").addEventListener("change", function(){
+    if (!actif || !doc) return;
+    var v = this.value;
+    if (v === "") appliquerNiveau(null);
+    else if (v !== "libre"){ var f = plageNiveau(+v); f.i = +v; appliquerNiveau(f); }
+  });
+  function dlgNiveaux(){
+    var E = DXF3D.etendue(doc);
+    dialogue("Plage de cotes Z", [{ id: "a", l: "Z mini (" + doc.unite + ")", v: filtreZ && isFinite(filtreZ.a) ? filtreZ.a : Math.round(E.min[2]*1e4)/1e4 },
+      { id: "b", l: "Z maxi, exclu (" + doc.unite + ")", v: filtreZ && isFinite(filtreZ.b) ? filtreZ.b : Math.round((E.max[2] + 1)*1e4)/1e4 }], function(r){
+      if (r.b <= r.a){ etat("Le Z maxi doit être plus grand que le Z mini."); return; }
+      appliquerNiveau({ a: r.a, b: r.b, nom: "Z " + nb(r.a, 3) + " à " + nb(r.b, 3), libre: true });
+    }, '<p class="note">Seuls les objets dont le point le plus bas est dans la plage restent affichés : un niveau garde sa dalle, ses poutres, ses pieds de murs et ses poteaux qui en partent.</p>' +
+      (niveaux.length ? '<div class="niv">' + niveaux.map(function(z, i){ return '<button type="button" class="bt" data-niv="' + i + '">' + esc(nb(z, 3)) + "</button>"; }).join("") + "</div>" : ""));
+    $("#dlg3d").querySelectorAll("[data-niv]").forEach(function(b){
+      b.addEventListener("click", function(){ var i = +b.getAttribute("data-niv"), f = plageNiveau(i); f.i = i; $("#dlg3d").close(); appliquerNiveau(f); });
+    });
+  }
+
   // ================= Petite fenêtre de saisie =================
-  function dialogue(titre, champs, ok){
+  function dialogue(titre, champs, ok, note){
     var d = $("#dlg3d");
     d.innerHTML = '<form method="dialog"><h2>' + esc(titre) + '</h2><div class="champs">' + champs.map(function(c){
       return '<label><span>' + esc(c.l) + '</span><input class="champ" type="number" step="any" name="' + c.id + '" value="' + c.v + '"' + (c.min != null ? ' min="' + c.min + '"' : "") + "></label>";
-    }).join("") + '</div><div class="pied"><button type="submit" class="bt prim" value="ok">OK</button><button type="submit" class="bt" value="non" formnovalidate>Annuler</button></div></form>';
+    }).join("") + "</div>" + (note || "") + '<div class="pied"><button type="submit" class="bt prim" value="ok">OK</button><button type="submit" class="bt" value="non" formnovalidate>Annuler</button></div></form>';
     var f = d.querySelector("form");
     f.addEventListener("submit", function(ev){
       var bt = ev.submitter;
@@ -764,7 +1059,7 @@
     }
     var L = Array.from(sel), cal = L[0].calque, memeCal = L.every(function(e){ return e.calque === cal; }), lg = 0;
     L.forEach(function(e){ for (var j = 0; j + 1 < e.pts.length; j++) lg += Math.hypot(e.pts[j + 1][0] - e.pts[j][0], e.pts[j + 1][1] - e.pts[j][1], e.pts[j + 1][2] - e.pts[j][2]); if (e.ferme && e.pts.length > 2){ var a = e.pts[e.pts.length - 1], b = e.pts[0]; lg += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); } });
-    var h = '<div class="tete"><h2>' + (L.length === 1 ? esc(L[0].type === "LIGNE" ? "Ligne" : L[0].type === "POLYLIGNE" ? "Polyligne" + (L[0].ferme ? " fermée" : "") : "Point") : L.length + " objets") +
+    var h = '<div class="tete"><h2>' + (info && L.length > 1 ? esc(info.type.replace(/^IFC/, "")) + " · " + L.length + " objets" : L.length === 1 ? esc(L[0].type === "LIGNE" ? "Ligne" : L[0].type === "POLYLIGNE" ? "Polyligne" + (L[0].ferme ? " fermée" : "") : "Point") : L.length + " objets") +
       '</h2><div class="sous">' + (memeCal ? "Calque " + esc(cal) : "Plusieurs calques") + '</div><button type="button" class="fermer" title="Ne rien choisir">×</button></div>' +
       '<div class="carte"><table class="tbl">' +
       ligneProp("Calque", '<select class="champ" id="ed-calque">' + (memeCal ? "" : '<option value="" selected>(plusieurs)</option>') + optionsCalques(memeCal ? cal : null) + '<option value="+">Nouveau calque…</option></select>') +
@@ -774,7 +1069,7 @@
       h += ligneProp("En plan", '<span class="mono">' + nb(pl, 4) + "</span>") + (pl > 1e-9 ? ligneProp("Angle en plan", '<span class="mono">' + nb(Math.atan2(dy, dx)*180/PI, 3) + "°</span>") : "") +
         ligneProp("ΔZ", '<span class="mono">' + nb(dz, 4) + "</span>");
     }
-    var info = L.length === 1 && L[0].info && L[0].info.ifc;
+    var g0 = gid(L[0]), info = g0 && L.every(function(e){ return gid(e) === g0; }) ? L[0].info.ifc : null;
     if (info) h += ligneProp("IFC", esc(info.type + (info.nom ? " · " + info.nom : ""))) + (info.gid ? ligneProp("GlobalId", '<span class="mono">' + esc(info.gid) + "</span>") : "");
     h += "</table></div>";
     if (L.length === 1 && L[0].pts.length <= 24){
@@ -842,7 +1137,7 @@
     // lit le DXF (texte ou ArrayBuffer) : { entites, ignores (nombre d'objets non repris), a3D (des Z différents) }
     charger: function(buf, nom){
       doc = DXF3D.lire(buf); nomDoc = nom || "";
-      sel.clear(); survol = null; outil = null; et = null; annul = []; retab = []; modifie = false;
+      sel.clear(); survol = null; outil = null; et = null; annul = []; retab = []; modifie = false; boite = null; filtreZ = null;
       calqueCourant = doc.calques.length ? doc.calques[0].nom : "0";
       var E = DXF3D.etendue(doc), ign = 0;
       Object.keys(doc.ignores).forEach(function(k){ ign += doc.ignores[k]; });
@@ -855,10 +1150,21 @@
       actif = !!on;
       if (!actif){ outil = null; et = null; return; }
       document.querySelectorAll("#outils3d [data-o]").forEach(function(b){ b.setAttribute("aria-pressed", "false"); });
+      detecterNiveaux(); majBoite();
       taille(); cadrer(); calques(); proprietes();
       if (cube) cube.redessiner();
     },
     actif: function(){ return actif; },
+    commande: lancer,
+    etatMenus: function(){ return { annuler: annul.length > 0, retablir: retab.length > 0, sel: sel.size > 0, parElement: parElement, filtreZ: !!filtreZ, boite: !!boite, cadreBoite: cadreBoite }; },
+    bilan: function(){
+      if (!doc) return "";
+      var t = { LIGNE: 0, POLYLIGNE: 0, POINT: 0 }, g = new Set();
+      doc.entites.forEach(function(e){ t[e.type]++; if (gid(e)) g.add(gid(e)); });
+      return t.LIGNE + " lignes · " + t.POLYLIGNE + " polylignes" + (t.POINT ? " · " + t.POINT + " points" : "") + " · " + doc.calques.length + " calques" +
+        (g.size ? " · " + g.size + " éléments IFC" : "") + (modifie ? " · modifié" : "");
+    },
+    surChange: function(f){ rappelChange = f; },
     modifie: function(){ return modifie; },
     enregistre: function(){ modifie = false; },
     texte: function(){ return DXF3D.ecrire(doc); }

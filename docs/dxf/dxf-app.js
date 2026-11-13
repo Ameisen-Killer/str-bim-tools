@@ -2,7 +2,7 @@
    (dxf-editeur.js). Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "2.0.0";
+  var VERSION = "2.1.0";
   var Ed = window.Editeur3D || null;
   function en3D(){ return !!(Ed && Ed.actif()); }
   var $ = function(s){ return document.querySelector(s); };
@@ -11,7 +11,7 @@
   function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e){} }
   function hex(c){ return "#" + ("00000" + c.toString(16)).slice(-6); }
   function nb(x, d){ return (Math.round(x*Math.pow(10, d))/Math.pow(10, d)).toLocaleString("fr-CH", { maximumFractionDigits: d }); }
-  $("#version").textContent = "v" + VERSION;
+  $("#version").textContent = $("#version2").textContent = "v" + VERSION;
 
   var cv = $("#vue"), ctx = cv.getContext("2d"), centre = $("#centre");
   var S = null;                 // scène lue (DXF.lire)
@@ -274,9 +274,16 @@
   cv.addEventListener("dblclick", function(){ if (mode !== "mesure") recadrer(); });
   document.addEventListener("keydown", function(e){
     if (e.target.closest && e.target.closest("input,textarea,select,dialog")) return;
+    var k = e.key, ctrl = e.ctrlKey || e.metaKey;
+    // raccourcis communs aux deux modes
+    if (ctrl && (k === "o" || k === "O")){ e.preventDefault(); choisirFichier(); return; }
+    if (ctrl && (k === "s" || k === "S")){ e.preventDefault(); if (source) enregistrer("dxf"); return; }
+    if (!ctrl && !e.altKey && S && (k === "e" || k === "E")){ e.preventDefault(); choisirMode(en3D() ? "2d" : "3d"); return; }
+    if (!ctrl && !e.altKey && k === "?"){ e.preventDefault(); raccourcis(); return; }
     if (en3D()) return;
-    if (e.key === "Escape"){ if (mode){ outilMesure(false); } else choisir(-1); }
-    else if (e.key === "f" || e.key === "F") recadrer();
+    if (k === "Escape"){ if (ouvert) fermerMenu(); else if (mode){ outilMesure(false); } else choisir(-1); }
+    else if (!ctrl && (k === "f" || k === "F")) recadrer();
+    else if (!ctrl && S && (k === "m" || k === "M")) outilMesure(mode !== "mesure");
   });
 
   // ================= Mesure =================
@@ -400,7 +407,7 @@
   $("#aucun").addEventListener("click", function(){ if (S && !en3D()){ S.calques.forEach(function(c){ c.visible = false; }); calques(); demander(); } });
 
   // ================= Ouverture =================
-  function etat(t){ $("#etat").textContent = t || ""; }
+  function etat(t){ $("#etat").textContent = t || ""; $("#etat0").textContent = $("#haut").hidden ? t || "" : ""; }
   var veut3D = false;
   // ================= Bascule Plan 2D / 3D · édition =================
   // Les retouches faites en 3D sont reportées dans le plan 2D et dans le fichier à enregistrer (synchro)
@@ -412,6 +419,7 @@
     choisi = -1; cheminChoisi = null; mesure = [];
     construire();
     Ed.enregistre();
+    bilan();
   }
   function choisirMode(m){
     var d3 = m === "3d" && !!Ed;
@@ -419,10 +427,13 @@
     if (mode) outilMesure(false);
     document.querySelectorAll("#bascule [data-mode]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === (d3 ? "3d" : "2d"))); });
     $("#vue").hidden = d3; $("#outils").hidden = d3 || !S;
-    $("#scene3d").hidden = !d3; $("#outils3d").hidden = !d3;
+    $("#scene3d").hidden = !d3; $("#outils3d").hidden = $("#palette3d").hidden = $("#niveau3d").hidden = !d3;
     $("#coord").textContent = "";
+    $("#vue-aide").textContent = d3 ? "Glisser : tourner autour du point visé · Maj + glisser ou bouton du milieu : déplacer · Molette : zoom · Clic : choisir · Ctrl + glisser : fenêtre · Clic droit : menu" :
+      "Glisser : déplacer · Molette : zoom · Clic : choisir · Double-clic : tout voir · E : passer en 3D";
     if (Ed) Ed.activer(d3);
     if (!d3){ calques(); proprietes(); taille(); recadrer(); }
+    bilan();
   }
   $("#bascule").addEventListener("click", function(e){
     var b = e.target.closest("[data-mode]");
@@ -444,7 +455,6 @@
       return enDxf(buf, f.name);
     }).then(function(buf){
       source = { nom: f.name, dxf: buf, dwg: brut };
-      $("#btn-dxf").hidden = $("#btn-dwg").hidden = false;
       $("#chargement-txt").textContent = "Lecture de « " + f.name + " »…";
       return new Promise(function(ok){ setTimeout(ok, 30); }).then(function(){ return DXF.lire(buf, f.name); });
     }).then(function(sc){
@@ -452,12 +462,16 @@
       S = sc; choisi = -1; cheminChoisi = null; mesure = [];
       construire();
       $("#accueil").hidden = true; $("#outils").hidden = false;
+      // interface façon IFC Studio : barre de menus, mode, fichier, état
+      document.body.classList.add("edition"); $("#haut").hidden = false; $("#etat0").textContent = "";
+      $("#f-nom").textContent = f.name;
       // mode 3D : document DXF3D lu à part ; un dessin 3D fait seulement de lignes s'ouvre directement en 3D
       var info3 = Ed ? Ed.charger(source.dxf, f.name) : null;
       $("#bascule").hidden = !Ed;
       choisirMode(info3 && (veut3D || (info3.a3D && !info3.ignores && info3.entites)) ? "3d" : "2d");
       document.title = f.name + " · DXF Studio";
-      calques(); proprietes(); recadrer();
+      bilan();
+      if (!en3D()){ calques(); proprietes(); recadrer(); }
       $("#chargement").hidden = true;
       etat(f.name + " · " + S.ents.length + " objets · " + S.calques.length + " calques · ouvert en " + nb((performance.now() - t0)/1000, 2) + " s" +
         (en3D() ? " · mode 3D : clique un objet, ou choisis un outil en haut" : ""));
@@ -532,8 +546,6 @@
       if (window.console) console.error(e);
     });
   }
-  $("#btn-dxf").addEventListener("click", function(){ enregistrer("dxf"); });
-  $("#btn-dwg").addEventListener("click", function(){ enregistrer("dwg"); });
   $("#fichier").addEventListener("change", function(){ ouvrir(this.files[0]); this.value = ""; });
   function choisirFichier(){ $("#fichier").click(); }
   $("#btn-ouvrir").addEventListener("click", choisirFichier);
@@ -561,14 +573,115 @@
     replier(c, false);
     $("#rep-" + c).addEventListener("click", function(){ replier(c, !$(".app").classList.contains("sans-" + c)); });
   });
-  $("#btn-theme").addEventListener("click", function(){
-    var c = clair() ? "sombre" : "clair";
+  $("#btn-theme").addEventListener("click", function(){ theme(clair() ? "sombre" : "clair"); });
+  function theme(c){
     document.documentElement.setAttribute("data-theme", c);
     document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
     lsSet("dxf.theme", c);
     if (S && !en3D()){ calques(); proprietes(); }
     demander();
+  }
+  // ================= Bilan du fichier (barre du haut) =================
+  function bilan(){
+    if (!S) return;
+    var b = en3D() && Ed ? Ed.bilan() : S.ents.length + " objets · " + S.calques.length + " calques" + (S.dwg ? " · DWG" : "");
+    $("#f-bilan").textContent = b;
+  }
+  if (Ed) Ed.surChange(bilan);
+
+  // ================= Barre de menus (comme IFC Studio) =================
+  var mb = $("#mb"), groupes = [].slice.call(mb.querySelectorAll(".mb-gr")), ouvert = null;
+  function itemsDe(liste){ return [].filter.call(liste.querySelectorAll("button"), function(b){ return !b.disabled && b.getClientRects().length > 0; }); }
+  function fermerMenu(){
+    if (!ouvert) return;
+    ouvert.liste.hidden = true;
+    ouvert.titre.setAttribute("aria-expanded", "false");
+    ouvert = null;
+  }
+  // état des commandes : celles du mode 3D grisées en plan 2D, annuler / rétablir, thème, choix par élément
+  function majMenus(){
+    var d3 = en3D(), st = d3 && Ed ? Ed.etatMenus() : {};
+    mb.querySelectorAll("[data-3d]").forEach(function(b){ b.disabled = !d3; });
+    mb.querySelectorAll('[data-cmd="dxf"],[data-cmd="dwg"]').forEach(function(b){ b.disabled = !source; });
+    if (d3){
+      mb.querySelector('[data-cmd="annuler"]').disabled = !st.annuler;
+      mb.querySelector('[data-cmd="retablir"]').disabled = !st.retablir;
+      ["supprimer", "deplacer", "copier", "deplacer-val", "copier-val", "cote-z", "meme-calque", "meme-element"].forEach(function(c){ mb.querySelector('[data-cmd="' + c + '"]').disabled = !st.sel; });
+      mb.querySelector('[data-cmd="par-element"]').setAttribute("aria-checked", String(!!st.parElement));
+      mb.querySelector('[data-cmd="tous-niveaux"]').disabled = !st.filtreZ;
+      mb.querySelector('[data-cmd="boite-retirer"]').disabled = !st.boite;
+      mb.querySelector('[data-cmd="boite-cadre"]').disabled = !st.boite;
+      mb.querySelector('[data-cmd="boite-cadre"]').setAttribute("aria-checked", String(!!st.cadreBoite));
+    }
+    mb.querySelector('[data-cmd="cadrer"]').disabled = !S;
+    mb.querySelector('[data-cmd="mesure"]').disabled = !S;
+    mb.querySelectorAll('[data-cmd="theme"]').forEach(function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-theme-choix") === (clair() ? "clair" : "sombre"))); });
+  }
+  function ouvrirMenu(gr, focus){
+    fermerMenu();
+    var titre = gr.querySelector(".mb-titre"), liste = gr.querySelector(".mb-liste");
+    majMenus();
+    liste.hidden = false;
+    titre.setAttribute("aria-expanded", "true");
+    ouvert = { gr: gr, titre: titre, liste: liste };
+    liste.style.left = "";
+    var r = liste.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) liste.style.left = (window.innerWidth - 8 - r.right) + "px";
+    if (focus){ var b = itemsDe(liste)[0]; if (b) b.focus(); }
+  }
+  groupes.forEach(function(gr){
+    var titre = gr.querySelector(".mb-titre");
+    titre.addEventListener("click", function(e){ e.stopPropagation(); if (ouvert && ouvert.gr === gr) fermerMenu(); else ouvrirMenu(gr, e.detail === 0); });
+    titre.addEventListener("mouseenter", function(){ if (ouvert && ouvert.gr !== gr) ouvrirMenu(gr, false); });
   });
+  document.addEventListener("click", function(e){ if (ouvert && !mb.contains(e.target)) fermerMenu(); });
+  mb.addEventListener("mouseover", function(e){
+    var sm = e.target.closest(".mb-sm");
+    if (!sm) return;
+    var sl = sm.querySelector(".mb-sl");
+    sl.classList.remove("a-gauche");
+    if (sl.getBoundingClientRect().right > window.innerWidth - 8) sl.classList.add("a-gauche");
+  });
+  mb.addEventListener("keydown", function(e){
+    if (!ouvert) return;
+    var its = itemsDe(ouvert.liste), i = its.indexOf(document.activeElement), gi = groupes.indexOf(ouvert.gr);
+    if (e.key === "ArrowDown"){ e.preventDefault(); if (its.length) its[(i + 1) % its.length].focus(); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); if (its.length) its[(i - 1 + its.length) % its.length].focus(); }
+    else if (e.key === "ArrowRight" || e.key === "ArrowLeft"){ e.preventDefault(); ouvrirMenu(groupes[(gi + (e.key === "ArrowRight" ? 1 : -1) + groupes.length) % groupes.length], true); }
+    else if (e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); var t = ouvert.titre; fermerMenu(); t.focus(); }
+  });
+  var COMMANDES = {
+    ouvrir: choisirFichier,
+    dxf: function(){ enregistrer("dxf"); },
+    dwg: function(){ enregistrer("dwg"); },
+    cadrer: function(){ if (en3D()) Ed.commande("cadrer"); else recadrer(); },
+    mesure: function(){ if (en3D()) Ed.commande("mesure"); else if (S) outilMesure(mode !== "mesure"); },
+    "calques-tous": function(){ if (en3D()) Ed.commande("calques-tous"); else if (S){ S.calques.forEach(function(c){ c.visible = true; }); calques(); demander(); } },
+    theme: function(b){ theme(b.getAttribute("data-theme-choix")); },
+    raccourcis: raccourcis
+  };
+  mb.addEventListener("click", function(e){
+    var b = e.target.closest("button[data-cmd],button[data-lien]");
+    if (!b || b.disabled) return;
+    fermerMenu();
+    if (b.hasAttribute("data-lien")){ location.href = b.getAttribute("data-lien"); return; }
+    var c = b.getAttribute("data-cmd");
+    if (COMMANDES[c]) COMMANDES[c](b);
+    else if (en3D()) Ed.commande(c);
+  });
+  function raccourcis(){
+    var d = $("#dlg3d"), L = [
+      ["Ctrl+O · Ctrl+S", "ouvrir · enregistrer en DXF"], ["E", "passer du plan 2D à la 3D et inversement"], ["F · double-clic", "tout voir"], ["M", "mesurer"],
+      ["Glisser", "3D : tourner autour du point visé · 2D : déplacer"], ["Maj + glisser, bouton du milieu", "3D : déplacer la vue"],
+      ["Clic · Ctrl + clic", "choisir · ajouter ou retirer"], ["Ctrl + glisser", "fenêtre (vers la gauche : objets touchés ; avec Maj : retirer)"],
+      ["A · P · R · S", "aligner · prolonger · coin · scinder"], ["D · C", "déplacer · copier par deux points"], ["N · Z · L", "nœuds · cote Z · ligne"],
+      ["1 · 2 · 3 · 4", "vue 3D · dessus · face · côté"], ["B · Maj+B", "boîte de coupe autour de la sélection · la retirer (poignées à tirer)"], ["Suppr · Ctrl+Z · Ctrl+Y", "supprimer · annuler · rétablir"], ["Clic droit", "menu de l'objet (3D) ; sort de l'outil en cours"],
+      ["Échap", "sortir de l'outil, puis vider la sélection"]];
+    d.innerHTML = '<form method="dialog"><h2>Raccourcis clavier</h2><table class="aide-table">' + L.map(function(l){ return "<tr><td><kbd>" + esc(l[0]) + "</kbd></td><td>" + esc(l[1]) + "</td></tr>"; }).join("") +
+      '</table><div class="pied"><button type="submit" class="bt prim" value="ok">Fermer</button></div></form>';
+    d.showModal();
+  }
+
   // ================= Modèle analytique envoyé par IFC Studio (/dxf/#ifc ouvert par IFC Studio) =================
   if (location.hash === "#ifc" && window.opener){
     window.addEventListener("message", function(e){
