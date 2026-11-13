@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Visionneuse DXF et DWG · STR Bim Tools</title>
-<meta name="description" content="Ouvre un plan DXF ou DWG dans le navigateur : calques, propriétés des objets, mesure. Le fichier ne quitte pas ton poste.">
+<title>DXF Studio · STR Bim Tools</title>
+<meta name="description" content="DXF Studio : ouvre un plan DXF ou DWG dans le navigateur, retravaille un modèle 3D (aligner, prolonger, raccorder), calques, mesure. Le fichier ne quitte pas ton poste.">
 <meta name="theme-color" content="#202020">
 <script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("dxf.theme")||"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 19h24v5H4z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M12 16h8v11h-8z' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Cpath d='M20 6l3 3 6-6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
@@ -182,6 +182,32 @@ button,input,select,textarea{font:inherit;color:inherit}
 .accueil .pied{margin-top:16px;font-size:12px;color:var(--texte-faible)}
 .chargement{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;min-width:300px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;padding:18px 20px;box-shadow:var(--ombre)}
 
+/* ---------- Mode 3D ---------- */
+.scene3d{position:absolute;inset:0}
+.centre .scene3d canvas.cube3d{inset:auto;right:10px;top:58px;width:140px;height:140px;z-index:4;cursor:default;opacity:.85;transition:opacity .15s ease}
+.centre .scene3d canvas.cube3d:hover{opacity:1}
+.outils3d{right:170px}
+.accueil p a{color:var(--or)}
+.calque .courant{font-size:11px;color:var(--or);margin-left:4px}
+.tbl.sommets input{height:26px;padding:2px 6px;font-size:12px}
+.tbl.sommets td{padding:2px 3px}
+.carte select.champ{margin-top:4px}
+.barre .bascule-mode{display:inline-flex;gap:2px;padding:2px;border-radius:6px;background:var(--controle);border:1px solid var(--bord-controle)}
+.barre .bascule-mode button{height:26px;padding:0 10px;font-size:12px}
+.barre .bascule-mode button[aria-pressed="true"]{background:var(--or);color:var(--sur-accent)}
+.barre .lien-ifc{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;color:var(--texte)}
+.barre .lien-ifc svg{width:16px;height:16px}
+.barre .lien-ifc:hover{background:var(--controle-survol);border-color:var(--bord-controle)}
+.dlg3d{border:1px solid var(--ligne);border-radius:8px;background:var(--couche-2);color:var(--texte);box-shadow:var(--ombre);padding:20px 22px 16px;min-width:300px}
+.dlg3d::backdrop{background:rgba(0,0,0,.35)}
+.dlg3d h2{margin:0 0 12px;font-family:var(--titre);font-size:18px;font-weight:600}
+.dlg3d .champs{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px}
+.dlg3d label{display:grid;gap:4px;font-size:12px;color:var(--texte-doux)}
+.dlg3d .pied{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.dlg3d .bt{border:1px solid var(--bord-controle);background:var(--controle)}
+.dlg3d .bt.prim{background:var(--or);color:var(--sur-accent)}
+@media (max-width:760px){.outils3d{right:130px}.centre .scene3d canvas.cube3d{width:110px;height:110px}.barre .lien-ifc span{display:none}}
+
 @media (max-width:1100px){.app{grid-template-columns:260px 1fr 300px}.app.sans-g{grid-template-columns:1fr 300px}.app.sans-d{grid-template-columns:260px 1fr}}
 @media (max-width:760px){
   body{overflow:auto}
@@ -197,9 +223,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 <body>
 <header class="barre">
   <a class="logo" href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M6 24L14 8l6 10 6-4" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 26h20" stroke="currentColor" stroke-width="1.4"/></svg><span class="sous-titre">STR Bim Tools</span></a>
-  <span class="titre"><b>Visionneuse DXF · DWG</b></span>
+  <span class="titre"><b>DXF Studio</b></span>
   <span class="ver" id="version"></span>
+  <div class="bascule-mode" id="bascule" role="group" aria-label="Mode d'affichage" hidden>
+    <button type="button" data-mode="2d" aria-pressed="true" title="Plan à plat : tout le dessin (textes, hachures, blocs), en lecture">Plan 2D</button>
+    <button type="button" data-mode="3d" aria-pressed="false" title="Vue 3D et outils d'édition : lignes, polylignes et points">3D · édition</button>
+  </div>
   <span class="esp"></span>
+  <a class="lien-ifc" href="/ifc/" title="IFC Studio : ouvrir et retravailler un IFC"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z M2 5l6 3.5L14 5 M8 8.5v6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>IFC Studio</span></a>
   <span class="sig">Tony VARIN</span>
   <button type="button" id="btn-ouvrir" title="Ouvrir un DXF ou un DWG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
   <button type="button" id="btn-dxf" hidden title="Enregistrer le dessin en DXF"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3-3 3 3 3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>DXF</span></button>
@@ -217,6 +248,36 @@ button,input,select,textarea{font:inherit;color:inherit}
   </aside>
   <main class="centre" id="centre">
     <canvas id="vue"></canvas>
+    <!-- mode 3D (dxf-editeur.js) : vue et cube dans leur propre cadre (le cube envoie la molette au canvas voisin) -->
+    <div class="scene3d" id="scene3d" hidden>
+      <canvas id="vue3d"></canvas>
+      <canvas class="cube3d" id="cube3d" aria-label="Cube de navigation : clic sur une face, une arête ou un coin pour voir depuis ce côté, glisser pour tourner, maison pour la vue de départ"></canvas>
+    </div>
+    <div class="outils outils3d" id="outils3d" hidden>
+      <div class="groupe">
+        <button type="button" class="bt" data-c="cadrer" title="Tout voir (F ou double-clic)">⤢</button>
+        <button type="button" class="bt" data-c="dessus" title="Vue de dessus">Dessus</button>
+        <button type="button" class="bt" data-c="maison" title="Vue 3D de départ">3D</button>
+      </div>
+      <div class="groupe">
+        <button type="button" class="bt" data-o="aligner" aria-pressed="false" title="Aligner (A) : clique la référence, puis les lignes ou les croix de poteaux à amener dessus">Aligner</button>
+        <button type="button" class="bt" data-o="prolonger" aria-pressed="false" title="Prolonger jusqu'à (P) : clique la limite, puis le bout de chaque ligne à prolonger ou à couper">Prolonger</button>
+        <button type="button" class="bt" data-o="coin" aria-pressed="false" title="Raccorder en coin (R) : clique deux lignes du côté à garder">Coin</button>
+        <button type="button" class="bt" data-c="noeuds" title="Fusionner les nœuds proches (N) : extrémités recalées au point moyen, dans la sélection ou sur les calques visibles">Nœuds</button>
+      </div>
+      <div class="groupe">
+        <button type="button" class="bt" data-o="deplacer" aria-pressed="false" title="Déplacer par deux points (D) ; valeurs exactes dans le panneau de droite">Déplacer</button>
+        <button type="button" class="bt" data-o="copier" aria-pressed="false" title="Copier par deux points (C)">Copier</button>
+        <button type="button" class="bt" data-c="z" title="Mettre la sélection à une cote Z (Z)">Cote Z</button>
+        <button type="button" class="bt" data-o="ligne" aria-pressed="false" title="Dessiner des lignes sur le calque courant (L)">Ligne</button>
+        <button type="button" class="bt" data-c="supprimer" title="Supprimer la sélection (Suppr)">Supprimer</button>
+      </div>
+      <div class="groupe">
+        <button type="button" class="bt" data-o="mesure" aria-pressed="false" title="Mesurer en 3D entre deux points (M)">Mesure</button>
+        <button type="button" class="bt" data-c="annuler" title="Annuler (Ctrl+Z)">↶</button>
+        <button type="button" class="bt" data-c="retablir" title="Rétablir (Ctrl+Y)">↷</button>
+      </div>
+    </div>
     <div class="outils" id="outils" hidden>
       <div class="groupe">
         <button type="button" class="bt" data-c="cadrer" title="Tout voir (double-clic ou F)">⤢</button>
@@ -230,8 +291,8 @@ button,input,select,textarea{font:inherit;color:inherit}
     <div class="accueil" id="accueil">
       <div class="boite">
         <div class="icone"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 26L14 8l6 10 7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M4 28h24" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h1>Visionneuse <b>DXF · DWG</b></h1>
-        <p>Ouvre un plan DXF ou DWG : calques, propriétés des objets, mesure avec accroche.</p>
+        <h1><b>DXF</b> Studio</h1>
+        <p>Ouvre un plan DXF ou DWG : calques, propriétés, mesure avec accroche. Un modèle 3D (par exemple le modèle analytique exporté d'<a href="/ifc/">IFC Studio</a>) se retravaille en 3D : aligner, prolonger, raccorder en coin, fusionner les nœuds.</p>
         <button type="button" class="bt prim" id="btn-ouvrir2">Ouvrir un DXF ou un DWG…</button>
         <div class="zone">ou glisse le fichier ici</div>
         <div class="pied">Le fichier est lu dans ton navigateur, il ne quitte pas ton poste. Les DWG sont convertis par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a> (GPL 3), environ 10 Mo chargés au premier DWG.</div>
@@ -242,8 +303,12 @@ button,input,select,textarea{font:inherit;color:inherit}
   <aside class="panneau p-props" id="props"></aside>
 </div>
 <input type="file" id="fichier" accept=".dxf,.dwg" hidden>
+<dialog class="dlg3d" id="dlg3d"></dialog>
 <script src="/dxf/dxf-lecteur.js?v=1"></script>
 <script src="/dxf/dxf-ecrivain.js?v=1"></script>
-<script src="/dxf/dxf-app.js?v=4"></script>
+<script src="/dxf/dxf-3d.js?v=1"></script>
+<script src="/ifc/ifc-cube.js?v=2"></script>
+<script src="/dxf/dxf-editeur.js?v=1"></script>
+<script src="/dxf/dxf-app.js?v=5"></script>
 </body>
 </html>

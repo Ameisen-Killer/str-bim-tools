@@ -1,7 +1,10 @@
-/* STR Bim Tools · visionneuse DXF : canvas 2D, calques, propriétés, mesure. Les fichiers restent sur le poste. */
+/* STR Bim Tools · DXF Studio : plan 2D (canvas, calques, propriétés, mesure) et bascule vers le mode 3D d'édition
+   (dxf-editeur.js). Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "1.2.1";
+  var VERSION = "2.0.0";
+  var Ed = window.Editeur3D || null;
+  function en3D(){ return !!(Ed && Ed.actif()); }
   var $ = function(s){ return document.querySelector(s); };
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e){ return d; } }
@@ -270,7 +273,8 @@
   cv.addEventListener("pointercancel", lacher);
   cv.addEventListener("dblclick", function(){ if (mode !== "mesure") recadrer(); });
   document.addEventListener("keydown", function(e){
-    if (e.target.closest && e.target.closest("input,textarea,select")) return;
+    if (e.target.closest && e.target.closest("input,textarea,select,dialog")) return;
+    if (en3D()) return;
     if (e.key === "Escape"){ if (mode){ outilMesure(false); } else choisir(-1); }
     else if (e.key === "f" || e.key === "F") recadrer();
   });
@@ -359,7 +363,7 @@
     Object.keys(E.info).forEach(function(k){ h += ligneProp(k, valeurProp(E.info[k])); });
     f.innerHTML = h + "</table></div>";
   }
-  $("#props").addEventListener("click", function(e){ if (e.target.closest(".fermer")) choisir(-1); });
+  $("#props").addEventListener("click", function(e){ if (!en3D() && e.target.closest(".fermer")) choisir(-1); });
 
   // ================= Calques =================
   var filtre = "";
@@ -377,6 +381,7 @@
     }).join("") || '<div class="vide-p">Aucun calque ne correspond.</div>';
   }
   $("#calques").addEventListener("change", function(e){
+    if (en3D()) return;
     var i = e.target.getAttribute("data-i");
     if (i === null) return;
     S.calques[+i].visible = e.target.checked;
@@ -384,18 +389,48 @@
   });
   $("#calques").addEventListener("dblclick", function(e){
     var l = e.target.closest(".calque");
-    if (!l) return;
+    if (!l || en3D()) return;
     e.preventDefault();
     var i = +l.querySelector("input").getAttribute("data-i");
     S.calques.forEach(function(c, k){ c.visible = k === i; });
     calques(); demander();
   });
-  $("#f-calque").addEventListener("input", function(){ filtre = this.value.trim().toLowerCase(); calques(); });
-  $("#tous").addEventListener("click", function(){ if (S){ S.calques.forEach(function(c){ c.visible = true; }); calques(); demander(); } });
-  $("#aucun").addEventListener("click", function(){ if (S){ S.calques.forEach(function(c){ c.visible = false; }); calques(); demander(); } });
+  $("#f-calque").addEventListener("input", function(){ filtre = this.value.trim().toLowerCase(); if (!en3D()) calques(); });
+  $("#tous").addEventListener("click", function(){ if (S && !en3D()){ S.calques.forEach(function(c){ c.visible = true; }); calques(); demander(); } });
+  $("#aucun").addEventListener("click", function(){ if (S && !en3D()){ S.calques.forEach(function(c){ c.visible = false; }); calques(); demander(); } });
 
   // ================= Ouverture =================
   function etat(t){ $("#etat").textContent = t || ""; }
+  var veut3D = false;
+  // ================= Bascule Plan 2D / 3D · édition =================
+  // Les retouches faites en 3D sont reportées dans le plan 2D et dans le fichier à enregistrer (synchro)
+  function synchro(){
+    if (!Ed || !Ed.modifie() || !source) return;
+    var t = Ed.texte(), u8 = new TextEncoder().encode(t);
+    source.dxf = u8.buffer; source.dwg = null;
+    S = DXF.lire(source.dxf, source.nom);
+    choisi = -1; cheminChoisi = null; mesure = [];
+    construire();
+    Ed.enregistre();
+  }
+  function choisirMode(m){
+    var d3 = m === "3d" && !!Ed;
+    if (!d3) synchro();
+    if (mode) outilMesure(false);
+    document.querySelectorAll("#bascule [data-mode]").forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === (d3 ? "3d" : "2d"))); });
+    $("#vue").hidden = d3; $("#outils").hidden = d3 || !S;
+    $("#scene3d").hidden = !d3; $("#outils3d").hidden = !d3;
+    $("#coord").textContent = "";
+    if (Ed) Ed.activer(d3);
+    if (!d3){ calques(); proprietes(); taille(); recadrer(); }
+  }
+  $("#bascule").addEventListener("click", function(e){
+    var b = e.target.closest("[data-mode]");
+    if (b && S) choisirMode(b.getAttribute("data-mode"));
+  });
+  // avant de quitter avec des retouches 3D non enregistrées
+  window.addEventListener("beforeunload", function(e){ if (Ed && Ed.modifie()){ e.preventDefault(); e.returnValue = ""; } });
+
   function ouvrir(f){
     if (!f) return;
     var dwg = /\.dwg$/i.test(f.name);
@@ -417,10 +452,16 @@
       S = sc; choisi = -1; cheminChoisi = null; mesure = [];
       construire();
       $("#accueil").hidden = true; $("#outils").hidden = false;
-      document.title = f.name + " · Visionneuse DXF · DWG";
+      // mode 3D : document DXF3D lu à part ; un dessin 3D fait seulement de lignes s'ouvre directement en 3D
+      var info3 = Ed ? Ed.charger(source.dxf, f.name) : null;
+      $("#bascule").hidden = !Ed;
+      choisirMode(info3 && (veut3D || (info3.a3D && !info3.ignores && info3.entites)) ? "3d" : "2d");
+      document.title = f.name + " · DXF Studio";
       calques(); proprietes(); recadrer();
       $("#chargement").hidden = true;
-      etat(f.name + " · " + S.ents.length + " objets · " + S.calques.length + " calques · ouvert en " + nb((performance.now() - t0)/1000, 2) + " s");
+      etat(f.name + " · " + S.ents.length + " objets · " + S.calques.length + " calques · ouvert en " + nb((performance.now() - t0)/1000, 2) + " s" +
+        (en3D() ? " · mode 3D : clique un objet, ou choisis un outil en haut" : ""));
+      veut3D = false;
     }).catch(function(err){
       $("#chargement").hidden = true;
       etat("Lecture impossible : " + (err && err.message || err));
@@ -473,6 +514,7 @@
   function base(){ return source.nom.replace(/\.(dxf|dwg)$/i, ""); }
   function enregistrer(fmt){
     if (!source) return;
+    synchro();
     if (fmt === "dxf"){ telecharger(source.dxf, base() + ".dxf", "application/dxf"); etat("DXF enregistré : " + base() + ".dxf"); return; }
     if (source.dwg){ telecharger(source.dwg, base() + ".dwg", "application/acad"); etat("DWG enregistré tel qu'il a été ouvert : " + base() + ".dwg"); return; }
     $("#chargement").hidden = false;
@@ -524,8 +566,21 @@
     document.documentElement.setAttribute("data-theme", c);
     document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
     lsSet("dxf.theme", c);
-    if (S){ calques(); proprietes(); }
+    if (S && !en3D()){ calques(); proprietes(); }
     demander();
   });
+  // ================= Modèle analytique envoyé par IFC Studio (/dxf/#ifc ouvert par IFC Studio) =================
+  if (location.hash === "#ifc" && window.opener){
+    window.addEventListener("message", function(e){
+      if (e.origin !== location.origin || e.source !== window.opener || !e.data || e.data.type !== "dxf-ifc") return;
+      var t = String(e.data.texte || ""), nom = String(e.data.nom || "Analytique3D.dxf");
+      var u8 = new TextEncoder().encode(t);
+      veut3D = true;
+      ouvrir({ name: nom, arrayBuffer: function(){ return Promise.resolve(u8.buffer); } });
+      history.replaceState(null, "", location.pathname);
+    });
+    try { window.opener.postMessage({ type: "dxf-pret" }, location.origin); } catch (x){}
+  }
+
   calques(); proprietes(); taille();
 })();
