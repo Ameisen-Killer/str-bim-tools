@@ -1649,7 +1649,7 @@
     }
     return [pt(lo[0]), pt(hi[0])];
   }
-  // Contours de la face supérieure d'une dalle, vue de dessus : boucles fermées rangées en contour (profondeur
+  // Contours de la face supérieure d'une dalle, vue de dessus (points [x, y, z], z du dessus) : boucles fermées rangées en contour (profondeur
   // paire) et réservations (boucle dans une autre), plus les bouts qui ne se referment pas.
   // q : tolérance de raccord (unités du fichier). → { contours: [[x, y]…]…, reservations: …, libres: … }
   function contoursDessus(geo, q){
@@ -1674,7 +1674,7 @@
     });
     cotes.forEach(function(o){
       if (o.n !== 1) return;
-      var b = o.b, a = [b[3*o.i], b[3*o.i+1]], c = [b[3*o.j], b[3*o.j+1]], ka = cle(a[0], a[1]), kc = cle(c[0], c[1]);
+      var b = o.b, a = [b[3*o.i], b[3*o.i+1], b[3*o.i+2]], c = [b[3*o.j], b[3*o.j+1], b[3*o.j+2]], ka = cle(a[0], a[1]), kc = cle(c[0], c[1]);
       if (ka === kc) return;
       var k = ka < kc ? ka + "|" + kc : kc + "|" + ka;
       if (vus.has(k)) return;
@@ -1736,6 +1736,29 @@
       if (t0 > t1) return null;
     }
     return [x1 + t0*(x2 - x1), y1 + t0*(y2 - y1), x1 + t1*(x2 - x1), y1 + t1*(y2 - y1)];
+  }
+  // Segment 3D coupé par la boîte (repère tourné en plan, hauteur en z) ; null s'il est dehors
+  function couperSegment3D(p, q, B){
+    if (!B) return [p, q];
+    var la = versBoite(B, p[0], p[1]), lb = versBoite(B, q[0], q[1]), t0 = 0, t1 = 1;
+    la.push(p[2]); lb.push(q[2]);
+    for (var ax = 0; ax < 3; ax++){
+      var d = lb[ax] - la[ax];
+      if (Math.abs(d) < 1e-12){ if (la[ax] < B.min[ax] || la[ax] > B.max[ax]) return null; continue; }
+      var u = (B.min[ax] - la[ax])/d, v = (B.max[ax] - la[ax])/d;
+      if (u > v){ var w = u; u = v; v = w; }
+      if (u > t0) t0 = u;
+      if (v < t1) t1 = v;
+      if (t0 > t1) return null;
+    }
+    // bout non coupé : le point d'origine lui-même (l'appelant reconnaît ainsi une polyligne restée entière)
+    function en(t, o){ return t === o ? (o ? q : p) : [p[0] + t*(q[0] - p[0]), p[1] + t*(q[1] - p[1]), p[2] + t*(q[2] - p[2])]; }
+    return [en(t0, 0), en(t1, 1)];
+  }
+  // Genre analytique d'un élément : murs, dalles, poteaux, poutres, ossatures (membrures, contreventements), sinon null
+  function genreAnalytique(t){
+    if (/^IFCBEAM/.test(t)) return "poutres";
+    return genrePlan(t);
   }
   // Genre d'un élément pour le plan : murs, dalles, poteaux, ossatures (poutres, membrures), sinon null
   function genrePlan(t){
@@ -3357,6 +3380,87 @@
             else ax.forEach(function(p){ poly(genre, p, false); });
           }
           if (ok) r.n[genre]++;
+        });
+        return r;
+      },
+      // Modèle analytique 3D : éléments affichés (murs, dalles, poteaux, poutres, ossatures) qui touchent la boîte
+      // de coupe, ou tous sans boîte ; lignes coupées par la boîte, en mètres dans le repère du fichier.
+      // → { elements: [{ genre, ifc: { id, type, gid, nom, m }, lignes: [{ quoi, pts: [[x, y, z]…], ferme }],
+      //     base?: [x, y, z] (poteau : centre au pied) }], n: éléments par genre, axesCalcules }
+      //   quoi : "pied" (mur : axe du pied, au milieu de l'épaisseur), "axe" (poteau, poutre, ossature),
+      //   "contour" et "reservation" (dalle : bord du dessus)
+      analytique: function(){
+        var b = coupe, r = { elements: [], n: { murs: 0, dalles: 0, poteaux: 0, poutres: 0, ossatures: 0 }, axesCalcules: 0 };
+        liste.forEach(function(it){
+          var G = Gs.get(it.m), g = it.geo, e = G && it.e && G.m.ent.get(it.e), genre = e && genreAnalytique(e.type);
+          if (!genre || !g || !g.faces) return;
+          if (b){
+            if (g.min[2] > b.max[2] || g.max[2] < b.min[2]) return;
+            var u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+            for (var i = 0; i < 4; i++){
+              var l = versBoite(b, i & 1 ? g.max[0] : g.min[0], i & 2 ? g.max[1] : g.min[1]);
+              if (l[0] < u0) u0 = l[0]; if (l[0] > u1) u1 = l[0]; if (l[1] < v0) v0 = l[1]; if (l[1] > v1) v1 = l[1];
+            }
+            if (u0 > b.max[0] || u1 < b.min[0] || v0 > b.max[1] || v1 < b.min[1]) return;
+          }
+          var pm = G.parM || 1, k = 1/pm, a = C(e), el = { genre: genre, lignes: [],
+            ifc: { id: it.e, type: e.type, gid: IFC.chaine(a[0]), nom: IFC.chaine(a[2]), m: it.m } };
+          function m3(p){ return [p[0]*k, p[1]*k, p[2]*k]; }
+          // polyligne coupée par la boîte : morceaux continus ; fermée seulement si rien n'est coupé
+          function poly(quoi, p, ferme){
+            var n = p.length, segs = n - 1 + (ferme && n > 2 ? 1 : 0), cur = null, morceaux = [], entier = true;
+            for (var j = 0; j < segs; j++){
+              var s = couperSegment3D(p[j], p[(j + 1) % n], b);
+              if (!s){ entier = false; cur = null; continue; }
+              if (Math.abs(s[1][0] - s[0][0]) + Math.abs(s[1][1] - s[0][1]) + Math.abs(s[1][2] - s[0][2]) < 1e-4*pm) continue;
+              var debutCoupe = s[0] !== p[j], finCoupe = s[1] !== p[(j + 1) % n];
+              if (debutCoupe || finCoupe) entier = false;
+              if (!cur || debutCoupe){ cur = [s[0]]; morceaux.push(cur); }
+              cur.push(s[1]);
+              if (finCoupe) cur = null;
+            }
+            if (ferme && entier && morceaux.length === 1 && morceaux[0].length > 3){
+              if (morceaux[0][morceaux[0].length - 1] === morceaux[0][0]) morceaux[0].pop();
+              el.lignes.push({ quoi: quoi, pts: morceaux[0].map(m3), ferme: true });
+              return;
+            }
+            morceaux.forEach(function(q){ if (q.length > 1) el.lignes.push({ quoi: quoi, pts: q.map(m3), ferme: false }); });
+          }
+          if (genre === "dalles"){
+            var c = contoursDessus(g, .001*pm);
+            c.contours.forEach(function(p){ poly("contour", p, true); });
+            c.reservations.forEach(function(p){ poly("reservation", p, true); });
+            c.libres.forEach(function(p){ poly("contour", p, false); });
+          } else {
+            var ax = axeRepresente(G, it.e);
+            if (!ax.length){ var a2 = axeGeometrie(g, genre === "murs"); if (a2){ ax = [a2]; r.axesCalcules++; } }
+            if (genre === "murs"){
+              // pied du mur : axe ramené au milieu de l'épaisseur (s'il est droit) et posé au bas de la géométrie
+              var zb = g.min[2];
+              ax = ax.map(function(p){
+                var q = p.map(function(v){ return [v[0], v[1], zb]; });
+                if (q.length !== 2) return q;
+                var dx = q[1][0] - q[0][0], dy = q[1][1] - q[0][1], lg = Math.hypot(dx, dy);
+                if (lg < 1e-6*pm) return q;
+                var nx = -dy/lg, ny = dx/lg, lo = Infinity, hi = -Infinity;
+                g.faces.forEach(function(f){ f.b.forEach(function(bb){ for (var j = 0; j < bb.length; j += 3){ var t = (bb[j] - q[0][0])*nx + (bb[j+1] - q[0][1])*ny; if (t < lo) lo = t; if (t > hi) hi = t; } }); });
+                if (!isFinite(lo)) return q;
+                var d = (lo + hi)/2;
+                return q.map(function(v){ return [v[0] + nx*d, v[1] + ny*d, zb]; });
+              });
+              ax.forEach(function(p){ poly("pied", p, false); });
+            } else {
+              ax.forEach(function(p){ poly("axe", p, false); });
+              if (genre === "poteaux" && ax.length){
+                // centre au pied : bout le plus bas de l'axe, dans la boîte
+                var bas = null;
+                ax.forEach(function(p){ p.forEach(function(q){ if (!bas || q[2] < bas[2]) bas = q; }); });
+                var lb = b && bas ? versBoite(b, bas[0], bas[1]) : null;
+                if (bas && (!b || (lb[0] >= b.min[0] && lb[0] <= b.max[0] && lb[1] >= b.min[1] && lb[1] <= b.max[1] && bas[2] >= b.min[2] && bas[2] <= b.max[2]))) el.base = m3(bas);
+              }
+            }
+          }
+          if (el.lignes.length || el.base){ r.elements.push(el); r.n[genre]++; }
         });
         return r;
       },

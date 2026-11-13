@@ -751,6 +751,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <button type="button" role="menuitem" data-ed data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
             <button type="button" role="menuitem" data-ed data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-axes"><span>Exporter le plan des axes en DXF</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="dxf-3d"><span>Exporter le modèle analytique en DXF 3D</span><kbd></kbd></button>
             <div data-dyn="exports" data-ed></div>
             <hr>
             <button type="button" role="menuitem" data-cmd="fermer-tout"><span>Tout fermer</span><kbd></kbd></button>
@@ -961,6 +962,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
           <button type="button" class="btn petit" id="b-recadrer">Recadrer</button>
           <button type="button" class="btn petit" id="b-boite" aria-pressed="false" title="Boîte de coupe autour de la sélection, ou de tout sans sélection ; un clic quand elle est posée l'enlève">Boîte de coupe</button>
           <button type="button" class="btn petit" id="b-dxf" title="Plan DXF des axes des murs, poteaux et ossatures et du contour des dalles, dans la boîte de coupe">DXF</button>
+          <button type="button" class="btn petit" id="b-dxf3d" title="DXF 3D analytique : pied des murs, centre des poteaux (croix), axes des poutres, contour des dalles, dans la boîte de coupe">DXF 3D</button>
           <button type="button" class="btn petit" id="b-lissage" aria-pressed="true" title="Lisser les bords des pièces (plus lent sur un gros modèle)">Lissage</button>
           <div class="bascule" role="group" aria-label="Rendu de la vue 3D">
             <button type="button" class="btn petit" id="b-solide" aria-pressed="true" title="Pièces pleines, ombrées">Solide</button>
@@ -1193,11 +1195,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=8"></script>
 <script src="/ifc/ifc-core.js?v=12"></script>
-<script src="/ifc/ifc-vue.js?v=44"></script>
+<script src="/ifc/ifc-vue.js?v=45"></script>
+<script src="/ifc/ifc-dxf.js?v=1"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=5"></script>
 <script src="/ifc/ifc-edition.js?v=1"></script>
-<script src="/ifc/ifc-app.js?v=52"></script>
+<script src="/ifc/ifc-app.js?v=53"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
