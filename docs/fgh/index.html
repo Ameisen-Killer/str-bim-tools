@@ -12,6 +12,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/fgh/favicon-ab-192.png?v=1">
 <link rel="apple-touch-icon" href="/fgh/favicon-ab-180.png?v=1">
 <link rel="preload" href="/fgh/fairmont-fond.jpg?v=1" as="image">
+<!-- Connexion obligatoire (identifiants de la planification) : voir /fgh/acces.js -->
+<script src="/fgh/acces.js?v=1"></script>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 /* Même habillage que /fgh/rsv/ (inspiré de Windows 11, Fluent), en version vitrine :
@@ -121,6 +123,7 @@ main{position:relative;z-index:3;max-width:1040px;margin:-84px auto 0;padding:0 
   <header class="barre">
     <a class="logo-ab" href="/" title="str-bim-tools.com"><img src="/fgh/logo-ab.jpg?v=1" alt="AB" width="170" height="161"></a>
     <span class="esp"></span>
+    <button type="button" id="btn-sortie" title="Se déconnecter"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10.5 5l3 3-3 3M13.5 8H6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="qui">Se déconnecter</span></button>
     <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
   </header>
   <div class="texte">
@@ -165,9 +168,17 @@ main{position:relative;z-index:3;max-width:1040px;margin:-84px auto 0;padding:0 
       <div class="bas"><span>Poste et téléphone · partagé</span><span class="esp"></span><span class="ouvrir">Ouvrir<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
     </a>
   </div>
-  <p class="pied"><span>Pages réservées au chantier, hors menu du site.</span><a href="/">str-bim-tools.com</a></p>
+  <p class="pied"><span>Pages réservées au chantier, hors menu du site. Connexion avec les identifiants de la planification.</span><a href="/">str-bim-tools.com</a></p>
 </main>
 <script>
+// compte connecté (identifiants de la planification) et déconnexion
+(function(){
+  var b = document.getElementById("btn-sortie"), mail = window.FghAcces ? FghAcces.email() : "";
+  if (mail) { document.getElementById("qui").textContent = mail; b.title = "Connecté en tant que " + mail + " · se déconnecter"; }
+  b.addEventListener("click", function(){
+    FghAcces.deconnexion().then(function(){ location.replace("/fgh/connexion/?retour=%2Ffgh%2F"); });
+  });
+})();
 document.getElementById("btn-theme").addEventListener("click", function(){
   var r = document.documentElement, c = r.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
   r.setAttribute("data-theme", c);

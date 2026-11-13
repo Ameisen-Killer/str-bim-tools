@@ -22,9 +22,10 @@
 --  réservées. L'outil lui-même ne crée ni ne modifie de membre : la table
 --  membres y est en lecture seule.
 --  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
---  qui permet de publier cette clé dans un dépôt public. Seule exception, voulue :
---  les outils Visas (/fgh/vis/) et Plans FGH (/fgh/pln/), ouverts sans connexion —
---  voir les sections « Visas » et « Plans FGH ».
+--  qui permet de publier cette clé dans un dépôt public. Les outils du chantier
+--  FGH (Visas, Plans FGH, Fiches ARM) demandent eux aussi la connexion depuis le
+--  13.11.2026 : voir « Outils du chantier FGH ». Seul l'organiseur de documents
+--  (/organiseur/) reste ouvert sans connexion.
 --
 --  Après exécution, dans le tableau de bord Supabase (voir reglages-supabase.md) :
 --    - Authentication > Auth Hooks : « Before User Created », fonction
@@ -2874,12 +2875,48 @@ revoke execute on function public.console_reinitialise_demo() from public, anon;
 grant execute on function public.console_reinitialise_demo() to authenticated;
 
 
+-- ===================================================== Outils du chantier FGH ==
+-- Visas, Plans FGH et Fiches ARM (/fgh/) : connexion obligatoire depuis le
+-- 13.11.2026, avec les identifiants de la planification (/fgh/acces.js), et accès
+-- réservé au super admin et aux accès actifs du bureau de fgh_reglages.
+-- ------------------------------------------------- bureau du chantier FGH ---
+-- Une seule ligne. Fermée à tous : seules les fonctions de la base la lisent.
+create table if not exists public.fgh_reglages (
+  id         boolean primary key default true constraint fgh_reglages_une_ligne check (id),
+  bureau_id  uuid not null references public.bureaux (id) on delete cascade
+);
+comment on table public.fgh_reglages is
+  'Bureau dont les accès actifs ouvrent les outils du chantier FGH (/fgh/). Une seule ligne.';
+alter table public.fgh_reglages enable row level security;
+revoke all on public.fgh_reglages from public, anon, authenticated;
+
+-- Base neuve : la table reste vide (seul le super admin entre). Pour ouvrir les
+-- outils à un bureau : insert into public.fgh_reglages (bureau_id) values ('<id du bureau>');
+-- (migration-fgh-connexion.sql le fait en repérant le bureau AB).
+
+-- ----------------------------------------------- qui entre dans les outils ---
+create or replace function public.acces_fgh()
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.est_super_admin() or exists (
+    select 1
+      from public.acces a
+      join public.fgh_reglages r on r.bureau_id = a.bureau_id
+      join public.bureaux b on b.id = a.bureau_id
+     where a.email = lower(coalesce(auth.jwt() ->> 'email', ''))
+       and a.actif
+       and b.actif
+  );
+$$;
+comment on function public.acces_fgh() is
+  'Vrai si la personne connectée peut utiliser les outils du chantier FGH : super admin, ou accès actif du bureau de fgh_reglages.';
+revoke all on function public.acces_fgh() from public, anon;
+grant execute on function public.acces_fgh() to authenticated;
+
 -- ===================================================================== Visas ==
 -- L'outil /visas/, à part de la planification : les exports « Tableau de suivi »
--- de la GED Kairnial et les plans cochés « Traité ». Il est ouvert à toute
--- personne qui a l'adresse de l'outil, SANS CONNEXION : le rôle anon (la clé
--- publiable seule) lit, dépose, coche et retire. C'est la seule exception à
--- « la clé publiable n'ouvre rien » : ces trois tables et le seau « visas ».
+-- de la GED Kairnial et les plans cochés « Traité ». Réservé aux personnes
+-- connectées qui ont accès au chantier (acces_fgh) : lire, déposer, cocher, retirer.
 -- Exports et coches ne se modifient pas (pas d'update) : un export se dépose
 -- ou se retire, une coche se pose ou s'enlève. Les bornes des colonnes limitent ce qu'un inconnu
 -- peut y glisser ; le seau n'accepte que des classeurs .xlsx de 25 Mo au plus.
@@ -2918,31 +2955,34 @@ on conflict (id) do update
 alter table public.visas_exports enable row level security;
 alter table public.visas_coches  enable row level security;
 revoke all on public.visas_exports, public.visas_coches from anon, authenticated;
-grant select, insert, delete on public.visas_exports, public.visas_coches to anon, authenticated;
+grant select, insert, delete on public.visas_exports, public.visas_coches to authenticated;
 
 drop policy if exists "visas : lecture" on public.visas_exports;
 drop policy if exists "visas : dépôt"   on public.visas_exports;
 drop policy if exists "visas : retrait" on public.visas_exports;
-create policy "visas : lecture" on public.visas_exports for select to anon, authenticated using (true);
-create policy "visas : dépôt"   on public.visas_exports for insert to anon, authenticated
-  with check (depose_le between now() - interval '5 minutes' and now() + interval '5 minutes');
-create policy "visas : retrait" on public.visas_exports for delete to anon, authenticated using (true);
+create policy "visas : lecture" on public.visas_exports for select to authenticated using ((select public.acces_fgh()));
+create policy "visas : dépôt"   on public.visas_exports for insert to authenticated
+  with check ((select public.acces_fgh()) and depose_le between now() - interval '5 minutes' and now() + interval '5 minutes');
+create policy "visas : retrait" on public.visas_exports for delete to authenticated using ((select public.acces_fgh()));
 
 drop policy if exists "visas : lecture" on public.visas_coches;
 drop policy if exists "visas : coche"   on public.visas_coches;
 drop policy if exists "visas : retrait" on public.visas_coches;
-create policy "visas : lecture" on public.visas_coches for select to anon, authenticated using (true);
-create policy "visas : coche"   on public.visas_coches for insert to anon, authenticated
-  with check (traite_le between now() - interval '5 minutes' and now() + interval '5 minutes');
-create policy "visas : retrait" on public.visas_coches for delete to anon, authenticated using (true);
+create policy "visas : lecture" on public.visas_coches for select to authenticated using ((select public.acces_fgh()));
+create policy "visas : coche"   on public.visas_coches for insert to authenticated
+  with check ((select public.acces_fgh()) and traite_le between now() - interval '5 minutes' and now() + interval '5 minutes');
+create policy "visas : retrait" on public.visas_coches for delete to authenticated using ((select public.acces_fgh()));
 
--- Les fichiers du seau : mêmes droits, sans connexion
+-- Les fichiers du seau : mêmes droits
 drop policy if exists "visas : lecture" on storage.objects;
 drop policy if exists "visas : dépôt"   on storage.objects;
 drop policy if exists "visas : retrait" on storage.objects;
-create policy "visas : lecture" on storage.objects for select to anon, authenticated using (bucket_id = 'visas');
-create policy "visas : dépôt"   on storage.objects for insert to anon, authenticated with check (bucket_id = 'visas');
-create policy "visas : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'visas');
+create policy "visas : lecture" on storage.objects for select to authenticated
+  using (bucket_id = 'visas' and (select public.acces_fgh()));
+create policy "visas : dépôt"   on storage.objects for insert to authenticated
+  with check (bucket_id = 'visas' and (select public.acces_fgh()));
+create policy "visas : retrait" on storage.objects for delete to authenticated
+  using (bucket_id = 'visas' and (select public.acces_fgh()));
 
 -- Captures de la boîte à idées : seau privé, images de 5 Mo au plus, rangées
 -- sous <bureau>/<idée>/. Tout le bureau en dépose (sauf le compte démo) ;
@@ -2988,24 +3028,23 @@ create trigger visas_note_horodate before insert or update on public.visas_notes
 
 alter table public.visas_notes enable row level security;
 revoke all on public.visas_notes from anon, authenticated;
-grant select, insert, update, delete on public.visas_notes to anon, authenticated;
+grant select, insert, update, delete on public.visas_notes to authenticated;
 drop policy if exists "visas : lecture"      on public.visas_notes;
 drop policy if exists "visas : écriture"     on public.visas_notes;
 drop policy if exists "visas : modification" on public.visas_notes;
 drop policy if exists "visas : retrait"      on public.visas_notes;
-create policy "visas : lecture"      on public.visas_notes for select to anon, authenticated using (true);
-create policy "visas : écriture"     on public.visas_notes for insert to anon, authenticated with check (true);
-create policy "visas : modification" on public.visas_notes for update to anon, authenticated using (true) with check (true);
-create policy "visas : retrait"      on public.visas_notes for delete to anon, authenticated using (true);
-
+create policy "visas : lecture"      on public.visas_notes for select to authenticated using ((select public.acces_fgh()));
+create policy "visas : écriture"     on public.visas_notes for insert to authenticated with check ((select public.acces_fgh()));
+create policy "visas : modification" on public.visas_notes for update to authenticated
+  using ((select public.acces_fgh())) with check ((select public.acces_fgh()));
+create policy "visas : retrait"      on public.visas_notes for delete to authenticated using ((select public.acces_fgh()));
 
 -- ============================================================ Plans FGH ==
 -- L'outil /fgh/pln/ : la liste des plans du chantier Fairmont (03.11.2026).
--- Comme Visas, ouvert SANS CONNEXION à toute personne qui a l'adresse : le rôle
--- anon (la clé publiable seule) lit, crée, modifie et supprime des plans.
+-- Réservé aux personnes connectées qui ont accès au chantier (acces_fgh).
 -- Une ligne = un livrable à son indice en cours. Les champs suivent le code
 -- Kairnial FGH-STR-ABI-51-<type>-<niveau>-<zone>-<n°> ; les bornes limitent ce
--- qu'un inconnu peut y glisser. La base pose elle-même l'heure de modification.
+-- qu'on peut y glisser. La base pose elle-même l'heure de modification.
 create table if not exists public.fgh_plans (
   id          uuid primary key default gen_random_uuid(),
   projet      text not null default 'FGH' check (char_length(projet) between 1 and 10),
@@ -3056,15 +3095,17 @@ create trigger fgh_plans_horodate before insert or update on public.fgh_plans
 
 alter table public.fgh_plans enable row level security;
 revoke all on public.fgh_plans from anon, authenticated;
-grant select, insert, update, delete on public.fgh_plans to anon, authenticated;
+grant select, insert, update, delete on public.fgh_plans to authenticated;
+
 drop policy if exists "fgh plans : lecture"      on public.fgh_plans;
 drop policy if exists "fgh plans : création"     on public.fgh_plans;
 drop policy if exists "fgh plans : modification" on public.fgh_plans;
 drop policy if exists "fgh plans : suppression"  on public.fgh_plans;
-create policy "fgh plans : lecture"      on public.fgh_plans for select to anon, authenticated using (true);
-create policy "fgh plans : création"     on public.fgh_plans for insert to anon, authenticated with check (true);
-create policy "fgh plans : modification" on public.fgh_plans for update to anon, authenticated using (true) with check (true);
-create policy "fgh plans : suppression"  on public.fgh_plans for delete to anon, authenticated using (true);
+create policy "fgh plans : lecture"      on public.fgh_plans for select to authenticated using ((select public.acces_fgh()));
+create policy "fgh plans : création"     on public.fgh_plans for insert to authenticated with check ((select public.acces_fgh()));
+create policy "fgh plans : modification" on public.fgh_plans for update to authenticated
+  using ((select public.acces_fgh())) with check ((select public.acces_fgh()));
+create policy "fgh plans : suppression"  on public.fgh_plans for delete to authenticated using ((select public.acces_fgh()));
 
 -- ==================================================== mises à jour en direct ==
 -- Les pages ouvertes se mettent à jour quand un collègue enregistre
@@ -3093,7 +3134,7 @@ commit;
 notify pgrst, 'reload schema';
 
 -- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite ; sauf visas_exports, visas_coches, visas_notes et fgh_plans, ouvertes)
+--   lecture  -> 200 et [] (rien ne fuite ; sauf doc_chantiers et doc_reservations, ouvertes)
 --   écriture -> 401 « new row violates row-level security policy »
 
 -- ============================================================ Fiches ARM FGH ==
@@ -3152,21 +3193,23 @@ create trigger fgh_controles_photos_horodate before insert or update on public.f
 alter table public.fgh_controles enable row level security;
 alter table public.fgh_controles_photos enable row level security;
 revoke all on public.fgh_controles, public.fgh_controles_photos from anon, authenticated;
-grant select, insert, update on public.fgh_controles, public.fgh_controles_photos to anon, authenticated;
+grant select, insert, update on public.fgh_controles, public.fgh_controles_photos to authenticated;
 
 drop policy if exists "fgh arm : lecture" on public.fgh_controles;
-drop policy if exists "fgh arm : ajout" on public.fgh_controles;
-drop policy if exists "fgh arm : modif" on public.fgh_controles;
-create policy "fgh arm : lecture" on public.fgh_controles for select to anon, authenticated using (true);
-create policy "fgh arm : ajout" on public.fgh_controles for insert to anon, authenticated with check (true);
-create policy "fgh arm : modif" on public.fgh_controles for update to anon, authenticated using (true) with check (true);
+drop policy if exists "fgh arm : ajout"   on public.fgh_controles;
+drop policy if exists "fgh arm : modif"   on public.fgh_controles;
+create policy "fgh arm : lecture" on public.fgh_controles for select to authenticated using ((select public.acces_fgh()));
+create policy "fgh arm : ajout"   on public.fgh_controles for insert to authenticated with check ((select public.acces_fgh()));
+create policy "fgh arm : modif"   on public.fgh_controles for update to authenticated
+  using ((select public.acces_fgh())) with check ((select public.acces_fgh()));
 
 drop policy if exists "fgh arm : lecture" on public.fgh_controles_photos;
-drop policy if exists "fgh arm : ajout" on public.fgh_controles_photos;
-drop policy if exists "fgh arm : modif" on public.fgh_controles_photos;
-create policy "fgh arm : lecture" on public.fgh_controles_photos for select to anon, authenticated using (true);
-create policy "fgh arm : ajout" on public.fgh_controles_photos for insert to anon, authenticated with check (true);
-create policy "fgh arm : modif" on public.fgh_controles_photos for update to anon, authenticated using (true) with check (true);
+drop policy if exists "fgh arm : ajout"   on public.fgh_controles_photos;
+drop policy if exists "fgh arm : modif"   on public.fgh_controles_photos;
+create policy "fgh arm : lecture" on public.fgh_controles_photos for select to authenticated using ((select public.acces_fgh()));
+create policy "fgh arm : ajout"   on public.fgh_controles_photos for insert to authenticated with check ((select public.acces_fgh()));
+create policy "fgh arm : modif"   on public.fgh_controles_photos for update to authenticated
+  using ((select public.acces_fgh())) with check ((select public.acces_fgh()));
 
 -- photos (JPEG/PNG) et fiches PDF à envoyer par mail : seau privé, 40 Mo au plus par fichier
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -3174,19 +3217,24 @@ values ('fgh-arm', 'fgh-arm', false, 41943040, array['image/jpeg', 'image/png', 
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
-drop policy if exists "fgh arm : lecture" on storage.objects;
-drop policy if exists "fgh arm : dépôt" on storage.objects;
+drop policy if exists "fgh arm : lecture"      on storage.objects;
+drop policy if exists "fgh arm : dépôt"        on storage.objects;
 drop policy if exists "fgh arm : remplacement" on storage.objects;
-drop policy if exists "fgh arm : retrait" on storage.objects;
-create policy "fgh arm : lecture" on storage.objects for select to anon, authenticated using (bucket_id = 'fgh-arm');
-create policy "fgh arm : dépôt" on storage.objects for insert to anon, authenticated with check (bucket_id = 'fgh-arm');
-create policy "fgh arm : remplacement" on storage.objects for update to anon, authenticated using (bucket_id = 'fgh-arm') with check (bucket_id = 'fgh-arm');
-create policy "fgh arm : retrait" on storage.objects for delete to anon, authenticated using (bucket_id = 'fgh-arm');
+drop policy if exists "fgh arm : retrait"      on storage.objects;
+create policy "fgh arm : lecture" on storage.objects for select to authenticated
+  using (bucket_id = 'fgh-arm' and (select public.acces_fgh()));
+create policy "fgh arm : dépôt" on storage.objects for insert to authenticated
+  with check (bucket_id = 'fgh-arm' and (select public.acces_fgh()));
+create policy "fgh arm : remplacement" on storage.objects for update to authenticated
+  using (bucket_id = 'fgh-arm' and (select public.acces_fgh())) with check (bucket_id = 'fgh-arm' and (select public.acces_fgh()));
+create policy "fgh arm : retrait" on storage.objects for delete to authenticated
+  using (bucket_id = 'fgh-arm' and (select public.acces_fgh()));
 
 -- ===================================================== Organiseur de documents ==
 -- L'outil /organiseur/ (04.11.2026) : numérotation des documents par chantier et
--- réservation de plages de numéros à l'avance. Comme la liste des plans FGH,
--- ouvert SANS CONNEXION à toute personne qui a l'adresse (rôle anon).
+-- réservation de plages de numéros à l'avance. Ouvert SANS CONNEXION à toute
+-- personne qui a l'adresse (rôle anon) ; la liste des plans FGH qu'il peut lier
+-- ne se lit, elle, qu'avec une connexion aux outils FGH.
 -- doc_chantiers.config (jsonb) porte les référentiels du chantier : gabarit du
 -- code, disciplines, phases, types de document, bâtiments avec niveaux et zones,
 -- arbre des plages (lots et sous-lots). doc_reservations = un bloc de n° (de–à)

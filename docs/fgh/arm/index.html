@@ -13,6 +13,8 @@
 <link rel="apple-touch-icon" href="/fgh/favicon-ab-180.png?v=1">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Contrôle armature</title>
+<!-- Connexion obligatoire (identifiants de la planification) : voir /fgh/acces.js -->
+<script src="/fgh/acces.js?v=1"></script>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 :root{--bg:#f2f2f0;--card:#fff;--ink:#1d1d1b;--mut:#74746d;--line:#e3e3df;--g:#5a8a1f;--g2:#cbe099;--gb:#d7e7a9;--gbh:#c9de8f;
@@ -434,14 +436,14 @@ $('#inCfg').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
 
 /* ---------- Index et liste des plans (lecture) ---------- */
 let IDX=null,PLANS=null;
-/* ---------- liste des plans FGH en ligne (/fgh/pln/, table fgh_plans de Supabase, clé publiable) ---------- */
+/* ---------- liste des plans FGH en ligne (/fgh/pln/, table fgh_plans de Supabase ; clé et jeton de connexion posés par /fgh/acces.js) ---------- */
 const PLN={url:'https://hxhjkdfnoygrlbdhjkwc.supabase.co',cle:'sb_publishable_33G_BjGlKGUBhSVIc_QUmQ_QDKC64vA'};
 // niveaux Kairnial écrits comme l'attendent les propositions de plans (SS-3, Rez inf, E4…)
 const PLN_ETAGE={'000':'','050':'SS-4','060':'SS-3','070':'SS-2','080':'SS-1','090':'Rez inf','100':'Rez','110':'E1','120':'E2','130':'E3','140':'E4','150':'E5','160':'E6','170':'E7','180':'E8','190':'Toiture'};
 const isoFr=d=>{const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(d||'').trim());return m?m[3]+'-'+m[2]+'-'+m[1]:null;};
 const frIso=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||''));return m?m[3]+'.'+m[2]+'.'+m[1]:'';};
-async function plnFetch(path,o={}){const h={apikey:PLN.cle};if(o.body)h['Content-Type']='application/json';if(o.range)h.Range=o.range;if(o.prefer)h.Prefer=o.prefer;
-  let r;try{r=await fetch(PLN.url+'/rest/v1/'+path,{method:o.method||'GET',headers:h,body:o.body?JSON.stringify(o.body):undefined});}catch(e){throw new Error('Liste FGH injoignable : pas de réseau ?');}
+async function plnFetch(path,o={}){const h={};if(o.body)h['Content-Type']='application/json';if(o.range)h.Range=o.range;if(o.prefer)h.Prefer=o.prefer;
+  let r;try{r=await FghAcces.fetch(PLN.url+'/rest/v1/'+path,{method:o.method||'GET',headers:h,body:o.body?JSON.stringify(o.body):undefined});}catch(e){throw new Error('Liste FGH injoignable : pas de réseau ?');}
   if(!r.ok){let m='erreur '+r.status;try{const j=await r.json();m=j.message||m;if(/PGRST205|does not exist|could not find/i.test(m+' '+(j.code||'')))m='table pas encore créée dans Supabase (migration-fgh-plans.sql)';}catch(e){}throw new Error('Liste FGH : '+m);}
   if(r.status===204)return null;const t=await r.text();if(!t)return null;try{return JSON.parse(t);}catch(e){return null;}}
 async function loadPLN(silent){if(!S)return;if(!silent)busy(true,'Lecture de la liste FGH…');
@@ -500,8 +502,8 @@ const SY_OFF=['sendState','sendErr','projectId','_maj'];
 function syMark(s,id,del){SYQ[s+':'+id]={s,id,del:!!del,t:Date.now()};DB.kvSet('sync:file',SYQ);clearTimeout(SYT);SYT=setTimeout(syPush,2500);}
 DB.put=(s,o)=>{if((s==='ctrl'||s==='photos')&&o&&o.id){o._maj=Date.now();syMark(s,o.id);}return DB_put(s,o);};
 DB.del=(s,id)=>{if(s==='ctrl'||s==='photos')syMark(s,id,true);return DB_del(s,id);};
-async function stFetch(path,o={}){const h={apikey:PLN.cle};if(o.type)h['Content-Type']=o.type;if(o.upsert)h['x-upsert']='true';
-  let r;try{r=await fetch(PLN.url+'/storage/v1/object/'+(o.lire?'authenticated/':'')+'fgh-arm/'+path,{method:o.method||'GET',headers:h,body:o.body});}catch(e){throw new Error('Photos en ligne injoignables : pas de réseau ?');}
+async function stFetch(path,o={}){const h={};if(o.type)h['Content-Type']=o.type;if(o.upsert)h['x-upsert']='true';
+  let r;try{r=await FghAcces.fetch(PLN.url+'/storage/v1/object/'+(o.lire?'authenticated/':'')+'fgh-arm/'+path,{method:o.method||'GET',headers:h,body:o.body});}catch(e){throw new Error('Photos en ligne injoignables : pas de réseau ?');}
   if(!r.ok){let m='erreur '+r.status;try{const j=await r.json();m=j.message||j.error||m;}catch(e){}throw new Error('Photos en ligne : '+m);}return r;}
 const stPut=(path,b)=>stFetch(path,{method:'POST',body:b,type:b.type||'image/jpeg',upsert:true});
 const stGet=async path=>(await stFetch(path,{lire:true})).blob();
@@ -912,7 +914,7 @@ function openMail(L){MAILSEL=L;const uns=L.filter(c=>!c.sig_ctrl||!c.conclusion)
 async function mailEnLigne(to,subj,body,files){busy(true,'Envoi du mail…');const dossier='m/'+uid()+uid(),pj=[];
   const tot=files.reduce((a,f)=>a+f.size,0);if(tot>30e6)throw new Error('Mail trop lourd ('+Math.round(tot/1e6)+' Mo) : décoche « Joindre aussi les photos ».');
   for(const [i,f] of files.entries()){const chemin=dossier+'/fiche-'+(i+1)+'.pdf';await stFetch(chemin,{method:'POST',body:f,type:'application/pdf',upsert:true});pj.push({chemin,nom:f.name});}
-  let r;try{r=await fetch(PLN.url+'/functions/v1/fgh-arm-mail',{method:'POST',headers:{apikey:PLN.cle,'Content-Type':'application/json'},body:JSON.stringify({a:to,sujet:subj,texte:body,fichiers:pj})});}
+  let r;try{r=await FghAcces.fetch(PLN.url+'/functions/v1/fgh-arm-mail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({a:to,sujet:subj,texte:body,fichiers:pj})});}
   catch(e){throw new Error('Envoi du mail impossible : serveur injoignable.');}
   let j={};try{j=await r.json();}catch(e){}
   if(!r.ok||!j.ok)throw new Error('Envoi du mail impossible : '+(j.erreur||(r.status===404?'la fonction fgh-arm-mail n\'est pas encore déployée dans Supabase':'erreur '+r.status)));

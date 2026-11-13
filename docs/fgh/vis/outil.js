@@ -478,11 +478,12 @@
      retraduit pour l'écran. */
   function appel(chemin, o) {
     o = o || {};
-    var entetes = { apikey: BASE.cle };
+    // Clé publiable et jeton de la personne connectée : posés par /fgh/acces.js
+    var entetes = {};
     if (o.type) entetes["Content-Type"] = o.type;
     if (o.prefer) entetes.Prefer = o.prefer;
     if (o.plage) entetes.Range = o.plage;
-    return fetch(BASE.url + chemin, { method: o.methode || "GET", headers: entetes, body: o.corps })
+    return global.FghAcces.fetch(BASE.url + chemin, { method: o.methode || "GET", headers: entetes, body: o.corps })
       .catch(function () { throw erreur("Serveur injoignable : vérifie ta connexion, puis réessaie."); })
       .then(function (r) {
         if (r.ok) return r;

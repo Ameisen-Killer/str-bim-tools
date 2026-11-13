@@ -1,8 +1,8 @@
 // Service worker : l'appli s'ouvre sans réseau (cache), mise à jour en arrière-plan.
-const CACHE='controle-armature-v21';
+const CACHE='controle-armature-v22';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png',
   './vendor/jspdf-2.5.1.umd.min.js','./vendor/jszip-3.10.1.min.js','./vendor/xlsx-0.18.5.full.min.js',
-  '/assets/polices/polices.css'];
+  '/assets/polices/polices.css','/fgh/acces.js']; // acces.js : la connexion, aussi hors ligne
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{

@@ -53,11 +53,12 @@
   // ------------------------------------------------------------------ base
   function appel(chemin, o) {
     o = o || {};
-    var h = { apikey: BASE.cle };
+    // Clé publiable et jeton de la personne connectée : posés par /fgh/acces.js
+    var h = {};
     if (o.corps !== undefined) h["Content-Type"] = "application/json";
     if (o.prefer) h.Prefer = o.prefer;
     if (o.plage) h.Range = o.plage;
-    return fetch(BASE.url + "/rest/v1/" + chemin, { method: o.methode || "GET", headers: h, body: o.corps === undefined ? undefined : JSON.stringify(o.corps) })
+    return window.FghAcces.fetch(BASE.url + "/rest/v1/" + chemin, { method: o.methode || "GET", headers: h, body: o.corps === undefined ? undefined : JSON.stringify(o.corps) })
       .catch(function () { throw new Error("Serveur injoignable : vérifie ta connexion, puis réessaie."); })
       .then(function (r) {
         if (r.ok) return r.status === 204 ? null : r.text().then(function (t) { return t ? JSON.parse(t) : null; });

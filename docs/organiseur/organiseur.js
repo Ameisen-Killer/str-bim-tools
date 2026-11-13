@@ -227,7 +227,10 @@
     if (o.corps !== undefined) h["Content-Type"] = "application/json";
     if (o.prefer) h.Prefer = o.prefer;
     if (o.plage) h.Range = o.plage;
-    return fetch(BASE.url + "/rest/v1/" + chemin, { method: o.methode || "GET", headers: h, body: o.corps === undefined ? undefined : JSON.stringify(o.corps) })
+    // La liste des plans FGH n'est lue qu'avec une connexion aux outils du chantier
+    // (/fgh/acces.js, identifiants de la planification) ; sans elle, la base ne rend rien.
+    var envoi = /^fgh_/.test(chemin) && window.FghAcces && window.FghAcces.connecte() ? window.FghAcces.fetch : fetch;
+    return envoi(BASE.url + "/rest/v1/" + chemin, { method: o.methode || "GET", headers: h, body: o.corps === undefined ? undefined : JSON.stringify(o.corps) })
       .catch(function () { throw new Error("Serveur injoignable : vérifie ta connexion, puis réessaie."); })
       .then(function (r) {
         if (r.ok) return r.status === 204 ? null : r.text().then(function (t) { return t ? JSON.parse(t) : null; });

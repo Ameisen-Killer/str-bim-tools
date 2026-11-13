@@ -208,3 +208,20 @@ passe par une fonction qui envoie avec Resend, depuis une adresse du domaine.
 Sans la fonction (ou hors réseau), ARM propose d'ouvrir l'appli Mail du téléphone avec la fiche jointe.
 Une adresse hors de `FGH_MAIL_AUTORISES` est refusée : c'est ce qui empêche quiconque d'utiliser la
 fonction pour écrire à n'importe qui depuis le domaine.
+Depuis le 13.11.2026, la fonction exige en plus une personne connectée aux outils FGH : si elle
+était déjà déployée, recoller la nouvelle version de `index.ts` **après** avoir exécuté
+`migration-fgh-connexion.sql` (section 11).
+
+## 11. Connexion aux outils du chantier FGH (13.11.2026)
+
+Les pages /fgh/ demandent les identifiants de la planification (/fgh/connexion/, script
+`docs/fgh/acces.js`, même session que /planif/). La base n'ouvre Visas, Plans FGH et Fiches ARM
+qu'au super admin et aux accès actifs du bureau du chantier (fonction `acces_fgh`, table
+`fgh_reglages`).
+
+1. SQL Editor : coller `migration-fgh-connexion.sql`, Run. La dernière ligne affiche le nom du
+   bureau retenu ; s'il n'est pas trouvé, écrire son nom exact dans `v_nom_bureau`, en tête du bloc.
+2. Un collègue sans compte : console › Accès, ajouter son adresse dans ce bureau ; il crée son mot
+   de passe par « Premier accès » (lien de la page de connexion).
+3. Contrôle, sans connexion, avec la clé publiable : `fgh_plans`, `fgh_controles`,
+   `fgh_controles_photos`, `visas_exports`, `visas_coches`, `visas_notes` rendent 0 ligne.
