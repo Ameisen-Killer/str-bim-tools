@@ -7,7 +7,7 @@
 <title>DXF Studio · STR Bim Tools</title>
 <meta name="description" content="DXF Studio : ouvre un plan DXF ou DWG dans le navigateur, retravaille un modèle 3D (aligner, prolonger, raccorder), calques, mesure. Le fichier ne quitte pas ton poste.">
 <meta name="theme-color" content="#202020">
-<script>(function(){var r=document.documentElement;try{var c=localStorage.getItem("dxf.theme")||"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");}catch(e){r.setAttribute("data-theme","sombre");}})();</script>
+<script>(function(){var r=document.documentElement,c="sombre";try{c=localStorage.getItem("dxf.theme")||"sombre";}catch(e){}if(c==="systeme")c=matchMedia("(prefers-color-scheme: light)").matches?"clair":"sombre";r.setAttribute("data-theme",c);if(c==="clair")document.querySelector("meta[name=theme-color]").setAttribute("content","#F3F3F3");})();</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M4 19h24v5H4z' fill='none' stroke='%23ECE8E0' stroke-opacity='.6' stroke-width='1.2'/%3E%3Cpath d='M12 16h8v11h-8z' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3Cpath d='M20 6l3 3 6-6' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
 <style>
 /* Habillage inspiré de Windows 11 (Fluent), le même que /fgh/ et /ifc/ */
@@ -87,25 +87,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 ::-webkit-scrollbar-track{background:transparent}
 
 /* ---------- Barre de titre ---------- */
-.barre{height:var(--haut);display:flex;align-items:center;gap:12px;padding:0 10px 0 16px;background:var(--mica);white-space:nowrap;font-size:12px}
-.barre a{text-decoration:none;color:inherit}
-.barre .logo{display:flex;align-items:center;gap:10px;color:var(--texte-doux)}
-.barre .logo svg{width:20px;height:20px;flex:none}
-.barre .logo:hover{color:var(--texte)}
-.barre .titre{font-size:14px;color:var(--texte)}
-.barre .titre b{font-weight:600}
-.barre .ver{padding:1px 8px;border-radius:10px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-doux);font-size:11px}
-.barre .esp{flex:1}
-.barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
-.barre .json::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
-.barre .json.on{color:var(--vert)}
-@media (max-width:760px){.barre .json{max-width:30vw}}
-.barre .sig{color:var(--texte-faible)}
-.barre button{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;background:transparent;cursor:pointer;color:var(--texte)}
-.barre button svg{width:16px;height:16px}
-.barre button:hover{background:var(--controle-survol);border-color:var(--bord-controle)}
-.barre button:active{background:var(--controle-appui);color:var(--texte-doux)}
-@media (max-width:760px){.barre .sig,.barre .ver,.barre .sous-titre{display:none}.barre button span{display:none}}
 
 /* ---------- Grille ---------- */
 .app{height:calc(100% - var(--haut));display:grid;grid-template-columns:300px 1fr 340px;gap:8px;padding:0 8px 8px;min-height:0}
@@ -170,31 +151,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app.sans-g.sans-d{grid-template-columns:1fr}
 
 /* ---------- Accueil ---------- */
-.accueil{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:24px;background:var(--mica)}
-.accueil .boite{max-width:560px;border:1px solid var(--ligne);border-radius:8px;padding:32px 32px 24px;text-align:center;background:var(--couche-2);box-shadow:var(--ombre)}
-.accueil .icone{width:56px;height:56px;margin:0 auto 14px;display:grid;place-items:center;border-radius:12px;background:rgba(var(--or-rvb),.14);color:var(--or)}
-.accueil .icone svg{width:30px;height:30px}
-.accueil h1{font-family:var(--titre);font-weight:600;font-size:28px;line-height:36px;margin:0 0 8px}
-.accueil h1 b{color:var(--or);font-weight:600}
-.accueil p{color:var(--texte-doux);margin:0 0 16px}
-.accueil .zone{margin-top:16px;padding:14px;border:1px dashed rgba(var(--encre),.25);border-radius:8px;color:var(--texte-faible);font-size:12px}
-.centre.survol .accueil .zone{border-color:var(--or);color:var(--or);background:rgba(var(--or-rvb),.08)}
-.accueil .pied a{color:var(--or)}
-.accueil .pied{margin-top:16px;font-size:12px;color:var(--texte-faible)}
 .chargement{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;min-width:300px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;padding:18px 20px;box-shadow:var(--ombre)}
 
 /* ---------- Mode 3D ---------- */
 .scene3d{position:absolute;inset:0}
 .centre .scene3d canvas.cube3d{inset:auto;right:10px;top:58px;width:140px;height:140px;z-index:4;cursor:default;opacity:.85;transition:opacity .15s ease}
 .centre .scene3d canvas.cube3d:hover{opacity:1}
-.accueil p a{color:var(--or)}
 .calque .courant{font-size:11px;color:var(--or);margin-left:4px}
 .tbl.sommets input{height:26px;padding:2px 6px;font-size:12px}
 .tbl.sommets td{padding:2px 3px}
 .carte select.champ{margin-top:4px}
-.barre .lien-ifc{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:4px;border:1px solid transparent;color:var(--texte)}
-.barre .lien-ifc svg{width:16px;height:16px}
-.barre .lien-ifc:hover{background:var(--controle-survol);border-color:var(--bord-controle)}
 .dlg3d{border:1px solid var(--ligne);border-radius:8px;background:var(--couche-2);color:var(--texte);box-shadow:var(--ombre);padding:20px 22px 16px;min-width:300px}
 .dlg3d::backdrop{background:rgba(0,0,0,.35)}
 .dlg3d h2{margin:0 0 12px;font-family:var(--titre);font-size:18px;font-weight:600}
@@ -218,7 +184,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ================= Après ouverture : interface façon IFC Studio (body.edition) ================= */
 body{display:flex;flex-direction:column}
-body.edition .barre{display:none}
 .app{flex:1;height:auto}
 .haut{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:4px 12px 6px;background:var(--mica);flex:none}
 .mb{display:flex;align-items:stretch;margin-left:-4px;gap:2px}
@@ -256,8 +221,6 @@ body.edition .barre{display:none}
 .haut .etat{position:static;flex:1 1 100%;min-height:1.4em;font-size:12px;color:var(--texte-doux);text-shadow:none;pointer-events:auto}
 .haut .etat::before{content:"";display:inline-block;width:6px;height:6px;margin:0 8px 1px 2px;border-radius:50%;background:var(--or);vertical-align:middle}
 .haut .etat:empty::before{display:none}
-.accueil-etat{margin-top:10px;font-size:12px;color:var(--rouge)}
-.accueil-etat:empty{display:none}
 /* panneaux : titres comme IFC Studio */
 .p-titre{font-family:var(--titre);font-size:14px;font-weight:600;color:var(--texte);padding:12px 14px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .p-titre .n{font-family:var(--sans);font-weight:400;font-size:12px;color:var(--texte-faible)}
@@ -295,19 +258,169 @@ body.edition .barre{display:none}
   .vue-aide{display:none}
   .mb-sm>.mb-sl{position:static;display:flex;box-shadow:none;border:0;border-left:1px solid var(--ligne);margin:0 0 4px 14px;padding:2px 0;min-width:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
 }
+
+/* ---------- Accueil façon fenêtre Windows 11 (13.11.2026, comme IFC Studio, maquette « win-1 ») ----------
+   Fond Mica à deux halos, une carte centrée de 8 px de rayon : la vue 3D filaire à gauche, ouvrir et récents à droite. */
+body:not(.edition){
+  --carte:#2B2B2B;
+  --panneau-vue:#1C1C1C;
+  --rangee:rgba(255,255,255,.035);
+  --rangee-survol:rgba(255,255,255,.07);
+  --mica-fond:radial-gradient(ellipse 80% 60% at 15% 0%,#2A2D33,transparent 70%),radial-gradient(ellipse 60% 60% at 100% 100%,#2B2620,transparent 70%),#202020;
+  display:flex;flex-direction:column;min-height:100vh;min-height:100svh;height:auto;overflow-x:hidden;overflow-y:auto;
+  background:var(--mica-fond);background-attachment:fixed;
+}
+:root[data-theme="clair"] body:not(.edition){
+  --carte:#FBFBFB;
+  --panneau-vue:#EEEEEE;
+  --rangee:#FFFFFF;
+  --rangee-survol:#F6F6F6;
+  --mica-fond:radial-gradient(ellipse 80% 60% at 15% 0%,#E9EEF6,transparent 70%),radial-gradient(ellipse 60% 60% at 100% 100%,#F4EFE6,transparent 70%),#F3F3F3;
+}
+/* couleurs lues par la vue filaire (dxf-accueil.js) */
+:root{--scene-fond:28,28,28;--scene-or:96,205,255}
+:root[data-theme="clair"]{--scene-fond:238,238,238;--scene-or:0,95,184}
+body:not(.edition) .app,body.edition .barre,body.edition .accueil,body.edition footer{display:none}
+
+/* barre de titre, sans fond */
+.barre{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;height:calc(48px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 16px 0;font-size:12.5px;color:var(--texte-doux);white-space:nowrap}
+.barre a{color:inherit;text-decoration:none}
+.tb-gauche{display:flex;align-items:center;gap:10px;min-width:0}
+.tb-gauche svg{flex:none;width:18px;height:18px;fill:none;stroke:var(--or);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tb-gauche b{font-weight:400;color:var(--texte)}
+.tb-gauche .ver{padding:0 7px;border-radius:10px;background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte-faible);font-size:11px;line-height:17px}
+.tb-gauche .ver:empty{display:none}
+.tb-gauche a:hover{color:var(--texte)}
+.barre-droite{display:flex;align-items:center;gap:4px}
+.tb-lien,.theme-btn,.barre .menu-btn{display:inline-flex;align-items:center;gap:8px;height:32px;margin:0;padding:0 12px;border:0;border-radius:4px;background:transparent;cursor:pointer;
+  font-family:var(--sans);font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--texte-doux);text-decoration:none;transition:background .15s,color .15s}
+.tb-lien:hover,.theme-btn:hover,.theme-btn:focus-visible,.barre .menu-btn:hover,.barre .menu-btn:focus-visible{background:var(--controle-survol);color:var(--texte);outline:none}
+.theme{position:relative}
+.menu-theme{position:absolute;right:0;top:calc(100% + 4px);z-index:40;display:flex;flex-direction:column;min-width:160px;padding:4px;border-radius:8px;background:var(--carte);border:1px solid var(--ligne);box-shadow:0 8px 16px rgba(0,0,0,.26)}
+.menu-theme button{background:none;border:0;border-radius:4px;padding:7px 12px;text-align:left;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--texte)}
+.menu-theme button:hover,.menu-theme button:focus-visible{background:var(--controle-survol);outline:none}
+.menu-theme button[aria-checked="true"]::before{content:"● ";font-size:8px;vertical-align:middle;color:var(--or)}
+.menu-ouvert .barre[data-menu-hote]{top:0;left:0;right:0}
+.menu-ouvert .barre,.menu-ouvert .barre .tb-gauche b{color:#ECE8E0}
+.menu-ouvert .barre .tb-lien,.menu-ouvert .barre .theme-btn,.menu-ouvert .barre .menu-btn{color:#ECE8E0}
+@media (max-width:560px){.tb-gauche a,.tb-gauche .sep,.tb-gauche .ver,.theme-btn span+span{display:none}}
+
+/* la carte */
+.accueil{flex:1 0 auto;display:grid;place-items:center;padding:12px clamp(12px,3vw,40px) 20px}
+.accueil-carte{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);min-height:min(600px,calc(100svh - 150px));
+  background:var(--carte);border:1px solid var(--ligne);border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.14),0 16px 40px -18px rgba(0,0,0,.4);transition:border-color .2s,box-shadow .2s}
+:root[data-theme="clair"] .accueil-carte{box-shadow:0 2px 4px rgba(0,0,0,.04),0 16px 40px -20px rgba(0,0,0,.18)}
+body.glisse .accueil-carte{border-color:var(--or);box-shadow:0 0 0 1px var(--or),0 16px 40px -18px rgba(0,0,0,.4)}
+.accueil-scene{position:relative;min-height:320px;background:var(--panneau-vue);border-right:1px solid var(--ligne)}
+.accueil-scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y;cursor:grab}
+.accueil-scene canvas:active{cursor:grabbing}
+.scene-note{position:absolute;left:20px;bottom:16px;font-size:12px;color:var(--texte-faible);pointer-events:none}
+.accueil-texte{display:flex;flex-direction:column;min-width:0;padding:clamp(28px,4.4vw,44px) clamp(22px,4.4vw,48px)}
+.accueil h1{margin:0;font-family:var(--titre);font-weight:600;font-size:clamp(32px,3.4vw,40px);line-height:1.1;letter-spacing:-.01em;color:var(--texte)}
+.chapeau{margin:6px 0 0;font-size:16px;line-height:22px;color:var(--texte-doux)}
+.ouvrir{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:5px 16px;border-radius:4px;font-family:var(--sans);font-size:14px;cursor:pointer;
+  background:var(--controle);border:1px solid var(--bord-controle);color:var(--texte)}
+.btn:hover{background:var(--controle-survol)}
+.btn.plein{min-height:36px;padding:6px 20px;font-weight:600;background:var(--or);border-color:transparent;color:var(--sur-accent);box-shadow:inset 0 -1px 0 rgba(0,0,0,.18)}
+.btn.plein:hover{background:var(--or);filter:brightness(.92)}
+.btn:focus-visible{outline:2px solid var(--texte);outline-offset:2px}
+.ouvrir-note{font-size:12.5px;color:var(--texte-faible)}
+.ouvrir-note kbd{font-family:var(--sans);font-size:11.5px;padding:1px 6px;border-radius:4px;border:1px solid var(--bord-controle);background:var(--controle);color:var(--texte-doux)}
+.accueil-etat{margin-top:16px;padding:8px 12px;border-radius:4px;border-left:3px solid var(--rouge);background:rgba(var(--encre),.04);font-size:13px;color:var(--texte)}
+.accueil-etat:empty{display:none}
+
+/* récents */
+.recents{margin-top:32px}
+.recents-titre{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--texte)}
+.recents-titre span{margin-left:8px;font-weight:400;font-size:12px;color:var(--texte-faible)}
+.recents ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.recents li{position:relative;display:flex;align-items:stretch;border-radius:6px;background:var(--rangee);border:1px solid var(--bord-controle);transition:background .15s}
+.recents li:hover{background:var(--rangee-survol)}
+.recents li:focus-within::before{content:"";position:absolute;left:-1px;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--or)}
+.recent{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:10px 14px;background:none;border:0;cursor:pointer;text-align:left;color:var(--texte);font:inherit}
+.recent::before{content:"";flex:none;width:20px;height:20px;background:var(--or);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M6 3h8l4 4v14H6z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M6 3h8l4 4v14H6z'/%3E%3Cpath d='M14 3v4h4'/%3E%3C/svg%3E") center/contain no-repeat}
+.r-nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.r-info{flex:none;font-size:12px;color:var(--texte-faible);font-variant-numeric:tabular-nums}
+.recent:focus-visible{outline:none}
+.r-x{flex:none;width:36px;background:none;border:0;border-radius:0 6px 6px 0;cursor:pointer;color:var(--texte-faible);font-size:16px;opacity:0;transition:opacity .15s,background .15s}
+.recents li:hover .r-x,.r-x:focus-visible{opacity:1}
+.r-x:hover{color:var(--rouge);background:var(--controle-survol)}
+@media (hover:none){.r-x{opacity:1}}
+@media (max-width:560px){.r-info{display:none}}
+.accueil-note{margin:auto 0 0;padding-top:24px;font-size:12.5px;color:var(--texte-faible)}
+.accueil-note a{color:inherit;text-decoration:underline;text-decoration-color:rgba(var(--encre),.25);text-underline-offset:2px}
+.accueil-note a:hover{color:var(--texte)}
+
+/* pied du site, discret sous la carte */
+footer.pied{display:flex;justify-content:space-between;gap:16px;flex:none;padding:10px 20px max(12px,env(safe-area-inset-bottom));font-size:12px;color:var(--texte-faible)}
+footer.pied a:hover,footer.pied a:focus-visible{color:var(--texte)}
+/* les pieds des boîtes de dialogue gardent leur mise en page (menu.css vise aussi .pied) */
+.dlg3d .pied{flex-direction:row-reverse!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;text-align:left!important}
+
+/* fichier glissé au-dessus de la page */
+.voile-depot{position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .2s;background:rgba(var(--encre),.04)}
+.voile-depot span{padding:22px 34px;border-radius:8px;border:2px dashed var(--or);background:var(--carte);font-family:var(--titre);font-size:22px;font-weight:600;color:var(--texte);box-shadow:0 8px 16px rgba(0,0,0,.26)}
+body.glisse:not(.edition) .voile-depot{opacity:1}
+/* lecture : au centre de la fenêtre, sur l'accueil comme dans l'éditeur */
+.chargement{position:fixed!important;z-index:80}
+
+@media (max-width:860px){
+  .accueil{place-items:start stretch}
+  .accueil-carte{grid-template-columns:minmax(0,1fr);min-height:0}
+  .accueil-scene{height:min(46vh,380px);border-right:0;border-bottom:1px solid var(--ligne)}
+  .accueil-note{padding-top:20px}
+}
+@media (max-width:560px){.ouvrir-note{display:none}}
 </style>
+<link rel="stylesheet" href="/assets/menu.css?v=5">
 </head>
 <body>
-<header class="barre">
-  <a class="logo" href="/" title="str-bim-tools.com"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="currentColor" opacity=".12"/><path d="M6 24L14 8l6 10 6-4" fill="none" stroke="var(--or)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M6 26h20" stroke="currentColor" stroke-width="1.4"/></svg><span class="sous-titre">STR Bim Tools</span></a>
-  <span class="titre"><b>DXF Studio</b></span>
-  <span class="ver" id="version"></span>
-  <span class="esp"></span>
-  <a class="lien-ifc" href="/ifc/" title="IFC Studio : ouvrir et retravailler un IFC"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z M2 5l6 3.5L14 5 M8 8.5v6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>IFC Studio</span></a>
-  <span class="sig">Tony VARIN</span>
-  <button type="button" id="btn-ouvrir" title="Ouvrir un DXF ou un DWG"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
-  <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
+<header class="barre" data-menu-hote>
+  <span class="tb-gauche">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5 9 16l11 3.5M9 16V5.5M4 19.5V9l5-3.5M20 19.5V9L9 5.5M4 9l16 0"/></svg>
+    <b>DXF Studio</b><span class="ver" id="version"></span><span class="sep">·</span><a href="/">STR Bim Tools</a>
+  </span>
+  <span class="barre-droite">
+    <a class="tb-lien" href="/ifc/" title="IFC Studio : ouvrir et retravailler un IFC">IFC Studio</a>
+    <span class="theme">
+      <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="menu" aria-expanded="false" title="Thème d'affichage"><span aria-hidden="true">◐</span><span>Thème</span></button>
+      <div class="menu-theme" id="menu-theme" role="menu" hidden>
+        <button type="button" role="menuitemradio" data-choix-theme="sombre">Sombre</button>
+        <button type="button" role="menuitemradio" data-choix-theme="clair">Clair</button>
+        <button type="button" role="menuitemradio" data-choix-theme="systeme">Système</button>
+      </div>
+    </span>
+    <button class="menu-btn" type="button"><span class="menu-lignes" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-txt"><span>Menu</span><span aria-hidden="true">Fermer</span></span></button>
+  </span>
 </header>
+
+<!-- Avant ouverture : une carte, la vue 3D filaire à gauche, ouvrir et récents à droite -->
+<section class="accueil" id="accueil">
+  <div class="accueil-carte" id="depot">
+    <div class="accueil-scene">
+      <canvas id="scene" role="img" aria-label="Ossature analytique en fil de fer : grille d'axes A, B, C et 1, 2, 3, croix aux pieds des poteaux, axes des poteaux et des poutres sur deux niveaux, contours des dalles, tracés trait par trait puis en rotation lente"></canvas>
+      <span class="scene-note">Glisser pour tourner</span>
+    </div>
+    <div class="accueil-texte">
+      <h1>DXF Studio</h1>
+      <p class="chapeau">Ouvre, retravaille et réenregistre tes plans DXF et DWG, en 2D comme en 3D.</p>
+      <div class="ouvrir">
+        <button type="button" class="btn plein" id="btn-ouvrir2">Ouvrir un fichier…</button>
+        <span class="ouvrir-note">ou dépose-le dans la fenêtre · <kbd>Ctrl</kbd> + <kbd>O</kbd></span>
+      </div>
+      <div class="accueil-etat" id="etat0" role="status"></div>
+      <div class="recents" id="recents" hidden>
+        <div class="recents-titre">Récents <span>gardés dans ce navigateur</span></div>
+        <ul id="recents-liste"></ul>
+      </div>
+      <p class="accueil-note">DXF · DWG (converti par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a>) · modèle analytique d'<a href="/ifc/">IFC Studio</a> · 100 % local, le fichier ne quitte pas ton poste</p>
+    </div>
+  </div>
+  <div class="voile-depot" aria-hidden="true"><span>Lâche ton fichier DXF ou DWG</span></div>
+</section>
 
 <!-- Après ouverture d'un fichier : barre façon IFC Studio (menus, mode, fichier, signature, état) -->
 <div class="haut" id="haut" hidden>
@@ -395,6 +508,7 @@ body.edition .barre{display:none}
           <div class="mb-liste mb-sl" role="menu">
             <button type="button" role="menuitemradio" data-cmd="theme" data-theme-choix="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
             <button type="button" role="menuitemradio" data-cmd="theme" data-theme-choix="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
+            <button type="button" role="menuitemradio" data-cmd="theme" data-theme-choix="systeme" aria-checked="false"><span>Système</span><kbd></kbd></button>
           </div>
         </div>
       </div>
@@ -477,21 +591,18 @@ body.edition .barre{display:none}
     <button type="button" class="replier d" id="rep-d" title="Réduire les propriétés">›</button>
     <div class="coord" id="coord"></div>
     <div class="vue-aide" id="vue-aide"></div>
-    <div class="accueil" id="accueil">
-      <div class="boite">
-        <div class="icone"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 26L14 8l6 10 7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M4 28h24" stroke="currentColor" stroke-width="1.6"/></svg></div>
-        <h1><b>DXF</b> Studio</h1>
-        <p>Ouvre un plan DXF ou DWG : calques, propriétés, mesure avec accroche. Un modèle 3D (par exemple le modèle analytique exporté d'<a href="/ifc/">IFC Studio</a>) se retravaille en 3D : aligner, prolonger, raccorder en coin, scinder, fusionner les nœuds.</p>
-        <button type="button" class="bt prim" id="btn-ouvrir2">Ouvrir un DXF ou un DWG…</button>
-        <div class="zone">ou glisse le fichier ici</div>
-        <div class="accueil-etat" id="etat0" role="status"></div>
-        <div class="pied">Le fichier est lu dans ton navigateur, il ne quitte pas ton poste. Les DWG sont convertis par <a href="/dxf/vendor/libredwg/LISEZMOI.txt">LibreDWG</a> (GPL 3), environ 10 Mo chargés au premier DWG.</div>
-      </div>
-    </div>
-    <div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div></div>
   </main>
   <aside class="panneau p-props"><div class="p-titre">Propriétés</div><div class="props" id="props"></div></aside>
 </div>
+<footer class="pied">
+  <a class="pied-site" href="/">← str-bim-tools.com</a>
+  <div class="pied-droite">
+    <a class="courriel" data-courriel="moc.sloot-mib-rts|tcatnoc"><span class="long">contact (arobase) str-bim-tools.com</span><span class="court">Contact</span></a>
+    <a href="/mentions-legales/">Mentions légales</a>
+    <span class="pied-maj">Dernière mise à jour : <span data-maj>jj.mm.aaaa</span></span>
+  </div>
+</footer>
+<div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div></div>
 <div class="ctx mb-liste" id="ctx" role="menu" hidden></div>
 <input type="file" id="fichier" accept=".dxf,.dwg" hidden>
 <dialog class="dlg3d" id="dlg3d"></dialog>
@@ -500,6 +611,8 @@ body.edition .barre{display:none}
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/dxf/dxf-editeur.js?v=2"></script>
-<script src="/dxf/dxf-app.js?v=6"></script>
+<script src="/dxf/dxf-accueil.js?v=1"></script>
+<script src="/dxf/dxf-app.js?v=7"></script>
+<script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

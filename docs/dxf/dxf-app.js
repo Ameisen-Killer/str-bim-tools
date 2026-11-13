@@ -2,7 +2,7 @@
    (dxf-editeur.js). Les fichiers restent sur le poste. */
 (function(){
   "use strict";
-  var VERSION = "2.1.0";
+  var VERSION = "2.2.0";
   var Ed = window.Editeur3D || null;
   function en3D(){ return !!(Ed && Ed.actif()); }
   var $ = function(s){ return document.querySelector(s); };
@@ -460,10 +460,13 @@
     }).then(function(sc){
       if (dwg) sc.dwg = true;
       S = sc; choisi = -1; cheminChoisi = null; mesure = [];
+      // interface façon IFC Studio : barre de menus, mode, fichier, état (avant de construire, pour que la vue ait sa taille)
+      document.body.classList.add("edition"); document.body.classList.remove("glisse");
+      $("#accueil").hidden = true; $("#haut").hidden = false; $("#etat0").textContent = "";
       construire();
-      $("#accueil").hidden = true; $("#outils").hidden = false;
-      // interface façon IFC Studio : barre de menus, mode, fichier, état
-      document.body.classList.add("edition"); $("#haut").hidden = false; $("#etat0").textContent = "";
+      $("#outils").hidden = false;
+      // gardé dans les récents de l'accueil (contenu d'origine : DWG tel quel, ou DXF)
+      if (window.DXFAccueil) DXFAccueil.memoriser(f.name, source.dwg || source.dxf, veut3D);
       $("#f-nom").textContent = f.name;
       // mode 3D : document DXF3D lu à part ; un dessin 3D fait seulement de lignes s'ouvre directement en 3D
       var info3 = Ed ? Ed.charger(source.dxf, f.name) : null;
@@ -548,10 +551,11 @@
   }
   $("#fichier").addEventListener("change", function(){ ouvrir(this.files[0]); this.value = ""; });
   function choisirFichier(){ $("#fichier").click(); }
-  $("#btn-ouvrir").addEventListener("click", choisirFichier);
   $("#btn-ouvrir2").addEventListener("click", choisirFichier);
-  ["dragenter", "dragover"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); centre.classList.add("survol"); }); });
-  ["dragleave", "drop"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); if (t === "drop" || !e.relatedTarget) centre.classList.remove("survol"); }); });
+  ["dragenter", "dragover"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); centre.classList.add("survol"); document.body.classList.add("glisse"); }); });
+  ["dragleave", "drop"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); if (t === "drop" || !e.relatedTarget){ centre.classList.remove("survol"); document.body.classList.remove("glisse"); } }); });
+  // récents de l'accueil (dxf-accueil.js)
+  if (window.DXFAccueil) DXFAccueil.surOuvrir(function(f, ifc){ veut3D = !!ifc; ouvrir(f); });
   document.addEventListener("drop", function(e){ var f = e.dataTransfer && e.dataTransfer.files; if (f && f.length) ouvrir(f[0]); });
 
   // ================= Barre d'outils, panneaux, thème =================
@@ -573,14 +577,30 @@
     replier(c, false);
     $("#rep-" + c).addEventListener("click", function(){ replier(c, !$(".app").classList.contains("sans-" + c)); });
   });
-  $("#btn-theme").addEventListener("click", function(){ theme(clair() ? "sombre" : "clair"); });
+  // thème : sombre, clair ou système (menu de l'accueil et Affichage > Thème)
+  function choixTheme(){ return lsGet("dxf.theme", "sombre"); }
   function theme(c){
-    document.documentElement.setAttribute("data-theme", c);
-    document.querySelector("meta[name=theme-color]").setAttribute("content", c === "clair" ? "#F3F3F3" : "#202020");
+    var eff = c === "systeme" ? (matchMedia("(prefers-color-scheme: light)").matches ? "clair" : "sombre") : c;
+    document.documentElement.setAttribute("data-theme", eff);
+    document.querySelector("meta[name=theme-color]").setAttribute("content", eff === "clair" ? "#F3F3F3" : "#202020");
     lsSet("dxf.theme", c);
+    [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === c)); });
     if (S && !en3D()){ calques(); proprietes(); }
     demander();
   }
+  (function(){
+    var btn = $("#theme-btn"), menu = $("#menu-theme");
+    if (!btn || !menu) return;
+    function ouvre(o){ menu.hidden = !o; btn.setAttribute("aria-expanded", String(o)); }
+    btn.addEventListener("click", function(e){ e.stopPropagation(); ouvre(menu.hidden); });
+    document.addEventListener("click", function(e){ if (!menu.hidden && !menu.contains(e.target)) ouvre(false); });
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape" && !menu.hidden){ ouvre(false); btn.focus(); } });
+    [].forEach.call(menu.querySelectorAll("[data-choix-theme]"), function(b){
+      b.addEventListener("click", function(){ theme(b.getAttribute("data-choix-theme")); ouvre(false); btn.focus(); });
+    });
+    try { matchMedia("(prefers-color-scheme: light)").addEventListener("change", function(){ if (choixTheme() === "systeme") theme("systeme"); }); } catch (e){}
+    [].forEach.call(menu.querySelectorAll("[data-choix-theme]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === choixTheme())); });
+  })();
   // ================= Bilan du fichier (barre du haut) =================
   function bilan(){
     if (!S) return;
@@ -615,7 +635,7 @@
     }
     mb.querySelector('[data-cmd="cadrer"]').disabled = !S;
     mb.querySelector('[data-cmd="mesure"]').disabled = !S;
-    mb.querySelectorAll('[data-cmd="theme"]').forEach(function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-theme-choix") === (clair() ? "clair" : "sombre"))); });
+    mb.querySelectorAll('[data-cmd="theme"]').forEach(function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-theme-choix") === choixTheme())); });
   }
   function ouvrirMenu(gr, focus){
     fermerMenu();
