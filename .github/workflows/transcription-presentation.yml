@@ -17,10 +17,13 @@ jobs:
       - run: pip -q install faster-whisper
       - name: Transcription
         run: |
+          ffmpeg -loglevel error -y -i docs/planificateur-presentation-q7k3/presentation/presentation.mp3 -ar 16000 -ac 1 -f s16le /tmp/p.raw
           python - <<'PY'
+          import numpy as np
           from faster_whisper import WhisperModel
+          audio = np.fromfile("/tmp/p.raw", dtype=np.int16).astype(np.float32) / 32768.0
           m = WhisperModel("medium", device="cpu", compute_type="int8")
-          segs, _ = m.transcribe("docs/planificateur-presentation-q7k3/presentation/presentation.mp3", language="fr", word_timestamps=True)
+          segs, _ = m.transcribe(audio, language="fr", word_timestamps=True)
           for s in segs:
               print(f"SEG {s.start:7.2f}-{s.end:7.2f} {s.text}")
               if s.start < 25 or "SIA" in s.text.upper().replace(".", "").replace(" ", "") or "S I A" in s.text.upper():
