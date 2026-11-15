@@ -1,0 +1,44 @@
+# Captures d'écran du planificateur pour la page de présentation (15.11.2026) : lancée à la main.
+# Entre avec le compte de démonstration (aucune donnée réelle), photographie les pages
+# et publie les images dans le dossier de la page de présentation.
+name: Captures de la présentation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: captures-presentation
+  cancel-in-progress: false
+
+jobs:
+  captures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Navigateur
+        working-directory: outils/presentation
+        run: |
+          npm init -y >/dev/null
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Captures
+        run: SORTIE="$GITHUB_WORKSPACE/docs/planificateur-presentation-q7k3/captures" node captures.mjs
+        working-directory: outils/presentation
+      - name: Publication
+        run: |
+          rm -f outils/presentation/package.json outils/presentation/package-lock.json
+          rm -rf outils/presentation/node_modules
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add docs/planificateur-presentation-q7k3/captures
+          git diff --cached --quiet && { echo "Rien de neuf"; exit 0; }
+          git commit -m "Présentation : captures d'écran du planificateur (compte démo)"
+          git pull --rebase origin main
+          git push origin HEAD:main
