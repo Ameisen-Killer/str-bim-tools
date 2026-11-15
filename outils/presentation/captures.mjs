@@ -35,6 +35,12 @@ async function marqueBureau(ctx) {
     js = js.replace(avant, 'return "ab";');
     await route.fulfill({ response: rep, body: js });
   });
+  // Filet (demande de Tony) : tout logo STR Bim Tools qui resterait est simplement masqué
+  await ctx.addInitScript(() => {
+    const st = document.createElement("style");
+    st.textContent = ".marque-str,.ab-logo-str{visibility:hidden!important}";
+    (document.head || document.documentElement).appendChild(st);
+  });
 }
 
 async function entreEnDemo(page) {
