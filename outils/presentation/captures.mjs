@@ -35,10 +35,11 @@ async function marqueBureau(ctx) {
     js = js.replace(avant, 'return "ab";');
     await route.fulfill({ response: rep, body: js });
   });
-  // Filet (demande de Tony) : tout logo STR Bim Tools qui resterait est simplement masqué
+  // Filet (demande de Tony) : un logo STR Bim Tools qui resterait est remplacé par le petit logo AB
   await ctx.addInitScript(() => {
     const st = document.createElement("style");
-    st.textContent = ".marque-str,.ab-logo-str{visibility:hidden!important}";
+    st.textContent = ".marque-str,.ab-logo-str{background:url(/planif/assets/logo-ab-marque.svg?v=1) left center/contain no-repeat!important}"
+      + ".marque-str>*,.ab-logo-str>*{visibility:hidden!important}";
     (document.head || document.documentElement).appendChild(st);
   });
 }
@@ -52,8 +53,8 @@ async function entreEnDemo(page) {
 
 async function photo(page, nom, chemin, filtre) {
   try {
-    await page.goto(SITE + chemin, { waitUntil: "networkidle", timeout: 45000 });
-    await pause(2500);                       // données, animations d'entrée
+    await page.goto(SITE + chemin, { waitUntil: "load", timeout: 60000 });
+    await pause(5000);                       // données, animations d'entrée
     if (filtre) {
       try { await page.getByText(filtre, { exact: true }).first().click({ timeout: 5000 }); await pause(1500); }
       catch (e) { console.log("filtre absent", nom, filtre); }
