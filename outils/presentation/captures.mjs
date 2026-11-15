@@ -23,6 +23,20 @@ const PAGES = [
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Logo du bureau sur les captures (demande de Tony, 15.11.2026) : le site garde la
+// marque STR en démonstration ; ici seulement, donnees.js est servi au navigateur de
+// capture avec la marque « ab » forcée. Rien n'est changé sur le site ni en base.
+async function marqueBureau(ctx) {
+  await ctx.route(/\/planif\/assets\/donnees\.js/, async (route) => {
+    const rep = await route.fetch();
+    let js = await rep.text();
+    const avant = 'if (D.enDemo() || !p || !p.bureau) return "str";';
+    if (!js.includes(avant)) console.log("ATTENTION : marque non remplacée");
+    js = js.replace(avant, 'return "ab";');
+    await route.fulfill({ response: rep, body: js });
+  });
+}
+
 async function entreEnDemo(page) {
   await page.goto(SITE + "/planif/connexion/", { waitUntil: "networkidle" });
   await page.click("#demo");
@@ -52,6 +66,7 @@ const nav = await chromium.launch();
 
 // Ordinateur : 1440 × 900, net sur grand écran
 const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, locale: "fr-CH", timezoneId: "Europe/Zurich" });
+await marqueBureau(ctx);
 const page = await ctx.newPage();
 await entreEnDemo(page);
 for (const [nom, chemin, filtre] of PAGES) await photo(page, nom, chemin, filtre);
@@ -72,6 +87,7 @@ await ctx.close();
 
 // Téléphone (format Galaxy S24)
 const tel = await nav.newContext({ viewport: { width: 384, height: 832 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-CH", timezoneId: "Europe/Zurich" });
+await marqueBureau(tel);
 const pt = await tel.newPage();
 await entreEnDemo(pt);
 await photo(pt, "mobile-accueil", "/planif/");
