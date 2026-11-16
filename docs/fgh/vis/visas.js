@@ -572,7 +572,8 @@
     // sortent de tous les comptes ; un plan, lui, est toujours pris à son dernier indice.
     var okBase = function (d) {
       return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type) &&
-        (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur);
+        (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur) &&
+        (!f.niveau || f.niveau === "tous" || String(d.niveau || "") === f.niveau) && (!f.zone || f.zone === "tous" || String(d.zone || "") === f.zone);
     };
     var ok = function (d) { return okBase(d) && (!f.dernierSeul || (!d.depasse && !d.renumerote)); };
     var R = { edition: D.edition };
