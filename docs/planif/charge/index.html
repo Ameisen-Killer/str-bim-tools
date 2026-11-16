@@ -618,7 +618,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var v = {};
     try { v = JSON.parse(localStorage.getItem("planif.vue") || "{}") || {}; } catch (e) {}
     // Le tableau de bord reprend la personne, la semaine et les affaires comptées
-    v.debut = lundi; v.membres = [idMembre]; v.affaires = vue.affaires.slice();
+    v.debut = lundi; v.debutPose = true; v.membres = [idMembre]; v.affaires = vue.affaires.slice();
     delete v.membre; delete v.affaire;
     try { localStorage.setItem("planif.vue", JSON.stringify(v)); } catch (e) {}
     location.href = "/planif/planning/";
@@ -628,7 +628,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=7"></script>
+<script src="/planif/assets/aide-fiches.js?v=8"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

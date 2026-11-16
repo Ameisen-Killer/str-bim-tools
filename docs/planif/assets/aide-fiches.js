@@ -555,9 +555,9 @@
 
     { id: "tb-periode", pages: ["tableau", "absences", "charge"],
       question: "Comment changer la période affichée ?",
-      aussi: ["voir plus de semaines", "semaine suivante", "revenir à aujourd'hui"],
+      aussi: ["voir plus de semaines", "semaine suivante", "revenir à aujourd'hui", "ouvrir sur la semaine en cours", "pourquoi le planning revient à cette semaine"],
       mots: "periode semaine suivante precedente aujourd hui duree",
-      reponse: "Les flèches **◀ ▶** passent d'une semaine à l'autre, **Aujourd'hui** y revient, et le menu à côté affiche **1, 2 ou 4 semaines**.",
+      reponse: "Le tableau de bord s'ouvre toujours sur la **semaine en cours** (sauf quand tu y arrives depuis une case du tableau de charge : il montre alors cette semaine-là). Les flèches **◀ ▶** passent d'une semaine à l'autre, **Aujourd'hui** y revient, et le menu à côté affiche **1, 2 ou 4 semaines** (retenu sur cet appareil).",
       ici: {
         absences: "Les flèches **◀ ▶** avancent ou reculent, **Ce mois** revient au présent, et le menu choisit **1 semaine, 1, 2 ou 3 mois**.",
         charge: "Les flèches **◀ ▶** passent d'une semaine à l'autre, **Cette semaine** y revient, et le menu affiche **8, 12, 16 ou 26 semaines** (retenu sur cet appareil)."

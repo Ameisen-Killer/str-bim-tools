@@ -160,7 +160,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   if (vue.affaires.length > 1) vue.affaires = vue.affaires.slice(0, 1);
   // Première visite sur un écran étroit : une seule semaine, sinon tout est illisible.
   if (!memorise0 && window.innerWidth < 760) vue.duree = 7;
-  if (!vue.debut) vue.debut = C.lundi(C.isoAuj());
+  /* Le tableau de bord s'ouvre toujours sur la semaine en cours (demande de Tony,
+     16.11.2026) ; seul le tableau de charge, qui y envoie sur une semaine précise
+     (« debutPose »), garde la semaine choisie. */
+  if (!vue.debutPose || !vue.debut) vue.debut = C.lundi(C.isoAuj());
+  delete vue.debutPose;
 
   function memorise() {
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
@@ -1404,7 +1408,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=7"></script>
+<script src="/planif/assets/aide-fiches.js?v=8"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>
