@@ -1,0 +1,48 @@
+# Migration SQL du planificateur (16.11.2026, demande de Tony : « que tu fasses
+# les migrations tout seul »). Lancée à la main (ou par Claude) avec le nom d'un
+# fichier migration-<sujet>.sql de la racine du dépôt. ON_ERROR_STOP : la
+# moindre erreur arrête tout, et le begin … commit du fichier annule la migration.
+# Secret requis : SUPABASE_DB_URL = chaîne de connexion « Session pooler » de
+# Supabase (Connect › Session pooler, mot de passe de la base compris) ; la
+# connexion directe db.<ref>.supabase.co ne passe pas depuis GitHub (IPv6).
+name: Migration SQL
+
+on:
+  workflow_dispatch:
+    inputs:
+      fichier:
+        description: "Fichier à exécuter, par ex. migration-createur-tache.sql"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-sql
+  cancel-in-progress: false
+
+jobs:
+  migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exécute la migration
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          FICHIER: ${{ github.event.inputs.fichier }}
+        run: |
+          set -eu
+          if [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::error::Secret SUPABASE_DB_URL absent (Settings › Secrets and variables › Actions)."; exit 1
+          fi
+          # Seuls les fichiers migration-*.sql de la racine du dépôt
+          if ! printf '%s' "$FICHIER" | grep -Eq '^migration-[a-z0-9-]+\.sql$'; then
+            echo "::error::Nom refusé : $FICHIER (attendu : migration-<sujet>.sql)"; exit 1
+          fi
+          if [ ! -f "$FICHIER" ]; then
+            echo "::error::$FICHIER introuvable à la racine du dépôt."; exit 1
+          fi
+          echo "== $FICHIER"
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -f "$FICHIER"
+          echo "== Migration exécutée."
