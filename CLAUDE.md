@@ -10,3 +10,7 @@
 - Interdit sans demande explicite : serveur local, capture Chromium/Playwright, jsdom, base Postgres
   jetable, faux serveur Supabase, script d'essai. La relecture se fait en lisant le code.
 - Avant de toucher au site, charger le skill `str-bim-tools-site` : tout le reste y est.
+- Base Supabase : Claude fait lui-même les modifications (demande de Tony, 16.11.2026) —
+  `migration-<sujet>.sql` rejouable poussé sur `main`, tâche GitHub « Migration SQL »
+  (`migration-sql.yml`, entrée `fichier`), journal relu, fichier retiré, `base-supabase.sql` à jour.
+  Suppression ou réécriture de données : seulement avec l'accord explicite de Tony.
