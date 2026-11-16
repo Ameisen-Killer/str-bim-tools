@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.9.0";
+  var VERSION = "2.10.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -182,8 +182,12 @@
   // la fusion d'un fichier partagé ne la fasse pas revenir
   function vive(x){ return !!x && !x.retire; }
   function vives(m){ return m ? PARAMS.filter(function(p){ return vive(m.v[p]); }) : []; }
-  // une date déjà dans la maquette reste (règle de Tony) : une date posée ici par une version précédente est ignorée
-  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; if (p === P_DATE && r.ifc[P_DATE]) return r.ifc[P_DATE]; return vive(x) ? x.nouveau : (r.ifc[p] || ""); }
+  // coche « Garder la date initiale » (cochée par défaut, même clé que /fgh/his/) : une date déjà dans la
+  // maquette reste, une date posée ici par une version précédente est ignorée. Décochée : la date de
+  // validation est mise à aujourd'hui à chaque décision, comme avant la 2.9.0.
+  function gardeDate(){ return lsGet("fgh.dateInitiale", "1") === "1"; }
+  function cocheDate(){ return '<label class="coche-date" title="Cochée : la date de validation déjà remplie ne change plus quand le statut ou le commentaire change. Décochée : elle est mise à aujourd\'hui à chaque décision."><input type="checkbox" id="garde-date"' + (gardeDate() ? " checked" : "") + "> Garder la date initiale</label>"; }
+  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; if (p === P_DATE && r.ifc[P_DATE] && gardeDate()) return r.ifc[P_DATE]; return vive(x) ? x.nouveau : (r.ifc[p] || ""); }
   function modifie(r, p){ var m = modifs.get(r.k); return p ? !!(m && vive(m.v[p])) : vives(m).length > 0; }
   function teinte(r){ return TEINTE[classe(valeur(r, P_ST))]; }
   function aujourdhui(){ var d = new Date(); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear(); }
@@ -942,9 +946,9 @@
       var cls = new Set(rs.map(function(r){ return classe(valeur(r, P_ST)); })), cl = cls.size === 1 ? Array.from(cls)[0] : "";
       f.innerHTML = '<div class="tete"><h2>' + pluriel(rs.length, "réservation") + '</h2><div class="fam">' + esc(rs.slice(0, 12).map(function(r){ return r.num; }).join(", ") + (rs.length > 12 ? "…" : "")) + '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() + bandeauHorsSync(rs) +
         '<div class="bloc"><h3>Décision pour toutes</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(cl) +
-        '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' +
+        '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' + cocheDate() +
         '<div class="actions"><button type="button" class="bt" data-a="com-multi"' + ro + '>Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
-        '<p class="note">La date de validation est remplie à la première décision seulement : une date déjà remplie ne change plus, même si le statut change.</p></div>' + noteClash(rs);
+        '<p class="note">' + (gardeDate() ? "La date de validation est remplie à la première décision seulement : une date déjà remplie ne change plus, même si le statut ou le commentaire change." : "La date de validation est mise à aujourd'hui à chaque décision.") + "</p></div>" + noteClash(rs);
       return;
     }
     var r = rs[0], p = r.p, st = valeur(r, P_ST), d = valeur(r, P_DATE);
@@ -952,10 +956,10 @@
       '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() + bandeauHorsSync(rs) +
       '<div class="bloc"><h3>Validation</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(classe(st)) +
       '<div class="fchamp">' + etiquette(r, P_ST) + '<select class="champ" data-p="' + P_ST + '">' + optionsStatut(st) + "</select></div>" +
-      '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '"' + (r.ifc[P_DATE] ? " disabled" : "") + ">" +
+      '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '"' + (r.ifc[P_DATE] && gardeDate() ? " disabled" : "") + ">" +
       (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") +
-      (r.ifc[P_DATE] ? '<div class="note">Date initiale gardée : elle ne change pas, même si le statut change.</div>' : "") + "</div>" +
-      '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
+      (r.ifc[P_DATE] && gardeDate() ? '<div class="note">Date initiale gardée : elle ne change pas, même si le statut ou le commentaire change.</div>' : "") + "</div>" +
+      '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" + cocheDate() +
       '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' + blocClash(r) +
       '<div class="bloc"><h3>Demande</h3>' + dl([
         ["Demandeur", p["Demandeur"]], ["Date", p["Date demande"]], ["Commentaire", p["Commentaire demande"]],
@@ -982,6 +986,11 @@
   // Date et commentaire : enregistrés sans redessiner la fiche. Le commentaire est validé quand il perd le
   // focus, c'est-à-dire pendant le clic suivant (« Valider »…) : refaire la fiche à ce moment ferait perdre ce clic.
   $("#fiche").addEventListener("change", function(e){
+    if (e.target.id === "garde-date"){
+      lsSet("fgh.dateInitiale", e.target.checked ? "1" : "0");
+      etat(e.target.checked ? "Date initiale gardée : un changement de statut ou de commentaire ne la modifie plus." : "Date initiale non gardée : chaque décision met la date à aujourd'hui.");
+      renduListe(); renduFiche(); return;
+    }
     var c = e.target.closest("[data-p]");
     if (!c) return;
     var rs = choisis(), p = c.getAttribute("data-p");
@@ -1036,7 +1045,10 @@
       // pas quand le statut change ; elle n'est mise à aujourd'hui que si elle est vide (première décision).
       // Retour au statut d'origine : la date de la maquette revient. Une date de la maquette annule celle
       // qu'une version précédente de la page aurait écrite.
-      if (r.ifc[P_DATE] || (statut === (r.ifc[P_ST] || "") && !modifie(r, P_ST))) fixer(r, P_DATE, null);
+      // Coche décochée : aujourd'hui à chaque décision, la date de la maquette si on revient au statut d'origine.
+      var retour = statut === (r.ifc[P_ST] || "") && !modifie(r, P_ST);
+      if (!gardeDate()) fixer(r, P_DATE, retour ? null : d);
+      else if (r.ifc[P_DATE] || retour) fixer(r, P_DATE, null);
       else if (!valeur(r, P_DATE)) fixer(r, P_DATE, d);
     });
     apresModif(rs);

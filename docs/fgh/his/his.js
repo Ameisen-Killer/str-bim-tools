@@ -44,6 +44,18 @@
   function cmpTxt(a, b) { return String(a).localeCompare(String(b), "fr", { numeric: true }); }
   // valeur d'une entrée : une décision annulée (retire) ramène la valeur de la maquette (ancien)
   function valeur(e) { return e ? (e.retire ? e.ancien || "" : e.nouveau || "") : ""; }
+  // coche « Garder la date initiale » (cochée par défaut, même clé que /fgh/rsv/) : la date de validation
+  // affichée et exportée est la première connue (celle de la maquette avant la première décision, sinon la
+  // première posée), même si une décision plus tard (statut, commentaire) l'a changée. Décochée : la dernière.
+  function gardeDate() { return lsGet("fgh.dateInitiale") !== "0"; }
+  function dateInitiale(r) {
+    for (var i = 0; i < r.ev.length; i++) {
+      var e = r.ev[i]; if (e.parametre !== P_DATE) continue;
+      if (e.ancien) return e.ancien;
+      if (!e.retire && e.nouveau) return e.nouveau;
+    }
+    return r.dateDern;
+  }
 
   // ------------------------------------------------------------------ base
   function appel(chemin, o) {
@@ -115,7 +127,9 @@
       var avis = {}; Object.keys(dernStAuteur).forEach(function (a) { avis[dernStAuteur[a]] = 1; });
       r.diverge = Object.keys(dernStAuteur).length > 1 && Object.keys(avis).length > 1;
       r.statut = valeur(r.cur[P_ST]);
-      r.date = valeur(r.cur[P_DATE]);
+      r.dateDern = valeur(r.cur[P_DATE]);
+      r.dateInit = dateInitiale(r);
+      r.date = gardeDate() ? r.dateInit : r.dateDern;
       r.com = valeur(r.cur[P_COM]);
       r.dern = r.ev[r.ev.length - 1];
       r.nom = r.numero || r.element_id || r.k;
@@ -270,7 +284,8 @@
     $("#fr-titre").textContent = "Réservation " + r.nom;
     $("#fr-sous").textContent = [r.famille, r.niveau ? r.niveau + " (" + nomNiv(r.niveau) + ")" : "", r.unique_id].filter(Boolean).join(" · ");
     var h = '<div class="etat-actuel"><div><span>Statut</span><b>' + pastilleSt(r.statut) + (r.diverge ? '<span class="diverge">AVIS</span>' : "") + "</b></div>" +
-      "<div><span>Date de validation</span><b>" + esc(r.date || "—") + "</b></div><div><span>Commentaire</span><b>" + esc(r.com || "—") + "</b></div></div>";
+      "<div><span>Date de validation" + (gardeDate() ? " (initiale)" : "") + "</span><b>" + esc(r.date || "—") +
+      (r.dateInit !== r.dateDern ? ' <small class="muet">' + (gardeDate() ? "dernière : " + esc(r.dateDern || "vide") : "initiale : " + esc(r.dateInit || "vide")) + "</small>" : "") + "</b></div><div><span>Commentaire</span><b>" + esc(r.com || "—") + "</b></div></div>";
     // une ligne de frise par (heure, auteur) : statut, date et commentaire posés ensemble
     var groupes = [], dern = null;
     r.ev.forEach(function (e) {
@@ -308,6 +323,12 @@
   function ouvreImport() { $("#fi-bilan").innerHTML = ""; $("#f-import").hidden = false; }
   $("#btn-import").addEventListener("click", ouvreImport);
   $("#fi-depot").addEventListener("click", function () { $("#fichier").click(); });
+  $("#garde-date").checked = gardeDate();
+  $("#garde-date").addEventListener("change", function () {
+    lsSet("fgh.dateInitiale", this.checked ? "1" : "0");
+    calcule(); rendu();
+    toast(this.checked ? "Date initiale gardée : affichage, Excel et JSON consolidé." : "Dernière date affichée et exportée.");
+  });
   $("#fichier").addEventListener("change", function () { var f = Array.from(this.files || []); this.value = ""; if (f.length) importe(f); });
   ["dragenter", "dragover"].forEach(function (t) {
     document.addEventListener(t, function (ev) { if (ev.dataTransfer && Array.from(ev.dataTransfer.types || []).indexOf("Files") >= 0) { ev.preventDefault(); document.body.classList.add("glisse"); } });
@@ -391,6 +412,8 @@
         var e = { cle: r.cle || "", unique_id: r.unique_id || "", element_id: r.element_id || "", numero: r.numero || "", famille: r.famille || "", niveau: r.niveau || "",
           parametre: p, ancien: x.ancien, nouveau: x.nouveau, par: x.par || "", quand: x.quand || "" };
         if (x.retire) e.retire = true;
+        // date initiale gardée : le fichier rend la première date, le valideur la relit telle quelle
+        if (p === P_DATE && r.date !== valeur(x)) { e.nouveau = r.date; delete e.retire; }
         out.push(e);
       });
     });
