@@ -138,7 +138,7 @@ et la même adresse dans **Redirect URLs**.
 ## 7. Essai
 
 1. Console > Nouvelle personne : un prénom et un nom, une adresse à toi qui n'est pas encore inscrite,
-   dans un bureau d'essai (ou le bureau d'essai de `jeu-essai.sql`). Coche « Se connecte à l'outil »,
+   dans un bureau d'essai. Coche « Se connecte à l'outil »,
    mets l'accès sur « Ouvert » et coche « Envoyer tout de suite le lien de bienvenue ».
 2. Le courriel arrive, le lien ouvre « Bienvenue », tu choisis un mot de passe, tu entres dans le planning
    de ce bureau, et seulement lui.
