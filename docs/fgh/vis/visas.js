@@ -571,7 +571,8 @@
     // dernierSeul : les indices remplacés (un indice plus élevé existe, dans ce circuit ou un autre)
     // sortent de tous les comptes ; un plan, lui, est toujours pris à son dernier indice.
     var okBase = function (d) {
-      return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.type || f.type === "tous" || d.type === f.type) &&
+      return (!f.circuit || f.circuit === "tous" || d.circuit === f.circuit) && (!f.types || !Object.keys(f.types).length || f.types[d.type]) &&
+        (!f.neufs || (d.dep !== null && d.dep !== undefined && d.dep > (D.edition || 0) - 7)) &&
         (!f.auteur || f.auteur === "tous" || auteurDe(d) === f.auteur) &&
         (!f.niveau || f.niveau === "tous" || String(d.niveau || "") === f.niveau) && (!f.zone || f.zone === "tous" || String(d.zone || "") === f.zone);
     };

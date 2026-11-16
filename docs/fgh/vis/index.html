@@ -73,6 +73,15 @@ body.v-glisse::after{content:"Dépose l'export Kairnial";position:fixed;inset:12
 .v-tuile .v-val{font-size:clamp(40px,5vw,56px);font-weight:200;line-height:1;font-variant-numeric:tabular-nums}
 .v-tuile .v-det{font-size:13.5px;color:var(--texte-doux)}
 
+/* types et « Nouveaux » en pastilles, comme la liste des plans */
+.v-types{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 0}
+.v-types button{height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--ligne);background:rgba(var(--encre),.03);cursor:pointer;font:inherit;font-size:13px;color:var(--texte-doux);transition:background .2s,border-color .2s}
+.v-types button:hover{background:rgba(var(--encre),.08)}
+.v-types button[aria-pressed="true"]{background:var(--or);border-color:var(--or);color:var(--noir);font-weight:600}
+.v-types button i{font-style:normal;opacity:.7;margin-left:5px}
+.v-types button.b-neufs{border-color:var(--or);color:var(--or);font-weight:600;margin-right:8px}
+.v-types button.b-neufs[aria-pressed="true"]{color:var(--noir)}
+
 /* bandeau de gauche : zones puis étages, comme la liste des plans */
 .v-app{display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;align-items:start}
 .v-corps{min-width:0}
@@ -256,12 +265,12 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         <div class="grille-champs">
           <div class="champ" id="champ-export" hidden><label for="f-export">Export analysé</label><select id="f-export"></select></div>
           <div class="champ"><label for="f-circuit">Circuit</label><select id="f-circuit"></select></div>
-          <div class="champ"><label for="f-type">Type de document</label><select id="f-type"></select></div>
           <div class="champ"><label for="f-auteur">Déposé par</label><select id="f-auteur"></select></div>
         </div>
       </div>
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
+      <div class="v-types" id="types" aria-label="Types de document"></div>
       <section class="section">
         <div class="v-tuiles" id="tuiles" aria-label="Ce qui demande une action"></div>
       </section>
@@ -306,14 +315,14 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div id="v-bulle" role="tooltip" hidden></div>
 
 <script src="/fgh/vis/outil.js?v=8"></script>
-<script src="/fgh/vis/visas.js?v=4"></script>
+<script src="/fgh/vis/visas.js?v=5"></script>
 <script>
 (function () {
   "use strict";
   var UI = window.Outil, S = window.Stock, V = window.Visas, $ = function (id) { return document.getElementById(id); };
 
   var donnees = null, R = null, barre = null, source = null;
-  var etat = { circuit: "tous", niveau: "tous", zone: "tous", type: "tous", auteur: "tous", dernierSeul: true, visa: "", traite: "tous", annotes: false, statuts: {}, tri: "statut", limite: 60, fantomes: false,
+  var etat = { circuit: "tous", niveau: "tous", zone: "tous", types: {}, neufs: false, auteur: "tous", dernierSeul: true, visa: "", traite: "tous", annotes: false, statuts: {}, tri: "statut", limite: 60, fantomes: false,
     triInter: { col: "attenteRetard", sens: -1 }, ouvert: null };
 
   /* ------------------------------------------------------------ outils */
@@ -698,7 +707,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.type = "tous"; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
+    etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe(); noyaux();
     filtres();
     $("accueil").hidden = true; $("analyse").hidden = false;
@@ -713,12 +722,37 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     $("f-circuit").innerHTML = '<option value="tous">Tous les circuits</option>' + donnees.circuits.map(function (c) {
       return '<option value="' + esc(c.nom) + '">' + esc(c.nom) + "</option>";
     }).join("");
-    var nb = {};
-    donnees.plans.forEach(function (p) { nb[p.doc.type] = (nb[p.doc.type] || 0) + 1; });
-    $("f-type").innerHTML = '<option value="tous">Tous les types</option>' + Object.keys(nb).sort(function (a, b) { return nb[b] - nb[a]; }).map(function (t) {
-      return '<option value="' + esc(t) + '">' + esc(t || "sans type") + " · " + n(nb[t]) + " plans</option>";
-    }).join("");
   }
+
+  /* Types et « Nouveaux » en pastilles, comme la liste des plans : plusieurs types
+     à la fois ; « Nouveaux » = dernier indice déposé dans les 7 jours avant l'export.
+     Comptés dans la zone, l'étage, le circuit et la personne choisis. */
+  var NOMS_TYPES = { PLA: "Plan", ARM: "Armatures", LIS: "Listes de fers", ELV: "Élévation", DET: "Détail", NDC: "Note de calcul", DES: "Descriptif",
+    RAP: "Rapport", CPE: "Coupe", SCH: "Schéma", CDC: "Cahier des charges", FTE: "Fiche technique", RFI: "RFI", MOD: "Maquette" };
+  function neuf(d) { return d.dep !== null && d.dep !== undefined && d.dep > (donnees.edition || 0) - 7; }
+  function dessineTypes() {
+    var c = {}, nN = 0;
+    donnees.plans.forEach(function (p) {
+      var d = p.doc;
+      if (p.renumerote || d.depasse) return;
+      if ((etat.circuit !== "tous" && d.circuit !== etat.circuit) || (etat.auteur !== "tous" && V.auteurDe(d) !== etat.auteur)) return;
+      if ((etat.zone !== "tous" && String(d.zone || "") !== etat.zone) || (etat.niveau !== "tous" && String(d.niveau || "") !== etat.niveau)) return;
+      c[d.type] = (c[d.type] || 0) + 1;
+      if (neuf(d)) nN++;
+    });
+    Object.keys(etat.types).forEach(function (t) { if (!c[t]) c[t] = 0; });
+    $("types").innerHTML = '<button type="button" class="b-neufs" data-neuf="1" aria-pressed="' + !!etat.neufs + '" title="Plans dont le dernier indice a été déposé dans les 7 jours avant l\'export">Nouveaux<i>' + n(nN) + "</i></button>" +
+      Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (t) {
+        return '<button type="button" data-t="' + esc(t) + '" aria-pressed="' + !!etat.types[t] + '" title="' + esc(NOMS_TYPES[t] || t || "Sans type") + '">' + esc(t || "—") + "<i>" + n(c[t]) + "</i></button>";
+      }).join("");
+  }
+  $("types").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-neuf")) etat.neufs = !etat.neufs;
+    else { var t = b.getAttribute("data-t"); if (etat.types[t]) delete etat.types[t]; else etat.types[t] = true; }
+    etat.limite = 60; etat.ouvert = null;
+    rend();
+  });
   /* Étage et zone : lus dans le numéro du plan (champs niveau et zone de Kairnial).
      Chaque menu compte les plans du choix posé dans l'autre. */
   var NIVEAUX = { "000": "Tous niveaux", "050": "SS-4", "060": "SS-3", "070": "SS-2", "080": "SS-1", "090": "Rez inf", "100": "Rez",
@@ -749,7 +783,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     donnees.plans.forEach(function (p) {
       var d = p.doc;
       if (p.renumerote || d.depasse) return;
-      if ((etat.circuit !== "tous" && d.circuit !== etat.circuit) || (etat.type !== "tous" && d.type !== etat.type) ||
+      if ((etat.circuit !== "tous" && d.circuit !== etat.circuit) || (Object.keys(etat.types).length && !etat.types[d.type]) || (etat.neufs && !neuf(d)) ||
           (etat.auteur !== "tous" && V.auteurDe(d) !== etat.auteur)) return;
       var z = String(d.zone || ""), ni = String(d.niveau || ""), rouge = aReprendre(p) ? 1 : 0;
       var o = Z[z] = Z[z] || { n: 0, rouge: 0, niv: {} };
@@ -789,7 +823,6 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     this.setAttribute("aria-expanded", this.getAttribute("aria-expanded") === "true" ? "false" : "true");
   });
   $("f-circuit").addEventListener("change", function () { etat.circuit = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
-  $("f-type").addEventListener("change", function () { etat.type = this.value; etat.limite = 60; etat.ouvert = null; rend(); });
   /* Masquer les indices et plans remplacés : les indices remplacés sortent des
      délais, des graphiques et des motifs ; les plans refaits sous un autre numéro
      sortent de partout, liste comprise. Le parcours jusqu'à la validation garde
@@ -803,7 +836,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   /* ------------------------------------------------------------ rendu */
   function rend() {
-    dessineZones(); menuAuteurs();
+    dessineZones(); dessineTypes(); menuAuteurs();
     R = V.analyse(donnees, etat);
     rendCartouche(); rendTuiles(); rendListe();
   }
@@ -947,7 +980,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   function menuAuteurs() {
     var nb = {};
     donnees.plans.forEach(function (p) {
-      if ((etat.circuit !== "tous" && p.doc.circuit !== etat.circuit) || (etat.type !== "tous" && p.doc.type !== etat.type)) return;
+      if ((etat.circuit !== "tous" && p.doc.circuit !== etat.circuit) || (Object.keys(etat.types).length && !etat.types[p.doc.type]) || (etat.neufs && !neuf(p.doc))) return;
       if (etat.dernierSeul && p.renumerote) return;
       if ((etat.niveau !== "tous" && String(p.doc.niveau || "") !== etat.niveau) || (etat.zone !== "tous" && String(p.doc.zone || "") !== etat.zone)) return;
       var a = V.auteurDe(p.doc); nb[a] = (nb[a] || 0) + 1;
@@ -1067,13 +1100,14 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   function enteteImpression() {
     var f = [
       etat.circuit === "tous" ? "Tous les circuits" : "Circuit " + etat.circuit,
-      etat.type === "tous" ? "Tous les types" : "Type " + etat.type,
+      Object.keys(etat.types).length ? "Types " + Object.keys(etat.types).join(", ") : "Tous les types",
       etat.niveau === "tous" ? "Tous les étages" : nomNiveau(etat.niveau),
       etat.zone === "tous" ? "Toutes les zones" : "Zone " + nomZone(etat.zone),
       etat.auteur === "tous" ? "Tout le monde" : "Déposé par " + (etat.auteur === SANS_NOM ? "sans nom" : etat.auteur)
     ];
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
     if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
+    if (etat.neufs) f.push("Nouveaux (7 derniers jours)");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
     if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
     if (notesOk && etat.annotes) f.push("Plans annotés");
