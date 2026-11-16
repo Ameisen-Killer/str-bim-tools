@@ -723,7 +723,59 @@
     return R;
   }
 
-  global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
+  /* Pistes pour traiter vite les plans à reprendre (refus MO ou rejet SAS, dernier indice) :
+     forme   : rejet Doc Control pour cartouche, logo, zone, indice, n° GED ou type ;
+     pj      : motif seulement dans la pièce jointe (aucun commentaire ou « cf. annexe ») ;
+     famille : au moins 3 plans à reprendre du même type et du même numéro ;
+     paire   : ARM et LIS de même étage, zone et numéro, tous deux à reprendre ;
+     vieux   : refus de plus de 6 mois avant l'export.
+     Rend { code: { cles: {forme:1,…}, erreur, action, famille } }. */
+  function sansAccent(t) { return String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  var ERREURS = [
+    [/logo/, "Logo illisible", "Remplacer le logo (SPVA ou AMO) par une version nette"],
+    [/provisoire/, "Mention « provisoire »", "Retirer la mention « provisoire » du cartouche"],
+    [/manque le cartouche|ajouter en 1ere page un cartouche|cartouche rempli/, "Cartouche absent", "Ajouter un cartouche rempli en 1re page"],
+    [/type doc|type de document/, "Type de document faux", "Corriger le type (trigramme) dans le cartouche ou dans Kairnial"],
+    [/indice/, "Indice faux", "Aligner l'indice du cartouche, du nom de fichier et de Kairnial (monter d'indice si déjà diffusé)"],
+    [/numero ged|numero de document/, "N° GED faux", "Corriger le numéro du cartouche selon la nomenclature Kairnial"],
+    [/zone|noyau|etage|a0\d sur/, "Zone ou étage faux", "Corriger la zone, le noyau ou l'étage du cartouche et du titre"],
+    [/cartouche|lid|nomenclature/, "Cartouche à corriger", "Corriger le cartouche selon la remarque"]
+  ];
+  var RENVOI = /annexe|annot|piece jointe|^\s*(cf|voir)\b|commentaires? (dans|en|joint)/;
+  function pistes(D) {
+    var ed = D.edition || 0, P = {}, A = D.plans.filter(function (p) {
+      return !p.renumerote && !p.doc.depasse && (p.statut === "reprendre" || p.statut === "sas_rejet");
+    });
+    var seg = function (p) { return String(p.code).split("-"); };
+    var fam = function (p) { var s = seg(p); return s[4] + "-" + s[7]; };
+    var paire = function (p) { var s = seg(p); return s[5] + "-" + s[6] + "-" + s[7]; };
+    var nF = {}, nP = {};
+    A.forEach(function (p) {
+      nF[fam(p)] = (nF[fam(p)] || 0) + 1;
+      var t = seg(p)[4]; if (t === "ARM" || t === "LIS") (nP[paire(p)] = nP[paire(p)] || {})[t] = 1;
+    });
+    A.forEach(function (p) {
+      var d = p.doc, o = { cles: {}, erreur: "", action: "", famille: "" };
+      var rendus = d.visas.filter(function (v) { return v.etat === "rendu"; });
+      var refus = rendus.filter(function (v) { return /^(REF|R&R|REJ)$/.test(v.code || ""); });
+      var dc = refus.filter(function (v) { return v.qui === "DOC CONTROL"; });
+      var dcTxt = sansAccent(dc.map(function (v) { return v.com; }).join(" "));
+      if (dc.length) for (var i = 0; i < ERREURS.length; i++) if (ERREURS[i][0].test(dcTxt)) {
+        o.cles.forme = 1; o.erreur = ERREURS[i][1]; o.action = ERREURS[i][2]; break;
+      }
+      var coms = d.visas.filter(function (v) { return v.com && String(v.com).trim(); });
+      var pjs = d.visas.filter(function (v) { return v.pj; });
+      if (pjs.length && !o.cles.forme && (!coms.length || coms.some(function (v) { return RENVOI.test(sansAccent(v.com)); }))) o.cles.pj = 1;
+      if (nF[fam(p)] >= 3) { o.cles.famille = 1; o.famille = fam(p) + " (" + nF[fam(p)] + " plans)"; }
+      if (nP[paire(p)] && nP[paire(p)].ARM && nP[paire(p)].LIS) o.cles.paire = 1;
+      var mo = rendus.filter(function (v) { return v.qui === "MO"; })[0], dv = mo ? mo.dv : (refus[0] ? refus[0].dv : d.dep);
+      if (dv !== null && dv !== undefined && ed - dv > 180) o.cles.vieux = 1;
+      P[p.code] = o;
+    });
+    return P;
+  }
+
+  global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, pistes: pistes, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
     SANS_NOM: SANS_NOM, auteurDe: auteurDe, annote: annote };
   if (typeof module !== "undefined" && module.exports) module.exports = global.Visas;
 })(typeof window !== "undefined" ? window : globalThis);
