@@ -227,9 +227,10 @@
     if (o.corps !== undefined) h["Content-Type"] = "application/json";
     if (o.prefer) h.Prefer = o.prefer;
     if (o.plage) h.Range = o.plage;
-    // La liste des plans FGH n'est lue qu'avec une connexion aux outils du chantier
-    // (/fgh/acces.js, identifiants de la planification) ; sans elle, la base ne rend rien.
-    var envoi = /^fgh_/.test(chemin) && window.FghAcces && window.FghAcces.connecte() ? window.FghAcces.fetch : fetch;
+    // La liste des plans FGH et, depuis le 16.11.2026, les tables de l'organiseur ne se lisent
+    // qu'avec une connexion aux outils du chantier (/fgh/acces.js, identifiants de la
+    // planification) ; sans elle, la base ne rend rien.
+    var envoi = /^(fgh_|doc_)/.test(chemin) && window.FghAcces && window.FghAcces.connecte() ? window.FghAcces.fetch : fetch;
     return envoi(BASE.url + "/rest/v1/" + chemin, { method: o.methode || "GET", headers: h, body: o.corps === undefined ? undefined : JSON.stringify(o.corps) })
       .catch(function () { throw new Error("Serveur injoignable : vérifie ta connexion, puis réessaie."); })
       .then(function (r) {
@@ -238,7 +239,7 @@
           var j = {}; try { j = JSON.parse(t); } catch (e) {}
           var brut = String(j.message || j.error || "") + " " + (j.code || "");
           var err = new Error(/PGRST205|42P01|does not exist|could not find the table/i.test(brut)
-            ? "Les tables de l'organiseur n'existent pas encore : exécute migration-organiseur.sql dans Supabase."
+            ? "Les tables de l'organiseur n'existent pas encore : la migration de l'organiseur n'a pas été exécutée."
             : j.code === "23P01" ? j.message
             : j.code === "23505" ? "Ce code de chantier existe déjà."
             : /row-level security|permission/i.test(brut) || r.status === 401 || r.status === 403 ? "Opération refusée par la base."
