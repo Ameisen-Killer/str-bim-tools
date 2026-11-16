@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.8.0";
+  var VERSION = "2.9.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -182,7 +182,8 @@
   // la fusion d'un fichier partagé ne la fasse pas revenir
   function vive(x){ return !!x && !x.retire; }
   function vives(m){ return m ? PARAMS.filter(function(p){ return vive(m.v[p]); }) : []; }
-  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; return vive(x) ? x.nouveau : (r.ifc[p] || ""); }
+  // une date déjà dans la maquette reste (règle de Tony) : une date posée ici par une version précédente est ignorée
+  function valeur(r, p){ var m = modifs.get(r.k), x = m && m.v[p]; if (p === P_DATE && r.ifc[P_DATE]) return r.ifc[P_DATE]; return vive(x) ? x.nouveau : (r.ifc[p] || ""); }
   function modifie(r, p){ var m = modifs.get(r.k); return p ? !!(m && vive(m.v[p])) : vives(m).length > 0; }
   function teinte(r){ return TEINTE[classe(valeur(r, P_ST))]; }
   function aujourdhui(){ var d = new Date(); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear(); }
@@ -943,7 +944,7 @@
         '<div class="bloc"><h3>Décision pour toutes</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(cl) +
         '<div class="fchamp"><label>Commentaire commun <span class="p">' + P_COM + '</span></label><textarea class="champ" id="com-multi" placeholder="Laisse vide pour garder le commentaire de chacune"></textarea></div></fieldset>' +
         '<div class="actions"><button type="button" class="bt" data-a="com-multi"' + ro + '>Appliquer le commentaire</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="centrer">Centrer</button></div>' +
-        '<p class="note">La date de validation est mise à aujourd\'hui à chaque décision.</p></div>' + noteClash(rs);
+        '<p class="note">La date de validation est remplie à la première décision seulement : une date déjà remplie ne change plus, même si le statut change.</p></div>' + noteClash(rs);
       return;
     }
     var r = rs[0], p = r.p, st = valeur(r, P_ST), d = valeur(r, P_DATE);
@@ -951,8 +952,9 @@
       '</div><button type="button" class="fermer" data-a="fermer" title="Fermer">×</button></div>' + bandeauRO() + bandeauHorsSync(rs) +
       '<div class="bloc"><h3>Validation</h3><fieldset class="dec"' + ro + ">" + boutonsDecision(classe(st)) +
       '<div class="fchamp">' + etiquette(r, P_ST) + '<select class="champ" data-p="' + P_ST + '">' + optionsStatut(st) + "</select></div>" +
-      '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '">' +
-      (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") + "</div>" +
+      '<div class="fchamp">' + etiquette(r, P_DATE) + '<input class="champ" type="date" data-p="' + P_DATE + '" value="' + esc(versIso(d)) + '"' + (r.ifc[P_DATE] ? " disabled" : "") + ">" +
+      (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") +
+      (r.ifc[P_DATE] ? '<div class="note">Date initiale gardée : elle ne change pas, même si le statut change.</div>' : "") + "</div>" +
       '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" +
       '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' + blocClash(r) +
       '<div class="bloc"><h3>Demande</h3>' + dl([
@@ -1030,8 +1032,12 @@
     var d = aujourdhui();
     rs.forEach(function(r){
       fixer(r, P_ST, statut);
-      // date de validation : aujourd'hui à chaque décision, celle de la maquette si on revient au statut d'origine
-      fixer(r, P_DATE, statut === (r.ifc[P_ST] || "") && !modifie(r, P_ST) ? null : d);
+      // règle de Tony : la date initiale reste. Une date déjà dans la maquette ou déjà posée ici ne change
+      // pas quand le statut change ; elle n'est mise à aujourd'hui que si elle est vide (première décision).
+      // Retour au statut d'origine : la date de la maquette revient. Une date de la maquette annule celle
+      // qu'une version précédente de la page aurait écrite.
+      if (r.ifc[P_DATE] || (statut === (r.ifc[P_ST] || "") && !modifie(r, P_ST))) fixer(r, P_DATE, null);
+      else if (!valeur(r, P_DATE)) fixer(r, P_DATE, d);
     });
     apresModif(rs);
   }
