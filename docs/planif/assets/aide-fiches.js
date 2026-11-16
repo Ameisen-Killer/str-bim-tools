@@ -41,7 +41,7 @@
 (function (global) {
   "use strict";
 
-  var MAJ = "2026-11-11";   // Charlie
+  var MAJ = "2026-11-16";   // Charlie
 
   /* Expressions de plusieurs mots soudées avant la recherche (mises à plat :
      sans accents ni apostrophes). Le mot soudé peut ensuite avoir des synonymes. */
@@ -433,6 +433,13 @@
       mots: "personne designee porte part calcul dessin ingenieur dessinateur charge",
       reponse: "Une tâche a **une personne désignée**, ingénieur ou dessinateur, et **sa charge** en jours. Ceux qui doivent rendre quelque chose avant ont chacun leur **dépendance**. Seules les anciennes tâches gardent encore deux parts (calcul et dessin), jusqu'à leur prochaine modification.",
       voir: ["tache-dependances", "tache-anciennes", "tache-terminer"] },
+
+    { id: "tache-createur", pages: ["taches", "tableau"],
+      question: "Qui a créé cette tâche ?",
+      aussi: ["voir le créateur d'une tâche", "qui a ajouté la tâche", "auteur de la tâche", "quand la tâche a été créée", "date de création"],
+      mots: "createur cree creee auteur ajoute qui date creation",
+      reponse: "Survole la tâche : tout en bas de la bulle, en petit, « **Créée par … le …** ». La fiche de la tâche (un clic) le montre aussi, à la ligne **Création**.\nLe créateur est noté automatiquement, on ne peut pas le changer. Les tâches créées avant le 16.11.2026 n'en ont pas : seule leur date s'affiche.",
+      voir: ["tache-parts", "tache-terminer"] },
 
     { id: "tache-terminer", pages: ["taches", "tableau", "accueil"], frequente: true,
       question: "Comment terminer une tâche ?",

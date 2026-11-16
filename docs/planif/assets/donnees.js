@@ -834,6 +834,8 @@
         priorite: Math.min(5, Math.max(1, parseInt(t.priorite, 10) || 5)),
         // Dépendance (11.11.2026) : la tâche principale qu'elle précède ; vide pour une tâche principale
         avant: texte(t.avant) || null,
+        // Fiche de la personne qui l'a créée (16.11.2026) ; vide pour les tâches d'avant
+        creePar: texte(t.creePar) || null,
         cree: texte(t.cree) || new Date().toISOString(),
         maj: texte(t.maj) || new Date().toISOString()
         // À la lecture, « Terminé » prime : une tâche d'avant les parts, ou
@@ -1704,6 +1706,8 @@
         if (!v.priorite) v.priorite = 5;
         bornePrincipale(v);
         v.id = id(); v.cree = new Date().toISOString(); v.maj = v.cree;
+        // La base pose elle-même le créateur ; on l'affiche sans attendre la relecture
+        var moi = D.monMembre(); v.creePar = moi ? moi.id : null;
         etat.taches.push(v);
         return sauve().then(function () { return v; });
       });

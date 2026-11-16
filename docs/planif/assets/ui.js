@@ -262,7 +262,8 @@
     return el("div", { class: "champ" + (o.large ? " large" : "") }, [
       el("label", { for: "c-" + o.nom, text: o.label }),
       ctrl,
-      o.aide ? el("div", { class: "aide", text: o.aide }) : null
+      o.aide ? el("div", { class: "aide", text: o.aide }) : null,
+      texteCreation(t) ? el("div", { class: "cree", text: texteCreation(t) }) : null
     ]);
   }
 
@@ -2045,6 +2046,7 @@
       ligne("Dessin", t.chargeDessin > 0 ? (t.dessinateurId ? D.nomMembre(t.dessinateurId) : "À affecter") + " · " + C.fmtJours(t.chargeDessin) + " j" + (t.finiDessin ? "  ·  terminé" : periode(t.chargeDessin, t.dessinateurId, "dessinateur")) : "—")
     ]).concat(lignesDeps).concat([
       ligne("Échéance", C.fmtLong(t.echeance)),
+      texteCreation(t) ? ligne("Création", texteCreation(t).replace(/^Créée /, "")) : null,
       lectureSeule
         ? el("p", { class: "aide", style: "margin-top:20px;font-size:14px;color:var(--texte-doux)", text: "Cette tâche ne te concerne pas : tu peux la consulter, pas la modifier." })
         : null,
@@ -2802,6 +2804,15 @@
       if (f.reportee) { p.debut = f.debut; p.fin = f.fin; p.reportee = true; }
     }
     return p;
+  }
+
+  /** « Créée par Tony Varin le 16.11.2026 » (16.11.2026, demande de Tony). Sans
+      créateur connu (tâche d'avant, fiche supprimée) : la date seule. */
+  function texteCreation(t) {
+    var d = t.cree ? new Date(t.cree) : null, le = d && !isNaN(d) ? C.fmtCH(C.iso(d)) : "";
+    var qui = t.creePar && D.membre(t.creePar) ? D.nomMembre(t.creePar) : "";
+    if (!qui && !le) return "";
+    return "Créée" + (qui ? " par " + qui : "") + (le ? " le " + le : "");
   }
 
   /** o : { role (part survolée, facultatif), periode (la sienne, sinon calculée), aide, x, y } */

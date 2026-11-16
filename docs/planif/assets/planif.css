@@ -776,6 +776,8 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .bt-bulle .alertes{margin-top:9px;padding-top:8px;border-top:1px solid var(--ligne-faible);display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--texte-doux)}
 .bt-bulle .alertes .rouge{color:var(--alerte)}
 .bt-bulle .aide{margin-top:8px;font-size:11px;color:var(--texte-faible)}
+/* Créateur de la tâche (16.11.2026) : en tout petit, sous l'aide */
+.bt-bulle .cree{margin-top:3px;font-size:calc(var(--t-mini) - 1px);color:var(--texte-faible);opacity:.85}
 @media (hover:none){.bt-bulle{display:none}}
 @media print{.bt-bulle{display:none!important}}
 

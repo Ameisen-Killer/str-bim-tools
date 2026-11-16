@@ -379,6 +379,9 @@ create table if not exists public.taches (
   -- rendue la veille de son début. Vide : tâche principale. Supprimer la tâche
   -- principale supprime ses dépendances.
   avant          uuid references public.taches (id) on delete cascade,
+  -- Qui l'a créée (16.11.2026) : posé par la base à la création, figé ensuite
+  -- (garde_createur_tache, plus bas). Vide pour les tâches d'avant.
+  cree_par       uuid constraint taches_cree_par_fk references public.membres (id) on delete set null,
   cree_le        timestamptz not null default now(),
   maj_le         timestamptz not null default now(),
   constraint charge_non_nulle check (charge_inge + charge_dessin > 0),
@@ -398,6 +401,23 @@ create index if not exists taches_echeance  on public.taches (echeance);
 create index if not exists taches_ingenieur on public.taches (ingenieur_id);
 create index if not exists taches_dessin    on public.taches (dessinateur_id);
 create index if not exists taches_avant     on public.taches (avant);
+
+-- Le créateur d'une tâche : la personne connectée à la création, jamais modifié
+create or replace function public.garde_createur_tache()
+returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    new.cree_par := coalesce(public.mon_membre(), new.cree_par);
+  else
+    new.cree_par := old.cree_par;
+  end if;
+  return new;
+end $$;
+revoke all on function public.garde_createur_tache() from public, anon, authenticated;
+drop trigger if exists garde_createur on public.taches;
+create trigger garde_createur before insert or update on public.taches
+  for each row execute function public.garde_createur_tache();
 
 comment on column public.taches.debut is
   'Facultatif. Vide, l''interface cale la tâche au plus tard avant son échéance.';

@@ -683,6 +683,8 @@
           finCalcul: t.fin_calcul || null,
           priorite: t.priorite,
           avant: t.avant || null,
+          // Qui l'a créée (16.11.2026) : posé par la base, vide pour les tâches d'avant
+          creePar: t.cree_par || null,
           cree: t.cree_le, maj: t.maj_le
         };
       }),
