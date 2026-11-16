@@ -87,6 +87,15 @@ body.v-glisse::after{content:"Dépose l'export Kairnial";position:fixed;inset:12
 a.v-recent{color:var(--v-obs);font-weight:600;text-decoration:none}
 a.v-recent:hover{text-decoration:underline}
 .v-pistes{margin-top:10px}
+.v-rem{margin:12px 0 0;border:1px solid var(--ligne);border-radius:10px;padding:8px 12px;background:rgba(var(--encre),.02)}
+.v-rem summary{cursor:pointer;font-weight:600;font-size:14px}
+.v-rem-liste{display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:340px;overflow:auto}
+.v-rem-liste button{display:flex;gap:10px;align-items:baseline;text-align:left;border:1px solid transparent;border-radius:8px;background:none;padding:5px 8px;cursor:pointer;font:inherit;font-size:13px;color:inherit}
+.v-rem-liste button:hover{background:rgba(var(--encre),.06)}
+.v-rem-liste button[aria-pressed="true"]{border-color:var(--or);background:rgba(var(--encre),.08)}
+.v-rem-liste b{min-width:2.4em;text-align:right;color:var(--or)}
+.v-rem-actif{margin:6px 0 0;font-size:13px}
+.v-rem-actif button{margin-left:8px}
 .v-pistes>span{align-self:center;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--texte-doux);margin-right:4px}
 .v-pistes button[aria-pressed="true"]{background:var(--v-ko,#e5534b);border-color:var(--v-ko,#e5534b);color:#fff}
 .v-piste{color:var(--v-ko,#e5534b);font-weight:600}
@@ -291,6 +300,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       <div class="v-recherche" data-recherche></div>
       <div class="v-types" id="types" aria-label="Types de document"></div>
       <div class="v-types v-pistes" id="pistes" aria-label="Pistes pour traiter vite les plans à reprendre"></div>
+      <details class="v-rem" id="remarques" hidden><summary id="rem-titre">Remarques lues dans les PDF</summary><p class="v-faible" style="margin:6px 0 0;font-size:13px">Clique une remarque : la liste ne montre que ses plans. Puis « Annoter ensemble » écrit la même réponse à tous, « Cocher traités » les coche d'un coup.</p><div class="v-rem-liste" id="rem-liste"></div></details>
+      <p class="v-rem-actif" id="rem-actif" hidden></p>
       <section class="section">
         <div class="v-tuiles" id="tuiles" aria-label="Ce qui demande une action"></div>
       </section>
@@ -730,7 +741,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = ""; etat.bloque = "";
+    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = ""; etat.bloque = ""; etat.remarque = "";
     etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.recents = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe(); noyaux(); TEXTES = {};
     filtres();
@@ -1147,6 +1158,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
+      if (etat.remarque && remarquesDe(p.code).indexOf(etat.remarque) < 0) return false;
       if (etat.bloque && !(PISTES[p.code] && PISTES[p.code].par.indexOf(etat.bloque) >= 0)) return false;
       if (notesOk && etat.annotes && !noteDe(p.code)) return false;
       if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
@@ -1165,7 +1177,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     // La zone d'annotation en cours de frappe est redessinée : on lui rend le curseur
     var actif = document.activeElement, enCours = actif && actif.matches && actif.matches("textarea[data-note]")
       ? { code: actif.getAttribute("data-note"), debut: actif.selectionStart, fin: actif.selectionEnd, haut: actif.scrollTop } : null;
-    menuVisas(); menuTraite(); menuBloque();
+    menuVisas(); menuTraite(); menuBloque(); dessineRemarques();
     $("outils-liste").hidden = !traitesOk;
     $("intro-traites").hidden = !traitesOk;
     var l = listeFiltree();
@@ -1192,6 +1204,47 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     $("plus").hidden = reste <= 0;
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
   }
+
+  /* Remarques lues dans les PDF de réponse (lignes « Lu dans … : r1 / r2 » des annotations),
+     regroupées mot pour mot (sans accents ni ponctuation) et comptées sur les plans affichés. */
+  var REMTXT = {};
+  function cleRem(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80); }
+  function remarquesDe(code) {
+    var t = noteDe(code), l = [];
+    if (!t) return l;
+    t.split("\n").forEach(function (li) {
+      var m = li.match(/^Lu dans .*?\(\d{2}\.\d{2}\.\d{4}\) : (.*)$/); if (!m) return;
+      m[1].split(" / ").forEach(function (r) {
+        var k = cleRem(r); if (k.length < 15 || l.indexOf(k) >= 0) return;
+        l.push(k); if (!REMTXT[k]) REMTXT[k] = r.trim();
+      });
+    });
+    return l;
+  }
+  function dessineRemarques() {
+    var c = {};
+    if (notesOk) R.plans.forEach(function (p) { remarquesDe(p.code).forEach(function (k) { c[k] = (c[k] || 0) + 1; }); });
+    var cles = Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
+    $("remarques").hidden = !cles.length && !etat.remarque;
+    var multi = cles.filter(function (k) { return c[k] > 1; }).length;
+    $("rem-titre").textContent = "Remarques lues dans les PDF · " + n(cles.length) + " différentes, dont " + n(multi) + " sur plusieurs plans";
+    $("rem-liste").innerHTML = cles.slice(0, 150).map(function (k) {
+      return '<button type="button" data-rem="' + esc(k) + '" aria-pressed="' + (etat.remarque === k) + '"><b>' + c[k] + "</b><span>" + esc(REMTXT[k]) + "</span></button>";
+    }).join("");
+    $("rem-actif").hidden = !etat.remarque;
+    if (etat.remarque) $("rem-actif").innerHTML = "Remarque choisie : « " + esc((REMTXT[etat.remarque] || "").slice(0, 200)) + ' »<button class="btn" type="button" id="rem-aucune">Retirer</button>';
+  }
+  $("rem-liste").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-rem]"); if (!b) return;
+    var k = b.getAttribute("data-rem");
+    etat.remarque = etat.remarque === k ? "" : k; etat.limite = 60; etat.ouvert = null;
+    rendListe();
+    if (etat.remarque) $("liste-plans").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("rem-actif").addEventListener("click", function (e) {
+    if (e.target.id !== "rem-aucune") return;
+    etat.remarque = ""; etat.limite = 60; rendListe();
+  });
 
   /* Refusé par : les intervenants qui ont refusé (REF, R&R, REJ) le dernier indice des plans à reprendre */
   function menuBloque() {
@@ -1426,6 +1479,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     if (etat.recents) f.push("Indice plus récent dans la liste des plans");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
     if (etat.bloque) f.push("Refusé par " + etat.bloque);
+    if (etat.remarque) f.push("Remarque : " + (REMTXT[etat.remarque] || "").slice(0, 60));
     if (etat.piste) f.push("Piste : " + NOMS_PISTES.filter(function (x) { return x[0] === etat.piste; })[0][1]);
     if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
     if (notesOk && etat.annotes) f.push("Plans annotés");
