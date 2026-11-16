@@ -262,8 +262,7 @@
     return el("div", { class: "champ" + (o.large ? " large" : "") }, [
       el("label", { for: "c-" + o.nom, text: o.label }),
       ctrl,
-      o.aide ? el("div", { class: "aide", text: o.aide }) : null,
-      texteCreation(t) ? el("div", { class: "cree", text: texteCreation(t) }) : null
+      o.aide ? el("div", { class: "aide", text: o.aide }) : null
     ]);
   }
 
@@ -2887,7 +2886,8 @@
       el("div", { class: "titre", text: t.titre }),
       parts.length ? el("div", { class: "parts" + (parts.length > 1 ? " lies" : "") }, parts) : null,
       alertes.length ? el("div", { class: "alertes" }, alertes) : null,
-      o.aide ? el("div", { class: "aide", text: o.aide }) : null
+      o.aide ? el("div", { class: "aide", text: o.aide }) : null,
+      texteCreation(t) ? el("div", { class: "cree", text: texteCreation(t) }) : null
     ]);
   }
 
