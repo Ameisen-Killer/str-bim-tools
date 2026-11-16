@@ -91,6 +91,11 @@ a.v-recent:hover{text-decoration:underline}
 .v-pistes button[aria-pressed="true"]{background:var(--v-ko,#e5534b);border-color:var(--v-ko,#e5534b);color:#fff}
 .v-piste{color:var(--v-ko,#e5534b);font-weight:600}
 .v-piste-bloc{margin:2px 0 12px;padding:8px 12px;border-left:3px solid var(--v-ko,#e5534b);background:rgba(var(--encre),.03)}
+.v-lot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0 0}
+.v-lot>span{font-size:13px;color:var(--texte-doux);margin-right:4px}
+.v-lot-note{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:10px 0 0}
+.v-lot-note textarea{flex:1 1 420px;min-height:64px;font:inherit;font-size:14px;padding:8px;border-radius:8px;border:1px solid var(--ligne);background:rgba(var(--encre),.03);color:inherit}
+.v-kairnial{margin-left:14px}
 .v-lien-pln{margin:2px 0 12px}
 .v-lien-pln a{color:var(--or);text-decoration:none}
 .v-lien-pln a:hover{text-decoration:underline}
@@ -298,6 +303,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
           <div class="champ"><label for="f-visa">Visa reçu</label><select id="f-visa"></select></div>
+          <div class="champ"><label for="f-bloque">Refusé par</label><select id="f-bloque"></select></div>
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
               <option value="statut">Statut, puis plus ancien</option>
@@ -308,6 +314,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           </div>
         </div>
         <div class="cases" id="cases-annotes" hidden style="margin:14px 0 0"><label class="case" title="Ne montrer que les plans qui portent une annotation. Se combine avec les autres filtres."><input type="checkbox" id="f-annotes"> <span id="lib-annotes">Plans annotés seulement</span></label></div>
+        <div class="v-lot" id="lot" hidden></div>
+        <div class="v-lot-note" id="lot-note" hidden><textarea id="lot-texte" maxlength="2000" placeholder="Texte ajouté à la fin de l'annotation de chaque plan affiché (ex. : réponse commune, détail repris de l'étage 7…)"></textarea><button class="btn" type="button" id="lot-ecrit">Ajouter</button><button class="btn" type="button" id="lot-annule">Annuler</button></div>
+        <input type="file" id="lot-pdf" accept=".pdf" multiple hidden>
         <div class="defile" style="margin-top:18px"><table class="liste" id="table-plans"></table></div>
         <button class="btn v-plus" type="button" id="plus" hidden></button>
       </section>
@@ -329,7 +338,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div id="v-bulle" role="tooltip" hidden></div>
 
 <script src="/fgh/vis/outil.js?v=9"></script>
-<script src="/fgh/vis/visas.js?v=7"></script>
+<script src="/fgh/vis/visas.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -721,7 +730,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = "";
+    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = ""; etat.bloque = "";
     etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.recents = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe(); noyaux(); TEXTES = {};
     filtres();
@@ -826,12 +835,21 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   var PISTES = {};
   var NOMS_PISTES = [
     ["forme", "Cartouche / forme", "Rejet Doc Control pour le cartouche : logo, zone, indice, n° GED, type. Correction rapide puis redépôt."],
+    ["interrompu", "Interrompus", "Le MO a marqué le visa « interrompu » : à redéposer tel quel."],
+    ["redepose", "Déjà redéposé", "La liste des plans a déjà un indice plus élevé : sans doute déjà repris, à cocher traité."],
+    ["jumeau", "Jumeau visé", "Un plan du même type et du même numéro (autre zone ou étage) est visé VSO/VAO : son détail sert de modèle."],
+    ["commun", "Commentaire commun", "La même remarque mot pour mot sur plusieurs plans : une réponse pour tous."],
     ["pj", "Pièce jointe à ouvrir", "Aucun commentaire ou « cf. annexe » : le motif est dans la réponse annotée sur Kairnial."],
     ["famille", "Familles en série", "Au moins 3 plans à reprendre du même type et du même numéro : une seule réponse pour tous."],
     ["paire", "Paires ARM + LIS", "Plan d'armature et liste de fers de la même zone, à reprendre ensemble."],
     ["vieux", "Refus de plus de 6 mois", "Refus vieux de plus de 6 mois : à statuer (encore utile, remplacé, à clore ?)."]
   ];
-  function pisteOk(d) { return !etat.piste || !!(PISTES[d.code] && PISTES[d.code].cles[etat.piste]); }
+  function clesDe(d) {
+    var o = PISTES[d.code]; if (!o) return null;
+    if (PLN && plusRecent(d) && avecVisas(d)) { var c = { redepose: 1 }; Object.keys(o.cles).forEach(function (k) { c[k] = 1; }); return c; }
+    return o.cles;
+  }
+  function pisteOk(d) { var c = etat.piste ? clesDe(d) : null; return !etat.piste || !!(c && c[etat.piste]); }
   function dessinePistes() {
     var c = {}, total = 0;
     donnees.plans.forEach(function (p) {
@@ -841,10 +859,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       if ((etat.zone !== "tous" && String(d.zone || "") !== etat.zone) || (etat.niveau !== "tous" && String(d.niveau || "") !== etat.niveau)) return;
       if ((Object.keys(etat.types).length && !etat.types[d.type]) || (etat.neufs && !neuf(d)) || !trouve(p.code)) return;
       total++;
-      Object.keys(o.cles).forEach(function (k) { c[k] = (c[k] || 0) + 1; });
+      Object.keys(clesDe(d)).forEach(function (k) { c[k] = (c[k] || 0) + 1; });
     });
     $("pistes").hidden = !total && !etat.piste;
-    $("pistes").innerHTML = "<span>Pistes</span>" + NOMS_PISTES.map(function (x) {
+    $("pistes").innerHTML = "<span>Pistes</span>" + NOMS_PISTES.filter(function (x) { return x[0] !== "redepose" || PLN; }).map(function (x) {
       return '<button type="button" data-piste="' + x[0] + '" aria-pressed="' + (etat.piste === x[0]) + '" title="' + esc(x[2] + " Plans à reprendre pas encore traités.") + '">' + esc(x[1]) + "<i>" + n(c[x[0]] || 0) + "</i></button>";
     }).join("");
   }
@@ -859,6 +877,9 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var o = PISTES[code]; if (!o) return "";
     if (etat.piste === "forme" || (o.cles.forme && !etat.piste)) return o.erreur;
     if (etat.piste === "famille") return "Famille " + o.famille;
+    if (etat.piste === "jumeau") return "Jumeau visé : " + o.jumeaux.slice(0, 3).map(court).join(", ") + (o.jumeaux.length > 3 ? "…" : "");
+    if (etat.piste === "commun") return "Remarque commune à " + o.nCommun + " plans";
+    if (o.cles.interrompu && !etat.piste) return "Interrompu";
     if (etat.piste === "pj" || (o.cles.pj && !etat.piste)) return "Motif dans la pièce jointe";
     return "";
   }
@@ -866,6 +887,12 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var o = PISTES[code]; if (!o) return "";
     var l = [];
     if (o.cles.forme) l.push("<b>" + esc(o.erreur) + "</b> : " + esc(o.action) + ".");
+    if (o.cles.interrompu) l.push("<b>Interrompu</b> par le MO : redéposer tel quel à l'indice suivant.");
+    var dd = (donnees.parCode[code] || [])[0];
+    if (dd && PLN && plusRecent(dd) && avecVisas(dd)) l.push("<b>Déjà redéposé</b> : la liste des plans a l'indice " + ind(plnDe(dd).ind) + ". À cocher traité si c'est bien la reprise.");
+    if (o.cles.jumeau) l.push("<b>Jumeau visé</b> : " + o.jumeaux.map(court).map(esc).join(", ") + " : reprendre sa solution.");
+    if (o.cles.commun) l.push("<b>Remarque commune à " + o.nCommun + " plans</b> : « " + esc(o.commun) + " ».");
+    if (o.par.length) l.push("<b>Refusé par</b> : " + o.par.map(esc).join(", ") + ".");
     if (o.cles.pj) l.push("<b>Motif dans la pièce jointe</b> : ouvrir la réponse annotée sur Kairnial et noter la remarque dans l'annotation ci-dessous.");
     if (o.cles.famille) l.push("<b>Famille " + esc(o.famille) + "</b> : une même réponse peut couvrir tous ses plans.");
     if (o.cles.paire) l.push("<b>Paire ARM + LIS</b> : reprendre le plan d'armature et sa liste de fers ensemble.");
@@ -1120,6 +1147,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
+      if (etat.bloque && !(PISTES[p.code] && PISTES[p.code].par.indexOf(etat.bloque) >= 0)) return false;
       if (notesOk && etat.annotes && !noteDe(p.code)) return false;
       if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
       return !mots.length || trouve(p.code);
@@ -1137,11 +1165,12 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     // La zone d'annotation en cours de frappe est redessinée : on lui rend le curseur
     var actif = document.activeElement, enCours = actif && actif.matches && actif.matches("textarea[data-note]")
       ? { code: actif.getAttribute("data-note"), debut: actif.selectionStart, fin: actif.selectionEnd, haut: actif.scrollTop } : null;
-    menuVisas(); menuTraite();
+    menuVisas(); menuTraite(); menuBloque();
     $("outils-liste").hidden = !traitesOk;
     $("intro-traites").hidden = !traitesOk;
     var l = listeFiltree();
     if (barre) barre.compte(l.length, R.plans.length);
+    rendLot(l);
     var vis = l.slice(0, etat.limite), nc = traitesOk ? 8 : 7;
     tableau("table-plans", "<thead><tr>" + (traitesOk ? '<th class="v-coche">Traité</th>' : "") + "<th>Plan" + (PREFIXE ? " (" + esc(PREFIXE) + "…)" : "") + '</th><th class="n">Ind.</th><th>Libellé</th><th>Statut</th><th>Derniers visas</th><th>Déposé par</th><th class="n">Dépôt</th></tr></thead><tbody>' +
       (vis.length ? vis.map(function (p) {
@@ -1153,7 +1182,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + (!t && textePiste(p.code) ? ' · <span class="v-piste">' + esc(textePiste(p.code)) + "</span>" : "") +
           (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     if (enCours) {
       var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
@@ -1163,6 +1192,169 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     $("plus").hidden = reste <= 0;
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
   }
+
+  /* Refusé par : les intervenants qui ont refusé (REF, R&R, REJ) le dernier indice des plans à reprendre */
+  function menuBloque() {
+    var nb = {};
+    R.plans.forEach(function (p) { var o = PISTES[p.code]; if (o) o.par.forEach(function (q) { nb[q] = (nb[q] || 0) + 1; }); });
+    if (etat.bloque && !nb[etat.bloque]) nb[etat.bloque] = 0;
+    $("f-bloque").innerHTML = '<option value="">Tout le monde</option>' + Object.keys(nb).sort(function (a, b) { return nb[b] - nb[a]; }).map(function (q) {
+      return '<option value="' + esc(q) + '"' + (q === etat.bloque ? " selected" : "") + ">" + esc(q) + " · " + n(nb[q]) + " plan" + (nb[q] > 1 ? "s" : "") + "</option>";
+    }).join("");
+  }
+  $("f-bloque").addEventListener("change", function () { etat.bloque = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
+
+  /* Kairnial : pas de lien direct vers la fiche (ni identifiant ni recherche dans l'adresse) ;
+     on copie le n° et on ouvre la GED, il reste à le coller dans la recherche. */
+  var KAIRNIAL = "https://front-eu-1.kairnial.com/#!/rfiles/list";
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[data-kairnial]"); if (!a) return;
+    var c = a.getAttribute("data-kairnial");
+    if (navigator.clipboard) navigator.clipboard.writeText(c).then(function () { UI.toast("N° copié : colle-le dans la recherche Kairnial (Ctrl+V)."); }, function () { UI.toast("Cherche « " + c + " » dans Kairnial."); });
+    else UI.toast("Cherche « " + c + " » dans Kairnial.");
+  });
+
+  /* Actions sur tous les plans affichés (filtres et piste en cours) */
+  var LOT = [];
+  function rendLot(l) {
+    LOT = l;
+    var b = $("lot"); b.hidden = !l.length;
+    if (!l.length) { $("lot-note").hidden = true; return; }
+    var nT = l.filter(function (p) { return !traiteDe(p); }).length;
+    b.innerHTML = "<span>" + n(l.length) + " plan" + (l.length > 1 ? "s" : "") + " affiché" + (l.length > 1 ? "s" : "") + " :</span>" +
+      (traitesOk && nT ? '<button class="btn" type="button" data-lot="coche" title="Marque traités tous les plans affichés pas encore cochés">Cocher traités (' + n(nT) + ")</button>" : "") +
+      (notesOk ? '<button class="btn" type="button" data-lot="note" title="Ajoute le même texte à l\'annotation de chaque plan affiché">Annoter ensemble</button>' : "") +
+      '<button class="btn" type="button" data-lot="tableau" title="Tableau Plan / Remarques / Réponse AB des plans affichés, pour Excel">Tableau de réponses</button>' +
+      (notesOk ? '<button class="btn" type="button" data-lot="pdf" title="Choisis (ou glisse sur la liste) les PDF « -reponse » téléchargés de Kairnial : leurs annotations vont dans l\'annotation du plan">Lire des PDF de réponse</button>' : "");
+  }
+  $("lot").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-lot]"); if (!b) return;
+    var k = b.getAttribute("data-lot");
+    if (k === "coche") cocheLot();
+    else if (k === "note") { $("lot-note").hidden = false; $("lot-texte").focus(); }
+    else if (k === "tableau") tableauReponses();
+    else if (k === "pdf") $("lot-pdf").click();
+  });
+  $("lot-annule").addEventListener("click", function () { $("lot-note").hidden = true; });
+  $("lot-ecrit").addEventListener("click", function () {
+    var t = $("lot-texte").value.trim(); if (!t) return;
+    var l = LOT.slice();
+    UI.confirme("Annoter " + n(l.length) + " plans ?", "Le texte est ajouté à la fin de l'annotation de chacun des " + n(l.length) + " plans affichés.", "Ajouter").then(function (ok) {
+      if (!ok) return;
+      ajouteNotes(l.map(function (p) { return { code: p.code, texte: t }; })).then(function (r) {
+        $("lot-note").hidden = true; $("lot-texte").value = "";
+        UI.toast(n(r.ok) + " annotation" + (r.ok > 1 ? "s" : "") + " complétée" + (r.ok > 1 ? "s" : "") + (r.ko ? ", " + r.ko + " en échec" : "") + ".");
+      });
+    });
+  });
+  // Ajoute un texte au bout de l'annotation de chaque plan, un plan après l'autre
+  function ajouteNotes(liste) {
+    var r = { ok: 0, ko: 0, deja: 0 };
+    return liste.reduce(function (pr, x) {
+      return pr.then(function () {
+        var avant = noteDe(x.code);
+        if (avant.indexOf(x.texte) >= 0) { r.deja++; return; }
+        return S.notes.ecrit(x.code, (avant ? avant + "\n" : "") + x.texte).then(function (y) { notes[x.code] = y; r.ok++; }, function () { r.ko++; });
+      });
+    }, Promise.resolve()).then(function () { menuTraite(); rendListe(); return r; });
+  }
+  function cocheLot() {
+    var l = LOT.filter(function (p) { return !traiteDe(p); });
+    UI.confirme("Cocher " + n(l.length) + " plans traités ?", "Tous les plans affichés pas encore cochés passent « traités » pour leur indice actuel. Une coche se retire plan par plan.", "Cocher").then(function (ok) {
+      if (!ok) return;
+      var r = 0;
+      l.reduce(function (pr, p) {
+        return pr.then(function () {
+          return S.traites.marque({ code: p.code, indice: p.doc.ind }).then(function (t) {
+            traites[cleTraite(p.code, p.doc.ind)] = t || { code: p.code, indice: p.doc.ind, traiteLe: new Date().toISOString() }; r++;
+          }, function () {});
+        });
+      }, Promise.resolve()).then(function () { rend(); UI.toast(n(r) + " plan" + (r > 1 ? "s" : "") + " marqué" + (r > 1 ? "s" : "") + " traité" + (r > 1 ? "s" : "") + "."); });
+    });
+  }
+  function tableauReponses() {
+    var cel = function (t) { t = String(t == null ? "" : t).replace(/\r?\n/g, " / "); return /[";]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    var lignes = [["Plan", "Indice", "Libellé", "Statut", "Refusé par", "Piste", "Remarques des intervenants", "Annotation", "Réponse AB"]];
+    LOT.forEach(function (p) {
+      var d = p.doc, o = PISTES[p.code] || { par: [] }, c = clesDe(d) || {};
+      lignes.push([p.code, ind(d.ind), d.lib, (V.STATUTS.filter(function (s) { return s.id === p.statut; })[0] || {}).nom || p.statut, o.par.join(", "),
+        NOMS_PISTES.filter(function (x) { return c[x[0]]; }).map(function (x) { return x[1]; }).join(", "),
+        d.visas.filter(function (v) { return v.com; }).map(function (v) { return v.qui + " (" + (v.code || "") + ") : " + String(v.com).trim(); }).join(" || "),
+        noteDe(p.code), ""]);
+    });
+    var csv = "\ufeff" + lignes.map(function (l) { return l.map(cel).join(";"); }).join("\r\n");
+    var a = document.createElement("a"), url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.href = url; a.download = "visas-reponses-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    UI.toast("Tableau de " + n(LOT.length) + " plans téléchargé (s'ouvre dans Excel).");
+  }
+
+  /* PDF « -reponse » de Kairnial : on lit les annotations (bulles, textes) posées par les
+     intervenants et on les ajoute à l'annotation du plan, retrouvé par le nom du fichier. */
+  function inflate(u8) {
+    var rd = new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate")).getReader(), parts = [], n0 = 0;
+    function suite() {
+      return rd.read().then(function (x) { if (x.done) return; parts.push(x.value); n0 += x.value.length; return suite(); }, function () {});
+    }
+    return suite().then(function () { var o = new Uint8Array(n0), i = 0; parts.forEach(function (q) { o.set(q, i); i += q.length; }); return o; });
+  }
+  function latin(u8) { var o = ""; for (var i = 0; i < u8.length; i += 8192) o += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return o; }
+  function chainePdf(s, hex) {
+    if (hex) { s = s.replace(/\s+/g, ""); var h = ""; for (var i = 0; i + 1 < s.length; i += 2) h += String.fromCharCode(parseInt(s.substr(i, 2), 16)); s = h; }
+    else s = s.replace(/\\(\d{1,3})/g, function (a, o) { return String.fromCharCode(parseInt(o, 8)); }).replace(/\\([nrt()\\])/g, function (a, c) { return { n: "\n", r: "\n", t: " " }[c] || c; });
+    if (s.charCodeAt(0) === 254 && s.charCodeAt(1) === 255) { var o = ""; for (var j = 2; j + 1 < s.length; j += 2) o += String.fromCharCode(s.charCodeAt(j) * 256 + s.charCodeAt(j + 1)); return o; }
+    try { return decodeURIComponent(escape(s)); } catch (e) { return s; }
+  }
+  function annotationsPdf(f) {
+    return f.arrayBuffer().then(function (ab) {
+      var b = new Uint8Array(ab), brut = latin(b), re = /ObjStm/g, m, flux = [];
+      while ((m = re.exec(brut))) {
+        var st = brut.indexOf("stream", m.index) + 6; if (brut[st] === "\r") st++; if (brut[st] === "\n") st++;
+        var en = brut.indexOf("endstream", st); if (en > st) flux.push(b.slice(st, en));
+      }
+      return Promise.all(flux.map(inflate)).then(function (l) {
+        var txt = brut + "\n" + l.map(latin).join("\n"), res = [], rc = /\/Contents\s*(?:\(((?:\\[\s\S]|[^\\)])*)\)|<([0-9A-Fa-f\s]+)>)/g, x;
+        while ((x = rc.exec(txt))) {
+          var ctx = txt.slice(Math.max(0, x.index - 800), x.index + x[0].length + 800);
+          var t = ctx.match(/\/T\s*\(((?:\\[\s\S]|[^\\)])*)\)/), qui = t ? chainePdf(t[1]).trim() : "";
+          var c = chainePdf(x[1] !== undefined ? x[1] : x[2], x[1] === undefined).replace(/\s+/g, " ").trim();
+          if (c.length > 3 && !/autocad/i.test(qui) && !/^(page|p\.)\s*\d+$/i.test(c)) res.push((qui ? qui + " : " : "") + c);
+        }
+        return res.filter(function (v, i) { return res.indexOf(v) === i; });
+      });
+    });
+  }
+  function codeDuFichier(nom) {
+    var m = String(nom).toUpperCase().match(/[A-Z0-9]+-[A-Z]{3}-[A-Z0-9]+-\d{2}-[A-Z]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-\d{4}/);
+    return m && donnees.parCode[m[0]] ? m[0] : null;
+  }
+  function lisPdfs(fichiers) {
+    fichiers = [].slice.call(fichiers || []).filter(function (f) { return /\.pdf$/i.test(f.name); });
+    if (!fichiers.length || !donnees) return;
+    if (!notesOk) { UI.toast("Annotations indisponibles : impossible d'enregistrer ce qui est lu."); return; }
+    if (typeof DecompressionStream === "undefined") { UI.toast("Ton navigateur ne sait pas lire ces PDF. Mets-le à jour."); return; }
+    UI.toast("Lecture de " + fichiers.length + " PDF…");
+    var jour = new Date().toLocaleDateString("fr-CH"), ajouts = [], inconnus = [], vides = [];
+    fichiers.reduce(function (pr, f) {
+      return pr.then(function () {
+        var code = codeDuFichier(f.name);
+        if (!code) { inconnus.push(f.name); return; }
+        return annotationsPdf(f).then(function (l) {
+          if (!l.length) { vides.push(f.name); return; }
+          ajouts.push({ code: code, texte: "Lu dans " + f.name + " (" + jour + ") : " + l.join(" / ") });
+        }, function () { vides.push(f.name); });
+      });
+    }, Promise.resolve()).then(function () { return ajouteNotes(ajouts); }).then(function (r) {
+      UI.toast(n(r.ok) + " plan" + (r.ok > 1 ? "s" : "") + " annoté" + (r.ok > 1 ? "s" : "") + (r.deja ? ", " + r.deja + " déjà lu" + (r.deja > 1 ? "s" : "") : "") +
+        (vides.length ? ", " + vides.length + " PDF sans annotation" : "") + (inconnus.length ? ", " + inconnus.length + " fichier" + (inconnus.length > 1 ? "s" : "") + " sans n° de plan connu (" + inconnus.slice(0, 2).join(", ") + ")" : "") + ".");
+    });
+  }
+  $("lot-pdf").addEventListener("change", function () { lisPdfs(this.files); this.value = ""; });
+  $("liste-plans").addEventListener("dragover", function (e) { if (e.dataTransfer && [].indexOf.call(e.dataTransfer.types, "Files") >= 0) e.preventDefault(); });
+  $("liste-plans").addEventListener("drop", function (e) {
+    if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault(); lisPdfs(e.dataTransfer.files);
+  });
 
   function historique(p) {
     var lien = p.remplacePar ? '<p class="v-faible">Refait sous le numéro ' + esc(p.remplacePar) + " (même type, niveau, zone et libellé, déposé plus récemment).</p>"
@@ -1233,6 +1425,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     if (etat.neufs) f.push("Nouveaux (7 derniers jours)");
     if (etat.recents) f.push("Indice plus récent dans la liste des plans");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
+    if (etat.bloque) f.push("Refusé par " + etat.bloque);
     if (etat.piste) f.push("Piste : " + NOMS_PISTES.filter(function (x) { return x[0] === etat.piste; })[0][1]);
     if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
     if (notesOk && etat.annotes) f.push("Plans annotés");

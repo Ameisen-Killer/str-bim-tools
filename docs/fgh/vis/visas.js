@@ -754,8 +754,28 @@
       nF[fam(p)] = (nF[fam(p)] || 0) + 1;
       var t = seg(p)[4]; if (t === "ARM" || t === "LIS") (nP[paire(p)] = nP[paire(p)] || {})[t] = 1;
     });
+    // Plans visés (VSO, VAO) par famille : un jumeau visé sert de modèle
+    var vises = {};
+    D.plans.forEach(function (p) {
+      if (p.renumerote || p.doc.depasse || (p.statut !== "valide" && p.statut !== "valide_obs")) return;
+      (vises[fam(p)] = vises[fam(p)] || []).push(p.code);
+    });
+    // Commentaires repris mot pour mot sur plusieurs plans à reprendre (hors simple renvoi à l'annexe)
+    // Le commentaire commence par « Prénom Nom : » : on compare le texte seul
+    var cleCom = function (t) {
+      var k = sansAccent(String(t).replace(/^[^:\n]{2,40}:\s*/, "")).replace(/[^a-z0-9]+/g, " ").trim();
+      return k.length < 12 || RENVOI.test(k) || /interrompu|voir pj/.test(k) ? null : k.slice(0, 90);
+    };
+    var parCom = {}, texteCom = {};
     A.forEach(function (p) {
-      var d = p.doc, o = { cles: {}, erreur: "", action: "", famille: "" };
+      var vu = {};
+      p.doc.visas.forEach(function (v) {
+        var k = v.com && cleCom(v.com); if (!k || vu[k]) return;
+        vu[k] = 1; parCom[k] = (parCom[k] || 0) + 1; texteCom[k] = texteCom[k] || (v.qui + " : " + String(v.com).trim().replace(/\s+/g, " "));
+      });
+    });
+    A.forEach(function (p) {
+      var d = p.doc, o = { cles: {}, erreur: "", action: "", famille: "", jumeaux: [], commun: "", nCommun: 0, par: [] };
       var rendus = d.visas.filter(function (v) { return v.etat === "rendu"; });
       var refus = rendus.filter(function (v) { return /^(REF|R&R|REJ)$/.test(v.code || ""); });
       var dc = refus.filter(function (v) { return v.qui === "DOC CONTROL"; });
@@ -770,6 +790,14 @@
       if (nP[paire(p)] && nP[paire(p)].ARM && nP[paire(p)].LIS) o.cles.paire = 1;
       var mo = rendus.filter(function (v) { return v.qui === "MO"; })[0], dv = mo ? mo.dv : (refus[0] ? refus[0].dv : d.dep);
       if (dv !== null && dv !== undefined && ed - dv > 180) o.cles.vieux = 1;
+      if (mo && /interrompu/i.test(mo.com || "")) o.cles.interrompu = 1;
+      var j = (vises[fam(p)] || []).filter(function (c) { return c !== p.code; });
+      if (j.length) { o.cles.jumeau = 1; o.jumeaux = j; }
+      d.visas.forEach(function (v) {
+        var k = v.com && cleCom(v.com);
+        if (k && parCom[k] >= 2 && parCom[k] > o.nCommun) { o.cles.commun = 1; o.commun = texteCom[k]; o.nCommun = parCom[k]; }
+      });
+      refus.forEach(function (v) { if (o.par.indexOf(v.qui) < 0) o.par.push(v.qui); });
       P[p.code] = o;
     });
     return P;
