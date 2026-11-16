@@ -81,6 +81,14 @@ body.v-glisse::after{content:"Dépose l'export Kairnial";position:fixed;inset:12
 .v-types button i{font-style:normal;opacity:.7;margin-left:5px}
 .v-types button.b-neufs{border-color:var(--or);color:var(--or);font-weight:600;margin-right:8px}
 .v-types button.b-neufs[aria-pressed="true"]{color:var(--noir)}
+.v-types button.b-recents{border-color:var(--v-obs);color:var(--v-obs);font-weight:600;margin-right:8px}
+.v-types button.b-recents[aria-pressed="true"]{background:var(--v-obs);border-color:var(--v-obs);color:#111}
+.v-recherche{margin-top:18px}
+a.v-recent{color:var(--v-obs);font-weight:600;text-decoration:none}
+a.v-recent:hover{text-decoration:underline}
+.v-lien-pln{margin:2px 0 12px}
+.v-lien-pln a{color:var(--or);text-decoration:none}
+.v-lien-pln a:hover{text-decoration:underline}
 
 /* bandeau de gauche : zones puis étages, comme la liste des plans */
 .v-app{display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;align-items:start}
@@ -270,6 +278,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       </div>
       <button class="btn seul-mobile" type="button" id="btn-pdf" style="width:100%;justify-content:center;margin-top:16px"><span class="ico-txt ico-export" aria-hidden="true"></span>Exporter en PDF</button>
 
+      <div class="v-recherche" data-recherche></div>
       <div class="v-types" id="types" aria-label="Types de document"></div>
       <section class="section">
         <div class="v-tuiles" id="tuiles" aria-label="Ce qui demande une action"></div>
@@ -280,7 +289,6 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           <div class="v-outils-liste" id="outils-liste" hidden><button class="btn" type="button" id="btn-excel" title="Une copie de l'export Kairnial analysé, avec les colonnes « Traité » et « Annotation » au bout de chaque feuille."><span class="ico-txt ico-export" aria-hidden="true"></span>Télécharger l'Excel annoté</button></div>
         </div>
         <p class="v-intro" id="intro-traites" hidden>Coche un plan repris : il repasse « à traiter » au prochain indice. Clique une ligne pour voir ses visas et l'annoter.</p>
-        <div data-recherche></div>
         <div class="grille-champs" style="margin:16px 0 4px;max-width:1080px">
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
           <div class="champ"><label for="f-visa">Visa reçu</label><select id="f-visa"></select></div>
@@ -314,8 +322,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/fgh/vis/outil.js?v=8"></script>
-<script src="/fgh/vis/visas.js?v=5"></script>
+<script src="/fgh/vis/outil.js?v=9"></script>
+<script src="/fgh/vis/visas.js?v=6"></script>
 <script>
 (function () {
   "use strict";
@@ -707,8 +715,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
-    prefixe(); noyaux();
+    etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.recents = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
+    prefixe(); noyaux(); TEXTES = {};
     filtres();
     $("accueil").hidden = true; $("analyse").hidden = false;
     var projet = (donnees.docs[0] && donnees.docs[0].code.split("-")[0]) || "";
@@ -724,6 +732,54 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     }).join("");
   }
 
+  /* Lien avec la liste des plans (/fgh/pln/, alimentée par Kairnial) : pour chaque
+     plan, le dernier indice connu là-bas (type-niveau-zone-n°). « Indice plus récent » :
+     plans visés ici dont la liste des plans connaît un indice plus élevé que le
+     dernier indice de l'export de visas — leurs visas portent sur un ancien indice. */
+  var PLN = null;                                   // clé → { ind, date } ; null tant que pas lu
+  function clePln(type, niveau, zone, numero) {
+    var nv = String(niveau || "").trim();
+    if (/^\d{1,3}$/.test(nv)) nv = ("00" + nv).slice(-3);
+    return [String(type || "").trim().toUpperCase(), nv, String(zone || "").trim().toUpperCase(), String(numero || "").trim().toUpperCase()].join("|");
+  }
+  function plnDe(d) {
+    if (!PLN) return null;
+    return PLN[clePln(d.type, d.niveau, d.zone, String(d.code).split("-").pop())] || null;
+  }
+  function plusRecent(d) { var x = plnDe(d); return !!x && x.ind > (d.maxInd !== undefined ? d.maxInd : d.ind); }
+  function avecVisas(d) { return d.visas.some(function (v) { return v.etat !== "abandon"; }); }
+  function chargePln() {
+    return S.plans.liste().then(function (l) {
+      var m = {};
+      l.forEach(function (p) {
+        var k = clePln(p.type, p.niveau, p.zone, p.numero), i = parseInt(p.indice, 10);
+        if (isNaN(i)) return;
+        if (!m[k] || i > m[k].ind) m[k] = { ind: i, date: p.date_indice };
+      });
+      PLN = m;
+      if (donnees) rend();
+    }, function (e) {
+      UI.toast("Liste des plans : " + ((e && e.message) || "lecture impossible.") + " Le filtre « Indice plus récent » n'est pas disponible.");
+    });
+  }
+  function lienPln(code) { return "/fgh/pln/#q=" + encodeURIComponent(code); }
+  function datePln(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? m[3] + "." + m[2] + "." + m[1] : ""; }
+
+  /* Recherche en tête de page : numéro (complet ou court), libellé, personne qui a
+     déposé, intervenants et codes de visa, commentaires, annotation, zone, étage.
+     Elle filtre tout : cases, bandeau et liste. Texte d'un plan mis en cache. */
+  var TEXTES = {};
+  function texteRecherche(code) {
+    if (TEXTES[code] !== undefined) return TEXTES[code];
+    var l = donnees.parCode[code] || [], d = l[0] || {}, t = [code, court(code), String(code).split("-").pop(), d.zone, nomNiveau(String(d.niveau || "")), d.type, NOMS_TYPES[d.type]];
+    l.forEach(function (x) {
+      t.push(x.lib, x.auteur, x.comLibre, x.circuit);
+      x.visas.forEach(function (v) { t.push(v.qui, v.code, v.com); });
+    });
+    return (TEXTES[code] = t.filter(Boolean).join(" "));
+  }
+  function trouve(code) { var m = barre ? barre.termes() : []; return !m.length || UI.correspond([texteRecherche(code), noteDe(code)], m); }
+
   /* Types et « Nouveaux » en pastilles, comme la liste des plans : plusieurs types
      à la fois ; « Nouveaux » = dernier indice déposé dans les 7 jours avant l'export.
      Comptés dans la zone, l'étage, le circuit et la personne choisis. */
@@ -731,17 +787,21 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     RAP: "Rapport", CPE: "Coupe", SCH: "Schéma", CDC: "Cahier des charges", FTE: "Fiche technique", RFI: "RFI", MOD: "Maquette" };
   function neuf(d) { return d.dep !== null && d.dep !== undefined && d.dep > (donnees.edition || 0) - 7; }
   function dessineTypes() {
-    var c = {}, nN = 0;
+    var c = {}, nN = 0, nR = 0;
     donnees.plans.forEach(function (p) {
       var d = p.doc;
       if (p.renumerote || d.depasse) return;
       if ((etat.circuit !== "tous" && d.circuit !== etat.circuit) || (etat.auteur !== "tous" && V.auteurDe(d) !== etat.auteur)) return;
       if ((etat.zone !== "tous" && String(d.zone || "") !== etat.zone) || (etat.niveau !== "tous" && String(d.niveau || "") !== etat.niveau)) return;
+      if (!trouve(p.code)) return;
+      if (plusRecent(d) && avecVisas(d) && (!Object.keys(etat.types).length || etat.types[d.type]) && (!etat.neufs || neuf(d))) nR++;
+      if (etat.recents && PLN && !(plusRecent(d) && avecVisas(d))) return;
       c[d.type] = (c[d.type] || 0) + 1;
       if (neuf(d)) nN++;
     });
     Object.keys(etat.types).forEach(function (t) { if (!c[t]) c[t] = 0; });
     $("types").innerHTML = '<button type="button" class="b-neufs" data-neuf="1" aria-pressed="' + !!etat.neufs + '" title="Plans dont le dernier indice a été déposé dans les 7 jours avant l\'export">Nouveaux<i>' + n(nN) + "</i></button>" +
+      (PLN ? '<button type="button" class="b-recents" data-recent="1" aria-pressed="' + !!etat.recents + '" title="Plans visés dont la liste des plans connaît un indice plus élevé : les visas portent sur un ancien indice">Indice plus récent dans la liste des plans<i>' + n(nR) + "</i></button>" : "") +
       Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (t) {
         return '<button type="button" data-t="' + esc(t) + '" aria-pressed="' + !!etat.types[t] + '" title="' + esc(NOMS_TYPES[t] || t || "Sans type") + '">' + esc(t || "—") + "<i>" + n(c[t]) + "</i></button>";
       }).join("");
@@ -749,6 +809,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   $("types").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-neuf")) etat.neufs = !etat.neufs;
+    else if (b.hasAttribute("data-recent")) etat.recents = !etat.recents;
     else { var t = b.getAttribute("data-t"); if (etat.types[t]) delete etat.types[t]; else etat.types[t] = true; }
     etat.limite = 60; etat.ouvert = null;
     rend();
@@ -783,6 +844,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     donnees.plans.forEach(function (p) {
       var d = p.doc;
       if (p.renumerote || d.depasse) return;
+      if ((etat.recents && PLN && !(plusRecent(d) && avecVisas(d))) || !trouve(p.code)) return;
       if ((etat.circuit !== "tous" && d.circuit !== etat.circuit) || (Object.keys(etat.types).length && !etat.types[d.type]) || (etat.neufs && !neuf(d)) ||
           (etat.auteur !== "tous" && V.auteurDe(d) !== etat.auteur)) return;
       var z = String(d.zone || ""), ni = String(d.niveau || ""), rouge = aReprendre(p) ? 1 : 0;
@@ -837,6 +899,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* ------------------------------------------------------------ rendu */
   function rend() {
     dessineZones(); dessineTypes(); menuAuteurs();
+    var rec = etat.recents && PLN, mots = barre ? barre.termes() : [];
+    etat.garde = rec || mots.length ? function (d) { return (!rec || (plusRecent(d) && avecVisas(d))) && (!mots.length || trouve(d.code)); } : null;
     R = V.analyse(donnees, etat);
     rendCartouche(); rendTuiles(); rendListe();
   }
@@ -1000,7 +1064,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
       if (notesOk && etat.annotes && !noteDe(p.code)) return false;
       if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
-      return !mots.length || UI.correspond([p.code, p.doc.lib, p.doc.auteur, noteDe(p.code)], mots);
+      return !mots.length || trouve(p.code);
     });
     l.sort({
       statut: function (a, b) { return ORDRE[a.statut] - ORDRE[b.statut] || (a.doc.dep || 0) - (b.doc.dep || 0); },
@@ -1028,9 +1092,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           ' aria-label="' + esc(court(p.code)) + " traité" + '"></label></td>' : "";
         return '<tr class="v-plan' + (t ? " v-fait" : "") + '" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '">' + caseT + '<td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
           '</td><td class="n">' + ind(d.ind) + '</td><td class="v-lib"><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
-          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
+          (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") +
+          (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '"><p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     if (enCours) {
       var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
@@ -1108,6 +1173,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var st = Object.keys(etat.statuts).map(function (s) { return STATUT[s].nom; });
     if (etat.dernierSeul) f.push("Indices et plans remplacés masqués");
     if (etat.neufs) f.push("Nouveaux (7 derniers jours)");
+    if (etat.recents) f.push("Indice plus récent dans la liste des plans");
     if (etat.visa) f.push("Visa : " + libelleCle(etat.visa));
     if (traitesOk && etat.traite !== "tous") f.push(etat.traite === "traites" ? "Plans traités" : "Plans à traiter");
     if (notesOk && etat.annotes) f.push("Plans annotés");
@@ -1214,10 +1280,15 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   UI.pied();
   UI.colleSousBarre(document.querySelector(".tete-collante"));
   document.querySelector(".entete").classList.add("vu");
+  var attenteSaisie;
   barre = UI.recherche({
     hote: document.querySelector("[data-recherche]"),
-    exemple: "Rechercher un numéro, un libellé ou une personne…",
-    surSaisie: function () { etat.limite = 60; if (donnees) rendListe(); },
+    exemple: "Rechercher un numéro, un libellé, une personne, un intervenant, un commentaire…",
+    surSaisie: function () {
+      etat.limite = 60; etat.ouvert = null;
+      clearTimeout(attenteSaisie);
+      attenteSaisie = setTimeout(function () { if (donnees) rend(); }, 180);
+    },
     surEntree: function () { var t = document.querySelector("tr.v-plan"); if (t && document.querySelectorAll("tr.v-plan").length === 1) bascule(t); }
   });
   /* Retour sur l'onglet : relire la liste des exports et les coches, pour voir
@@ -1232,6 +1303,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   });
   chargeTraites();
   chargeNotes();
+  chargePln();
   chargeListe().then(function (l) {
     var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];
     if (x) return ouvre(x);

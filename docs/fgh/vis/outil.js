@@ -602,10 +602,23 @@
     }
   };
 
+  /* Liste des plans (/fgh/pln/, table fgh_plans) : seulement ce qu'il faut pour
+     comparer les indices, lu par pages de 1000. */
+  var plansListe = {
+    liste: function () {
+      var tout = [];
+      function page(d) {
+        return appel("/rest/v1/fgh_plans?select=type,niveau,zone,numero,indice,date_indice&order=type,niveau,zone,numero", { plage: d + "-" + (d + 999) })
+          .then(json).then(function (l) { tout = tout.concat(l || []); return l && l.length === 1000 ? page(d + 1000) : tout; });
+      }
+      return page(0);
+    }
+  };
+
   global.Outil = {
     el: el, toast: toast, ouvre: ouvre, confirme: confirme,
     barre: barre, colleSousBarre: colleSousBarre, pied: pied,
     recherche: recherche, correspond: correspond, imprime: imprime
   };
-  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes };
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe };
 })(window);
