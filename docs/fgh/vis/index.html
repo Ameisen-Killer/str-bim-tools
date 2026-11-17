@@ -348,7 +348,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/fgh/vis/outil.js?v=9"></script>
+<script src="/fgh/vis/outil.js?v=10"></script>
 <script src="/fgh/vis/visas.js?v=8"></script>
 <script>
 (function () {
@@ -1194,7 +1194,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + (!t && textePiste(p.code) ? ' · <span class="v-piste">' + esc(textePiste(p.code)) + "</span>" : "") +
           (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + blocPj(p.code) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     if (enCours) {
       var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
@@ -1409,6 +1409,49 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     e.preventDefault(); lisPdfs(e.dataTransfer.files);
   });
 
+  /* Réponses Kairnial (visas_pj) : liens vers les pièces jointes des visas, posés depuis
+     Kairnial (bouton « Envoyer vers Visas » ajouté dans la page Kairnial, qui ouvre cet
+     outil et lui passe les lignes par postMessage). */
+  var PJ = {};
+  function chargePj() {
+    if (!S.pj) return;
+    S.pj.liste().then(function (l) {
+      PJ = {};
+      (l || []).forEach(function (x) { (PJ[x.code] = PJ[x.code] || []).push(x); });
+      Object.keys(PJ).forEach(function (c) { PJ[c].sort(function (a, b) { return String(b.date_visa || "").localeCompare(String(a.date_visa || "")); }); });
+      if (donnees) rendListe();
+    }, function () {});
+  }
+  function blocPj(code) {
+    var l = PJ[code]; if (!l || !l.length) return "";
+    return '<div class="v-piste-bloc" style="border-left-color:var(--or)"><b>Réponses Kairnial</b> : ' + l.map(function (x) {
+      var d = x.date_visa ? new Date(x.date_visa).toLocaleDateString("fr-CH") : "";
+      return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.nom) + '">' + esc((x.visa || "Pièce jointe") + (d ? " du " + d : "") + (x.indice !== null && x.indice !== undefined ? " (ind. " + ind(x.indice) + ")" : "")) + " ↗</a>";
+    }).join(" · ") + "</div>";
+  }
+  var ORIGINE_KAIRNIAL = "https://front-eu-1.kairnial.com";
+  if (window.opener && /kairnial-pj/.test(location.hash)) {
+    addEventListener("message", function (e) {
+      if (e.origin !== ORIGINE_KAIRNIAL || !e.data || e.data.type !== "visas-pj" || !Array.isArray(e.data.lignes)) return;
+      var ok = e.data.lignes.filter(function (x) {
+        return x && typeof x.code === "string" && /^[A-Z0-9-]{10,60}$/.test(x.code) && typeof x.url === "string" && x.url.indexOf("https://ws-eu-1.kairnial.com/") === 0 && x.url.length < 500;
+      }).map(function (x) {
+        return { code: x.code, url: x.url, indice: /^\d{1,3}$/.test(String(x.indice)) ? +x.indice : null, visa: String(x.visa || "").slice(0, 100),
+          date_visa: x.date_visa && !isNaN(new Date(x.date_visa)) ? new Date(x.date_visa).toISOString() : null, nom: String(x.nom || "").slice(0, 300) };
+      });
+      var lots = []; for (var i = 0; i < ok.length; i += 200) lots.push(ok.slice(i, i + 200));
+      lots.reduce(function (pr, l) { return pr.then(function () { return S.pj.ecrit(l); }); }, Promise.resolve()).then(function () {
+        UI.toast(n(ok.length) + " liens de réponses Kairnial enregistrés.");
+        try { e.source.postMessage({ type: "visas-pj-ok", n: ok.length }, ORIGINE_KAIRNIAL); } catch (x) {}
+        chargePj();
+      }, function (er) {
+        UI.toast("Liens Kairnial non enregistrés : " + ((er && er.message) || "erreur inconnue."));
+        try { e.source.postMessage({ type: "visas-pj-ko", msg: String((er && er.message) || er) }, ORIGINE_KAIRNIAL); } catch (x) {}
+      });
+    });
+    window.opener.postMessage({ type: "visas-pret" }, ORIGINE_KAIRNIAL);
+  }
+
   function historique(p) {
     var lien = p.remplacePar ? '<p class="v-faible">Refait sous le numéro ' + esc(p.remplacePar) + " (même type, niveau, zone et libellé, déposé plus récemment).</p>"
       : p.remplace ? '<p class="v-faible">Reprend ' + p.remplace.map(esc).join(", ") + ", refait sous ce numéro.</p>" : "";
@@ -1606,9 +1649,11 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     chargeListe().catch(function () {});
     chargeTraites();
     chargeNotes();
+    chargePj();
   });
   chargeTraites();
   chargeNotes();
+  chargePj();
   chargePln();
   chargeListe().then(function (l) {
     var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];

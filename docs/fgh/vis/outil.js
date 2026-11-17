@@ -620,5 +620,17 @@
     barre: barre, colleSousBarre: colleSousBarre, pied: pied,
     recherche: recherche, correspond: correspond, imprime: imprime
   };
-  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe };
+  /* Réponses Kairnial : { code, url, indice, visa, date_visa, nom }, une ligne de visas_pj
+     par pièce jointe de visa ; seulement le lien vers le fichier chez Kairnial. */
+  var pj = {
+    liste: function () { return litTout("visas_pj", "code"); },
+    ecrit: function (lignes) {
+      return appel("/rest/v1/visas_pj?on_conflict=code,url", {
+        methode: "POST", type: "application/json", prefer: "resolution=merge-duplicates,return=minimal",
+        corps: JSON.stringify(lignes)
+      });
+    }
+  };
+
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj };
 })(window);
