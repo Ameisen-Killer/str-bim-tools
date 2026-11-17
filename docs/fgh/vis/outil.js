@@ -661,5 +661,19 @@
     }
   };
 
-  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj, avis: avis, reponses: reponses };
+  /* Qui reprend le plan : { code, qui, modifie_le }, une ligne par plan */
+  var attributions = {
+    liste: function () { return litTout("visas_attributions", "code"); },
+    ecrit: function (code, qui) {
+      return appel("/rest/v1/visas_attributions?on_conflict=code", {
+        methode: "POST", type: "application/json", prefer: "resolution=merge-duplicates,return=minimal",
+        corps: JSON.stringify({ code: code, qui: String(qui).slice(0, 100) })
+      });
+    },
+    efface: function (code) {
+      return appel("/rest/v1/visas_attributions?code=eq." + encodeURIComponent(code), { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
+
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj, avis: avis, reponses: reponses, attributions: attributions };
 })(window);
