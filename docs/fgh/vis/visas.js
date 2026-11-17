@@ -803,7 +803,35 @@
     return P;
   }
 
-  global.Visas = { lire: lire, parse: parse, inflate: inflate, analyse: analyse, pistes: pistes, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
+  /* Avis estimé sur une remarque de visa : nous concerne (AB Ingénieurs, ingénieur civil,
+     auteur des plans STR), ne nous concerne pas (adressé à un autre, rappel ou simple accord),
+     doute (coordination avec d'autres lots, à lire). Première règle qui répond. */
+  var AVIS = [
+    [/^[\d\s.,]+(m|cm|mm)?$/, "nous", "Cote corrigée sur le plan"],
+    [/^(pmsa ?:? ?|br ?:? ?)?(ok|vso|vao|bpe|bpd|position ok|a conserver|en ordre)\b.{0,20}$|bien prises? en compte|annule et remplace|^interrompu$|en cours de mise a jour/, "pas", "Accord ou information, rien à faire"],
+    [/impact sur le gros.?oeuvre|point bloquant/, "doute", "Point bloquant chez un autre lot qui peut toucher la structure"],
+    [/responsabilite de (l.?entreprise totale |la )?spva|spva (est|doit|a la responsabilite)|l.?et est responsable|responsabilite de l.?et\b|securite sur le chantier|plutot pour (spva|l.?archi)/, "pas", "Rappel adressé à SPVA (entreprise totale), pas d'action pour nous"],
+    [/bur(ckhardt)? valide que|br effectue les validations|validation br sera realisee|\bbr\b.{0,12}non vise|non vise ?:|ne peut etre effectuee?s? sans plans? (d.?)?architecte/, "pas", "Réserve du BR ou de l'architecte sur son périmètre"],
+    [/(spva doit|veuillez|merci de) (transmettre|fournir|nous situer)|plan de reperage|^.{0,40}commentaires? generaux|veuillez (indiquer|coter|ajouter|dessiner)|merci (d.?|de )(ajouter|indiquer|coter|fournir|afficher|clarifier)|cotation de tous|recuperer|retrouver|selon ndp|en rouge/, "nous", "Demande de compléter ou corriger nos plans"],
+    [/cartouche|logo|indice|nomenclature|\blid\b|type doc|type de document|provisoire|numero ged|n.? ged|zone d.?impression|kairnial et la reference|n.?existe pas|geolocalisation|altitude|underscore|type de zone|mettre a jour la zone|trame|hachur|legende|couleur|superposition des textes|reperage|ingenieur facade|lisible|ech(elle)? ?:? ?1|plan 1:|afficher le niveau/, "nous", "Forme du document : cartouche, légende ou repérage à corriger"],
+    [/\barup\b|amo pi|police du feu|polfeu|scenographi/, "doute", "Autre spécialiste (feu, scène) : voir avec SPVA"],
+    [/\bfmc\b|acousticien|chape|niveaux? finis?|faux.?plafond|plenum|reseaux|\bwsp\b|mandataires|finitions|enveloppe|pierre|\bstores?\b|loggias?|berisha|mineral expertise|schindler|genilac|pompes?|places? de parc|stationnement|caillebotis|air neuf|prise d.?air|conflit|details? de facade|plans? (d.?)?architecte/, "doute", "Coordination avec un autre lot : à vérifier"],
+    [/ingenieur|concepteur|note de calcul|calcul|dimensionn|poinconnement|ancrage|armature|ferraill|goujon|etayage|etayer|renfor|charges?\b|descente|socle|percement|reservation|\bresa|tremie|sciage|demoli|cote|cotation|dimension|manque|inexistant|fond de plan|nuage|epaisseur|diametre|platine|soudure|boulon|assemblage|contrevent|liste|coffrage|dalle|poteau|pilier|poutre|\bmur|profil|\bhe[abm]\b|\bipe\b|carbone|beton|detail|coupe|elevation|\baxe|ouverture|resoumettre|reviser|a reprendre|corrig|correction|a modifier|revoir|plan associe|actualis|incomplet|encastrement|flambage|excentricite|rigidite|effort|sismique|vibration|thermique|deformation|scellement|barres?\b|\blits?\b|recouvrement|attentes|raidisseur|cheville|beche|cisaillement|torseur|etriers?|potelets?|resine|\bc\d\d\/\d\d|\u00f8|\bkg\b|\d ?kg|t\/m|\bkn\b|poids|existant|trait|precis|valeur|vague/, "nous", "Porte sur la structure que nous dessinons ou calculons"],
+    [/\bzones?\b|circulation|\blocal|stockage|bureaux?|\bwc\b|bacs? a|gaine technique|armoire|verrieres|garage|nacelle|ascenseur/, "nous", "Plan de charges : zone ou usage à corriger"]
+  ];
+  function avis(texte) {
+    var t = sansAccent(String(texte || "")).replace(/\s+/g, " ").trim(), seul = t.replace(/^[^:]{2,40}:\s*/, "");
+    for (var i = 0; i < AVIS.length; i++) if (AVIS[i][0].test(i === 0 || i === 1 ? seul : t)) return { avis: AVIS[i][1], pourquoi: AVIS[i][2] };
+    return { avis: "doute", pourquoi: "Pas de mot-clé reconnu : à lire" };
+  }
+  // Commentaire qui ne fait que renvoyer à la pièce jointe (son contenu est lu à part)
+  function renvoiSeul(texte) {
+    var t = sansAccent(String(texte || "")).replace(/^[^:]{2,40}:\s*/, "").trim();
+    return t.length < 110 && !/cartouche|indice|zone|logo/.test(t) &&
+      (/annexe|ci.?joint|\bjoints?\b|\bpj\b|piece jointe|notes sur le plan|commentaires? du mo\b|voir (les )?notes|voir annotations/.test(t) || /prendre en compte no(s|us) (commentaires?|annotations?)/.test(t));
+  }
+
+  global.Visas = { avis: avis, renvoiSeul: renvoiSeul, lire: lire, parse: parse, inflate: inflate, analyse: analyse, pistes: pistes, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
     SANS_NOM: SANS_NOM, auteurDe: auteurDe, annote: annote };
   if (typeof module !== "undefined" && module.exports) module.exports = global.Visas;
 })(typeof window !== "undefined" ? window : globalThis);

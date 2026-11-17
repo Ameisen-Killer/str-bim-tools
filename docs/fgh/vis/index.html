@@ -95,6 +95,23 @@ a.v-recent:hover{text-decoration:underline}
 .v-rem-liste button[aria-pressed="true"]{border-color:var(--or);background:rgba(var(--encre),.08)}
 .v-rem-liste b{min-width:2.4em;text-align:right;color:var(--or)}
 .v-rem-actif{margin:6px 0 0;font-size:13px}
+.v-rem-ligne{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--ligne);padding-bottom:3px}
+.v-rem-ligne>button{flex:1}
+.v-rem-filtres{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center}
+.v-rem-filtres button{border:1px solid var(--ligne);border-radius:999px;background:none;padding:3px 10px;font:inherit;font-size:12.5px;color:inherit;cursor:pointer}
+.v-rem-filtres button[aria-pressed="true"]{background:rgba(var(--encre),.1);border-color:var(--or)}
+.v-avis{display:inline-flex;gap:4px;flex-shrink:0;padding-top:4px}
+.v-avis button{border:1px solid var(--ligne);border-radius:6px;background:none;padding:2px 7px;font:inherit;font-size:11.5px;color:var(--v-neutre);cursor:pointer;white-space:nowrap}
+.v-avis button:hover{color:inherit;background:rgba(var(--encre),.06)}
+.v-avis button.estime{border-style:dashed;color:inherit}
+.v-avis button.choisi{color:#fff}
+.v-avis .v-avis-nous.estime{border-color:var(--v-mauvais)} .v-avis .v-avis-nous.choisi{background:var(--v-mauvais);border-color:var(--v-mauvais)}
+.v-avis .v-avis-pas.estime{border-color:var(--v-bon)} .v-avis .v-avis-pas.choisi{background:var(--v-bon);border-color:var(--v-bon)}
+.v-avis .v-avis-doute.estime{border-color:var(--v-obs)} .v-avis .v-avis-doute.choisi{background:var(--v-obs);border-color:var(--v-obs)}
+.v-avis-bloc{border-left-color:var(--v-cours)}
+.v-avis-bloc ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.v-avis-bloc li{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;font-size:13px}
+@media (max-width:700px){.v-rem-ligne,.v-avis-bloc li{flex-direction:column}.v-avis{flex-wrap:wrap}}
 .v-rem-actif button{margin-left:8px}
 .v-pistes>span{align-self:center;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--texte-doux);margin-right:4px}
 .v-pistes button[aria-pressed="true"]{background:var(--v-ko,#e5534b);border-color:var(--v-ko,#e5534b);color:#fff}
@@ -300,7 +317,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       <div class="v-recherche" data-recherche></div>
       <div class="v-types" id="types" aria-label="Types de document"></div>
       <div class="v-types v-pistes" id="pistes" aria-label="Pistes pour traiter vite les plans à reprendre"></div>
-      <details class="v-rem" id="remarques" hidden><summary id="rem-titre">Remarques lues dans les PDF</summary><p class="v-faible" style="margin:6px 0 0;font-size:13px">Clique une remarque : la liste ne montre que ses plans. Puis « Annoter ensemble » écrit la même réponse à tous, « Cocher traités » les coche d'un coup.</p><div class="v-rem-liste" id="rem-liste"></div></details>
+      <details class="v-rem" id="remarques" hidden><summary id="rem-titre">Remarques des visas</summary><p class="v-faible" style="margin:6px 0 0;font-size:13px">Les remarques lues dans les PDF et les commentaires des visas. J'ai estimé pour chacune si elle nous concerne (cadre pointillé) : un clic sur un bouton confirme ton avis, un second clic revient à mon estimation. Clique le texte d'une remarque : la liste ne montre que ses plans, puis « Annoter ensemble » ou « Cocher traités ».</p><div class="v-rem-filtres" id="rem-filtres"></div><div class="v-rem-liste" id="rem-liste"></div></details>
       <p class="v-rem-actif" id="rem-actif" hidden></p>
       <section class="section">
         <div class="v-tuiles" id="tuiles" aria-label="Ce qui demande une action"></div>
@@ -315,6 +332,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           <div class="champ" id="champ-traite" hidden><label for="f-traite">Traitement</label><select id="f-traite"></select></div>
           <div class="champ"><label for="f-visa">Visa reçu</label><select id="f-visa"></select></div>
           <div class="champ"><label for="f-bloque">Refusé par</label><select id="f-bloque"></select></div>
+          <div class="champ"><label for="f-avis">Remarques</label><select id="f-avis"><option value="">Tous les plans</option><option value="nous">Au moins une nous concerne</option><option value="pas">Aucune ne nous concerne</option><option value="doute">Au moins un doute</option><option value="atrancher">Avis pas encore confirmé</option></select></div>
           <div class="champ"><label for="f-tri">Tri</label>
             <select id="f-tri">
               <option value="statut">Statut, puis plus ancien</option>
@@ -348,8 +366,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/fgh/vis/outil.js?v=10"></script>
-<script src="/fgh/vis/visas.js?v=8"></script>
+<script src="/fgh/vis/outil.js?v=11"></script>
+<script src="/fgh/vis/visas.js?v=9"></script>
 <script>
 (function () {
   "use strict";
@@ -741,7 +759,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     courant = o.ligne || { id: null, nom: o.nom };
     retiens(o.ligne ? o.ligne.id : null);
     donnees = V.inflate(o.jeu);
-    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = ""; etat.bloque = ""; etat.remarque = "";
+    PISTES = V.pistes ? V.pistes(donnees) : {}; etat.piste = ""; etat.bloque = ""; etat.remarque = ""; etat.avisPlan = ""; etat.avisRem = ""; $("f-avis").value = "";
     etat.circuit = "tous"; etat.niveau = "tous"; etat.zone = "tous"; etat.types = {}; etat.neufs = false; etat.recents = false; etat.auteur = "tous"; etat.visa = ""; etat.statuts = {}; etat.ouvert = null; etat.limite = 60;
     prefixe(); noyaux(); TEXTES = {};
     filtres();
@@ -1158,7 +1176,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var l = R.plans.filter(function (p) {
       if (fs.length && !etat.statuts[p.statut]) return false;
       if (etat.visa && clesVisas(p.doc).indexOf(etat.visa) < 0) return false;
-      if (etat.remarque && remarquesDe(p.code).indexOf(etat.remarque) < 0) return false;
+      if (etat.remarque && remarquesDe(p).indexOf(etat.remarque) < 0) return false;
+      if (etat.avisPlan && !avisPlanOk(p)) return false;
       if (etat.bloque && !(PISTES[p.code] && PISTES[p.code].par.indexOf(etat.bloque) >= 0)) return false;
       if (notesOk && etat.annotes && !noteDe(p.code)) return false;
       if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
@@ -1194,7 +1213,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
           (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + (!t && textePiste(p.code) ? ' · <span class="v-piste">' + esc(textePiste(p.code)) + "</span>" : "") +
           (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + blocPj(p.code) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + blocPj(p.code) + blocAvis(p) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     if (enCours) {
       var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
@@ -1205,34 +1224,97 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     $("plus").textContent = "Afficher " + Math.min(60, reste) + " plans de plus (" + n(reste) + " restants)";
   }
 
-  /* Remarques lues dans les PDF de réponse (lignes « Lu dans … : r1 / r2 » des annotations),
-     regroupées mot pour mot (sans accents ni ponctuation) et comptées sur les plans affichés. */
-  var REMTXT = {};
+  /* Remarques des visas : celles lues dans les PDF de réponse (lignes « Lu dans … : r1 / r2 » des
+     annotations) et les commentaires des visas du dernier indice (hors simple renvoi à la pièce
+     jointe), regroupées mot pour mot (sans accents ni ponctuation). Chacune a un avis : nous
+     concerne, ne nous concerne pas, doute. Estimé par Visas.avis, confirmé par un clic (visas_avis). */
+  var REMTXT = {}, AVIS = {}, avisOk = false, ESTIME = {};
+  var NOMS_AVIS = { nous: "Nous concerne", pas: "Ne nous concerne pas", doute: "J'ai un doute" };
   function cleRem(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80); }
-  function remarquesDe(code) {
-    var t = noteDe(code), l = [];
-    if (!t) return l;
-    t.split("\n").forEach(function (li) {
+  function remarquesDe(p) {
+    var t = noteDe(p.code), l = [];
+    if (t) t.split("\n").forEach(function (li) {
       var m = li.match(/^Lu dans .*?\(\d{2}\.\d{2}\.\d{4}\) : (.*)$/); if (!m) return;
       m[1].split(" / ").forEach(function (r) {
         var k = cleRem(r); if (k.length < 15 || l.indexOf(k) >= 0) return;
         l.push(k); if (!REMTXT[k]) REMTXT[k] = r.trim();
       });
     });
+    p.doc.visas.forEach(function (v) {
+      if (!v.com || V.renvoiSeul(v.com)) return;
+      var c = String(v.com).trim().replace(/\s+/g, " "), k = cleRem(c.replace(/^[^:]{2,40}:\s*/, ""));
+      if (k.length < 8 || l.indexOf(k) >= 0) return;
+      l.push(k); if (!REMTXT[k]) REMTXT[k] = v.qui + " · " + c;
+    });
     return l;
+  }
+  function avisDe(k) {
+    if (AVIS[k]) return { avis: AVIS[k], tranche: true, pourquoi: "" };
+    var e = ESTIME[k] || (ESTIME[k] = V.avis(REMTXT[k]));
+    return { avis: e.avis, tranche: false, pourquoi: e.pourquoi };
+  }
+  function avisPlanOk(p) {
+    var l = remarquesDe(p).map(avisDe); if (!l.length) return false;
+    if (etat.avisPlan === "pas") return l.every(function (a) { return a.avis === "pas"; });
+    if (etat.avisPlan === "atrancher") return l.some(function (a) { return !a.tranche; });
+    return l.some(function (a) { return a.avis === etat.avisPlan; });
+  }
+  function boutonsAvis(k) {
+    var a = avisDe(k);
+    return '<span class="v-avis" role="group" aria-label="Avis sur cette remarque">' + ["nous", "pas", "doute"].map(function (x) {
+      var sur = a.avis === x;
+      return '<button type="button" data-avis="' + x + '" data-cle="' + esc(k) + '" class="v-avis-' + x + (sur ? (a.tranche ? " choisi" : " estime") : "") + '" aria-pressed="' + (sur && a.tranche) + '" title="' +
+        esc(sur && !a.tranche ? "Mon estimation : " + a.pourquoi + ". Clique pour confirmer." : sur ? "Ton avis. Clique pour revenir à mon estimation." : "Clique pour choisir : " + NOMS_AVIS[x]) + '">' + NOMS_AVIS[x] + "</button>";
+    }).join("") + "</span>";
+  }
+  function blocAvis(p) {
+    var l = remarquesDe(p); if (!l.length) return "";
+    return '<div class="v-piste-bloc v-avis-bloc"><b>Remarques de ce plan</b><ul>' + l.map(function (k) {
+      return "<li><span>" + esc(REMTXT[k]) + "</span>" + boutonsAvis(k) + "</li>";
+    }).join("") + "</ul></div>";
   }
   function dessineRemarques() {
     var c = {};
-    if (notesOk) R.plans.forEach(function (p) { remarquesDe(p.code).forEach(function (k) { c[k] = (c[k] || 0) + 1; }); });
-    var cles = Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
+    R.plans.forEach(function (p) { remarquesDe(p).forEach(function (k) { c[k] = (c[k] || 0) + 1; }); });
+    var cles = Object.keys(c), nb = { "": cles.length, nous: 0, pas: 0, doute: 0, atrancher: 0 };
+    cles.forEach(function (k) { var a = avisDe(k); nb[a.avis]++; if (!a.tranche) nb.atrancher++; });
+    var vis = cles.filter(function (k) {
+      var a = avisDe(k); return !etat.avisRem || (etat.avisRem === "atrancher" ? !a.tranche : a.avis === etat.avisRem);
+    }).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
     $("remarques").hidden = !cles.length && !etat.remarque;
-    var multi = cles.filter(function (k) { return c[k] > 1; }).length;
-    $("rem-titre").textContent = "Remarques lues dans les PDF · " + n(cles.length) + " différentes, dont " + n(multi) + " sur plusieurs plans";
-    $("rem-liste").innerHTML = cles.slice(0, 150).map(function (k) {
-      return '<button type="button" data-rem="' + esc(k) + '" aria-pressed="' + (etat.remarque === k) + '"><b>' + c[k] + "</b><span>" + esc(REMTXT[k]) + "</span></button>";
+    $("rem-titre").textContent = "Remarques des visas · " + n(cles.length) + " différentes : " + n(nb.nous) + " nous concernent, " + n(nb.pas) + " non, " + n(nb.doute) + " doutes";
+    $("rem-filtres").innerHTML = [["", "Toutes"], ["nous", NOMS_AVIS.nous], ["pas", NOMS_AVIS.pas], ["doute", NOMS_AVIS.doute], ["atrancher", "Pas encore confirmées"]].map(function (f) {
+      return '<button type="button" data-avis-filtre="' + f[0] + '" aria-pressed="' + ((etat.avisRem || "") === f[0]) + '">' + f[1] + " · " + n(nb[f[0]]) + "</button>";
     }).join("");
+    $("rem-liste").innerHTML = vis.length ? vis.slice(0, 400).map(function (k) {
+      return '<div class="v-rem-ligne"><button type="button" data-rem="' + esc(k) + '" aria-pressed="' + (etat.remarque === k) + '" title="Ne montrer que les plans qui ont cette remarque"><b>' + c[k] + "</b><span>" + esc(REMTXT[k]) + "</span></button>" + boutonsAvis(k) + "</div>";
+    }).join("") + (vis.length > 400 ? '<p class="v-faible">… et ' + n(vis.length - 400) + " autres (choisis un filtre).</p>" : "") : '<p class="v-faible">Aucune remarque dans ce filtre.</p>';
     $("rem-actif").hidden = !etat.remarque;
     if (etat.remarque) $("rem-actif").innerHTML = "Remarque choisie : « " + esc((REMTXT[etat.remarque] || "").slice(0, 200)) + ' »<button class="btn" type="button" id="rem-aucune">Retirer</button>';
+  }
+  $("rem-filtres").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-avis-filtre]"); if (!b) return;
+    etat.avisRem = b.getAttribute("data-avis-filtre"); rendListe();
+  });
+  $("f-avis").addEventListener("change", function () { etat.avisPlan = this.value; etat.limite = 60; etat.ouvert = null; rendListe(); });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-avis]"); if (!b) return;
+    e.stopPropagation();
+    if (!avisOk) { UI.toast("Connecte-toi pour enregistrer ton avis."); return; }
+    var k = b.getAttribute("data-cle"), x = b.getAttribute("data-avis"), avant = AVIS[k], retire = avant === x;
+    if (retire) delete AVIS[k]; else AVIS[k] = x;
+    rendListe();
+    (retire ? S.avis.efface(k) : S.avis.ecrit(k, x, REMTXT[k])).then(null, function (er) {
+      if (avant) AVIS[k] = avant; else delete AVIS[k];
+      rendListe(); UI.toast("Avis non enregistré : " + ((er && er.message) || "erreur inconnue."));
+    });
+  }, true);
+  function chargeAvis() {
+    if (!S.avis) return;
+    S.avis.liste().then(function (l) {
+      AVIS = {}; (l || []).forEach(function (x) { AVIS[x.cle] = x.avis; });
+      avisOk = true; if (donnees) rendListe();
+    }, function () {});
   }
   $("rem-liste").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-rem]"); if (!b) return;
@@ -1650,10 +1732,12 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     chargeTraites();
     chargeNotes();
     chargePj();
+    chargeAvis();
   });
   chargeTraites();
   chargeNotes();
   chargePj();
+  chargeAvis();
   chargePln();
   chargeListe().then(function (l) {
     var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];

@@ -632,5 +632,19 @@
     }
   };
 
-  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj };
+  /* Avis sur les remarques : { cle, avis (nous | pas | doute), texte }, une ligne par remarque */
+  var avis = {
+    liste: function () { return litTout("visas_avis", "cle"); },
+    ecrit: function (cle, a, texte) {
+      return appel("/rest/v1/visas_avis?on_conflict=cle", {
+        methode: "POST", type: "application/json", prefer: "resolution=merge-duplicates,return=minimal",
+        corps: JSON.stringify({ cle: String(cle).slice(0, 120), avis: a, texte: String(texte || "").slice(0, 600) })
+      });
+    },
+    efface: function (cle) {
+      return appel("/rest/v1/visas_avis?cle=eq." + encodeURIComponent(cle), { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
+
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj, avis: avis };
 })(window);
