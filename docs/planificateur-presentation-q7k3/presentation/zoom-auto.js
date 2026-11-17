@@ -12,7 +12,7 @@
 
   var voile = document.createElement("div");
   voile.setAttribute("aria-hidden", "true");
-  voile.style.cssText = "position:fixed;inset:0;z-index:39;background:#050505;opacity:0;pointer-events:none";
+  voile.style.cssText = "position:fixed;inset:0;z-index:39;background:#F4F5F2;opacity:0;pointer-events:none";
   document.body.appendChild(voile);
 
   var cible = null, k = 0, dx = 0, dy = 0;

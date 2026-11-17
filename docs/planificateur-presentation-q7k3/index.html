@@ -8,19 +8,19 @@
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#050505">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Cpath d='M9 27V9h8v18M17 27V15h7v12' fill='none' stroke='%23D6A85C' stroke-width='1.5'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#F4F5F2">
+<link rel="icon" href="/planif/assets/logo-ab-marque.svg?v=1" type="image/svg+xml">
 <link rel="preload" href="/assets/polices/inter-tight-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/polices/ibm-plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/polices/polices.css?v=4">
 <style>
 :root{
-  --noir:#050505;
-  --ligne:rgba(236,232,224,.12);
-  --or:#D6A85C;
-  --texte:#ECE8E0;
-  --texte-doux:rgba(236,232,224,.56);
-  --texte-faible:rgba(236,232,224,.34);
+  --noir:#F4F5F2;
+  --ligne:rgba(32,32,32,.12);
+  --or:#5F9126;
+  --texte:#202020;
+  --texte-doux:rgba(32,32,32,.66);
+  --texte-faible:rgba(32,32,32,.48);
   --g:clamp(18px,4vw,56px);
   --mono:"IBM Plex Mono","Plex Mono repli",ui-monospace,Consolas,monospace;
 }
@@ -37,15 +37,17 @@ p{margin:0}
 
 .barre{
   position:fixed;inset:0 0 auto 0;z-index:10;
-  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  display:flex;justify-content:space-between;align-items:center;gap:16px;
   padding:max(18px,env(safe-area-inset-top)) var(--g) 18px;
   font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--texte-doux);
-  background:rgba(5,5,5,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  border-bottom:1px solid rgba(236,232,224,.06);
+  background:rgba(244,245,242,.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(32,32,32,.06);
 }
 .barre a{text-decoration:none;transition:color .3s}
 .barre a:hover{color:var(--or)}
 .barre .ouvrir{color:var(--or)}
+.barre .marque{display:inline-flex;align-items:center;gap:12px}
+.barre .marque img{height:28px;width:auto;display:block}
 
 .rv{opacity:0;transform:translateY(18px);transition:opacity 1.2s ease var(--d,0s),transform 1.2s cubic-bezier(.2,.7,.2,1) var(--d,0s)}
 .vu .rv,.rv.vu{opacity:1;transform:none}
@@ -103,11 +105,11 @@ section{padding-block:clamp(88px,15vh,170px);border-top:1px solid var(--ligne)}
 
 .capture{position:relative;margin:0;padding:10px;cursor:zoom-in}
 .capture::before{
-  content:"";position:absolute;inset:0;border:1px solid rgba(236,232,224,.2);
+  content:"";position:absolute;inset:0;border:1px solid rgba(32,32,32,.2);
   clip-path:inset(0 100% 0 0);transition:clip-path 1.4s cubic-bezier(.55,.05,.25,1) var(--d,.2s);
 }
 .vu .capture::before,.capture.vu::before{clip-path:inset(0 0 0 0)}
-.capture img{display:block;width:100%;height:auto;border-radius:2px;opacity:0;transform:scale(.985);transition:opacity 1.4s ease calc(var(--d,.2s) + .5s),transform 1.6s cubic-bezier(.2,.7,.2,1) calc(var(--d,.2s) + .5s);background:#111}
+.capture img{display:block;width:100%;height:auto;border-radius:2px;opacity:0;transform:scale(.985);transition:opacity 1.4s ease calc(var(--d,.2s) + .5s),transform 1.6s cubic-bezier(.2,.7,.2,1) calc(var(--d,.2s) + .5s);background:#E8E9E4}
 .vu .capture img,.capture.vu img{opacity:1;transform:none}
 .capture figcaption{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--texte-faible)}
 
@@ -119,11 +121,11 @@ section{padding-block:clamp(88px,15vh,170px);border-top:1px solid var(--ligne)}
 .equation{display:grid;grid-template-columns:1fr auto 1fr auto 1.2fr;align-items:stretch;gap:clamp(12px,2vw,28px);margin-top:clamp(48px,8vh,88px)}
 .terme{position:relative;padding:clamp(22px,3vw,36px)}
 .terme::before{
-  content:"";position:absolute;inset:0;border:1px solid rgba(236,232,224,.2);
+  content:"";position:absolute;inset:0;border:1px solid rgba(32,32,32,.2);
   clip-path:inset(0 100% 0 0);transition:clip-path 1.4s cubic-bezier(.55,.05,.25,1) var(--d,0s);
 }
 .vu .terme::before{clip-path:inset(0 0 0 0)}
-.terme.resultat::before{border-color:rgba(214,168,92,.7)}
+.terme.resultat::before{border-color:rgba(95,145,38,.7)}
 .terme .etiq{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--texte-faible)}
 .terme b{display:block;margin-top:14px;font-weight:200;font-size:clamp(30px,3.6vw,48px);line-height:1}
 .terme.resultat b{color:var(--or)}
@@ -153,9 +155,9 @@ footer a{text-decoration:none}
 footer a:hover{color:var(--or)}
 
 /* ---------- agrandissement d'une capture ---------- */
-.loupe{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,40px);background:rgba(5,5,5,.94);opacity:0;pointer-events:none;transition:opacity .4s ease;cursor:zoom-out}
+.loupe{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:clamp(12px,3vw,40px);background:rgba(244,245,242,.97);opacity:0;pointer-events:none;transition:opacity .4s ease;cursor:zoom-out}
 .loupe.ouverte{opacity:1;pointer-events:auto}
-.loupe img{max-width:100%;max-height:100%;object-fit:contain;border:1px solid rgba(236,232,224,.2)}
+.loupe img{max-width:100%;max-height:100%;object-fit:contain;border:1px solid rgba(32,32,32,.2)}
 .loupe .fermer{position:absolute;top:max(14px,env(safe-area-inset-top));right:var(--g);font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--texte-doux)}
 
 @media (max-width:860px){
@@ -171,12 +173,12 @@ footer a:hover{color:var(--or)}
   footer{flex-direction:column;align-items:center;text-align:center}
 }
 </style>
-<link rel="stylesheet" href="presentation/lecteur.css?v=1">
+<link rel="stylesheet" href="presentation/lecteur.css?v=2">
 </head>
 <body>
 
 <header class="barre">
-  <span>Planification</span>
+  <span class="marque"><img src="/planif/assets/logo-ab-marque.svg?v=1" alt="" width="34" height="32">Planification</span>
   <a class="ouvrir" href="/planif/">Ouvrir l'outil →</a>
 </header>
 
@@ -431,13 +433,13 @@ footer a:hover{color:var(--or)}
     // trame
     for (var l=0; l<=LIGNES; l++){
       var y = l/LIGNES, a = P(-1, y), b = P(1, y);
-      ctx.strokeStyle = "rgba(236,232,224," + (.10 + .14*(1-y))*entree + ")";
+      ctx.strokeStyle = "rgba(32,32,32," + (.10 + .14*(1-y))*entree + ")";
       ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
     }
     for (var c=0; c<=COLS; c++){
       var x = -1 + 2*(c - defile)/COLS; if (x < -1) continue;
       var a2 = P(x, 0), b2 = P(x, 1);
-      ctx.strokeStyle = "rgba(236,232,224," + .14*entree + ")";
+      ctx.strokeStyle = "rgba(32,32,32," + .14*entree + ")";
       ctx.beginPath(); ctx.moveTo(a2[0],a2[1]); ctx.lineTo(b2[0],b2[1]); ctx.stroke();
     }
     // cases : une barre verticale par personne et par semaine, hauteur = charge
@@ -453,8 +455,8 @@ footer a:hover{color:var(--or)}
         var h = q * H * .085 * (1 - y0*.5);
         var or = q > 1.12;
         var alpha = (.25 + .5*(1-y0)) * entree * apparition;
-        ctx.strokeStyle = or ? "rgba(214,168,92," + Math.min(.95, alpha*1.6) + ")" : "rgba(236,232,224," + alpha*.8 + ")";
-        ctx.fillStyle = or ? "rgba(214,168,92," + .16*alpha + ")" : "rgba(236,232,224," + .03*alpha + ")";
+        ctx.strokeStyle = or ? "rgba(95,145,38," + Math.min(.95, alpha*1.6) + ")" : "rgba(32,32,32," + alpha*.8 + ")";
+        ctx.fillStyle = or ? "rgba(95,145,38," + .16*alpha + ")" : "rgba(32,32,32," + .03*alpha + ")";
         ctx.beginPath();
         ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p0[0], p0[1]-h); ctx.lineTo(p1[0], p1[1]-h); ctx.lineTo(p1[0], p1[1]);
         ctx.fill(); ctx.stroke();
@@ -464,7 +466,7 @@ footer a:hover{color:var(--or)}
     var xa = -1 + 2*(3 - defile + .5)/COLS;
     if (xa > -1){
       var s0 = P(xa, -.02), s1 = P(xa, 1.02);
-      ctx.strokeStyle = "rgba(214,168,92," + .55*entree + ")";
+      ctx.strokeStyle = "rgba(95,145,38," + .55*entree + ")";
       ctx.setLineDash([3,5]); ctx.beginPath(); ctx.moveTo(s0[0],s0[1]); ctx.lineTo(s1[0],s1[1]); ctx.stroke(); ctx.setLineDash([]);
     }
   }
@@ -531,7 +533,7 @@ footer a:hover{color:var(--or)}
 })();
 </script>
 <script src="presentation/lecteur.js?v=2" defer></script>
-<script src="presentation/zoom-auto.js?v=1" defer></script>
+<script src="presentation/zoom-auto.js?v=2" defer></script>
 <script src="/assets/mesure.js?v=2" defer></script>
 </body>
 </html>
