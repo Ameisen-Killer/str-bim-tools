@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.10.0";
+  var VERSION = "2.11.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -505,7 +505,7 @@
     niveaux = Array.from(parNom, function(x){ return { nom: x[0], z: x[1] }; }).sort(function(a, b){ return a.z - b.z; });
     chargerModifs();
     sel = new Set(); actif = null;
-    clash = null; isoleRien = false; boutonRien();
+    clash = null; isoleRien = false; cacheRien = false; boutonRien();
     remplirNiveaux();
     $("#accueil").hidden = fichiers.length > 0;
     $("#outils").hidden = $("#cube").hidden = !fichiers.length;
@@ -544,6 +544,7 @@
     return RES.filter(function(r){
       if (stMasques.size && stMasques.has(classe(valeur(r, P_ST)))) return false;
       if (isoleRien && clash && !clash.rien.has(r.cle)) return false;
+      if (cacheRien && ditRien(r)) return false;
       if (n && r.niveau !== n) return false;
       if (s === "modif"){ if (!modifie(r)) return false; }
       else if (s === "attente"){ if (classe(valeur(r, P_ST)) !== "attente") return false; }
@@ -587,7 +588,7 @@
   $("#f-txt").addEventListener("input", filtreChange);
   $("#f-niv").addEventListener("change", function(){ nivAuto = ""; filtreChange(); });
   $("#f-st").addEventListener("change", filtreChange);
-  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; nivAuto = ""; isoleRien = false; boutonRien(); filtreChange(); });
+  $("#f-raz").addEventListener("click", function(){ $("#f-txt").value = ""; $("#f-niv").value = ""; $("#f-st").value = ""; nivAuto = ""; isoleRien = false; cacheRien = false; boutonRien(); legende(); filtreChange(); });
   $("#liste").addEventListener("click", function(e){
     var el = e.target.closest(".res");
     if (!el) return;
@@ -619,10 +620,22 @@
     RES.forEach(function(r){ var c = classe(valeur(r, P_ST)); tot[c] = (tot[c] || 0) + 1; if (!D || D.has(r.cle)) n[c] = (n[c] || 0) + 1; });
     $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return tot[c]; })
       .map(function(c){ return '<label title="Décocher pour masquer ce statut dans la liste et la vue 3D"><input type="checkbox" data-st="' + c + '"' + (stMasques.has(c) ? "" : " checked") + '><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + (D && stMasques.has(c) ? "" : " · " + (n[c] || 0)) + "</label>"; }).join("") +
-      (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "");
+      (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "") + ligneRien(D);
     $("#legende").hidden = false;
   }
+  // Coche « Ne traverse rien » (demande de Tony, 17.11.2026) : décochée, cache les réservations dont le commentaire de
+  // validation dit « Ne traverse rien » (commentaire mis par l'ingénieur, pas la géométrie : demande de Tony)
+  var cacheRien = false;
+  function ditRien(r){ return RIEN.test(valeur(r, P_COM)); }
+  function ligneRien(D){
+    if (!RES.length) return "";
+    var n = 0;
+    RES.forEach(function(r){ if (ditRien(r) && (!D || D.has(r.cle))) n++; });
+    if (!n && !cacheRien) return "";
+    return '<label class="l-rien" title="Décocher pour cacher les réservations dont le commentaire est « Ne traverse rien »"><input type="checkbox" data-rien' + (cacheRien ? "" : " checked") + '><i class="pastille s-rien"></i>« Ne traverse rien »' + (D && cacheRien ? "" : " · " + n) + "</label>";
+  }
   $("#legende").addEventListener("change", function(e){
+    if (e.target.hasAttribute && e.target.hasAttribute("data-rien")){ cacheRien = !e.target.checked; filtreChange(); return; }
     var c = e.target.getAttribute && e.target.getAttribute("data-st");
     if (!c) return;
     if (e.target.checked) stMasques.delete(c); else stMasques.add(c);
@@ -829,6 +842,7 @@
       var rien = new Set();
       x.traverse.forEach(function(h, cle){ if (!h.length) rien.add(cle); });
       clash = { traverse: x.traverse, rien: rien, ms: x.ms, nRes: res.length, nStr: str.length, sansGeo: RES.length - res.length };
+      legende();
       return clash;
     }, function(err){
       $("#chargement").hidden = true;
