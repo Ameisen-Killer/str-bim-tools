@@ -646,5 +646,20 @@
     }
   };
 
-  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj, avis: avis };
+  /* Réponse aux questions des visas : { code, texte, indice, envoye_le, modifie_le }, une par plan,
+     à pousser ensuite dans Kairnial */
+  var reponses = {
+    liste: function () { return litTout("visas_reponses", "code"); },
+    ecrit: function (code, texte, indice) {
+      return appel("/rest/v1/visas_reponses?on_conflict=code", {
+        methode: "POST", type: "application/json", prefer: "resolution=merge-duplicates,return=representation",
+        corps: JSON.stringify({ code: code, texte: String(texte).slice(0, 4000), indice: /^\d{1,3}$/.test(String(indice)) ? +indice : null, envoye_le: null })
+      }).then(json).then(function (l) { return l && l[0]; });
+    },
+    efface: function (code) {
+      return appel("/rest/v1/visas_reponses?code=eq." + encodeURIComponent(code), { methode: "DELETE", prefer: "return=minimal" });
+    }
+  };
+
+  global.Stock = { exports: exportsKairnial, traites: traites, notes: notes, plans: plansListe, pj: pj, avis: avis, reponses: reponses };
 })(window);

@@ -196,6 +196,10 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 .v-annot-zone textarea::placeholder{color:var(--texte-faible)}
 .v-note-etat{font-size:12px;color:var(--texte-faible);min-height:1.5em}
 .v-note-etat.erreur{color:var(--alerte)}
+.v-rep-zone label{color:var(--v-cours)}
+.v-rep-zone textarea{border-color:color-mix(in srgb,var(--v-cours) 45%,transparent)}
+.v-rep{margin-top:6px;padding-left:8px;border-left:2px solid var(--v-cours);font-size:13px;color:var(--texte-doux);white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.v-rep b{color:var(--v-cours);font-weight:600}
 .v-annot{margin-top:6px;padding-left:8px;border-left:2px solid var(--or);font-size:13px;color:var(--texte-doux);white-space:pre-line;overflow-wrap:anywhere;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .v-outils-liste{display:flex;flex-wrap:wrap;gap:8px}
@@ -344,6 +348,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         </div>
         <div class="cases" id="cases-annotes" hidden style="margin:14px 0 0"><label class="case" title="Ne montrer que les plans qui portent une annotation. Se combine avec les autres filtres."><input type="checkbox" id="f-annotes"> <span id="lib-annotes">Plans annotés seulement</span></label></div>
         <div class="v-lot" id="lot" hidden></div>
+        <div class="v-lot-note" id="lot-rep" hidden><textarea id="lot-rep-texte" maxlength="2000" placeholder="Réponse question écrite pour chaque plan affiché (ajoutée à la fin si le plan a déjà une réponse)"></textarea><button class="btn" type="button" id="lot-rep-ecrit">Répondre</button><button class="btn" type="button" id="lot-rep-annule">Annuler</button></div>
         <div class="v-lot-note" id="lot-note" hidden><textarea id="lot-texte" maxlength="2000" placeholder="Texte ajouté à la fin de l'annotation de chaque plan affiché (ex. : réponse commune, détail repris de l'étage 7…)"></textarea><button class="btn" type="button" id="lot-ecrit">Ajouter</button><button class="btn" type="button" id="lot-annule">Annuler</button></div>
         <input type="file" id="lot-pdf" accept=".pdf" multiple hidden>
         <div class="defile" style="margin-top:18px"><table class="liste" id="table-plans"></table></div>
@@ -366,7 +371,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div data-pied></div>
 <div id="v-bulle" role="tooltip" hidden></div>
 
-<script src="/fgh/vis/outil.js?v=11"></script>
+<script src="/fgh/vis/outil.js?v=12"></script>
 <script src="/fgh/vis/visas.js?v=10"></script>
 <script>
 (function () {
@@ -603,6 +608,90 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   });
   // Quitter la page avec une frappe pas encore partie : on l'envoie (au mieux)
   addEventListener("pagehide", function () { Object.keys(minuteurs).forEach(enregistreNote); });
+
+  /* ------------------------------------------------------------ réponse question
+     Une réponse par plan aux questions des visas, à pousser ensuite dans Kairnial
+     (visas_reponses). Même fonctionnement que l'annotation : enregistrée seule. */
+  var reponses = {}, reponsesOk = false, brouillonsR = {}, minuteursR = {};
+  function repDe(code) { var x = reponses[code]; return x ? x.texte : ""; }
+  function etatRep(code) {
+    var x = reponses[code]; if (!x) return "Le texte qui partira dans Kairnial. Enregistré automatiquement.";
+    var d = new Date(x.modifie_le), h = isNaN(d) ? "" : d.toLocaleDateString("fr-CH") + " à " + d.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" });
+    return (x.envoye_le ? "Envoyée dans Kairnial · " : "Pas encore envoyée dans Kairnial · ") + "modifiée le " + h + (x.indice !== null && x.indice !== undefined ? " (indice " + ind(x.indice) + ")" : "");
+  }
+  function chargeReponses() {
+    if (!S.reponses) return;
+    S.reponses.liste().then(function (l) {
+      reponses = {}; reponsesOk = true;
+      (l || []).forEach(function (x) { reponses[x.code] = x; });
+      if (donnees) rendListe();
+    }, function () {});
+  }
+  function zoneReponse(p) {
+    var code = p.code, id = "rep-" + code.replace(/[^A-Za-z0-9_-]/g, "_");
+    var texte = code in brouillonsR ? brouillonsR[code] : repDe(code);
+    return '<div class="v-annot-zone v-rep-zone"><label for="' + esc(id) + '">Réponse question</label>' +
+      '<textarea id="' + esc(id) + '" data-rep="' + esc(code) + '" data-indice="' + esc(p.doc.ind) + '" rows="3" maxlength="4000" placeholder="La réponse d\'AB aux questions et remarques des visas de ce plan : elle sera poussée dans Kairnial.">' + esc(texte) + "</textarea>" +
+      '<span class="v-note-etat" data-etat-rep="' + esc(code) + '" aria-live="polite">' + esc(etatRep(code)) + "</span></div>";
+  }
+  function apercuReponse(code) {
+    var t = repDe(code);
+    return t ? '<div class="v-rep" data-apercu-rep="' + esc(code) + '" title="' + esc(t) + '"><b>Réponse :</b> ' + esc(t) + "</div>" : "";
+  }
+  function montreRep(code, message, erreur) {
+    var tr = document.querySelector('tr.v-plan[data-code="' + CSS.escape(code) + '"]');
+    var cel = tr && tr.querySelector("td.v-lib");
+    if (cel) {
+      var a = cel.querySelector("[data-apercu-rep]"); if (a) a.remove();
+      if (repDe(code)) { var b = cel.querySelector("[data-apercu-note]"); if (b) b.insertAdjacentHTML("beforebegin", apercuReponse(code)); else cel.insertAdjacentHTML("beforeend", apercuReponse(code)); }
+    }
+    var e = document.querySelector('[data-etat-rep="' + CSS.escape(code) + '"]');
+    if (e) { e.textContent = message || etatRep(code); e.classList.toggle("erreur", !!erreur); }
+  }
+  function enregistreRep(code, indice) {
+    clearTimeout(minuteursR[code]); delete minuteursR[code];
+    if (!(code in brouillonsR)) return Promise.resolve();
+    var texte = brouillonsR[code], vide = !texte.trim();
+    if (texte === repDe(code) || (vide && !reponses[code])) { delete brouillonsR[code]; montreRep(code); return Promise.resolve(); }
+    montreRep(code, "Enregistrement…");
+    return (vide ? S.reponses.efface(code).then(function () { return null; }) : S.reponses.ecrit(code, texte, indice)).then(function (x) {
+      if (x) reponses[code] = x; else delete reponses[code];
+      if (brouillonsR[code] === texte) delete brouillonsR[code];
+      montreRep(code, x ? null : "Réponse effacée.");
+    }, function (e) {
+      montreRep(code, "Pas enregistrée : " + ((e && e.message) || "erreur inconnue.") + " Elle sera retentée à la prochaine frappe.", true);
+    });
+  }
+  $("table-plans").addEventListener("input", function (e) {
+    var z = e.target.closest("textarea[data-rep]"); if (!z) return;
+    var code = z.getAttribute("data-rep"), indice = z.getAttribute("data-indice");
+    brouillonsR[code] = z.value;
+    clearTimeout(minuteursR[code]);
+    minuteursR[code] = setTimeout(function () { enregistreRep(code, indice); }, 1000);
+    montreRep(code, "Modifiée…");
+  });
+  $("table-plans").addEventListener("focusout", function (e) {
+    var z = e.target.closest && e.target.closest("textarea[data-rep]");
+    if (z) enregistreRep(z.getAttribute("data-rep"), z.getAttribute("data-indice"));
+  });
+  addEventListener("pagehide", function () { Object.keys(minuteursR).forEach(function (c) { enregistreRep(c, null); }); });
+  $("lot-rep-annule").addEventListener("click", function () { $("lot-rep").hidden = true; });
+  $("lot-rep-ecrit").addEventListener("click", function () {
+    var t = $("lot-rep-texte").value.trim(); if (!t) return;
+    var l = LOT.slice(), r = { ok: 0, ko: 0 };
+    UI.confirme("Répondre à " + n(l.length) + " plans ?", "Cette réponse question est écrite pour chacun des " + n(l.length) + " plans affichés (ajoutée à la fin si un plan a déjà une réponse).", "Répondre").then(function (ok) {
+      if (!ok) return;
+      l.reduce(function (pr, p) {
+        return pr.then(function () {
+          var avant = repDe(p.code); if (avant.indexOf(t) >= 0) return;
+          return S.reponses.ecrit(p.code, (avant ? avant + "\n" : "") + t, p.doc.ind).then(function (x) { reponses[p.code] = x; r.ok++; }, function () { r.ko++; });
+        });
+      }, Promise.resolve()).then(function () {
+        $("lot-rep").hidden = true; $("lot-rep-texte").value = ""; rendListe();
+        UI.toast(n(r.ok) + " réponse" + (r.ok > 1 ? "s" : "") + " écrite" + (r.ok > 1 ? "s" : "") + (r.ko ? ", " + r.ko + " en échec" : "") + ".");
+      });
+    });
+  });
 
   function chargeListe() {
     return S.exports.disponible().then(function (ok) {
@@ -1194,8 +1283,8 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 
   function rendListe() {
     // La zone d'annotation en cours de frappe est redessinée : on lui rend le curseur
-    var actif = document.activeElement, enCours = actif && actif.matches && actif.matches("textarea[data-note]")
-      ? { code: actif.getAttribute("data-note"), debut: actif.selectionStart, fin: actif.selectionEnd, haut: actif.scrollTop } : null;
+    var actif = document.activeElement, enCours = actif && actif.matches && actif.matches("textarea[data-note], textarea[data-rep]")
+      ? { attr: actif.hasAttribute("data-rep") ? "data-rep" : "data-note", code: actif.getAttribute(actif.hasAttribute("data-rep") ? "data-rep" : "data-note"), debut: actif.selectionStart, fin: actif.selectionEnd, haut: actif.scrollTop } : null;
     menuVisas(); menuTraite(); menuBloque(); dessineRemarques();
     $("outils-liste").hidden = !traitesOk;
     $("intro-traites").hidden = !traitesOk;
@@ -1211,12 +1300,12 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
         return '<tr class="v-plan' + (t ? " v-fait" : "") + '" tabindex="0" data-code="' + esc(p.code) + '" aria-expanded="' + ouvert + '">' + caseT + '<td class="mono" title="' + esc(p.code) + '">' + esc(court(p.code)) +
           '</td><td class="n">' + ind(d.ind) + '</td><td class="v-lib"><div class="principal">' + esc(d.lib) + '</div><div class="secondaire">' + esc(d.circuit) + (p.remplacePar ? " · remplacé par " + esc(court(p.remplacePar)) : "") +
           (p.remplace && !etat.dernierSeul ? " · remplace " + p.remplace.map(court).map(esc).join(", ") : "") + (t ? ' · <span class="v-traite-txt">' + esc(texteTraite(t)) + "</span>" : "") + (!t && textePiste(p.code) ? ' · <span class="v-piste">' + esc(textePiste(p.code)) + "</span>" : "") +
-          (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
+          (plusRecent(d) ? ' · <a class="v-recent" href="' + lienPln(p.code) + '" title="Ouvrir dans la liste des plans">ind. ' + ind(plnDe(d).ind) + " dans la liste des plans" + (plnDe(d).date ? " (" + datePln(plnDe(d).date) + ")" : "") + "</a>" : "") + "</div>" + apercuReponse(p.code) + apercuNote(p.code) + "</td><td>" + pastille(p.statut) +
           "</td><td>" + visasCourts(d) + '</td><td class="v-auteur">' + (d.auteur ? esc(d.auteur) : '<span class="v-faible">—</span>') + '</td><td class="n">' + date(d.dep) + "</td></tr>" +
-          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + blocPj(p.code) + blocAvis(p) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
+          (ouvert ? '<tr class="v-detail"><td colspan="' + nc + '">' + blocPiste(p.code) + blocPj(p.code) + blocAvis(p) + '<p class="v-lien-pln"><a href="' + lienPln(p.code) + '">Ouvrir ce plan dans la liste des plans →</a><a class="v-kairnial" href="' + KAIRNIAL + '" target="_blank" rel="noopener" data-kairnial="' + esc(p.code) + '" title="Copie le n° du plan et ouvre la GED Kairnial : colle-le dans la recherche (Ctrl+V)">Chercher dans Kairnial ↗</a></p>' + (reponsesOk ? zoneReponse(p) : "") + (notesOk ? zoneNote(p.code) : "") + historique(p) + "</td></tr>" : "");
       }).join("") : '<tr><td colspan="' + nc + '" class="vide">Aucun plan ne correspond</td></tr>') + "</tbody>");
     if (enCours) {
-      var z = document.querySelector('textarea[data-note="' + CSS.escape(enCours.code) + '"]');
+      var z = document.querySelector("textarea[" + enCours.attr + '="' + CSS.escape(enCours.code) + '"]');
       if (z) { z.focus({ preventScroll: true }); z.setSelectionRange(enCours.debut, enCours.fin); z.scrollTop = enCours.haut; }
     }
     var reste = l.length - vis.length;
@@ -1354,10 +1443,11 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   function rendLot(l) {
     LOT = l;
     var b = $("lot"); b.hidden = !l.length;
-    if (!l.length) { $("lot-note").hidden = true; return; }
+    if (!l.length) { $("lot-note").hidden = true; $("lot-rep").hidden = true; return; }
     var nT = l.filter(function (p) { return !traiteDe(p); }).length;
     b.innerHTML = "<span>" + n(l.length) + " plan" + (l.length > 1 ? "s" : "") + " affiché" + (l.length > 1 ? "s" : "") + " :</span>" +
       (traitesOk && nT ? '<button class="btn" type="button" data-lot="coche" title="Marque traités tous les plans affichés pas encore cochés">Cocher traités (' + n(nT) + ")</button>" : "") +
+      (reponsesOk ? '<button class="btn" type="button" data-lot="rep" title="Écrit la même réponse question à chaque plan affiché">Répondre ensemble</button>' : "") +
       (notesOk ? '<button class="btn" type="button" data-lot="note" title="Ajoute le même texte à l\'annotation de chaque plan affiché">Annoter ensemble</button>' : "") +
       '<button class="btn" type="button" data-lot="tableau" title="Tableau Plan / Remarques / Réponse AB des plans affichés, pour Excel">Tableau de réponses</button>' +
       (notesOk ? '<button class="btn" type="button" data-lot="pdf" title="Choisis (ou glisse sur la liste) les PDF « -reponse » téléchargés de Kairnial : leurs annotations vont dans l\'annotation du plan">Lire des PDF de réponse</button>' : "");
@@ -1366,6 +1456,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     var b = e.target.closest("button[data-lot]"); if (!b) return;
     var k = b.getAttribute("data-lot");
     if (k === "coche") cocheLot();
+    else if (k === "rep") { $("lot-rep").hidden = false; $("lot-rep-texte").focus(); }
     else if (k === "note") { $("lot-note").hidden = false; $("lot-texte").focus(); }
     else if (k === "tableau") tableauReponses();
     else if (k === "pdf") $("lot-pdf").click();
@@ -1409,13 +1500,13 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   }
   function tableauReponses() {
     var cel = function (t) { t = String(t == null ? "" : t).replace(/\r?\n/g, " / "); return /[";]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
-    var lignes = [["Plan", "Indice", "Libellé", "Statut", "Refusé par", "Piste", "Remarques des intervenants", "Annotation", "Réponse AB"]];
+    var lignes = [["Plan", "Indice", "Libellé", "Statut", "Refusé par", "Piste", "Remarques des intervenants", "Annotation", "Réponse question"]];
     LOT.forEach(function (p) {
       var d = p.doc, o = PISTES[p.code] || { par: [] }, c = clesDe(d) || {};
       lignes.push([p.code, ind(d.ind), d.lib, (V.STATUTS.filter(function (s) { return s.id === p.statut; })[0] || {}).nom || p.statut, o.par.join(", "),
         NOMS_PISTES.filter(function (x) { return c[x[0]]; }).map(function (x) { return x[1]; }).join(", "),
         d.visas.filter(function (v) { return v.com; }).map(function (v) { return v.qui + " (" + (v.code || "") + ") : " + String(v.com).trim(); }).join(" || "),
-        noteDe(p.code), ""]);
+        noteDe(p.code), repDe(p.code)]);
     });
     var csv = "\ufeff" + lignes.map(function (l) { return l.map(cel).join(";"); }).join("\r\n");
     var a = document.createElement("a"), url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -1733,11 +1824,13 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     chargeNotes();
     chargePj();
     chargeAvis();
+    chargeReponses();
   });
   chargeTraites();
   chargeNotes();
   chargePj();
   chargeAvis();
+  chargeReponses();
   chargePln();
   chargeListe().then(function (l) {
     var i = retenu(), x = l.filter(function (e) { return e.id === i; })[0] || l[0];
