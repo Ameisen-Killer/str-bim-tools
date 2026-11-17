@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.11.0";
+  var VERSION = "2.11.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -928,7 +928,7 @@
   // sans fichier branché, la page ne fait que montrer : le fichier est la seule mémoire des décisions
   function bandeauRO(){
     if (FS.actif) return "";
-    var b = !FS.ok ? "" : FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + "</button>" :
+    var b = !FS.ok ? "" : FS.h ? '<button type="button" class="bt prim" data-m="fs-reprendre">Reprendre ' + esc(FS.nom) + '</button><button type="button" class="bt" data-m="fs-ouvrir">Ouvrir un autre JSON…</button>' :
       '<button type="button" class="bt prim" data-m="fs-ouvrir">Ouvrir un JSON…</button><button type="button" class="bt prim" data-m="fs-nouveau">Créer un nouveau JSON…</button>';
     return '<div class="ro"><b>Lecture seule</b> · ' + (FS.ok ? "ouvre le JSON de validation, ou crée-le, pour décider." : "ce navigateur ne sait pas écrire dans un fichier : ouvre la page dans Chrome ou Edge pour décider.") +
       (b ? '<div class="actions">' + b + "</div>" : "") + "</div>";
@@ -1212,7 +1212,7 @@
     var e = $("#json-etat"); if (!e) return;
     e.classList.toggle("on", on);
     e.textContent = on ? FS.nom : "Aucun JSON connecté";
-    e.title = on ? "Fichier JSON connecté : " + FS.nom : "Aucun fichier JSON connecté : la page est en lecture seule";
+    e.title = on ? "Fichier JSON connecté : " + FS.nom : "Aucun fichier JSON connecté : la page est en lecture seule. Clic : ouvrir un JSON";
   }
   setInterval(majJson, 500);
   var FS = { ok: typeof window.showSaveFilePicker === "function", h: null, actif: false, nom: "", maquette: "", quand: null, err: "", minut: 0, lu: 0, nonEcrit: false, remplacees: [], ecriture: 0, branche: 0 };
@@ -1438,10 +1438,29 @@
       if (o === "modifs") renduModifs();
     });
   });
-  function choisirFichiers(){ $("#fichier").click(); }
+  // « Ouvrir » prend les IFC et le JSON de validation ensemble ou séparément (17.11.2026 : un JSON choisi ici était
+  // refusé, seul « Ouvrir un JSON… » de l'onglet Modifications le prenait). Chrome / Edge : le JSON se branche en
+  // écriture, comme avec « Ouvrir un JSON… » ; ailleurs il est lu sans y écrire.
+  var TYPES_OUVRIR = [{ description: "IFC et JSON de validation", accept: { "application/octet-stream": [".ifc"], "application/json": [".json"] } }];
+  function choisirFichiers(){
+    if (typeof window.showOpenFilePicker !== "function"){ $("#fichier").click(); return; }
+    window.showOpenFilePicker({ multiple: true, types: TYPES_OUVRIR }).then(function(hs){
+      var js = hs.filter(function(h){ return /\.json$/i.test(h.name); }), ifcs = hs.filter(function(h){ return /\.ifc$/i.test(h.name); });
+      if (js.length) enBranchement(fsAutoriser(js[0])).catch(fsErreur);
+      if (ifcs.length) Promise.all(ifcs.map(function(h){ return h.getFile(); })).then(function(fs){ ouvrir(fs); }).catch(fsErreur);
+      if (!js.length && !ifcs.length) etat("Choisis des fichiers .ifc ou un JSON de validation.");
+    }).catch(fsErreur);
+  }
   $("#btn-ouvrir").addEventListener("click", choisirFichiers);
   $("#btn-ouvrir2").addEventListener("click", choisirFichiers);
-  $("#fichier").addEventListener("change", function(){ ouvrir(this.files); this.value = ""; });
+  $("#fichier").addEventListener("change", function(){
+    var fs = Array.prototype.slice.call(this.files || []), js = fs.filter(function(f){ return /\.json$/i.test(f.name); }), ifcs = fs.filter(function(f){ return /\.ifc$/i.test(f.name); });
+    var lire = js.length ? function(){ js.forEach(lireJson); } : null;
+    if (ifcs.length) ouvrir(ifcs, lire); else if (lire) lire(); else etat("Choisis des fichiers .ifc ou un JSON de validation.");
+    this.value = "";
+  });
+  // « Aucun JSON connecté » en haut : un clic ouvre le JSON de validation
+  $("#json-etat").addEventListener("click", function(){ if (!FS.actif) fsOuvrir(); });
   var centre = $("#centre");
   ["dragenter", "dragover"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); centre.classList.add("survol"); }); });
   ["dragleave", "drop"].forEach(function(t){ document.addEventListener(t, function(e){ e.preventDefault(); if (t === "drop" || !e.relatedTarget) centre.classList.remove("survol"); }); });

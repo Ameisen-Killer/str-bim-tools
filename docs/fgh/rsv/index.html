@@ -110,6 +110,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .barre .esp{flex:1}
 .barre .json{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:40vw;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rouge)}
 .barre .json::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:currentColor}
+.barre .json:not(.on){cursor:pointer}
 .barre .json.on{color:var(--vert)}
 @media (max-width:760px){.barre .json{max-width:30vw}}
 .barre .sig{color:var(--texte-faible)}
@@ -339,7 +340,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
   <span class="json" id="json-etat">Aucun JSON connecté</span>
   <span class="esp"></span>
   <span class="sig">Tony VARIN</span>
-  <button type="button" id="btn-ouvrir" title="Ouvrir des IFC"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
+  <button type="button" id="btn-ouvrir" title="Ouvrir des IFC et, si tu veux, le JSON de validation"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
   <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
 </header>
 
@@ -431,12 +432,12 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 
   <aside class="panneau fiche vide" id="fiche"><div class="vide-fiche">Clique une réservation dans la liste ou dans la vue 3D. Ctrl + clic pour en choisir plusieurs.</div></aside>
 </div>
-<input type="file" id="fichier" accept=".ifc" multiple hidden>
+<input type="file" id="fichier" accept=".ifc,.json" multiple hidden>
 
 <script src="/fgh/rsv/fgh-core.js?v=3"></script>
 <script src="/fgh/rsv/fgh-vue.js?v=22"></script>
 <script src="/fgh/rsv/fgh-clash.js?v=1"></script>
 <script src="/fgh/rsv/fgh-cube.js?v=5"></script>
-<script src="/fgh/rsv/fgh-app.js?v=43"></script>
+<script src="/fgh/rsv/fgh-app.js?v=44"></script>
 </body>
 </html>
