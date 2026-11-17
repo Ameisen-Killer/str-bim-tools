@@ -367,7 +367,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
 <div id="v-bulle" role="tooltip" hidden></div>
 
 <script src="/fgh/vis/outil.js?v=11"></script>
-<script src="/fgh/vis/visas.js?v=9"></script>
+<script src="/fgh/vis/visas.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -396,7 +396,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   var COULEUR = { bon: "var(--v-bon)", obs: "var(--v-obs)", cours: "var(--v-cours)", mauvais: "var(--v-mauvais)", neutre: "var(--v-neutre)" };
   var GROUPES = [
     { id: "bon", nom: "Validé (VSO)", statuts: ["valide"] },
-    { id: "obs", nom: "Validé avec observations (VAO)", statuts: ["valide_obs"] },
+    { id: "obs", nom: "Avec observations (VAO, OBS)", statuts: ["valide_obs", "observations"] },
     { id: "cours", nom: "En cours de visa", statuts: ["attente", "sas_cours"] },
     { id: "mauvais", nom: "Refusé ou rejeté", statuts: ["reprendre", "sas_rejet"] },
     { id: "neutre", nom: "Autre", statuts: ["autre"] }
@@ -951,7 +951,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* Bandeau de gauche, comme la liste des plans : les zones, puis les étages de la
      zone choisie. Comptés avec les autres filtres (circuit, type, personne) ; la
      pastille rouge compte les plans à reprendre pas encore traités. */
-  function aReprendre(p) { return (p.statut === "reprendre" || p.statut === "sas_rejet") && !traiteDe(p); }
+  function aReprendre(p) { return V.A_REPRENDRE.indexOf(p.statut) >= 0 && !traiteDe(p); }
   function dessineZones() {
     if (!donnees) return;
     var Z = {}, tous = 0, tousRouge = 0;
@@ -1026,20 +1026,20 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* Ce qui demande une action, en trois cases : à reprendre, en attente, validés.
      Une case cliquée filtre la liste des plans ; un second clic retire le filtre. */
   var CASES = [
-    { id: "mauvais", lib: "À reprendre", statuts: ["reprendre", "sas_rejet"] },
+    { id: "mauvais", lib: "À reprendre", statuts: ["reprendre", "sas_rejet", "valide_obs", "observations"] },
     { id: "cours", lib: "En attente de visa", statuts: ["attente", "sas_cours"] },
-    { id: "bon", lib: "Validés", statuts: ["valide", "valide_obs"] }
+    { id: "bon", lib: "Validés sans observation", statuts: ["valide"] }
   ];
   function rendTuiles() {
-    var ref = compte("reprendre"), rej = compte("sas_rejet");
-    var restant = traitesOk ? R.plans.filter(function (p) { return (p.statut === "reprendre" || p.statut === "sas_rejet") && !traiteDe(p); }).length : null;
+    var ref = compte("reprendre"), rej = compte("sas_rejet"), vao = compte("valide_obs"), obs = compte("observations");
+    var restant = traitesOk ? R.plans.filter(aReprendre).length : null;
     var retard = R.plans.filter(function (p) {
       return (p.statut === "attente" || p.statut === "sas_cours") && p.doc.visas.some(function (v) { return v.etat === "attente" && v.cpt < 0; });
     }).length;
     var detail = {
-      mauvais: !(ref + rej) ? "rien à reprendre" : (restant === null ? "" : restant ? n(restant) + " pas encore traités · " : "tous traités · ") + n(ref) + " refusés MO, " + n(rej) + " rejetés SAS",
+      mauvais: !(ref + rej + vao + obs) ? "rien à reprendre" : (restant === null ? "" : restant ? n(restant) + " pas encore traités · " : "tous traités · ") + n(ref) + " refusés MO, " + n(rej) + " rejetés SAS, " + n(vao) + " VAO, " + n(obs) + " OBS",
       cours: retard ? n(retard) + " avec un visa en retard" : "aucun visa en retard",
-      bon: n(compte("valide")) + " VSO, " + n(compte("valide_obs")) + " VAO"
+      bon: n(compte("valide")) + " VSO sans OBS"
     };
     var choisis = Object.keys(etat.statuts);
     $("tuiles").innerHTML = CASES.map(function (c) {
@@ -1069,7 +1069,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     PREFIXE = p.length ? p.join("-") + "-" : "";
   }
   function court(c) { return PREFIXE && c.indexOf(PREFIXE) === 0 ? c.slice(PREFIXE.length) : c; }
-  var ORDRE = { reprendre: 0, sas_rejet: 1, attente: 2, sas_cours: 3, valide_obs: 4, valide: 5, autre: 6 };
+  var ORDRE = { reprendre: 0, sas_rejet: 1, valide_obs: 2, observations: 3, attente: 4, sas_cours: 5, valide: 6, autre: 7 };
 
   /* Filtre « Visa reçu » : un intervenant et ce qu'il a répondu sur le dernier indice
      du plan — un code rendu (BURCKHARDT · REF), ou un visa encore attendu, dans le

@@ -444,7 +444,7 @@
     D.plans = D.codes.map(function (c) {
       var l = parCode[c].slice().sort(function (a, b) { return a.ind - b.ind || (a.dep || 0) - (b.dep || 0); });
       var d = l[l.length - 1];
-      var p = { code: c, doc: d, versions: l, statut: statutDe(d) };
+      var p = { code: c, doc: d, versions: l, statut: avecObs(d, statutDe(d)) };
       p.premierDepot = Math.min.apply(null, l.map(function (x) { return x.dep || Infinity; }));
       return p;
     });
@@ -492,6 +492,7 @@
   var STATUTS = [
     { id: "valide", nom: "Validé par le MO (VSO)", groupe: "bon" },
     { id: "valide_obs", nom: "Validé avec observations (VAO)", groupe: "obs" },
+    { id: "observations", nom: "Observations d'un intervenant (OBS)", groupe: "obs" },
     { id: "attente", nom: "En attente du MO", groupe: "cours" },
     { id: "sas_cours", nom: "En cours au SAS", groupe: "cours" },
     { id: "reprendre", nom: "Refusé par le MO (REF, R&R)", groupe: "mauvais" },
@@ -501,6 +502,11 @@
 
   /* Le circuit fixe la règle : là où le MO vise, son visa décide ; dans un circuit
      à Doc Control (le « SAS »), le Doc Control puis les autres ; ailleurs, tous les visas. */
+  /* Un OBS rendu au dernier indice demande de reprendre le plan, même visé VSO ou encore en circuit */
+  function avecObs(d, s) {
+    if (s === "reprendre" || s === "sas_rejet" || s === "valide_obs") return s;
+    return d.visas.some(function (v) { return v.etat === "rendu" && v.code === "OBS"; }) ? "observations" : s;
+  }
   function statutDe(d) {
     var inters = d.visas;
     if (d.circ.inters.indexOf("MO") >= 0) {
@@ -742,9 +748,10 @@
     [/cartouche|lid|nomenclature/, "Cartouche à corriger", "Corriger le cartouche selon la remarque"]
   ];
   var RENVOI = /annexe|annot|piece jointe|^\s*(cf|voir)\b|commentaires? (dans|en|joint)/;
+  var A_REPRENDRE = ["reprendre", "sas_rejet", "valide_obs", "observations"];
   function pistes(D) {
     var ed = D.edition || 0, P = {}, A = D.plans.filter(function (p) {
-      return !p.renumerote && !p.doc.depasse && (p.statut === "reprendre" || p.statut === "sas_rejet");
+      return !p.renumerote && !p.doc.depasse && A_REPRENDRE.indexOf(p.statut) >= 0;
     });
     var seg = function (p) { return String(p.code).split("-"); };
     var fam = function (p) { var s = seg(p); return s[4] + "-" + s[7]; };
@@ -831,7 +838,7 @@
       (/annexe|ci.?joint|\bjoints?\b|\bpj\b|piece jointe|notes sur le plan|commentaires? du mo\b|voir (les )?notes|voir annotations/.test(t) || /prendre en compte no(s|us) (commentaires?|annotations?)/.test(t));
   }
 
-  global.Visas = { avis: avis, renvoiSeul: renvoiSeul, lire: lire, parse: parse, inflate: inflate, analyse: analyse, pistes: pistes, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
+  global.Visas = { avis: avis, renvoiSeul: renvoiSeul, lire: lire, parse: parse, inflate: inflate, analyse: analyse, pistes: pistes, A_REPRENDRE: A_REPRENDRE, famille: famille, STATUTS: STATUTS, serialVersDate: serialVersDate,
     SANS_NOM: SANS_NOM, auteurDe: auteurDe, annote: annote };
   if (typeof module !== "undefined" && module.exports) module.exports = global.Visas;
 })(typeof window !== "undefined" ? window : globalThis);
