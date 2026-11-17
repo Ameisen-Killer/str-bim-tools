@@ -354,7 +354,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
             </select>
           </div>
         </div>
-        <div class="cases" id="cases-annotes" hidden style="margin:14px 0 0"><label class="case" title="Ne montrer que les plans qui portent une annotation. Se combine avec les autres filtres."><input type="checkbox" id="f-annotes"> <span id="lib-annotes">Plans annotés seulement</span></label></div>
+        <div class="cases" id="cases-annotes" hidden style="margin:14px 0 0"><label class="case" title="Ne montrer que les plans qui portent une annotation. Se combine avec les autres filtres."><input type="checkbox" id="f-annotes"> <span id="lib-annotes">Plans annotés seulement</span></label><label class="case" id="case-sans-qui" title="Masque les plans qui ont déjà quelqu'un pour les reprendre, ou la mention « Pas de reprise nécessaire ». Se combine avec les autres filtres."><input type="checkbox" id="f-sans-qui"> <span id="lib-sans-qui">Masquer les plans attribués</span></label></div>
         <div class="v-lot" id="lot" hidden></div>
         <div class="v-lot-note" id="lot-rep" hidden><textarea id="lot-rep-texte" maxlength="2000" placeholder="Réponse question écrite pour chaque plan affiché (ajoutée à la fin si le plan a déjà une réponse)"></textarea><button class="btn" type="button" id="lot-rep-ecrit">Répondre</button><button class="btn" type="button" id="lot-rep-annule">Annuler</button></div>
         <div class="v-lot-note" id="lot-note" hidden><textarea id="lot-texte" maxlength="2000" placeholder="Texte ajouté à la fin de l'annotation de chaque plan affiché (ex. : réponse commune, détail repris de l'étage 7…)"></textarea><button class="btn" type="button" id="lot-ecrit">Ajouter</button><button class="btn" type="button" id="lot-annule">Annuler</button></div>
@@ -743,7 +743,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     if (!quiOk) { z.value = avant; UI.toast("Connecte-toi pour attribuer les plans."); return; }
     if (q) QUI[code] = q; else delete QUI[code];
     z.classList.toggle("pris", !!q); z.classList.toggle("aucune", q === SANS_REPRISE);
-    menuQui();
+    menuQui(); menuTraite();
     (q ? S.attributions.ecrit(code, q) : S.attributions.efface(code)).then(function () {
       UI.toast(court(code) + (q ? " : à reprendre par " + q + "." : " : attribution retirée."));
     }, function (e) {
@@ -1269,8 +1269,11 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   } catch (e) {}
   function menuTraite() {
     $("champ-traite").hidden = !traitesOk;
-    $("cases-annotes").hidden = !notesOk;
+    $("cases-annotes").hidden = !notesOk && !quiOk;
+    $("f-annotes").parentNode.hidden = !notesOk;
     if (!R) return;
+    var nQ = R.plans.filter(function (p) { return quiDe(p.code); }).length;
+    $("lib-sans-qui").textContent = "Masquer les plans attribués · " + n(nQ);
     var annotes = R.plans.filter(function (p) { return !!noteDe(p.code); }).length;
     $("f-annotes").checked = !!etat.annotes;
     $("lib-annotes").textContent = "Plans annotés seulement · " + n(annotes);
@@ -1283,6 +1286,13 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   $("f-traite").addEventListener("change", function () {
     etat.traite = this.value; etat.limite = 60; etat.ouvert = null;
     try { localStorage.setItem(CLE_TRAITE, etat.traite); } catch (e) {}
+    rendListe();
+  });
+  try { etat.sansQui = localStorage.getItem("visas.sansQui") === "1"; } catch (e) {}
+  $("f-sans-qui").checked = !!etat.sansQui;
+  $("f-sans-qui").addEventListener("change", function () {
+    etat.sansQui = this.checked; etat.limite = 60; etat.ouvert = null;
+    try { localStorage.setItem("visas.sansQui", etat.sansQui ? "1" : "0"); } catch (e) {}
     rendListe();
   });
   $("f-annotes").addEventListener("change", function () {
@@ -1336,6 +1346,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
       if (etat.remarque && remarquesDe(p).indexOf(etat.remarque) < 0) return false;
       if (etat.avisPlan && !avisPlanOk(p)) return false;
       if (etat.qui && (etat.qui === "-" ? quiDe(p.code) : quiDe(p.code) !== etat.qui)) return false;
+      if (etat.sansQui && quiDe(p.code)) return false;
       if (etat.bloque && !(PISTES[p.code] && PISTES[p.code].par.indexOf(etat.bloque) >= 0)) return false;
       if (notesOk && etat.annotes && !noteDe(p.code)) return false;
       if (traitesOk && etat.traite !== "tous" && !traiteDe(p) === (etat.traite === "traites")) return false;
