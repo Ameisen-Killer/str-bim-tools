@@ -185,8 +185,8 @@ footer a:hover{color:var(--or)}
 </header>
 
 <div data-lecture="0" class="hero wrap" id="haut">
-  <img class="logo-hero rv" style="--d:.1s" src="/planif/assets/logo-ab-horizontal.svg?v=1" alt="AB Ingénieurs civils, géotechnique, environnement" width="4200" height="1422">
-  <div class="hero-scene"><canvas id="scene" role="img" aria-label="Une carte de charge en fil de fer : des semaines qui défilent, des cases qui se remplissent"></canvas></div>
+  <img class="logo-hero rv" style="--d:.1s" src="/planif/assets/logo-ab-marque.svg?v=1" alt="AB" width="1492" height="1418">
+  <div class="hero-scene"><canvas id="scene" role="img" aria-label="Le logo AB en volume, dessiné en fil de fer, qui tourne lentement"></canvas></div>
   <div class="hero-texte">
     <div class="surtitre rv" style="--d:.3s">Présentation au bureau</div>
     <h1 class="rv" style="--d:.5s">Le planificateur</h1>
@@ -399,9 +399,11 @@ footer a:hover{color:var(--or)}
   function ease(p){return p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2}
 
   // =====================================================================
-  //  Ouverture : une carte de charge en fil de fer, vue en perspective.
-  //  Les semaines défilent, les cases se remplissent ; une sur quelques-unes
-  //  s'allume en or (la surcharge qu'on repère à temps).
+  //  Ouverture : le logo AB en volume, en fil de fer, qui tourne lentement.
+  //  Le pavé (vert en haut, bande grise en bas) est extrudé ; les lettres A et B
+  //  ressortent de la face avant. Les arêtes se tracent à l'arrivée, un plan
+  //  de lecture vert balaie le volume, un sol en cercles reçoit son reflet.
+  //  On peut le faire tourner à la souris ou au doigt.
   // =====================================================================
   var cv = document.getElementById("scene"), ctx = cv.getContext("2d");
   var W=0, H=0, dpr=1;
@@ -412,65 +414,147 @@ footer a:hover{color:var(--or)}
   }
   window.addEventListener("resize", taille); taille();
 
-  var LIGNES = 9, COLS = 14;
-  function rnd(i){ var x = Math.sin(i*127.1+311.7)*43758.5453; return x-Math.floor(x) }
-  // charge d'une case (0 à 1,3) : varie doucement avec le temps
-  function charge(l, c, T){
-    var b = rnd(l*31 + c*7);
-    return clamp(.25 + .7*b + .25*Math.sin(T*.35 + l*1.3 + c*.6)) * 1.3;
+  // --- géométrie, relevée sur logo-ab-marque.svg (unités du fichier, y vers le bas)
+  var CX = 752.47, CY = 711.08, U = 1418.23;
+  var X0 = 6.62, X1 = 1498.32, Y0 = 1.97, Y1 = 1420.2, YB = 1040.9;   // pavé et bande grise
+  var PROF = 300, RELIEF = 70;                                          // épaisseur du pavé, relief des lettres
+  function arc(cx, cy, r, a0, a1, n){
+    var p = [];
+    for (var i=0;i<=n;i++){ var a = a0 + (a1-a0)*i/n; p.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]); }
+    return p;
   }
+  var D2R = Math.PI/180;
+  var lettreA = [[379.04,733.3],[491.52,733.3],[730.2,1269.8],[607.91,1269.8],[434.68,844.11],[258.75,1269.8],[163.42,1269.8]];
+  var lettreB = [[800.1,733.3],[1159.76,733.3]]
+    .concat(arc(1159.76,887.66,154.36,-90*D2R,47.7*D2R,14).slice(1))
+    .concat(arc(1159.16,1115.47,154.33,-47.4*D2R,90*D2R,14).slice(1))
+    .concat([[800.1,1269.8]]);
+  var trou1 = [[908,814.34],[1125.27,814.34]].concat(arc(1125.27,888.98,74.64,-90*D2R,90*D2R,12).slice(1)).concat([[908,963.62]]);
+  var trou2 = [[908,1040.45],[1123.81,1040.45]].concat(arc(1123.81,1114.97,74.52,-90*D2R,90*D2R,12).slice(1)).concat([[908,1189.49]]);
+
+  // arêtes : [x1,y1,z1, x2,y2,z2, genre]  genre : 0 pavé, 1 bande, 2 lettre
+  var aretes = [];
+  function A3(a, b, g){ aretes.push([a[0],a[1],a[2], b[0],b[1],b[2], g]); }
+  var zf = PROF/2, zb = -PROF/2;
+  [[X0,Y0],[X1,Y0],[X1,Y1],[X0,Y1]].forEach(function(p, i, t){
+    var q = t[(i+1)%4];
+    A3([p[0],p[1],zf],[q[0],q[1],zf],0); A3([p[0],p[1],zb],[q[0],q[1],zb],0); A3([p[0],p[1],zf],[p[0],p[1],zb],0);
+  });
+  // la ligne entre le vert et le gris, tout autour
+  A3([X0,YB,zf],[X1,YB,zf],1); A3([X0,YB,zb],[X1,YB,zb],1); A3([X0,YB,zf],[X0,YB,zb],1); A3([X1,YB,zf],[X1,YB,zb],1);
+  // lettres : contour avant, contour arrière (sur la face), et les angles reliés
+  [lettreA, lettreB, trou1, trou2].forEach(function(c){
+    var n = c.length;
+    for (var i=0;i<n;i++){
+      var p = c[i], q = c[(i+1)%n];
+      A3([p[0],p[1],zf+RELIEF],[q[0],q[1],zf+RELIEF],2);
+      A3([p[0],p[1],zf],[q[0],q[1],zf],2);
+      if (n < 10 || i % 4 === 0 || i === 1) A3([p[0],p[1],zf],[p[0],p[1],zf+RELIEF],2);
+    }
+  });
+  var NA = aretes.length;
+
+  // faces avant teintées : le vert et le gris de la marque, très légers
+  var faceVert = [[X0,Y0,zf],[X1,Y0,zf],[X1,YB,zf],[X0,YB,zf]];
+  var faceGris = [[X0,YB,zf],[X1,YB,zf],[X1,Y1,zf],[X0,Y1,zf]];
+
+  function clampN(x){return x<0?0:x>1?1:x}
+  var tourne = 0, tirage = null, elan = 0;
+  cv.style.touchAction = "pan-y"; cv.style.cursor = "grab";
+  cv.addEventListener("pointerdown", function(e){ tirage = e.clientX; elan = 0; cv.style.cursor = "grabbing"; });
+  window.addEventListener("pointermove", function(e){ if (tirage === null) return; var d = (e.clientX - tirage) * .008; tourne += d; elan = d; tirage = e.clientX; });
+  window.addEventListener("pointerup", function(){ tirage = null; cv.style.cursor = "grab"; });
 
   function dessiner(T){
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,W,H);
-    ctx.lineWidth = 1;
-    var entree = ease(clamp(T/3));
-    // plan incliné : x de -1 à 1, y de 0 (près) à 1 (loin)
-    var largeur = Math.min(W*.92, H*1.6), haut0 = H*.88, haut1 = H*.16;
-    function P(x, y){
-      var k = 1 - y*.55;                       // rétrécit avec la profondeur
-      return [W/2 + x*largeur/2*k, haut0 + (haut1-haut0)*(y*(1.2 - y*.2))];
-    }
-    var defile = (T*.12) % 1;                  // une colonne glisse toutes les ~8 s
+    if (tirage === null){ tourne += elan; elan *= .95; }
+    var ry = T * (2*Math.PI/26) + tourne + Math.PI*.12;
+    var rx = -.2 + Math.sin(T*.31)*.06;
+    var cy_ = Math.cos(ry), sy = Math.sin(ry), cx_ = Math.cos(rx), sx = Math.sin(rx);
+    var F = Math.min(W*1.05, H*1.15) * .95, CAM = 3.3, ox = W/2, oy = H*.47 + Math.sin(T*.5)*H*.006;
+    var SOL = -(Y1 - CY)/U - .07;
 
-    // trame
-    for (var l=0; l<=LIGNES; l++){
-      var y = l/LIGNES, a = P(-1, y), b = P(1, y);
-      ctx.strokeStyle = "rgba(32,32,32," + (.10 + .14*(1-y))*entree + ")";
+    function P(x, y, z){            // coordonnées du fichier → écran (et profondeur)
+      var X = (x - CX)/U, Y = -(y - CY)/U, Z = z/U;
+      var x1 = X*cy_ + Z*sy, z1 = -X*sy + Z*cy_;
+      var y2 = Y*cx_ - z1*sx, z2 = Y*sx + z1*cx_;
+      var k = CAM/(CAM - z2);
+      return [ox + x1*F*k*.57, oy - y2*F*k*.57, z2];
+    }
+    function Pn(X, Y, Z){            // coordonnées déjà normalisées (sol)
+      return P(X*U + CX, CY - Y*U, Z*U);
+    }
+    function trait(a, b, coul, al){
+      if (al < .004) return;
+      ctx.strokeStyle = "rgba(" + coul + "," + al.toFixed(3) + ")";
       ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
     }
-    for (var c=0; c<=COLS; c++){
-      var x = -1 + 2*(c - defile)/COLS; if (x < -1) continue;
-      var a2 = P(x, 0), b2 = P(x, 1);
-      ctx.strokeStyle = "rgba(32,32,32," + .14*entree + ")";
-      ctx.beginPath(); ctx.moveTo(a2[0],a2[1]); ctx.lineTo(b2[0],b2[1]); ctx.stroke();
+    var entree = clampN(T/1.2);
+
+    // sol : cercles concentriques et rayons qui tournent doucement
+    ctx.lineWidth = 1;
+    for (var r=1; r<=4; r++){
+      var R = .22 + r*.2, al = .13*entree*(1 - r/5.5);
+      ctx.strokeStyle = "rgba(32,32,32," + al.toFixed(3) + ")";
+      ctx.beginPath();
+      for (var i=0;i<=72;i++){ var a = i/72*2*Math.PI, p = Pn(Math.cos(a)*R, SOL, Math.sin(a)*R); if (i) ctx.lineTo(p[0],p[1]); else ctx.moveTo(p[0],p[1]); }
+      ctx.stroke();
     }
-    // cases : une barre verticale par personne et par semaine, hauteur = charge
-    var indice0 = Math.floor(T*.12);
-    for (var l2=LIGNES-1; l2>=0; l2--){
-      for (var c2=0; c2<COLS; c2++){
-        var x0 = -1 + 2*(c2 - defile + .2)/COLS, x1 = x0 + 2*.6/COLS;
-        if (x0 < -1 || x1 > 1) continue;
-        var y0 = (l2 + .3)/LIGNES;
-        var apparition = clamp(T*1.2 - (c2*.12 + (LIGNES-l2)*.08));
-        var q = charge(l2, c2 + indice0, T) * ease(apparition);
-        var p0 = P(x0, y0), p1 = P(x1, y0);
-        var h = q * H * .085 * (1 - y0*.5);
-        var or = q > 1.12;
-        var alpha = (.25 + .5*(1-y0)) * entree * apparition;
-        ctx.strokeStyle = or ? "rgba(95,145,38," + Math.min(.95, alpha*1.6) + ")" : "rgba(32,32,32," + alpha*.8 + ")";
-        ctx.fillStyle = or ? "rgba(95,145,38," + .16*alpha + ")" : "rgba(32,32,32," + .03*alpha + ")";
+    for (var j=0;j<24;j++){
+      var a2 = j/24*2*Math.PI - T*.05;
+      trait(Pn(Math.cos(a2)*.36, SOL, Math.sin(a2)*.36), Pn(Math.cos(a2)*1.02, SOL, Math.sin(a2)*1.02), "32,32,32", .06*entree);
+    }
+    // repère d'orbite : un point vert qui fait le tour du sol
+    var ao = T*.6, po = Pn(Math.cos(ao)*1.02, SOL, Math.sin(ao)*1.02);
+    ctx.fillStyle = "rgba(95,145,38," + (.7*entree).toFixed(3) + ")";
+    ctx.beginPath(); ctx.arc(po[0], po[1], 2.6, 0, 2*Math.PI); ctx.fill();
+
+    // reflet sur le sol (le logo renversé, très pâle)
+    var mir = function(x, y, z){ var Y = -(y - CY)/U; var Ym = 2*SOL - Y; return P(x, CY - Ym*U, z); };
+    for (var e=0; e<NA; e++){
+      var s = aretes[e], g = s[6];
+      var pr = clampN((T - .4 - e/NA*2.2)/1.1); if (!pr) continue;
+      var a3 = mir(s[0],s[1],s[2]), b3 = mir(s[3],s[4],s[5]);
+      b3 = [a3[0]+(b3[0]-a3[0])*pr, a3[1]+(b3[1]-a3[1])*pr];
+      trait(a3, b3, g === 2 ? "95,145,38" : "32,32,32", g === 2 ? .07 : .045);
+    }
+
+    // faces teintées (seulement quand la face avant regarde vers nous)
+    var n = P(CX, CY, zf), n2 = P(CX, CY, zf + 100);
+    var face = n2[2] > n[2];
+    var teinte = clampN((T - 2.4)/1.6);
+    if (face && teinte){
+      [[faceVert, "202,224,155", .30], [faceGris, "135,134,139", .18]].forEach(function(f){
+        ctx.fillStyle = "rgba(" + f[1] + "," + (f[2]*teinte).toFixed(3) + ")";
         ctx.beginPath();
-        ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p0[0], p0[1]-h); ctx.lineTo(p1[0], p1[1]-h); ctx.lineTo(p1[0], p1[1]);
-        ctx.fill(); ctx.stroke();
-      }
+        f[0].forEach(function(q, i){ var p = P(q[0],q[1],q[2]); if (i) ctx.lineTo(p[0],p[1]); else ctx.moveTo(p[0],p[1]); });
+        ctx.closePath(); ctx.fill();
+      });
     }
-    // la semaine en cours : un trait or qui traverse la carte
-    var xa = -1 + 2*(3 - defile + .5)/COLS;
-    if (xa > -1){
-      var s0 = P(xa, -.02), s1 = P(xa, 1.02);
-      ctx.strokeStyle = "rgba(95,145,38," + .55*entree + ")";
-      ctx.setLineDash([3,5]); ctx.beginPath(); ctx.moveTo(s0[0],s0[1]); ctx.lineTo(s1[0],s1[1]); ctx.stroke(); ctx.setLineDash([]);
+
+    // arêtes du volume, tracées à l'arrivée, plus nettes au premier plan
+    for (var e2=0; e2<NA; e2++){
+      var s2 = aretes[e2], g2 = s2[6];
+      var pr2 = clampN((T - .4 - e2/NA*2.2)/1.1); if (!pr2) continue;
+      var a4 = P(s2[0],s2[1],s2[2]), b4 = P(s2[3],s2[4],s2[5]);
+      var prof = clampN(((a4[2] + b4[2])/2 + .55)/1.1);          // 0 au fond, 1 devant
+      var al2 = g2 === 2 ? .45 + .5*prof : g2 === 1 ? .25 + .35*prof : .18 + .5*prof;
+      var c2 = g2 === 2 ? "95,145,38" : g2 === 1 ? "135,134,139" : "32,32,32";
+      ctx.lineWidth = g2 === 2 ? 1.25 : 1;
+      trait(a4, [a4[0]+(b4[0]-a4[0])*pr2, a4[1]+(b4[1]-a4[1])*pr2], c2, al2);
+    }
+    ctx.lineWidth = 1;
+
+    // plan de lecture : un cadre vert qui balaie le pavé de bas en haut
+    var cyc = (T*.11) % 1, fond = Math.sin(cyc*Math.PI);
+    var ys = Y1 - (Y1 - Y0)*cyc, m = 40;
+    var c = [P(X0-m,ys,zf+m), P(X1+m,ys,zf+m), P(X1+m,ys,zb-m), P(X0-m,ys,zb-m)];
+    var al3 = .55*fond*clampN((T-3.2)/1.5);
+    for (var q=0;q<4;q++) trait(c[q], c[(q+1)%4], "95,145,38", al3);
+    if (al3 > .01){
+      ctx.fillStyle = "rgba(95,145,38," + (al3*.08).toFixed(3) + ")";
+      ctx.beginPath(); ctx.moveTo(c[0][0],c[0][1]); for (var q2=1;q2<4;q2++) ctx.lineTo(c[q2][0],c[q2][1]); ctx.closePath(); ctx.fill();
     }
   }
   var t0 = null, visible = true;
