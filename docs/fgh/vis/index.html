@@ -186,6 +186,7 @@ table.liste td.v-qui{min-width:9.5em}
 .v-qui input:hover{border-color:var(--or)}
 .v-qui input:focus{outline:none;border-style:solid;border-color:var(--or);background:rgba(var(--encre),.05)}
 .v-qui input.pris{border-style:solid;border-color:var(--v-cours);font-weight:600}
+.v-qui input.aucune{border-color:var(--v-bon);color:var(--v-bon);font-weight:500}
 @media print{.v-qui input{border:none}}
 /* coche « Traité » : une case large à viser, qui n'ouvre pas la ligne ; le plan traité s'efface à demi */
 table.liste th.v-coche,table.liste td.v-coche{width:1%;text-align:center;padding-inline:6px}
@@ -703,25 +704,26 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
   /* ------------------------------------------------------------ qui reprend le plan
      Un champ sur la ligne : on tape ou on choisit un nom (déposants de l'export et noms
      déjà donnés), enregistré en quittant le champ ou avec Entrée (visas_attributions). */
-  var QUI = {}, quiOk = false;
+  var QUI = {}, quiOk = false, SANS_REPRISE = "Pas de reprise nécessaire";
   function quiDe(code) { return QUI[code] || ""; }
   function champQui(code) {
     var q = quiDe(code);
-    return '<input type="text" list="liste-qui" maxlength="100" data-qui="' + esc(code) + '" value="' + esc(q) + '"' + (q ? ' class="pris"' : "") +
+    return '<input type="text" list="liste-qui" maxlength="100" data-qui="' + esc(code) + '" value="' + esc(q) + '"' + (q ? ' class="pris' + (q === SANS_REPRISE ? " aucune" : "") + '"' : "") +
       ' placeholder="Attribuer…" aria-label="Qui reprend ' + esc(court(code)) + '" title="Tape ou choisis un nom, Entrée pour valider ; vide pour retirer">';
   }
   function nomsQui() {
     var v = {};
     if (donnees) donnees.plans.forEach(function (p) { if (p.doc.auteur) v[p.doc.auteur] = 1; });
     Object.keys(QUI).forEach(function (c) { v[QUI[c]] = 1; });
-    return Object.keys(v).sort(function (a, b) { return a.localeCompare(b, "fr"); });
+    delete v[SANS_REPRISE];
+    return [SANS_REPRISE].concat(Object.keys(v).sort(function (a, b) { return a.localeCompare(b, "fr"); }));
   }
   function menuQui() {
     var nb = {}, sans = 0;
     R.plans.forEach(function (p) { var q = quiDe(p.code); if (q) nb[q] = (nb[q] || 0) + 1; else sans++; });
     if (etat.qui && etat.qui !== "-" && !nb[etat.qui]) nb[etat.qui] = 0;
     $("f-qui").innerHTML = '<option value="">Tout le monde</option><option value="-"' + (etat.qui === "-" ? " selected" : "") + ">Pas encore attribués · " + n(sans) + "</option>" +
-      Object.keys(nb).sort(function (a, b) { return a.localeCompare(b, "fr"); }).map(function (q) {
+      Object.keys(nb).sort(function (a, b) { return a === SANS_REPRISE ? -1 : b === SANS_REPRISE ? 1 : a.localeCompare(b, "fr"); }).map(function (q) {
         return '<option value="' + esc(q) + '"' + (q === etat.qui ? " selected" : "") + ">" + esc(q) + " · " + n(nb[q]) + " plan" + (nb[q] > 1 ? "s" : "") + "</option>";
       }).join("");
     $("liste-qui").innerHTML = nomsQui().map(function (q) { return '<option value="' + esc(q) + '">'; }).join("");
@@ -740,7 +742,7 @@ table.liste tr.v-fait:hover td:not(.v-coche),table.liste tr.v-fait[aria-expanded
     if (q === avant) return;
     if (!quiOk) { z.value = avant; UI.toast("Connecte-toi pour attribuer les plans."); return; }
     if (q) QUI[code] = q; else delete QUI[code];
-    z.classList.toggle("pris", !!q);
+    z.classList.toggle("pris", !!q); z.classList.toggle("aucune", q === SANS_REPRISE);
     menuQui();
     (q ? S.attributions.ecrit(code, q) : S.attributions.efface(code)).then(function () {
       UI.toast(court(code) + (q ? " : à reprendre par " + q + "." : " : attribution retirée."));
