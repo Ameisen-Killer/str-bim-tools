@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.12.0";
+  var VERSION = "2.12.1";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -505,7 +505,7 @@
     niveaux = Array.from(parNom, function(x){ return { nom: x[0], z: x[1] }; }).sort(function(a, b){ return a.z - b.z; });
     chargerModifs();
     sel = new Set(); actif = null;
-    clash = null; isoleRien = false; cacheRien = false; boutonRien();
+    clash = null; isoleRien = false; cacheRien = false; boutonRien(); remplirClash();
     cmp = { ifc: null, json: null }; remplirCmp(); renduSynthese();
     remplirNiveaux();
     $("#accueil").hidden = fichiers.length > 0;
@@ -547,7 +547,8 @@
       if (isoleRien && clash && !clash.rien.has(r.cle)) return false;
       if (cacheRien && ditRien(r)) return false;
       if (n && r.niveau !== n) return false;
-      if (s.indexOf("cmp-") === 0){ if (catCmp(r, s) !== true) return false; }
+      if (s === "clash-com" || s === "clash-sans"){ if (!clash || !clash.traverse.has(r.cle) || (s === "clash-com" ? !(ditRien(r) && !clash.rien.has(r.cle)) : !(clash.rien.has(r.cle) && !ditRien(r)))) return false; }
+      else if (s.indexOf("cmp-") === 0){ if (catCmp(r, s) !== true) return false; }
       else if (s === "modif"){ if (!modifie(r)) return false; }
       else if (s === "attente"){ if (classe(valeur(r, P_ST)) !== "attente") return false; }
       else if (s){ if (classe(valeur(r, P_ST)) !== classe(s)) return false; }
@@ -844,7 +845,7 @@
       var rien = new Set();
       x.traverse.forEach(function(h, cle){ if (!h.length) rien.add(cle); });
       clash = { traverse: x.traverse, rien: rien, ms: x.ms, nRes: res.length, nStr: str.length, sansGeo: RES.length - res.length };
-      legende();
+      legende(); remplirClash();
       return clash;
     }, function(err){
       $("#chargement").hidden = true;
@@ -859,8 +860,18 @@
     RES.forEach(function(r){ if (!RIEN.test(valeur(r, P_COM))) return; if (c.rien.has(r.cle)) oui++; else non++; });
     return "Clash STR / RES : " + pluriel(c.nRes, "réservation") + " contre " + pluriel(c.nStr, "élément") + " de structure en " + (c.ms/1000).toFixed(1).replace(".", ",") + " s · " +
       c.rien.size + " ne traverse" + (c.rien.size > 1 ? "nt" : "") + " rien" +
-      (oui + non ? " · commentaire « Ne traverse rien » : " + oui + " confirmé" + (oui > 1 ? "s" : "") + ", " + non + " qui traverse" + (non > 1 ? "nt" : "") + " pourtant quelque chose" : "") +
+      (oui + non ? " · commentées « Ne traverse rien » : " + (oui + non) + ", dont " + oui + " confirmée" + (oui > 1 ? "s" : "") + " et " + non + " où la détection trouve un élément traversé (filtre « Commentées … mais qui traversent ») · " +
+        (c.rien.size - oui) + " sans le commentaire" : "") +
       (c.sansGeo ? " · " + c.sansGeo + " sans géométrie, non testée" + (c.sansGeo > 1 ? "s" : "") : "") + ".";
+  }
+  // filtre de statut : les deux désaccords entre la détection et le commentaire « Ne traverse rien » (18.11.2026)
+  function remplirClash(){
+    var s = $("#f-st"), g = $("#f-clash");
+    if (g) g.remove();
+    if (!clash){ if (/^clash-/.test(s.value)){ s.value = ""; filtreChange(); } return; }
+    g = document.createElement("optgroup"); g.id = "f-clash"; g.label = "Détection de clash";
+    g.innerHTML = '<option value="clash-com">Commentées « Ne traverse rien » mais qui traversent</option><option value="clash-sans">Ne traversent rien, sans le commentaire</option>';
+    s.insertBefore(g, $("#f-cmp"));
   }
   function libStr(cle){
     var m = /^s(\d+):(\d+)$/.exec(cle), fi = m && fichiers.filter(function(x){ return x.uid === +m[1]; })[0], i = fi && IFC.infos(fi.m, +m[2]);
