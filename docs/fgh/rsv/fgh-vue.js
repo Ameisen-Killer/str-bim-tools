@@ -2369,6 +2369,7 @@
     }
     demarrer(/[?&]moteur=canvas\b/.test(location.search) ? "canvas" : rappels.moteur);
 
+    var libres = new WeakMap();
     var Gs = new Map(), prets = new Map(), liste = [], sel = new Set(), actif = 0, nbFaces = 0, source = "maison";
 
     // Géométrie externe (web-ifc) : ses unités et ses axes peuvent différer (mètres, Y vers le haut).
@@ -3129,6 +3130,14 @@
       // FGH : point du monde (mètres) → position à l'écran (pixels du canevas), ou null avant le premier affichage
       ecran: function(p){ return W && H ? ecran(camera(), p) : null; },
       // FGH : géométrie d'un élément d'un modèle ouvert : { T (triangles à plat), min, max } en mètres, ou null
+      // FGH : boîte d'un élément d'un modèle qui n'est pas dans la vue (ancien IFC à comparer) : { min, max } en
+      // mètres, ou null ; contexte de calcul à part, oublié avec le modèle
+      boiteLibre: function(m, id){
+        var G = libres.get(m);
+        if (!G){ G = Contexte(m); libres.set(m, G); }
+        var g = geometrie(G, id);
+        return g ? { min: g.min.slice(), max: g.max.slice() } : null;
+      },
       geo: function(m, id){
         var G = Gs.get(m) || prets.get(m), g = G ? geometrie(G, id) : null;
         return g ? { T: triangles(g), min: g.min, max: g.max } : null;

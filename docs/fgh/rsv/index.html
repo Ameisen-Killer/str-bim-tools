@@ -266,6 +266,24 @@ textarea.champ{height:auto;resize:vertical;min-height:72px;line-height:20px}
 .chrono td{padding:3px 6px;text-align:right;white-space:nowrap;border-top:1px solid var(--ligne);font-variant-numeric:tabular-nums}
 .chrono td:first-child{text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .chrono td small{display:block;color:var(--texte-faible);font-size:11px}
+.synthese{width:min(340px,calc(100% - 24px));max-height:calc(100% - 120px);overflow:auto;bottom:auto;top:64px}
+.synthese .sy-bloc{padding:6px 0;border-top:1px solid var(--ligne)}
+.synthese h4{margin:0 0 2px;font-size:13px;font-weight:600}
+.synthese .sy-src{color:var(--texte-faible);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.synthese .sy-att{color:var(--orange);font-size:12px;margin-bottom:4px}
+.synthese .sy-cat{display:flex;justify-content:space-between;align-items:center;width:100%;padding:4px 6px;border:0;border-radius:4px;background:none;color:var(--texte);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.synthese .sy-cat b{font-variant-numeric:tabular-nums}
+.synthese button.sy-cat:hover{background:var(--controle-survol)}
+.synthese button.sy-cat[aria-pressed="true"]{background:var(--or);color:var(--sur-accent)}
+.synthese button.sy-cat:disabled{opacity:.45;cursor:default}
+.synthese .sy-fixe{cursor:default}
+.synthese .sy-top{margin:4px 6px;color:var(--texte-doux);font-size:12px}
+.synthese details{margin:4px 6px;font-size:12px}
+.synthese summary{cursor:pointer;color:var(--texte-doux)}
+.synthese ul{margin:4px 0 0;padding-left:16px}
+.synthese .sy-pied{display:flex;flex-wrap:wrap;gap:6px;padding-top:6px;border-top:1px solid var(--ligne)}
+.sy-fiche{font-size:13px;margin:2px 0 6px}
+.sy-fiche ul{margin:4px 0 0;padding-left:18px;color:var(--texte-doux);font-size:12px}
 .chrono-pied{margin-top:4px;padding-top:4px;border-top:1px solid var(--ligne);text-align:right}
 .chargement{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;min-width:320px;background:var(--couche-2);border:1px solid var(--ligne);border-radius:8px;padding:18px 20px;box-shadow:var(--ombre)}
 .chargement .barre-p{height:3px;border-radius:2px;background:rgba(var(--encre),.12);margin-top:12px;overflow:hidden}
@@ -341,6 +359,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
   <span class="esp"></span>
   <span class="sig">Tony VARIN</span>
   <button type="button" id="btn-ouvrir" title="Ouvrir des IFC et, si tu veux, le JSON de validation"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><span>Ouvrir</span></button>
+  <button type="button" id="btn-comparer" title="Synthèse des changements : compare l'IFC des réservations ouvert à l'ancien IFC (ajoutées, supprimées, modifiées) et / ou au JSON qui a servi à le mettre à jour"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h10M9.5 2.5 12 5 9.5 7.5M14 11H4M6.5 8.5 4 11l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Comparer</span></button>
   <button type="button" id="btn-theme" title="Thème clair ou sombre"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span>Thème</span></button>
 </header>
 
@@ -427,17 +446,19 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
       </div>
     </div>
     <div class="chrono" id="chrono" hidden></div>
+    <div class="chrono synthese" id="synthese" hidden></div>
     <div class="chargement" id="chargement" hidden><div id="chargement-txt">Lecture…</div><div class="barre-p"><i id="prog"></i></div></div>
   </main>
 
   <aside class="panneau fiche vide" id="fiche"><div class="vide-fiche">Clique une réservation dans la liste ou dans la vue 3D. Ctrl + clic pour en choisir plusieurs.</div></aside>
 </div>
 <input type="file" id="fichier" accept=".ifc,.json" multiple hidden>
+<input type="file" id="fichier-cmp" accept=".ifc,.json" multiple hidden>
 
 <script src="/fgh/rsv/fgh-core.js?v=3"></script>
-<script src="/fgh/rsv/fgh-vue.js?v=22"></script>
+<script src="/fgh/rsv/fgh-vue.js?v=23"></script>
 <script src="/fgh/rsv/fgh-clash.js?v=1"></script>
 <script src="/fgh/rsv/fgh-cube.js?v=5"></script>
-<script src="/fgh/rsv/fgh-app.js?v=44"></script>
+<script src="/fgh/rsv/fgh-app.js?v=45"></script>
 </body>
 </html>

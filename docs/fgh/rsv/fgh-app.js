@@ -11,7 +11,7 @@
 (function(){
   "use strict";
 
-  var VERSION = "2.11.1";
+  var VERSION = "2.12.0";
   var FORMAT = "STR_FGH_RES_VALIDATION", PSET = "STR_FGH_RES", PSET_STR = "STR_FGH_STR";
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
@@ -358,7 +358,7 @@
         .then(function(){ m.octets = null; m.aCacher = true; });
     });
   }
-  var URL_GEO = "/fgh/rsv/fgh-geo.js?v=2";
+  var URL_GEO = "/fgh/rsv/fgh-geo.js?v=3";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -506,6 +506,7 @@
     chargerModifs();
     sel = new Set(); actif = null;
     clash = null; isoleRien = false; cacheRien = false; boutonRien();
+    cmp = { ifc: null, json: null }; remplirCmp(); renduSynthese();
     remplirNiveaux();
     $("#accueil").hidden = fichiers.length > 0;
     $("#outils").hidden = $("#cube").hidden = !fichiers.length;
@@ -546,7 +547,8 @@
       if (isoleRien && clash && !clash.rien.has(r.cle)) return false;
       if (cacheRien && ditRien(r)) return false;
       if (n && r.niveau !== n) return false;
-      if (s === "modif"){ if (!modifie(r)) return false; }
+      if (s.indexOf("cmp-") === 0){ if (catCmp(r, s) !== true) return false; }
+      else if (s === "modif"){ if (!modifie(r)) return false; }
       else if (s === "attente"){ if (classe(valeur(r, P_ST)) !== "attente") return false; }
       else if (s){ if (classe(valeur(r, P_ST)) !== classe(s)) return false; }
       for (var i = 0; i < mots.length; i++) if (r.txt.indexOf(mots[i]) < 0) return false;
@@ -974,7 +976,7 @@
       (d && !versIso(d) ? '<div class="note">Valeur actuelle : « ' + esc(d) + " »</div>" : "") +
       (r.ifc[P_DATE] && gardeDate() ? '<div class="note">Date initiale gardée : elle ne change pas, même si le statut ou le commentaire change.</div>' : "") + "</div>" +
       '<div class="fchamp">' + etiquette(r, P_COM) + '<textarea class="champ" data-p="' + P_COM + '" rows="3">' + esc(valeur(r, P_COM)) + "</textarea></div></fieldset>" + cocheDate() +
-      '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' + blocClash(r) +
+      '<div class="actions"><button type="button" class="bt" data-a="centrer">Centrer</button><button type="button" class="bt" data-a="boite">Boîte autour</button><button type="button" class="bt" data-a="niveau">Coupe au niveau</button></div></div>' + blocCmp(r) + blocClash(r) +
       '<div class="bloc"><h3>Demande</h3>' + dl([
         ["Demandeur", p["Demandeur"]], ["Date", p["Date demande"]], ["Commentaire", p["Commentaire demande"]],
         ["Dimensions", dims(p)], ["Carottage", p["Carottage"]], ["Calfeutrement", p["Calfeutrement"]],
@@ -1438,6 +1440,217 @@
       if (o === "modifs") renduModifs();
     });
   });
+  // ================= Synthèse des changements (demande de Tony, 18.11.2026) =================
+  // Après « Import Validation RES » et un nouvel export, on ouvre le nouvel IFC RES puis « Comparer » avec
+  // l'ancien IFC RES (réservations ajoutées, supprimées, modifiées : propriétés du jeu STR_FGH_RES et boîte 3D)
+  // et / ou le JSON qui a servi à mettre la maquette à jour (décisions intégrées, écarts, réservations absentes).
+  // Correspondance par l'ADN, puis par le UniqueId Revit. Rien n'est écrit : ni dans le JSON branché, ni ailleurs.
+  var cmp = { ifc: null, json: null };
+  var IGNORE_CMP = { "Export du": 1, "Maquette": 1 };
+  var NOMS_CMP = { "ifc-ajout": "Ajoutées", "ifc-modif": "Modifiées", "ifc-same": "Identiques", "ifc-suppr": "Supprimées",
+    "json-ok": "Décisions intégrées", "json-ecart": "Écarts avec le JSON", "json-absent": "Absentes de l'IFC", "json-hors": "Sans décision dans le JSON" };
+  var UN_CMP = { "ifc-ajout": "ajoutée", "ifc-modif": "modifiée", "ifc-same": "identique", "json-ok": "décision intégrée", "json-ecart": "écart avec le JSON", "json-hors": "sans décision dans le JSON" };
+  // r est-il dans la catégorie s (« cmp-ifc-ajout »…) ?
+  function catCmp(r, s){
+    var q = s.slice(4), c = q.indexOf("json-") === 0 ? cmp.json : cmp.ifc;
+    if (!c) return false;
+    var e = c.etat.get(r.cle);
+    return q === "json-hors" ? !e : !!e && e.cat === q;
+  }
+  function egal(p, a, b){
+    a = String(a == null ? "" : a).replace(/\s+/g, " ").trim(); b = String(b == null ? "" : b).replace(/\s+/g, " ").trim();
+    if (p === P_DATE && versIso(a) && versIso(b)) return versIso(a) === versIso(b);
+    return p === P_ST ? a.toUpperCase() === b.toUpperCase() : a === b;
+  }
+  function m3(v){ return (Math.round(v*1000)/1000).toFixed(3); }
+  function comparerIfc(ref, nom, autre){
+    var parAdn = new Map(), parUid = new Map(), pris = new Set(), etat = new Map();
+    ref.forEach(function(o){ if (o.adn && !parAdn.has(o.adn)) parAdn.set(o.adn, o); if (o.uid && !parUid.has(o.uid)) parUid.set(o.uid, o); });
+    RES.forEach(function(r){
+      var o = (r.adn && parAdn.get(r.adn)) || (r.uid && parUid.get(r.uid)) || null;
+      if (o && pris.has(o)) o = null;                       // ADN en double : la seconde compte comme ajoutée
+      if (!o){ etat.set(r.cle, { cat: "ifc-ajout", d: [] }); return; }
+      pris.add(o);
+      var d = [], vus = {};
+      Object.keys(r.p).concat(Object.keys(o.p)).forEach(function(k){
+        if (vus[k] || IGNORE_CMP[k]) return; vus[k] = 1;
+        var a = String(o.p[k] || "").trim(), b = String(r.p[k] || "").trim();
+        if (a !== b) d.push({ k: k, t: k + " : « " + (a || "vide") + " » → « " + (b || "vide") + " »" });
+      });
+      var g = vue.geo(r.f.m, r.id);
+      if (g && o.bb){
+        var dc = Math.hypot((g.min[0] + g.max[0] - o.bb.min[0] - o.bb.max[0])/2, (g.min[1] + g.max[1] - o.bb.min[1] - o.bb.max[1])/2, (g.min[2] + g.max[2] - o.bb.min[2] - o.bb.max[2])/2), dt = 0;
+        for (var a = 0; a < 3; a++) dt = Math.max(dt, Math.abs((g.max[a] - g.min[a]) - (o.bb.max[a] - o.bb.min[a])));
+        if (dc > .01) d.push({ k: "Position 3D", t: "Position 3D : déplacée de " + Math.round(dc*1000)/10 + " cm" });
+        if (dt > .01) d.push({ k: "Taille 3D", t: "Taille 3D : " + [0, 1, 2].map(function(a){ return m3(o.bb.max[a] - o.bb.min[a]); }).join(" × ") + " → " + [0, 1, 2].map(function(a){ return m3(g.max[a] - g.min[a]); }).join(" × ") + " m" });
+      }
+      etat.set(r.cle, { cat: d.length ? "ifc-modif" : "ifc-same", d: d });
+    });
+    return { nom: nom, autre: autre, etat: etat, absentes: ref.filter(function(o){ return !pris.has(o); }) };
+  }
+  function comparerJson(doc, nom){
+    if (!doc || doc.format !== FORMAT) throw new Error("« " + nom + " » n'est pas un fichier de validation des réservations FGH");
+    var der = new Map();
+    (doc.modifications || []).forEach(function(x){
+      if (!x || PARAMS.indexOf(x.parametre) < 0) return;
+      var k = x.cle || ("uid:" + x.unique_id), e = der.get(k);
+      if (!e) der.set(k, e = { k: k, uid: x.unique_id || "", num: x.numero || "", niveau: x.niveau || "", famille: x.famille || "", v: {} });
+      var a = e.v[x.parametre];
+      if (!a || (a.quand || "") <= (x.quand || "")) e.v[x.parametre] = x;
+    });
+    var parK = new Map(), parUid = new Map(), etat = new Map(), absentes = [];
+    RES.forEach(function(r){ parK.set(r.k, r); if (r.uid && !parUid.has(r.uid)) parUid.set(r.uid, r); });
+    der.forEach(function(e){
+      var ps = PARAMS.filter(function(p){ return e.v[p] && !e.v[p].retire; });
+      if (!ps.length) return;
+      var r = parK.get(e.k) || (e.uid && parUid.get(e.uid)) || null;
+      var att = function(p){ var v = e.v[p].nouveau; return v == null ? "" : String(v); };
+      if (!r){ absentes.push({ k: e.k, adn: e.k, num: e.num, niveau: e.niveau, famille: e.famille, d: ps.map(function(p){ return { k: p, t: LIB[p] + " attendu : « " + (att(p) || "vide") + " »" }; }) }); return; }
+      var d = [];
+      ps.forEach(function(p){ if (!egal(p, att(p), r.ifc[p])) d.push({ k: LIB[p], t: LIB[p] + " : attendu « " + (att(p) || "vide") + " », IFC « " + (r.ifc[p] || "vide") + " »" }); });
+      etat.set(r.cle, { cat: d.length ? "json-ecart" : "json-ok", d: d, j: ps.map(function(p){ return LIB[p] + " « " + (att(p) || "vide") + " »"; }) });
+    });
+    return { nom: nom, etat: etat, absentes: absentes, auteur: doc.auteur || "", date: doc.date || "" };
+  }
+  // Ancien IFC : lu sans l'afficher, ses réservations et leur boîte 3D gardées, le modèle oublié ensuite
+  function refIfc(f){
+    return lecture(f, function(p){ progres("Lecture de l'ancien IFC « " + f.name + " »…", p); }).then(function(m){
+      var rs = reservationsDe(m);
+      if (!rs || !rs.length) throw new Error("« " + f.name + " » ne contient pas de réservations (jeu STR_FGH_RES)");
+      var vus = new Set(), ref = [], i = 0, autre = "";
+      rs.forEach(function(x){
+        if (vus.has(x.id)) return; vus.add(x.id);
+        var p = x.p;
+        if (!autre && p["Maquette"] && maquette.nom && !memeMaquette(p["Maquette"], maquette.nom)) autre = p["Maquette"];
+        ref.push({ id: x.id, p: p, adn: (p["Cle ADN"] || "").trim(), uid: p["Revit UniqueId"] || "", num: p["Numero"] || "", niveau: p["Niveau"] || p["Niveau associe"] || "", famille: p["Famille"] || "" });
+      });
+      return new Promise(function(ok){
+        (function tranche(){
+          var t0 = performance.now();
+          while (i < ref.length && performance.now() - t0 < 40){ var o = ref[i++]; try { o.bb = vue.boiteLibre(m, o.id); } catch (x){ o.bb = null; } }
+          progres("Géométrie de l'ancien IFC : " + Math.round(100*i/ref.length) + " %", ref.length ? i/ref.length : 1);
+          if (i < ref.length) setTimeout(tranche, 0);
+          else { m.octets = null; ok(comparerIfc(ref, f.name, autre)); }
+        })();
+      });
+    });
+  }
+  function comparer(liste){
+    var fs = Array.prototype.slice.call(liste || []), js = fs.filter(function(f){ return /\.json$/i.test(f.name); }), ifcs = fs.filter(function(f){ return /\.ifc$/i.test(f.name); });
+    if (!RES.length){ etat("Comparer : ouvre d'abord le nouvel IFC des réservations, puis compare-le à l'ancien IFC ou au JSON intégré."); return; }
+    if (!js.length && !ifcs.length){ etat("Comparer : choisis l'ancien IFC des réservations (.ifc) et / ou le JSON intégré (.json)."); return; }
+    var suite = Promise.resolve();
+    if (js.length) suite = suite.then(function(){ return js[0].text(); }).then(function(t){ cmp.json = comparerJson(JSON.parse(t || "{}"), js[0].name); });
+    if (ifcs.length) suite = suite.then(function(){ return refIfc(ifcs[0]); }).then(function(c){ cmp.ifc = c; });
+    suite.then(function(){
+      $("#chargement").hidden = true;
+      renduSynthese(true); remplirCmp(); renduFiche();
+      etat("Synthèse des changements prête" + (cmp.ifc ? " · ancien IFC « " + cmp.ifc.nom + " »" : "") + (cmp.json ? " · JSON « " + cmp.json.nom + " »" : "") + ".");
+    }).catch(function(err){
+      $("#chargement").hidden = true;
+      etat("⚠ Comparaison impossible : " + (err && err.message || err));
+    });
+  }
+  // options du filtre de statut : une par catégorie de la synthèse
+  function remplirCmp(){
+    var s = $("#f-st"), g = $("#f-cmp");
+    if (g) g.remove();
+    var opts = [];
+    if (cmp.ifc) ["ifc-ajout", "ifc-modif", "ifc-same"].forEach(function(c){ opts.push(c); });
+    if (cmp.json) ["json-ok", "json-ecart", "json-hors"].forEach(function(c){ opts.push(c); });
+    if (!opts.length){ if (s.value.indexOf("cmp-") === 0){ s.value = ""; filtreChange(); } return; }
+    g = document.createElement("optgroup"); g.id = "f-cmp"; g.label = "Synthèse des changements";
+    g.innerHTML = opts.map(function(c){ return '<option value="cmp-' + c + '">' + esc(NOMS_CMP[c]) + "</option>"; }).join("");
+    s.appendChild(g);
+  }
+  function comptes(c){ var n = {}; c.etat.forEach(function(e){ n[e.cat] = (n[e.cat] || 0) + 1; }); return n; }
+  function ligneCmp(c, n, titre){
+    return '<button type="button" class="sy-cat" data-cmp="' + c + '"' + (n ? "" : " disabled") + ' title="Montrer seulement ces réservations dans la liste et la vue 3D">' + esc(titre || NOMS_CMP[c]) + "<b>" + n + "</b></button>";
+  }
+  function listeAbsentes(l){
+    if (!l.length) return "";
+    return "<details><summary>" + pluriel(l.length, "réservation") + " (absentes du nouvel IFC)</summary><ul>" + l.slice(0, 200).map(function(o){
+      return "<li><b>" + esc(o.num || "(sans N°)") + "</b> " + esc([o.niveau, o.famille].filter(Boolean).join(" · ")) + "</li>";
+    }).join("") + (l.length > 200 ? "<li>… la suite dans le CSV</li>" : "") + "</ul></details>";
+  }
+  // propriétés les plus souvent changées
+  function topChamps(c){
+    var n = {};
+    c.etat.forEach(function(e){ if (e.cat === "ifc-modif" || e.cat === "json-ecart") e.d.forEach(function(x){ n[x.k] = (n[x.k] || 0) + 1; }); });
+    var l = Object.keys(n).sort(function(a, b){ return n[b] - n[a]; });
+    return l.length ? '<div class="sy-top">' + l.slice(0, 6).map(function(k){ return esc(k) + " · " + n[k]; }).join("<br>") + (l.length > 6 ? "<br>…" : "") + "</div>" : "";
+  }
+  function renduSynthese(montrer){
+    var e = $("#synthese"); if (!e) return;
+    if (!cmp.ifc && !cmp.json){ e.hidden = true; e.innerHTML = ""; return; }
+    var h = '<div class="chrono-tete"><b>Synthèse des changements</b><button type="button" class="ferme" title="Fermer">✕</button></div>';
+    if (cmp.ifc){
+      var n = comptes(cmp.ifc);
+      h += '<div class="sy-bloc"><h4>Ancien IFC → IFC ouvert</h4><div class="sy-src" title="' + esc(cmp.ifc.nom) + '">' + esc(cmp.ifc.nom) + "</div>" +
+        (cmp.ifc.autre ? '<div class="sy-att">⚠ Autre maquette : « ' + esc(cmp.ifc.autre) + " »</div>" : "") +
+        ligneCmp("ifc-ajout", n["ifc-ajout"] || 0) + ligneCmp("ifc-modif", n["ifc-modif"] || 0) +
+        '<div class="sy-cat sy-fixe">Supprimées<b>' + cmp.ifc.absentes.length + "</b></div>" + ligneCmp("ifc-same", n["ifc-same"] || 0) +
+        topChamps(cmp.ifc) + listeAbsentes(cmp.ifc.absentes) + "</div>";
+    }
+    if (cmp.json){
+      var k = comptes(cmp.json), hors = RES.length - cmp.json.etat.size;
+      h += '<div class="sy-bloc"><h4>JSON intégré → IFC ouvert</h4><div class="sy-src" title="' + esc(cmp.json.nom) + '">' + esc(cmp.json.nom) + (cmp.json.auteur ? " · " + esc(cmp.json.auteur) : "") + "</div>" +
+        ligneCmp("json-ok", k["json-ok"] || 0) + ligneCmp("json-ecart", k["json-ecart"] || 0) +
+        '<div class="sy-cat sy-fixe">Absentes de l\'IFC<b>' + cmp.json.absentes.length + "</b></div>" + ligneCmp("json-hors", hors) +
+        topChamps(cmp.json) + listeAbsentes(cmp.json.absentes) + "</div>";
+    }
+    h += '<div class="sy-pied"><button type="button" class="bt" data-sy="csv">Exporter (CSV)</button><button type="button" class="bt" data-sy="tout">Tout afficher</button><button type="button" class="bt" data-sy="oublier">Oublier</button></div>';
+    e.innerHTML = h;
+    if (montrer){ e.hidden = false; $("#chrono").hidden = true; }
+    var v = $("#f-st").value;
+    Array.prototype.forEach.call(e.querySelectorAll("[data-cmp]"), function(b){ b.setAttribute("aria-pressed", String(v === "cmp-" + b.getAttribute("data-cmp"))); });
+  }
+  function csvSynthese(){
+    var L = [["Comparaison", "Catégorie", "N°", "Niveau", "Famille", "ADN", "Détail"]];
+    function ajoute(qui, c){
+      RES.forEach(function(r){
+        var x = c.etat.get(r.cle), cat = x ? x.cat : "json-hors";
+        L.push([qui + " « " + c.nom + " »", NOMS_CMP[cat], r.num, r.niveau, r.famille, r.adn, x ? x.d.map(function(y){ return y.t; }).join(" | ") || (x.j || []).join(" | ") : ""]);
+      });
+      c.absentes.forEach(function(o){ L.push([qui + " « " + c.nom + " »", NOMS_CMP[qui === "Ancien IFC" ? "ifc-suppr" : "json-absent"], o.num, o.niveau, o.famille, o.adn, (o.d || []).map(function(y){ return y.t; }).join(" | ")]); });
+    }
+    if (cmp.ifc) ajoute("Ancien IFC", cmp.ifc);
+    if (cmp.json) ajoute("JSON", cmp.json);
+    var txt = "\ufeff" + L.map(function(l){ return l.map(function(v){ v = String(v == null ? "" : v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(";"); }).join("\r\n");
+    var b = new Blob([txt], { type: "text/csv;charset=utf-8" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = "FGH_Synthese_RES_" + (maquette.nom || "maquette").replace(/[^\w\-]+/g, "_") + ".csv";
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  $("#synthese").addEventListener("click", function(e){
+    if (e.target.closest(".ferme")){ $("#synthese").hidden = true; return; }
+    var c = e.target.closest("[data-cmp]");
+    if (c){
+      var v = "cmp-" + c.getAttribute("data-cmp");
+      $("#f-st").value = $("#f-st").value === v ? "" : v;
+      filtreChange(); renduSynthese();
+      if (document.querySelector(".app").classList.contains("sans-g")) replier("g", false);
+      return;
+    }
+    var a = e.target.closest("[data-sy]"), q = a && a.getAttribute("data-sy");
+    if (q === "csv") csvSynthese();
+    else if (q === "tout"){ $("#f-st").value = ""; filtreChange(); renduSynthese(); }
+    else if (q === "oublier"){ cmp = { ifc: null, json: null }; remplirCmp(); renduSynthese(); renduFiche(); etat(""); }
+  });
+  $("#f-st").addEventListener("change", function(){ renduSynthese(); });
+  function blocCmp(r){
+    var h = "";
+    [["ifc", "Par rapport à l'ancien IFC"], ["json", "Par rapport au JSON intégré"]].forEach(function(x){
+      var c = cmp[x[0]];
+      if (!c) return;
+      var e = c.etat.get(r.cle), cat = e ? e.cat : "json-hors";
+      h += '<div class="sy-fiche"><b>' + esc(x[1]) + " : " + esc(UN_CMP[cat]) + "</b>" +
+        (e && e.d.length ? "<ul>" + e.d.map(function(y){ return "<li>" + esc(y.t) + "</li>"; }).join("") + "</ul>" : "") + "</div>";
+    });
+    return h ? '<div class="bloc"><h3>Synthèse des changements</h3>' + h + "</div>" : "";
+  }
+  $("#btn-comparer").addEventListener("click", function(){ $("#fichier-cmp").click(); });
+  $("#fichier-cmp").addEventListener("change", function(){ comparer(this.files); this.value = ""; });
+
   // « Ouvrir » prend les IFC et le JSON de validation ensemble ou séparément (17.11.2026 : un JSON choisi ici était
   // refusé, seul « Ouvrir un JSON… » de l'onglet Modifications le prenait). Chrome / Edge : le JSON se branche en
   // écriture, comme avec « Ouvrir un JSON… » ; ailleurs il est lu sans y écrire.
