@@ -24,6 +24,22 @@
     var y = f>d ? d+(f-d)*p : t+h/2-vh/2;
     return Math.max(0,Math.min(y,document.documentElement.scrollHeight-vh));
   }
+  // repères (19.11.2026) : un élément portant data-t="0.4" doit être en haut de l'écran quand la voix
+  // atteint 40 % du bloc ; on y glisse pendant les 1,8 s qui précèdent. Sans repère : défilement régulier.
+  function reperes(i,t){
+    var el=segs[i], rs=el.querySelectorAll("[data-t]"); if(!rs.length) return null;
+    var s=TL[i][0], e=TL[i][1], vh=innerHeight, m=vh*.14, top=haut(el), h=el.offsetHeight;
+    var mini=top-m, maxi=top+h-(vh-m), y=visee(i,0);
+    if(maxi<=mini) return y;
+    for(var k=0;k<rs.length;k++){
+      var tk=s+parseFloat(rs[k].getAttribute("data-t"))*(e-s);
+      var a=Math.max(0,Math.min(1,(t-(tk-1.8))/1.8)); if(!a) break;
+      a=a*a*(3-2*a);
+      var cible=Math.max(mini,Math.min(haut(rs[k])-m,maxi));
+      y+= (cible-y)*a;
+    }
+    return Math.max(0,Math.min(y,document.documentElement.scrollHeight-vh));
+  }
   function seg(t){for(var i=0;i<N;i++){if(t<TL[i][1]) return i} return N-1}
   function etiquette(i){
     if(i===actif) return;
@@ -38,7 +54,7 @@
     if(aud.duration) bb.style.width=(100*t/aud.duration)+"%";
     if(manuel||!auto.checked) return;
     var s=TL[i][0], e=TL[i][1], p=Math.max(0,Math.min(1,(t-s)/(e-s)));
-    var q0=Math.max(0,Math.min(1,(p-.08)/.77)); var y=visee(i,q0*q0*(3-2*q0));
+    var q0=Math.max(0,Math.min(1,(p-.08)/.77)); var y=reperes(i,t); if(y===null) y=visee(i,q0*q0*(3-2*q0));
     // fin de bloc : on glisse en continu vers le début du suivant, sans à-coup
     if(i<N-1 && p>.85){var q=(p-.85)/.15; q=q*q*(3-2*q); y=y+(visee(i+1,0)-y)*q}
     if(yl===null) yl=scrollY;
