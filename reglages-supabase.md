@@ -78,7 +78,8 @@ valide son mot de passe (un antivirus de messagerie qui ouvre les liens à l'ava
 
 Refonte du 19.11.2026 (demande de Tony) : charte du bureau comme dans l'outil (fond `#F4F5F2`, vert
 `#4D7A1C`, logo `docs/planif/assets/logo-ab-courriel.png`, PNG car les messageries n'affichent pas le
-SVG), un encadré qui dit d'où vient le message pour qu'il ne soit pas pris pour un spam, et plus de
+SVG), un objet et un en-tête au nom du bureau pour qu'il ne soit pas pris pour un spam (l'encadré
+« Ce message est bien réel » a été retiré à la demande de Tony), et plus de
 date limite annoncée : le lien porte l'adresse (`&adresse={{ .Email }}`), et quand son jeton a plus de
 24 heures la page de connexion envoie d'elle-même un lien neuf. Ces modèles valent pour tous les
 bureaux de la base : à revoir le jour où un autre bureau que celui-ci reçoit des invitations.
@@ -99,7 +100,7 @@ Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
           <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
         </tr></table>
       </td></tr>
-      <tr><td style="padding:26px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
+      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Bienvenue</p>
         <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Ton accès au planificateur est ouvert</h1>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
@@ -114,15 +115,6 @@ Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
            s'il a plus de 24 heures, la page t'envoie d'elle-même un lien tout neuf.</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Choisis un mot de passe propre à l'outil, différent de celui de ta session ou de ta messagerie.
            Personne ne te le demandera.</p>
-      </td></tr>
-      <tr><td style="padding:22px 32px 26px 32px">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF5DE;border-radius:8px"><tr>
-          <td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#202020">
-            <b>Ce message est bien réel.</b> Il est envoyé automatiquement par le planificateur du bureau.
-            L'outil est développé en interne par Tony Varin et hébergé sur str-bim-tools.com : c'est pour cela que
-            l'expéditeur et le lien portent ce nom. Un doute ? Demande-lui avant de cliquer.
-          </td>
-        </tr></table>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
@@ -148,7 +140,7 @@ Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
           <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
         </tr></table>
       </td></tr>
-      <tr><td style="padding:26px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
+      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Lien de connexion</p>
         <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Entre dans le planificateur</h1>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
@@ -161,15 +153,6 @@ Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358"><b style="color:#202020">Aucune date limite.</b> Si ce bouton a plus de 24 heures, la page
            t'envoie d'elle-même un lien tout neuf.</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
-      </td></tr>
-      <tr><td style="padding:22px 32px 26px 32px">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF5DE;border-radius:8px"><tr>
-          <td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#202020">
-            <b>Ce message est bien réel.</b> Il est envoyé automatiquement par le planificateur du bureau.
-            L'outil est développé en interne par Tony Varin et hébergé sur str-bim-tools.com : c'est pour cela que
-            l'expéditeur et le lien portent ce nom. Un doute ? Demande-lui avant de cliquer.
-          </td>
-        </tr></table>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
@@ -195,7 +178,7 @@ Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
           <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
         </tr></table>
       </td></tr>
-      <tr><td style="padding:26px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
+      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Mot de passe</p>
         <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Choisis un nouveau mot de passe</h1>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
@@ -207,15 +190,6 @@ Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358"><b style="color:#202020">Aucune date limite.</b> Si ce bouton a plus de 24 heures, la page
            t'envoie d'elle-même un lien tout neuf.</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
-      </td></tr>
-      <tr><td style="padding:22px 32px 26px 32px">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF5DE;border-radius:8px"><tr>
-          <td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#202020">
-            <b>Ce message est bien réel.</b> Il est envoyé automatiquement par le planificateur du bureau.
-            L'outil est développé en interne par Tony Varin et hébergé sur str-bim-tools.com : c'est pour cela que
-            l'expéditeur et le lien portent ce nom. Un doute ? Demande-lui avant de cliquer.
-          </td>
-        </tr></table>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
