@@ -61,7 +61,7 @@ Puis Authentication > Emails > SMTP Settings > **Enable custom SMTP** :
 | Champ | Valeur |
 |---|---|
 | Sender email | `contact@str-bim-tools.com` (n'importe quelle adresse du domaine vérifié) |
-| Sender name | `Planificateur ab ingénieurs` (19.11.2026 ; avant : `STR Bim Tools`) |
+| Sender name | `Planificateur AB ingénieurs` (19.11.2026 ; avant : `STR Bim Tools`) |
 | Host | `smtp.resend.com` |
 | Port | `465` |
 | Username | `resend` |
@@ -87,7 +87,7 @@ disponible), un objet et un en-tête au nom du bureau pour qu'il ne soit pas pri
 date limite (le mail n'en parle plus, demande de Tony) : le lien porte l'adresse (`&adresse={{ .Email }}`), et quand son jeton a plus de
 24 heures la page de connexion envoie d'elle-même un lien neuf. Ces modèles valent pour tous les
 bureaux de la base : à revoir le jour où un autre bureau que celui-ci reçoit des invitations.
-Dans **SMTP Settings**, mettre aussi **Sender name** = `Planificateur ab ingénieurs`.
+Dans **SMTP Settings**, mettre aussi **Sender name** = `Planificateur AB ingénieurs`.
 
 ### Confirm signup — invitation d'un nouvel utilisateur
 
