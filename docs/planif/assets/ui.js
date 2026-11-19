@@ -133,7 +133,8 @@
       // de texte (note), elle garde son rôle : aller à la ligne. Une touche
       // maintenue ne compte pas : l'Entrée qui a ouvert la fenêtre (recherche)
       // ne doit pas l'enregistrer en se répétant.
-      else if (e.key === "Enter" && !e.repeat && boutonEntree && !e.isComposing &&
+      // defaultPrevented : un menu long ou le calendrier a pris l'Entrée pour s'ouvrir (19.11.2026)
+      else if (e.key === "Enter" && !e.repeat && boutonEntree && !e.isComposing && !e.defaultPrevented &&
                /^(INPUT|SELECT)$/.test(e.target.tagName) && boite.contains(e.target)) {
         e.preventDefault();
         boutonEntree.click();
@@ -174,7 +175,7 @@
         class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : "") + (b.centre ? " centre" : "") + (b.vif ? " vif" : ""),
         type: "button",
         onclick: function () {
-          var r = b.action ? b.action() : true;
+          var r = b.action ? b.action(bouton) : true;
           // Une action qui part sur le réseau peut durer : le bouton le montre
           // au lieu de rester muet, et un second clic ne la relance pas.
           var attente = !!(r && typeof r.then === "function");
@@ -1862,10 +1863,29 @@
    *  (19.11.2026, demandes de Tony). `rouvre` : ramène la fenêtre si l'on répond
    *  « Annuler » à la question. */
   function boutonSupprimeTache(t, apres, rouvre, place) {
+    /* La confirmation se fait sur le bouton lui-même (19.11.2026, audit) :
+       la question en fenêtre remplaçait la fiche ou le formulaire, et
+       « Annuler » y faisait perdre les saisies en cours. Premier clic : le
+       bouton demande confirmation quatre secondes ; second clic : suppression,
+       avec « Annuler » dans le message comme partout. */
+    var arme = null;
     return {
       label: "Supprimer cette tâche", rouge: true, vif: true,
       centre: !place, gauche: place === "gauche",
-      action: function () { supprimeTache(t, apres, rouvre); return false; }
+      action: function (bouton) {
+        if (!arme) {
+          var n = D.dependances(t.id).length;
+          bouton.textContent = n ? "Confirmer, avec " + (n > 1 ? "ses " + n + " dépendances" : "sa dépendance") : "Confirmer la suppression";
+          arme = setTimeout(function () { arme = null; bouton.textContent = "Supprimer cette tâche"; }, 4000);
+          return false;
+        }
+        clearTimeout(arme); arme = null;
+        var nb = D.dependances(t.id).length;
+        return D.suppTache(t.id).then(function () {
+          if (apres) apres();
+          toast(nb ? "Tâche supprimée, avec " + (nb > 1 ? "ses dépendances." : "sa dépendance.") : "Tâche supprimée.");
+        }).catch(function (e) { if (apres) apres(); toast(e.message); });
+      }
     };
   }
   function supprimeTache(t, apres, siAnnule) {

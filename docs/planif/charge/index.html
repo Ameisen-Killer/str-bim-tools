@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=114">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=115">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 </head>
@@ -94,12 +94,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=64"></script>
-<script src="/planif/assets/donnees.js?v=89"></script>
+<script src="/planif/assets/donnees.js?v=90"></script>
 <script src="/planif/assets/calculs.js?v=17"></script>
 <script src="/planif/assets/version.js?v=25"></script>
-<script src="/planif/assets/ui.js?v=133"></script>
+<script src="/planif/assets/ui.js?v=134"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
-<script src="/planif/assets/palette.js?v=23"></script>
+<script src="/planif/assets/palette.js?v=24"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
 <script>
@@ -223,14 +223,21 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 
   function pourcent(taux) { return Math.round(taux * 100) + " %"; }
 
+  var cacheRep = null;
   function calcule() {
     var canton = D.canton();
+    // Affaire mémorisée terminée ou supprimée depuis : le filtre agissait encore, menu vide (19.11.2026)
+    if (vue.affaires.length && !D.affaires({}).some(function (a) { return a.id === vue.affaires[0]; })) { vue.affaires = []; memorise(); }
     var jours = C.serie(vue.debut, vue.semaines * 7);
     sems = Calc.semaines(jours);
 
     var ouvertes = D.taches({ sansTerminees: true });
     var tous = D.membres({ planifies: true });
-    var rep = Calc.repartition(ouvertes, tous, canton);
+    // La répartition ne dépend ni de la recherche ni de la semaine affichée : elle n'est refaite
+    // que si les données, le canton ou le jour changent (19.11.2026, elle l'était à chaque frappe)
+    var cleRep = D.version() + "|" + canton + "|" + C.isoAuj();
+    if (!cacheRep || cacheRep.cle !== cleRep) cacheRep = { cle: cleRep, rep: Calc.repartition(ouvertes, tous, canton) };
+    var rep = cacheRep.rep;
     var dansAffaire = null;
     if (vue.affaires.length) {
       dansAffaire = Object.create(null);
@@ -287,7 +294,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         });
         var taux = capacite > 0 ? charge / capacite : (charge > 0 ? 99 : 0);
         var c = { m: m, s: s, charge: charge, capacite: capacite, taux: taux, absents: absents,
-                  palier: palier(taux, capacite, charge), parts: parts };
+                  // Même seuil de surcharge qu'au tableau de bord et dans les alertes (calculs.js) :
+                  // 0,05 j au-dessus de la capacité de la personne (19.11.2026, audit)
+                  palier: capacite > 0 && charge > capacite + 0.05 ? "trop" : palier(taux, capacite, charge), parts: parts };
         detail[m.id + "|" + s.jours[0]] = c;
         return c;
       });
@@ -628,7 +637,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=10"></script>
+<script src="/planif/assets/aide-fiches.js?v=11"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

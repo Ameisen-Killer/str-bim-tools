@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=114">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=115">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <link rel="stylesheet" href="/planif/assets/inter.css?v=6">
 <link rel="stylesheet" href="/planif/assets/mandat.css?v=4">
@@ -137,12 +137,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=64"></script>
-<script src="/planif/assets/donnees.js?v=89"></script>
+<script src="/planif/assets/donnees.js?v=90"></script>
 <script src="/planif/assets/calculs.js?v=17"></script>
 <script src="/planif/assets/version.js?v=25"></script>
-<script src="/planif/assets/ui.js?v=133"></script>
+<script src="/planif/assets/ui.js?v=134"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
-<script src="/planif/assets/palette.js?v=23"></script>
+<script src="/planif/assets/palette.js?v=24"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
 <script src="/planif/assets/mandat.js?v=3"></script>
@@ -308,7 +308,11 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var ul = el("ul", { class: "is-veille" });
     l.forEach(function (v) {
       var s = D.suiviVeille(v.id), delai = v.delai ? new Date(v.delai) : null;
-      var jours = delai ? Math.ceil((delai - maintenant) / 864e5) : null;
+      /* En jours de calendrier, à l'heure d'ici (19.11.2026, audit) : une
+         remise ce soir se lisait « dans 1 j », une remise de ce matin
+         « aujourd'hui ». -1 : l'heure de remise est passée. */
+      var isoRemise = delai ? delai.getFullYear() + "-" + String(delai.getMonth() + 1).padStart(2, "0") + "-" + String(delai.getDate()).padStart(2, "0") : "";
+      var jours = !delai ? null : delai < maintenant ? -1 : C.diff(C.isoAuj(), isoRemise);
       var aff = s && s.affaireId ? D.affaire(s.affaireId) : null;
       // Clic droit (09.11.2026, demande de Tony) : les actions de la publication
       var menuPub = function (e) {
@@ -332,7 +336,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         el("div", { class: "is-pub-adj", text: [v.adjudicateur, v.lieu].filter(Boolean).join(" · ") }),
         el("div", { class: "is-pub-bas" }, [
           el("span", { class: "is-remise" + (jours !== null && jours < 0 ? " depassee" : jours !== null && jours <= 7 ? " proche" : "") },
-            [delai ? "Remise : " + jourCourt(v.delai.slice(0, 10)) + " " + String(delai.getHours()).padStart(2, "0") + ":" + String(delai.getMinutes()).padStart(2, "0") +
+            [delai ? "Remise : " + jourCourt(isoRemise) + " " + String(delai.getHours()).padStart(2, "0") + ":" + String(delai.getMinutes()).padStart(2, "0") +
               (jours < 0 ? " · passée" : jours === 0 ? " · aujourd'hui" : " · dans " + jours + " j") : "Remise : non indiquée"]),
           el("span", { class: "is-motifs" }, v.motifs.slice(0, 4).map(function (m) { return el("span", { class: "etiq is-motif", text: m }); })),
           el("span", { class: "is-pub-actions" }, s ? [
@@ -832,7 +836,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=10"></script>
+<script src="/planif/assets/aide-fiches.js?v=11"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

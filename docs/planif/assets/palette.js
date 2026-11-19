@@ -246,11 +246,8 @@
       liste.push({ nom: "Poser une absence", mots: "vacances conge maladie formation absence", glyphe: "◐", action: function () { ferme(); UI.nouvelleAbsence({ surChangement: D.redessine }); } });
       liste.push({ nom: "Rafraîchir les données", mots: "recharger actualiser mise a jour", glyphe: "↻", action: function () { ferme(); UI.rafraichit(false); } });
     }
-    if (UI.choisitTheme) {
-      [["sombre", "Thème sombre"], ["clair", "Thème clair"], ["systeme", "Thème du système"]].forEach(function (t) {
-        liste.push({ nom: t[1], mots: "theme couleur apparence mode", glyphe: "◑", action: function () { UI.choisitTheme(t[0]); ferme(); UI.toast(t[1] + "."); } });
-      });
-    }
+    // Les trois commandes de thème sont retirées (19.11.2026, audit) : l'outil n'a plus qu'un
+    // thème, elles annonçaient un changement qui n'avait pas lieu.
     if (UI.avecBase && UI.deconnecte) {
       liste.push({ nom: "Se déconnecter", mots: "quitter deconnexion sortir", glyphe: "⎋", action: function () { ferme(); UI.deconnecte(); } });
     }

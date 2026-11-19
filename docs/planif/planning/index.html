@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=114">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=115">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <link rel="stylesheet" href="/planif/assets/bandeau.css?v=2">
 </head>
@@ -123,12 +123,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=64"></script>
-<script src="/planif/assets/donnees.js?v=89"></script>
+<script src="/planif/assets/donnees.js?v=90"></script>
 <script src="/planif/assets/calculs.js?v=17"></script>
 <script src="/planif/assets/version.js?v=25"></script>
-<script src="/planif/assets/ui.js?v=133"></script>
+<script src="/planif/assets/ui.js?v=134"></script>
 <script src="/planif/assets/tchat.js?v=13"></script>
-<script src="/planif/assets/palette.js?v=23"></script>
+<script src="/planif/assets/palette.js?v=24"></script>
 <script src="/planif/assets/direct.js?v=15"></script>
 <script src="/planif/assets/bandeau.js?v=2"></script>
 <script>
@@ -163,8 +163,12 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   /* Le tableau de bord s'ouvre toujours sur la semaine en cours (demande de Tony,
      16.11.2026) ; seul le tableau de charge, qui y envoie sur une semaine précise
      (« debutPose »), garde la semaine choisie. */
+  var venuDeLaCharge = !!vue.debutPose;
   if (!vue.debutPose || !vue.debut) vue.debut = C.lundi(C.isoAuj());
   delete vue.debutPose;
+  // La semaine posée par la Charge ne sert qu'une fois (19.11.2026) : sans cela, le tableau de
+  // bord rouvrait dessus tant qu'aucun filtre n'avait été touché
+  if (venuDeLaCharge) { try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {} }
 
   function memorise() {
     try { localStorage.setItem(CLE_VUE, JSON.stringify(vue)); } catch (e) {}
@@ -286,9 +290,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     Bandeau.equipes(hote, { toute: D.membres({ planifies: true }).filter(function (m) { return !mien || mien.gens[m.id]; }),
       nombre: nombre, actif: vue.cle, choix: choisit });
     var sc = Bandeau.succursaleDe(vue.cle);
+    var miennes = mesAffaires();   // une fois, pas deux par affaire (chaque appel reparcourt les tâches)
     var opts = D.optionsAffaires(D.affaires({ tous: true }).filter(function (a) {
       if (vue.affaires[0] === a.id) return true;
-      return (!mesAffaires() || mesAffaires()[a.id]) && (!sc || (a.succursale || "_") === sc);
+      return (!miennes || miennes[a.id]) && (!sc || (a.succursale || "_") === sc);
     }), function (a) { return [a.id, D.libelleAffaire(a)]; });
     Bandeau.liste(hote, "Affaire", [["", mien ? "Toutes mes affaires" : "Toutes les affaires"]].concat(opts), vue.affaires[0] || "", function (v) {
       vue.affaires = v ? [v] : []; memorise(); rend();
@@ -306,6 +311,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function rend() {
     var canton = D.canton();
     mien = perimetre();
+    // Affaire mémorisée supprimée depuis : le filtre agissait encore sans paraître au menu (19.11.2026)
+    if (vue.affaires.length && !D.affaire(vue.affaires[0])) { vue.affaires = []; memorise(); }
     jours = C.serie(vue.debut, vue.duree);
     sems = Calc.semaines(jours);
 
@@ -505,7 +512,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
     var taux = capacite > 0 ? Math.round(charge / capacite * 100) : 0;
     var auj = C.isoAuj();
     // Les trois autres chiffres suivent le filtre : le retard aussi, sinon il compte pour toute l'équipe
-    var choisis = vue.cle === "tous" || !filtrees ? null : filtrees;
+    // « Toute l'équipe » limitée aux ingénieurs ou aux dessinateurs compte aussi pour le retard (19.11.2026)
+    var choisis = (vue.cle === "tous" && !vue.cotes.length) || !filtrees ? null : filtrees;
     var retard = D.taches({ sansTerminees: true, membreId: mien ? mien.moi : null }).filter(function (t) {
       if (mien && !mien.taches[t.id]) return false;
       if (choisis && !(t.ingenieurId && choisis[t.ingenieurId]) && !(t.dessinateurId && choisis[t.dessinateurId])) return false;
@@ -1165,6 +1173,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       }
       var x0 = e.clientX, y0 = e.clientY, bouge = false, delta = 0, cible = null;
       var col0 = colonne(x0);
+      /* Sans le droit sur cette tâche (19.11.2026, audit) : la barre ne se
+         déplace pas — elle se posait, puis la base refusait. Le clic ouvre
+         toujours la fiche, en lecture. */
+      var deplacable = D.peutEcrireTache(D.tache(info.tache.id) || info.tache), prevenu = false;
 
       // Rectangles des lignes, figés au début du geste : plus fiable que elementFromPoint.
       var zones = [].map.call(document.querySelectorAll(".pl-zone[data-membre]"), function (z) {
@@ -1176,6 +1188,10 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
       function bougeSouris(ev) {
         var dx = ev.clientX - x0, dy = ev.clientY - y0;
         if (!bouge && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        if (!deplacable) {
+          if (!prevenu && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) { prevenu = true; UI.toast("Cette tâche ne te concerne pas : tu peux la consulter, pas la déplacer."); }
+          return;
+        }
         if (!bouge) { bouge = true; n.classList.add("glisse"); document.body.classList.add("glisse-en-cours"); }
         var col1 = colonne(ev.clientX);
         delta = col1 - col0;
@@ -1201,7 +1217,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
         n.classList.remove("glisse");
         document.body.classList.remove("glisse-en-cours");
         n.style.transform = "";
-        if (!bouge) { fiche(info); return; }
+        if (!bouge) { if (!prevenu) fiche(info); return; }
         applique(info, delta, cible ? cible.id : null, cible ? cible.role : null);
       }
 
@@ -1288,6 +1304,8 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function applique(info, delta, membreCible, roleCible) {
     var t = D.tache(info.tache.id);
     if (!t) return;
+    // Flèches du clavier comprises : même règle que le glisser (19.11.2026)
+    if (!D.peutEcrireTache(t)) { UI.toast("Cette tâche ne te concerne pas : tu peux la consulter, pas la déplacer."); return; }
     var champs = {};
     /* Le décalage passe par D.decalePart (12.10.2026) : la part calcul d'une
        tâche enchaînée s'y avance sans toucher au dessin, ou repousse le
@@ -1408,7 +1426,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=10"></script>
+<script src="/planif/assets/aide-fiches.js?v=11"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

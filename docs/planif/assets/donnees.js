@@ -720,6 +720,8 @@
   var index = null;
 
   function idx() {
+    // Page sans état chargé (la console ne lit que le profil) : un index vide, pas une erreur
+    if (!etat) return { membres: {}, affaires: {}, taches: {}, parAffaire: {}, triees: [] };
     if (index && index.v === version &&
         index.m === etat.membres && index.nm === etat.membres.length &&
         index.a === etat.affaires && index.na === etat.affaires.length &&

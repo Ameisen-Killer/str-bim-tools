@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="/planif/assets/echelle.css?v=1">
 <link rel="stylesheet" href="/planif/assets/aide.css?v=2">
 <script src="/planif/assets/echelle.js?v=1"></script>
-<link rel="stylesheet" href="/planif/assets/planif.css?v=114">
+<link rel="stylesheet" href="/planif/assets/planif.css?v=115">
 <link rel="stylesheet" href="/planif/assets/habillage.css?v=28">
 <style>
   /* La console travaille sur des tableaux larges : elle prend toute la fenêtre
@@ -215,9 +215,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 <script src="/planif/assets/calendrier.js?v=7"></script>
 <script src="/planif/assets/config.js?v=1"></script>
 <script src="/planif/assets/supabase.js?v=64"></script>
-<script src="/planif/assets/donnees.js?v=89"></script>
-<script src="/planif/assets/ui.js?v=133"></script>
-<script src="/planif/assets/palette.js?v=23"></script>
+<script src="/planif/assets/donnees.js?v=90"></script>
+<script src="/planif/assets/ui.js?v=134"></script>
+<script src="/planif/assets/palette.js?v=24"></script>
 <script>
 (function () {
   "use strict";
@@ -1610,9 +1610,9 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
   function alerteEnvoi(adresse, e) {
     var m = e.message || "";
     var conseil = /SMTP|équipe Supabase|Limite d'envoi/i.test(m)
-      ? "Branche un serveur d'envoi à toi : voir « 03 — Mise en route », plus bas."
+      ? "Branche un serveur d'envoi à toi : voir la rubrique « Mise en route »."
       : /création de comptes est fermée/i.test(m)
-      ? "Autorise la création des comptes : voir « 03 — Mise en route », plus bas."
+      ? "Autorise la création des comptes : voir la rubrique « Mise en route »."
       : /non autoris/i.test(m)
       ? "La garde a refusé l'adresse : vérifie que son accès est ouvert, dans un bureau ouvert."
       : "";
@@ -1711,7 +1711,7 @@ window.planifSousNav=function(){try{var t=JSON.parse(localStorage.getItem("plani
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=10"></script>
+<script src="/planif/assets/aide-fiches.js?v=11"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

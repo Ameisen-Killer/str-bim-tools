@@ -275,6 +275,7 @@ html[data-direct="oui"] .bulle-en-ligne::after{
 .btn-nu:hover{border-color:var(--ligne)}
 .btn-rouge:hover{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.5);background:transparent}
 .btn[disabled]{opacity:.35;cursor:not-allowed}
+.tache-bascules .ico[disabled]{opacity:.35;cursor:not-allowed}
 /* action en cours : le bouton reste lisible et s'annonce */
 .btn.occupe{opacity:1;cursor:progress}
 .btn.occupe::after{content:"…";margin-left:3px}
@@ -576,7 +577,9 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .modale-pied{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne)}
 .modale-pied .gauche{margin-right:auto}
 /* « Supprimer cette tâche » : au milieu de la rangée (.centre), rouge sans attendre le survol (.vif) */
+/* à égale distance de ses voisins : derrière un bouton de gauche, sa marge gauche ne compte pas double */
 .modale-pied .centre{margin-inline:auto}
+.modale-pied .gauche + .centre{margin-left:0}
 .modale-boite .modale-pied .btn.btn-rouge.vif{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.55);background:transparent}
 .modale-boite .modale-pied .btn.btn-rouge.vif:hover{color:#fff;background:var(--alerte);border-color:var(--alerte)}
 

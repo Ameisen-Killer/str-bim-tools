@@ -466,8 +466,8 @@
       question: "Comment supprimer une tâche ?",
       aussi: ["effacer une tâche", "retirer une tâche", "supprimer une barre"],
       mots: "supprimer tache effacer corbeille barre",
-      reponse: "Clic droit sur la tâche › **Supprimer la tâche** (ou la corbeille de la ligne), ou le bouton rouge **Supprimer cette tâche** en bas de sa fiche rapide et de son formulaire, puis confirme. Ses **dépendances** partent avec elle (la question le dit). « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite ; pour la garder dans l'historique, marque-la plutôt **terminée**.",
-      ici: { tableau: "Clic droit sur la barre › **Supprimer la tâche**, ou le bouton rouge **Supprimer cette tâche** en bas de sa fiche rapide, puis confirme. Ses **dépendances** partent avec elle. « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite." },
+      reponse: "Clic droit sur la tâche › **Supprimer la tâche** (ou la corbeille de la ligne), ou le bouton rouge **Supprimer cette tâche** en bas de sa fiche rapide et de son formulaire (un second clic sur le bouton confirme). Ses **dépendances** partent avec elle (la question le dit). « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite ; pour la garder dans l'historique, marque-la plutôt **terminée**.",
+      ici: { tableau: "Clic droit sur la barre › **Supprimer la tâche**, ou le bouton rouge **Supprimer cette tâche** en bas de sa fiche rapide (un second clic sur le bouton confirme). Ses **dépendances** partent avec elle. « Annuler » dans le message, ou Ctrl+Z, la ramène tout de suite." },
       voir: ["tache-terminer"] },
 
     { id: "tache-decaler", pages: ["tableau", "taches"], frequente: true,
