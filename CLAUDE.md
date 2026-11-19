@@ -14,5 +14,5 @@
   `migration-<sujet>.sql` rejouable poussé sur `main`, tâche GitHub « Migration SQL »
   (`migration-sql.yml`, entrée `fichier`), journal relu, fichier retiré, `base-supabase.sql` à jour.
   Suppression ou réécriture de données : seulement avec l'accord explicite de Tony.
-- Passations par sujet (lisibles par tous les comptes Claude de Tony) : dossier `claude/`.
-  Présentation du planificateur : `claude/presentation-planificateur.md`.
+- Passations par sujet et façon de travailler avec Tony : dépôt privé `Ameisen-Killer/claude-memoire`
+  (lire son `CLAUDE.md`). Le tenir à jour à chaque changement notable.
