@@ -8,7 +8,7 @@
   var DEBUT = .22, FIN = .78;          // part du passage où la capture est agrandie
   var base = (document.currentScript && document.currentScript.src || "").replace(/[^\/]*$/, "");
   var TL = null;
-  fetch(base + "timeline.json?v=2").then(function(r){ return r.json() }).then(function(t){ TL = t });
+  fetch(base + "timeline.json?v=3").then(function(r){ return r.json() }).then(function(t){ TL = t });
 
   var voile = document.createElement("div");
   voile.setAttribute("aria-hidden", "true");
