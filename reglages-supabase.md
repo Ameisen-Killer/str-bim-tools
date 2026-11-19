@@ -77,8 +77,9 @@ il n'est jamais envoyé au serveur du site, et la page ne l'utilise qu'au moment
 valide son mot de passe (un antivirus de messagerie qui ouvre les liens à l'avance ne le grille pas).
 
 Refonte du 19.11.2026 (demande de Tony) : charte du bureau comme dans l'outil (fond `#F4F5F2`, vert
-`#4D7A1C`, logo `docs/planif/assets/logo-ab-courriel.png`, PNG car les messageries n'affichent pas le
-SVG), un objet et un en-tête au nom du bureau pour qu'il ne soit pas pris pour un spam (l'encadré
+`#4D7A1C`, bandeau vert en tête ; pas d'image : Outlook bloque les images distantes et montrait une case
+vide à la place du logo, essai du 19.11.2026 — le PNG `docs/planif/assets/logo-ab-courriel.png` reste
+disponible), un objet et un en-tête au nom du bureau pour qu'il ne soit pas pris pour un spam (l'encadré
 « Ce message est bien réel » a été retiré à la demande de Tony), et aucune
 date limite (le mail n'en parle plus, demande de Tony) : le lien porte l'adresse (`&adresse={{ .Email }}`), et quand son jeton a plus de
 24 heures la page de connexion envoie d'elle-même un lien neuf. Ces modèles valent pour tous les
@@ -94,11 +95,9 @@ Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
   <tr><td align="center" style="padding:28px 12px">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td style="padding:28px 32px 0 32px">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="vertical-align:middle"><img src="https://str-bim-tools.com/planif/assets/logo-ab-courriel.png" width="60" height="57" alt="AB" style="display:block;border:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#4D7A1C"></td>
-          <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
-        </tr></table>
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
+      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
+        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
       </td></tr>
       <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Bienvenue</p>
@@ -108,13 +107,15 @@ Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
            le planning et la charge de l'équipe, les absences, les affaires.</p>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Un accès vient d'être ouvert pour ton adresse <b>{{ .Email }}</b>. Il ne te reste qu'à choisir
            ton mot de passe : tu entres ensuite directement dans l'outil.</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
-          <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=signup&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir mon mot de passe</a></td>
+        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=signup&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir mon mot de passe</a></td>
         </tr></table>
+        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'ab ingénieurs sa, envoyé à {{ .Email }}.<br>
+      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
       Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
     </p>
   </td></tr>
@@ -130,11 +131,9 @@ Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
   <tr><td align="center" style="padding:28px 12px">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td style="padding:28px 32px 0 32px">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="vertical-align:middle"><img src="https://str-bim-tools.com/planif/assets/logo-ab-courriel.png" width="60" height="57" alt="AB" style="display:block;border:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#4D7A1C"></td>
-          <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
-        </tr></table>
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
+      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
+        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
       </td></tr>
       <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Lien de connexion</p>
@@ -143,14 +142,16 @@ Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Voici un lien de connexion au planificateur du bureau pour ton adresse <b>{{ .Email }}</b> :
            tu l'as demandé depuis la page de connexion, ou l'administrateur de l'outil te l'envoie.</p>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Le bouton t'ouvre l'outil et te fait choisir un mot de passe.</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
-          <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=magiclink&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir mon mot de passe</a></td>
+        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=magiclink&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir mon mot de passe</a></td>
         </tr></table>
+        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'ab ingénieurs sa, envoyé à {{ .Email }}.<br>
+      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
       Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
     </p>
   </td></tr>
@@ -166,11 +167,9 @@ Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
   <tr><td align="center" style="padding:28px 12px">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td style="padding:28px 32px 0 32px">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="vertical-align:middle"><img src="https://str-bim-tools.com/planif/assets/logo-ab-courriel.png" width="60" height="57" alt="AB" style="display:block;border:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#4D7A1C"></td>
-          <td style="vertical-align:middle;padding-left:14px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">ab ingénieurs sa<br><b style="color:#202020">Planificateur du bureau</b></td>
-        </tr></table>
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
+      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
+        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
       </td></tr>
       <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
         <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Mot de passe</p>
@@ -178,14 +177,16 @@ Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
         <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Ce lien te permet de choisir un nouveau mot de passe pour le planificateur du bureau
            (adresse <b>{{ .Email }}</b>).</p>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
-          <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=recovery&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir un mot de passe</a></td>
+        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=recovery&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir un mot de passe</a></td>
         </tr></table>
+        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'ab ingénieurs sa, envoyé à {{ .Email }}.<br>
+      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
       Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
     </p>
   </td></tr>
