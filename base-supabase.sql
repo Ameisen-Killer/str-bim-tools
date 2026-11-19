@@ -1765,6 +1765,8 @@ language sql stable security definer set search_path = '' as $$
                 '-infinity'::timestamptz);
 $$;
 revoke all on function public.derniere_venue(text, timestamptz) from public, anon, authenticated;
+comment on function public.derniere_venue(text, timestamptz) is
+  'Dernière venue d''une personne : la plus récente de sa dernière connexion et de sa dernière activité relevée (console).';
 
 create or replace function public.console_etat()
 returns jsonb
