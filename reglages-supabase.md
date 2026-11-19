@@ -76,6 +76,9 @@ Les liens pointent directement sur la page de connexion de l'outil, avec le jeto
 il n'est jamais envoyé au serveur du site, et la page ne l'utilise qu'au moment où la personne
 valide son mot de passe (un antivirus de messagerie qui ouvre les liens à l'avance ne le grille pas).
 
+Version sobre du 19.11.2026 (la première était « grossière » dans Outlook) : pas d'image, pas d'adresse
+dans le texte (Outlook la souligne en bleu), bouton vert clair comme « Enregistrer » dans l'outil, marges
+posées sur les cellules (Outlook ignore celles des liens).
 Refonte du 19.11.2026 (demande de Tony) : charte du bureau comme dans l'outil (fond `#F4F5F2`, vert
 `#4D7A1C`, bandeau vert en tête ; pas d'image : Outlook bloque les images distantes et montrait une case
 vide à la place du logo, essai du 19.11.2026 — le PNG `docs/planif/assets/logo-ab-courriel.png` reste
@@ -88,107 +91,96 @@ Dans **SMTP Settings**, mettre aussi **Sender name** = `Planificateur ab ingéni
 
 ### Confirm signup — invitation d'un nouvel utilisateur
 
-Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
+Sujet : `Planificateur AB ingénieurs : ton accès est ouvert`
 
 ```html
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F4F5F2">Un accès à l'outil de planification du bureau vient d'être ouvert pour toi. Un clic pour choisir ton mot de passe.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
-  <tr><td align="center" style="padding:28px 12px">
-    <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
-      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
-        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F4F5F2">Un accès à l'outil de planification du bureau vient d'être ouvert pour toi.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F5F2" style="background:#F4F5F2">
+  <tr><td align="center" style="padding:32px 12px">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:520px;background:#FFFFFF;border:1px solid #E3E6DE">
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:4px;line-height:4px;font-size:4px">&nbsp;</td></tr>
+      <tr><td style="padding:30px 36px 0 36px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;letter-spacing:.04em;color:#6B7065">
+        <span style="color:#202020;font-weight:600">AB ingénieurs sa</span> &nbsp;·&nbsp; Planificateur
       </td></tr>
-      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
-        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Bienvenue</p>
-        <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Ton accès au planificateur est ouvert</h1>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">ab ingénieurs utilise un outil de planification fait pour le bureau : les tâches et leurs échéances,
-           le planning et la charge de l'équipe, les absences, les affaires.</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Un accès vient d'être ouvert pour ton adresse <b>{{ .Email }}</b>. Il ne te reste qu'à choisir
-           ton mot de passe : tu entres ensuite directement dans l'outil.</p>
-        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+      <tr><td style="padding:22px 36px 0 36px">
+        <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:21px;line-height:1.3;font-weight:600;color:#202020">Ton accès au planificateur est ouvert</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Bonjour,</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">AB ingénieurs utilise un outil de planification fait pour le bureau : les tâches et leurs échéances, le planning et la charge de l'équipe, les absences, les affaires.</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Un accès vient d'être ouvert pour toi. Il ne te reste qu'à choisir ton mot de passe : tu entres ensuite directement dans l'outil.</p>
+      </td></tr>
+      <tr><td style="padding:14px 36px 0 36px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=signup&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir mon mot de passe</a></td>
+          <td bgcolor="#D5E8AC" style="background:#D5E8AC;border-radius:6px;padding:10px 20px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=signup&adresse={{ .Email }}" style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;color:#202020;text-decoration:none">Choisir mon mot de passe</a></td>
         </tr></table>
-        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
+      </td></tr>
+      <tr><td style="padding:22px 36px 30px 36px">
       </td></tr>
     </table>
-    <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
-      Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
-    </p>
+    <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;color:#8A8F84">Message automatique du planificateur d'AB ingénieurs sa.</p>
   </td></tr>
 </table>
 ```
 
 ### Magic Link — lien de connexion, mot de passe oublié
 
-Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
+Sujet : `Planificateur AB ingénieurs : ton lien de connexion`
 
 ```html
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F4F5F2">Voici ton lien pour entrer dans le planificateur du bureau et choisir un mot de passe.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
-  <tr><td align="center" style="padding:28px 12px">
-    <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
-      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
-        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F4F5F2">Ton lien pour entrer dans le planificateur du bureau.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F5F2" style="background:#F4F5F2">
+  <tr><td align="center" style="padding:32px 12px">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:520px;background:#FFFFFF;border:1px solid #E3E6DE">
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:4px;line-height:4px;font-size:4px">&nbsp;</td></tr>
+      <tr><td style="padding:30px 36px 0 36px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;letter-spacing:.04em;color:#6B7065">
+        <span style="color:#202020;font-weight:600">AB ingénieurs sa</span> &nbsp;·&nbsp; Planificateur
       </td></tr>
-      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
-        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Lien de connexion</p>
-        <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Entre dans le planificateur</h1>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Voici un lien de connexion au planificateur du bureau pour ton adresse <b>{{ .Email }}</b> :
-           tu l'as demandé depuis la page de connexion, ou l'administrateur de l'outil te l'envoie.</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Le bouton t'ouvre l'outil et te fait choisir un mot de passe.</p>
-        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+      <tr><td style="padding:22px 36px 0 36px">
+        <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:21px;line-height:1.3;font-weight:600;color:#202020">Ton lien de connexion</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Bonjour,</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Voici ton lien pour entrer dans le planificateur du bureau. Il t'ouvre l'outil et te fait choisir un mot de passe.</p>
+      </td></tr>
+      <tr><td style="padding:14px 36px 0 36px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=magiclink&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir mon mot de passe</a></td>
+          <td bgcolor="#D5E8AC" style="background:#D5E8AC;border-radius:6px;padding:10px 20px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=magiclink&adresse={{ .Email }}" style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;color:#202020;text-decoration:none">Choisir mon mot de passe</a></td>
         </tr></table>
-        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
+      </td></tr>
+      <tr><td style="padding:22px 36px 30px 36px">
+        <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#6B7065">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
-    <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
-      Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
-    </p>
+    <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;color:#8A8F84">Message automatique du planificateur d'AB ingénieurs sa.</p>
   </td></tr>
 </table>
 ```
 
 ### Reset Password — réinitialisation lancée depuis Supabase
 
-Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
+Sujet : `Planificateur AB ingénieurs : nouveau mot de passe`
 
 ```html
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#F4F5F2">Un lien pour choisir un nouveau mot de passe du planificateur du bureau.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F4F5F2">
-  <tr><td align="center" style="padding:28px 12px">
-    <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCDFD6;border-radius:10px">
-      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:10px;line-height:10px;font-size:10px;border-radius:10px 10px 0 0">&nbsp;</td></tr>
-      <tr><td style="padding:24px 32px 0 32px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:#5E6358">
-        <b style="font-size:16px;color:#202020">AB ingénieurs sa</b><br>Planificateur du bureau
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F5F2" style="background:#F4F5F2">
+  <tr><td align="center" style="padding:32px 12px">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:520px;background:#FFFFFF;border:1px solid #E3E6DE">
+      <tr><td bgcolor="#CAE09B" style="background:#CAE09B;height:4px;line-height:4px;font-size:4px">&nbsp;</td></tr>
+      <tr><td style="padding:30px 36px 0 36px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;letter-spacing:.04em;color:#6B7065">
+        <span style="color:#202020;font-weight:600">AB ingénieurs sa</span> &nbsp;·&nbsp; Planificateur
       </td></tr>
-      <tr><td style="padding:26px 32px 22px 32px;font-family:Arial,Helvetica,sans-serif;color:#202020">
-        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#4D7A1C">Mot de passe</p>
-        <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;font-weight:bold;color:#202020">Choisis un nouveau mot de passe</h1>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Bonjour,</p>
-        <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Ce lien te permet de choisir un nouveau mot de passe pour le planificateur du bureau
-           (adresse <b>{{ .Email }}</b>).</p>
-        <div style="height:10px;line-height:10px;font-size:10px">&nbsp;</div>
+      <tr><td style="padding:22px 36px 0 36px">
+        <p style="margin:0 0 16px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:21px;line-height:1.3;font-weight:600;color:#202020">Nouveau mot de passe</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Bonjour,</p>
+        <p style="margin:0 0 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#202020">Ce lien te permet de choisir un nouveau mot de passe pour le planificateur du bureau.</p>
+      </td></tr>
+      <tr><td style="padding:14px 36px 0 36px">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td bgcolor="#4D7A1C" style="background:#4D7A1C;border-radius:8px;padding:14px 26px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=recovery&adresse={{ .Email }}" style="font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none">Choisir un mot de passe</a></td>
+          <td bgcolor="#D5E8AC" style="background:#D5E8AC;border-radius:6px;padding:10px 20px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=recovery&adresse={{ .Email }}" style="font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;color:#202020;text-decoration:none">Choisir un mot de passe</a></td>
         </tr></table>
-        <div style="height:16px;line-height:16px;font-size:16px">&nbsp;</div>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
+      </td></tr>
+      <tr><td style="padding:22px 36px 30px 36px">
+        <p style="margin:0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#6B7065">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
-    <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
-      Message automatique du planificateur d'AB ingénieurs sa, envoyé à {{ .Email }}.<br>
-      Page de connexion : <a href="https://str-bim-tools.com/planif/connexion/" style="color:#4D7A1C">str-bim-tools.com/planif/connexion</a>
-    </p>
+    <p style="margin:14px 0 0;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;color:#8A8F84">Message automatique du planificateur d'AB ingénieurs sa.</p>
   </td></tr>
 </table>
 ```
