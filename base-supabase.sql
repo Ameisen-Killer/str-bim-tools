@@ -1754,6 +1754,18 @@ end $$;
 -- le reste du site, c'est ici que se trouve la serrure.
 
 -- Tout ce que la console affiche, en un seul appel
+-- Dernière venue (19.11.2026) : la console affichait la dernière saisie du mot de passe
+-- (auth.users.last_sign_in_at), alors qu'une session reste ouverte des semaines. On retient
+-- le plus récent des deux : cette connexion, ou la dernière activité relevée dans l'outil.
+create or replace function public.derniere_venue(p_email text, p_connexion timestamptz)
+returns timestamptz
+language sql stable security definer set search_path = '' as $$
+  select nullif(greatest(coalesce(p_connexion, '-infinity'::timestamptz),
+                         coalesce((select max(a.fin) from public.activite a where a.email = lower(p_email)), '-infinity'::timestamptz)),
+                '-infinity'::timestamptz);
+$$;
+revoke all on function public.derniere_venue(text, timestamptz) from public, anon, authenticated;
+
 create or replace function public.console_etat()
 returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -1813,7 +1825,7 @@ begin
           'email', a.email, 'accesActif', a.actif, 'superAdmin', coalesce(a.super_admin, false),
           'compte', u.id is not null,
           'confirme', u.email_confirmed_at is not null,
-          'derniereConnexion', u.last_sign_in_at,
+          'derniereConnexion', public.derniere_venue(a.email, u.last_sign_in_at),
           'taches', (select count(*) from public.taches t
                       where t.ingenieur_id = m.id or t.dessinateur_id = m.id))
         order by lower(m.prenom), lower(m.nom))
@@ -1827,7 +1839,7 @@ begin
           'actif', a.actif, 'droit', a.droit, 'ajoute', a.ajoute_le, 'membreId', a.membre_id,
           'compte', u.id is not null,
           'confirme', u.email_confirmed_at is not null,
-          'derniereConnexion', u.last_sign_in_at)
+          'derniereConnexion', public.derniere_venue(a.email, u.last_sign_in_at))
         order by a.email)
       from public.acces a
       left join auth.users u on lower(u.email) = a.email), '[]'::jsonb)
@@ -1855,7 +1867,7 @@ begin
       select jsonb_agg(jsonb_build_object(
                'email', a.email, 'bureauId', a.bureau_id, 'actif', a.actif, 'superAdmin', a.super_admin,
                'prenom', m.prenom, 'nom', m.nom, 'photo', m.photo,
-               'derniereConnexion', u.last_sign_in_at)
+               'derniereConnexion', public.derniere_venue(a.email, u.last_sign_in_at))
              order by a.email)
         from public.acces a
         left join public.membres m on m.id = a.membre_id
