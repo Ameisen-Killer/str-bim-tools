@@ -5,6 +5,10 @@ name: Captures de la présentation
 
 on:
   workflow_dispatch:
+    inputs:
+      seulement:
+        description: "vide : toutes les captures ; aide : seulement celle de l'aide"
+        default: ""
 
 permissions:
   contents: write
@@ -29,6 +33,8 @@ jobs:
           npm i --no-save playwright@1.49.1
           npx playwright install --with-deps chromium
       - name: Captures
+        env:
+          SEULEMENT: ${{ github.event.inputs.seulement }}
         run: SORTIE="$GITHUB_WORKSPACE/docs/planificateur-presentation-q7k3/captures" node captures.mjs
         working-directory: outils/presentation
       - name: Publication

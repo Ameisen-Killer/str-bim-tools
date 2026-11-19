@@ -76,14 +76,17 @@ const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, devic
 await marqueBureau(ctx);
 const page = await ctx.newPage();
 await entreEnDemo(page);
-for (const [nom, chemin, filtre] of PAGES) await photo(page, nom, chemin, filtre);
+// SEULEMENT=aide : ne refaire que la capture de l'aide
+const SEULEMENT = process.env.SEULEMENT || "";
+if (!SEULEMENT) for (const [nom, chemin, filtre] of PAGES) await photo(page, nom, chemin, filtre);
 
 // L'aide « Charlie » ouverte sur une question
 try {
-  await page.goto(SITE + "/planif/absences/", { waitUntil: "networkidle" });
-  await pause(2000);
+  // sur Tâches, question sur les tâches (19.11.2026 : rien sur les congés ni les absences)
+  await page.goto(SITE + "/planif/taches/", { waitUntil: "load", timeout: 60000 });
+  await pause(5000);
   await page.click(".aide-bouton");
-  await page.fill(".aide-saisie", "Comment je demande un congé ?");
+  await page.fill(".aide-saisie", "Comment créer une tâche ?");
   await page.keyboard.press("Enter");
   await pause(2500);
   await page.mouse.move(2, 2);
@@ -94,6 +97,7 @@ await ctx.close();
 
 // Téléphone (format Galaxy S24)
 const tel = await nav.newContext({ viewport: { width: 384, height: 832 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "fr-CH", timezoneId: "Europe/Zurich" });
+if (SEULEMENT) { await nav.close(); process.exit(0); }
 await marqueBureau(tel);
 const pt = await tel.newPage();
 await entreEnDemo(pt);
