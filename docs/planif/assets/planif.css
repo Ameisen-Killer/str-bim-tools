@@ -575,6 +575,10 @@ button.etiq:focus-visible{outline:1px solid var(--or);outline-offset:2px}
 .modale-tete .surtitre{margin-bottom:8px}
 .modale-pied{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px;padding-top:20px;border-top:1px solid var(--ligne)}
 .modale-pied .gauche{margin-right:auto}
+/* bouton seul, centré tout en bas : « Supprimer cette tâche », rouge sans attendre le survol */
+.modale-bas{display:flex;justify-content:center;margin-top:14px}
+.modale-boite .modale-bas .btn.btn-rouge{color:var(--alerte);border-color:rgba(var(--alerte-rvb),.55);background:transparent}
+.modale-boite .modale-bas .btn.btn-rouge:hover{color:#fff;background:var(--alerte);border-color:var(--alerte)}
 
 /* Fenêtre resserrée (formulaire de tâche) : moins de blanc, champs sur deux
    colonnes (une sur téléphone). Les intertitres, moins espacés, prennent un
@@ -1226,6 +1230,7 @@ html.palette-ouverte{overflow:hidden}
   .modale-pied{flex-direction:column-reverse;align-items:stretch}
   .modale-pied .btn{justify-content:center}
   .modale-pied .gauche{margin-right:0;margin-top:6px}
+  .modale-bas .btn{width:100%;justify-content:center}
   footer.pied-outil .maj{display:none}
 
   /* barre : compacte, les quatre sections tiennent sans défiler */

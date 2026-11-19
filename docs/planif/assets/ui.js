@@ -142,8 +142,9 @@
   }
 
   /**
-   * ouvre({surtitre, titre, corps:Node, compacte, boutons:[{label, or, rouge, gauche, entree, action}]})
+   * ouvre({surtitre, titre, corps:Node, compacte, boutons:[{label, or, rouge, gauche, centre, entree, action}]})
    * L'action peut renvoyer une promesse ; renvoyer false empêche la fermeture.
+   * centre : bouton posé seul, centré, tout en bas de la fenêtre (« Supprimer cette tâche »).
    * compacte : fenêtre resserrée (planif.css) ; entree : bouton déclenché par la touche Entrée.
    */
   function ouvre(o) {
@@ -165,7 +166,7 @@
 
     if (o.corps) boite.appendChild(o.corps);
 
-    var pied = el("div", { class: "modale-pied" });
+    var pied = el("div", { class: "modale-pied" }), bas = el("div", { class: "modale-bas" });
     (o.boutons || []).forEach(function (b) {
       if (!b) return;                         // bouton absent selon les droits
       var bouton = el("button", {
@@ -187,9 +188,10 @@
         }
       }, [b.label]);
       if (b.entree) boutonEntree = bouton;
-      pied.appendChild(bouton);
+      (b.centre ? bas : pied).appendChild(bouton);
     });
     if (pied.childNodes.length) boite.appendChild(pied);
+    if (bas.childNodes.length) boite.appendChild(bas);
 
     modale.classList.add("ouverte");
     document.documentElement.style.overflow = "hidden";
@@ -1855,12 +1857,22 @@
    *  au tableau de bord). Ses dépendances partent avec elle : la question le dit.
    *  Le droit est celui de toujours : ses tâches, ou « Créer des tâches pour
    *  les autres » (console) ; la base applique la même règle. */
-  function supprimeTache(t, apres) {
+  /** Bouton « Supprimer cette tâche », rouge, centré en bas de la fiche et du
+   *  formulaire d'une tâche (19.11.2026, demande de Tony). `rouvre` : ramène la
+   *  fenêtre si l'on répond « Annuler » à la question. */
+  function boutonSupprimeTache(t, apres, rouvre) {
+    return {
+      label: "Supprimer cette tâche", rouge: true, centre: true,
+      action: function () { supprimeTache(t, apres, rouvre); return false; }
+    };
+  }
+  function supprimeTache(t, apres, siAnnule) {
     if (!t) return;
     var n = D.dependances(t.id).length;
     var detail = t.titre + (n ? " — avec " + (n > 1 ? "ses " + n + " dépendances" : "sa dépendance") : "");
     return confirme("Supprimer la tâche ?", detail, "Supprimer", true).then(function (ok) {
-      if (!ok) return;
+      // Refus : la fenêtre d'où l'on venait revient (après la fermeture de la question)
+      if (!ok) { if (siAnnule) setTimeout(siAnnule, 0); return; }
       return D.suppTache(t.id).then(function () {
         if (apres) apres();
         toast(n ? "Tâche supprimée, avec " + (n > 1 ? "ses dépendances." : "sa dépendance.") : "Tâche supprimée.");
@@ -2099,7 +2111,8 @@
       corps: corps,
       boutons: lectureSeule
         ? [detail, { label: "Fermer" }]
-        : [detail, { label: "Fermer" }, { label: "Enregistrer", or: true, entree: true, action: enregistre }]
+        : [detail, { label: "Fermer" }, { label: "Enregistrer", or: true, entree: true, action: enregistre },
+           boutonSupprimeTache(t, o.surEnregistrement, function () { ficheTache(idTache, o); })]
     });
   }
 
@@ -2550,7 +2563,8 @@
           setTimeout(function () { formulaireTache(principale.id, o); }, 0);
         } } : null,
         { label: "Annuler" },
-        { label: "Enregistrer", or: true, entree: true, action: enregistre }
+        { label: "Enregistrer", or: true, entree: true, action: enregistre },
+        t ? boutonSupprimeTache(t, o.surEnregistrement, function () { formulaireTache(idTache, o); }) : null
       ]
     });
   }
