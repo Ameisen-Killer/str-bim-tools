@@ -144,7 +144,7 @@
   /**
    * ouvre({surtitre, titre, corps:Node, compacte, boutons:[{label, or, rouge, gauche, centre, entree, action}]})
    * L'action peut renvoyer une promesse ; renvoyer false empêche la fermeture.
-   * centre : bouton posé seul, centré, tout en bas de la fenêtre (« Supprimer cette tâche »).
+   * centre : bouton centré sur la rangée, entre ceux de gauche et de droite (« Supprimer cette tâche »).
    * compacte : fenêtre resserrée (planif.css) ; entree : bouton déclenché par la touche Entrée.
    */
   function ouvre(o) {
@@ -166,11 +166,11 @@
 
     if (o.corps) boite.appendChild(o.corps);
 
-    var pied = el("div", { class: "modale-pied" }), bas = el("div", { class: "modale-bas" });
+    var pied = el("div", { class: "modale-pied" });
     (o.boutons || []).forEach(function (b) {
       if (!b) return;                         // bouton absent selon les droits
       var bouton = el("button", {
-        class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : ""),
+        class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : "") + (b.centre ? " centre" : ""),
         type: "button",
         onclick: function () {
           var r = b.action ? b.action() : true;
@@ -188,10 +188,9 @@
         }
       }, [b.label]);
       if (b.entree) boutonEntree = bouton;
-      (b.centre ? bas : pied).appendChild(bouton);
+      pied.appendChild(bouton);
     });
     if (pied.childNodes.length) boite.appendChild(pied);
-    if (bas.childNodes.length) boite.appendChild(bas);
 
     modale.classList.add("ouverte");
     document.documentElement.style.overflow = "hidden";
@@ -1857,7 +1856,7 @@
    *  au tableau de bord). Ses dépendances partent avec elle : la question le dit.
    *  Le droit est celui de toujours : ses tâches, ou « Créer des tâches pour
    *  les autres » (console) ; la base applique la même règle. */
-  /** Bouton « Supprimer cette tâche », rouge, centré en bas de la fiche et du
+  /** Bouton « Supprimer cette tâche », rouge, au milieu de la rangée de boutons de la fiche et du
    *  formulaire d'une tâche (19.11.2026, demande de Tony). `rouvre` : ramène la
    *  fenêtre si l'on répond « Annuler » à la question. */
   function boutonSupprimeTache(t, apres, rouvre) {
@@ -2111,8 +2110,8 @@
       corps: corps,
       boutons: lectureSeule
         ? [detail, { label: "Fermer" }]
-        : [detail, { label: "Fermer" }, { label: "Enregistrer", or: true, entree: true, action: enregistre },
-           boutonSupprimeTache(t, o.surEnregistrement, function () { ficheTache(idTache, o); })]
+        : [detail, boutonSupprimeTache(t, o.surEnregistrement, function () { ficheTache(idTache, o); }),
+           { label: "Fermer" }, { label: "Enregistrer", or: true, entree: true, action: enregistre }]
     });
   }
 
@@ -2562,9 +2561,9 @@
         principale ? { label: "Ouvrir la tâche principale", gauche: true, action: function () {
           setTimeout(function () { formulaireTache(principale.id, o); }, 0);
         } } : null,
+        t ? boutonSupprimeTache(t, o.surEnregistrement, function () { formulaireTache(idTache, o); }) : null,
         { label: "Annuler" },
-        { label: "Enregistrer", or: true, entree: true, action: enregistre },
-        t ? boutonSupprimeTache(t, o.surEnregistrement, function () { formulaireTache(idTache, o); }) : null
+        { label: "Enregistrer", or: true, entree: true, action: enregistre }
       ]
     });
   }
