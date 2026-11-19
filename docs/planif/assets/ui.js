@@ -1817,36 +1817,6 @@
     });
   }
 
-  /* ---------------------------------------------------------------- tâche
-     Formulaire complet d'une tâche, commun à la page Tâches et au tableau de
-     bord : il s'ouvre sur place, sans changer de page. */
-
-  function selMembres(nom, role, valeur, affaireId) {
-    var sel = el("select", { name: nom, id: "c-" + nom });
-    sel.appendChild(el("option", { value: "" }, ["— À affecter —"]));
-
-    var aff = affaireId ? D.affaire(affaireId) : null;
-    var idsEquipe = aff ? (role === "ingenieur" ? aff.ingenieurs : aff.dessinateurs) : [];
-    // Un inactif qui porte déjà la tâche reste proposé : absent de la liste, la
-    // tâche ne pouvait plus être enregistrée sans lui choisir un remplaçant.
-    var tous = D.membres({ cote: role, tous: true }).filter(function (m) { return m.actif || m.id === valeur; });
-    var equipe = tous.filter(function (m) { return idsEquipe.indexOf(m.id) >= 0; });
-    var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
-
-    function groupe(label, liste) {
-      if (!liste.length) return;
-      var g = el("optgroup", { label: label });
-      liste.forEach(function (m) {
-        g.appendChild(el("option", { value: m.id, selected: m.id === valeur }, [m.prenom + " " + m.nom + (D.aStatut(m, "administrateur") ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
-      });
-      sel.appendChild(g);
-    }
-    groupe("Équipe de l'affaire", equipe);
-    groupe(equipe.length ? "Autres" : "Équipe", autres);
-    sel.value = valeur || "";
-    return sel;
-  }
-
   /* ------------------------------------------------------- fiche rapide */
 
   /**
@@ -2277,7 +2247,6 @@
       return toast("Sans le droit de créer des tâches pour les autres, une tâche que tu crées est la tienne : tu peux en revanche confier ses dépendances à des collègues.");
     }
     var lectureSeule = !libre && !!t && !D.meConcerne(t);
-    var actives = D.dependancesActives();
 
     // La tâche principale, quand celle-ci est une dépendance
     var principale = t ? D.principale(t) : null;
@@ -2451,11 +2420,9 @@
     if (!principale) {
       blocDeps = el("fieldset", { class: "deps" }, [
         el("div", { class: "legende", text: "Dépendances" }),
-        el("div", { class: "aide deps-aide", text: actives
-          ? "À faire avant la tâche : chaque dépendance est rendue la veille du jour où la tâche commence."
-          : "Les dépendances seront disponibles dès que la base aura été mise à jour (migration-dependances.sql)." }),
+        el("div", { class: "aide deps-aide", text: "À faire avant la tâche : chaque dépendance est rendue la veille du jour où la tâche commence." }),
         listeDeps,
-        actives ? boutonDep : null
+        boutonDep
       ]);
     }
     var echInit = t ? t.echeance : (o.echeance || b.echeance || "");
@@ -2543,10 +2510,6 @@
         var l = lignesDeps[i], cd = nombre(l.charge.value);
         if (!(cd > 0)) { toast("Indique la charge de la dépendance " + (i + 1) + ", ou retire-la."); return false; }
         deps.push({ ligne: l, parts: partsDe(l.boite.querySelector("select").value, cd, l.cote) });
-      }
-      if (deps.length && !actives) {
-        toast("Les dépendances ne peuvent pas encore être enregistrées : la base doit d'abord être mise à jour (migration-dependances.sql).");
-        return false;
       }
       var echBrouillon = {};
       Object.keys(champs).forEach(function (k) { echBrouillon[k] = champs[k]; });
@@ -3165,110 +3128,6 @@
     if (boutons[0]) boutons[0].focus({ preventScroll: true });
   }
 
-  /* ------------------------------------------------ filtre à cases
-     Un menu déroulant où l'on coche plusieurs valeurs (13.10.2026 : affaires,
-     succursales, secteurs, fonctions, membres). Aucune valeur retenue = tout,
-     affiché toutes cases cochées. Une option peut porter un « groupe »
-     (intertitre) ; au-delà de dix options, un champ de recherche filtre la liste.
-       multiChoix({ libelle, tous, pluriel, options:[{valeur,label,groupe}], valeurs:[], surChange(valeurs) })
-     Tous les menus (13.10.2026, demande de Tony) : « tout » s'affiche toutes
-     cases cochées ; on décoche ce qu'on ne veut pas voir, la dernière case
-     cochée ne se décoche pas, et tout cocher revient à « tout » (rien de retenu).
-     Partout (13.10.2026, demande de Tony) : la case coche ou décoche, un clic
-     sur l'intitulé n'affiche que ce choix.
-     Renvoie { noeud, valeurs(), pose(valeurs) }. */
-  function multiChoix(o) {
-    var choisis = (o.valeurs || []).slice();
-    var texte = el("span", { class: "mc-texte" });
-    var bouton = el("button", { type: "button", class: "btn mc-bouton", "aria-haspopup": "true", "aria-expanded": "false",
-      "aria-label": o.libelle }, [texte, el("span", { class: "mc-fleche", "aria-hidden": "true", text: "▾" })]);
-    var liste = el("div", { class: "mc-liste" });
-    var cherche = o.options.length > 10 ? el("input", { type: "search", class: "mc-cherche", placeholder: "Chercher…", "aria-label": "Chercher dans la liste" }) : null;
-    // o.large : un panneau large, une ligne par option (les affaires, codes et noms longs)
-    var panneau = el("div", { class: "mc-panneau" + (o.large ? " mc-large" : ""), hidden: true, role: "group", "aria-label": o.libelle }, [
-      cherche,
-      liste,
-      el("div", { class: "mc-pied" }, [
-        el("button", { type: "button", class: "mc-lien", text: "Tout afficher", onclick: function () { choisis = []; maj(true); } })
-      ])
-    ]);
-    var noeud = el("div", { class: "mc" }, [bouton, panneau]);
-
-    function libelleDe(v) {
-      var t = o.options.filter(function (x) { return x.valeur === v; })[0];
-      return t ? t.label : v;
-    }
-    // Les cases, construites une fois ; un changement ne fait que les recocher
-    var groupe = null, intertitres = [];
-    var cases = o.options.map(function (x) {
-      if (x.groupe && x.groupe !== groupe) {
-        groupe = x.groupe;
-        var t = el("div", { class: "mc-groupe", text: x.groupe });
-        intertitres.push(t);
-        liste.appendChild(t);
-      }
-      var c = el("input", { type: "checkbox", value: x.valeur });
-      c.addEventListener("change", function () {
-        var base = !choisis.length ? o.options.map(function (y) { return y.valeur; }) : choisis;
-        base = c.checked ? base.filter(function (v) { return v !== x.valeur; }).concat([x.valeur]) : base.filter(function (v) { return v !== x.valeur; });
-        if (!base.length) { c.checked = true; return; }   // au moins une case
-        choisis = base.length >= o.options.length ? [] : base;
-        maj(true);
-      });
-      var ligne = el("label", { class: "mc-option", title: x.label, dataset: { groupe: x.groupe || "", texte: simplifie(x.label + " " + (x.groupe || "")) } }, [c, el("span", { text: x.label })]);
-      // L'intitulé (et le blanc autour) : seulement ce choix ; la case garde son rôle
-      ligne.addEventListener("click", function (e) {
-        if (e.target === c) return;
-        e.preventDefault();
-        choisis = [x.valeur];
-        maj(true);
-      });
-      liste.appendChild(ligne);
-      return c;
-    });
-    function simplifie(t) { return String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
-    if (cherche) cherche.addEventListener("input", function () {
-      var mots = simplifie(cherche.value).split(/\s+/).filter(Boolean), vus = {};
-      cases.forEach(function (c) {
-        var lab = c.parentNode, ok = mots.every(function (m) { return lab.dataset.texte.indexOf(m) >= 0; });
-        lab.hidden = !ok;
-        if (ok) vus[lab.dataset.groupe] = true;
-      });
-      intertitres.forEach(function (t) { t.hidden = !vus[t.textContent]; });
-    });
-    function maj(prevenir) {
-      choisis = choisis.filter(function (v) { return o.options.some(function (x) { return x.valeur === v; }); });
-      if (choisis.length >= o.options.length) choisis = [];
-      texte.textContent = !choisis.length ? o.tous
-        : choisis.length === 1 ? libelleDe(choisis[0])
-        : choisis.length + " " + o.pluriel;
-      bouton.classList.toggle("actif", choisis.length > 0);
-      cases.forEach(function (c) { c.checked = !choisis.length || choisis.indexOf(c.value) >= 0; });
-      if (prevenir && o.surChange) o.surChange(choisis.slice());
-    }
-    function ouvre(oui) {
-      panneau.hidden = !oui;
-      bouton.setAttribute("aria-expanded", String(oui));
-      if (oui) {
-        // Calé à droite du bouton s'il sortirait de l'écran
-        panneau.classList.remove("a-droite");
-        if (panneau.getBoundingClientRect().right > global.innerWidth - 8) panneau.classList.add("a-droite");
-        var premier = panneau.querySelector("input"); if (premier) premier.focus();
-      }
-      else if (cherche && cherche.value) { cherche.value = ""; cherche.dispatchEvent(new Event("input")); }
-    }
-    bouton.addEventListener("click", function () { ouvre(panneau.hidden); });
-    document.addEventListener("pointerdown", function (e) { if (!panneau.hidden && !noeud.contains(e.target)) ouvre(false); });
-    noeud.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panneau.hidden) { e.stopPropagation(); ouvre(false); bouton.focus(); } });
-    maj(false);
-    return {
-      noeud: noeud,
-      valeurs: function () { return choisis.slice(); },
-      pose: function (v) { choisis = (v || []).slice(); maj(false); },
-      texte: function () { return choisis.length ? choisis.map(libelleDe).join(", ") : ""; }
-    };
-  }
-
   /* ------------------------------------------------ liste avec recherche
      Pose une recherche sur un <select> (13.10.2026, demande de Tony). Le
      select garde son allure et sa valeur — le code qui l'écoute ne change
@@ -3742,7 +3601,7 @@
 
   global.UI = {
     el: el, vide: vide, teinte: teinte, toast: toast, boutonIcone: boutonIcone, lienIcone: lienIcone,
-    ouvre: ouvre, ferme: ferme, confirme: confirme, multiChoix: multiChoix, listeCherchable: listeCherchable,
+    ouvre: ouvre, ferme: ferme, confirme: confirme, listeCherchable: listeCherchable,
     champ: champ, cases: cases, lit: lit, optionsParMetier: optionsParMetier,
     etiquettesStatuts: etiquettesStatuts,
     chrome: chrome, pied: pied, bandeauDemo: bandeauDemo, rafraichit: rafraichit,

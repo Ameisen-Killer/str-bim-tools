@@ -1713,10 +1713,6 @@
     },
     /** La tâche principale d'une dépendance, ou null. */
     principale: function (t) { return t && t.avant ? D.tache(t.avant) : null; },
-    /** Les dépendances peuvent-elles s'enregistrer ? Base sans migration-dependances.sql : non. */
-    dependancesActives: function () {
-      return !(global.Sb && global.Sb.configure && ADAPTATEUR === global.Sb.ADAPT) || !!(global.Sb.dependances && global.Sb.dependances());
-    },
     /** Numéro de version de l'état : change à chaque enregistrement. Sert de clé aux calculs mis en cache. */
     version: function () { return version; },
 

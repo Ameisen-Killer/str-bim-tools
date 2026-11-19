@@ -23,7 +23,7 @@
   var ETATS = [["nouvelle", "Nouvelle"], ["lue", "Lue"], ["retenue", "Pris en compte"], ["faite", "Réalisée"], ["ecartee", "Rejeté"]];
   var A_TRAITER = { nouvelle: 1, lue: 1, retenue: 1 };
 
-  var hote = null, identite = {}, baseOk = true, idees = [], filtre = "traiter";
+  var hote = null, identite = {}, idees = [], filtre = "traiter";
 
   /* ------------------------------------------------------------ où écrire */
 
@@ -78,8 +78,7 @@
         var j = null;
         try { j = JSON.parse(txt); } catch (e) { j = null; }
         var m = (j && (j.message || j.error)) || ("Erreur " + r.status);
-        if (/bucket not found/i.test(m)) m = "Le stockage des captures n'est pas encore créé (migration de la boîte à idées).";
-        else if (/row-level security|unauthorized|403/i.test(m)) m = "Dépôt de la capture refusé par la base.";
+        if (/row-level security|unauthorized|403/i.test(m)) m = "Dépôt de la capture refusé par la base.";
         throw new Error(m);
       });
     });
@@ -111,14 +110,6 @@
     if (!enBase()) { idees = litLocal(); return Promise.resolve(idees); }
     return SB.requete("idees?select=id,auteur_nom,auteur_email,bureau_nom,texte,captures,statut,cree_le&order=cree_le.desc&limit=500")
       .then(function (l) { idees = (l || []).map(depuisBase); return idees; });
-  }
-
-  /** La table existe-t-elle ? (la RLS rend une liste vide à qui n'a pas le droit) */
-  function sonde() {
-    if (!enBase()) return Promise.resolve(true);
-    return SB.requete("idees?select=id&limit=1").then(function () { return true; }, function (e) {
-      return !(e && /PGRST205|42P01/.test(e.code || "")) && !/idees/.test(e && e.message || "");
-    });
   }
 
   function enregistre(texte, captures) {
@@ -465,10 +456,6 @@
   function actualise() {
     if (!hote) return;
     var actions = P.vide(hote.querySelector(".ab-id-boutons"));
-    if (!baseOk) {
-      actions.appendChild(el("span", { class: "ab-id-note", text: "Base à mettre à jour : migration de la boîte à idées à lancer." }));
-      return;
-    }
     actions.appendChild(el("button", { type: "button", class: "ab-id-btn principal", onclick: proposer }, [
       P.svg("0 0 24 24", '<path d="M12 5v14M5 12h14"/>'), "Proposer une idée"
     ]));
@@ -487,7 +474,8 @@
     if (!hote) return;
     var p = hote.querySelector(".ab-id-texte-intro");
     if (p && peutLire()) p.textContent = "Une idée, une remarque, quelque chose qui coince ? Écris-le, ajoute des captures d'écran. En administrateur du site, tu les lis toutes.";
-    sonde().then(function (ok) { baseOk = ok; actualise(); });
+    // Table et stockage sont en base (contrôlé le 19.11.2026) : plus de sonde ni de message de migration
+    actualise();
   }
 
   global.Idees = { monte: monte };

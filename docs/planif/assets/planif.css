@@ -491,7 +491,7 @@ table.liste tr.groupe-vide td{padding:14px 0}
 .ico-lien{--ico:url(/planif/icons/mail_send.svg?v=1)}
 .ico-carte{--ico:url(/planif/icons/map_marker.svg?v=1)}
 .ico-jours{--ico:url(/planif/icons/calendar_week.svg?v=1)}
-.ico-avancement{--ico:url(/planif/icons/gauge.svg?v=1)}   /* avancement et facturation du mandat */
+.ico-avancement{--ico:url(/planif/icons/gauge.svg?v=2)}   /* avancement et facturation du mandat */
 table.liste td.actions > *{vertical-align:middle}              /* boutons texte et icônes sur une même ligne */
 table.liste td.actions .ico + .ico{margin-left:4px}
 table.liste td.actions .btn + .ico{margin-left:8px}
@@ -1556,7 +1556,7 @@ html.dp-maison input[type="date"]::-webkit-calendar-picker-indicator,
 html.dp-maison input[type="time"]::-webkit-calendar-picker-indicator{display:none}
 html.dp-maison input[type="time"],html.dp-maison:root[data-version] .champ input[type="time"]{
   padding-right:38px;cursor:pointer;
-  background-image:url(/planif/icons/clock.svg?v=1);background-repeat:no-repeat;
+  background-image:url(/planif/icons/clock.svg?v=2);background-repeat:no-repeat;
   background-position:right 11px center;background-size:17px;
 }
 html.dp-maison input[type="date"],html.dp-maison:root[data-version] .champ input[type="date"]{
@@ -1659,7 +1659,7 @@ html.dp-maison input[type="date"]:disabled{cursor:default}
 
 /* Choisir une heure (ui.js, ouvreHorloge, 13.10.2026) : des créneaux d'un
    quart d'heure, à la façon des agendas */
-.ico-horloge{--ico:url(/planif/icons/clock.svg?v=1)}
+.ico-horloge{--ico:url(/planif/icons/clock.svg?v=2)}
 .dp.hl{width:216px;padding:0 0 8px;overflow:hidden}
 .dp.hl.avec-duree{width:262px}
 .hl-tete{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;font-size:13px;font-weight:700;color:var(--texte-doux);border-bottom:1px solid var(--ligne-faible)}
