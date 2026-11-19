@@ -10,9 +10,13 @@
 - Interdit sans demande explicite : serveur local, capture Chromium/Playwright, jsdom, base Postgres
   jetable, faux serveur Supabase, script d'essai. La relecture se fait en lisant le code.
 - Avant de toucher au site, charger le skill `str-bim-tools-site` : tout le reste y est.
-- Base Supabase : Claude fait lui-même les modifications (demande de Tony, 16.11.2026) —
-  `migration-<sujet>.sql` rejouable poussé sur `main`, tâche GitHub « Migration SQL »
-  (`migration-sql.yml`, entrée `fichier`), journal relu, fichier retiré, `base-supabase.sql` à jour.
-  Suppression ou réécriture de données : seulement avec l'accord explicite de Tony.
+- Base Supabase : Claude fait lui-même les modifications (demande de Tony, 16.11.2026), **par le
+  connecteur Supabase** de la session (demande de Tony, 19.11.2026) : projet « Planif », SQL rejouable
+  appliqué avec `apply_migration` (lecture et contrôle avec `execute_sql`), `base-supabase.sql` mis à
+  jour dans le même commit. Sans connecteur dans la session : ancienne voie, `migration-<sujet>.sql`
+  poussé sur `main`, tâche GitHub « Migration SQL » (`migration-sql.yml`, entrée `fichier`), journal
+  relu, fichier retiré. Le connecteur ne règle pas l'authentification (modèles de courriels, SMTP) :
+  c'est Tony qui le fait dans Supabase. Suppression ou réécriture de données : seulement avec
+  l'accord explicite de Tony.
 - Passations par sujet et façon de travailler avec Tony : dépôt privé `Ameisen-Killer/claude-memoire`
   (lire son `CLAUDE.md`). Le tenir à jour à chaque changement notable.
