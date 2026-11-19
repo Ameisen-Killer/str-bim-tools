@@ -3,9 +3,9 @@
    (autant de blocs que d'entrées dans timeline.json). */
 (function(){
   var base=(document.currentScript&&document.currentScript.src||"").replace(/[^\/]*$/,"");
-  fetch(base+"timeline.json?v=6").then(function(r){return r.json()}).then(function(TL){
+  fetch(base+"timeline.json?v=7").then(function(r){return r.json()}).then(function(TL){
     var d=document.createElement("div"); d.innerHTML="<div class=\"lecteur\" id=\"lecteur\" role=\"region\" aria-label=\"Lecture audio\"><button id=\"lp\" aria-label=\"Lire / pause\">\u25b6</button><div class=\"info\"><div class=\"titre\" id=\"lt\">Lancer la lecture</div><div class=\"barre-p\"><i id=\"lb\"></i></div></div><label title=\"D\u00e9filement automatique\"><input type=\"checkbox\" id=\"la\" checked><span>D\u00e9filement auto</span></label></div><audio id=\"aud\" preload=\"auto\"></audio>"; while(d.firstChild) document.body.appendChild(d.firstChild);
-    document.getElementById("aud").src=base+"presentation.mp3?v=6";
+    document.getElementById("aud").src=base+"presentation.mp3?v=7";
     (function(){
 
   var N=TL.length, segs=[].slice.call(document.querySelectorAll("[data-lecture]"));
