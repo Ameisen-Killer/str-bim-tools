@@ -144,7 +144,8 @@
   /**
    * ouvre({surtitre, titre, corps:Node, compacte, boutons:[{label, or, rouge, gauche, centre, entree, action}]})
    * L'action peut renvoyer une promesse ; renvoyer false empêche la fermeture.
-   * centre : bouton centré sur la rangée, entre ceux de gauche et de droite (« Supprimer cette tâche »).
+   * centre : bouton centré sur la rangée, entre ceux de gauche et de droite ; vif : rouge sans
+   * attendre le survol (« Supprimer cette tâche »).
    * compacte : fenêtre resserrée (planif.css) ; entree : bouton déclenché par la touche Entrée.
    */
   function ouvre(o) {
@@ -170,7 +171,7 @@
     (o.boutons || []).forEach(function (b) {
       if (!b) return;                         // bouton absent selon les droits
       var bouton = el("button", {
-        class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : "") + (b.centre ? " centre" : ""),
+        class: "btn" + (b.or ? " btn-or" : "") + (b.rouge ? " btn-rouge" : "") + (b.gauche ? " gauche" : "") + (b.centre ? " centre" : "") + (b.vif ? " vif" : ""),
         type: "button",
         onclick: function () {
           var r = b.action ? b.action() : true;
@@ -1856,12 +1857,14 @@
    *  au tableau de bord). Ses dépendances partent avec elle : la question le dit.
    *  Le droit est celui de toujours : ses tâches, ou « Créer des tâches pour
    *  les autres » (console) ; la base applique la même règle. */
-  /** Bouton « Supprimer cette tâche », rouge, au milieu de la rangée de boutons de la fiche et du
-   *  formulaire d'une tâche (19.11.2026, demande de Tony). `rouvre` : ramène la
-   *  fenêtre si l'on répond « Annuler » à la question. */
-  function boutonSupprimeTache(t, apres, rouvre) {
+  /** Bouton « Supprimer cette tâche », rouge, sur la rangée de boutons : au milieu
+   *  dans la fiche rapide, à gauche (`place` = "gauche") dans le formulaire
+   *  (19.11.2026, demandes de Tony). `rouvre` : ramène la fenêtre si l'on répond
+   *  « Annuler » à la question. */
+  function boutonSupprimeTache(t, apres, rouvre, place) {
     return {
-      label: "Supprimer cette tâche", rouge: true, centre: true,
+      label: "Supprimer cette tâche", rouge: true, vif: true,
+      centre: !place, gauche: place === "gauche",
       action: function () { supprimeTache(t, apres, rouvre); return false; }
     };
   }
@@ -2558,10 +2561,11 @@
       corps: corps,
       compacte: true,
       boutons: lectureSeule ? [{ label: "Fermer" }] : [
+        // À gauche ; sur une dépendance, collé devant « Ouvrir la tâche principale », qui pousse le reste à droite
+        t ? boutonSupprimeTache(t, o.surEnregistrement, function () { formulaireTache(idTache, o); }, principale ? "colle" : "gauche") : null,
         principale ? { label: "Ouvrir la tâche principale", gauche: true, action: function () {
           setTimeout(function () { formulaireTache(principale.id, o); }, 0);
         } } : null,
-        t ? boutonSupprimeTache(t, o.surEnregistrement, function () { formulaireTache(idTache, o); }) : null,
         { label: "Annuler" },
         { label: "Enregistrer", or: true, entree: true, action: enregistre }
       ]
