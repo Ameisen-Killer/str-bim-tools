@@ -100,6 +100,10 @@
      puis { jetons } (session ouverte), pour qu'un mot de passe refusé puisse
      être corrigé sans redemander de lien. */
   var lien = null;
+  /* Adresse portée par le lien du courriel (&adresse=…, 19.11.2026) : si le
+     jeton a plus de 24 heures, un lien neuf lui est renvoyé sans rien
+     redemander — l'invitation n'a pas de date limite pour la personne. */
+  var adresseLien = "";
 
   function dis(texte, bon) {
     boiteMsg.textContent = texte;
@@ -158,8 +162,12 @@
     var jeton = h.get("jeton") || p.get("jeton");
     var refus = h.get("error_description") || p.get("error_description") || h.get("error") || p.get("error");
 
+    var a = (h.get("adresse") || "").trim();
+    if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(a) && a.length < 200) adresseLien = a;
+
     if (jeton) {
       lien = { jeton: jeton, type: type };
+      if (adresseLien) email.value = adresseLien;
     } else if (h.get("access_token") && /^(recovery|signup|magiclink|invite)$/.test(type)) {
       lien = { jetons: { access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: h.get("expires_in") } };
     } else if (refus) {
@@ -240,12 +248,22 @@
           if (err.reseau) throw err;                     // panne réseau : le lien reste bon, on pourra réessayer
           lien = null;
           passeEn("connexion");
-          throw new Error(messageLien("otp_expired", ""));
+          if (!adresseLien) throw new Error(messageLien("otp_expired", ""));
+          // Lien trop ancien ou déjà servi : un neuf part tout seul à l'adresse du courriel
+          email.value = adresseLien;
+          return window.Sb.envoieLien(adresseLien).then(function () {
+            var e = new Error("Ce lien avait plus de 24 heures, ou avait déjà servi : un nouveau vient de partir à " + adresseLien +
+              ". Ouvre-le pour choisir ton mot de passe. Tu as déjà un mot de passe ? Connecte-toi simplement ici.");
+            e.bon = true; throw e;
+          }, function (e2) {
+            if (/patiente/i.test(e2.message || "")) throw new Error("Ce lien a déjà servi ou a expiré. " + e2.message);
+            throw new Error(messageLien("otp_expired", ""));
+          });
         });
     jetons
       .then(function (j) { return window.Sb.choisitMotDePasse(j, secret); })
       .then(function () { location.replace(retour); })
-      .catch(function (err) { fini(err.message); });
+      .catch(function (err) { fini(); dis(err.message, err.bon === true); });
   });
 
   // Date de la version publiée, au pied
@@ -273,7 +291,7 @@
 })();
 </script>
 <!-- Aide sans IA (09.11.2026) : bouton « ? » en bas à droite, fiches dans aide-fiches.js -->
-<script src="/planif/assets/aide-fiches.js?v=9"></script>
+<script src="/planif/assets/aide-fiches.js?v=10"></script>
 <script src="/planif/assets/aide.js?v=5"></script>
 </body>
 </html>

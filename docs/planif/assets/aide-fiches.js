@@ -1215,7 +1215,7 @@
       question: "Je ne reçois pas le courriel de connexion",
       aussi: ["pas de lien reçu", "le lien ne marche pas", "lien expiré"],
       mots: "courriel recu lien expire spam",
-      reponse: "Regarde dans les **indésirables**. Le lien n'est envoyé qu'à une adresse **inscrite par un administrateur** ; vérifie l'orthographe. Un lien sert une fois : redemande-en un avec **Mot de passe oublié ou première connexion**. Si rien n'arrive, contacte un administrateur.",
+      reponse: "Regarde dans les **indésirables**. Le lien n'est envoyé qu'à une adresse **inscrite par un administrateur** ; vérifie l'orthographe. Un lien sert une fois et son bouton vaut 24 heures : passé ce délai, la page t'en renvoie un neuf toute seule quand tu valides ; sinon redemande-en un avec **Mot de passe oublié ou première connexion**. Si rien n'arrive, contacte un administrateur.",
       montre: "Mot de passe oublié" },
 
     { id: "fenetres", pages: ["taches", "affaires"],
