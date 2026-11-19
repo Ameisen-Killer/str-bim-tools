@@ -1867,6 +1867,8 @@ begin
       select jsonb_agg(jsonb_build_object(
                'email', a.email, 'bureauId', a.bureau_id, 'actif', a.actif, 'superAdmin', a.super_admin,
                'prenom', m.prenom, 'nom', m.nom, 'photo', m.photo,
+               -- compte, confirme (19.11.2026) : la page distingue « lien non envoyé » de « lien envoyé », comme la console
+               'compte', u.id is not null, 'confirme', u.email_confirmed_at is not null,
                'derniereConnexion', public.derniere_venue(a.email, u.last_sign_in_at))
              order by a.email)
         from public.acces a

@@ -396,6 +396,9 @@
         prenom: p.prenom || "", nomFamille: p.nom || "", photo: p.photo || null,
         bureauId: p.bureauId, actif: p.actif !== false,
         derniere: p.derniereConnexion ? Date.parse(p.derniereConnexion) : null,
+        // Où en est la personne quand elle n'est jamais venue (19.11.2026) : comme dans la console
+        etape: p.compte === undefined ? "" : p.confirme ? "compte activé, pas encore de visite" : p.compte ? "lien envoyé" : "lien non envoyé",
+        rangEtape: p.confirme ? 0 : p.compte ? 1 : 2,
         init: p.prenom ? (p.prenom.charAt(0) + (p.nom || "").charAt(0)).toUpperCase() : p.email.charAt(0).toUpperCase()
       };
     });
@@ -956,7 +959,7 @@
 
     var absents = Object.keys(donnees.parEmail).map(qui).filter(function (p) {
       return !stats[p.email] && p.actif && (!reglage.bureau || p.bureauId === reglage.bureau);
-    }).sort(function (a, b) { return (b.derniere || 0) - (a.derniere || 0); });
+    }).sort(function (a, b) { return (b.derniere || 0) - (a.derniere || 0) || (a.rangEtape || 0) - (b.rangEtape || 0); });
 
     return el("section", { class: "section ac-rv" }, [
       el("div", { class: "ac-tete" }, [
@@ -972,7 +975,7 @@
         el("ul", {}, absents.map(function (p) {
           return el("li", {}, [avatar(p, false), el("span", { class: "ac-qui" }, [
             el("span", { class: "ac-nom", style: "font-size:14px", text: p.nom }),
-            el("span", { class: "ac-sous", text: p.derniere ? "Dernière connexion " + relatif(p.derniere) : "Jamais connecté" })
+            el("span", { class: "ac-sous", text: p.derniere ? "Dernière connexion " + relatif(p.derniere) : p.etape ? p.etape.charAt(0).toUpperCase() + p.etape.slice(1) : "Jamais connecté" })
           ])]);
         }))
       ]) : null
