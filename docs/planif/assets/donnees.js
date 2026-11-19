@@ -940,6 +940,10 @@
       t.affaireId = neuf(t.affaireId);
       t.ingenieurId = neuf(t.ingenieurId);
       t.dessinateurId = neuf(t.dessinateurId);
+      // Dépendance (19.11.2026) : elle suit sa tâche principale sous son nouvel identifiant,
+      // sinon la base refusait toutes les tâches de l'import
+      if (t.avant) t.avant = neuf(t.avant);
+      if (t.creePar) t.creePar = neuf(t.creePar);
     });
     // Les fiches de l'annuaire ne pendent à rien : seul leur identifiant change
     (e.contacts || []).forEach(function (c) { c.id = neuf(c.id); });
@@ -973,9 +977,14 @@
     var vraisC = {};
     (e.contacts || []).forEach(function (c) { vraisC[c.id] = true; });
     e.affaires.forEach(function (a) { if (!vraisC[a.demandeurId]) a.demandeurId = null; });
+    var vraisT = {};
+    e.taches.forEach(function (t) { vraisT[t.id] = true; });
     e.taches.forEach(function (t) {
       if (!vraisM[t.ingenieurId]) t.ingenieurId = null;
       if (!vraisM[t.dessinateurId]) t.dessinateurId = null;
+      if (t.creePar && !vraisM[t.creePar]) t.creePar = null;
+      // Une tâche principale absente du fichier laisse une tâche ordinaire
+      if (t.avant && (!vraisT[t.avant] || t.avant === t.id)) t.avant = null;
     });
     return e;
   }
@@ -1314,9 +1323,17 @@
     /** tables (facultatif) : seules ces tables de la base ont changé — le
      *  direct n'en relit pas plus (supabase.js garde les autres). */
     recharge: function (tables) {
+      /* Une écriture lancée pendant la lecture (19.11.2026) a photographié
+         l'état d'avant : poser ici l'état lu lui ferait calculer son écart
+         contre une référence qu'elle ne connaît pas — elle défaisait alors ce
+         que les collègues venaient d'enregistrer, et le geste lui-même
+         disparaissait de l'écran. La lecture est donc jetée, et refaite
+         entière une fois ces écritures passées. */
+      var DIFFEREE = {};
       var lecture = file.then(function () {
         return ADAPTATEUR.lire(tables).then(function (brut) {
           if (!brut) throw erreur("Lecture vide.");
+          if (ecrituresEnCours > 0) return DIFFEREE;
           etat = normalise(brut);
           precedent = copie(etat);
           version++;
@@ -1325,7 +1342,8 @@
         });
       });
       file = lecture.catch(function () {});
-      return lecture;
+      // Hors de la file : la relecture se range derrière les écritures qui attendent
+      return lecture.then(function (r) { return r === DIFFEREE ? D.recharge() : r; });
     },
 
     majReglages: function (o) {
@@ -1700,6 +1718,10 @@
     /** Numéro de version de l'état : change à chaque enregistrement. Sert de clé aux calculs mis en cache. */
     version: function () { return version; },
 
+    /** Vérifie une tâche sans rien écrire : lève l'erreur qu'aurait levée l'enregistrement
+     *  (le formulaire s'en sert avant de toucher aux dépendances, 19.11.2026). */
+    verifieTache: function (o) { valideTache(o); },
+
     ajouteTache: function (o) {
       return Promise.resolve().then(function () {
         var v = accordeParts(valideTache(o), partsNommees(o), false);
@@ -1776,9 +1798,10 @@
           var echP = Calc.finDepuis(chargeP, Calc.premierJourApres(cibleDep, mP, canton), mP, canton);
           if (echP < p.echeance) echP = p.echeance;
           var avantP = p.echeance;
-          return D.retoucheTache(p.id, { echeance: echP, debut: null })
-            .then(function () { return D.retoucheTache(i, { echeance: cibleDep, debut: null }); })
-            .then(function () { return { dependance: dDep, principale: C.diff(avantP, echP) }; });
+          return D.groupe("décalage de " + nomTache(i), function () {
+            return D.retoucheTache(p.id, { echeance: echP, debut: null })
+              .then(function () { return D.retoucheTache(i, { echeance: cibleDep, debut: null }); });
+          }).then(function () { return { dependance: dDep, principale: C.diff(avantP, echP) }; });
         }
         if (role !== "ingenieur" || !Calc || !Calc.enchainee(t)) {
           var ech = glisse(C.ajoute(t.echeance, jours)), delta = C.diff(t.echeance, ech);
@@ -2274,6 +2297,14 @@
      La pile vit dans la page (30 gestes) ; elle repart vide à chaque page. */
 
   var PILE_MAX = 30, pile = [];
+  /* Geste composé (19.11.2026) : une tâche enregistrée avec ses dépendances,
+     une dépendance qui repousse sa tâche principale — plusieurs écritures, un
+     seul « Annuler ». Tant qu'un groupe est ouvert, les photos s'y rangent. */
+  var groupe = null;
+  function empile(g) {
+    pile.push(g);
+    if (pile.length > PILE_MAX) pile.shift();
+  }
 
   function trouveDans(liste, i) {
     for (var k = 0; k < liste.length; k++) if (liste[k].id === i) return k;
@@ -2311,8 +2342,8 @@
       return ecrit.apply(D, args).then(function (res) {
         if (photos) {
           if (apres) photos = photos.concat(apres.apply(null, [res].concat(args)));
-          pile.push({ libelle: dit, photos: photos, quand: Date.now() });
-          if (pile.length > PILE_MAX) pile.shift();
+          if (groupe) groupe.photos = groupe.photos.concat(photos);
+          else empile({ libelle: dit, photos: photos, quand: Date.now() });
         }
         return res;
       });
@@ -2344,7 +2375,10 @@
       .filter(function (t) { return t.affaireId === i; })
       .map(function (t) { return { coll: "taches", id: t.id, avant: copie(t) }; }))
       .concat((etat.saisies || []).filter(function (x) { return x.affaireId === i; })
-        .map(function (x) { return { coll: "saisies", id: x.id, avant: copie(x) }; }));
+        .map(function (x) { return { coll: "saisies", id: x.id, avant: copie(x) }; }))
+      // Les rendez-vous de l'appel d'offres partent avec l'affaire : ils reviennent aussi (19.11.2026)
+      .concat((etat.agenda || []).filter(function (r) { return r.affaireId === i; })
+        .map(function (r) { return { coll: "agenda", id: r.id, avant: copie(r) }; }));
   }, function (i) { return "suppression de " + nomAffaire(i); });
 
   annulable("ajouteAbsence", function (i) { return [photoAbsences(i)]; },
@@ -2364,6 +2398,23 @@
     function (i) { return "modification de " + nomContact(i); });
   annulable("suppContact", function (i) { return [photo("contacts", i)]; },
     function (i) { return "suppression de " + nomContact(i); });
+
+  /**
+   * Plusieurs écritures annulables d'un seul « Annuler » : `f` les enchaîne et
+   * rend une promesse. Les photos sont remises dans l'ordre inverse, la plus
+   * ancienne d'un même élément a donc le dernier mot. Un échec en route garde
+   * ce qui est passé : c'est cela qu'« Annuler » défera.
+   */
+  D.groupe = function (libelle, f) {
+    if (groupe) return Promise.resolve().then(f);          // déjà dans un geste composé : il englobe celui-ci
+    var g = { libelle: libelle, photos: [], quand: 0 };
+    groupe = g;
+    function clos() {
+      if (groupe === g) groupe = null;
+      if (g.photos.length) { g.quand = Date.now(); empile(g); }
+    }
+    return Promise.resolve().then(f).then(function (r) { clos(); return r; }, function (e) { clos(); throw e; });
+  };
 
   /** Le dernier geste annulable : { libelle, quand }, ou null. */
   D.annulable = function () {

@@ -1996,6 +1996,13 @@
         sel.appendChild(el("option", { value: m.id, selected: m.id === t[p.membre] },
           [m.prenom + " " + m.nom + (D.aStatut(m, "administrateur") ? " · administrateur" : "") + (m.actif ? "" : " (inactif)")]));
       });
+      /* Sa personne a changé de métier (19.11.2026) : absente du menu, elle
+         était désaffectée au premier enregistrement. Elle y reste, signalée. */
+      var enPlace = t[p.membre] ? D.membre(t[p.membre]) : null;
+      if (enPlace && !sel.querySelector('option[value="' + enPlace.id + '"]')) {
+        sel.appendChild(el("option", { value: enPlace.id },
+          [enPlace.prenom + " " + enPlace.nom + " · " + D.libelleMetier(enPlace.metier).toLowerCase() + (enPlace.actif ? "" : " (inactif)")]));
+      }
       sel.value = t[p.membre] || "";
       return { role: r, part: p, select: sel };
     });
@@ -2085,9 +2092,13 @@
       };
       // Seules les parts de cette fiche changent : les autres gardent la leur
       coches.forEach(function (c) { maj[c.part.fini] = c.input.checked; });
+      /* La tâche telle qu'elle est maintenant (19.11.2026) : après un échec,
+         l'état est relu et `t`, déjà retouché par le premier essai, ne dit
+         plus ce qui est en base — le second essai perdait la réaffectation. */
+      var actuelle = D.tache(t.id) || t;
       var confiees = [], liberees = 0;
       confies.forEach(function (c) {
-        if (c.select.value === (t[c.part.membre] || "")) return;
+        if (c.select.value === (actuelle[c.part.membre] || "")) return;
         maj[c.part.membre] = c.select.value || null;
         if (c.select.value) confiees.push(D.nomMembre(c.select.value));
         else liberees++;
@@ -2165,10 +2176,12 @@
    * se range ainsi au premier enregistrement.
    */
   /** Valeur d'une personne dans les menus : son identifiant, ou « @métier » à affecter. */
-  function partsDe(valeur, charge) {
+  /* repli : le côté où ranger la charge d'une personne dont le métier n'est plus
+     planifié (elle a changé de métier en gardant la tâche, 19.11.2026). */
+  function partsDe(valeur, charge, repli) {
     var o = { ingenieurId: null, chargeInge: 0, dessinateurId: null, chargeDessin: 0 };
     var m = valeur && valeur.charAt(0) !== "@" ? D.membre(valeur) : null;
-    var cote = m ? (D.cote(m.metier) || "ingenieur") : (valeur === "@dessinateur" ? "dessinateur" : "ingenieur");
+    var cote = m ? (D.cote(m.metier) || repli || "ingenieur") : (valeur === "@dessinateur" ? "dessinateur" : "ingenieur");
     if (cote === "dessinateur") { o.dessinateurId = m ? m.id : null; o.chargeDessin = charge; }
     else { o.ingenieurId = m ? m.id : null; o.chargeInge = charge; }
     return o;
@@ -2200,6 +2213,10 @@
     var autres = tous.filter(function (m) { return idsEquipe.indexOf(m.id) < 0; });
     groupe("Ingénieurs", autres.filter(function (m) { return D.cote(m.metier) === "ingenieur"; }));
     groupe("Dessinateurs", autres.filter(function (m) { return D.cote(m.metier) === "dessinateur"; }));
+    // La personne en place n'est plus au planning (métier changé) : elle reste au menu,
+    // sinon la tâche repartait « à affecter » au premier enregistrement (19.11.2026)
+    var enPlace = valeur && valeur.charAt(0) !== "@" ? D.membre(valeur) : null;
+    if (enPlace && !tous.some(function (m) { return m.id === enPlace.id; })) groupe("Hors planning", [enPlace], true);
     sel.value = valeur || "@ingenieur";
     if (sel.value !== valeur) sel.value = "@ingenieur";
     return sel;
@@ -2275,6 +2292,8 @@
       chargeInit = bDeux ? b.chargeDessin : (b.chargeInge || b.chargeDessin || "");
     }
 
+    // Le côté de la charge en base : gardé si la personne en place n'a plus de métier planifié
+    var cotePrincipal = t ? (deuxParts ? "dessinateur" : (t.chargeInge > 0 ? "ingenieur" : "dessinateur")) : null;
     var boitePers = el("div", { class: "champ" }, [el("label", { for: "c-personne", text: "Personne désignée" })]);
     var chCharge = champ({
       nom: "charge", label: "Charge (j)", type: "number", pas: "0.5", min: "0", inputmode: "decimal",
@@ -2288,7 +2307,8 @@
     function ajouteLigne(d) {
       d = d || {};
       var k = ++nDep;
-      var ligne = { id: d.id || null, echeance: d.echeance || null, statut: d.statut || "a_faire", avancement: d.avancement || 0, priorite: d.priorite };
+      var ligne = { id: d.id || null, echeance: d.echeance || null, statut: d.statut || "a_faire", avancement: d.avancement || 0, priorite: d.priorite,
+                    cote: d.cote || null };   // côté de sa charge en base, gardé si sa personne n'a plus de métier planifié
       var boite = el("div", { class: "champ" }, [el("label", { for: "c-dep-p" + k, text: "À faire avant par" })]);
       ligne.boite = boite;
       ligne.valeur = d.personne || (moi && maCote && !libre ? "@" + (maCote === "ingenieur" ? "dessinateur" : "ingenieur") : "@ingenieur");
@@ -2317,10 +2337,11 @@
     if (t && !principale) {
       D.dependances(t.id).forEach(function (d) {
         ajouteLigne({ id: d.id, personne: valeurPersonne(d), charge: d.chargeInge || d.chargeDessin,
+          cote: d.chargeInge > 0 ? "ingenieur" : "dessinateur",
           titre: d.titre === t.titre ? "" : d.titre, echeance: d.echeance, statut: d.statut, avancement: d.avancement, priorite: d.priorite });
       });
       if (deuxParts) {
-        ajouteLigne({ personne: valeurPersonne(t, "ingenieur"), charge: t.chargeInge,
+        ajouteLigne({ personne: valeurPersonne(t, "ingenieur"), charge: t.chargeInge, cote: "ingenieur",
           echeance: Calc.finPart(t, "ingenieur", D.canton()), statut: t.finiInge ? "termine" : "a_faire" });
       }
     } else if (!t && b.chargeInge > 0 && b.chargeDessin > 0) {
@@ -2361,13 +2382,13 @@
     /** La tâche principale telle que le formulaire la dit, pour les calculs. */
     function brouillonPrincipal() {
       var v = lit(corps);
-      var p = partsDe(boitePers.querySelector("select").value, nombre(v.charge));
+      var p = partsDe(boitePers.querySelector("select").value, nombre(v.charge), cotePrincipal);
       p.echeance = v.echeance || null;
       p.statut = "a_faire";
       return p;
     }
     function brouillonDep(l) {
-      return partsDe(l.boite.querySelector("select").value, nombre(l.charge.value));
+      return partsDe(l.boite.querySelector("select").value, nombre(l.charge.value), l.cote);
     }
     function ligneApercu(role, x, debut, fin, ouvres, idM, rendu) {
       return el("div", {}, [
@@ -2482,11 +2503,12 @@
                 : "Tâche remise à affecter : elle quitte ton planning.";
     }
 
+    var creee = null;   // tâche neuve déjà créée par un essai dont une dépendance a échoué
     function enregistre() {
       var v = lit(corps);
       var charge = nombre(v.charge);
       if (!(charge > 0)) { toast("Indique la charge de la personne désignée (0,1 j au minimum)."); return false; }
-      var p = partsDe(boitePers.querySelector("select").value, charge);
+      var p = partsDe(boitePers.querySelector("select").value, charge, cotePrincipal);
       var champs = {
         affaireId: principale ? principale.affaireId : v.affaireId, titre: v.titre, note: v.note,
         echeance: v.echeance, statut: v.statut, avancement: v.avancement, enchaine: false,
@@ -2500,7 +2522,7 @@
       for (var i = 0; i < lignesDeps.length; i++) {
         var l = lignesDeps[i], cd = nombre(l.charge.value);
         if (!(cd > 0)) { toast("Indique la charge de la dépendance " + (i + 1) + ", ou retire-la."); return false; }
-        deps.push({ ligne: l, parts: partsDe(l.boite.querySelector("select").value, cd) });
+        deps.push({ ligne: l, parts: partsDe(l.boite.querySelector("select").value, cd, l.cote) });
       }
       if (deps.length && !actives) {
         toast("Les dépendances ne peuvent pas encore être enregistrées : la base doit d'abord être mise à jour (migration-dependances.sql).");
@@ -2513,8 +2535,10 @@
         var lim = Calc.limiteDependance(echBrouillon, dp.parts, D.canton());
         // Avancée à la main, une dépendance garde sa date tant qu'elle tient avant la tâche
         var ech = l.echeance && lim && l.echeance < lim ? l.echeance : lim;
+        // Sa note ne se saisit pas ici : elle garde celle qu'elle porte (19.11.2026, elle était vidée)
+        var dejaLa = l.id ? D.tache(l.id) : null;
         var c = {
-          affaireId: champs.affaireId, titre: (l.titre.value || "").trim() || champs.titre, note: "",
+          affaireId: champs.affaireId, titre: (l.titre.value || "").trim() || champs.titre, note: dejaLa ? dejaLa.note || "" : "",
           echeance: ech, statut: l.statut, avancement: l.avancement, enchaine: false, avant: idPrincipale,
           ingenieurId: dp.parts.ingenieurId, chargeInge: dp.parts.chargeInge,
           dessinateurId: dp.parts.dessinateurId, chargeDessin: dp.parts.chargeDessin
@@ -2527,28 +2551,46 @@
         return !lignesDeps.some(function (l) { return l.id === d.id; });
       }) : [];
 
-      var suite;
-      if (!t) {
-        // La tâche d'abord : ses dépendances portent son identifiant
-        suite = D.ajouteTache(champs).then(function (n) {
-          return deps.reduce(function (s, dp) {
-            return s.then(function () { return D.ajouteTache(champsDep(dp, n.id)); });
-          }, Promise.resolve());
-        });
-      } else {
-        /* Les dépendances d'abord, la tâche ensuite : sans le droit, qui passe
-           la main sur la tâche ne pourrait plus toucher à ses dépendances. */
-        suite = retirees.reduce(function (s, d) {
-          return s.then(function () { return D.suppTache(d.id); });
-        }, Promise.resolve());
-        deps.forEach(function (dp) {
-          suite = suite.then(function () {
-            var c = champsDep(dp, t.id);
-            return dp.ligne.id ? D.majTache(dp.ligne.id, c) : D.ajouteTache(c);
-          });
-        });
-        suite = suite.then(function () { return D.majTache(t.id, champs); });
+      /* Tout vérifier avant la première écriture (19.11.2026) : un libellé
+         vide était refusé après que les dépendances retirées avaient déjà
+         été supprimées. */
+      try {
+        D.verifieTache(champs);
+        deps.forEach(function (dp) { D.verifieTache(champsDep(dp, null)); });
+      } catch (e) { toast(e.message); return false; }
+
+      /** Une dépendance : modifiée si elle existe, créée sinon — et alors retenue,
+       *  pour qu'un second essai après un échec ne la crée pas deux fois. */
+      function ecritDep(dp, idPrincipale) {
+        var c = champsDep(dp, idPrincipale);
+        if (dp.ligne.id && D.tache(dp.ligne.id)) return D.majTache(dp.ligne.id, c);
+        return D.ajouteTache(c).then(function (n) { dp.ligne.id = n.id; });
       }
+      // Plusieurs écritures, un seul « Annuler » (D.groupe)
+      var suite = D.groupe((t ? "modification de « " : "création de « ") + champs.titre + " »", function () {
+        var s;
+        if (!t) {
+          /* La tâche d'abord : ses dépendances portent son identifiant. Créée
+             à un premier essai resté en route, elle est reprise, pas refaite. */
+          s = (creee && D.tache(creee) ? D.majTache(creee, champs) : D.ajouteTache(champs)).then(function (n) {
+            creee = n.id;
+            return deps.reduce(function (x, dp) {
+              return x.then(function () { return ecritDep(dp, n.id); });
+            }, Promise.resolve());
+          });
+        } else {
+          /* Les dépendances d'abord, la tâche ensuite : sans le droit, qui passe
+             la main sur la tâche ne pourrait plus toucher à ses dépendances. */
+          s = retirees.reduce(function (x, d) {
+            return x.then(function () { return D.suppTache(d.id); });
+          }, Promise.resolve());
+          deps.forEach(function (dp) {
+            s = s.then(function () { return ecritDep(dp, t.id); });
+          });
+          s = s.then(function () { return D.majTache(t.id, champs); });
+        }
+        return s;
+      });
       return suite.then(function () {
         if (o.surEnregistrement) o.surEnregistrement();
         toast(passe || (t ? "Tâche modifiée." : (deps.length ? "Tâche créée, avec " + deps.length + (deps.length > 1 ? " dépendances." : " dépendance.") : "Tâche créée.")));
