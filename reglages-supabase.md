@@ -79,8 +79,8 @@ valide son mot de passe (un antivirus de messagerie qui ouvre les liens à l'ava
 Refonte du 19.11.2026 (demande de Tony) : charte du bureau comme dans l'outil (fond `#F4F5F2`, vert
 `#4D7A1C`, logo `docs/planif/assets/logo-ab-courriel.png`, PNG car les messageries n'affichent pas le
 SVG), un objet et un en-tête au nom du bureau pour qu'il ne soit pas pris pour un spam (l'encadré
-« Ce message est bien réel » a été retiré à la demande de Tony), et plus de
-date limite annoncée : le lien porte l'adresse (`&adresse={{ .Email }}`), et quand son jeton a plus de
+« Ce message est bien réel » a été retiré à la demande de Tony), et aucune
+date limite (le mail n'en parle plus, demande de Tony) : le lien porte l'adresse (`&adresse={{ .Email }}`), et quand son jeton a plus de
 24 heures la page de connexion envoie d'elle-même un lien neuf. Ces modèles valent pour tous les
 bureaux de la base : à revoir le jour où un autre bureau que celui-ci reçoit des invitations.
 Dans **SMTP Settings**, mettre aussi **Sender name** = `Planificateur ab ingénieurs`.
@@ -111,10 +111,6 @@ Sujet : `Planificateur ab ingénieurs : ton accès est ouvert`
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
           <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=signup&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir mon mot de passe</a></td>
         </tr></table>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358"><b style="color:#202020">Aucune date limite.</b> Ton accès reste ouvert, et ce bouton aussi :
-           s'il a plus de 24 heures, la page t'envoie d'elle-même un lien tout neuf.</p>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Choisis un mot de passe propre à l'outil, différent de celui de ta session ou de ta messagerie.
-           Personne ne te le demandera.</p>
       </td></tr>
     </table>
     <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#5E6358">
@@ -150,8 +146,6 @@ Sujet : `Planificateur ab ingénieurs : ton lien de connexion`
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
           <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=magiclink&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir mon mot de passe</a></td>
         </tr></table>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358"><b style="color:#202020">Aucune date limite.</b> Si ce bouton a plus de 24 heures, la page
-           t'envoie d'elle-même un lien tout neuf.</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
@@ -187,8 +181,6 @@ Sujet : `Planificateur ab ingénieurs : nouveau mot de passe`
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 10px"><tr>
           <td bgcolor="#4D7A1C" style="border-radius:8px"><a href="https://str-bim-tools.com/planif/connexion/#jeton={{ .TokenHash }}&type=recovery&adresse={{ .Email }}" style="display:inline-block;padding:14px 26px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:8px">Choisir un mot de passe</a></td>
         </tr></table>
-        <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358"><b style="color:#202020">Aucune date limite.</b> Si ce bouton a plus de 24 heures, la page
-           t'envoie d'elle-même un lien tout neuf.</p>
         <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#5E6358">Tu n'attendais pas ce message ? Ignore-le : ton mot de passe actuel reste valable.</p>
       </td></tr>
     </table>
