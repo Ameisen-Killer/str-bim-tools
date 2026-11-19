@@ -45,7 +45,16 @@
     yl+= (y-yl)*.12; scrollTo(0,yl);
   }
   boucle();
-  function maj(){bp.textContent=aud.paused?"▶":"❚❚"}
+  var boite=document.getElementById("lecteur"), repli=null;
+  function maj(){
+    bp.textContent=aud.paused?"▶":"❚❚";
+    // bandeau replié pendant la lecture (19.11.2026), un instant après le départ
+    clearTimeout(repli);
+    if(aud.paused) boite.classList.remove("replie");
+    else repli=setTimeout(function(){boite.classList.add("replie")},1400);
+  }
+  // au toucher (téléphone), le bandeau replié se rouvre quelques secondes
+  boite.addEventListener("touchstart",function(){ if(aud.paused) return; boite.classList.remove("replie"); clearTimeout(repli); repli=setTimeout(function(){ if(!aud.paused) boite.classList.add("replie") },3500) },{passive:true});
   bp.onclick=function(){
     if(!aud.paused){aud.pause();maj();return}
     manuel=false; auto.checked=true;

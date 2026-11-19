@@ -11,3 +11,10 @@
 .lecteur input{accent-color:#5F9126}
 [data-lecture].lu-actif{outline:1px solid rgba(95,145,38,.35);outline-offset:14px}
 @media (max-width:640px){.lecteur label span{display:none}.lecteur .barre-p{width:28vw}}
+/* 19.11.2026 : pendant la lecture, le bandeau se replie sur le seul bouton ; il se redéploie au survol, au toucher ou à la pause */
+.lecteur{transition:gap .7s cubic-bezier(.65,0,.35,1),padding .7s cubic-bezier(.65,0,.35,1),background-color .5s,border-color .5s,box-shadow .5s}
+.lecteur .info,.lecteur label{max-width:420px;overflow:hidden;opacity:1;transition:max-width .7s cubic-bezier(.65,0,.35,1),opacity .45s ease .2s}
+.lecteur button{transition:background-color .3s,color .3s,width .7s cubic-bezier(.65,0,.35,1),height .7s cubic-bezier(.65,0,.35,1)}
+.lecteur.replie:not(:hover):not(:has(:focus-visible)){gap:0;padding:6px;background:rgba(255,255,255,.72);border-color:rgba(32,32,32,.1);box-shadow:0 6px 24px rgba(32,32,32,.08)}
+.lecteur.replie:not(:hover):not(:has(:focus-visible)) .info,.lecteur.replie:not(:hover):not(:has(:focus-visible)) label{max-width:0;opacity:0;transition:max-width .7s cubic-bezier(.65,0,.35,1),opacity .25s ease}
+.lecteur.replie:not(:hover):not(:has(:focus-visible)) button{width:32px;height:32px}
