@@ -76,6 +76,8 @@ else {
   else { console.error(reels.length + " bureaux réels : préciser BUREAU (id)."); process.exit(1); }
 }
 if (!bureau) { console.error("Bureau introuvable."); process.exit(1); }
+// « remplace » vide toutes les tâches d'un bureau : jamais sur un bureau deviné (19.11.2026, audit)
+if (MODE === "remplace" && !BUREAU) { console.error("MODE=remplace : préciser BUREAU (id ou nom), il n'est pas deviné."); process.exit(1); }
 const B = bureau.id;
 console.log(`${bureaux.length} bureaux dans la base ; bureau visé : ${B}${FICTIFS.test(bureau.nom) ? " (fictif)" : ""}.`);
 

@@ -10,7 +10,7 @@ on:
         description: "essai, injecte, remplace (vide TOUTES les tâches du bureau) ou retire"
         default: "essai"
       bureau:
-        description: "Id du bureau (vide : le seul bureau réel)"
+        description: "Id du bureau (vide : le seul bureau réel ; obligatoire en mode remplace)"
         default: ""
 
 permissions:

@@ -173,8 +173,21 @@
   function deconnexion() {
     var s = session;
     poseSession(null);
+    /* Poste partagé (19.11.2026, audit) : rien de nominatif ne reste après
+       « Quitter » — photos de l'équipe, barre et en-tête gardés pour l'affichage
+       immédiat. Les préférences (marque, teinte, vue) restent. */
+    try {
+      var ls = global.localStorage, morts = [];
+      for (var i = 0; i < ls.length; i++) {
+        var k = ls.key(i) || "";
+        if (k === "planif.photos" || k.indexOf("planif.barre:") === 0 || k.indexOf("planif.entete:") === 0) morts.push(k);
+      }
+      morts.forEach(function (k) { ls.removeItem(k); });
+    } catch (e) {}
     if (!s) return Promise.resolve();
-    return fetch(URL_BASE + "/auth/v1/logout", {
+    // scope=local : on ferme cette session, pas celles des autres appareils (ni des autres
+    // visiteurs du compte de démonstration, qui est partagé)
+    return fetch(URL_BASE + "/auth/v1/logout?scope=local", {
       method: "POST",
       headers: { apikey: CLE, Authorization: "Bearer " + s.jeton }
     }).catch(function () {}).then(function () {});

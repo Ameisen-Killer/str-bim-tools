@@ -262,7 +262,7 @@ passe par une fonction qui envoie avec Resend, depuis une adresse du domaine.
 3. Supabase > Edge Functions > Secrets (ou Settings > Edge Functions) : ajouter
    - `RESEND_API_KEY` = la clé du point 2 ;
    - `FGH_MAIL_AUTORISES` = les adresses ou domaines qui peuvent recevoir une fiche, séparés par des
-     virgules, par exemple `varintony@gmail.com, @mon-bureau.ch` (un domaine commence par `@`) ;
+     virgules, par exemple `prenom.nom@exemple.ch, @mon-bureau.ch` (un domaine commence par `@`) ;
    - au choix `FGH_MAIL_DE` = l'expéditeur, par défaut `Contrôle armatures FGH <contact@str-bim-tools.com>`.
 4. Edge Functions > Deploy a new function > **Via Editor**, nom **`fgh-arm-mail`**, coller le
    contenu de `supabase/functions/fgh-arm-mail/index.ts`, Deploy. Puis **Enforce JWT Verification**

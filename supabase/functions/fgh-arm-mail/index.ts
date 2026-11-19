@@ -4,7 +4,7 @@
 // fonction avec { a: [adresses], sujet, texte, fichiers: [{ chemin, nom }] }. La fonction lit les
 // PDF avec la clé de service, les joint au mail, puis les efface du seau.
 // Garde-fou : seules les adresses ou domaines listés dans FGH_MAIL_AUTORISES sont acceptés
-// (ex. « @ab-ing.ch, varintony@gmail.com »), pour que personne ne s'en serve pour écrire à n'importe qui.
+// (ex. « @ab-ing.ch, prenom.nom@exemple.ch »), pour que personne ne s'en serve pour écrire à n'importe qui.
 // Depuis le 13.11.2026, seule une personne connectée aux outils FGH (identifiants de la
 // planification, fonction acces_fgh de la base) peut s'en servir : son jeton est relu ici.
 // À déployer dans le tableau de bord Supabase, « Verify JWT » désactivé, avec les secrets

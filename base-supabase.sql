@@ -24,8 +24,8 @@
 --  Sans connexion, la clé publique du projet ne donne accès à rien : c'est ce
 --  qui permet de publier cette clé dans un dépôt public. Les outils du chantier
 --  FGH (Visas, Plans FGH, Fiches ARM) demandent eux aussi la connexion depuis le
---  13.11.2026 : voir « Outils du chantier FGH ». Seul l'organiseur de documents
---  (/organiseur/) reste ouvert sans connexion.
+--  13.11.2026 : voir « Outils du chantier FGH ». L'organiseur de documents
+--  (/organiseur/) demande la même connexion (règles acces_fgh, rôle anon révoqué).
 --
 --  Après exécution, dans le tableau de bord Supabase (voir reglages-supabase.md) :
 --    - Authentication > Auth Hooks : « Before User Created », fonction
@@ -1279,8 +1279,12 @@ create policy "bureau courant (suppression)" on public.ao_agenda for delete to a
 -- les modifient ou les retirent.
 create policy "bureau courant (lecture)" on public.rendez_vous for select to authenticated
   using (bureau_id = (select public.bureau_courant()));
+-- Un rendez-vous se note en son nom (19.11.2026) : on ne l'attribue pas à un collègue,
+-- qui serait alors seul à pouvoir le modifier.
 create policy "bureau courant (création)" on public.rendez_vous for insert to authenticated
-  with check (bureau_id = (select public.bureau_courant()));
+  with check (bureau_id = (select public.bureau_courant())
+              and (cree_par is null or cree_par = (select public.mon_membre())
+                   or (select public.a_droit('absences_autrui'))));
 create policy "les siens ou le droit (modification)" on public.rendez_vous for update to authenticated
   using (bureau_id = (select public.bureau_courant()) and (
     cree_par = (select public.mon_membre())
@@ -1296,8 +1300,16 @@ create policy "les siens ou le droit (suppression)" on public.rendez_vous for de
 -- Demandes de congé : tout le bureau les voit (qui part quand) ; on demande
 -- pour soi (ou pour un autre avec le droit sur ses absences), on annule sa
 -- demande tant qu'elle attend. La décision passe par decide_conge.
-create policy "bureau courant (lecture)" on public.conges for select to authenticated
-  using (bureau_id = (select public.bureau_courant()));
+-- Lecture resserrée le 19.11.2026 (audit) : le droit « Voir les congés de l'équipe »
+-- n'était appliqué que par la page ; la base ne rend plus que ses propres demandes,
+-- sauf à qui a ce droit, décide des congés ou pose les absences des autres.
+create policy "les miennes ou le droit (lecture)" on public.conges for select to authenticated
+  using (bureau_id = (select public.bureau_courant()) and (
+    membre_id = (select public.mon_membre())
+    or (select public.a_droit('voir_conges_equipe'))
+    or (select public.a_droit('conges_tous'))
+    or (select public.a_droit('conges_secteur'))
+    or (select public.a_droit('absences_autrui'))));
 create policy "ma demande ou le droit (création)" on public.conges for insert to authenticated
   with check (bureau_id = (select public.bureau_courant()) and statut = 'en_attente'
               and valide_par is null and absence_id is null
@@ -1305,8 +1317,10 @@ create policy "ma demande ou le droit (création)" on public.conges for insert t
 create policy "ma demande en attente (annulation)" on public.conges for update to authenticated
   using (bureau_id = (select public.bureau_courant()) and statut = 'en_attente'
          and (membre_id = (select public.mon_membre()) or (select public.a_droit('absences_autrui'))))
+  -- La demande reste celle de la même personne (19.11.2026) : sans le droit, on ne la passe pas à un collègue
   with check (bureau_id = (select public.bureau_courant()) and statut in ('en_attente', 'annulee')
-              and valide_par is null and absence_id is null);
+              and valide_par is null and absence_id is null
+              and (membre_id = (select public.mon_membre()) or (select public.a_droit('absences_autrui'))));
 
 -- Veille : toute personne autorisée lit les publications ; seule la tâche
 -- planifiée (clé de service) les écrit. Le suivi est celui du bureau.
@@ -2875,6 +2889,10 @@ begin
   delete from public.absences where bureau_id = v_bureau;
   delete from public.avis     where bureau_id = v_bureau;
   delete from public.contacts where bureau_id = v_bureau;
+  -- Complété le 19.11.2026 : rendez-vous, demandes de congé et suivi de la veille restaient d'un visiteur à l'autre
+  delete from public.rendez_vous  where bureau_id = v_bureau;
+  delete from public.conges       where bureau_id = v_bureau;
+  delete from public.veille_suivi where bureau_id = v_bureau;
   delete from public.membres  where bureau_id = v_bureau and email like '%@demo.exemple.ch';
 
   perform public.remplit_demo(v_bureau);
@@ -2893,6 +2911,54 @@ begin
 end $$;
 revoke execute on function public.console_reinitialise_demo() from public, anon;
 grant execute on function public.console_reinitialise_demo() to authenticated;
+
+
+-- ------------------------------------------ bornes de taille (19.11.2026) --
+-- Audit : aucun champ de texte n'avait de borne, et le compte de démonstration,
+-- public, écrit dans la même base que les bureaux réels. Chaque texte des tables
+-- de travail est borné à 10 000 caractères, et le « Bureau de test » à 2 000
+-- lignes par table : personne ne remplit la base à lui seul.
+do $$
+declare c record;
+begin
+  for c in
+    select table_name, column_name from information_schema.columns
+     where table_schema = 'public' and data_type = 'text'
+       and table_name in ('affaires', 'taches', 'contacts', 'rendez_vous', 'conges', 'absences', 'avis', 'ao_agenda', 'veille_suivi')
+  loop
+    if not exists (select 1 from pg_constraint
+                    where conrelid = format('public.%I', c.table_name)::regclass
+                      and conname = c.table_name || '_' || c.column_name || '_longueur') then
+      execute format('alter table public.%I add constraint %I check (char_length(%I) <= 10000)',
+                     c.table_name, c.table_name || '_' || c.column_name || '_longueur', c.column_name);
+    end if;
+  end loop;
+end $$;
+
+create or replace function public.plafond_demo()
+returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare n bigint;
+begin
+  if exists (select 1 from public.bureaux b where b.id = new.bureau_id and b.nom = 'Bureau de test') then
+    execute format('select count(*) from public.%I where bureau_id = $1', tg_table_name) into n using new.bureau_id;
+    if n >= 2000 then
+      raise exception 'La démonstration est pleine : elle doit être réinitialisée.';
+    end if;
+  end if;
+  return new;
+end $$;
+revoke all on function public.plafond_demo() from public, anon, authenticated;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['affaires', 'taches', 'contacts', 'rendez_vous', 'conges', 'absences', 'avis', 'ao_agenda', 'veille_suivi']
+  loop
+    execute format('drop trigger if exists plafond_demo on public.%I', t);
+    execute format('create trigger plafond_demo before insert on public.%I for each row execute function public.plafond_demo()', t);
+  end loop;
+end $$;
 
 
 -- ===================================================== Outils du chantier FGH ==
@@ -3323,7 +3389,7 @@ commit;
 notify pgrst, 'reload schema';
 
 -- À vérifier en ligne après exécution, avec la clé publiable et sans connexion :
---   lecture  -> 200 et [] (rien ne fuite ; sauf doc_chantiers et doc_reservations, ouvertes)
+--   lecture  -> 200 et [] (rien ne fuite, organiseur compris)
 --   écriture -> 401 « new row violates row-level security policy »
 
 -- ============================================================ Fiches ARM FGH ==
@@ -3421,9 +3487,9 @@ create policy "fgh arm : retrait" on storage.objects for delete to authenticated
 
 -- ===================================================== Organiseur de documents ==
 -- L'outil /organiseur/ (04.11.2026) : numérotation des documents par chantier et
--- réservation de plages de numéros à l'avance. Ouvert SANS CONNEXION à toute
--- personne qui a l'adresse (rôle anon) ; la liste des plans FGH qu'il peut lier
--- ne se lit, elle, qu'avec une connexion aux outils FGH.
+-- réservation de plages de numéros à l'avance. Connexion aux outils FGH requise
+-- (acces_fgh), comme pour la liste des plans FGH qu'il peut lier : le rôle anon
+-- n'y a aucun droit (commentaire corrigé le 19.11.2026, il disait l'inverse).
 -- doc_chantiers.config (jsonb) porte les référentiels du chantier : gabarit du
 -- code, disciplines, phases, types de document, bâtiments avec niveaux et zones,
 -- arbre des plages (lots et sous-lots). doc_reservations = un bloc de n° (de–à)

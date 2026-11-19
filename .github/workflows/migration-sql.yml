@@ -23,6 +23,10 @@ concurrency:
 
 jobs:
   migration:
+    # Seulement depuis main (19.11.2026, audit) : le fichier exécuté est celui de la branche lancée,
+    # et il tourne avec le mot de passe de la base. Voie de secours : la base se modifie d'abord
+    # par le connecteur Supabase (voir CLAUDE.md).
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
