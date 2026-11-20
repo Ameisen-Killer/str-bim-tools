@@ -204,8 +204,8 @@ textarea.champ{height:auto;min-height:64px;resize:vertical}
 .version{font-size:11px;color:var(--texte-faible);font-family:var(--mono)}
 .filtre-titre{padding:12px 14px 4px;font-size:12px;font-weight:600;color:var(--texte-faible);text-transform:uppercase;letter-spacing:.04em}
 .zone .pt{width:10px;height:10px;border-radius:50%;flex:none;background:var(--gris)}
-.st-valide{--c:var(--vert)}.st-refuse{--c:var(--rouge)}.st-revoir{--c:#F7A23B}.st-attente{--c:var(--gris)}.st-aucune{--c:transparent}
-:root[data-theme="clair"] .st-revoir{--c:#B85C00}
+.st-valide{--c:var(--vert)}.st-refuse{--c:var(--rouge)}.st-revoir{--c:#F7A23B}.st-etude{--c:#60CDFF}.st-attente{--c:var(--gris)}.st-aucune{--c:transparent}
+:root[data-theme="clair"] .st-revoir{--c:#B85C00}:root[data-theme="clair"] .st-etude{--c:#005FB8}
 .zone .pt[class*="st-"]{background:var(--c)}
 .zone .pt.st-aucune{border:1px dashed var(--texte-faible)}
 .zone .n.zero{opacity:.45}
@@ -281,7 +281,7 @@ td.nw{white-space:nowrap}
       <span class="nsel" id="nsel">Aucune ligne cochée</span>
       <span class="grp act">
         <select class="champ" id="m-statut" title="Statut à poser">
-          <option value="VALIDE">VALIDE</option><option value="A REVOIR">A REVOIR</option><option value="REFUSE">REFUSE</option><option value="">(vide)</option>
+          <option value="VALIDE">VALIDE</option><option value="A REVOIR">A REVOIR</option><option value="EN ETUDE">EN ETUDE</option><option value="REFUSE">REFUSE</option><option value="">(vide)</option>
         </select>
         <button type="button" class="bt cadre petit" id="m-statut-ok">Poser le statut</button>
         <label class="ck" title="Seulement si la maquette n'a pas de date et qu'il n'y a pas de ligne date"><input type="checkbox" id="m-dater" checked>dater du jour si la maquette n'a pas de date</label>
@@ -332,6 +332,6 @@ td.nw{white-space:nowrap}
 <div id="toast" role="status"></div>
 <div id="occupe" hidden>Traitement…</div>
 
-<script src="/fgh/jsn/jsn.js?v=1"></script>
+<script src="/fgh/jsn/jsn.js?v=2"></script>
 </body>
 </html>

@@ -50,7 +50,7 @@
   function nomNiv(n) { var c = codeNiv(n); return NIVEAUX[c] ? n + " · " + NIVEAUX[c] : (n || "—"); }
   function cmpTxt(a, b) { return String(a).localeCompare(String(b), "fr", { numeric: true }); }
   function copie(o) { return JSON.parse(JSON.stringify(o)); }
-  function classeSt(v) { return v === "VALIDE" ? "valide" : v === "REFUSE" ? "refuse" : v === "A REVOIR" ? "revoir" : "attente"; }
+  function classeSt(v) { return v === "VALIDE" ? "valide" : v === "REFUSE" ? "refuse" : v === "A REVOIR" ? "revoir" : v === "EN ETUDE" ? "etude" : "attente"; }
   function pastille(v) { return '<span class="statut st-' + classeSt(v) + '">' + esc(v || "(vide)") + "</span>"; }
 
   // ------------------------------------------------------------------ réservations
@@ -220,8 +220,8 @@
     ["date-gardee", "Date initiale gardée", function (r) { var mq = maquette(r, P_DATE), n = nouveau(r.lignes, P_DATE); return n !== null && !!mq && n !== mq; }],
     ["modifiees", "Modifiées", modifiee]
   ];
-  var ST_J = [["valide", "VALIDE"], ["revoir", "A REVOIR"], ["refuse", "REFUSE"], ["attente", "(vide)"], ["aucune", GARDE]];
-  var ST_M = [["valide", "VALIDE"], ["revoir", "A REVOIR"], ["refuse", "REFUSE"], ["attente", "(vide)"], ["inconnu", "Inconnu (?)"]];
+  var ST_J = [["valide", "VALIDE"], ["revoir", "A REVOIR"], ["etude", "EN ETUDE"], ["refuse", "REFUSE"], ["attente", "(vide)"], ["aucune", GARDE]];
+  var ST_M = [["valide", "VALIDE"], ["revoir", "A REVOIR"], ["etude", "EN ETUDE"], ["refuse", "REFUSE"], ["attente", "(vide)"], ["inconnu", "Inconnu (?)"]];
 
   function passe(r, sauf) {
     if (sauf !== "stj" && FILT.stj && stjCle(r) !== FILT.stj) return false;
