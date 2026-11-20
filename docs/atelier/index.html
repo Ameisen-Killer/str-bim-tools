@@ -226,7 +226,7 @@ a{color:inherit;text-decoration:none}
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.8.0";
+  var VERSION = "1.8.1";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -263,6 +263,9 @@ a{color:inherit;text-decoration:none}
   ];
 
   var $ = function(s){ return document.querySelector(s); };
+  // Le même dessin sert plusieurs fois dans la page : chaque copie reçoit ses propres identifiants de dégradé
+  function dessin(id, pre){ return DESSINS[id].replace(/id="(\w+)"/g, 'id="' + pre + '$1"').replace(/url\(#(\w+)\)/g, "url(#" + pre + "$1)"); }
+  var elBulle = $("#bulle");
   document.title = NOM + " · STR Bim Tools";
   $("#nom-barre").textContent = NOM;
   $("#version").textContent = "v" + VERSION;
@@ -284,19 +287,19 @@ a{color:inherit;text-decoration:none}
     });
     el.addEventListener("dblclick", function(){ ouvrir(a); });
     el.addEventListener("mouseenter", function(){ bulle(el); });
-    el.addEventListener("mouseleave", function(){ $("#bulle").hidden = true; });
+    el.addEventListener("mouseleave", function(){ clearTimeout(minuteur); elBulle.hidden = true; });
     bureau.appendChild(el);
 
     var ep = document.createElement("a");
-    ep.className = "epingle"; ep.href = a.href; ep.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="m$1"').replace(/url\(#(\w+)\)/g, "url(#m$1)") + "<span></span><small></small>";
+    ep.className = "epingle"; ep.href = a.href; ep.innerHTML = dessin(a.id, "m") + "<span></span><small></small>";
     ep.querySelector("span").textContent = a.nom; ep.querySelector("small").textContent = a.desc;
     ep.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); menu(false); ouvrir(a); });
     $("#epingles").appendChild(ep);
 
     var t = document.createElement("a");
-    t.className = "tache"; t.href = a.href; t.title = a.nom;
-    t.innerHTML = DESSINS[a.id].replace(/id="(\w+)"/g, 'id="t$1"').replace(/url\(#(\w+)\)/g, "url(#t$1)") + '<span class="etiquette"></span>';
-    t.querySelector(".etiquette").textContent = a.nom; t.removeAttribute("title"); t.dataset.app = a.id;
+    t.className = "tache"; t.href = a.href;
+    t.innerHTML = dessin(a.id, "t") + '<span class="etiquette"></span>';
+    t.querySelector(".etiquette").textContent = a.nom; t.dataset.app = a.id;
     t.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); basculer(a); });
     $("#taches").appendChild(t);
   });
@@ -326,7 +329,7 @@ a{color:inherit;text-decoration:none}
     if (f){ f.el.classList.remove("reduite"); devant(f); return; }
     var el = document.createElement("section");
     el.className = "fenetre neuve"; el.setAttribute("aria-label", a.nom);
-    el.innerHTML = '<div class="titre">' + DESSINS[a.id].replace(/id="(\w+)"/g, 'id="f$1"').replace(/url\(#(\w+)\)/g, "url(#f$1)") +
+    el.innerHTML = '<div class="titre">' + dessin(a.id, "f") +
       '<span class="nom"></span>' +
       '<a class="onglet" target="_blank" rel="noopener" title="Ouvrir dans un onglet">' + BTN.onglet + '</a>' +
       '<button class="reduire" title="Réduire">' + BTN.reduire + '</button>' +
@@ -376,7 +379,8 @@ a{color:inherit;text-decoration:none}
     else ouvrir(a);
   }
   function dockEtat(){
-    [].forEach.call(dock.querySelectorAll(".tache[data-app]"), function(t){
+    TACHES.forEach(function(t){
+      if (!t.dataset.app) return;
       var f = FEN[t.dataset.app];
       t.classList.toggle("ouverte", !!f);
       t.classList.toggle("devant", !!f && f.el.classList.contains("active") && !f.el.classList.contains("reduite"));
@@ -421,17 +425,28 @@ a{color:inherit;text-decoration:none}
   addEventListener("resize", function(){ Object.keys(FEN).forEach(function(k){ cadre(FEN[k]); }); });
 
   // ---------- Dock : grossissement au survol (souris seulement) ----------
-  var dock = $("#taches");
+  // Un seul calcul par image affichée ; toutes les mesures d'abord, toutes les écritures ensuite
+  // (mesurer et écrire en alternance oblige le navigateur à refaire la mise en page à chaque icône)
+  var dock = $("#taches"), TACHES = [].slice.call(dock.querySelectorAll(".tache")), xDock = null, dockPrevu = false;
   function grossit(e){
-    [].forEach.call(dock.querySelectorAll(".tache"), function(t){
-      var r = t.getBoundingClientRect(), d = (e.clientX - (r.left + r.width / 2)) / 64;
-      t.style.setProperty("--s", (1 + .75 * Math.exp(-d * d)).toFixed(3));
+    xDock = e.clientX;
+    if (dockPrevu) return;
+    dockPrevu = true;
+    requestAnimationFrame(function(){
+      dockPrevu = false;
+      if (xDock === null) return;
+      var centres = TACHES.map(function(t){ var r = t.getBoundingClientRect(); return r.left + r.width / 2; });
+      TACHES.forEach(function(t, n){
+        var d = (xDock - centres[n]) / 64;
+        t.style.setProperty("--s", (1 + .75 * Math.exp(-d * d)).toFixed(3));
+      });
     });
   }
   if (!tactile){
     dock.addEventListener("mousemove", grossit);
     dock.addEventListener("mouseleave", function(){
-      [].forEach.call(dock.querySelectorAll(".tache"), function(t){ t.style.setProperty("--s", 1); });
+      xDock = null;
+      TACHES.forEach(function(t){ t.style.setProperty("--s", 1); });
     });
   }
 
@@ -449,7 +464,7 @@ a{color:inherit;text-decoration:none}
     clearTimeout(minuteur);
     minuteur = setTimeout(function(){
       if (!el.matches(":hover")) return;
-      var b = $("#bulle"), r = el.getBoundingClientRect();
+      var b = elBulle, r = el.getBoundingClientRect();
       b.textContent = el.dataset.desc; b.hidden = false;
       b.style.left = Math.min(r.right + 6, innerWidth - b.offsetWidth - 8) + "px";
       b.style.top = (r.top + 8) + "px";
@@ -470,8 +485,9 @@ a{color:inherit;text-decoration:none}
     if (e.key === "Escape") menu(false);
     if (e.key === "Meta" || (e.key === "s" && e.altKey)) { e.preventDefault(); menu(); }
     // Flèches : passer d'une icône du bureau à l'autre
-    var ic = [].slice.call(document.querySelectorAll(".icone")), i = ic.indexOf(document.activeElement);
-    if (i >= 0 && /^Arrow/.test(e.key)){
+    if (!/^Arrow/.test(e.key)) return;
+    var ic = [].slice.call(bureau.children), i = ic.indexOf(document.activeElement);
+    if (i >= 0){
       e.preventDefault();
       var j = /Down|Right/.test(e.key) ? Math.min(i + 1, ic.length - 1) : Math.max(i - 1, 0);
       ic[j].focus(); choisir(ic[j]);
@@ -532,47 +548,85 @@ a{color:inherit;text-decoration:none}
     var r = document.documentElement, c = r.getAttribute("data-theme") === "clair" ? "sombre" : "clair";
     r.setAttribute("data-theme", c);
     try { localStorage.setItem("atelier.theme", c); } catch(e){}
+    filMaj();
   });
 
   // ---------- Horloge ----------
-  function horloge(){
+  // Réveil calé sur le changement de minute : l'heure tourne à la seconde près, avec un seul réveil par minute
+  var elHeure = $("#heure"), elDate = $("#date");
+  function heure(){
     var d = new Date(), z = function(x){ return (x < 10 ? "0" : "") + x; };
-    $("#heure").textContent = z(d.getHours()) + ":" + z(d.getMinutes());
-    $("#date").textContent = z(d.getDate()) + "." + z(d.getMonth() + 1) + "." + d.getFullYear();
+    elHeure.textContent = z(d.getHours()) + ":" + z(d.getMinutes());
+    elDate.textContent = z(d.getDate()) + "." + z(d.getMonth() + 1) + "." + d.getFullYear();
+    return d;
   }
-  horloge(); setInterval(horloge, 10000);
+  function horloge(){
+    var d = heure();
+    setTimeout(horloge, 60050 - (d.getSeconds() * 1000 + d.getMilliseconds()));
+  }
+  horloge();
+  // Onglet resté longtemps en arrière-plan ou poste sorti de veille : remise à l'heure dès le retour
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) heure(); });
 
   // ---------- Fond d'écran : ossature filaire (poteaux, dalles) qui tourne lentement ----------
+  // Le fond passe sous les flous de la barre, des tuiles et des fenêtres : chaque image redessinée les fait
+  // recalculer. D'où 30 images par seconde (la rotation fait un tour en 2 min 40, l'œil ne voit pas la
+  // différence), l'arrêt complet quand le fond est caché, et un tracé sans rien allouer en mémoire.
   var cv = $("#fond"), ctx = cv.getContext("2d"), L, H, dpr;
-  function taille(){ dpr = Math.min(window.devicePixelRatio || 1, 2); L = innerWidth; H = innerHeight; cv.width = L * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
-  taille(); addEventListener("resize", taille);
-  var segs = [], nx = 4, ny = 3, nz = 5, p = 1;
-  for (var k = 0; k <= nz; k++) for (var i = 0; i <= nx; i++) for (var j = 0; j <= ny; j++){
-    var a = [i - nx/2, k - nz/2, j - ny/2];
-    if (i < nx) segs.push([a, [a[0] + p, a[1], a[2]]]);
-    if (j < ny) segs.push([a, [a[0], a[1], a[2] + p]]);
-    if (k < nz) segs.push([a, [a[0], a[1] + p, a[2]]]);
+  var nx = 4, ny = 3, nz = 5, pasI = ny + 1, pasK = (nx + 1) * (ny + 1), NN = (nz + 1) * pasK;
+  var noeuds = new Float32Array(NN * 3), proj = new Float32Array(NN * 3), liens = [], n = 0;
+  for (var k = 0; k <= nz; k++) for (var i = 0; i <= nx; i++) for (var j = 0; j <= ny; j++, n++){
+    noeuds[n*3] = i - nx/2; noeuds[n*3 + 1] = k - nz/2; noeuds[n*3 + 2] = j - ny/2;
+    if (i < nx) liens.push(n, n + pasI);
+    if (j < ny) liens.push(n, n + 1);
+    if (k < nz) liens.push(n, n + pasK);
   }
-  var t0 = performance.now();
-  function dessine(t){
-    var ang = (t - t0) / 26000, c = Math.cos(ang), s = Math.sin(ang);
-    var ech = Math.min(L, H) / 11, cx = L * .62, cy = H * .5;
-    var fil = getComputedStyle(document.documentElement).getPropertyValue("--fil").trim();
+  var NS = liens.length / 2, niveau = new Uint8Array(NS), NIV = 16, ang = 0, fil = "255,255,255";
+  function trace(){
+    var c = Math.cos(ang), s = Math.sin(ang), ech = Math.min(L, H) / 11, cx = L * .62, cy = H * .5, m, q, v;
+    for (m = 0; m < NN; m++){
+      var x = noeuds[m*3]*c - noeuds[m*3 + 2]*s, z = noeuds[m*3]*s + noeuds[m*3 + 2]*c, f = 7 / (7 + z * .6);
+      proj[m*3] = cx + x * ech * f; proj[m*3 + 1] = cy - noeuds[m*3 + 1] * ech * f + z * ech * .28; proj[m*3 + 2] = z;
+    }
+    // opacité selon la profondeur (0,10 − 0,02 × profondeur), rangée en 16 niveaux : un tracé par niveau
+    for (q = 0; q < NS; q++){
+      v = Math.round((0.10 - (proj[liens[q*2]*3 + 2] + proj[liens[q*2 + 1]*3 + 2]) * .01) * 100) - 1;
+      niveau[q] = v < 0 ? 0 : v >= NIV ? NIV - 1 : v;
+    }
     ctx.clearRect(0, 0, L, H);
     ctx.lineWidth = 1;
-    segs.forEach(function(sg){
-      var pr = sg.map(function(q){
-        var x = q[0]*c - q[2]*s, z = q[0]*s + q[2]*c, y = q[1];
-        var f = 7 / (7 + z * .6);
-        return [cx + x * ech * f, cy - y * ech * f + z * ech * .28, z];
-      });
-      var prof = (pr[0][2] + pr[1][2]) / 2;
-      ctx.strokeStyle = "rgba(" + fil + "," + (0.10 - prof * .02).toFixed(3) + ")";
-      ctx.beginPath(); ctx.moveTo(pr[0][0], pr[0][1]); ctx.lineTo(pr[1][0], pr[1][1]); ctx.stroke();
-    });
-    requestAnimationFrame(dessine);
+    for (v = 0; v < NIV; v++){
+      var vide = true;
+      for (q = 0; q < NS; q++){
+        if (niveau[q] !== v) continue;
+        if (vide){ ctx.beginPath(); vide = false; }
+        var d1 = liens[q*2] * 3, d2 = liens[q*2 + 1] * 3;
+        ctx.moveTo(proj[d1], proj[d1 + 1]); ctx.lineTo(proj[d2], proj[d2 + 1]);
+      }
+      if (!vide){ ctx.strokeStyle = "rgba(" + fil + "," + ((v + 1) / 100).toFixed(2) + ")"; ctx.stroke(); }
+    }
   }
-  requestAnimationFrame(dessine);
+  function filMaj(){ fil = getComputedStyle(document.documentElement).getPropertyValue("--fil").trim() || fil; trace(); }
+  function taille(){ dpr = Math.min(window.devicePixelRatio || 1, 2); L = innerWidth; H = innerHeight; cv.width = L * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); trace(); }
+  taille(); filMaj(); addEventListener("resize", taille);
+  // Fond caché : écran d'extinction, ou une fenêtre agrandie (elle couvre tout le bureau)
+  function cache(){
+    if (!ecran.hidden && ecran.classList.contains("on")) return true;
+    for (var id in FEN) if (FEN[id].el.classList.contains("agrandie") && !FEN[id].el.classList.contains("reduite")) return true;
+    return false;
+  }
+  var tDernier = 0;
+  function boucle(t){
+    if (cache()){ tDernier = 0; setTimeout(function(){ requestAnimationFrame(boucle); }, 400); return; }
+    var dt = t - tDernier;
+    if (dt >= 30){
+      // l'angle n'avance que pendant l'affichage : pas de saut au retour d'une pause
+      if (tDernier) ang += Math.min(dt, 100) / 26000;
+      tDernier = t; trace();
+    }
+    requestAnimationFrame(boucle);
+  }
+  requestAnimationFrame(boucle);
 })();
 </script>
 </body>
