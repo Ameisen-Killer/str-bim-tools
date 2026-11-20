@@ -17,10 +17,10 @@
   var PARAMS = [P_ST, P_DATE, P_COM];
   var LIB = {}; LIB[P_ST] = "Statut"; LIB[P_DATE] = "Date"; LIB[P_COM] = "Commentaire";
   // Valeurs proposées : lues par « Sync Reservations » (VALID… = copiée en STR, REFUS… = refusée, autre = non copiée)
-  var STATUTS = [["", "En attente"], ["VALIDE", "Validée"], ["REFUSE", "Refusée"], ["A REVOIR", "À revoir"]];
+  var STATUTS = [["", "En attente"], ["VALIDE", "Validée"], ["REFUSE", "Refusée"], ["A REVOIR", "À revoir"], ["EN ETUDE", "En étude"]];
   // teinte de la vue (remplissage pastel, arêtes du même ton plus soutenu) et classe des pastilles
-  var TEINTE = { valide: 135, refuse: 4, revoir: 36, attente: 212, autre: 275 };
-  var NOM_CLASSE = { valide: "Validée", refuse: "Refusée", revoir: "À revoir", attente: "En attente", autre: "Autre statut" };
+  var TEINTE = { valide: 135, refuse: 4, revoir: 36, etude: 175, attente: 212, autre: 275 };
+  var NOM_CLASSE = { valide: "Validée", refuse: "Refusée", revoir: "À revoir", etude: "En étude", attente: "En attente", autre: "Autre statut" };
 
   var $ = function(s){ return document.querySelector(s); };
   var C = IFC.champs, R = IFC.idRef, L = IFC.refsListe;
@@ -101,8 +101,8 @@
   // ================= Export DXF (vue de dessus) =================
   // Arêtes de ce qui est affiché, coupées par la boîte de coupe, à plat dans le repère du projet Revit (mètres).
   // DXF R12 texte : lu par AutoCAD, Revit, BricsCAD, LibreCAD… Calques : structure et un par statut de réservation.
-  var CALQUES_DXF = [["STR_EXISTANT", 8], ["STR_NOUVEAU", 221], ["RES_EN_ATTENTE", 5], ["RES_VALIDEE", 3], ["RES_REFUSEE", 1], ["RES_A_REVOIR", 30], ["RES_AUTRE", 6], ["RES_NUMEROS", 7]];
-  var CALQUE_CLASSE = { attente: "RES_EN_ATTENTE", valide: "RES_VALIDEE", refuse: "RES_REFUSEE", revoir: "RES_A_REVOIR", autre: "RES_AUTRE" };
+  var CALQUES_DXF = [["STR_EXISTANT", 8], ["STR_NOUVEAU", 221], ["RES_EN_ATTENTE", 5], ["RES_VALIDEE", 3], ["RES_REFUSEE", 1], ["RES_A_REVOIR", 30], ["RES_EN_ETUDE", 4], ["RES_AUTRE", 6], ["RES_NUMEROS", 7]];
+  var CALQUE_CLASSE = { attente: "RES_EN_ATTENTE", valide: "RES_VALIDEE", refuse: "RES_REFUSEE", revoir: "RES_A_REVOIR", etude: "RES_EN_ETUDE", autre: "RES_AUTRE" };
   function asciiDxf(t){ return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "_"); }
   function exporterDxf(){
     if (!fichiers.length){ etat("Ouvre d'abord les IFC."); return; }
@@ -176,6 +176,7 @@
     if (u.indexOf("VALID") >= 0) return "valide";
     if (u.indexOf("REFUS") >= 0) return "refuse";
     if (u.indexOf("REVOIR") >= 0) return "revoir";
+    if (u.indexOf("ETUDE") >= 0) return "etude";
     return "autre";
   }
   // Entrée d'une modification : { ancien, nouveau, par, quand } ; retire : true = décision annulée, gardée pour que
@@ -621,7 +622,7 @@
     // tous les statuts présents restent dans la légende, décochés compris (masqués : pas comptés dans la boîte)
     var n = {}, tot = {}, D = vue.dansCoupe();
     RES.forEach(function(r){ var c = classe(valeur(r, P_ST)); tot[c] = (tot[c] || 0) + 1; if (!D || D.has(r.cle)) n[c] = (n[c] || 0) + 1; });
-    $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "autre"].filter(function(c){ return tot[c]; })
+    $("#legende").innerHTML = (D ? "<span>Dans la boîte de coupe</span>" : "") + ["attente", "valide", "refuse", "revoir", "etude", "autre"].filter(function(c){ return tot[c]; })
       .map(function(c){ return '<label title="Décocher pour masquer ce statut dans la liste et la vue 3D"><input type="checkbox" data-st="' + c + '"' + (stMasques.has(c) ? "" : " checked") + '><i class="pastille s-' + c + '"></i>' + NOM_CLASSE[c] + (D && stMasques.has(c) ? "" : " · " + (n[c] || 0)) + "</label>"; }).join("") +
       (neufs ? '<span><i class="pastille s-neuf"></i>Structure nouvelle</span>' : "") + ligneRien(D);
     $("#legende").hidden = false;
@@ -935,7 +936,8 @@
     return '<div class="decision">' +
       '<button type="button" class="s-valide" data-dec="VALIDE" aria-pressed="' + (cl === "valide") + '">✓ Valider</button>' +
       '<button type="button" class="s-refuse" data-dec="REFUSE" aria-pressed="' + (cl === "refuse") + '">✗ Refuser</button>' +
-      '<button type="button" class="s-revoir" data-dec="A REVOIR" aria-pressed="' + (cl === "revoir") + '">À revoir</button></div>';
+      '<button type="button" class="s-revoir" data-dec="A REVOIR" aria-pressed="' + (cl === "revoir") + '">À revoir</button>' +
+      '<button type="button" class="s-etude" data-dec="EN ETUDE" aria-pressed="' + (cl === "etude") + '">En étude</button></div>';
   }
   function choisis(){ return Array.from(sel).map(function(c){ return parCle.get(c); }).filter(Boolean); }
   // sans fichier branché, la page ne fait que montrer : le fichier est la seule mémoire des décisions
@@ -1410,7 +1412,7 @@
       '<div class="actions"><button type="button" class="bt prim" data-m="heritage-ok"' + (FS.actif ? "" : " disabled") + '>Les mettre dans le fichier</button><button type="button" class="bt" data-m="heritage-non">Les jeter</button></div></div></div>';
     var L = Array.from(modifs.values()).filter(function(m){ return vives(m).length; }).sort(function(a, b){ return rangNiveau(a.niveau) - rangNiveau(b.niveau) || (a.num < b.num ? -1 : 1); }), parK = new Map();
     RES.forEach(function(r){ parK.set(r.k, r); });
-    if (!L.length) h += '<p class="note" style="padding:0 2px">Aucune décision pour l\'instant. Choisis une réservation et clique « Valider », « Refuser » ou « À revoir ».</p>';
+    if (!L.length) h += '<p class="note" style="padding:0 2px">Aucune décision pour l\'instant. Choisis une réservation et clique « Valider », « Refuser », « À revoir » ou « En étude ».</p>';
     else {
       h += '<div class="carte"><h3>' + pluriel(L.length, "réservation") + " · " + pluriel(nbModifs(), "valeur") + '</h3><div class="in">' + L.map(function(m){
         var r = parK.get(m.k);

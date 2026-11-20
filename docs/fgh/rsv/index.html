@@ -181,7 +181,7 @@ textarea.champ{height:auto;resize:vertical;min-height:72px;line-height:20px}
 .vide-liste{padding:24px 14px;color:var(--texte-faible)}
 
 /* couleurs des statuts (pastilles ; dans la vue : remplissage pastel, arêtes plus soutenues) */
-.s-valide{--c:var(--vert)}.s-refuse{--c:var(--rouge)}.s-revoir{--c:var(--orange)}.s-attente{--c:var(--bleu)}.s-autre{--c:#A88BD0}.s-neuf{--c:#E0A0B4}
+.s-valide{--c:var(--vert)}.s-refuse{--c:var(--rouge)}.s-revoir{--c:var(--orange)}.s-etude{--c:#2BB3A3}.s-attente{--c:var(--bleu)}.s-autre{--c:#A88BD0}.s-neuf{--c:#E0A0B4}
 .pastille{background:color-mix(in srgb,var(--c) 45%,transparent);border:2px solid var(--c)}
 
 /* ---------- Vue ---------- */
@@ -302,7 +302,7 @@ textarea.champ{height:auto;resize:vertical;min-height:72px;line-height:20px}
 .bloc dt{color:var(--texte-faible)}
 .bloc dd{margin:0;word-break:break-word}
 .bloc .adn{font-family:var(--mono);font-size:11px;color:var(--texte-faible);word-break:break-all;margin-top:8px}
-.decision{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px}
+.decision{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
 .decision button{min-height:36px;border:1px solid var(--bord-controle);border-bottom-color:var(--bord-bas);background:var(--controle);padding:7px 4px;cursor:pointer;border-radius:4px;font-weight:600}
 .decision button:hover{background:var(--controle-survol);border-color:var(--c)}
 .decision button[aria-pressed="true"]{background:color-mix(in srgb,var(--c) 24%,transparent);border-color:var(--c);color:var(--texte)}
@@ -380,6 +380,7 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
             <option value="VALIDE">Validées</option>
             <option value="REFUSE">Refusées</option>
             <option value="A REVOIR">À revoir</option>
+            <option value="EN ETUDE">En étude</option>
             <option value="modif">Modifiées ici</option>
           </select>
         </div>
@@ -459,6 +460,6 @@ fieldset.dec:disabled button,fieldset.dec:disabled .champ{cursor:not-allowed}
 <script src="/fgh/rsv/fgh-vue.js?v=23"></script>
 <script src="/fgh/rsv/fgh-clash.js?v=1"></script>
 <script src="/fgh/rsv/fgh-cube.js?v=5"></script>
-<script src="/fgh/rsv/fgh-app.js?v=46"></script>
+<script src="/fgh/rsv/fgh-app.js?v=47"></script>
 </body>
 </html>

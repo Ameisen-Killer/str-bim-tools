@@ -16,7 +16,7 @@
   var P_ST = "PVA_RES_VAL_Statut", P_DATE = "PVA_RES_VAL_Date", P_COM = "PVA_RES_VAL_Commentaire";
   var PARAMS = [P_ST, P_DATE, P_COM];
   var LIB = {}; LIB[P_ST] = "Statut"; LIB[P_DATE] = "Date"; LIB[P_COM] = "Commentaire";
-  var STATUTS = [["VALIDE", "Validée", "valide"], ["REFUSE", "Refusée", "refuse"], ["A REVOIR", "À revoir", "revoir"], ["", "En attente", "attente"]];
+  var STATUTS = [["VALIDE", "Validée", "valide"], ["REFUSE", "Refusée", "refuse"], ["A REVOIR", "À revoir", "revoir"], ["EN ETUDE", "En étude", "etude"], ["", "En attente", "attente"]];
   var EXCELJS = "/fgh/pln/vendor/exceljs-4.4.0.min.js?v=1";
   // Niveaux : mêmes codes que /fgh/pln/ (FGH_070 = 070 = SS-2)
   var NIVEAUX = { "000": "Tous niveaux", "050": "SS-4", "060": "SS-3", "070": "SS-2", "080": "SS-1", "090": "Rez inf", "100": "Rez",
