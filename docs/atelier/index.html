@@ -20,6 +20,7 @@
   --tuile:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.08));
   --tuile-bord:rgba(255,255,255,.18);
   --panneau:rgba(40,40,40,.9);
+  --fenetre:#272C32;
   --controle:rgba(255,255,255,.061);
   --controle-survol:rgba(255,255,255,.084);
   --ligne:rgba(255,255,255,.083);
@@ -44,6 +45,7 @@
   --tuile:linear-gradient(160deg,rgba(255,255,255,.95),rgba(255,255,255,.7));
   --tuile-bord:rgba(0,0,0,.08);
   --panneau:rgba(243,243,243,.92);
+  --fenetre:#F1F2F3;
   --controle:rgba(0,0,0,.035);
   --controle-survol:rgba(0,0,0,.06);
   --ligne:rgba(0,0,0,.0803);
@@ -100,8 +102,7 @@ a{color:inherit;text-decoration:none}
 .tache:active{transform:scale(.9)}
 .tache[aria-expanded="true"]::after{content:"";position:absolute;bottom:-5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--texte-doux)}
 .tache .etiquette{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);white-space:nowrap;padding:4px 10px;border-radius:8px;
-  background:var(--panneau);border:1px solid var(--ligne);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;
-  -webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
+  background:var(--fenetre);border:1px solid var(--ligne);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
 .tache:hover .etiquette{opacity:1;transform:translateX(-50%)}
 .demarrer-ico{background:linear-gradient(160deg,#E7BE77,#A9782E)!important;border-color:rgba(255,255,255,.25)!important}
 .droite{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;gap:2px}
@@ -145,10 +146,10 @@ a{color:inherit;text-decoration:none}
 .pied .alim:hover{background:var(--controle-survol)}
 .pied .alim svg,.zone.eteindre svg,.zone.plein svg{width:16px;height:16px}
 
-/* ---------- Fenêtres des outils ---------- */
+/* ---------- Fenêtres des outils (fond opaque, sans flou : le flou d'une grande surface coûte cher à la carte graphique) ---------- */
 .fenetres{position:fixed;inset:0 0 48px 0;z-index:10;pointer-events:none}
 .fenetre{position:absolute;display:flex;flex-direction:column;min-width:320px;min-height:220px;border-radius:12px;overflow:hidden;pointer-events:auto;
-  background:var(--panneau);border:1px solid var(--ligne);box-shadow:var(--ombre);-webkit-backdrop-filter:blur(60px);backdrop-filter:blur(60px);
+  background:var(--fenetre);border:1px solid var(--ligne);box-shadow:var(--ombre);
   transition:opacity .18s,transform .22s cubic-bezier(.2,.9,.3,1)}
 .fenetre.neuve{opacity:0;transform:scale(.94)}
 .fenetre.reduite{opacity:0;transform:translateY(40%) scale(.3);pointer-events:none}
@@ -226,7 +227,7 @@ a{color:inherit;text-decoration:none}
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.8.1";
+  var VERSION = "1.9.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -288,12 +289,14 @@ a{color:inherit;text-decoration:none}
     el.addEventListener("dblclick", function(){ ouvrir(a); });
     el.addEventListener("mouseenter", function(){ bulle(el); });
     el.addEventListener("mouseleave", function(){ clearTimeout(minuteur); elBulle.hidden = true; });
+    survol(el, a);
     bureau.appendChild(el);
 
     var ep = document.createElement("a");
     ep.className = "epingle"; ep.href = a.href; ep.innerHTML = dessin(a.id, "m") + "<span></span><small></small>";
     ep.querySelector("span").textContent = a.nom; ep.querySelector("small").textContent = a.desc;
     ep.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); menu(false); ouvrir(a); });
+    survol(ep, a);
     $("#epingles").appendChild(ep);
 
     var t = document.createElement("a");
@@ -301,8 +304,38 @@ a{color:inherit;text-decoration:none}
     t.innerHTML = dessin(a.id, "t") + '<span class="etiquette"></span>';
     t.querySelector(".etiquette").textContent = a.nom; t.dataset.app = a.id;
     t.addEventListener("click", function(e){ if (horsAtelier(e)) return; e.preventDefault(); basculer(a); });
+    survol(t, a);
     $("#taches").appendChild(t);
   });
+
+  // ---------- Préchargement : le pointeur s'attarde sur un outil, ses scripts et ses styles arrivent en avance ----------
+  // On lit la page de l'outil pour y trouver ses fichiers (avec leur ?v= du moment), puis le navigateur les met en cache.
+  var PRECHARGE = {};
+  function precharger(a){
+    if (PRECHARGE[a.id] || FEN[a.id]) return;
+    PRECHARGE[a.id] = true;
+    if (!window.fetch || !window.DOMParser || !window.URL) return;
+    if (navigator.connection && navigator.connection.saveData) return;   // économiseur de données : rien en avance
+    var base = new URL(a.href, location.href);
+    fetch(base.href, {credentials:"same-origin"}).then(function(r){ return r.ok ? r.text() : ""; }).then(function(html){
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      [].forEach.call(doc.querySelectorAll('script[src],link[rel="stylesheet"][href]'), function(x){
+        var script = x.tagName === "SCRIPT", u;
+        try { u = new URL(x.getAttribute(script ? "src" : "href"), base); } catch(e){ return; }
+        if (u.origin !== location.origin) return;
+        var l = document.createElement("link");
+        l.rel = "prefetch"; l.as = script ? "script" : "style"; l.href = u.href;
+        document.head.appendChild(l);
+      });
+    }).catch(function(){});
+  }
+  function survol(el, a){
+    if (tactile) return;   // au doigt, pas de survol : le toucher ouvre directement
+    var m;
+    el.addEventListener("mouseenter", function(){ m = setTimeout(function(){ precharger(a); }, 150); });
+    el.addEventListener("mouseleave", function(){ clearTimeout(m); });
+    el.addEventListener("focus", function(){ precharger(a); });
+  }
 
   // ---------- Fenêtres : chaque outil s'ouvre dans l'atelier (une fenêtre par outil) ----------
   var couche = $("#fenetres"), FEN = {}, zMax = 10, petit = function(){ return innerWidth <= 640; };
