@@ -92,18 +92,21 @@ a{color:inherit;text-decoration:none}
 /* ---------- Barre des tâches ---------- */
 .barre{position:fixed;left:0;right:0;bottom:0;height:48px;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--barre);border-top:1px solid var(--ligne);
   -webkit-backdrop-filter:blur(40px) saturate(1.4);backdrop-filter:blur(40px) saturate(1.4);padding-bottom:env(safe-area-inset-bottom)}
-/* Dock façon iOS : les icônes grossissent sous le pointeur, leurs voisines un peu moins */
+/* Dock façon iOS : les icônes grossissent sous le pointeur, leurs voisines un peu moins.
+   Tout passe par transform (--s grossit, --dx écarte les voisines, --p enfonce au clic) : aucune remise en page. */
 .barre{overflow:visible}
 .barre .centre{display:flex;gap:8px;align-items:flex-end;height:40px;padding:0 8px}
-.tache{--s:1;position:relative;flex:none;width:calc(36px * var(--s));height:calc(36px * var(--s));border:1px solid var(--tuile-bord);border-radius:calc(9px * var(--s));
+.tache{--s:1;--dx:0px;--p:1;position:relative;flex:none;width:36px;height:36px;border:1px solid var(--tuile-bord);border-radius:9px;
   background:var(--tuile);box-shadow:0 2px 8px rgba(0,0,0,.22);display:grid;place-items:center;cursor:default;padding:0;
-  transition:width .14s ease-out,height .14s ease-out,border-radius .14s ease-out,transform .25s cubic-bezier(.3,1.6,.5,1);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+  transform:translateX(var(--dx)) scale(calc(var(--s) * var(--p)));transform-origin:50% 100%;transition:transform .14s ease-out;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .tache svg{width:72%;height:72%}
-.tache:active{transform:scale(.9)}
-.tache[aria-expanded="true"]::after{content:"";position:absolute;bottom:-5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--texte-doux)}
-.tache .etiquette{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(4px);white-space:nowrap;padding:4px 10px;border-radius:8px;
-  background:var(--fenetre);border:1px solid var(--ligne);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
-.tache:hover .etiquette{opacity:1;transform:translateX(-50%)}
+.tache:active{--p:.9}
+/* le point et l'étiquette ne grossissent pas avec l'icône */
+.tache::after{transform:scale(calc(1 / var(--s)));transform-origin:50% 100%}
+.tache[aria-expanded="true"]::after{content:"";position:absolute;bottom:calc(-5px / var(--s));left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--texte-doux)}
+.tache .etiquette{position:absolute;bottom:calc(100% + 10px / var(--s));left:50%;translate:-50% 4px;scale:calc(1 / var(--s));transform-origin:50% 100%;white-space:nowrap;padding:4px 10px;border-radius:8px;
+  background:var(--fenetre);border:1px solid var(--ligne);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:12px;line-height:16px;opacity:0;pointer-events:none;transition:opacity .15s,translate .15s}
+.tache:hover .etiquette{opacity:1;translate:-50% 0}
 .demarrer-ico{background:linear-gradient(160deg,#E7BE77,#A9782E)!important;border-color:rgba(255,255,255,.25)!important}
 .droite{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;gap:2px}
 .zone{height:40px;padding:0 8px;border:0;border-radius:4px;background:transparent;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;font-size:12px;line-height:16px;cursor:default}
@@ -171,7 +174,7 @@ a{color:inherit;text-decoration:none}
 .poignee.g{top:36px;left:0;bottom:8px;width:6px;cursor:ew-resize}
 .poignee.db{right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize}
 .fenetre.agrandie .poignee{display:none}
-.tache.ouverte::after{content:"";position:absolute;bottom:-6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--texte-doux)}
+.tache.ouverte::after{content:"";position:absolute;bottom:calc(-6px / var(--s));left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--texte-doux)}
 .tache.devant::after{background:var(--accent);width:14px;margin-left:-7px;border-radius:3px}
 
 @media (max-width:640px){
@@ -227,7 +230,7 @@ a{color:inherit;text-decoration:none}
 (function(){
   "use strict";
   var NOM = "Atelier STR";
-  var VERSION = "1.9.0";
+  var VERSION = "1.10.0";
 
   // Icônes Fluent dessinées à la main (aucune bibliothèque)
   var DESSINS = {
@@ -458,9 +461,12 @@ a{color:inherit;text-decoration:none}
   addEventListener("resize", function(){ Object.keys(FEN).forEach(function(k){ cadre(FEN[k]); }); });
 
   // ---------- Dock : grossissement au survol (souris seulement) ----------
-  // Un seul calcul par image affichée ; toutes les mesures d'abord, toutes les écritures ensuite
-  // (mesurer et écrire en alternance oblige le navigateur à refaire la mise en page à chaque icône)
-  var dock = $("#taches"), TACHES = [].slice.call(dock.querySelectorAll(".tache")), xDock = null, dockPrevu = false;
+  // Les icônes gardent leur place dans la page : le grossissement et l'écartement sont des transformations,
+  // calculées une fois par image affichée à partir des centres au repos (mesurés à l'entrée du pointeur).
+  var dock = $("#taches"), TACHES = [].slice.call(dock.querySelectorAll(".tache")), xDock = null, dockPrevu = false, repos = null;
+  function dockMesure(){
+    repos = TACHES.map(function(t){ return t.offsetParent.getBoundingClientRect().left + t.offsetLeft + t.offsetWidth / 2; });
+  }
   function grossit(e){
     xDock = e.clientX;
     if (dockPrevu) return;
@@ -468,18 +474,27 @@ a{color:inherit;text-decoration:none}
     requestAnimationFrame(function(){
       dockPrevu = false;
       if (xDock === null) return;
-      var centres = TACHES.map(function(t){ var r = t.getBoundingClientRect(); return r.left + r.width / 2; });
+      if (!repos) dockMesure();
+      var plus = [], total = 0, cumul = 0;
+      var ech = TACHES.map(function(t, n){
+        var d = (xDock - repos[n]) / 64, k = 1 + .75 * Math.exp(-d * d);
+        plus[n] = t.offsetWidth * (k - 1); total += plus[n];
+        return k;
+      });
+      // chaque icône se décale de ce que ses voisines de gauche ont gagné, le tout restant centré
       TACHES.forEach(function(t, n){
-        var d = (xDock - centres[n]) / 64;
-        t.style.setProperty("--s", (1 + .75 * Math.exp(-d * d)).toFixed(3));
+        t.style.setProperty("--s", ech[n].toFixed(3));
+        t.style.setProperty("--dx", (cumul + plus[n] / 2 - total / 2).toFixed(2) + "px");
+        cumul += plus[n];
       });
     });
   }
   if (!tactile){
+    dock.addEventListener("mouseenter", dockMesure);
     dock.addEventListener("mousemove", grossit);
     dock.addEventListener("mouseleave", function(){
       xDock = null;
-      TACHES.forEach(function(t){ t.style.setProperty("--s", 1); });
+      TACHES.forEach(function(t){ t.style.setProperty("--s", 1); t.style.setProperty("--dx", "0px"); });
     });
   }
 
@@ -603,8 +618,9 @@ a{color:inherit;text-decoration:none}
 
   // ---------- Fond d'écran : ossature filaire (poteaux, dalles) qui tourne lentement ----------
   // Le fond passe sous les flous de la barre, des tuiles et des fenêtres : chaque image redessinée les fait
-  // recalculer. D'où 30 images par seconde (la rotation fait un tour en 2 min 40, l'œil ne voit pas la
-  // différence), l'arrêt complet quand le fond est caché, et un tracé sans rien allouer en mémoire.
+  // recalculer. D'où 20 images par seconde (la rotation fait un tour en 2 min 40 : un demi-pixel par image
+  // au plus), l'arrêt complet quand le fond est caché ou que le navigateur n'est pas au premier plan,
+  // et un tracé sans rien allouer en mémoire.
   var cv = $("#fond"), ctx = cv.getContext("2d"), L, H, dpr;
   var nx = 4, ny = 3, nz = 5, pasI = ny + 1, pasK = (nx + 1) * (ny + 1), NN = (nz + 1) * pasK;
   var noeuds = new Float32Array(NN * 3), proj = new Float32Array(NN * 3), liens = [], n = 0;
@@ -642,8 +658,10 @@ a{color:inherit;text-decoration:none}
   function filMaj(){ fil = getComputedStyle(document.documentElement).getPropertyValue("--fil").trim() || fil; trace(); }
   function taille(){ dpr = Math.min(window.devicePixelRatio || 1, 2); L = innerWidth; H = innerHeight; cv.width = L * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); trace(); }
   taille(); filMaj(); addEventListener("resize", taille);
-  // Fond caché : écran d'extinction, ou une fenêtre agrandie (elle couvre tout le bureau)
+  // Fond à l'arrêt : navigateur pas au premier plan (un clic dans un outil de l'atelier compte comme premier plan),
+  // écran d'extinction, ou une fenêtre agrandie (elle couvre tout le bureau)
   function cache(){
+    if (!document.hasFocus()) return true;
     if (!ecran.hidden && ecran.classList.contains("on")) return true;
     for (var id in FEN) if (FEN[id].el.classList.contains("agrandie") && !FEN[id].el.classList.contains("reduite")) return true;
     return false;
@@ -652,7 +670,7 @@ a{color:inherit;text-decoration:none}
   function boucle(t){
     if (cache()){ tDernier = 0; setTimeout(function(){ requestAnimationFrame(boucle); }, 400); return; }
     var dt = t - tDernier;
-    if (dt >= 30){
+    if (dt >= 45){
       // l'angle n'avance que pendant l'affichage : pas de saut au retour d'une pause
       if (tDernier) ang += Math.min(dt, 100) / 26000;
       tDernier = t; trace();
