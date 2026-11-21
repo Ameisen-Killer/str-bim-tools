@@ -3419,7 +3419,7 @@
           var G = Gs.get(it.m), g = null, rgb = null;
           if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
           if (G && !g) g = G.attente && !G.cache.has(it.id) ? null : geometrie(G, it.id);
-          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb, m: it.m, e: it.id }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb || it.rgb || null, m: it.m, e: it.id }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
@@ -3443,6 +3443,26 @@
       // cube de navigation : orientation actuelle, vue animée vers une orientation, rotation libre au glisser
       // (dl, dp en radians, image allégée jusqu'à finTourner), lissage des bords
       angles: function(){ return { lacet: yaw, plongee: pitch }; },
+      // Vue enregistrée : caméra (décalage rapporté à la taille de la vue) et boîte de coupe, à rendre à poserVue
+      etatVue: function(){
+        var d = Math.min(W, H) || 1;
+        return { lacet: yaw, plongee: pitch, zoom: zoom, dx: px/d, dy: py/d, centre: centre.slice(), rayon: rayon,
+          coupe: coupe ? { a: coupe.a || 0, min: coupe.min.slice(), max: coupe.max.slice() } : null, fige: fige, cadre: !cadreMasque };
+      },
+      poserVue: function(v){
+        function trois(t){ return Array.isArray(t) && t.length === 3 && t.every(function(x){ return typeof x === "number" && isFinite(x); }); }
+        if (!v || !trois(v.centre) || !(v.rayon > 0) || !(v.zoom > 0) || !isFinite(v.lacet) || !isFinite(v.plongee)) return false;
+        var d = Math.min(W, H) || 1, c = v.coupe;
+        anim = null;
+        yaw = v.lacet; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, v.plongee));
+        zoom = v.zoom; rayon = v.rayon; centre = v.centre.slice();
+        px = (isFinite(v.dx) ? v.dx : 0)*d; py = (isFinite(v.dy) ? v.dy : 0)*d;
+        coupe = c && trois(c.min) && trois(c.max) ? { a: isFinite(c.a) ? c.a : 0, min: c.min.slice(), max: c.max.slice() } : null;
+        fige = !!v.fige && !!coupe; cadreMasque = v.cadre === false && !!coupe;
+        M.coupe(coupe);
+        demander();
+        return true;
+      },
       // Image de la vue telle qu'affichée, sur le fond de la page : un canvas 2D, ou null si la vue est vide.
       // Le dessin et la copie se font dans la foulée (le tampon WebGL n'est pas gardé d'une image à l'autre).
       image: function(){

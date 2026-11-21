@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.7.0";
+  var VERSION = "1.8.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -560,7 +560,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=6";
+  var URL_GEO = "/ifc/ifc-geo.js?v=7";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1684,6 +1684,11 @@
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
     [].forEach.call(document.querySelectorAll("[data-geo]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-geo") === geoVoulue)); });
+    var dv = $('[data-dyn="vues"]'), lv = vuesEnregistrees();
+    if (dv) dv.innerHTML = lv.map(function(v, k){
+      return '<button type="button" role="menuitem" data-cmd="vue-rappel" data-k="' + k + '"><span>' + esc(v.nom) + "</span><kbd></kbd></button>";
+    }).join("") + (lv.length ? '<button type="button" role="menuitem" data-cmd="vues-oublier"><span>Supprimer les vues enregistrées…</span><kbd></kbd></button>' : "");
+    activerCmd("vue-enregistrer", fichiers.length > 0);
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
       return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
@@ -2430,7 +2435,13 @@
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
   function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && !l.f.enCalcul && l.i.vue3D && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
+    var duFichier = colorer === "fichier";
+    lignes.forEach(function(l){
+      if (!l.i || !l.f.visible || l.f.enCalcul || !l.i.vue3D || caches.has(l.cle)) return;
+      // couleurs du fichier : celle de l'élément s'il en a une, sinon sa teinte habituelle
+      var rgb = duFichier ? couleurFichier(l.f.m, l.id) : null;
+      items.push({ cle: l.cle, m: l.f.m, id: l.id, h: rgb ? null : teinteElement(l.f, l.id), rgb: rgb });
+    });
     return items;
   }
   function majVue(){
@@ -2977,8 +2988,8 @@
   });
 
   // ================= Couleurs selon un critère (légende cliquable) =================
-  var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette"]), teintesCat = null, catsLegende = [], catDe = null;
-  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison" };
+  var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette", "fichier"]), teintesCat = null, catsLegende = [], catDe = null;
+  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison", fichier: "Couleurs du fichier" };
   function categorie(l){
     if (colorer === "type") return l.i.typeLib;
     if (colorer === "famille") return l.i.objectType || "(sans famille : type)";
@@ -2992,7 +3003,7 @@
     var leg = $("#legende");
     // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
     if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = null; }
-    if (!colorer || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
+    if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
     lignes.forEach(function(l){
@@ -3020,7 +3031,8 @@
     if (colorer !== "diff") garder("ifc.colorer", colorer);
     calculerCouleurs();
     majVue();
-    if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
+    if (colorer === "fichier") etat("Couleurs du fichier : styles de surface et matériaux de l'IFC. Les éléments sans couleur gardent celle de leur maquette ; la transparence n'est pas rendue.");
+    else if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
   }
   $("#legende").addEventListener("click", function(e){
     if (e.target.closest("[data-leg-fermer]")){ poserColorer(""); etat("Couleurs des maquettes rétablies."); return; }
@@ -3035,6 +3047,143 @@
   });
 
   poserMode(modeEd);
+
+  // ================= Couleurs du fichier (styles de surface et matériaux) =================
+  // Couleur [r, v, b] (0–255) d'un élément : celle du style posé sur sa forme (IFCSTYLEDITEM), à défaut celle de
+  // son matériau (IFCMATERIALDEFINITIONREPRESENTATION) ; null s'il n'en a pas. La transparence n'est pas rendue.
+  function tableCouleurs(m){
+    if (m._coul && m._coul.v === m.version) return m._coul;
+    var C = IFC.champs, R = IFC.idRef, L = IFC.refsListe, N = IFC.nombre;
+    var T = { v: m.version, item: new Map(), mat: new Map(), el: new Map() };
+    function rvb(id, prof){
+      var e = m.ent.get(id);
+      if (!e || prof > 6) return null;
+      var a = C(e), r = null;
+      if (e.type === "IFCCOLOURRGB"){
+        var c = [N(a[1]), N(a[2]), N(a[3])];
+        return c.every(isFinite) ? c.map(function(x){ return Math.max(0, Math.min(255, Math.round(255*x))); }) : null;
+      }
+      var suite = e.type === "IFCSURFACESTYLERENDERING" || e.type === "IFCSURFACESTYLESHADING" ? [R(a[0])] :
+        e.type === "IFCSURFACESTYLE" ? L(a[2]) : e.type === "IFCPRESENTATIONSTYLEASSIGNMENT" ? L(a[0]) : [];
+      suite.some(function(x){ r = x ? rvb(x, prof + 1) : null; return !!r; });
+      return r;
+    }
+    function styles(a){ var r = null; L(a[1]).some(function(x){ r = rvb(x, 0); return !!r; }); return r; }
+    m.ent.forEach(function(e){
+      if (e.type === "IFCSTYLEDITEM"){
+        var a = C(e), it = R(a[0]);
+        if (it && !T.item.has(it)){ var c = styles(a); if (c) T.item.set(it, c); }
+      }
+      else if (e.type === "IFCMATERIALDEFINITIONREPRESENTATION"){
+        var b = C(e), mat = R(b[3]), cm = null;
+        L(b[2]).some(function(rep){
+          var re = m.ent.get(rep);
+          if (re) L(C(re)[3]).some(function(si){ var se = m.ent.get(si); if (se && se.type === "IFCSTYLEDITEM") cm = styles(C(se)); return !!cm; });
+          return !!cm;
+        });
+        if (mat && cm && !T.mat.has(mat)) T.mat.set(mat, cm);
+      }
+    });
+    m._coul = T;
+    return T;
+  }
+  function couleurFichier(m, id){
+    var T = tableCouleurs(m);
+    if (T.el.has(id)) return T.el.get(id);
+    var C = IFC.champs, R = IFC.idRef, L = IFC.refsListe, e = m.ent.get(id), c = null;
+    // style d'un objet de la forme : lui-même, la représentation qu'un IFCMAPPEDITEM recopie, le premier opérande d'une découpe
+    function deItem(x, prof){
+      if (!x || prof > 8) return null;
+      if (T.item.has(x)) return T.item.get(x);
+      var ie = m.ent.get(x);
+      if (!ie) return null;
+      var a = C(ie);
+      if (ie.type === "IFCMAPPEDITEM"){ var src = m.ent.get(R(a[0])); return src ? deRep(R(C(src)[1]), prof + 1) : null; }
+      if (ie.type === "IFCBOOLEANRESULT" || ie.type === "IFCBOOLEANCLIPPINGRESULT") return deItem(R(a[1]), prof + 1);
+      return null;
+    }
+    function deRep(rep, prof){
+      var re = m.ent.get(rep), r = null;
+      if (re) L(C(re)[3]).some(function(x){ r = deItem(x, prof); return !!r; });
+      return r;
+    }
+    var pds = e ? m.ent.get(R(C(e)[6])) : null;
+    if (pds) L(C(pds)[2]).some(function(rep){ c = deRep(rep, 0); return !!c; });
+    if (!c && T.mat.size){
+      var I = IFC.index(m), mats = I.materiaux.get(id) || (I.typeObjet.has(id) ? I.materiaux.get(I.typeObjet.get(id)) : null) || [], vu = new Set();
+      (function marche(liste, prof){
+        liste.some(function(r){
+          if (c || vu.has(r) || prof > 6) return !!c;
+          vu.add(r);
+          var me = m.ent.get(r);
+          if (!me || me.type.lastIndexOf("IFCMATERIAL", 0) !== 0) return false;
+          if (T.mat.has(r)){ c = T.mat.get(r); return true; }
+          marche(me.refs, prof + 1);
+          return !!c;
+        });
+      })(mats, 0);
+    }
+    T.el.set(id, c);
+    return c;
+  }
+
+  // ================= Vues enregistrées =================
+  // Caméra, boîte de coupe et éléments masqués, gardés dans ce navigateur pour le même jeu de fichiers (mêmes
+  // noms). Les éléments masqués sont notés par nom de fichier et numéro d'entité.
+  var MAX_VUES = 12;
+  function cleVues(){ return fichiers.map(function(f){ return f.m.nom; }).sort().join("|"); }
+  function toutesVues(){ try { var o = JSON.parse(localStorage.getItem("ifc.vues") || "{}"); return o && typeof o === "object" ? o : {}; } catch (e){ return {}; } }
+  // (relues du stockage seulement quand le jeu de fichiers change ou après une écriture : maj() passe ici souvent)
+  var vuesLues = null;
+  function vuesEnregistrees(){
+    if (!fichiers.length) return [];
+    var k = cleVues();
+    if (!vuesLues || vuesLues.k !== k){ var l = toutesVues()[k]; vuesLues = { k: k, l: Array.isArray(l) ? l : [] }; }
+    return vuesLues.l;
+  }
+  function ecrireVues(liste){
+    var o = toutesVues(), k = cleVues();
+    vuesLues = null;
+    if (liste.length) o[k] = liste; else delete o[k];
+    try { localStorage.setItem("ifc.vues", JSON.stringify(o)); return true; } catch (e){ return false; }
+  }
+  function enregistrerVue(){
+    if (!fichiers.length) return;
+    var l = vuesEnregistrees(), nom = prompt("Nom de la vue (caméra, boîte de coupe et éléments masqués) :", "Vue " + (l.length + 1));
+    if (nom === null) return;
+    nom = nom.trim().slice(0, 60) || "Vue " + (l.length + 1);
+    var masques = [];
+    caches.forEach(function(c){ var d = lireCle(c); if (d.f) masques.push([d.f.m.nom, d.id]); });
+    var v = { nom: nom, cam: vue.etatVue(), masques: masques };
+    l = l.filter(function(x){ return x.nom !== nom; });
+    l.push(v);
+    if (l.length > MAX_VUES) l = l.slice(l.length - MAX_VUES);
+    if (!ecrireVues(l)){ etat("Vue non enregistrée : le navigateur refuse l'écriture (stockage plein ou interdit)."); return; }
+    maj();
+    etat("Vue « " + nom + " » enregistrée dans ce navigateur (Affichage › Vues)." + (masques.length ? " " + pluriel(masques.length, "élément masqué", "éléments masqués") + " retenus." : ""));
+  }
+  function rappelerVue(k){
+    var v = vuesEnregistrees()[k];
+    if (!v || !v.cam) return;
+    var parNom = new Map();
+    fichiers.forEach(function(f){ if (!parNom.has(f.m.nom)) parNom.set(f.m.nom, f); });
+    caches = new Set();
+    (v.masques || []).forEach(function(x){
+      var f = parNom.get(x[0]);
+      if (f && f.m.ent.has(x[1])) caches.add(cle(f, x[1]));
+    });
+    majVue();
+    vue.poserVue(v.cam);
+    maj();
+    etat("Vue « " + v.nom + " »" + (caches.size ? " : " + pluriel(caches.size, "élément masqué", "éléments masqués") + "." : "."));
+  }
+  function oublierVues(){
+    var l = vuesEnregistrees();
+    if (!l.length || !confirm("Supprimer " + pluriel(l.length, "vue enregistrée", "vues enregistrées") + " pour ces fichiers ?")) return;
+    ecrireVues([]);
+    maj();
+    etat("Vues enregistrées supprimées.");
+  }
 
   // ================= Comparaison de deux maquettes =================
   // Deux versions du même projet, ouvertes ensemble : la première ouverte est l'ancienne, la seconde la nouvelle.
@@ -3293,6 +3442,9 @@
     recadrer: function(){ vue.recadrer(); },
     "vue-iso": function(){ vue.orienter(-Math.PI/4, Math.atan(Math.SQRT1_2)); },
     "vue-dessus": function(){ vue.orienter(0, 1.55); },
+    "vue-enregistrer": enregistrerVue,
+    "vue-rappel": function(b){ rappelerVue(+b.getAttribute("data-k")); },
+    "vues-oublier": oublierVues,
     "vue-face": function(){ vue.orienter(0, 0); },
     "vue-cote": function(){ vue.orienter(Math.PI/2, 0); },
     masquer: function(){ masquerCles(cibles()); },

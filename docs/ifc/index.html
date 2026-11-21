@@ -893,6 +893,9 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
                 <button type="button" role="menuitem" data-cmd="vue-dessus"><span>Dessus</span><kbd>2</kbd></button>
                 <button type="button" role="menuitem" data-cmd="vue-face"><span>Face</span><kbd>3</kbd></button>
                 <button type="button" role="menuitem" data-cmd="vue-cote"><span>Côté</span><kbd>4</kbd></button>
+                <hr>
+                <button type="button" role="menuitem" data-cmd="vue-enregistrer"><span>Enregistrer la vue actuelle…</span><kbd></kbd></button>
+                <div data-dyn="vues"></div>
               </div>
             </div>
             <hr>
@@ -914,6 +917,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Couleurs</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
                 <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="" aria-checked="true"><span>Par maquette</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="fichier" aria-checked="false"><span>Du fichier (styles et matériaux)</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="type" aria-checked="false"><span>Par type IFC</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="famille" aria-checked="false"><span>Par famille : type</span><kbd></kbd></button>
                 <button type="button" role="menuitemradio" data-cmd="colorer" data-colorer="etage" aria-checked="false"><span>Par étage</span><kbd></kbd></button>
@@ -1292,12 +1296,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
 <script src="/ifc/ifc-core.js?v=14"></script>
-<script src="/ifc/ifc-vue.js?v=48"></script>
+<script src="/ifc/ifc-vue.js?v=49"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=64"></script>
+<script src="/ifc/ifc-app.js?v=65"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
