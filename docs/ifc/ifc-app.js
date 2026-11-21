@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.8.2";
+  var VERSION = "1.9.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -560,7 +560,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=8";
+  var URL_GEO = "/ifc/ifc-geo.js?v=9";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1689,6 +1689,7 @@
       return '<button type="button" role="menuitem" data-cmd="vue-rappel" data-k="' + k + '"><span>' + esc(v.nom) + "</span><kbd></kbd></button>";
     }).join("") + (lv.length ? '<button type="button" role="menuitem" data-cmd="vues-oublier"><span>Supprimer les vues enregistrées…</span><kbd></kbd></button>' : "");
     activerCmd("vue-enregistrer", fichiers.length > 0);
+    activerCmd("rapport-comparaison", !!diffPaires && colorer === "diff");
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
       return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
@@ -2021,7 +2022,7 @@
     var nc = T.cols.length, nr = T.rangs.length, fin = lettre(nc - 1), dernier = nr + 1, rTotal = nr + 3;
     var L = ['<row r="1">' + T.cols.map(function(c, n){ return cellule(c.titre, n, 1, true); }).join("") + "</row>"];
     T.rangs.forEach(function(r, k){ L.push('<row r="' + (k + 2) + '">' + r.map(function(v, n){ return cellule(v, n, k + 2, false); }).join("") + "</row>"); });
-    if (nr){
+    if (nr && !T.sansTotal){
       var tot = cellule("Total (éléments affichés)", 0, rTotal, true);
       T.cols.forEach(function(c, n){
         var s = n && c.somme ? sommeColonne(T, n) : null;
@@ -3004,7 +3005,7 @@
   function calculerCouleurs(){
     var leg = $("#legende");
     // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
-    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = null; }
+    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = diffPaires = diffBilan = null; }
     if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; catsMasquees.clear(); leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
@@ -3200,79 +3201,185 @@
   }
 
   // ================= Comparaison de deux maquettes =================
-  // Deux versions du même projet, ouvertes ensemble : la première ouverte est l'ancienne, la seconde la nouvelle.
-  // Les éléments sont appariés par leur GlobalId, puis comparés : attributs, étage, matériau, propriétés et
-  // quantités, et boîte englobante de la forme (un élément déplacé ou redimensionné est « modifié »).
-  // Résultat dans diffDe (clé → état) et diffQuoi (clé → ce qui diffère), montré par les couleurs « Comparaison ».
-  var diffDe = null, diffQuoi = null, comparaisonEnCours = false;
-  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", modifie: "Modifié", pareil: "Inchangé" }, TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Modifié": 35 };
-  function ficheComparaison(l, boites){
+  // Deux versions du même projet, ouvertes ensemble. Les éléments sont appariés par leur GlobalId, puis comparés
+  // selon les réglages de la fenêtre (Outils › Comparer) : attributs, étage, matériau, propriétés, quantités,
+  // forme (boîte englobante et nombre de faces). Un élément supprimé et un élément ajouté de même classe, au
+  // même endroit et de même encombrement sont rapprochés (« Recréé » : redessiné, son GlobalId a changé).
+  // Résultat : diffDe (clé → état), diffQuoi (clé → [{ k, a, b }] : quoi, ancienne et nouvelle valeur),
+  // diffBilan (comptes, différences les plus fréquentes), montrés par les couleurs « Comparaison ».
+  var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, comparaisonEnCours = false;
+  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
+  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Modifié": 35, "Recréé": 280 };
+  var optsDiff = (function(){
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [] }, v = null;
+    try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
+    if (v && typeof v === "object"){
+      ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
+      if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
+    }
+    return d;
+  })();
+  var GEO_DIFF = "Géométrie";
+  function ficheComparaison(l, boites, O, ignores){
     var m = l.f.m, i = l.i, o = new Map();
-    o.set("Classe IFC", i.type); o.set("Nom", i.nom); o.set("Famille : type", i.objectType); o.set("Repère", i.tag);
-    o.set("Description", i.description); o.set("Matériau", i.materiau); o.set("Étage", etageDe(m, l.id));
-    IFC.donnees(m, l.id).forEach(function(d){
+    function garde(k){ var s = sansAccent(k); return !ignores.some(function(x){ return s.indexOf(x) >= 0; }); }
+    function mets(k, v){ if (garde(k)) o.set(k, v == null ? "" : String(v)); }
+    if (O.attrs){ mets("Classe IFC", i.typeLib); mets("Nom", i.nom); mets("Famille : type", i.objectType); mets("Repère", i.tag); mets("Description", i.description); }
+    if (O.materiau) mets("Matériau", i.materiau);
+    if (O.etage) mets("Étage", etageDe(m, l.id));
+    if (O.props || O.quantites) IFC.donnees(m, l.id).forEach(function(d){
+      if (d.quantite ? !O.quantites : !O.props) return;
       var k = d.jeu + " · " + d.nom;
-      if (!o.has(k)) o.set(k, typeof d.v === "number" ? String(Number(d.v.toPrecision(9))) : String(d.v));
+      if (!o.has(k)) mets(k, typeof d.v === "number" ? NB3.format(Number(d.v.toPrecision(9))) + (d.unite ? " " + d.unite : "") : d.v);
     });
-    return { o: o, b: boites.get(l.cle) || null };
+    return { o: o, b: O.geo ? boites.get(l.cle) || null : null };
   }
+  // [{ k, a, b }] : ce qui diffère de la fiche a (ancienne) à la fiche b (nouvelle)
   function differences(a, b){
     var quoi = [];
     if (a.b && b.b){
-      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = 1e-6*d + 1e-9, geo = false;
-      for (var k = 0; k < 3; k++) if (Math.abs(a.b[0][k] - b.b[0][k]) > tol || Math.abs(a.b[1][k] - b.b[1][k]) > tol) geo = true;
-      if (geo) quoi.push("Géométrie (position ou dimensions)");
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = 1e-6*d + 1e-9, boite = false;
+      for (var k = 0; k < 3; k++) if (Math.abs(a.b[0][k] - b.b[0][k]) > tol || Math.abs(a.b[1][k] - b.b[1][k]) > tol) boite = true;
+      if (boite) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b), b: texteBoite(b.b) });
+      else if (a.b[2] !== b.b[2]) quoi.push({ k: GEO_DIFF, a: fmtN(a.b[2]) + " faces", b: fmtN(b.b[2]) + " faces" });
     }
-    a.o.forEach(function(v, k){ if (!b.o.has(k)) quoi.push(k + " (retiré)"); else if (b.o.get(k) !== v) quoi.push(k); });
-    b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push(k + " (ajouté)"); });
+    a.o.forEach(function(v, k){ var w = b.o.has(k) ? b.o.get(k) : null; if (w !== v) quoi.push({ k: k, a: v, b: w === null ? "(absent)" : w }); });
+    b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push({ k: k, a: "(absent)", b: v }); });
     return quoi;
   }
-  function comparerMaquettes(){
+  function texteBoite(b){
+    function n(v){ return NB3.format(v); }
+    return "de " + [n(b[0][0]), n(b[0][1]), n(b[0][2])].join(" ; ") + " à " + [n(b[1][0]), n(b[1][1]), n(b[1][2])].join(" ; ");
+  }
+  // rapprochement d'un supprimé et d'un ajouté : même classe, même boîte englobante (à 7 chiffres près)
+  function empreinteForme(l, boites){
+    var b = boites.get(l.cle);
+    if (!b) return "";
+    return l.i.type + "|" + b[0].concat(b[1]).map(function(v){ return Number(v.toPrecision(7)); }).join(",");
+  }
+  function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
     if (fichiers.length !== 2){
-      etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version puis la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
+      etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version et la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
       return;
     }
-    var A = fichiers[0], B = fichiers[1], boites = vue.boitesElements(), parGid = new Map(), ls = [];
-    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) ls.push(l); });
-    var de = new Map(), quoi = new Map(), n = { ajoute: 0, supprime: 0, modifie: 0, pareil: 0 }, vusB = new Set();
+    var anc = diffBilan && parUid.has(diffBilan.ancien) ? diffBilan.ancien : fichiers[0].uid;
+    $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
+    ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
+    $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
+    // différences les plus fréquentes de la dernière comparaison : à cocher pour ne plus en tenir compte
+    var fr = diffBilan ? diffBilan.frequents : [], z = $("#cmp-frequents");
+    z.hidden = !fr.length;
+    z.innerHTML = fr.length ? "<legend>Différences les plus fréquentes (cocher pour les ignorer)</legend>" + fr.map(function(x, k){
+      return '<label class="coche"><input type="checkbox" data-cmp-ign="' + k + '"><span>' + esc(x[0]) + "</span><b>" + fmtN(x[1]) + "</b></label>";
+    }).join("") : "";
+    ouvrirFenetre($("#comparer"), null);
+  }
+  $("#comparer").addEventListener("close", function(){
+    if ($("#comparer").returnValue !== "oui") return;
+    ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ optsDiff[k] = $("#cmp-" + k).checked; });
+    var ign = $("#cmp-ignorer").value.split(/[;\n]/).map(function(x){ return x.trim(); }).filter(Boolean);
+    [].forEach.call(document.querySelectorAll("#cmp-frequents input:checked"), function(x){
+      var f = diffBilan && diffBilan.frequents[+x.getAttribute("data-cmp-ign")];
+      if (!f) return;
+      if (f[0] === GEO_DIFF) optsDiff.geo = false;        // la géométrie s'ignore par sa case, pas par un mot
+      else if (ign.indexOf(f[0]) < 0) ign.push(f[0]);
+    });
+    optsDiff.ignorer = ign.slice(0, 200);
+    garder("ifc.diff", JSON.stringify(optsDiff));
+    comparerMaquettes(+$("#cmp-ancien").value);
+  });
+  function comparerMaquettes(uidAncien){
+    if (comparaisonEnCours || occupe() || fichiers.length !== 2) return;
+    var A = parUid.get(uidAncien) || fichiers[0], B = fichiers[0] === A ? fichiers[1] : fichiers[0];
+    var O = optsDiff, ignores = O.ignorer.map(sansAccent), boites = O.geo ? vue.boitesElements() : new Map(), parGid = new Map(), lsA = [], lsB = [];
+    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) (l.f === A ? lsA : lsB).push(l); });
+    var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
+    var n = { ajoute: 0, supprime: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map();
+    function compare(la, fa, lb, etatSi){
+      var d = differences(fa, ficheComparaison(lb, boites, O, ignores)), e = etatSi || (d.length ? ETATS_DIFF.modifie : ETATS_DIFF.pareil);
+      de.set(la.cle, e); de.set(lb.cle, e);
+      if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
+      paires.push({ e: e, a: la, b: lb, d: d });
+      return d.length;
+    }
     comparaisonEnCours = true;
     etat("Comparaison en cours…");
-    // l'ancienne maquette d'abord (lignes dans l'ordre des fichiers), puis la nouvelle face à elle
+    // l'ancienne maquette d'abord (ses fiches), puis la nouvelle face à elle
     parTranches(ls.length, function(k){
       var l = ls[k], gid = l.i.globalId;
-      if (l.f === A){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites) }); return; }
-      if (l.f !== B || vusB.has(gid)) return;
+      if (k < lsA.length){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites, O, ignores) }); return; }
+      if (vusB.has(gid)) return;
       vusB.add(gid);
       var x = parGid.get(gid);
-      if (!x){ de.set(l.cle, ETATS_DIFF.ajoute); n.ajoute++; return; }
-      var d = differences(x.f, ficheComparaison(l, boites));
-      if (d.length){
-        de.set(l.cle, ETATS_DIFF.modifie); de.set(x.l.cle, ETATS_DIFF.modifie); quoi.set(l.cle, d); quoi.set(x.l.cle, d); n.modifie++;
-      } else { de.set(l.cle, ETATS_DIFF.pareil); de.set(x.l.cle, ETATS_DIFF.pareil); n.pareil++; }
+      if (!x){ ajoutes.push(l); return; }
+      if (compare(x.l, x.f, l)) n.modifie++; else n.pareil++;
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
-      parGid.forEach(function(x, gid){ if (!vusB.has(gid)){ de.set(x.l.cle, ETATS_DIFF.supprime); n.supprime++; } });
-      diffDe = de; diffQuoi = quoi;
+      // supprimés et ajoutés de même classe et de même encombrement : un élément redessiné
+      var orphelins = new Map();
+      parGid.forEach(function(x, gid){
+        if (vusB.has(gid)) return;
+        var k = O.geo ? empreinteForme(x.l, boites) : "";
+        if (!k){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; return; }
+        var t = orphelins.get(k); if (!t) orphelins.set(k, t = []); t.push(x);
+      });
+      ajoutes.forEach(function(l){
+        var k = O.geo ? empreinteForme(l, boites) : "", t = k ? orphelins.get(k) : null, x = t && t.length ? t.shift() : null;
+        if (x){ compare(x.l, x.f, l, ETATS_DIFF.recree); n.recree++; }
+        else { de.set(l.cle, ETATS_DIFF.ajoute); paires.push({ e: ETATS_DIFF.ajoute, a: null, b: l, d: [] }); n.ajoute++; }
+      });
+      orphelins.forEach(function(t){ t.forEach(function(x){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; }); });
+      var frequents = []; freq.forEach(function(nb, k){ frequents.push([k, nb]); });
+      frequents.sort(function(a, b){ return b[1] - a[1]; });
+      diffDe = de; diffQuoi = quoi; diffPaires = paires;
+      diffBilan = { ancien: A.uid, nouveau: B.uid, n: n, frequents: frequents.slice(0, 6) };
       catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
-      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m);
+      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.pareil;
       etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
-        pluriel(n.modifie, "modifié") + ", " + pluriel(n.pareil, "inchangé") + ". Clique une ligne de la légende pour sélectionner ses éléments." +
-        (ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
-        (A.enCalcul || B.enCalcul ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
+        pluriel(n.modifie, "modifié") + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
+        (paires2 > 20 && n.modifie > .8*paires2 && frequents.length ? " Presque tout est modifié, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
+        (O.geo && ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
+        (O.geo && (A.enCalcul || B.enCalcul) ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
     }).catch(function(err){
       if (window.console) console.error(err);
       etat("Comparaison interrompue : " + (err && err.message || err));
     }).then(function(){ comparaisonEnCours = false; });
   }
-  // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché
+  // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché : état, puis ancienne → nouvelle valeur
   function htmlComparaison(c){
     var e = colorer === "diff" && diffDe ? diffDe.get(c) : null;
     if (!e) return "";
     var q = diffQuoi.get(c) || [], MAX = 40;
-    return '<div class="pset"><div class="pset-nom">Comparaison</div><dl><dt>État</dt><dd>' + esc(e) + "</dd>" +
-      (q.length ? "<dt>Différences</dt><dd>" + q.slice(0, MAX).map(esc).join("<br>") + (q.length > MAX ? "<br>… et " + fmtN(q.length - MAX) + " autres" : "") + "</dd>" : "") + "</dl></div>";
+    return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div><dl>" +
+      (q.length ? q.slice(0, MAX).map(function(x){
+        return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
+      }).join("") + (q.length > MAX ? "<dt>…</dt><dd>" + fmtN(q.length - MAX) + " autres différences (voir le rapport)</dd>" : "")
+        : "<dt>État</dt><dd>" + esc(e === ETATS_DIFF.pareil ? "Aucune différence sur ce qui est comparé" : e === ETATS_DIFF.recree ? "Même forme au même endroit, GlobalId différent" : e) + "</dd>") + "</dl></div>";
+  }
+  // Rapport Excel : une ligne par différence (une seule pour un élément ajouté, supprimé ou recréé sans écart)
+  function exporterRapportComparaison(){
+    if (!diffPaires || !diffBilan || !parUid.has(diffBilan.ancien) || !parUid.has(diffBilan.nouveau)){ etat("Rapport : lance d'abord une comparaison (Outils › Comparer les deux maquettes)."); return; }
+    var titres = ["État", "GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"], rangs = [];
+    var ordre = [ETATS_DIFF.modifie, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
+    diffPaires.forEach(function(p){
+      if (p.e === ETATS_DIFF.pareil) return;
+      var l = p.b || p.a, i = l.i, tete = [p.e, p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)];
+      if (!p.d.length) rangs.push(tete.concat(["", "", ""]));
+      else p.d.forEach(function(x){ rangs.push(tete.concat([x.k, x.a, x.b])); });
+    });
+    if (!rangs.length){ etat("Rapport : aucune différence à écrire."); return; }
+    rangs.sort(function(a, b){ return ordre.indexOf(a[0]) - ordre.indexOf(b[0]); });
+    var A = parUid.get(diffBilan.ancien), B = parUid.get(diffBilan.nouveau);
+    var nom = "comparaison_" + A.m.nom.replace(/\.ifc$/i, "") + "_" + B.m.nom.replace(/\.ifc$/i, "") + ".xlsx";
+    tableauXlsx({ cols: titres.map(function(t){ return { titre: t, somme: false }; }), rangs: rangs, nbFixes: titres.length, sansTotal: true }).then(function(blob){
+      enregistrer(blob, nom);
+      etat("« " + nom + " » : " + pluriel(rangs.length, "ligne") + ", " + fmtTaille(blob.size) + ".");
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Rapport non exporté : " + (err && err.message || err));
+    });
   }
 
   // ================= Sélectionner similaires =================
@@ -3437,7 +3544,8 @@
         etat("« " + nom + " » : " + c.width + " × " + c.height + " px, " + fmtTaille(b.size) + ". Les cotes et étiquettes de mesure n'y figurent pas.");
       }, "image/png");
     },
-    comparer: comparerMaquettes,
+    comparer: ouvrirComparer,
+    "rapport-comparaison": exporterRapportComparaison,
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
       if (occupe()) return;

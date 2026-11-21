@@ -487,6 +487,7 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .suppr-types{display:flex;align-items:center;gap:10px;margin:10px 0 2px;cursor:pointer}
 .suppr-types input{accent-color:var(--or);width:16px;height:16px;margin:0;flex:none}
 .prefs label.coche{grid-template-columns:auto 1fr auto;gap:10px;cursor:pointer}
+.cmp-grille{display:grid;grid-template-columns:1fr 1fr;column-gap:18px}
 .prefs label.coche input{accent-color:var(--or);width:16px;height:16px;margin:0}
 .purge-titre{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
 .purge-titre .lien{background:none;border:0;padding:0;color:var(--texte-faible);font:inherit;letter-spacing:.08em;cursor:pointer;text-decoration:underline}
@@ -993,7 +994,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <div class="mb-gr">
           <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Outils</button>
           <div class="mb-liste" role="menu" hidden>
-            <button type="button" role="menuitem" data-cmd="comparer"><span>Comparer les deux maquettes ouvertes</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="comparer"><span>Comparer les deux maquettes ouvertes…</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="rapport-comparaison"><span>Exporter le rapport de comparaison (Excel)</span><kbd></kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="mesurer"><span id="cmd-mesurer">Mesurer</span><kbd>M</kbd></button>
             <button type="button" role="menuitem" data-cmd="coordonnees"><span id="cmd-coord">Coordonnées d'un point</span><kbd>C</kbd></button>
@@ -1237,6 +1239,31 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </form>
 </dialog>
 
+<dialog id="comparer" class="prefs sim">
+  <form method="dialog">
+    <h2>Comparer les deux maquettes</h2>
+    <label><span>Ancienne</span><select class="champ" id="cmp-ancien"></select></label>
+    <fieldset>
+      <legend>Comparer</legend>
+      <div class="cmp-grille">
+        <label class="coche"><input type="checkbox" id="cmp-attrs"><span>Attributs (nom, type, repère)</span></label>
+        <label class="coche"><input type="checkbox" id="cmp-geo"><span>Géométrie</span></label>
+        <label class="coche"><input type="checkbox" id="cmp-props"><span>Propriétés</span></label>
+        <label class="coche"><input type="checkbox" id="cmp-quantites"><span>Quantités</span></label>
+        <label class="coche"><input type="checkbox" id="cmp-materiau"><span>Matériau</span></label>
+        <label class="coche"><input type="checkbox" id="cmp-etage"><span>Étage</span></label>
+      </div>
+    </fieldset>
+    <fieldset id="cmp-frequents" hidden></fieldset>
+    <label><span>Ignorer</span><input class="champ" id="cmp-ignorer" autocomplete="off" spellcheck="false" placeholder="mots séparés par ; (ex. date ; IfcGUID)"></label>
+    <p class="pref-note">Les éléments sont appariés par leur GlobalId. « Ignorer » écarte toute propriété ou quantité dont le nom contient un de ces mots.</p>
+    <div class="actions">
+      <button type="submit" class="btn" value="non">Annuler</button>
+      <button type="submit" class="btn plein" value="oui">Comparer</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="classe" class="prefs ed">
   <form method="dialog">
     <h2>Classe IFC</h2>
@@ -1298,12 +1325,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
 <script src="/ifc/ifc-core.js?v=14"></script>
-<script src="/ifc/ifc-vue.js?v=50"></script>
+<script src="/ifc/ifc-vue.js?v=51"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=67"></script>
+<script src="/ifc/ifc-app.js?v=68"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

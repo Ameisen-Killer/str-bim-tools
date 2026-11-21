@@ -3712,10 +3712,10 @@
       enSaisie: function(){ return !!saisie; },
       // boîte englobante d'éléments affichés (clés) : { min, max } ou null
       boite: function(cles){ return boiteDe(cles); },
-      // boîte englobante [min, max] de chaque élément affiché, par clé (comparaison de maquettes)
+      // boîte englobante et nombre de faces [min, max, faces] de chaque élément affiché, par clé (comparaison de maquettes)
       boitesElements: function(){
         var o = new Map();
-        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max]); });
+        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max, it.geo.faces ? it.geo.faces.length : 0]); });
         return o;
       },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
