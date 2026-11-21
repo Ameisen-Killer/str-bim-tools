@@ -201,6 +201,7 @@ body:not(.edition) .menu-theme button:hover{background:var(--controle-survol);co
 body:not(.edition) .menu-theme button[aria-checked="true"]{color:var(--texte)}
 body:not(.edition) .menu-theme button[aria-checked="true"]::before{color:var(--or)}
 @media (max-width:560px){.tb-gauche a,.tb-gauche .sep{display:none}}
+@media (max-width:560px){.tb-lien+.tb-lien{display:none}}   /* smartphone : un seul lien vers un autre Studio dans la barre */
 
 /* la carte */
 .accueil{flex:1 0 auto;display:grid;place-items:center;padding:12px clamp(12px,3vw,40px) 20px}
@@ -792,6 +793,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </span>
   <span class="barre-droite">
     <a class="tb-lien" href="/dxf/" title="L'éditeur DXF de STR Bim Tools">DXF Studio</a>
+    <a class="tb-lien" href="/csv/" title="Le tableur CSV et Excel de STR Bim Tools">CSV Studio</a>
     <span class="theme">
       <button type="button" class="theme-btn" id="theme-btn" aria-haspopup="menu" aria-expanded="false" title="Thème d'affichage"><span aria-hidden="true">◐</span><span>Thème</span></button>
       <div class="menu-theme" id="menu-theme" role="menu" hidden>
@@ -959,6 +961,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <button type="button" role="menuitem" data-cmd="a-propos"><span>À propos d'IFC Studio (temps d'ouverture)</span><kbd></kbd></button>
             <hr>
             <button type="button" role="menuitem" data-cmd="lien" data-lien="/dxf/"><span>DXF Studio (éditeur DXF) ↗</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="lien" data-lien="/csv/"><span>CSV Studio (tableur CSV et Excel) ↗</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="site"><span>Retour à str-bim-tools.com</span><kbd></kbd></button>
           </div>
         </div>
