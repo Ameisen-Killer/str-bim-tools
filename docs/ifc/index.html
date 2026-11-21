@@ -489,6 +489,20 @@ dialog .actions{margin-top:20px;justify-content:flex-end}
 .suppr-types{display:flex;align-items:center;gap:10px;margin:10px 0 2px;cursor:pointer}
 .suppr-types input{accent-color:var(--or);width:16px;height:16px;margin:0;flex:none}
 .prefs label.coche{grid-template-columns:auto 1fr auto;gap:10px;cursor:pointer}
+dialog.config{width:720px;max-width:min(720px,calc(100vw - 32px))}
+.config-corps{display:grid;grid-template-columns:150px minmax(0,1fr);gap:20px;margin-top:14px;min-height:330px}
+.config-nav{display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--ligne);padding-right:12px}
+.config-nav button{text-align:left;background:none;border:0;border-left:2px solid transparent;padding:8px 10px;cursor:pointer;color:var(--texte-doux);font:inherit;font-size:14px;border-radius:0 4px 4px 0}
+.config-nav button:hover{color:var(--texte)}
+.config-nav button[aria-selected="true"]{border-left-color:var(--or);color:var(--texte);background:rgba(var(--or-rvb),.1)}
+.config-pages fieldset:first-child{margin-top:0}
+.config label{grid-template-columns:110px 1fr}
+@media (max-width:620px){
+  .config-corps{grid-template-columns:1fr;gap:12px;min-height:0}
+  .config-nav{flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--ligne);padding:0 0 6px}
+  .config-nav button{border-left:0;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}
+  .config-nav button[aria-selected="true"]{border-bottom-color:var(--or)}
+}
 .cmp-grille{display:grid;grid-template-columns:1fr 1fr;column-gap:18px}
 .prefs label.coche input{accent-color:var(--or);width:16px;height:16px;margin:0}
 .purge-titre{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--or)}
@@ -1004,7 +1018,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <button type="button" role="menuitem" data-cmd="coordonnees"><span id="cmd-coord">Coordonnées d'un point</span><kbd>C</kbd></button>
             <button type="button" role="menuitem" data-cmd="effacer-mesures"><span>Effacer les mesures et coordonnées</span><kbd></kbd></button>
             <hr>
-            <button type="button" role="menuitem" data-cmd="preferences"><span>Préférences…</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="preferences"><span>Configuration…</span><kbd></kbd></button>
           </div>
         </div>
         <div class="mb-gr">
@@ -1259,7 +1273,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
     </fieldset>
     <fieldset id="cmp-frequents" hidden></fieldset>
     <label><span>Ignorer</span><input class="champ" id="cmp-ignorer" autocomplete="off" spellcheck="false" placeholder="mots séparés par ; (ex. date ; IfcGUID)"></label>
-    <p class="pref-note">Les éléments sont appariés par leur GlobalId. « Ignorer » écarte toute propriété ou quantité dont le nom contient un de ces mots.</p>
+    <p class="pref-note">Les éléments sont appariés par leur GlobalId. « Ignorer » écarte toute propriété ou quantité dont le nom contient un de ces mots. Tolérances de déplacement et de dimensions : Outils › Configuration.</p>
     <div class="actions">
       <button type="submit" class="btn" value="non">Annuler</button>
       <button type="submit" class="btn plein" value="oui">Comparer</button>
@@ -1280,35 +1294,82 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </form>
 </dialog>
 
-<dialog id="preferences" class="prefs">
+<dialog id="preferences" class="prefs config">
   <form method="dialog">
-    <h2>Préférences</h2>
-    <fieldset>
-      <legend>Mesures</legend>
-      <label><span>Unité</span><select class="champ" id="pref-lu">
-        <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
-        <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
-      </select></label>
-      <label><span>Précision</span><select class="champ" id="pref-ld">
-        <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
-        <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
-      </select></label>
-    </fieldset>
-    <fieldset>
-      <legend>Coordonnées</legend>
-      <label><span>Unité</span><select class="champ" id="pref-cu">
-        <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
-        <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
-      </select></label>
-      <label><span>Précision</span><select class="champ" id="pref-cd">
-        <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
-        <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
-      </select></label>
-      <label><span>Repère</span><select class="champ" id="pref-repere">
-        <option value="fichier">Celui du fichier (X Y Z)</option><option value="geo">Géoréférencé (E N H)</option>
-      </select></label>
-      <p class="pref-note" id="pref-geo"></p>
-    </fieldset>
+    <h2>Configuration</h2>
+    <div class="config-corps">
+      <nav class="config-nav" role="tablist" aria-label="Catégories">
+        <button type="button" role="tab" data-config="affichage" aria-selected="true">Affichage</button>
+        <button type="button" role="tab" data-config="comparaison" aria-selected="false">Comparaison</button>
+        <button type="button" role="tab" data-config="mesures" aria-selected="false">Mesures</button>
+      </nav>
+      <div class="config-pages">
+        <section data-page="affichage">
+          <fieldset>
+            <legend>Vue 3D</legend>
+            <label><span>Rendu</span><select class="champ" id="cfg-rendu">
+              <option value="solide">Solide (pièces pleines, ombrées)</option><option value="filaire">Filaire (arêtes seules)</option>
+            </select></label>
+            <label><span>Couleurs</span><select class="champ" id="cfg-couleurs">
+              <option value="">Par maquette</option><option value="fichier">Du fichier (styles et matériaux)</option>
+              <option value="type">Par type IFC</option><option value="famille">Par famille : type</option>
+              <option value="etage">Par étage</option><option value="materiau">Par matériau</option><option value="maquette">Par fichier</option>
+            </select></label>
+            <label><span>Moteur 3D</span><select class="champ" id="cfg-moteur">
+              <option value="webgl">WebGL</option><option value="webgpu">WebGPU</option><option value="three">Three.js</option><option value="canvas">Canvas 2D (secours)</option>
+            </select></label>
+            <label class="coche"><input type="checkbox" id="cfg-lissage"><span>Lisser les bords des pièces (plus lent sur un gros modèle)</span></label>
+          </fieldset>
+          <fieldset>
+            <legend>Interface</legend>
+            <label><span>Thème</span><select class="champ" id="cfg-theme">
+              <option value="sombre">Sombre</option><option value="clair">Clair</option><option value="systeme">Comme le système</option>
+            </select></label>
+            <label><span>Arborescence</span><select class="champ" id="cfg-grouper">
+              <option value="">Structure du projet</option><option value="classe">Par classe IFC</option>
+              <option value="type">Par famille : type</option><option value="materiau">Par matériau</option>
+            </select></label>
+          </fieldset>
+        </section>
+        <section data-page="comparaison" hidden>
+          <fieldset>
+            <legend>Tolérances</legend>
+            <label><span>Déplacement</span><input class="champ" id="cfg-tol-dep" inputmode="decimal" autocomplete="off" aria-describedby="cfg-tol-note"></label>
+            <label><span>Dimensions</span><input class="champ" id="cfg-tol-dim" inputmode="decimal" autocomplete="off" aria-describedby="cfg-tol-note"></label>
+            <p class="pref-note" id="cfg-tol-note">En millimètres. Un élément est « Déplacé » si son centre bouge de plus que la première valeur, sans changer d'encombrement ; ses dimensions sont « modifiées » si un côté de son encombrement change de plus que la seconde.</p>
+            <p class="pref-note">Pris en compte à la prochaine comparaison (Outils › Comparer les deux maquettes).</p>
+          </fieldset>
+        </section>
+        <section data-page="mesures" hidden>
+          <fieldset>
+            <legend>Mesures</legend>
+            <label><span>Unité</span><select class="champ" id="pref-lu">
+              <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
+              <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
+            </select></label>
+            <label><span>Précision</span><select class="champ" id="pref-ld">
+              <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
+              <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
+            </select></label>
+          </fieldset>
+          <fieldset>
+            <legend>Coordonnées</legend>
+            <label><span>Unité</span><select class="champ" id="pref-cu">
+              <option value="auto">Celle du fichier</option><option value="mm">mm</option><option value="cm">cm</option>
+              <option value="dm">dm</option><option value="m">m</option><option value="ft">ft</option><option value="in">in</option>
+            </select></label>
+            <label><span>Précision</span><select class="champ" id="pref-cd">
+              <option value="auto">Selon l'unité</option><option value="0">0 décimale</option><option value="1">1 décimale</option>
+              <option value="2">2 décimales</option><option value="3">3 décimales</option><option value="4">4 décimales</option>
+            </select></label>
+            <label><span>Repère</span><select class="champ" id="pref-repere">
+              <option value="fichier">Celui du fichier (X Y Z)</option><option value="geo">Géoréférencé (E N H)</option>
+            </select></label>
+            <p class="pref-note" id="pref-geo"></p>
+          </fieldset>
+        </section>
+      </div>
+    </div>
     <p class="pref-note">Appliqué tout de suite et gardé dans ce navigateur.</p>
     <div class="actions">
       <button type="button" class="btn" id="pref-defaut">Valeurs par défaut</button>
@@ -1333,7 +1394,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=72"></script>
+<script src="/ifc/ifc-app.js?v=73"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

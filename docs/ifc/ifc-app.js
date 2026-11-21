@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.11.0";
+  var VERSION = "1.12.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -2574,9 +2574,54 @@
       ? "Géoréférencement lu dans « " + f0.m.nom + " » (" + g.source + (g.crs ? ", " + g.crs : "") + ") : E " + regle("m", "3")(g.E*g.fu) + ", N " + regle("m", "3")(g.N*g.fu) + ", H " + regle("m", "3")(g.H*g.fu) + "."
       : "« " + f0.m.nom + " » n'a ni IfcMapConversion ni ePset_MapConversion : les coordonnées restent celles du fichier.";
   }
+  // Fenêtre Configuration : catégories dans le bandeau de gauche, une page par catégorie. Tout s'applique dès
+  // qu'on change une valeur ; les réglages d'affichage passent par les mêmes fonctions que les menus et boutons.
+  var PAGES_CONFIG = ["affichage", "comparaison", "mesures"], pageConfig = lire("ifc.config.page", PAGES_CONFIG);
+  function montrerConfig(p){
+    pageConfig = PAGES_CONFIG.indexOf(p) >= 0 ? p : PAGES_CONFIG[0];
+    garder("ifc.config.page", pageConfig);
+    [].forEach.call(document.querySelectorAll("#preferences [data-config]"), function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-config") === pageConfig)); });
+    [].forEach.call(document.querySelectorAll("#preferences [data-page]"), function(x){ x.hidden = x.getAttribute("data-page") !== pageConfig; });
+  }
+  function nombreMm(v){ return String(Math.round(v*1000)/1000).replace(".", ","); }
+  function remplirConfig(){
+    $("#cfg-rendu").value = vue.filaire() ? "filaire" : "solide";
+    $("#cfg-couleurs").value = colorer === "diff" ? "" : colorer;
+    $("#cfg-moteur").value = vue.moteur();
+    $("#cfg-lissage").checked = !!vue.lissage();
+    $("#cfg-theme").value = lire("ifc.theme", ["sombre", "clair", "systeme"]);
+    $("#cfg-grouper").value = grouper;
+    $("#cfg-tol-dep").value = nombreMm(optsDiff.tolDep);
+    $("#cfg-tol-dim").value = nombreMm(optsDiff.tolDim);
+  }
+  $("#preferences").addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("[data-config]");
+    if (b) montrerConfig(b.getAttribute("data-config"));
+  });
+  $("#cfg-rendu").addEventListener("change", function(){ rendu(this.value === "filaire"); });
+  $("#cfg-couleurs").addEventListener("change", function(){ poserColorer(this.value); maj(); });
+  $("#cfg-lissage").addEventListener("change", function(){ if (this.checked !== !!vue.lissage()) $("#b-lissage").click(); });
+  $("#cfg-theme").addEventListener("change", function(){ if (choisirTheme) choisirTheme(this.value); maj(); });
+  $("#cfg-grouper").addEventListener("change", function(){ poserGrouper(this.value); });
+  $("#cfg-moteur").addEventListener("change", function(){
+    var sel = this, b = document.querySelector('#mb [data-cmd="moteur"][data-moteur="' + sel.value + '"]');
+    if (b) COMMANDES.moteur(b);
+    // le moteur démarre en différé et peut être refusé (indisponible sur ce poste) : la liste redit celui en service
+    setTimeout(function(){ sel.value = vue.moteur(); }, 3000);
+    if (!b || INDISPO[sel.value]) sel.value = vue.moteur();
+  });
+  // tolérances de la comparaison, en millimètres (virgule ou point) ; une saisie illisible remet la valeur gardée
+  [["cfg-tol-dep", "tolDep"], ["cfg-tol-dim", "tolDim"]].forEach(function(x){
+    $("#" + x[0]).addEventListener("change", function(){
+      var v = parseFloat(this.value.replace(/\s/g, "").replace(",", "."));
+      if (isFinite(v) && v >= 0 && v <= 100000){ optsDiff[x[1]] = v; garder("ifc.diff", JSON.stringify(optsDiff)); }
+      this.value = nombreMm(optsDiff[x[1]]);
+    });
+  });
   function preferences(){
     var d = $("#preferences");
     Object.keys(PREFS).forEach(function(k){ $("#pref-" + k).value = prefs[k]; });
+    remplirConfig(); montrerConfig(pageConfig);
     noteGeo();
     if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
   }
@@ -2587,7 +2632,21 @@
   Object.keys(PREFS).forEach(function(k){
     $("#pref-" + k).addEventListener("change", function(){ prefs[k] = PREFS[k].indexOf(this.value) >= 0 ? this.value : PREFS[k][0]; appliquerPrefs(); });
   });
+  // « Valeurs par défaut » ne touche que la page affichée
   $("#pref-defaut").addEventListener("click", function(){
+    if (pageConfig === "affichage"){
+      rendu(false); poserColorer(""); poserGrouper("");
+      if (!vue.lissage()) $("#b-lissage").click();
+      if (choisirTheme) choisirTheme("sombre");
+      maj(); remplirConfig();
+      return;
+    }
+    if (pageConfig === "comparaison"){
+      optsDiff.tolDep = TOL_DIFF; optsDiff.tolDim = TOL_DIFF;
+      garder("ifc.diff", JSON.stringify(optsDiff));
+      remplirConfig();
+      return;
+    }
     Object.keys(PREFS).forEach(function(k){ prefs[k] = PREFS[k][0]; $("#pref-" + k).value = prefs[k]; });
     appliquerPrefs();
   });
@@ -3293,11 +3352,14 @@
   var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, diffPaireDe = null, comparaisonEnCours = false;
   var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
   var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Recréé": 280 };
+  // tolérances en millimètres (fenêtre Configuration) : déplacement du centre, changement d'un côté de l'encombrement
+  var TOL_DIFF = .5;
   var optsDiff = (function(){
-    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [] }, v = null;
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF }, v = null;
     try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
     if (v && typeof v === "object"){
       ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
+      ["tolDep", "tolDim"].forEach(function(k){ if (typeof v[k] === "number" && isFinite(v[k]) && v[k] >= 0 && v[k] <= 100000) d[k] = v[k]; });
       if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
     }
     return d;
@@ -3318,15 +3380,16 @@
     return { o: o, b: O.geo ? boites.get(l.cle) || null : null };
   }
   // [{ k, a, b }] : ce qui diffère de la fiche a (ancienne) à la fiche b (nouvelle)
-  // U : { nom : unité de longueur du fichier, seuil : déplacement en dessous duquel l'élément n'a pas bougé }
+  // U : { nom : unité de longueur du fichier, seuilDep et seuilDim : tolérances de déplacement et de dimensions,
+  // dans cette unité }
   function differences(a, b, U){
     var quoi = [];
     if (a.b && b.b){
-      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = Math.max(1e-6*d + 1e-9, U.seuil);
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), base = 1e-6*d + 1e-9, tol = Math.max(base, U.seuilDep), tolDim = Math.max(base, U.seuilDim);
       // encombrement (côtés de la boîte englobante) et centre : même encombrement ailleurs = élément déplacé
       var taille = false, dep = [0, 0, 0];
       for (var k = 0; k < 3; k++){
-        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tol) taille = true;
+        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tolDim) taille = true;
         dep[k] = (b.b[0][k] + b.b[1][k])/2 - (a.b[0][k] + a.b[1][k])/2;
       }
       var dist = Math.hypot(dep[0], dep[1], dep[2]), un = U.nom ? " " + U.nom : "";
@@ -3388,8 +3451,9 @@
     var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
     var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map(), paireDe = new Map();
     finEvidence();
-    // un élément a bougé à partir d'un demi-millimètre (dans l'unité du fichier)
-    var U = { nom: A.unite && A.unite.nom || "", seuil: A.unite && A.unite.f > 0 ? .0005/A.unite.f : 0 };
+    // tolérances de la fenêtre Configuration (millimètres), ramenées à l'unité du fichier
+    var parMm = A.unite && A.unite.f > 0 ? .001/A.unite.f : 0;
+    var U = { nom: A.unite && A.unite.nom || "", seuilDep: O.tolDep*parMm, seuilDim: O.tolDim*parMm };
     function compare(la, fa, lb, etatSi){
       var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
       // « Déplacé » passe avant « Modifié » : l'élément a bougé, qu'il ait changé par ailleurs ou non
