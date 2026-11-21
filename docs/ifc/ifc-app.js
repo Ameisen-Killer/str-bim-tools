@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.17.0";
+  var VERSION = "1.17.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -1493,7 +1493,12 @@
       }
       h.push("<hr>");
     }
-    else if (choix.size) h.push(bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>");
+    else if (choix.size){
+      // clic droit dans le vide avec une sélection : les mêmes actions de vue que sur un élément, pour la sélection
+      c = elementsDe(Array.from(choix));
+      h.push('<div class="ctx-titre">' + esc("Sélection : " + pluriel(c.length, "élément")) + "</div>",
+        bouton("rien", "Tout désélectionner" + (choix.size > 1 ? " (" + fmtN(choix.size) + ")" : "")), "<hr>", boutonsVue(c), "<hr>");
+    }
     if (vue.aCoupe()) h.push(bouton("cadre-coupe", vue.cadre() ? "Masquer la boîte de coupe" : "Afficher la boîte de coupe"),
       bouton("figer-coupe", vue.fige() ? "Libérer la boîte de coupe" : "Figer la boîte de coupe"), bouton("sans-coupe", "Retirer la boîte de coupe"));
     if (vue.orienterCoupe()) h.push(bouton("equerre-coupe", "Remettre la boîte de coupe d'équerre"));
