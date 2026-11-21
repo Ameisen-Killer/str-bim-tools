@@ -17,8 +17,12 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.6.0";
-  (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
+  var VERSION = "1.6.1";
+  // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
+  (function(){
+    var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
+    [].forEach.call(document.querySelectorAll("[data-version]"), function(x){ x.textContent = "v" + VERSION; });
+  })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
   // fichier ouvert : { uid, m (modèle IFC), propre (état exporté, voir etatDe ; false : jamais exporté), visible, plie, teinte (0–360 ou null), taille: {v, t} }
@@ -3244,7 +3248,7 @@
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
-      aide("IFC Studio", "<p>Ouvre des maquettes IFC2X3, IFC4 ou IFC4X3, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
+      aide("IFC Studio v" + VERSION, "<p>Ouvre des maquettes IFC2X3, IFC4 ou IFC4X3, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
         "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
         "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +

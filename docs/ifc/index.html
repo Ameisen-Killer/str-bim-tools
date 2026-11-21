@@ -247,6 +247,7 @@ body:not(.edition) .prog i{border-radius:2px}
 .r-x:hover{color:var(--rouge);background:var(--controle-survol)}
 @media (hover:none){.r-x{opacity:1}}
 @media (max-width:560px){.r-info{display:none}}
+.accueil-version{font-family:var(--mono);font-size:13px;font-weight:400;letter-spacing:.04em;color:var(--texte-faible);vertical-align:middle;margin-left:.5em;white-space:nowrap}
 .accueil-note{margin-top:auto;padding-top:24px;font-size:12.5px;color:var(--texte-faible)}
 body:not(.edition) .erreur{margin-top:16px;border-radius:4px;border-left:3px solid var(--rouge);background:rgba(var(--encre),.04)}
 
@@ -793,7 +794,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <span class="scene-note">Glisser pour tourner</span>
       </div>
       <div class="accueil-texte">
-        <h1>IFC Studio</h1>
+        <h1>IFC Studio <span class="accueil-version" data-version></span></h1>
         <p class="chapeau">Ouvre, corrige et réécris tes maquettes IFC, sans rien installer.</p>
         <div class="ouvrir">
           <button type="button" class="btn plein" id="choisir">Ouvrir des fichiers…</button>
@@ -1293,7 +1294,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=62"></script>
+<script src="/ifc/ifc-app.js?v=63"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
