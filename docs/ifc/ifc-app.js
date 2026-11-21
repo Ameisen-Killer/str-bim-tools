@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.13.0";
+  var VERSION = "1.13.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -3439,8 +3439,10 @@
   // Résultat : diffDe (clé → état), diffQuoi (clé → [{ k, a, b }] : quoi, ancienne et nouvelle valeur),
   // diffBilan (comptes, différences les plus fréquentes), montrés par les couleurs « Comparaison ».
   var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, diffPaireDe = null, comparaisonEnCours = false;
-  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
-  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Recréé": 280 };
+  // « Modifié » : la géométrie a changé (encombrement ou nombre de faces). « Déplacé » : même encombrement, ailleurs.
+  // « Données modifiées » : seuls des attributs, propriétés, quantités, le matériau ou l'étage diffèrent.
+  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", donnees: "Données modifiées", recree: "Recréé", pareil: "Inchangé" };
+  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Données modifiées": 180, "Recréé": 280 };
   // tolérances en millimètres (fenêtre Configuration) : déplacement du centre, changement d'un côté de l'encombrement
   var TOL_DIFF = .5;
   var optsDiff = (function(){
@@ -3538,17 +3540,17 @@
     var O = optsDiff, ignores = O.ignorer.map(sansAccent), boites = O.geo ? vue.boitesElements() : new Map(), parGid = new Map(), lsA = [], lsB = [];
     lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) (l.f === A ? lsA : lsB).push(l); });
     var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
-    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map(), paireDe = new Map();
+    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, donnees: 0, recree: 0, pareil: 0 }, freq = new Map(), paireDe = new Map();
     finEvidence();
     // tolérances de la fenêtre Configuration (millimètres), ramenées à l'unité du fichier
     var parMm = A.unite && A.unite.f > 0 ? .001/A.unite.f : 0;
     var U = { nom: A.unite && A.unite.nom || "", seuilDep: O.tolDep*parMm, seuilDim: O.tolDim*parMm };
     function compare(la, fa, lb, etatSi){
       var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
-      // « Déplacé » passe avant « Modifié » : l'élément a bougé, qu'il ait changé par ailleurs ou non
-      var bouge = d.some(function(x){ return x.k === DEP_DIFF; });
-      var e = etatSi || (bouge ? ETATS_DIFF.deplace : d.length ? ETATS_DIFF.modifie : ETATS_DIFF.pareil);
-      if (!etatSi && bouge) n.deplace++;
+      // la géométrie d'abord : déplacé, sinon modifié ; des données seules qui diffèrent font un état à part
+      var bouge = d.some(function(x){ return x.k === DEP_DIFF; }), forme = d.some(function(x){ return x.k === GEO_DIFF; });
+      var genreDiff = bouge ? "deplace" : forme ? "modifie" : d.length ? "donnees" : "pareil", e = etatSi || ETATS_DIFF[genreDiff];
+      if (!etatSi) n[genreDiff]++;
       de.set(la.cle, e); de.set(lb.cle, e);
       if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
       var paire = { e: e, a: la, b: lb, d: d };
@@ -3565,8 +3567,7 @@
       vusB.add(gid);
       var x = parGid.get(gid);
       if (!x){ ajoutes.push(l); return; }
-      var avant = n.deplace, nd = compare(x.l, x.f, l);
-      if (n.deplace === avant){ if (nd) n.modifie++; else n.pareil++; }
+      compare(x.l, x.f, l);
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
       // supprimés et ajoutés de même classe et de même encombrement : un élément redessiné
       var orphelins = new Map();
@@ -3589,10 +3590,10 @@
       catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
-      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.pareil + n.deplace;
+      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.donnees + n.pareil + n.deplace;
       etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
-        pluriel(n.deplace, "déplacé") + ", " + pluriel(n.modifie, "modifié") + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
-        (paires2 > 20 && n.modifie > .8*paires2 && frequents.length ? " Presque tout est modifié, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
+        pluriel(n.deplace, "déplacé") + ", " + pluriel(n.modifie, "modifié") + " (géométrie), " + fmtN(n.donnees) + " aux données modifiées" + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
+        (paires2 > 20 && n.donnees > .5*paires2 && frequents.length ? " Beaucoup de données modifiées, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
         (O.geo && ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
         (O.geo && (A.enCalcul || B.enCalcul) ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
     }).catch(function(err){
@@ -3655,7 +3656,7 @@
   function exporterRapportComparaison(){
     if (!diffPaires || !diffBilan || !parUid.has(diffBilan.ancien) || !parUid.has(diffBilan.nouveau)){ etat("Rapport : lance d'abord une comparaison (Outils › Comparer les deux maquettes)."); return; }
     var titres = ["État", "GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"], rangs = [];
-    var ordre = [ETATS_DIFF.deplace, ETATS_DIFF.modifie, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
+    var ordre = [ETATS_DIFF.deplace, ETATS_DIFF.modifie, ETATS_DIFF.donnees, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
     diffPaires.forEach(function(p){
       if (p.e === ETATS_DIFF.pareil) return;
       var l = p.b || p.a, i = l.i, tete = [p.e, p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)];
