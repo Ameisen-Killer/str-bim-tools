@@ -253,6 +253,8 @@
       if (RELS_LISTE[t] !== undefined) L(a[RELS_LISTE[t]]).forEach(function(o){ if (tous.has(o)) lier(o, { rel: e.id, k: RELS_LISTE[t] }); });
       else if (t === "IFCRELAGGREGATES" || t === "IFCRELNESTS") L(a[5]).forEach(function(o){ if (tous.has(o)) lier(o, { rel: e.id, k: 5, parent: R(a[4]) }); });
       else if (t === "IFCRELVOIDSELEMENT"){ var o = R(a[5]); if (tous.has(o)) lier(o, { rel: e.id, hote: R(a[4]) }); }
+      // porte ou fenêtre qui remplit une ouverture : reliée à la copie de l'ouverture si son mur est copié avec elle
+      else if (t === "IFCRELFILLSELEMENT"){ var f = R(a[5]); if (tous.has(f)) lier(f, { rel: e.id, ouv: R(a[4]) }); }
     });
     var ajouts = new Map(), copies = [], Tk = ID;
     function ajout(rel, k, id){ var c = ajouts.get(rel); if (!c) ajouts.set(rel, c = { k: k, ids: [] }); c.ids.push(id); }
@@ -285,6 +287,12 @@
             var va = IFC.bruts(m.ent.get(l.rel)).slice();
             va[0] = guid(); va[4] = "#" + neuf.get(l.hote); va[5] = "#" + c;
             W.cree("IFCRELVOIDSELEMENT", va);
+          }
+          else if (l.ouv !== undefined){
+            if (!neuf.has(l.ouv)) return;
+            var fa = IFC.bruts(m.ent.get(l.rel)).slice();
+            fa[0] = guid(); fa[4] = "#" + neuf.get(l.ouv); fa[5] = "#" + c;
+            W.cree("IFCRELFILLSELEMENT", fa);
           }
           else if (l.parent !== undefined && neuf.has(l.parent)){
             var g = agreg.get(l.rel + ":" + l.parent);
@@ -449,6 +457,18 @@
   }
 
   // ================= Attributs =================
+  // Le repère (Tag) est le 8e attribut des seuls IfcElement. Les autres produits y rangent autre chose (axes d'une
+  // grille, genre d'un proxy, sens d'un port, charge ou appui d'un objet d'analyse, type d'un alignement…) : y
+  // écrire un texte rendrait le fichier invalide. Faute de schéma, on exige une classe hors de cette liste et, à
+  // cette place, un texte ou un vide.
+  var SANS_REPERE = /^IFC(GRID|PROXY|PORT|DISTRIBUTIONPORT|ANNOTATION|REFERENT|POSITIONINGELEMENT|LINEARPOSITIONINGELEMENT|ALIGNMENT\w*|STRUCTURAL\w+)$/;
+  function repereModifiable(m, id){
+    var e = m.ent.get(id);
+    if (!e || SANS_REPERE.test(e.type) || IFC.infos(m, id).genre === "spatial") return false;
+    var a = C(e);
+    if (a.length <= 7) return false;
+    return a[7] === null || (!!a[7] && a[7].str !== undefined);
+  }
   // valeurs : { 2: nom, 3: description, 4: type d'objet, 7: repère } ; "" efface, undefined ne change rien
   function attributs(m, ids, valeurs){
     var W = Ecrivain(m), nb = 0;
@@ -460,7 +480,7 @@
         var v = valeurs[k];
         if (v === undefined || v === null) return;
         k = +k;
-        if (k === 7 && g === "spatial") return;
+        if (k === 7 && (g === "spatial" || !repereModifiable(m, id))) return;
         if (k >= a.length) return;
         var t = v === "" ? "$" : texteStep(v);
         if (a[k] !== t){ a[k] = t; mod = true; }
@@ -517,6 +537,15 @@
     if (/INTEGER|COUNTMEASURE/.test(type) && dedans.indexOf(".") < 0) return type + "(" + Math.round(x) + ")";
     return type + "(" + reel(x) + ")";
   }
+  // toutes les références d'une valeur lue (référence, liste, valeur typée)
+  function refsDe(v, out){
+    out = out || [];
+    if (!v) return out;
+    if (v.ref) out.push(v.ref);
+    else if (Array.isArray(v)) v.forEach(function(x){ refsDe(x, out); });
+    else if (v.type) refsDe(v.v, out);
+    return out;
+  }
   // Valeur texte de la propriété « nom » du jeu « jeu » pour les objets ids ; les jeux partagés avec des objets
   // non visés sont copiés pour ceux-ci.
   function propriete(m, ids, jeu, nom, texte){
@@ -538,8 +567,10 @@
     var rels = new Map();         // jeu → relations qui le portent
     m.ent.forEach(function(e){
       if (e.type !== "IFCRELDEFINESBYPROPERTIES") return;
-      var d = R(C(e)[5]);
-      if (groupes.has(d)){ var l = rels.get(d); if (!l) rels.set(d, l = []); l.push(e.id); }
+      // un seul jeu (#n) ou, en IFC4, plusieurs à la fois : IFCPROPERTYSETDEFINITIONSET((#n, #p…))
+      refsDe(C(e)[5]).forEach(function(d){
+        if (groupes.has(d)){ var l = rels.get(d); if (!l) rels.set(d, l = []); if (l.indexOf(e.id) < 0) l.push(e.id); }
+      });
     });
     var qs = []; groupes.forEach(function(g){ qs.push(g.q); });
     var compte = compteRefs(m, qs), nb = 0, oter = new Map();
@@ -557,11 +588,14 @@
       } else {
         var nq2 = W.cree(qe.type, qa), pa = remplacerRef(IFC.bruts(m.ent.get(d)).slice(), g.q, nq2);
         pa[0] = guid();
-        var np = W.cree("IFCPROPERTYSET", pa), r0 = (rels.get(d) || [])[0], oh = r0 ? IFC.bruts(m.ent.get(r0))[1] : "$";
-        W.cree("IFCRELDEFINESBYPROPERTIES", [guid(), oh, "$", "$", listeIds(g.ids), "#" + np]);
+        var np = W.cree("IFCPROPERTYSET", pa);
+        // chaque relation qui portait le jeu perd les objets visés ; une relation neuve les relie à la copie du jeu
+        // (et aux autres jeux que la relation d'origine portait avec lui, laissés tels quels)
         (rels.get(d) || []).forEach(function(r){
           var dedans = L(C(m.ent.get(r))[4]).filter(function(o){ return cibles.has(o); });
           if (!dedans.length) return;
+          var rb = IFC.bruts(m.ent.get(r));
+          W.cree("IFCRELDEFINESBYPROPERTIES", [guid(), rb[1], "$", "$", listeIds(dedans), remplacerRef([rb[5]], d, np)[0]]);
           var l = oter.get(r); if (!l) oter.set(r, l = []);
           dedans.forEach(function(o){ if (l.indexOf(o) < 0) l.push(o); });
         });
@@ -586,22 +620,35 @@
   function changerClasse(m, ids, cible){
     var W = Ecrivain(m), def = CLASSES[cible], ifc4 = !/^IFC2X3/i.test(m.schema), nb = 0, ignores = 0;
     if (!def) return { changement: null, ids: [], nb: 0, ignores: ids.length };
-    var n = ifc4 ? def[2] : def[1];
+    var n = ifc4 ? def[2] : def[1], I = IFC.index(m), delies = new Set();
     ids.forEach(function(id){
       var e = m.ent.get(id), i = e && IFC.infos(m, id);
-      if (!e || !i || i.genre !== "element" || e.type === cible){ ignores++; return; }
+      // seuls les objets dont les 8 premiers attributs sont ceux d'un IfcElement (repère en 8e) se convertissent
+      if (!e || !i || i.genre !== "element" || e.type === cible || !repereModifiable(m, id)){ ignores++; return; }
       var a = IFC.bruts(e).slice(0, 8);
       if (a.length < 8){ ignores++; return; }
       if (n > 8) a.push(ifc4 || OBLIGATOIRE_2X3[cible] ? ".NOTDEFINED." : "$");
       W.retype(id, cible, a);
+      // le type de l'ancienne classe (un IfcBeamType sur un mur…) ne convient plus : l'objet en est détaché
+      var t = I.typeObjet.get(id), te = t ? m.ent.get(t) : null;
+      if (te && te.type !== cible + "TYPE") delies.add(id);
       nb++;
     });
+    if (delies.size){
+      var parRel = [];
+      m.ent.forEach(function(r){
+        if (r.type !== "IFCRELDEFINESBYTYPE") return;
+        var l = L(C(r)[4]).filter(function(o){ return delies.has(o); });
+        if (l.length) parRel.push([r.id, l]);
+      });
+      parRel.forEach(function(x){ oterDeLaListe(W, x[0], 4, x[1]); });
+    }
     return { changement: W.fin(), ids: [], nb: nb, ignores: ignores };
   }
 
   global.IFCEdition = {
     transformer: transformer, copier: copier, changerEtage: changerEtage, etages: etages,
-    extrusions: extrusions, dimensionner: dimensionner, attributs: attributs,
+    extrusions: extrusions, dimensionner: dimensionner, attributs: attributs, repereModifiable: repereModifiable,
     proprietesEditables: proprietesEditables, propriete: propriete, valeurStep: valeurStep,
     changerClasse: changerClasse, CLASSES: CLASSES,
     translation: translation, rotationZ: rotationZ, mul: mul, monde: monde

@@ -221,7 +221,9 @@
   }
 
   // ================= Lecture d'un fichier =================
-  var SCHEMAS_OK = /^(IFC2X3(_TC1|_FINAL)?|IFC4(_ADD1|_ADD2|_ADD2_TC1)?)$/;
+  // IFC4X3 (toutes ses révisions : _ADD1, _ADD2, _TC1…) : même écriture STEP et mêmes relations qu'IFC4 pour ce
+  // que l'outil lit ; ses classes propres (ouvrages linéaires, alignements) sont listées sans géométrie.
+  var SCHEMAS_OK = /^(IFC2X3(_TC1|_FINAL)?|IFC4(_ADD1|_ADD2|_ADD2_TC1)?|IFC4X3(_[A-Z0-9]+)*)$/;
 
   // Les blancs que trim() retire, pour les caractères 0–255 (le fichier est lu octet = caractère)
   function blanc(c){ return c === 32 || (c >= 9 && c <= 13) || c === 160; }
@@ -248,7 +250,7 @@
       }
     });
     if (!schema) throw erreur("Schéma introuvable : l'en-tête ne contient pas de FILE_SCHEMA.");
-    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3 et IFC4.");
+    if (!SCHEMAS_OK.test(schema)) throw erreur("Schéma « " + schema + " » non pris en charge : l'outil lit les fichiers IFC2X3, IFC4 et IFC4X3.");
     return schema;
   }
   function analyser(octets, progres){
@@ -462,12 +464,19 @@
   }
 
   // ================= Index des éléments et des relations =================
-  var SPATIAL = { IFCPROJECT:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1, IFCSPACE:1, IFCSPATIALZONE:1, IFCEXTERNALSPATIALELEMENT:1 };
-  var NON_SUPPRIMABLES = { IFCPROJECT:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1 };
+  var SPATIAL = { IFCPROJECT:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1, IFCSPACE:1, IFCSPATIALZONE:1, IFCEXTERNALSPATIALELEMENT:1,
+    // IFC4X3 : ouvrages et leurs parties
+    IFCFACILITY:1, IFCBRIDGE:1, IFCROAD:1, IFCRAILWAY:1, IFCMARINEFACILITY:1,
+    IFCFACILITYPART:1, IFCFACILITYPARTCOMMON:1, IFCBRIDGEPART:1, IFCROADPART:1, IFCRAILWAYPART:1, IFCMARINEPART:1 };
+  var NON_SUPPRIMABLES = { IFCPROJECT:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1,
+    IFCFACILITY:1, IFCBRIDGE:1, IFCROAD:1, IFCRAILWAY:1, IFCMARINEFACILITY:1,
+    IFCFACILITYPART:1, IFCFACILITYPARTCOMMON:1, IFCBRIDGEPART:1, IFCROADPART:1, IFCRAILWAYPART:1, IFCMARINEPART:1 };
   var OUVERTURES = { IFCOPENINGELEMENT:1, IFCOPENINGSTANDARDCASE:1 };
   var PLACEMENTS = { IFCLOCALPLACEMENT:1, IFCGRIDPLACEMENT:1, IFCLINEARPLACEMENT:1 };
   // produits reconnus même sans placement ni représentation ($, $)
-  var PRODUITS_NUS = { IFCELEMENTASSEMBLY:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1, IFCSPACE:1 };
+  var PRODUITS_NUS = { IFCELEMENTASSEMBLY:1, IFCSITE:1, IFCBUILDING:1, IFCBUILDINGSTOREY:1, IFCSPACE:1,
+    IFCFACILITY:1, IFCBRIDGE:1, IFCROAD:1, IFCRAILWAY:1, IFCMARINEFACILITY:1,
+    IFCFACILITYPART:1, IFCFACILITYPARTCOMMON:1, IFCBRIDGEPART:1, IFCROADPART:1, IFCRAILWAYPART:1, IFCMARINEPART:1 };
   // structure spatiale dont la forme n'est pas dessinée (volumes de pièces et de zones, qui cacheraient tout)
   var VOLUMES_SPATIAUX = { IFCPROJECT:1, IFCSPACE:1, IFCSPATIALZONE:1 };
 

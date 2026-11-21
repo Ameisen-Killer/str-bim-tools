@@ -133,7 +133,10 @@
         var VB = GPUBufferUsage.VERTEX;
         var liste = [], origine = [0, 0, 0], m = { nv: 0, nl: 0, plages: [] }, B = {}, coupe = null, cadre = null, cadreCol = null, tex = null, perdu = false;
         var quad = dev.createBuffer({ size: 18*12, usage: VB | GPUBufferUsage.COPY_DST }), quadCol = null;
-        dev.lost.then(function(){ perdu = true; });
+        // Appareil perdu (pilote réinitialisé, carte débranchée…) : WebGPU ne se restaure pas sur place, la vue
+        // est prévenue (surPerte, posé par ifc-vue.js) et repasse sur WebGL. Rien à faire si c'est notre liberer().
+        var libere = false, moteur = null;
+        dev.lost.then(function(){ perdu = true; if (!libere && moteur && moteur.surPerte) moteur.surPerte(); });
         function detruire(){ Object.keys(B).forEach(function(k){ if (B[k]) B[k].destroy(); }); B = {}; }
         function charger(l, orig){
           liste = l; origine = orig;
@@ -248,12 +251,12 @@
           pass.end();
           dev.queue.submit([enc.finish()]);
         }
-        return {
+        return moteur = {
           nom: "WebGPU", charger: charger, teinter: teinter, dessiner: dessiner,
           viser: function(c, x, y){ return O.viserCPU(liste, c, x, y, coupe); },
           coupe: poserCoupe,
           perdu: function(){ return perdu; }, restaurer: function(){},
-          liberer: function(){ detruire(); try { dev.destroy(); } catch (e){} }
+          liberer: function(){ libere = true; detruire(); try { dev.destroy(); } catch (e){} }
         };
       });
     });

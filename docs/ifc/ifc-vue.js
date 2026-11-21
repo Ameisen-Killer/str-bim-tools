@@ -187,8 +187,40 @@
       out.push(T ? [T[0]*x + T[3]*y + T[9], T[1]*x + T[4]*y + T[10], T[2]*x + T[5]*y + T[11]] : [x, y, 0]);
     }
   }
-  // Arc passant par trois points (IFCARCINDEX), dans le plan XY
+  // Arc passant par trois points hors d'un plan horizontal (directrice 3D d'une armature cintrée) : cercle dans
+  // le plan des trois points, parcouru de p à r en passant par q, pas de 10°
+  function arc3D(p, q, r, out){
+    var u = [q[0]-p[0], q[1]-p[1], q[2]-p[2]], v = [r[0]-p[0], r[1]-p[1], r[2]-p[2]];
+    var n = [u[1]*v[2] - u[2]*v[1], u[2]*v[0] - u[0]*v[2], u[0]*v[1] - u[1]*v[0]], n2 = n[0]*n[0] + n[1]*n[1] + n[2]*n[2];
+    var uu = u[0]*u[0] + u[1]*u[1] + u[2]*u[2], vv = v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+    if (n2 < 1e-18*uu*vv || !(n2 > 0)){ out.push(p, q, r); return; }       // points alignés
+    // centre = p + ((|u|² v − |v|² u) × n) / (2 |n|²)
+    var w = [uu*v[0] - vv*u[0], uu*v[1] - vv*u[1], uu*v[2] - vv*u[2]];
+    var c = [p[0] + (w[1]*n[2] - w[2]*n[1])/(2*n2), p[1] + (w[2]*n[0] - w[0]*n[2])/(2*n2), p[2] + (w[0]*n[1] - w[1]*n[0])/(2*n2)];
+    var e1 = [p[0]-c[0], p[1]-c[1], p[2]-c[2]], rr = Math.hypot(e1[0], e1[1], e1[2]), ln = Math.sqrt(n2);
+    if (!(rr > 0)){ out.push(p, q, r); return; }
+    e1 = [e1[0]/rr, e1[1]/rr, e1[2]/rr];
+    var e3 = [n[0]/ln, n[1]/ln, n[2]/ln], e2 = [e3[1]*e1[2] - e3[2]*e1[1], e3[2]*e1[0] - e3[0]*e1[2], e3[0]*e1[1] - e3[1]*e1[0]];
+    // autour de n = u × v, on tourne dans le sens direct de p vers q puis r : angle de r dans ]0, 2π[
+    var d = [r[0]-c[0], r[1]-c[1], r[2]-c[2]];
+    var t2 = Math.atan2(d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2], d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2]);
+    if (t2 <= 0) t2 += 2*Math.PI;
+    var nb = Math.max(4, Math.ceil(t2/(Math.PI/18)));
+    for (var i = 0; i <= nb; i++){
+      var t = t2*i/nb, co = rr*Math.cos(t), si = rr*Math.sin(t);
+      out.push([c[0] + co*e1[0] + si*e2[0], c[1] + co*e1[1] + si*e2[1], c[2] + co*e1[2] + si*e2[2]]);
+    }
+  }
+  // Arc passant par trois points (IFCARCINDEX) : dans un plan horizontal (cas courant, profils et tracés en plan),
+  // sinon dans l'espace
   function arc3(p, q, r, out){
+    var z = p[2] || 0;
+    if (Math.abs((q[2] || 0) - z) > 1e-9 || Math.abs((r[2] || 0) - z) > 1e-9){ arc3D(p, q, r, out); return; }
+    var debut = out.length;
+    arc3Plan(p, q, r, out);
+    if (z) for (var k = debut; k < out.length; k++) if (out[k] !== p && out[k] !== q && out[k] !== r) out[k][2] = z;
+  }
+  function arc3Plan(p, q, r, out){
     var ax = p[0], ay = p[1], bx = q[0], by = q[1], cx = r[0], cy = r[1];
     var d = 2*(ax*(by - cy) + bx*(cy - ay) + cx*(ay - by));
     if (Math.abs(d) < 1e-12){ out.push(p, q, r); return; }
@@ -679,6 +711,9 @@
   // Délai d'un calcul : passé ce temps, l'opération en cours abandonne (exception) et l'appelant garde l'élément
   // non découpé plutôt que de figer la page
   var BSP_FIN = 0, bspTours = 0;
+  // Découpe ou perçage abandonné (trop de triangles, délai dépassé) : compté avec les géométries non lues, pour
+  // que la vue le dise au lieu de montrer une pièce pleine sans rien signaler
+  var ABANDON = "découpe trop lourde (pièce laissée entière)", bspAbandon = false;
   function bspDelai(ms){ BSP_FIN = ms ? performance.now() + ms : 0; }
   function bspPartager(pl, p, cf, cb, f, b, eps){
     if (BSP_FIN && !(++bspTours & 4095) && performance.now() > BSP_FIN) throw new Error("BSP : délai dépassé");
@@ -932,10 +967,11 @@
     for (var k = 0; k < 3; k++) if (bB.min[k] > bA.max[k] + eps || bB.max[k] < bA.min[k] - eps) return op === "DIFFERENCE" ? A : null;
     var o = [(bA.min[0] + bA.max[0])/2, (bA.min[1] + bA.max[1])/2, (bA.min[2] + bA.max[2])/2];
     var PA = versPolys(A, o, eps*10, 0), PB = versPolys(B, o, eps*10, A.length);
+    if (PA.length > BSP_MAX || PB.length > BSP_MAX) bspAbandon = true;
     if (!PA.length || !PB.length || PA.length > BSP_MAX || PB.length > BSP_MAX) return null;
     var R;
     bspDelai(1500);
-    try { R = bspOperation(op, PA, PB, eps); } catch (x){ R = []; }
+    try { R = bspOperation(op, PA, PB, eps); } catch (x){ R = []; bspAbandon = true; }
     bspDelai(0);
     if (!R.length) return null;          // plus rien : plutôt un échec qu'un élément entièrement évidé
     var out = [];
@@ -1053,7 +1089,10 @@
       return out;
     }
     if (!B || !B.length) return null;
-    return booleenFaces(op, A, B);
+    bspAbandon = false;
+    var res = booleenFaces(op, A, B);
+    if (bspAbandon) nonLu(G, ABANDON);
+    return res;
   }
   // Ouvertures (IFCRELVOIDSELEMENT) retirées de l'élément hôte, chacune avec son propre placement. Une ouverture
   // qu'on ne sait pas soustraire est laissée de côté : l'hôte reste plein à cet endroit.
@@ -1086,18 +1125,22 @@
     var taille = Math.hypot(bH.max[0] - bH.min[0], bH.max[1] - bH.min[1], bH.max[2] - bH.min[2]) || 1, eps = taille*1e-8;
     var o = [(bH.min[0] + bH.max[0])/2, (bH.min[1] + bH.max[1])/2, (bH.min[2] + bH.max[2])/2];
     var PA = versPolys(faces, o, eps*10, 0), g0 = faces.length, perce = false;
+    if (PA.length > BSP_MAX) nonLu(G, ABANDON);
     if (!PA.length || PA.length > BSP_MAX) return faces;
+    var abandon = false;
     bspDelai(1500);
     lots.forEach(function(lot){
       var B = [], r = null;
       lot.g.forEach(function(g){ for (var i = 0; i < g.faces.length; i++) B.push(g.faces[i]); });
       var PB = versPolys(B, o, eps*10, g0);
       g0 += B.length;
+      if (PB.length > BSP_MAX || PA.length > BSP_MAX) abandon = true;
       if (!PB.length || PB.length > BSP_MAX || PA.length > BSP_MAX) return;
-      try { r = bspOperation("DIFFERENCE", PA, PB, eps); } catch (x){ r = null; }
+      try { r = bspOperation("DIFFERENCE", PA, PB, eps); } catch (x){ r = null; abandon = true; }
       if (r && r.length){ PA = r; perce = true; }
     });
     bspDelai(0);
+    if (abandon) nonLu(G, ABANDON);
     if (!perce) return faces;
     var out = [];
     versFaces(PA, o, eps, out);
@@ -1810,6 +1853,7 @@
         uK: gl.getUniformLocation(p, "uK"), uB0: gl.getUniformLocation(p, "uB0"), uB1: gl.getUniformLocation(p, "uB1"), uR: gl.getUniformLocation(p, "uR"), uA: gl.getUniformLocation(p, "uA") };
     }
     var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, fermes = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
+    var indexLarge = false;      // index sur 32 bits permis ; déclaré avant init(), qui le règle
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
@@ -1823,7 +1867,7 @@
     // Gros modèles, pendant un mouvement : les éléments plus petits que quelques pixels ne sont pas dessinés.
     // Un index range les sommets du plus gros élément au plus petit ; il suffit alors d'en dessiner le début
     // (un seul appel). grosTailles[k] = taille du k-ième élément, grosFins[k] = nombre de sommets jusqu'à lui.
-    var indexLarge = false, grosTailles = null, grosFins = null, SEUIL_GROS = 450000, PX_GROS = 4;
+    var grosTailles = null, grosFins = null, SEUIL_GROS = 450000, PX_GROS = 4;
     function indexerGros(nv){
       grosTailles = grosFins = null;
       if (!indexLarge || nv < SEUIL_GROS) return;
@@ -3584,11 +3628,16 @@
         if (nom === M.cle) return Promise.resolve(M.nom);
         var f = FABRIQUES[nom];
         if (!f) return Promise.reject(new Error("moteur inconnu"));
-        var neuf = cv.cloneNode(false);
+        var neuf = cv.cloneNode(false), moi = this;
         neuf.width = cv.width; neuf.height = cv.height;
         return Promise.resolve().then(function(){ return f(neuf, OUTILS); }).then(function(N){
           if (!N || N.echec) throw new Error((N && N.message) || "indisponible sur cet appareil ou ce navigateur");
           N.cle = nom;
+          // moteur qui s'arrête tout seul (appareil WebGPU perdu) : WebGL reprend, la page est prévenue
+          N.surPerte = function(){
+            if (M !== N) return;
+            moi.moteur("webgl").then(function(){ if (rappels.surMoteurPerdu) rappels.surMoteurPerdu(N.nom); }).catch(function(){});
+          };
           M.liberer();
           ptrs.clear(); vite = false;
           if (ro) ro.unobserve(cv);

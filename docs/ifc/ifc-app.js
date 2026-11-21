@@ -17,11 +17,11 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.4.0";
+  var VERSION = "1.4.1";
   (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
-  // fichier ouvert : { uid, m (modèle IFC), propre (version exportée), visible, plie, teinte (0–360 ou null), taille: {v, t} }
+  // fichier ouvert : { uid, m (modèle IFC), propre (état exporté, voir etatDe ; false : jamais exporté), visible, plie, teinte (0–360 ou null), taille: {v, t} }
   var fichiers = [], parUid = new Map(), uidSuivant = 1;
   var lignes = [], choix = new Set(), caches = new Set(), plies = new Set(), actif = "", histo = [], aRefaire = [];
 
@@ -31,7 +31,12 @@
   // WebGL et canvas démarrent tout de suite ; WebGPU et Three.js (ifc-moteurs.js) se chargent ensuite
   var cube = null;
   var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu, surMesure: function(t){ etat(t); },
-    surCamera: function(l, p){ if (cube) cube.camera(l, p); } });
+    surCamera: function(l, p){ if (cube) cube.camera(l, p); },
+    surMoteurPerdu: function(nom){
+      if (fichiers.length) majVue();
+      maj();
+      etat("Le moteur " + nom + " s'est arrêté (carte graphique réinitialisée) : WebGL le remplace.");
+    } });
   // cube de navigation comme le ViewCube de Revit (ifc-cube.js) : faces dans le repère du projet, maison = vue 3D
   // par défaut de Revit (coin haut, avant, droite), qui recadre tout
   var PLONGEE_MAISON = Math.atan(Math.SQRT1_2), angleProjet = 0;
@@ -104,7 +109,14 @@
     return { f: parUid.get(+c.slice(0, p)), id: +c.slice(p + 1) };
   }
   function existe(c){ var d = lireCle(c); return !!(d.f && d.f.m.ent.has(d.id)); }
-  function modifie(f){ return f.m.version !== f.propre; }
+  // État d'un fichier = dernière opération de l'historique qui le touche (null : comme à l'ouverture).
+  // m.version monte aussi à l'annulation : on ne s'en sert pas ici, sinon modifier puis annuler après un export
+  // laisserait le fichier marqué modifié.
+  function etatDe(f){
+    for (var i = histo.length - 1; i >= 0; i--) if (histo[i].parts.some(function(p){ return p.f === f; })) return histo[i];
+    return null;
+  }
+  function modifie(f){ return f.propre === false || etatDe(f) !== f.propre; }
   function tailleDe(f){
     if (f.taille.v !== f.m.version) f.taille = { v: f.m.version, t: IFC.taille(f.m) };
     return f.taille.t;
@@ -247,7 +259,7 @@
   }
   // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
   // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé.
-  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=8", chaud = null;
+  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=9", chaud = null;
   function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
   function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
   if (avecWorker) setTimeout(function(){
@@ -445,7 +457,7 @@
     var n = fichiers.length, base = fichiers.map(function(f){ return f.m.nom.replace(/\.ifc$/i, ""); }).join("+");
     var nom = "fusion_" + (base.length <= 60 ? base : n + "_maquettes") + ".ifc";
     if (!confirm("Les " + n + " maquettes ouvertes vont être remplacées par une seule, « " + nom + " », avec leurs modifications. " +
-      "Rien n'est perdu tant que tu ne fermes pas la page sans exporter. Continuer ?")) return;
+      "La fusion ne s'annule pas et vide l'historique : pour revenir aux maquettes séparées, il faudra les rouvrir. Continuer ?")) return;
     var t0 = performance.now(), ms = fichiers.map(function(f){ return f.m; }), bilan = null;
     $("#chargement").hidden = false;
     progresLecture("Fusion des maquettes…", 0);
@@ -461,7 +473,7 @@
       $("#chargement").hidden = true;
       vider();
       ouvrir([bilan.m], performance.now() - t0, []);
-      fichiers[0].propre = -1;            // jamais exportée : comptée comme modifiée
+      fichiers[0].propre = false;         // jamais exportée : comptée comme modifiée
       rendreListe(); maj();
       etat("Fusion de " + n + " maquettes : « " + nom + " », " + pluriel(bilan.m.ent.size, "entité") + ". Exporte-la avec Ctrl+S." +
         (bilan.unites ? " Attention : unités de longueur différentes (" + bilan.unites.map(function(u){ return u || "?"; }).join(", ") + "), les maquettes ne sont pas à la même échelle." : "") +
@@ -474,7 +486,9 @@
   }
 
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
-  function charger(liste){
+  // aLaPlace : les fichiers ouverts sont fermés une fois les nouveaux lus (commande Ouvrir) ; décidé à l'appel,
+  // pour qu'un « Ouvrir » abandonné ne fasse pas remplacer le dépôt de fichiers suivant
+  function charger(liste, aLaPlace){
     liste = [].slice.call(liste || []);
     if (!liste.length || occupe()) return;
     erreur("");
@@ -509,8 +523,7 @@
       });
     }).then(function(){
       $("#chargement").hidden = true;
-      if (ajoutes.length && remplacer) vider();
-      remplacer = false;
+      if (ajoutes.length && aLaPlace) vider();
       if (ajoutes.length){
         var aCalculer = ajoutes.filter(function(m){ return !!m.idsGeo; }), vide = !fichiers.length;
         ouvrir(ajoutes, performance.now() - t0, refus);
@@ -518,13 +531,19 @@
       }
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
       else erreur(refus.join(" "));
+    }).catch(function(err){
+      // panne pendant la préparation ou l'ouverture : la barre de progression ne reste pas affichée
+      if (window.console) console.error(err);
+      $("#chargement").hidden = true;
+      var msg = "Ouverture interrompue : " + (err && err.message || err);
+      if (fichiers.length) etat(msg); else erreur(msg);
     });
   }
 
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=3";
+  var URL_GEO = "/ifc/ifc-geo.js?v=4";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -626,7 +645,7 @@
     var premier = !fichiers.length;
     modeles.forEach(function(m){
       // arborescence réduite à l'ouverture (demande de Tony) : seule la ligne du fichier est affichée
-      var f = { uid: uidSuivant++, m: m, propre: m.version, visible: true, plie: true, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m), enCalcul: !!m.idsGeo };
+      var f = { uid: uidSuivant++, m: m, propre: null, visible: true, plie: true, teinte: null, taille: { v: -1, t: 0 }, unite: uniteMesure(m), carte: conversionCarte(m), enCalcul: !!m.idsGeo };
       fichiers.push(f); parUid.set(f.uid, f);
     });
     vue.modeles(fichiers.map(function(f){ return f.m; }));
@@ -1496,7 +1515,7 @@
       ligne("Type IFC", i.type, true) +
       (ed ? champ("Type d'objet", 4, i.objectType) : ligne("Type d'objet", i.objectType)) +
       (ed ? champ("Description", 3, i.description) : ligne("Description", i.description)) +
-      (ed && i.genre !== "spatial" ? champ("Repère", 7, i.tag) : ligne("Repère", i.tag)) +
+      (ed && IFCEdition.repereModifiable(m, i.id) ? champ("Repère", 7, i.tag) : ligne("Repère", i.tag)) +
       ligne("Nom long", i.nomLong) +
       ligne("Matériau", i.materiau || (i.genre === "spatial" ? "" : "—")) +
       ligne("Dans", pi ? nomAff(pi) + " (" + pi.typeLib + ")" : "") +
@@ -1762,7 +1781,7 @@
 
   // Téléchargement de l'IFC du fichier, ou de son .ifczip : promesse du bilan (texte)
   function telecharger(f, zip){
-    var m = f.m, version = m.version, oct = IFC.versOctets(IFC.ecrire(m)), nom = IFC.nomExport(m.nom);
+    var m = f.m, exporte = etatDe(f), oct = IFC.versOctets(IFC.ecrire(m)), nom = IFC.nomExport(m.nom);
     var pret = zip ? zipper(nom, oct) : Promise.resolve(new Blob([oct], { type: "application/x-step" }));
     return pret.then(function(blob){
       var a = document.createElement("a"), nomFichier = zip ? nom.replace(/\.ifc$/i, "") + ".ifczip" : nom;
@@ -1771,7 +1790,7 @@
       document.body.appendChild(a);
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-      f.propre = version;
+      f.propre = exporte;
       return "« " + nomFichier + " » : avant " + fmtN(m.nbOrigine) + " entités · " + fmtTaille(m.taille) +
         ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length) + (zip ? ", compressé " + fmtTaille(blob.size) : "");
     });
@@ -2843,7 +2862,7 @@
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
     },
     "a-propos": function(){
-      aide("IFC Studio", "<p>Ouvre des maquettes IFC2X3 ou IFC4, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
+      aide("IFC Studio", "<p>Ouvre des maquettes IFC2X3, IFC4 ou IFC4X3, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
         "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
         "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +
@@ -3026,7 +3045,12 @@
   var entree = $("#fichier");
   function choisir(){ entree.value = ""; entree.click(); }
   $("#choisir").addEventListener("click", choisir);
-  entree.addEventListener("change", function(){ if (entree.files && entree.files.length) charger(entree.files); });
+  entree.addEventListener("change", function(){
+    var aLaPlace = remplacer;
+    remplacer = false;
+    if (entree.files && entree.files.length) charger(entree.files, aLaPlace);
+  });
+  entree.addEventListener("cancel", function(){ remplacer = false; });
 
   function deposeFichiers(e){ var t = e.dataTransfer && e.dataTransfer.types; return !!t && [].indexOf.call(t, "Files") >= 0; }
   var profondeur = 0;
