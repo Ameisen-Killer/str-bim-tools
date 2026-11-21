@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.5.0";
+  var VERSION = "1.6.0";
   (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
@@ -822,18 +822,39 @@
   function reconstruire(){
     vue.formats(formatsMesure());
     lignes = [];
+    groupesListe = new Map();
     fichiers.forEach(function(f){
       lignes.push({ fichier: f });
+      var groupes = new Map(), spatial = [];
       IFC.arbre(f.m).forEach(function(l){
         var i = IFC.infos(f.m, l.id);
-        lignes.push({ cle: cle(f, l.id), f: f, id: l.id, niv: l.niv, i: i,
-          rech: sansAccent([nomAff(i), i.typeLib, i.type, i.materiau, i.globalId, i.tag, i.objectType, "#" + i.id].join(" ")) });
+        var x = { cle: cle(f, l.id), f: f, id: l.id, niv: grouper ? 1 : l.niv, i: i,
+          rech: sansAccent([nomAff(i), i.typeLib, i.type, i.materiau, i.globalId, i.tag, i.objectType, "#" + i.id].join(" ")) };
+        if (!grouper){ lignes.push(x); return; }
+        // arborescence regroupée : les éléments à plat sous leur classe, leur famille : type ou leur matériau ;
+        // la structure spatiale (projet, site, bâtiments, étages, locaux) dans un dernier groupe
+        if (!i.supprimable || i.genre === "spatial"){ spatial.push(x); return; }
+        var nom = grouper === "classe" ? i.typeLib : grouper === "type" ? i.objectType || "(sans famille : type)" : i.materiau || "(sans matériau)";
+        var g = groupes.get(nom);
+        if (!g) groupes.set(nom, g = []);
+        g.push(x);
       });
+      if (!grouper) return;
+      function poser(nom, membres, sansCase){
+        var gl = { g: nom, cle: "g" + f.uid + "|" + nom, f: f, niv: 0, membres: membres, sansCase: !!sansCase };
+        groupesListe.set(gl.cle, gl);
+        // un groupe apparaît replié : on lit d'abord la liste des classes, types ou matériaux et leur nombre
+        if (!groupesVus.has(gl.cle)){ groupesVus.add(gl.cle); plies.add(gl.cle); }
+        lignes.push(gl);
+        membres.forEach(function(x){ lignes.push(x); });
+      }
+      Array.from(groupes.keys()).sort(function(a, b){ return a.localeCompare(b, "fr", { numeric: true }); }).forEach(function(nom){ poser(nom, groupes.get(nom)); });
+      if (spatial.length) poser("Structure du projet", spatial, true);
     });
     lignes.forEach(function(l, k){ var n = lignes[k + 1]; l.enfants = !l.fichier && !!n && !n.fichier && n.niv > l.niv; });
     choix.forEach(function(c){ if (!existe(c)) choix.delete(c); });
     caches.forEach(function(c){ if (!existe(c)) caches.delete(c); });
-    plies.forEach(function(c){ if (!existe(c)) plies.delete(c); });
+    plies.forEach(function(c){ if (c.charAt(0) === "g" ? !groupesListe.has(c) : !existe(c)) plies.delete(c); });
     if (actif && !existe(actif)) actif = "";
     calculerCouleurs();
     remplirTypes();
@@ -978,6 +999,15 @@
   // Lignes affichées : { f } pour un en-tête de fichier, { l, pli, plie, filtre } pour un élément.
   // Au-delà de VIRTUEL lignes, seule la partie visible (et une marge) existe dans la page : deux cales
   // vides tiennent la place du reste, et le défilement redessine la fenêtre.
+  // Arborescence : "" structure du projet, ou regroupée par "classe", "type" (famille : type) ou "materiau"
+  var grouper = lire("ifc.grouper", ["", "classe", "type", "materiau"]), groupesListe = new Map(), groupesVus = new Set();
+  function poserGrouper(v){
+    if (v === grouper) return;
+    grouper = v; garder("ifc.grouper", v);
+    reconstruire();
+    etat(v ? "Arborescence regroupée par " + { classe: "classe IFC", type: "famille : type", materiau: "matériau" }[v] + " : coche un groupe pour sélectionner tous ses éléments."
+      : "Arborescence : structure du projet.");
+  }
   var visibles = [], rangs = [], VIRTUEL = 1500, MARGE = 800, hauts = { el: 46, fic: 62 }, fenetre = null, totalH = 0;
   function rendreListe(){
     var q = $("#recherche").value.trim(), t = $("#filtre-type").value, filtre = !!(q || t), crit = q ? lireRequete(q) : [];
@@ -990,6 +1020,13 @@
         return;
       }
       if (f.plie && !filtre) return;     // une recherche fouille aussi les maquettes réduites
+      if (l.g !== undefined){            // ligne de groupe : absente d'un résultat de recherche (éléments à plat)
+        if (filtre) return;
+        var gp = plies.has(l.cle);
+        seuil = gp ? l.niv : Infinity;
+        rangs.push({ g: l, plie: gp });
+        return;
+      }
       var i = l.i, pli = "";
       if (!filtre){
         // un nœud replié cache tout ce qui est plus profond que lui
@@ -1009,8 +1046,15 @@
     fenetre = null;
     peindre();
   }
+  function groupeCoche(gl){ return gl.membres.length > 0 && gl.membres.every(function(x){ return choix.has(x.cle); }); }
   function htmlRang(r){
     if (r.f) return enteteFichier(r.f);
+    if (r.g){
+      var gl = r.g;
+      return '<div class="el groupe' + (r.plie ? " plie" : "") + '" role="listitem" data-groupe="' + esc(gl.cle) + '" style="--niv:0">' +
+        (gl.sansCase ? '<span class="vide"></span>' : '<input type="checkbox" aria-label="Sélectionner le groupe ' + esc(gl.g) + '"' + (groupeCoche(gl) ? " checked" : "") + ">") +
+        '<div><div class="el-nom"><span class="pli" data-pli title="Réduire ou développer">▾</span>' + esc(gl.g) + '</div><div class="el-info">' + esc(pluriel(gl.membres.length, "élément")) + "</div></div></div>";
+    }
     var l = r.l, i = l.i, c = choix.has(l.cle);
     var info = [i.typeLib, i.materiau, "#" + i.id].filter(Boolean).join(" · ");
     return '<div class="el ' + i.genre + (c ? " choisi" : "") + (caches.has(l.cle) ? " cache" : "") + (l.cle === actif ? " actif" : "") + (r.plie ? " plie" : "") + '" role="listitem" data-cle="' + l.cle +
@@ -1072,7 +1116,12 @@
   // Met à jour cases et surbrillances sans reconstruire la liste
   function majLignes(){
     [].forEach.call($("#liste").children, function(r){
-      var c = r.getAttribute("data-cle");
+      var c = r.getAttribute("data-cle"), g = r.getAttribute("data-groupe");
+      if (g){
+        var gl = groupesListe.get(g), gcb = r.querySelector("input");
+        if (gl && gcb) gcb.checked = groupeCoche(gl);
+        return;
+      }
       if (!c) return;
       var oui = choix.has(c);
       r.classList.toggle("choisi", oui);
@@ -1134,6 +1183,20 @@
     }
     var r = e.target.closest(".el");
     if (!r) return;
+    if (r.hasAttribute("data-groupe")){
+      var gl = groupesListe.get(r.getAttribute("data-groupe"));
+      if (!gl) return;
+      if (e.target.tagName === "INPUT"){
+        var oui = e.target.checked;
+        gl.membres.forEach(function(x){ cocher(x.cle, oui); });
+        if (oui) activer(gl.membres[0].cle, false); else oublierActif();
+        etat("« " + gl.g + " » : " + pluriel(gl.membres.length, "élément") + (oui ? " ajoutés à" : " retirés de") + " la sélection.");
+        return;
+      }
+      if (plies.has(gl.cle)) plies.delete(gl.cle); else plies.add(gl.cle);
+      rendreListe();
+      return;
+    }
     var c = r.getAttribute("data-cle");
     if (e.target.closest("[data-pli]")){ if (plies.has(c)) plies.delete(c); else plies.add(c); rendreListe(); return; }
     if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); if (e.target.checked) activer(c, false); else oublierActif(); return; }
@@ -1567,6 +1630,7 @@
     var nEd = ciblesEdition().length;
     ["deplacer", "copier", "tourner", "deplacer-points", "copier-points", "etage", "dimensions", "attributs", "classe"].forEach(function(c){ activerCmd(c, nEd > 0); });
     [].forEach.call(document.querySelectorAll("[data-lecteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-lecteur") === lecteurVoulu)); });
+    [].forEach.call(document.querySelectorAll("[data-grouper]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-grouper") === grouper)); });
     [].forEach.call(document.querySelectorAll("[data-colorer]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-colorer") === colorer)); });
     activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
@@ -1851,7 +1915,7 @@
     var filtre = !!($("#recherche").value.trim() || $("#filtre-type").value);
     var garde = choix.size ? choix : filtre ? new Set(visibles) : null;
     return {
-      lignes: lignes.filter(function(l){ return !l.fichier && l.i.supprimable && (garde ? garde.has(l.cle) : true); }),
+      lignes: lignes.filter(function(l){ return !!l.i && l.i.supprimable && (garde ? garde.has(l.cle) : true); }),
       quoi: choix.size ? "sélection" : filtre ? "résultat de la recherche" : "tous les éléments"
     };
   }
@@ -1990,44 +2054,99 @@
       etat("Tableau non exporté : " + (err && err.message || err));
     }).then(function(){ tableauEnCours = false; });
   }
-  // Totaux des grandeurs qui s'additionnent sur les éléments cochés : [{ titre, unite, s, nb }], quantités d'abord
+  // Ce que les éléments cochés ont en commun, et ce qui s'additionne :
+  // { n, classes: [[classe, nombre]], attrs: { nom, objectType, description, tag, etage, materiau, type } (valeur
+  //   commune, ou undefined si elle diffère), repere (modifiable sur tous), communs: [{ jeu, nom, v, divers, ed }]
+  //   (présents sur tous ; ed : texte modifiable, en mode Éditeur), totaux: [{ titre, unite, s, nb }] }
   var MAX_TOTAUX = 3000, NB3 = new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 3 });
-  function totauxSelection(){
-    var par = new Map(), classes = new Map();
+  function analyseSelection(){
+    var par = new Map(), classes = new Map(), com = new Map(), edit = new Map(), n = 0, repere = true;
+    var A = { nom: null, objectType: null, description: null, tag: null, etage: null, materiau: null, type: null };
+    function meme(k, v){ if (A[k] === null) A[k] = v; else if (A[k] !== v) A[k] = undefined; }
     choix.forEach(function(c){
       var d = lireCle(c);
       if (!d.f || !d.f.m.ent.has(d.id)) return;
-      var i = IFC.infos(d.f.m, d.id), vus = new Set();
+      var m = d.f.m, i = IFC.infos(m, d.id), vus = new Set(), vusTot = new Set(), vusEd = new Set();
+      n++;
       classes.set(i.typeLib, (classes.get(i.typeLib) || 0) + 1);
-      IFC.donnees(d.f.m, d.id).forEach(function(p){
+      ["nom", "objectType", "description", "tag"].forEach(function(k){ meme(k, i[k] || ""); });
+      meme("etage", etageDe(m, d.id)); meme("materiau", i.materiau || ""); meme("type", typeRelie(m, d.id));
+      if (modeEd && repere && !IFCEdition.repereModifiable(m, d.id)) repere = false;
+      IFC.donnees(m, d.id).forEach(function(p){
+        var kc = p.jeu + "\u0000" + p.nom;
+        if (!vus.has(kc)){                              // la valeur de l'objet passe avant celle de son type
+          vus.add(kc);
+          var txt = typeof p.v === "number" ? NB3.format(p.v) + (p.unite ? " " + p.unite : "") : String(p.v), x = com.get(kc);
+          if (!x) com.set(kc, x = { jeu: p.jeu, nom: p.nom, v: txt, nb: 0, divers: false, ed: null });
+          else if (x.v !== txt) x.divers = true;
+          x.nb++;
+        }
         if (!p.somme) return;
-        var k = (p.quantite ? "0" : "1") + "\u0000" + p.jeu + "\u0000" + p.nom + "\u0000" + p.unite;
-        if (vus.has(k)) return;                       // la valeur de l'objet passe avant celle de son type
-        vus.add(k);
+        var k = (p.quantite ? "0" : "1") + "\u0000" + kc + "\u0000" + p.unite;
+        if (vusTot.has(k)) return;
+        vusTot.add(k);
         var t = par.get(k);
         if (!t) par.set(k, t = { titre: p.jeu + " · " + p.nom, unite: p.unite, s: 0, nb: 0, q: p.quantite });
         t.s += p.v; t.nb++;
       });
+      if (modeEd) IFCEdition.proprietesEditables(m, d.id).forEach(function(p){
+        var kc = p.jeu + "\u0000" + p.nom;
+        if (vusEd.has(kc)) return;
+        vusEd.add(kc);
+        var x = edit.get(kc);
+        if (!x) edit.set(kc, x = { texte: p.texte, nb: 0, divers: false });
+        else if (x.texte !== p.texte) x.divers = true;
+        x.nb++;
+      });
+    });
+    var communs = [];
+    com.forEach(function(x, kc){
+      if (x.nb !== n) return;
+      var e = edit.get(kc);
+      if (e && e.nb === n) x.ed = e.divers ? "" : e.texte;
+      communs.push(x);
     });
     var tot = []; par.forEach(function(t){ tot.push(t); });
     tot.sort(function(a, b){ return (a.q ? 0 : 1) - (b.q ? 0 : 1); });
-    var cl = []; classes.forEach(function(n, t){ cl.push([t, n]); });
+    var cl = []; classes.forEach(function(nb, t){ cl.push([t, nb]); });
     cl.sort(function(a, b){ return b[1] - a[1]; });
-    return { totaux: tot, classes: cl };
+    return { n: n, classes: cl, attrs: A, repere: repere, communs: communs, totaux: tot };
   }
   function htmlTotaux(){
     var n = choix.size, h = '<p class="props-vide">' + esc(pluriel(n, "élément sélectionné", "éléments sélectionnés")) + ".</p>";
     if (n > MAX_TOTAUX)
-      return h + '<p class="props-vide">Au-delà de ' + fmtN(MAX_TOTAUX) + " éléments, les totaux ne sont pas calculés ici : exporte le tableau (menu Fichier), il les contient.</p>";
-    var t = totauxSelection();
+      return h + '<p class="props-vide">Au-delà de ' + fmtN(MAX_TOTAUX) + " éléments, les valeurs communes et les totaux ne sont pas calculés ici : exporte le tableau (menu Fichier), il les contient.</p>";
+    var t = analyseSelection(), A = t.attrs, DIVERS = "valeurs différentes";
+    function fixe(dt, v){
+      if (v === "" || v === null) return "";
+      return "<dt>" + esc(dt) + "</dt><dd>" + (v === undefined ? '<span class="props-nb">' + DIVERS + "</span>" : esc(v)) + "</dd>";
+    }
+    function champ(dt, quoi, v){
+      return "<dt>" + esc(dt) + '</dt><dd><input class="pv" ' + quoi + ' data-lib="' + esc(dt) + '" data-v0="' + esc(v || "") + '" value="' + esc(v || "") + '"' +
+        (v === undefined ? ' placeholder="(' + DIVERS + ')"' : "") + ' autocomplete="off" spellcheck="false"></dd>';
+    }
+    function attr(dt, k, cle, permis){ return modeEd && permis ? champ(dt, 'data-attr="' + k + '"', A[cle]) : fixe(dt, A[cle]); }
+    h += '<div class="pset"><div class="pset-nom">En commun</div><dl>' +
+      attr("Nom", 2, "nom", true) + attr("Famille : type", 4, "objectType", true) + attr("Description", 3, "description", true) +
+      attr("Repère", 7, "tag", t.repere) + fixe("Type", A.type) + fixe("Étage", A.etage) + fixe("Matériau", A.materiau) + "</dl></div>";
+    // propriétés présentes sur tous les éléments, par jeu
+    var jeux = new Map();
+    t.communs.forEach(function(x){ var l = jeux.get(x.jeu); if (!l) jeux.set(x.jeu, l = []); l.push(x); });
+    jeux.forEach(function(l, jeu){
+      h += '<div class="pset"><div class="pset-nom">' + esc(jeu) + "</div><dl>" + l.map(function(x){
+        if (modeEd && x.ed !== null) return champ(x.nom, 'data-jeu="' + esc(jeu) + '" data-prop="' + esc(x.nom) + '"', x.divers ? undefined : x.ed);
+        return fixe(x.nom, x.divers ? undefined : x.v === "" ? "—" : x.v);
+      }).join("") + "</dl></div>";
+    });
     h += '<div class="pset"><div class="pset-nom">Par classe</div><dl>' +
       t.classes.map(function(c){ return "<dt>" + esc(c[0]) + "</dt><dd>" + fmtN(c[1]) + "</dd>"; }).join("") + "</dl></div>";
     h += '<div class="pset"><div class="pset-nom">Totaux de la sélection</div><dl>' +
       (t.totaux.length ? t.totaux.map(function(q){
         return "<dt>" + esc(q.titre) + "</dt><dd>" + esc(NB3.format(q.s) + (q.unite ? " " + q.unite : "")) +
-          (q.nb < n ? ' <span class="props-nb">(' + fmtN(q.nb) + " él.)</span>" : "") + "</dd>";
+          (q.nb < t.n ? ' <span class="props-nb">(' + fmtN(q.nb) + " él.)</span>" : "") + "</dd>";
       }).join("") : "<dt>—</dt><dd>Aucune quantité dans ces éléments</dd>") + "</dl></div>";
-    return h + '<p class="ed-note">Longueurs, surfaces, volumes, masses et nombres lus dans l\'IFC, additionnés tels quels. Détail par élément : menu Fichier, « Exporter le tableau ».</p>';
+    return h + '<p class="ed-note">' + (modeEd ? "Une valeur saisie ici s'applique à tous les éléments cochés (Entrée pour valider, Échap pour revenir). " : "") +
+      "Totaux : longueurs, surfaces, volumes, masses et nombres lus dans l'IFC, additionnés tels quels. Détail par élément : menu Fichier, « Exporter le tableau ».</p>";
   }
 
   // Sans argument : le fichier ouvert s'il est seul, sinon tous les fichiers modifiés
@@ -2766,17 +2885,38 @@
       : r.fait ? "Attributs modifiés : " + decrire(cles) + "." + (p && r.ignores ? " " + pluriel(r.ignores, "élément n'a", "éléments n'ont") + " pas la propriété « " + p.nom + " »." : "") + FIN_EDITION
       : "Rien n'a changé.");
   });
-  // Propriétés modifiables dans le panneau (mode Éditeur, un élément) : validées à la sortie du champ ou par Entrée
+  // Propriétés modifiables dans le panneau (mode Éditeur) : validées à la sortie du champ ou par Entrée.
+  // Elles s'appliquent à l'élément affiché, ou à tous les éléments cochés quand le panneau en montre plusieurs.
+  // La modification part juste après l'événement : le champ suivant (Tab) a alors le curseur, on le lui rend
+  // une fois le panneau redessiné, à la même hauteur.
+  function identiteChamp(el){
+    return el && el.classList && el.classList.contains("pv") && $("#props").contains(el) ?
+      [el.getAttribute("data-attr"), el.getAttribute("data-jeu"), el.getAttribute("data-prop")] : null;
+  }
   $("#props").addEventListener("change", function(e){
     var t = e.target;
-    if (!t.classList || !t.classList.contains("pv") || !modeEd || !actif || !existe(actif)) return;
-    var c = actif, r;
-    if (t.hasAttribute("data-attr")){
-      var v = {}; v[t.getAttribute("data-attr")] = t.value;
-      r = editer("modification des attributs", [c], function(f, ids){ return IFCEdition.attributs(f.m, ids, v); });
-    } else r = editer("modification de propriété", [c], function(f, ids){ return IFCEdition.propriete(f.m, ids, t.getAttribute("data-jeu"), t.getAttribute("data-prop"), t.value); });
-    if (r.refuse){ etat("Valeur refusée : elle doit garder son type (nombre, oui/non…)."); afficherProps(); }
-    else if (r.fait) etat("« " + (t.getAttribute("data-prop") || t.getAttribute("data-lib")) + " » modifié." + FIN_EDITION);
+    if (!t.classList || !t.classList.contains("pv") || !modeEd) return;
+    var cibles = choix.size > 1 ? Array.from(choix).filter(existe) : actif && existe(actif) ? [actif] : [];
+    if (!cibles.length) return;
+    var attr = t.getAttribute("data-attr"), jeu = t.getAttribute("data-jeu"), prop = t.getAttribute("data-prop"), lib = t.getAttribute("data-lib"), val = t.value;
+    setTimeout(function(){
+      var z = $("#props"), haut = z.scrollTop, suivant = identiteChamp(document.activeElement), r;
+      cibles = cibles.filter(existe);
+      if (!cibles.length) return;
+      if (attr !== null){
+        var v = {}; v[attr] = val;
+        r = editer("modification des attributs", cibles, function(f, ids){ return IFCEdition.attributs(f.m, ids, v); });
+      } else r = editer("modification de propriété", cibles, function(f, ids){ return IFCEdition.propriete(f.m, ids, jeu, prop, val); });
+      if (r.refuse && !r.fait){ etat("Valeur refusée : elle doit garder son type (nombre, oui/non…)."); afficherProps(); }
+      else if (r.fait) etat("« " + (prop || lib) + " » modifié" + (cibles.length > 1 ? " sur " + pluriel(cibles.length, "élément") : "") + "." + FIN_EDITION);
+      z.scrollTop = haut;
+      if (suivant) [].some.call(z.querySelectorAll("input.pv"), function(x){
+        var id = identiteChamp(x);
+        if (id[0] !== suivant[0] || id[1] !== suivant[1] || id[2] !== suivant[2]) return false;
+        x.focus({ preventScroll: true }); x.select();
+        return true;
+      });
+    }, 0);
   });
   $("#props").addEventListener("keydown", function(e){
     var t = e.target;
@@ -3006,6 +3146,7 @@
       etat("Lecture des prochains fichiers : " + (lecteurVoulu === "rust" ? "module Rust (WebAssembly)." : "lecteur JavaScript.") + " Rouvre le fichier pour comparer les temps.");
     },
     colorer: function(b){ poserColorer(b ? b.getAttribute("data-colorer") : ""); },
+    grouper: function(b){ poserGrouper(b ? b.getAttribute("data-grouper") || "" : ""); },
     mesurer: function(){ outil("mesure"); },
     coordonnees: function(){ outil("point"); },
     "effacer-mesures": function(){ vue.effacerMesures(); etat("Mesures et coordonnées effacées."); maj(); },
@@ -3054,7 +3195,11 @@
       etat(f ? "Boîte de coupe figée : poignées masquées." : "Boîte de coupe libérée : tire les poignées pour la retoucher.");
       maj();
     },
-    "tout-reduire": function(){ fichiers.forEach(function(f){ f.plie = true; }); rendreListe(); },
+    "tout-reduire": function(){
+      // arborescence regroupée : ce sont les groupes qui se replient, les maquettes restent ouvertes
+      if (grouper) groupesListe.forEach(function(gl){ plies.add(gl.cle); }); else fichiers.forEach(function(f){ f.plie = true; });
+      rendreListe();
+    },
     "tout-developper": function(){ fichiers.forEach(function(f){ f.plie = false; }); plies.clear(); rendreListe(); },
     theme: function(b){ if (choisirTheme) choisirTheme(b.getAttribute("data-choix-theme")); },
     moteur: function(b){

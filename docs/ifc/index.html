@@ -369,6 +369,8 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .el-nom{font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el-info{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el.spatial .el-nom{color:var(--texte-doux);font-weight:400}
+.el.groupe{cursor:pointer}
+.el.groupe .el-nom{font-weight:600}
 .el.ouverture{opacity:.62}
 .el.cache .el-nom,.el.cache .el-info{opacity:.42}
 .el.cache .el-nom::after{content:" · masqué";font-family:var(--mono);font-size:10px;color:var(--texte-faible)}
@@ -920,6 +922,11 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <div class="mb-sm">
               <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Arborescence</span><kbd>▸</kbd></button>
               <div class="mb-liste mb-sl" role="menu">
+                <button type="button" role="menuitemradio" data-cmd="grouper" data-grouper="" aria-checked="true"><span>Structure du projet</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="grouper" data-grouper="classe" aria-checked="false"><span>Par classe IFC</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="grouper" data-grouper="type" aria-checked="false"><span>Par famille : type</span><kbd></kbd></button>
+                <button type="button" role="menuitemradio" data-cmd="grouper" data-grouper="materiau" aria-checked="false"><span>Par matériau</span><kbd></kbd></button>
+                <hr>
                 <button type="button" role="menuitem" data-cmd="tout-reduire"><span>Tout réduire</span><kbd></kbd></button>
                 <button type="button" role="menuitem" data-cmd="tout-developper"><span>Tout développer</span><kbd></kbd></button>
               </div>
@@ -1286,7 +1293,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=61"></script>
+<script src="/ifc/ifc-app.js?v=62"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
