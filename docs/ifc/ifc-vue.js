@@ -3724,10 +3724,24 @@
       enSaisie: function(){ return !!saisie; },
       // boîte englobante d'éléments affichés (clés) : { min, max } ou null
       boite: function(cles){ return boiteDe(cles); },
-      // boîte englobante et nombre de faces [min, max, faces] de chaque élément affiché, par clé (comparaison de maquettes)
+      // Par élément affiché (clé) : [min, max, nombre de faces, surface totale, centre de cette surface], pour la
+      // comparaison de maquettes. Surface et centre viennent des triangles : la surface ne dépend ni de la position
+      // ni de l'orientation de l'élément.
       boitesElements: function(){
         var o = new Map();
-        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max, it.geo.faces ? it.geo.faces.length : 0]); });
+        liste.forEach(function(it){
+          var g = it.geo;
+          if (!g || !g.min || !isFinite(g.min[0])) return;
+          var T = triangles(g), aire = 0, cx = 0, cy = 0, cz = 0;
+          for (var k = 0; k + 8 < T.length; k += 9){
+            var ux = T[k+3] - T[k], uy = T[k+4] - T[k+1], uz = T[k+5] - T[k+2], vx = T[k+6] - T[k], vy = T[k+7] - T[k+1], vz = T[k+8] - T[k+2];
+            var a = .5*Math.hypot(uy*vz - uz*vy, uz*vx - ux*vz, ux*vy - uy*vx);
+            aire += a;
+            cx += a*(T[k] + T[k+3] + T[k+6])/3; cy += a*(T[k+1] + T[k+4] + T[k+7])/3; cz += a*(T[k+2] + T[k+5] + T[k+8])/3;
+          }
+          var c = aire > 0 ? [cx/aire, cy/aire, cz/aire] : [(g.min[0] + g.max[0])/2, (g.min[1] + g.max[1])/2, (g.min[2] + g.max[2])/2];
+          o.set(it.id, [g.min, g.max, g.faces ? g.faces.length : 0, aire, c]);
+        });
         return o;
       },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },

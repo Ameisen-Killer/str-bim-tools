@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.13.1";
+  var VERSION = "1.14.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -2653,6 +2653,7 @@
     $("#cfg-grouper").value = grouper;
     $("#cfg-tol-dep").value = nombreMm(optsDiff.tolDep);
     $("#cfg-tol-dim").value = nombreMm(optsDiff.tolDim);
+    $("#cfg-tol-rappr").value = nombreMm(optsDiff.tolRappr);
   }
   $("#preferences").addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest("[data-config]");
@@ -2691,7 +2692,7 @@
     });
   });
   // tolérances de la comparaison, en millimètres (virgule ou point) ; une saisie illisible remet la valeur gardée
-  [["cfg-tol-dep", "tolDep"], ["cfg-tol-dim", "tolDim"]].forEach(function(x){
+  [["cfg-tol-dep", "tolDep"], ["cfg-tol-dim", "tolDim"], ["cfg-tol-rappr", "tolRappr"]].forEach(function(x){
     $("#" + x[0]).addEventListener("change", function(){
       var v = parseFloat(this.value.replace(/\s/g, "").replace(",", "."));
       if (isFinite(v) && v >= 0 && v <= 100000){ optsDiff[x[1]] = v; garder("ifc.diff", JSON.stringify(optsDiff)); }
@@ -2731,7 +2732,7 @@
       return;
     }
     if (pageConfig === "comparaison"){
-      optsDiff.tolDep = TOL_DIFF; optsDiff.tolDim = TOL_DIFF;
+      optsDiff.tolDep = TOL_DIFF; optsDiff.tolDim = TOL_DIFF; optsDiff.tolRappr = RAPPR_DIFF;
       garder("ifc.diff", JSON.stringify(optsDiff));
       remplirConfig();
       return;
@@ -3444,18 +3445,18 @@
   var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", donnees: "Données modifiées", recree: "Recréé", pareil: "Inchangé" };
   var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Données modifiées": 180, "Recréé": 280 };
   // tolérances en millimètres (fenêtre Configuration) : déplacement du centre, changement d'un côté de l'encombrement
-  var TOL_DIFF = .5;
+  var TOL_DIFF = .5, RAPPR_DIFF = 2000;      // RAPPR_DIFF : distance maximale entre un supprimé et un ajouté rapprochés
   var optsDiff = (function(){
-    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF }, v = null;
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF, tolRappr: RAPPR_DIFF }, v = null;
     try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
     if (v && typeof v === "object"){
       ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
-      ["tolDep", "tolDim"].forEach(function(k){ if (typeof v[k] === "number" && isFinite(v[k]) && v[k] >= 0 && v[k] <= 100000) d[k] = v[k]; });
+      ["tolDep", "tolDim", "tolRappr"].forEach(function(k){ if (typeof v[k] === "number" && isFinite(v[k]) && v[k] >= 0 && v[k] <= 100000) d[k] = v[k]; });
       if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
     }
     return d;
   })();
-  var GEO_DIFF = "Géométrie (encombrement X × Y × Z)", DEP_DIFF = "Déplacement";
+  var GEO_DIFF = "Géométrie (encombrement X × Y × Z, surface)", DEP_DIFF = "Déplacement";
   function ficheComparaison(l, boites, O, ignores){
     var m = l.f.m, i = l.i, o = new Map();
     function garde(k){ var s = sansAccent(k); return !ignores.some(function(x){ return s.indexOf(x) >= 0; }); }
@@ -3468,26 +3469,49 @@
       var k = d.jeu + " · " + d.nom;
       if (!o.has(k)) mets(k, typeof d.v === "number" ? NB3.format(Number(d.v.toPrecision(9))) + (d.unite ? " " + d.unite : "") : d.v);
     });
-    return { o: o, b: O.geo ? boites.get(l.cle) || null : null };
+    // placement IFC de l'élément (repère du fichier) ; un élément sans IfcLocalPlacement n'en a pas
+    var pl = null;
+    if (O.geo){ var pid = IFC.idRef(IFC.champs(m.ent.get(l.id))[5]), pe = pid ? m.ent.get(pid) : null; if (pe && pe.type === "IFCLOCALPLACEMENT") pl = IFCEdition.monde(m, pid); }
+    return { o: o, b: O.geo ? boites.get(l.cle) || null : null, pl: pl };
   }
   // [{ k, a, b }] : ce qui diffère de la fiche a (ancienne) à la fiche b (nouvelle)
-  // U : { nom : unité de longueur du fichier, seuilDep et seuilDim : tolérances de déplacement et de dimensions,
-  // dans cette unité }
+  // U : { nom : unité de longueur du fichier ; seuilDep, seuilDim : tolérances de déplacement et de dimensions dans
+  // cette unité ; seuilRot : rotation en degrés à partir de laquelle l'élément a tourné }
+  // Géométrie d'une fiche : b = [min, max, faces, surface, centre de la surface] (éléments dessinés), pl = placement
+  // IFC de l'élément dans le repère du fichier (axes X, Y, Z puis origine), ou null.
+  // - La forme est jugée sur la surface totale de l'élément, qui ne change ni quand on le déplace ni quand on le
+  //   tourne : surface différente = « Modifié ».
+  // - À forme égale, l'élément est « Déplacé » si le centre de sa surface a bougé, si son placement IFC a tourné,
+  //   ou si son encombrement a changé (tourné sans que le placement le dise).
+  // - Sans géométrie dessinée, le placement IFC décide seul.
+  function ecartPlacement(pa, pb){
+    if (!pa || !pb) return null;
+    var t = [pb[9] - pa[9], pb[10] - pa[10], pb[11] - pa[11]], tr = 0;
+    for (var k = 0; k < 9; k++) tr += pa[k]*pb[k];           // trace de Rb·Raᵀ : somme des produits des axes homologues
+    return { t: t, d: Math.hypot(t[0], t[1], t[2]), ang: Math.acos(Math.max(-1, Math.min(1, (tr - 1)/2)))*180/Math.PI };
+  }
+  function texteDeplacement(v, dist, un){
+    return NB3.format(dist) + un + " (ΔX " + NB3.format(v[0]) + " ; ΔY " + NB3.format(v[1]) + " ; ΔZ " + NB3.format(v[2]) + ")";
+  }
   function differences(a, b, U){
-    var quoi = [];
+    var quoi = [], un = U.nom ? " " + U.nom : "", P = ecartPlacement(a.pl, b.pl), tourne = !!P && P.ang > U.seuilRot;
     if (a.b && b.b){
-      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), base = 1e-6*d + 1e-9, tol = Math.max(base, U.seuilDep), tolDim = Math.max(base, U.seuilDim);
-      // encombrement (côtés de la boîte englobante) et centre : même encombrement ailleurs = élément déplacé
-      var taille = false, dep = [0, 0, 0];
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), base = 1e-6*d + 1e-9;
+      var tol = Math.max(base, U.seuilDep), tolDim = Math.max(base, U.seuilDim);
+      var sa = a.b[3], sb = b.b[3], sm = Math.max(sa, sb), forme = Math.abs(sa - sb) > Math.max(1e-6*sm, tolDim*Math.sqrt(sm));
+      var cotes = false, dep = [0, 0, 0];
       for (var k = 0; k < 3; k++){
-        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tolDim) taille = true;
-        dep[k] = (b.b[0][k] + b.b[1][k])/2 - (a.b[0][k] + a.b[1][k])/2;
+        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tolDim) cotes = true;
+        dep[k] = b.b[4][k] - a.b[4][k];
       }
-      var dist = Math.hypot(dep[0], dep[1], dep[2]), un = U.nom ? " " + U.nom : "";
-      if (dist > tol && !taille) quoi.push({ k: DEP_DIFF, a: "", b: NB3.format(dist) + un + " (ΔX " + NB3.format(dep[0]) + " ; ΔY " + NB3.format(dep[1]) + " ; ΔZ " + NB3.format(dep[2]) + ")" });
-      else if (taille) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b, un), b: texteBoite(b.b, un) + (dist > tol ? ", centre déplacé de " + NB3.format(dist) + un : "") });
-      else if (a.b[2] !== b.b[2]) quoi.push({ k: GEO_DIFF, a: fmtN(a.b[2]) + " faces", b: fmtN(b.b[2]) + " faces" });
+      var dist = Math.hypot(dep[0], dep[1], dep[2]);
+      if (forme) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b, un) + ", surface " + NB3.format(sa), b: texteBoite(b.b, un) + ", surface " + NB3.format(sb) +
+        (dist > tol ? ", centre déplacé de " + NB3.format(dist) + un : "") });
+      else if (dist > tol || tourne || cotes) quoi.push({ k: DEP_DIFF, a: "", b: (dist > tol ? texteDeplacement(dep, dist, un) : "sur place") +
+        (tourne ? ", rotation de " + NB3.format(P.ang) + "°" : cotes ? ", orientation changée" : "") });
     }
+    else if (P && (P.d > U.seuilDep || tourne)) quoi.push({ k: DEP_DIFF, a: "", b: (P.d > U.seuilDep ? texteDeplacement(P.t, P.d, un) : "sur place") +
+      (tourne ? ", rotation de " + NB3.format(P.ang) + "°" : "") + " (placement IFC, géométrie non dessinée)" });
     a.o.forEach(function(v, k){ var w = b.o.has(k) ? b.o.get(k) : null; if (w !== v) quoi.push({ k: k, a: v, b: w === null ? "(absent)" : w }); });
     b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push({ k: k, a: "(absent)", b: v }); });
     return quoi;
@@ -3496,11 +3520,12 @@
   function texteBoite(b, un){
     return [0, 1, 2].map(function(k){ return NB3.format(b[1][k] - b[0][k]); }).join(" × ") + (un || "");
   }
-  // rapprochement d'un supprimé et d'un ajouté : même classe, même boîte englobante (à 7 chiffres près)
+  // Rapprochement d'un supprimé et d'un ajouté (élément redessiné, son GlobalId a changé) : même classe et même
+  // surface à 5 chiffres près ; le plus proche l'emporte, dans la limite de la distance de rapprochement.
   function empreinteForme(l, boites){
     var b = boites.get(l.cle);
-    if (!b) return "";
-    return l.i.type + "|" + b[0].concat(b[1]).map(function(v){ return Number(v.toPrecision(7)); }).join(",");
+    if (!b || !(b[3] > 0)) return "";
+    return l.i.type + "|" + Number(b[3].toPrecision(5));
   }
   function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
@@ -3544,15 +3569,17 @@
     finEvidence();
     // tolérances de la fenêtre Configuration (millimètres), ramenées à l'unité du fichier
     var parMm = A.unite && A.unite.f > 0 ? .001/A.unite.f : 0;
-    var U = { nom: A.unite && A.unite.nom || "", seuilDep: O.tolDep*parMm, seuilDim: O.tolDim*parMm };
-    function compare(la, fa, lb, etatSi){
+    var U = { nom: A.unite && A.unite.nom || "", seuilDep: O.tolDep*parMm, seuilDim: O.tolDim*parMm, seuilRappr: O.tolRappr*parMm, seuilRot: .05 };
+    // recree : paire rapprochée sans GlobalId commun (élément redessiné)
+    function compare(la, fa, lb, recree){
       var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
+      if (recree) d.push({ k: "GlobalId", a: la.i.globalId, b: lb.i.globalId });
       // la géométrie d'abord : déplacé, sinon modifié ; des données seules qui diffèrent font un état à part
       var bouge = d.some(function(x){ return x.k === DEP_DIFF; }), forme = d.some(function(x){ return x.k === GEO_DIFF; });
-      var genreDiff = bouge ? "deplace" : forme ? "modifie" : d.length ? "donnees" : "pareil", e = etatSi || ETATS_DIFF[genreDiff];
-      if (!etatSi) n[genreDiff]++;
+      var genreDiff = bouge ? "deplace" : forme ? "modifie" : recree ? "recree" : d.length ? "donnees" : "pareil", e = ETATS_DIFF[genreDiff];
+      n[genreDiff]++;
       de.set(la.cle, e); de.set(lb.cle, e);
-      if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
+      if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ if (x.k !== "GlobalId") freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
       var paire = { e: e, a: la, b: lb, d: d };
       paires.push(paire); paireDe.set(la.cle, paire); paireDe.set(lb.cle, paire);
       return d.length;
@@ -3569,7 +3596,7 @@
       if (!x){ ajoutes.push(l); return; }
       compare(x.l, x.f, l);
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
-      // supprimés et ajoutés de même classe et de même encombrement : un élément redessiné
+      // supprimés et ajoutés de même classe et de même forme : un élément redessiné, resté en place ou déplacé
       var orphelins = new Map();
       parGid.forEach(function(x, gid){
         if (vusB.has(gid)) return;
@@ -3578,8 +3605,19 @@
         var t = orphelins.get(k); if (!t) orphelins.set(k, t = []); t.push(x);
       });
       ajoutes.forEach(function(l){
-        var k = O.geo ? empreinteForme(l, boites) : "", t = k ? orphelins.get(k) : null, x = t && t.length ? t.shift() : null;
-        if (x){ compare(x.l, x.f, l, ETATS_DIFF.recree); n.recree++; }
+        var k = O.geo ? empreinteForme(l, boites) : "", t = k ? orphelins.get(k) : null, x = null;
+        if (t && t.length){
+          // le supprimé de même forme le plus proche, s'il est à portée
+          var cb = boites.get(l.cle)[4], mieux = -1, dm = U.seuilRappr;
+          t.forEach(function(y, q){
+            var ca = y.f.b && y.f.b[4];
+            if (!ca) return;
+            var dd = Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2]);
+            if (dd <= dm){ dm = dd; mieux = q; }
+          });
+          if (mieux >= 0) x = t.splice(mieux, 1)[0];
+        }
+        if (x) compare(x.l, x.f, l, true);
         else { de.set(l.cle, ETATS_DIFF.ajoute); paires.push({ e: ETATS_DIFF.ajoute, a: null, b: l, d: [] }); n.ajoute++; }
       });
       orphelins.forEach(function(t){ t.forEach(function(x){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; }); });
@@ -3650,7 +3688,7 @@
         if (x.k === DEP_DIFF) return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.b) + "</dd>";      // une seule valeur : la distance
         return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
       }).join("") + (q.length > MAX ? "<dt>…</dt><dd>" + fmtN(q.length - MAX) + " autres différences (voir le rapport)</dd>" : "")
-        : "<dt>État</dt><dd>" + esc(e === ETATS_DIFF.pareil ? "Aucune différence sur ce qui est comparé" : e === ETATS_DIFF.recree ? "Même forme au même endroit, GlobalId différent" : e) + "</dd>") + "</dl></div>";
+        : "<dt>État</dt><dd>" + esc(e === ETATS_DIFF.pareil ? "Aucune différence sur ce qui est comparé" : e) + "</dd>") + "</dl></div>";
   }
   // Rapport Excel : une ligne par différence (une seule pour un élément ajouté, supprimé ou recréé sans écart)
   function exporterRapportComparaison(){

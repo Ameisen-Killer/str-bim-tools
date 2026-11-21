@@ -1297,7 +1297,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <legend>Tolérances</legend>
             <label><span>Déplacement</span><input class="champ" id="cfg-tol-dep" inputmode="decimal" autocomplete="off" aria-describedby="cfg-tol-note"></label>
             <label><span>Dimensions</span><input class="champ" id="cfg-tol-dim" inputmode="decimal" autocomplete="off" aria-describedby="cfg-tol-note"></label>
-            <p class="pref-note" id="cfg-tol-note">En millimètres. Un élément est « Déplacé » si son centre bouge de plus que la première valeur, sans changer d'encombrement ; ses dimensions sont « modifiées » si un côté de son encombrement change de plus que la seconde.</p>
+            <label><span>Rapprochement</span><input class="champ" id="cfg-tol-rappr" inputmode="decimal" autocomplete="off" aria-describedby="cfg-tol-note"></label>
+            <p class="pref-note" id="cfg-tol-note">En millimètres. Déplacement : distance à partir de laquelle un élément de même forme est « Déplacé ». Dimensions : écart à partir duquel sa forme est « Modifiée ». Rapprochement : distance maximale entre un élément supprimé et un élément ajouté de même classe et de même forme pour les tenir pour le même élément, redessiné (GlobalId différent).</p>
             <p class="pref-note">Pris en compte à la prochaine comparaison (Outils › Comparer les deux maquettes).</p>
           </fieldset>
         </section>
@@ -1350,12 +1351,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
 <script src="/ifc/ifc-core.js?v=15"></script>
-<script src="/ifc/ifc-vue.js?v=53"></script>
+<script src="/ifc/ifc-vue.js?v=54"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=77"></script>
+<script src="/ifc/ifc-app.js?v=78"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
