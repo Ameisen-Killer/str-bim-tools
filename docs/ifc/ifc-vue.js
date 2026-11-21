@@ -523,11 +523,23 @@
     if (!c || c.length < 2 || !(r > 0)) return;
     var W = c.map(function(p){ var o = [0,0,0]; tp(M, p[0], p[1], p[2], o, 0); return o; });
     var echelle = Math.hypot(M[0], M[1], M[2]) || 1;
-    for (var i = 0; i + 1 < W.length; i++){
-      var p = W[i], q = W[i + 1], d = norm([q[0]-p[0], q[1]-p[1], q[2]-p[2]]);
+    // direction de chaque segment (null : points confondus)
+    var D = [], Rr = r*echelle;
+    for (var i = 0; i + 1 < W.length; i++) D.push(norm([W[i+1][0]-W[i][0], W[i+1][1]-W[i][1], W[i+1][2]-W[i][2]]));
+    // à un coude, chaque segment est prolongé de R·tan(angle/2) (au plus R) : les deux tubes se rejoignent côté
+    // extérieur au lieu de laisser un coin ouvert
+    function rallonge(a, b){
+      if (!a || !b) return 0;
+      var c = Math.max(-1, Math.min(1, dot(a, b)));
+      return c > .999999 ? 0 : Math.min(Rr, Rr*Math.sqrt((1 - c)/(1 + c + 1e-12)));
+    }
+    for (i = 0; i + 1 < W.length; i++){
+      var p = W[i], q = W[i + 1], d = D[i];
       if (!d) continue;
-      var T = repere(p, d, null), l = Math.hypot(q[0]-p[0], q[1]-p[1], q[2]-p[2]);
-      extruder([cercle(r*echelle, r*echelle, 8)], T, [0, 0, l], out);
+      var avant = i > 0 ? rallonge(D[i - 1], d) : 0, apres = i + 1 < D.length ? rallonge(d, D[i + 1]) : 0;
+      var l = Math.hypot(q[0]-p[0], q[1]-p[1], q[2]-p[2]);
+      var T = repere(avant ? [p[0] - d[0]*avant, p[1] - d[1]*avant, p[2] - d[2]*avant] : p, d, null);
+      extruder([cercle(Rr, Rr, 8)], T, [0, 0, l + avant + apres], out);
     }
   }
   // Faces triangulées et polygonales (IFC4)
@@ -1854,6 +1866,7 @@
     }
     var P = {}, B = {}, nTri = 0, nLig = 0, plages = [], boites = null, morceaux = null, fermes = [], origine = [0,0,0], fbo = null, coupe = null, kad = [214, 168, 92, 190], krouge = [200, 46, 40];
     var indexLarge = false;      // index sur 32 bits permis ; déclaré avant init(), qui le règle
+    var versionIds = 0;          // monte à chaque rechargement des tampons (voir viser)
     function init(){
       P.faces = programme(SOURCES.vFaces, SOURCES.fFaces, ["aP", "aN", "aC"]);
       P.lignes = programme(SOURCES.vLignes, SOURCES.fLignes, ["aP", null, "aC"]);
@@ -1944,6 +1957,8 @@
       remplir(B.pos, pos); remplir(B.nor, nor); remplir(B.ids, ids); remplir(B.lpos, lpos);
       remplir(B.col, new Uint8Array(3*nv), gl.DYNAMIC_DRAW);
       remplir(B.lcol, new Uint8Array(4*nl), gl.DYNAMIC_DRAW);
+      teint = null;            // tampons de couleur refaits : la prochaine teinte les remplit en entier
+      versionIds++;            // et l'image d'identifiants gardée pour la visée ne vaut plus
       indexerGros(nv);
       if (coupe) poserCoupe(coupe);
     }
@@ -1994,12 +2009,15 @@
         if (src[a][1] < fermes[b][1]) a++; else b++;
       }
     }
+    // Couleurs par élément. Quand seule la sélection (ou l'élément actif) change, seules les plages des éléments
+    // touchés sont recalculées et renvoyées à la carte ; tout le reste (autre liste, autres couleurs, filaire,
+    // trop d'éléments d'un coup) repasse par le remplissage complet.
+    var teint = null, MAX_RETOUCHES = 1500;
     function teinter(liste, sel, actif, coul){
       kad = coul.cadreRGBA; krouge = coul.coupeRGB;
-      var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
       var P1 = coul.piece, ar = coul.areteRGBA, aro = coul.areteOrRGBA, act = coul.actifRGBA, fil = !!coul.filaire;
-      liste.forEach(function(it, e){
-        var pl = plages[e];
+      function peindre(e, col, lcol){
+        var it = liste[e], pl = plages[e];
         if (!pl) return;
         var t = it.h != null ? coul.pastel(it.h) : null;
         // contour doré seulement pour la sélection ; l'élément actif non sélectionné garde un contour neutre renforcé
@@ -2007,9 +2025,33 @@
         for (var v = pl[0]; v < pl[1]; v++){ col[3*v] = c[0]; col[3*v+1] = c[1]; col[3*v+2] = c[2]; }
         var la = fil ? alphaFil(l[3]) : l[3];
         for (var w = pl[2]; w < pl[3]; w++){ lcol[4*w] = l[0]; lcol[4*w+1] = l[1]; lcol[4*w+2] = l[2]; lcol[4*w+3] = la; }
-      });
+      }
+      var T = teint;
+      if (T && T.liste === liste && T.coul === coul && T.fil === fil && T.col.length === 3*nTri && T.lcol.length === 4*nLig){
+        // éléments dont l'état a changé : entrés ou sortis de la sélection, ancien et nouvel élément actif
+        var touches = new Set(), trop = false;
+        T.sel.forEach(function(id){ if (!sel.has(id)) touches.add(id); });
+        sel.forEach(function(id){ if (!T.sel.has(id)) touches.add(id); });
+        if (T.actif !== actif){ touches.add(T.actif); touches.add(actif); }
+        if (touches.size > MAX_RETOUCHES) trop = true;
+        if (!trop){
+          if (!T.rang){ T.rang = new Map(); liste.forEach(function(it, e){ T.rang.set(it.id, e); }); }
+          touches.forEach(function(id){
+            var e = T.rang.get(id), pl = e === undefined ? null : plages[e];
+            if (!pl) return;
+            peindre(e, T.col, T.lcol);
+            if (pl[1] > pl[0]){ gl.bindBuffer(gl.ARRAY_BUFFER, B.col); gl.bufferSubData(gl.ARRAY_BUFFER, 3*pl[0], T.col.subarray(3*pl[0], 3*pl[1])); }
+            if (pl[3] > pl[2]){ gl.bindBuffer(gl.ARRAY_BUFFER, B.lcol); gl.bufferSubData(gl.ARRAY_BUFFER, 4*pl[2], T.lcol.subarray(4*pl[2], 4*pl[3])); }
+          });
+          T.sel = new Set(sel); T.actif = actif;
+          return;
+        }
+      }
+      var col = new Uint8Array(3*nTri), lcol = new Uint8Array(4*nLig);
+      for (var e = 0; e < liste.length; e++) peindre(e, col, lcol);
       remplir(B.col, col, gl.DYNAMIC_DRAW);
       remplir(B.lcol, lcol, gl.DYNAMIC_DRAW);
+      teint = { liste: liste, coul: coul, fil: fil, col: col, lcol: lcol, sel: new Set(sel), actif: actif, rang: null };
     }
 
     function matrice(c){ return matriceVue(c, origine); }
@@ -2166,13 +2208,20 @@
         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, fbo.r);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.f);
-      gl.viewport(0, 0, w, h);
-      gl.disable(gl.BLEND);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthFunc(gl.LEQUAL);
-      faces(c, P.id, B.ids);
+      // L'image d'identifiants reste bonne tant que rien de ce qui la dessine n'a changé (éléments, caméra,
+      // taille, boîte de coupe) : une visée de plus au même endroit (mesure, clics répétés) ne fait que la lire.
+      var vu = [versionIds, w, h, c.W, c.H, c.ca, c.sa, c.cb, c.sb, c.s, c.px, c.py, c.dpr, c.centre[0], c.centre[1], c.centre[2], c.prof, origine[0], origine[1], origine[2],
+        coupe ? [coupe.a || 0].concat(coupe.min, coupe.max).join(",") : ""].join("|");
+      if (fbo.vu !== vu){
+        gl.viewport(0, 0, w, h);
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        faces(c, P.id, B.ids);
+        fbo.vu = vu;
+      }
       var px = new Uint8Array(4), X = Math.round(x*c.dpr), Y = Math.round(h - y*c.dpr - 1);
       if (X >= 0 && Y >= 0 && X < w && Y < h) gl.readPixels(X, Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -3419,7 +3468,7 @@
           var G = Gs.get(it.m), g = null, rgb = null;
           if (G && source === "externe" && G.externe){ g = G.externe.geos.get(it.id) || null; if (g) rgb = G.externe.teintes.get(it.id) || null; }
           if (G && !g) g = G.attente && !G.cache.has(it.id) ? null : geometrie(G, it.id);
-          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb, m: it.m, e: it.id }); nbFaces += g.faces.length; }
+          if (g){ liste.push({ id: it.cle, geo: g, h: it.h, rgb: rgb || it.rgb || null, m: it.m, e: it.id }); nbFaces += g.faces.length; }
         });
         // origine fixée au premier affichage (précision des coordonnées en float32) ; profondeur élargie au besoin
         var b = boite();
@@ -3443,6 +3492,26 @@
       // cube de navigation : orientation actuelle, vue animée vers une orientation, rotation libre au glisser
       // (dl, dp en radians, image allégée jusqu'à finTourner), lissage des bords
       angles: function(){ return { lacet: yaw, plongee: pitch }; },
+      // Vue enregistrée : caméra (décalage rapporté à la taille de la vue) et boîte de coupe, à rendre à poserVue
+      etatVue: function(){
+        var d = Math.min(W, H) || 1;
+        return { lacet: yaw, plongee: pitch, zoom: zoom, dx: px/d, dy: py/d, centre: centre.slice(), rayon: rayon,
+          coupe: coupe ? { a: coupe.a || 0, min: coupe.min.slice(), max: coupe.max.slice() } : null, fige: fige, cadre: !cadreMasque };
+      },
+      poserVue: function(v){
+        function trois(t){ return Array.isArray(t) && t.length === 3 && t.every(function(x){ return typeof x === "number" && isFinite(x); }); }
+        if (!v || !trois(v.centre) || !(v.rayon > 0) || !(v.zoom > 0) || !isFinite(v.lacet) || !isFinite(v.plongee)) return false;
+        var d = Math.min(W, H) || 1, c = v.coupe;
+        anim = null;
+        yaw = v.lacet; pitch = Math.max(-DEMI_PI, Math.min(DEMI_PI, v.plongee));
+        zoom = v.zoom; rayon = v.rayon; centre = v.centre.slice();
+        px = (isFinite(v.dx) ? v.dx : 0)*d; py = (isFinite(v.dy) ? v.dy : 0)*d;
+        coupe = c && trois(c.min) && trois(c.max) ? { a: isFinite(c.a) ? c.a : 0, min: c.min.slice(), max: c.max.slice() } : null;
+        fige = !!v.fige && !!coupe; cadreMasque = v.cadre === false && !!coupe;
+        M.coupe(coupe);
+        demander();
+        return true;
+      },
       // Image de la vue telle qu'affichée, sur le fond de la page : un canvas 2D, ou null si la vue est vide.
       // Le dessin et la copie se font dans la foulée (le tampon WebGL n'est pas gardé d'une image à l'autre).
       image: function(){
@@ -3655,13 +3724,18 @@
       enSaisie: function(){ return !!saisie; },
       // boîte englobante d'éléments affichés (clés) : { min, max } ou null
       boite: function(cles){ return boiteDe(cles); },
-      // boîte englobante [min, max] de chaque élément affiché, par clé (comparaison de maquettes)
+      // boîte englobante et nombre de faces [min, max, faces] de chaque élément affiché, par clé (comparaison de maquettes)
       boitesElements: function(){
         var o = new Map();
-        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max]); });
+        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max, it.geo.faces ? it.geo.faces.length : 0]); });
         return o;
       },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
+      // cote posée par la page entre deux points du modèle (déplacement d'un élément entre deux maquettes)
+      cote: function(pa, pb){
+        mesure.liste.push({ a: { p: pa.slice(), type: "sommet" }, b: { p: pb.slice(), type: "sommet" } });
+        demander();
+      },
       effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
       // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }
       formats: function(f){ formats = f; demander(); },

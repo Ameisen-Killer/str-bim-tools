@@ -4,7 +4,14 @@
 // copie) ou { erreur, ifc }. Aucune requête réseau hors de ce site : le fichier ne quitte pas le navigateur.
 // lecteur "rust" : découpe par le module WebAssembly compilé depuis Rust (ifc-lecteur.wasm, source
 // outils/ifc-rust), plusieurs fois plus rapide ; le lecteur JavaScript reprend la main s'il manque ou échoue.
-importScripts("/ifc/ifc-core.js?v=14");
+// Les versions d'ifc-core.js vient de la page, dans l'adresse du worker (?core=…) :
+// le worker charge ainsi toujours le même code qu'elle, sans numéro à tenir à jour ici.
+var VERSIONS = (function(){
+  var o = {};
+  (self.location.search || "").replace(/^\?/, "").split("&").forEach(function(x){ var k = x.split("="); if (/^\d+$/.test(k[1] || "")) o[k[0]] = k[1]; });
+  return o;
+})();
+importScripts("/ifc/ifc-core.js?v=" + (VERSIONS.core || "0"));
 
 var module = null, rapport = null;
 function chargerRust(){

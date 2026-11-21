@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.7.0";
+  var VERSION = "1.11.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -276,7 +276,14 @@
   }
   // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
   // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé.
-  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=10", chaud = null;
+  // Numéros de version : un seul endroit, les balises <script> d'index.html. Les workers reçoivent dans leur
+  // adresse la version de la page (pour être rechargés à chaque publication) et celles du code qu'ils importent.
+  function versionScript(nom){
+    var sc = document.querySelector('script[src*="' + nom + '"]'), v = sc && /[?&]v=(\d+)/.exec(sc.getAttribute("src"));
+    return v ? v[1] : "0";
+  }
+  var V_APP = versionScript("ifc-app.js"), V_CORE = versionScript("ifc-core.js"), V_VUE = versionScript("ifc-vue.js");
+  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=" + V_APP + "&core=" + V_CORE, chaud = null;
   function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
   function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
   if (avecWorker) setTimeout(function(){
@@ -560,7 +567,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=6";
+  var URL_GEO = "/ifc/ifc-geo.js?v=" + V_APP + "&core=" + V_CORE + "&vue=" + V_VUE;
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1318,6 +1325,8 @@
   function neufs(f){ if (!f.neufs) f.neufs = neufsDe(f.m); return f.neufs; }
   // teinte d'un élément : celle de sa phase si elle est choisie, sinon celle de la maquette
   function teinteElement(f, id){
+    // mise en évidence d'un élément comparé : ancien état en rouge, nouvel état en vert, voisinage neutre
+    if (diffFocus){ var cf = cle(f, id); return cf === diffFocus.a ? 0 : cf === diffFocus.b ? 130 : null; }
     if (teintesCat){ var hc = teintesCat.get(cle(f, id)); return hc === undefined ? null : hc; }
     var p = f.phases;
     if (p){ var t = neufs(f).has(id) ? p.neuf : p.existant; if (t !== undefined) return t; }
@@ -1478,6 +1487,29 @@
     if (b) b.focus({ preventScroll: true });
   }
   function fermerCtx(){ if (!ctx.hidden){ ctx.hidden = true; cible = null; } }
+  // Clavier dans la liste (une fois cliquée ou atteinte par Tab) : flèches pour passer d'un élément à l'autre,
+  // Début et Fin, Espace pour cocher ou décocher l'élément affiché (Maj + flèche : coche en avançant)
+  $("#liste").addEventListener("keydown", function(e){
+    if (e.target !== this || e.ctrlKey || e.metaKey || e.altKey) return;
+    var haut = e.key === "ArrowUp", bas = e.key === "ArrowDown";
+    if (e.key === " " || e.key === "Spacebar"){
+      e.preventDefault();
+      if (!actif || !existe(actif) || !supprimable(actif)) return;
+      cocher(actif, !choix.has(actif));
+      dernierCoche = actif;
+      majLignes(); afficherProps(); maj();
+      return;
+    }
+    if (!haut && !bas && e.key !== "Home" && e.key !== "End") return;
+    var els = [];
+    rangs.forEach(function(r){ if (r.l) els.push(r.l.cle); });
+    if (!els.length) return;
+    e.preventDefault();
+    var k = els.indexOf(actif);
+    k = e.key === "Home" ? 0 : e.key === "End" ? els.length - 1 : k < 0 ? (bas ? 0 : els.length - 1) : Math.max(0, Math.min(els.length - 1, k + (bas ? 1 : -1)));
+    if (e.shiftKey && (haut || bas) && supprimable(els[k])){ cocher(els[k], true); dernierCoche = els[k]; }
+    activer(els[k], true);
+  });
   $("#liste").addEventListener("contextmenu", function(e){
     var fic = e.target.closest(".fic"), r = e.target.closest(".el"), k = -1;
     if (fic){ var f = parUid.get(+fic.getAttribute("data-fic")); if (f) k = indexFichier(f); }
@@ -1663,7 +1695,7 @@
     activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
     activerCmd("isoler", n > 0 || a);
-    activerCmd("tout-afficher", caches.size > 0);
+    activerCmd("tout-afficher", caches.size > 0 || !!diffFocus);
     activerCmd("zoomer", n > 0 || a);
     activerCmd("coupe", n > 0 || a);
     activerCmd("sans-coupe", vue.aCoupe());
@@ -1684,6 +1716,13 @@
     var mo = vue.moteur();
     [].forEach.call(document.querySelectorAll("[data-moteur]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-moteur") === mo)); });
     [].forEach.call(document.querySelectorAll("[data-geo]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-geo") === geoVoulue)); });
+    var dv = $('[data-dyn="vues"]'), lv = vuesEnregistrees();
+    if (dv) dv.innerHTML = lv.map(function(v, k){
+      return '<button type="button" role="menuitem" data-cmd="vue-rappel" data-k="' + k + '"><span>' + esc(v.nom) + "</span><kbd></kbd></button>";
+    }).join("") + (lv.length ? '<button type="button" role="menuitem" data-cmd="vues-oublier"><span>Supprimer les vues enregistrées…</span><kbd></kbd></button>' : "");
+    activerCmd("vue-enregistrer", fichiers.length > 0);
+    activerCmd("exporter-selection", choix.size > 0);
+    activerCmd("rapport-comparaison", !!diffPaires && colorer === "diff");
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
       return '<button type="button" role="menuitem" data-cmd="exporter-fichier" data-uid="' + f.uid + '"><span>Exporter « ' + esc(f.m.nom) + " »</span><kbd>" + (modifie(f) ? "modifié" : "") + "</kbd></button>";
@@ -1869,7 +1908,7 @@
     etat("Annulé : " + h.txt + " (" + pluriel(h.e, "entité remise", "entités remises") + ").");
   }
   function retablir(){
-    if (!aRefaire.length) return;
+    if (!aRefaire.length || occupe()) return;
     var h = aRefaire.pop();
     h.parts.forEach(function(p){ IFC.appliquer(p.f.m, p.ch); });
     var geo = relire(h.parts);
@@ -1895,6 +1934,56 @@
         ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length) + (zip ? ", compressé " + fmtTaille(blob.size) : "");
     });
   }
+  // ================= Export de la sélection seule =================
+  // Un IFC qui ne contient que les éléments cochés (avec leurs enfants d'assemblage, leurs ouvertures, leurs
+  // assemblages parents et, pour une ouverture, son hôte), la structure spatiale et ce dont ils dépendent. Le
+  // reste est retiré comme par une suppression, le fichier est écrit, puis tout est remis : la maquette ouverte
+  // et son historique ne changent pas.
+  function exporterSelection(){
+    if (occupe()) return;
+    var parF = groupesFichiers(Array.from(choix).filter(existe));
+    if (!parF.size){ etat("Export de la sélection : coche d'abord les éléments à garder."); return; }
+    var bilans = [], suite = Promise.resolve(), rang = 0;
+    parF.forEach(function(ids, f){
+      var k = rang++;
+      suite = suite.then(function(){ return k ? pause(400) : null; }).then(function(){
+        var m = f.m, I = IFC.index(m), garde = new Set(), faits = [];
+        ids.forEach(function(id){
+          garde.add(id);
+          IFC.descendants(m, id).forEach(function(x){ garde.add(x); });
+          for (var x = id, n = 0; n < 64; n++){ x = I.parent.get(x) || I.perce.get(x); if (!x) break; garde.add(x); }
+        });
+        Array.from(garde).forEach(function(id){ (I.ouvertures.get(id) || []).forEach(function(o){ garde.add(o); }); });
+        var autres = [];
+        I.produits.forEach(function(id){
+          if (garde.has(id)) return;
+          var i = IFC.infos(m, id);
+          if (i && i.supprimable && (i.genre === "element" || i.genre === "ouverture")) autres.push(id);
+        });
+        var oct, nbGardes = 0;
+        try {
+          var p = IFC.planifier(m, autres);
+          if (p.nbElements){ IFC.appliquer(m, p.changement); faits.push(p.changement); }
+          var t = IFC.planPurge(m, { types: true });         // types que plus aucun élément gardé n'utilise
+          if (t.nbEntites || t.nbModifiees){ IFC.appliquer(m, t.changement); faits.push(t.changement); }
+          IFC.index(m).produits.forEach(function(id){ var i = IFC.infos(m, id); if (i && i.genre === "element") nbGardes++; });
+          oct = IFC.versOctets(IFC.ecrire(m));
+        } finally {
+          while (faits.length) IFC.appliquer(m, faits.pop(), true);
+        }
+        var nom = IFC.nomExport(m.nom).replace(/\.ifc$/i, "") + "_selection.ifc";
+        enregistrer(new Blob([oct], { type: "application/x-step" }), nom);
+        bilans.push("« " + nom + " » : " + pluriel(nbGardes, "élément") + ", " + fmtTaille(oct.length));
+      });
+    });
+    suite.then(function(){
+      etat("Sélection exportée : " + bilans.join(" ; ") + ". La maquette ouverte n'a pas changé.");
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Sélection non exportée : " + (err && err.message || err));
+    });
+  }
+
   // ================= Tableau des éléments (Excel, CSV) et totaux =================
   // Archive ZIP de plusieurs fichiers [{ nom, u (octets) }] : promesse d'un Blob. Compressée si le navigateur
   // le sait, sinon simplement rangée. Sert au classeur .xlsx, qui est un ZIP de fichiers XML.
@@ -2016,7 +2105,7 @@
     var nc = T.cols.length, nr = T.rangs.length, fin = lettre(nc - 1), dernier = nr + 1, rTotal = nr + 3;
     var L = ['<row r="1">' + T.cols.map(function(c, n){ return cellule(c.titre, n, 1, true); }).join("") + "</row>"];
     T.rangs.forEach(function(r, k){ L.push('<row r="' + (k + 2) + '">' + r.map(function(v, n){ return cellule(v, n, k + 2, false); }).join("") + "</row>"); });
-    if (nr){
+    if (nr && !T.sansTotal){
       var tot = cellule("Total (éléments affichés)", 0, rTotal, true);
       T.cols.forEach(function(c, n){
         var s = n && c.somme ? sommeColonne(T, n) : null;
@@ -2430,7 +2519,14 @@
   function cibles(){ return elementsDe(choix.size ? Array.from(choix) : actif && existe(actif) ? [actif] : []); }
   function itemsVue(){
     var items = [];
-    lignes.forEach(function(l){ if (l.i && l.f.visible && !l.f.enCalcul && l.i.vue3D && !caches.has(l.cle)) items.push({ cle: l.cle, m: l.f.m, id: l.id, h: teinteElement(l.f, l.id) }); });
+    var duFichier = colorer === "fichier";
+    lignes.forEach(function(l){
+      if (!l.i || !l.f.visible || l.f.enCalcul || !l.i.vue3D || caches.has(l.cle)) return;
+      if (catsMasquees.size && catDe && catsMasquees.has(catDe.get(l.cle))) return;      // catégorie décochée dans la légende
+      // couleurs du fichier : celle de l'élément s'il en a une, sinon sa teinte habituelle
+      var rgb = duFichier ? couleurFichier(l.f.m, l.id) : null;
+      items.push({ cle: l.cle, m: l.f.m, id: l.id, h: rgb ? null : teinteElement(l.f, l.id), rgb: rgb });
+    });
     return items;
   }
   function majVue(){
@@ -2977,8 +3073,9 @@
   });
 
   // ================= Couleurs selon un critère (légende cliquable) =================
-  var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette"]), teintesCat = null, catsLegende = [], catDe = null;
-  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison" };
+  var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette", "fichier"]), teintesCat = null, catsLegende = [], catDe = null;
+  var catsMasquees = new Set();      // catégories de la légende décochées : leurs éléments ne sont pas dessinés
+  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison", fichier: "Couleurs du fichier" };
   function categorie(l){
     if (colorer === "type") return l.i.typeLib;
     if (colorer === "famille") return l.i.objectType || "(sans famille : type)";
@@ -2991,8 +3088,8 @@
   function calculerCouleurs(){
     var leg = $("#legende");
     // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
-    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = null; }
-    if (!colorer || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
+    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = diffPaires = diffPaireDe = diffBilan = null; diffFocus = null; }
+    if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; catsMasquees.clear(); leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
     lignes.forEach(function(l){
@@ -3011,17 +3108,30 @@
     var MAX = 14;
     leg.innerHTML = '<div class="legende-titre"><span>' + esc(NOMS_COLORER[colorer]) + '</span><button type="button" data-leg-fermer title="Revenir aux couleurs des maquettes" aria-label="Fermer la légende">×</button></div><ul>' +
       catsLegende.slice(0, MAX).map(function(c, k){
-        return '<li><button type="button" data-cat="' + k + '" title="Sélectionner ces éléments"><i style="--t:' + (teinte.has(c) ? pastille(teinte.get(c)) : "var(--texte-faible)") + '"></i><span>' + esc(c) + "</span><b>" + fmtN(compte.get(c)) + "</b></button></li>";
+        return '<li><input type="checkbox" data-cat-voir="' + k + '"' + (catsMasquees.has(c) ? "" : " checked") + ' title="Afficher ou masquer ces éléments dans la vue 3D" aria-label="Afficher ' + esc(c) + '">' +
+          '<button type="button" data-cat="' + k + '" title="Sélectionner ces éléments"><i style="--t:' + (teinte.has(c) ? pastille(teinte.get(c)) : "var(--texte-faible)") + '"></i><span>' + esc(c) + "</span><b>" + fmtN(compte.get(c)) + "</b></button></li>";
       }).join("") + "</ul>" + (catsLegende.length > MAX ? '<div class="autres">+ ' + pluriel(catsLegende.length - MAX, "autre catégorie", "autres catégories") + "</div>" : "");
     leg.hidden = false;
   }
   function poserColorer(v){
+    if ((v || "") !== colorer){ catsMasquees.clear(); finEvidence(); }      // autre découpage : toutes les catégories reviennent
     colorer = v || "";
     if (colorer !== "diff") garder("ifc.colorer", colorer);
     calculerCouleurs();
     majVue();
-    if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
+    if (colorer === "fichier") etat("Couleurs du fichier : styles de surface et matériaux de l'IFC. Les éléments sans couleur gardent celle de leur maquette ; la transparence n'est pas rendue.");
+    else if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
   }
+  // case d'une ligne de la légende : la catégorie disparaît de la vue 3D ou y revient (la liste ne change pas)
+  $("#legende").addEventListener("change", function(e){
+    var t = e.target;
+    if (!t.hasAttribute || !t.hasAttribute("data-cat-voir")) return;
+    var c = catsLegende[+t.getAttribute("data-cat-voir")];
+    if (c === undefined) return;
+    if (t.checked) catsMasquees.delete(c); else catsMasquees.add(c);
+    majVue();
+    etat("« " + c + " » " + (t.checked ? "affiché" : "masqué") + " dans la vue 3D." + (catsMasquees.size ? " " + pluriel(catsMasquees.size, "catégorie masquée", "catégories masquées") + "." : ""));
+  });
   $("#legende").addEventListener("click", function(e){
     if (e.target.closest("[data-leg-fermer]")){ poserColorer(""); etat("Couleurs des maquettes rétablies."); return; }
     var b = e.target.closest("[data-cat]");
@@ -3036,79 +3146,380 @@
 
   poserMode(modeEd);
 
-  // ================= Comparaison de deux maquettes =================
-  // Deux versions du même projet, ouvertes ensemble : la première ouverte est l'ancienne, la seconde la nouvelle.
-  // Les éléments sont appariés par leur GlobalId, puis comparés : attributs, étage, matériau, propriétés et
-  // quantités, et boîte englobante de la forme (un élément déplacé ou redimensionné est « modifié »).
-  // Résultat dans diffDe (clé → état) et diffQuoi (clé → ce qui diffère), montré par les couleurs « Comparaison ».
-  var diffDe = null, diffQuoi = null, comparaisonEnCours = false;
-  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", modifie: "Modifié", pareil: "Inchangé" }, TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Modifié": 35 };
-  function ficheComparaison(l, boites){
-    var m = l.f.m, i = l.i, o = new Map();
-    o.set("Classe IFC", i.type); o.set("Nom", i.nom); o.set("Famille : type", i.objectType); o.set("Repère", i.tag);
-    o.set("Description", i.description); o.set("Matériau", i.materiau); o.set("Étage", etageDe(m, l.id));
-    IFC.donnees(m, l.id).forEach(function(d){
-      var k = d.jeu + " · " + d.nom;
-      if (!o.has(k)) o.set(k, typeof d.v === "number" ? String(Number(d.v.toPrecision(9))) : String(d.v));
+  // ================= Couleurs du fichier (styles de surface et matériaux) =================
+  // Couleur [r, v, b] (0–255) d'un élément : celle du style posé sur sa forme (IFCSTYLEDITEM), à défaut celle de
+  // son matériau (IFCMATERIALDEFINITIONREPRESENTATION) ; null s'il n'en a pas. La transparence n'est pas rendue.
+  function tableCouleurs(m){
+    if (m._coul && m._coul.v === m.version) return m._coul;
+    var C = IFC.champs, R = IFC.idRef, L = IFC.refsListe, N = IFC.nombre;
+    var T = { v: m.version, item: new Map(), mat: new Map(), el: new Map() };
+    function rvb(id, prof){
+      var e = m.ent.get(id);
+      if (!e || prof > 6) return null;
+      var a = C(e), r = null;
+      if (e.type === "IFCCOLOURRGB"){
+        var c = [N(a[1]), N(a[2]), N(a[3])];
+        return c.every(isFinite) ? c.map(function(x){ return Math.max(0, Math.min(255, Math.round(255*x))); }) : null;
+      }
+      var suite = e.type === "IFCSURFACESTYLERENDERING" || e.type === "IFCSURFACESTYLESHADING" ? [R(a[0])] :
+        e.type === "IFCSURFACESTYLE" ? L(a[2]) : e.type === "IFCPRESENTATIONSTYLEASSIGNMENT" ? L(a[0]) : [];
+      suite.some(function(x){ r = x ? rvb(x, prof + 1) : null; return !!r; });
+      return r;
+    }
+    function styles(a){ var r = null; L(a[1]).some(function(x){ r = rvb(x, 0); return !!r; }); return r; }
+    m.ent.forEach(function(e){
+      if (e.type === "IFCSTYLEDITEM"){
+        var a = C(e), it = R(a[0]);
+        if (it && !T.item.has(it)){ var c = styles(a); if (c) T.item.set(it, c); }
+      }
+      else if (e.type === "IFCMATERIALDEFINITIONREPRESENTATION"){
+        var b = C(e), mat = R(b[3]), cm = null;
+        L(b[2]).some(function(rep){
+          var re = m.ent.get(rep);
+          if (re) L(C(re)[3]).some(function(si){ var se = m.ent.get(si); if (se && se.type === "IFCSTYLEDITEM") cm = styles(C(se)); return !!cm; });
+          return !!cm;
+        });
+        if (mat && cm && !T.mat.has(mat)) T.mat.set(mat, cm);
+      }
     });
-    return { o: o, b: boites.get(l.cle) || null };
+    m._coul = T;
+    return T;
   }
-  function differences(a, b){
+  function couleurFichier(m, id){
+    var T = tableCouleurs(m);
+    if (T.el.has(id)) return T.el.get(id);
+    var C = IFC.champs, R = IFC.idRef, L = IFC.refsListe, e = m.ent.get(id), c = null;
+    // style d'un objet de la forme : lui-même, la représentation qu'un IFCMAPPEDITEM recopie, le premier opérande d'une découpe
+    function deItem(x, prof){
+      if (!x || prof > 8) return null;
+      if (T.item.has(x)) return T.item.get(x);
+      var ie = m.ent.get(x);
+      if (!ie) return null;
+      var a = C(ie);
+      if (ie.type === "IFCMAPPEDITEM"){ var src = m.ent.get(R(a[0])); return src ? deRep(R(C(src)[1]), prof + 1) : null; }
+      if (ie.type === "IFCBOOLEANRESULT" || ie.type === "IFCBOOLEANCLIPPINGRESULT") return deItem(R(a[1]), prof + 1);
+      return null;
+    }
+    function deRep(rep, prof){
+      var re = m.ent.get(rep), r = null;
+      if (re) L(C(re)[3]).some(function(x){ r = deItem(x, prof); return !!r; });
+      return r;
+    }
+    var pds = e ? m.ent.get(R(C(e)[6])) : null;
+    if (pds) L(C(pds)[2]).some(function(rep){ c = deRep(rep, 0); return !!c; });
+    if (!c && T.mat.size){
+      var I = IFC.index(m), mats = I.materiaux.get(id) || (I.typeObjet.has(id) ? I.materiaux.get(I.typeObjet.get(id)) : null) || [], vu = new Set();
+      (function marche(liste, prof){
+        liste.some(function(r){
+          if (c || vu.has(r) || prof > 6) return !!c;
+          vu.add(r);
+          var me = m.ent.get(r);
+          if (!me || me.type.lastIndexOf("IFCMATERIAL", 0) !== 0) return false;
+          if (T.mat.has(r)){ c = T.mat.get(r); return true; }
+          marche(me.refs, prof + 1);
+          return !!c;
+        });
+      })(mats, 0);
+    }
+    T.el.set(id, c);
+    return c;
+  }
+
+  // ================= Vues enregistrées =================
+  // Caméra, boîte de coupe et éléments masqués, gardés dans ce navigateur pour le même jeu de fichiers (mêmes
+  // noms). Les éléments masqués sont notés par nom de fichier et numéro d'entité.
+  var MAX_VUES = 12;
+  function cleVues(){ return fichiers.map(function(f){ return f.m.nom; }).sort().join("|"); }
+  function toutesVues(){ try { var o = JSON.parse(localStorage.getItem("ifc.vues") || "{}"); return o && typeof o === "object" ? o : {}; } catch (e){ return {}; } }
+  // (relues du stockage seulement quand le jeu de fichiers change ou après une écriture : maj() passe ici souvent)
+  var vuesLues = null;
+  function vuesEnregistrees(){
+    if (!fichiers.length) return [];
+    var k = cleVues();
+    if (!vuesLues || vuesLues.k !== k){ var l = toutesVues()[k]; vuesLues = { k: k, l: Array.isArray(l) ? l : [] }; }
+    return vuesLues.l;
+  }
+  function ecrireVues(liste){
+    var o = toutesVues(), k = cleVues();
+    vuesLues = null;
+    if (liste.length) o[k] = liste; else delete o[k];
+    try { localStorage.setItem("ifc.vues", JSON.stringify(o)); return true; } catch (e){ return false; }
+  }
+  function enregistrerVue(){
+    if (!fichiers.length) return;
+    var l = vuesEnregistrees(), nom = prompt("Nom de la vue (caméra, boîte de coupe et éléments masqués) :", "Vue " + (l.length + 1));
+    if (nom === null) return;
+    nom = nom.trim().slice(0, 60) || "Vue " + (l.length + 1);
+    var masques = [];
+    caches.forEach(function(c){ var d = lireCle(c); if (d.f) masques.push([d.f.m.nom, d.id]); });
+    var v = { nom: nom, cam: vue.etatVue(), masques: masques };
+    l = l.filter(function(x){ return x.nom !== nom; });
+    l.push(v);
+    if (l.length > MAX_VUES) l = l.slice(l.length - MAX_VUES);
+    if (!ecrireVues(l)){ etat("Vue non enregistrée : le navigateur refuse l'écriture (stockage plein ou interdit)."); return; }
+    maj();
+    etat("Vue « " + nom + " » enregistrée dans ce navigateur (Affichage › Vues)." + (masques.length ? " " + pluriel(masques.length, "élément masqué", "éléments masqués") + " retenus." : ""));
+  }
+  function rappelerVue(k){
+    var v = vuesEnregistrees()[k];
+    if (!v || !v.cam) return;
+    var parNom = new Map();
+    fichiers.forEach(function(f){ if (!parNom.has(f.m.nom)) parNom.set(f.m.nom, f); });
+    caches = new Set();
+    (v.masques || []).forEach(function(x){
+      var f = parNom.get(x[0]);
+      if (f && f.m.ent.has(x[1])) caches.add(cle(f, x[1]));
+    });
+    majVue();
+    vue.poserVue(v.cam);
+    maj();
+    etat("Vue « " + v.nom + " »" + (caches.size ? " : " + pluriel(caches.size, "élément masqué", "éléments masqués") + "." : "."));
+  }
+  function oublierVues(){
+    var l = vuesEnregistrees();
+    if (!l.length || !confirm("Supprimer " + pluriel(l.length, "vue enregistrée", "vues enregistrées") + " pour ces fichiers ?")) return;
+    ecrireVues([]);
+    maj();
+    etat("Vues enregistrées supprimées.");
+  }
+
+  // ================= Comparaison de deux maquettes =================
+  // Deux versions du même projet, ouvertes ensemble. Les éléments sont appariés par leur GlobalId, puis comparés
+  // selon les réglages de la fenêtre (Outils › Comparer) : attributs, étage, matériau, propriétés, quantités,
+  // forme (boîte englobante et nombre de faces). Un élément supprimé et un élément ajouté de même classe, au
+  // même endroit et de même encombrement sont rapprochés (« Recréé » : redessiné, son GlobalId a changé).
+  // Résultat : diffDe (clé → état), diffQuoi (clé → [{ k, a, b }] : quoi, ancienne et nouvelle valeur),
+  // diffBilan (comptes, différences les plus fréquentes), montrés par les couleurs « Comparaison ».
+  var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, diffPaireDe = null, comparaisonEnCours = false;
+  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
+  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Recréé": 280 };
+  var optsDiff = (function(){
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [] }, v = null;
+    try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
+    if (v && typeof v === "object"){
+      ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
+      if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
+    }
+    return d;
+  })();
+  var GEO_DIFF = "Géométrie (encombrement X × Y × Z)", DEP_DIFF = "Déplacement";
+  function ficheComparaison(l, boites, O, ignores){
+    var m = l.f.m, i = l.i, o = new Map();
+    function garde(k){ var s = sansAccent(k); return !ignores.some(function(x){ return s.indexOf(x) >= 0; }); }
+    function mets(k, v){ if (garde(k)) o.set(k, v == null ? "" : String(v)); }
+    if (O.attrs){ mets("Classe IFC", i.typeLib); mets("Nom", i.nom); mets("Famille : type", i.objectType); mets("Repère", i.tag); mets("Description", i.description); }
+    if (O.materiau) mets("Matériau", i.materiau);
+    if (O.etage) mets("Étage", etageDe(m, l.id));
+    if (O.props || O.quantites) IFC.donnees(m, l.id).forEach(function(d){
+      if (d.quantite ? !O.quantites : !O.props) return;
+      var k = d.jeu + " · " + d.nom;
+      if (!o.has(k)) mets(k, typeof d.v === "number" ? NB3.format(Number(d.v.toPrecision(9))) + (d.unite ? " " + d.unite : "") : d.v);
+    });
+    return { o: o, b: O.geo ? boites.get(l.cle) || null : null };
+  }
+  // [{ k, a, b }] : ce qui diffère de la fiche a (ancienne) à la fiche b (nouvelle)
+  // U : { nom : unité de longueur du fichier, seuil : déplacement en dessous duquel l'élément n'a pas bougé }
+  function differences(a, b, U){
     var quoi = [];
     if (a.b && b.b){
-      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = 1e-6*d + 1e-9, geo = false;
-      for (var k = 0; k < 3; k++) if (Math.abs(a.b[0][k] - b.b[0][k]) > tol || Math.abs(a.b[1][k] - b.b[1][k]) > tol) geo = true;
-      if (geo) quoi.push("Géométrie (position ou dimensions)");
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = Math.max(1e-6*d + 1e-9, U.seuil);
+      // encombrement (côtés de la boîte englobante) et centre : même encombrement ailleurs = élément déplacé
+      var taille = false, dep = [0, 0, 0];
+      for (var k = 0; k < 3; k++){
+        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tol) taille = true;
+        dep[k] = (b.b[0][k] + b.b[1][k])/2 - (a.b[0][k] + a.b[1][k])/2;
+      }
+      var dist = Math.hypot(dep[0], dep[1], dep[2]), un = U.nom ? " " + U.nom : "";
+      if (dist > tol && !taille) quoi.push({ k: DEP_DIFF, a: "", b: NB3.format(dist) + un + " (ΔX " + NB3.format(dep[0]) + " ; ΔY " + NB3.format(dep[1]) + " ; ΔZ " + NB3.format(dep[2]) + ")" });
+      else if (taille) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b, un), b: texteBoite(b.b, un) + (dist > tol ? ", centre déplacé de " + NB3.format(dist) + un : "") });
+      else if (a.b[2] !== b.b[2]) quoi.push({ k: GEO_DIFF, a: fmtN(a.b[2]) + " faces", b: fmtN(b.b[2]) + " faces" });
     }
-    a.o.forEach(function(v, k){ if (!b.o.has(k)) quoi.push(k + " (retiré)"); else if (b.o.get(k) !== v) quoi.push(k); });
-    b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push(k + " (ajouté)"); });
+    a.o.forEach(function(v, k){ var w = b.o.has(k) ? b.o.get(k) : null; if (w !== v) quoi.push({ k: k, a: v, b: w === null ? "(absent)" : w }); });
+    b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push({ k: k, a: "(absent)", b: v }); });
     return quoi;
   }
-  function comparerMaquettes(){
+  // encombrement d'un élément : côtés de sa boîte englobante selon X, Y, Z
+  function texteBoite(b, un){
+    return [0, 1, 2].map(function(k){ return NB3.format(b[1][k] - b[0][k]); }).join(" × ") + (un || "");
+  }
+  // rapprochement d'un supprimé et d'un ajouté : même classe, même boîte englobante (à 7 chiffres près)
+  function empreinteForme(l, boites){
+    var b = boites.get(l.cle);
+    if (!b) return "";
+    return l.i.type + "|" + b[0].concat(b[1]).map(function(v){ return Number(v.toPrecision(7)); }).join(",");
+  }
+  function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
     if (fichiers.length !== 2){
-      etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version puis la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
+      etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version et la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
       return;
     }
-    var A = fichiers[0], B = fichiers[1], boites = vue.boitesElements(), parGid = new Map(), ls = [];
-    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) ls.push(l); });
-    var de = new Map(), quoi = new Map(), n = { ajoute: 0, supprime: 0, modifie: 0, pareil: 0 }, vusB = new Set();
+    var anc = diffBilan && parUid.has(diffBilan.ancien) ? diffBilan.ancien : fichiers[0].uid;
+    $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
+    ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
+    $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
+    // différences les plus fréquentes de la dernière comparaison : à cocher pour ne plus en tenir compte
+    var fr = diffBilan ? diffBilan.frequents : [], z = $("#cmp-frequents");
+    z.hidden = !fr.length;
+    z.innerHTML = fr.length ? "<legend>Différences les plus fréquentes (cocher pour les ignorer)</legend>" + fr.map(function(x, k){
+      return '<label class="coche"><input type="checkbox" data-cmp-ign="' + k + '"><span>' + esc(x[0]) + "</span><b>" + fmtN(x[1]) + "</b></label>";
+    }).join("") : "";
+    ouvrirFenetre($("#comparer"), null);
+  }
+  $("#comparer").addEventListener("close", function(){
+    if ($("#comparer").returnValue !== "oui") return;
+    ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ optsDiff[k] = $("#cmp-" + k).checked; });
+    var ign = $("#cmp-ignorer").value.split(/[;\n]/).map(function(x){ return x.trim(); }).filter(Boolean);
+    [].forEach.call(document.querySelectorAll("#cmp-frequents input:checked"), function(x){
+      var f = diffBilan && diffBilan.frequents[+x.getAttribute("data-cmp-ign")];
+      if (!f) return;
+      if (f[0] === GEO_DIFF || f[0] === DEP_DIFF) optsDiff.geo = false;        // la géométrie s'ignore par sa case, pas par un mot
+      else if (ign.indexOf(f[0]) < 0) ign.push(f[0]);
+    });
+    optsDiff.ignorer = ign.slice(0, 200);
+    garder("ifc.diff", JSON.stringify(optsDiff));
+    comparerMaquettes(+$("#cmp-ancien").value);
+  });
+  function comparerMaquettes(uidAncien){
+    if (comparaisonEnCours || occupe() || fichiers.length !== 2) return;
+    var A = parUid.get(uidAncien) || fichiers[0], B = fichiers[0] === A ? fichiers[1] : fichiers[0];
+    var O = optsDiff, ignores = O.ignorer.map(sansAccent), boites = O.geo ? vue.boitesElements() : new Map(), parGid = new Map(), lsA = [], lsB = [];
+    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) (l.f === A ? lsA : lsB).push(l); });
+    var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
+    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map(), paireDe = new Map();
+    finEvidence();
+    // un élément a bougé à partir d'un demi-millimètre (dans l'unité du fichier)
+    var U = { nom: A.unite && A.unite.nom || "", seuil: A.unite && A.unite.f > 0 ? .0005/A.unite.f : 0 };
+    function compare(la, fa, lb, etatSi){
+      var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
+      // « Déplacé » passe avant « Modifié » : l'élément a bougé, qu'il ait changé par ailleurs ou non
+      var bouge = d.some(function(x){ return x.k === DEP_DIFF; });
+      var e = etatSi || (bouge ? ETATS_DIFF.deplace : d.length ? ETATS_DIFF.modifie : ETATS_DIFF.pareil);
+      if (!etatSi && bouge) n.deplace++;
+      de.set(la.cle, e); de.set(lb.cle, e);
+      if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
+      var paire = { e: e, a: la, b: lb, d: d };
+      paires.push(paire); paireDe.set(la.cle, paire); paireDe.set(lb.cle, paire);
+      return d.length;
+    }
     comparaisonEnCours = true;
     etat("Comparaison en cours…");
-    // l'ancienne maquette d'abord (lignes dans l'ordre des fichiers), puis la nouvelle face à elle
+    // l'ancienne maquette d'abord (ses fiches), puis la nouvelle face à elle
     parTranches(ls.length, function(k){
       var l = ls[k], gid = l.i.globalId;
-      if (l.f === A){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites) }); return; }
-      if (l.f !== B || vusB.has(gid)) return;
+      if (k < lsA.length){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites, O, ignores) }); return; }
+      if (vusB.has(gid)) return;
       vusB.add(gid);
       var x = parGid.get(gid);
-      if (!x){ de.set(l.cle, ETATS_DIFF.ajoute); n.ajoute++; return; }
-      var d = differences(x.f, ficheComparaison(l, boites));
-      if (d.length){
-        de.set(l.cle, ETATS_DIFF.modifie); de.set(x.l.cle, ETATS_DIFF.modifie); quoi.set(l.cle, d); quoi.set(x.l.cle, d); n.modifie++;
-      } else { de.set(l.cle, ETATS_DIFF.pareil); de.set(x.l.cle, ETATS_DIFF.pareil); n.pareil++; }
+      if (!x){ ajoutes.push(l); return; }
+      var avant = n.deplace, nd = compare(x.l, x.f, l);
+      if (n.deplace === avant){ if (nd) n.modifie++; else n.pareil++; }
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
-      parGid.forEach(function(x, gid){ if (!vusB.has(gid)){ de.set(x.l.cle, ETATS_DIFF.supprime); n.supprime++; } });
-      diffDe = de; diffQuoi = quoi;
+      // supprimés et ajoutés de même classe et de même encombrement : un élément redessiné
+      var orphelins = new Map();
+      parGid.forEach(function(x, gid){
+        if (vusB.has(gid)) return;
+        var k = O.geo ? empreinteForme(x.l, boites) : "";
+        if (!k){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; return; }
+        var t = orphelins.get(k); if (!t) orphelins.set(k, t = []); t.push(x);
+      });
+      ajoutes.forEach(function(l){
+        var k = O.geo ? empreinteForme(l, boites) : "", t = k ? orphelins.get(k) : null, x = t && t.length ? t.shift() : null;
+        if (x){ compare(x.l, x.f, l, ETATS_DIFF.recree); n.recree++; }
+        else { de.set(l.cle, ETATS_DIFF.ajoute); paires.push({ e: ETATS_DIFF.ajoute, a: null, b: l, d: [] }); n.ajoute++; }
+      });
+      orphelins.forEach(function(t){ t.forEach(function(x){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; }); });
+      var frequents = []; freq.forEach(function(nb, k){ frequents.push([k, nb]); });
+      frequents.sort(function(a, b){ return b[1] - a[1]; });
+      diffDe = de; diffQuoi = quoi; diffPaires = paires; diffPaireDe = paireDe;
+      diffBilan = { ancien: A.uid, nouveau: B.uid, n: n, frequents: frequents.slice(0, 6) };
+      catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
-      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m);
+      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.pareil + n.deplace;
       etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
-        pluriel(n.modifie, "modifié") + ", " + pluriel(n.pareil, "inchangé") + ". Clique une ligne de la légende pour sélectionner ses éléments." +
-        (ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
-        (A.enCalcul || B.enCalcul ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
+        pluriel(n.deplace, "déplacé") + ", " + pluriel(n.modifie, "modifié") + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
+        (paires2 > 20 && n.modifie > .8*paires2 && frequents.length ? " Presque tout est modifié, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
+        (O.geo && ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
+        (O.geo && (A.enCalcul || B.enCalcul) ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
     }).catch(function(err){
       if (window.console) console.error(err);
       etat("Comparaison interrompue : " + (err && err.message || err));
     }).then(function(){ comparaisonEnCours = false; });
   }
-  // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché
+  // Mise en évidence d'un élément apparié : ses deux états seuls à l'écran avec leur voisinage (éléments de la
+  // nouvelle maquette autour d'eux), l'ancien en rouge, le nouveau en vert, une cote entre leurs centres.
+  // « Tout afficher » (Maj+H) y met fin.
+  var diffFocus = null;
+  function finEvidence(){ if (diffFocus){ diffFocus = null; return true; } return false; }
+  function voirEvidence(c){
+    var p = diffPaireDe && diffPaireDe.get(c);
+    if (!p || !p.a || !p.b || !existe(p.a.cle) || !existe(p.b.cle)) return;
+    // tout réafficher d'abord : les boîtes ne sont connues que pour ce qui est dessiné
+    diffFocus = null; caches = new Set();
+    infoVue(vue.afficher(itemsVue()));
+    var boites = vue.boitesElements(), ba = boites.get(p.a.cle), bb = boites.get(p.b.cle);
+    if (!ba || !bb){ majVue(); etat("Mise en évidence impossible : un des deux états n'est pas dessiné (catégorie décochée dans la légende, maquette masquée ou géométrie non lue)."); return; }
+    var mn = [0, 1, 2].map(function(k){ return Math.min(ba[0][k], bb[0][k]); }), mx = [0, 1, 2].map(function(k){ return Math.max(ba[1][k], bb[1][k]); });
+    var marge = Math.max(Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])*.75, p.b.f.unite && p.b.f.unite.f > 0 ? 1/p.b.f.unite.f : 0);
+    var garde = new Set([p.a.cle, p.b.cle]);
+    lignes.forEach(function(l){
+      if (!l.i || !l.i.vue3D || l.f !== p.b.f) return;
+      var b = boites.get(l.cle);
+      if (!b) return;
+      for (var k = 0; k < 3; k++) if (b[0][k] > mx[k] + marge || b[1][k] < mn[k] - marge) return;
+      garde.add(l.cle);
+    });
+    lignes.forEach(function(l){ if (l.i && l.i.vue3D && !garde.has(l.cle)) caches.add(l.cle); });
+    diffFocus = { a: p.a.cle, b: p.b.cle };
+    choix = new Set(); actif = p.b.cle;
+    majVue(); afficherProps();
+    function centre(b){ return [(b[0][0] + b[1][0])/2, (b[0][1] + b[1][1])/2, (b[0][2] + b[1][2])/2]; }
+    var ca = centre(ba), cb = centre(bb);
+    if (Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2]) > 0) vue.cote(ca, cb);
+    vue.cadrer([p.a.cle, p.b.cle]);
+    etat("« " + nomAff(p.b.i) + " » : ancien état en rouge, nouvel état en vert" + (garde.size > 2 ? ", " + pluriel(garde.size - 2, "élément voisin", "éléments voisins") + " en neutre" : "") +
+      ". Maj+H pour tout réafficher ; menu Outils pour effacer la cote.");
+  }
+  $("#props").addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("[data-evidence]");
+    if (b) voirEvidence(b.getAttribute("data-evidence"));
+  });
+  // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché : état, puis ancienne → nouvelle valeur
   function htmlComparaison(c){
     var e = colorer === "diff" && diffDe ? diffDe.get(c) : null;
     if (!e) return "";
-    var q = diffQuoi.get(c) || [], MAX = 40;
-    return '<div class="pset"><div class="pset-nom">Comparaison</div><dl><dt>État</dt><dd>' + esc(e) + "</dd>" +
-      (q.length ? "<dt>Différences</dt><dd>" + q.slice(0, MAX).map(esc).join("<br>") + (q.length > MAX ? "<br>… et " + fmtN(q.length - MAX) + " autres" : "") + "</dd>" : "") + "</dl></div>";
+    var q = diffQuoi.get(c) || [], MAX = 40, paire = diffPaireDe && diffPaireDe.get(c);
+    return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div>" +
+      (paire && paire.a && paire.b ? '<button type="button" class="btn petit" data-evidence="' + esc(c) + '" title="Isoler les deux états avec leur voisinage : ancien en rouge, nouveau en vert, cote entre les centres">Mettre en évidence (ancien → nouveau)</button>' : "") + "<dl>" +
+      (q.length ? q.slice(0, MAX).map(function(x){
+        if (x.k === DEP_DIFF) return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.b) + "</dd>";      // une seule valeur : la distance
+        return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
+      }).join("") + (q.length > MAX ? "<dt>…</dt><dd>" + fmtN(q.length - MAX) + " autres différences (voir le rapport)</dd>" : "")
+        : "<dt>État</dt><dd>" + esc(e === ETATS_DIFF.pareil ? "Aucune différence sur ce qui est comparé" : e === ETATS_DIFF.recree ? "Même forme au même endroit, GlobalId différent" : e) + "</dd>") + "</dl></div>";
+  }
+  // Rapport Excel : une ligne par différence (une seule pour un élément ajouté, supprimé ou recréé sans écart)
+  function exporterRapportComparaison(){
+    if (!diffPaires || !diffBilan || !parUid.has(diffBilan.ancien) || !parUid.has(diffBilan.nouveau)){ etat("Rapport : lance d'abord une comparaison (Outils › Comparer les deux maquettes)."); return; }
+    var titres = ["État", "GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"], rangs = [];
+    var ordre = [ETATS_DIFF.deplace, ETATS_DIFF.modifie, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
+    diffPaires.forEach(function(p){
+      if (p.e === ETATS_DIFF.pareil) return;
+      var l = p.b || p.a, i = l.i, tete = [p.e, p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)];
+      if (!p.d.length) rangs.push(tete.concat(["", "", ""]));
+      else p.d.forEach(function(x){ rangs.push(tete.concat([x.k, x.a, x.b])); });
+    });
+    if (!rangs.length){ etat("Rapport : aucune différence à écrire."); return; }
+    rangs.sort(function(a, b){ return ordre.indexOf(a[0]) - ordre.indexOf(b[0]); });
+    var A = parUid.get(diffBilan.ancien), B = parUid.get(diffBilan.nouveau);
+    var nom = "comparaison_" + A.m.nom.replace(/\.ifc$/i, "") + "_" + B.m.nom.replace(/\.ifc$/i, "") + ".xlsx";
+    tableauXlsx({ cols: titres.map(function(t){ return { titre: t, somme: false }; }), rangs: rangs, nbFixes: titres.length, sansTotal: true }).then(function(blob){
+      enregistrer(blob, nom);
+      etat("« " + nom + " » : " + pluriel(rangs.length, "ligne") + ", " + fmtTaille(blob.size) + ".");
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Rapport non exporté : " + (err && err.message || err));
+    });
   }
 
   // ================= Sélectionner similaires =================
@@ -3261,6 +3672,7 @@
     preferences: preferences,
     exporter: function(){ exporter(null); },
     "exporter-zip": function(){ exporter(null, true); },
+    "exporter-selection": exporterSelection,
     "tableau-xlsx": function(){ exporterTableau("xlsx"); },
     "tableau-csv": function(){ exporterTableau("csv"); },
     capture: function(){
@@ -3273,7 +3685,8 @@
         etat("« " + nom + " » : " + c.width + " × " + c.height + " px, " + fmtTaille(b.size) + ". Les cotes et étiquettes de mesure n'y figurent pas.");
       }, "image/png");
     },
-    comparer: comparerMaquettes,
+    comparer: ouvrirComparer,
+    "rapport-comparaison": exporterRapportComparaison,
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
       if (occupe()) return;
@@ -3282,7 +3695,8 @@
       modeEditeur(false);
       etat(""); window.scrollTo(0, 0);
     },
-    annuler: annuler, retablir: retablir, supprimer: seulEd(supprimer),
+    // annuler et rétablir changent la maquette : comme les autres modifications, en mode Éditeur seulement
+    annuler: seulEd(annuler), retablir: seulEd(retablir), supprimer: seulEd(supprimer),
     tout: function(){ $("#sel-tout").click(); },
     rien: function(){ var n = choix.size; choix.clear(); oublierActif(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
     inverser: function(){ $("#sel-inv").click(); },
@@ -3293,6 +3707,9 @@
     recadrer: function(){ vue.recadrer(); },
     "vue-iso": function(){ vue.orienter(-Math.PI/4, Math.atan(Math.SQRT1_2)); },
     "vue-dessus": function(){ vue.orienter(0, 1.55); },
+    "vue-enregistrer": enregistrerVue,
+    "vue-rappel": function(b){ rappelerVue(+b.getAttribute("data-k")); },
+    "vues-oublier": oublierVues,
     "vue-face": function(){ vue.orienter(0, 0); },
     "vue-cote": function(){ vue.orienter(Math.PI/2, 0); },
     masquer: function(){ masquerCles(cibles()); },
@@ -3345,7 +3762,7 @@
       else etat("Géométrie : lecteur de l'outil.");
     },
     site: function(){ location.href = "/"; },
-    "tout-afficher": function(){ var n = caches.size; caches = new Set(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
+    "tout-afficher": function(){ var n = caches.size; caches = new Set(); finEvidence(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
     raccourcis: function(){
       aide("Raccourcis clavier", '<div class="aide-table">' + [
         ["Ctrl+O", "Ouvrir des fichiers (remplace ceux ouverts)"], ["Ctrl+Maj+O", "Ajouter des fichiers"], ["Ctrl+S", "Exporter"],
@@ -3360,6 +3777,7 @@
         ["E", "Basculer Viewer / Éditeur"],
         ["D · Maj+D", "Déplacer (valeurs, ou deux points accrochés)"], ["K · Maj+K", "Copier (valeurs, ou deux points accrochés)"],
         ["R", "Rotation autour de la verticale"], ["A", "Aligner : face de référence, puis faces à amener dessus"], ["L", "Changer d'étage"],
+        ["↑ ↓ · Espace (liste)", "Passer d'un élément à l'autre, cocher ou décocher (Maj + flèche : cocher en avançant)"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
         ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe, sélectionner similaires ; en Éditeur : modifier"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
