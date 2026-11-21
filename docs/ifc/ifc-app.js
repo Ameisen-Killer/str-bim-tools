@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.9.0";
+  var VERSION = "1.9.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -276,7 +276,14 @@
   }
   // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
   // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé.
-  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=10", chaud = null;
+  // Numéros de version : un seul endroit, les balises <script> d'index.html. Les workers reçoivent dans leur
+  // adresse la version de la page (pour être rechargés à chaque publication) et celles du code qu'ils importent.
+  function versionScript(nom){
+    var sc = document.querySelector('script[src*="' + nom + '"]'), v = sc && /[?&]v=(\d+)/.exec(sc.getAttribute("src"));
+    return v ? v[1] : "0";
+  }
+  var V_APP = versionScript("ifc-app.js"), V_CORE = versionScript("ifc-core.js"), V_VUE = versionScript("ifc-vue.js");
+  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=" + V_APP + "&core=" + V_CORE, chaud = null;
   function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
   function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
   if (avecWorker) setTimeout(function(){
@@ -560,7 +567,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=9";
+  var URL_GEO = "/ifc/ifc-geo.js?v=" + V_APP + "&core=" + V_CORE + "&vue=" + V_VUE;
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1875,7 +1882,7 @@
     etat("Annulé : " + h.txt + " (" + pluriel(h.e, "entité remise", "entités remises") + ").");
   }
   function retablir(){
-    if (!aRefaire.length) return;
+    if (!aRefaire.length || occupe()) return;
     var h = aRefaire.pop();
     h.parts.forEach(function(p){ IFC.appliquer(p.f.m, p.ch); });
     var geo = relire(h.parts);
@@ -3554,7 +3561,8 @@
       modeEditeur(false);
       etat(""); window.scrollTo(0, 0);
     },
-    annuler: annuler, retablir: retablir, supprimer: seulEd(supprimer),
+    // annuler et rétablir changent la maquette : comme les autres modifications, en mode Éditeur seulement
+    annuler: seulEd(annuler), retablir: seulEd(retablir), supprimer: seulEd(supprimer),
     tout: function(){ $("#sel-tout").click(); },
     rien: function(){ var n = choix.size; choix.clear(); oublierActif(); if (n) etat(pluriel(n, "élément désélectionné", "éléments désélectionnés") + "."); },
     inverser: function(){ $("#sel-inv").click(); },

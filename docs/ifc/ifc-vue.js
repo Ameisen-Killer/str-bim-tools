@@ -523,11 +523,23 @@
     if (!c || c.length < 2 || !(r > 0)) return;
     var W = c.map(function(p){ var o = [0,0,0]; tp(M, p[0], p[1], p[2], o, 0); return o; });
     var echelle = Math.hypot(M[0], M[1], M[2]) || 1;
-    for (var i = 0; i + 1 < W.length; i++){
-      var p = W[i], q = W[i + 1], d = norm([q[0]-p[0], q[1]-p[1], q[2]-p[2]]);
+    // direction de chaque segment (null : points confondus)
+    var D = [], Rr = r*echelle;
+    for (var i = 0; i + 1 < W.length; i++) D.push(norm([W[i+1][0]-W[i][0], W[i+1][1]-W[i][1], W[i+1][2]-W[i][2]]));
+    // à un coude, chaque segment est prolongé de R·tan(angle/2) (au plus R) : les deux tubes se rejoignent côté
+    // extérieur au lieu de laisser un coin ouvert
+    function rallonge(a, b){
+      if (!a || !b) return 0;
+      var c = Math.max(-1, Math.min(1, dot(a, b)));
+      return c > .999999 ? 0 : Math.min(Rr, Rr*Math.sqrt((1 - c)/(1 + c + 1e-12)));
+    }
+    for (i = 0; i + 1 < W.length; i++){
+      var p = W[i], q = W[i + 1], d = D[i];
       if (!d) continue;
-      var T = repere(p, d, null), l = Math.hypot(q[0]-p[0], q[1]-p[1], q[2]-p[2]);
-      extruder([cercle(r*echelle, r*echelle, 8)], T, [0, 0, l], out);
+      var avant = i > 0 ? rallonge(D[i - 1], d) : 0, apres = i + 1 < D.length ? rallonge(d, D[i + 1]) : 0;
+      var l = Math.hypot(q[0]-p[0], q[1]-p[1], q[2]-p[2]);
+      var T = repere(avant ? [p[0] - d[0]*avant, p[1] - d[1]*avant, p[2] - d[2]*avant] : p, d, null);
+      extruder([cercle(Rr, Rr, 8)], T, [0, 0, l + avant + apres], out);
     }
   }
   // Faces triangulées et polygonales (IFC4)

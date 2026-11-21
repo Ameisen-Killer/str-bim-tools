@@ -784,7 +784,10 @@
 
   // ================= Suppression propre =================
   // Références « faibles » : elles ne gardent pas en vie ce qu'elles désignent, et sont nettoyées après coup.
-  var FAIBLES = { IFCSTYLEDITEM: [0], IFCPRESENTATIONLAYERASSIGNMENT: [2], IFCPRESENTATIONLAYERWITHSTYLE: [2], IFCMATERIALDEFINITIONREPRESENTATION: [3] };
+  var FAIBLES = { IFCSTYLEDITEM: [0], IFCPRESENTATIONLAYERASSIGNMENT: [2], IFCPRESENTATIONLAYERWITHSTYLE: [2], IFCMATERIALDEFINITIONREPRESENTATION: [3],
+    // l'aspect de forme désigne la forme de son produit sans la faire vivre : il part avec elle, et la géométrie
+    // qu'il était seul à tenir part ensuite (sinon elle restait dans le fichier après une suppression)
+    IFCSHAPEASPECT: [4] };
   // Objets racines (GlobalId) qu'on peut quand même supprimer quand plus rien ne les référence.
   // (…PROPERTIES : jeux de propriétés prédéfinis de l'IFC2X3, même rôle qu'un IFCPROPERTYSET)
   // (pas IFCRELDEFINESBYPROPERTIES : la relation est une racine, c'est elle qui tient le jeu en vie)
