@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.15.0";
+  var VERSION = "1.15.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -3538,22 +3538,40 @@
     if (ident === "attr:nom") v = l.i.nom;
     else if (ident === "attr:tag") v = l.i.tag;
     else {
+      // par le nom du paramètre, quel que soit son jeu (le même paramètre Revit peut changer de jeu d'un export
+      // à l'autre) ; l'ancienne écriture « Jeu · Paramètre » est encore comprise
       var nom = ident.slice(5);
-      IFC.donnees(l.f.m, l.id).some(function(d){ if (d.jeu + " · " + d.nom !== nom || d.v === "") return false; v = String(d.v); return true; });
+      IFC.donnees(l.f.m, l.id).some(function(d){ if ((d.nom !== nom && d.jeu + " · " + d.nom !== nom) || d.v === "") return false; v = String(d.v).trim(); return !!v; });
     }
     return v ? "v\u0000" + v : "g\u0000" + l.i.globalId;
   }
-  // Propriétés renseignées dans les deux maquettes, d'après un échantillon de 300 éléments de chacune
+  // Paramètres (noms de propriétés, sans leur jeu) renseignés dans les deux maquettes, d'après un échantillon de
+  // 1000 éléments de chacune
   function proprietesCommunes(){
     var jeux = fichiers.map(function(f){
-      var ls = lignes.filter(function(l){ return l.i && l.f === f && l.i.genre === "element"; }), pas = Math.max(1, Math.floor(ls.length/300)), vus = new Set();
-      for (var k = 0; k < ls.length; k += pas) IFC.donnees(f.m, ls[k].id).forEach(function(d){ if (d.v !== "" && !d.quantite) vus.add(d.jeu + " · " + d.nom); });
+      var ls = lignes.filter(function(l){ return l.i && l.f === f && l.i.genre === "element"; }), pas = Math.max(1, Math.floor(ls.length/1000)), vus = new Set();
+      for (var k = 0; k < ls.length; k += pas) IFC.donnees(f.m, ls[k].id).forEach(function(d){ if (d.v !== "" && !d.quantite && d.nom) vus.add(d.nom); });
       return vus;
     });
     var out = [];
     jeux[0].forEach(function(k){ if (jeux[1].has(k)) out.push(k); });
     return out.sort(function(a, b){ return a.localeCompare(b, "fr", { numeric: true }); });
   }
+  // liste « Identité » : GlobalId, Nom, Repère, les paramètres communs, puis « Autre paramètre… » pour en saisir un
+  function remplirIdentites(idents, choisi){
+    if (idents.indexOf(choisi) < 0) idents.push(choisi);       // choix gardé ou saisi, absent de l'échantillon
+    $("#cmp-identite").innerHTML = idents.map(function(v){
+      return '<option value="' + esc(v) + '"' + (v === choisi ? " selected" : "") + ">" + esc(nomIdentite(v) + (v ? "" : " (par défaut)")) + "</option>";
+    }).join("") + '<option value="__autre__">Autre paramètre…</option>';
+    $("#cmp-identite").setAttribute("data-choisi", choisi);
+  }
+  $("#cmp-identite").addEventListener("change", function(){
+    if (this.value !== "__autre__"){ this.setAttribute("data-choisi", this.value); return; }
+    var avant = this.getAttribute("data-choisi") || "", nom = prompt("Nom du paramètre qui identifie un élément dans les deux maquettes (tel qu'il s'affiche dans le panneau Propriétés) :", avant.indexOf("prop:") === 0 ? avant.slice(5) : "");
+    nom = nom === null ? "" : nom.trim().slice(0, 200);
+    var idents = [].map.call(this.options, function(o){ return o.value; }).filter(function(v){ return v !== "__autre__"; });
+    remplirIdentites(idents, nom ? "prop:" + nom : avant);
+  });
   function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
     if (fichiers.length !== 2){
@@ -3565,10 +3583,7 @@
     ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
     $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
     var idents = ["", "attr:nom", "attr:tag"].concat(proprietesCommunes().map(function(k){ return "prop:" + k; }));
-    if (idents.indexOf(optsDiff.identite) < 0) idents.push(optsDiff.identite);       // choix gardé, absent de l'échantillon
-    $("#cmp-identite").innerHTML = idents.map(function(v){
-      return '<option value="' + esc(v) + '"' + (v === optsDiff.identite ? " selected" : "") + ">" + esc(nomIdentite(v) + (v ? "" : " (par défaut)")) + "</option>";
-    }).join("");
+    remplirIdentites(idents, optsDiff.identite);
     // différences les plus fréquentes de la dernière comparaison : à cocher pour ne plus en tenir compte
     var fr = diffBilan ? diffBilan.frequents : [], z = $("#cmp-frequents");
     z.hidden = !fr.length;
@@ -3588,7 +3603,8 @@
       else if (ign.indexOf(f[0]) < 0) ign.push(f[0]);
     });
     optsDiff.ignorer = ign.slice(0, 200);
-    optsDiff.identite = $("#cmp-identite").value || "";
+    var ident = $("#cmp-identite").value || "";
+    optsDiff.identite = ident === "__autre__" ? $("#cmp-identite").getAttribute("data-choisi") || "" : ident;
     garder("ifc.diff", JSON.stringify(optsDiff));
     comparerMaquettes(+$("#cmp-ancien").value);
   });
@@ -3712,6 +3728,19 @@
   $("#props").addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest("[data-evidence]");
     if (b) voirEvidence(b.getAttribute("data-evidence"));
+  });
+  // Clic droit sur une propriété du panneau, deux maquettes ouvertes : la prendre comme identité de la comparaison
+  $("#props").addEventListener("contextmenu", function(e){
+    var dt = e.target.closest && e.target.closest(".pset dt, .pset dd");
+    if (!dt || fichiers.length !== 2) return;
+    if (dt.tagName === "DD") dt = dt.previousElementSibling;
+    var nom = dt && dt.tagName === "DT" ? dt.textContent.trim() : "";
+    if (!nom || nom === "—" || nom.indexOf(" › ") >= 0) return;
+    e.preventDefault();
+    if (!confirm("Identifier les éléments des deux maquettes par le paramètre « " + nom + " » pour la comparaison ?")) return;
+    optsDiff.identite = "prop:" + nom;
+    garder("ifc.diff", JSON.stringify(optsDiff));
+    ouvrirComparer();
   });
   // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché : état, puis ancienne → nouvelle valeur
   function htmlComparaison(c){
