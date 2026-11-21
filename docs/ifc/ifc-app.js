@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.8.1";
+  var VERSION = "1.8.2";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -2438,6 +2438,7 @@
     var duFichier = colorer === "fichier";
     lignes.forEach(function(l){
       if (!l.i || !l.f.visible || l.f.enCalcul || !l.i.vue3D || caches.has(l.cle)) return;
+      if (catsMasquees.size && catDe && catsMasquees.has(catDe.get(l.cle))) return;      // catégorie décochée dans la légende
       // couleurs du fichier : celle de l'élément s'il en a une, sinon sa teinte habituelle
       var rgb = duFichier ? couleurFichier(l.f.m, l.id) : null;
       items.push({ cle: l.cle, m: l.f.m, id: l.id, h: rgb ? null : teinteElement(l.f, l.id), rgb: rgb });
@@ -2989,6 +2990,7 @@
 
   // ================= Couleurs selon un critère (légende cliquable) =================
   var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette", "fichier"]), teintesCat = null, catsLegende = [], catDe = null;
+  var catsMasquees = new Set();      // catégories de la légende décochées : leurs éléments ne sont pas dessinés
   var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison", fichier: "Couleurs du fichier" };
   function categorie(l){
     if (colorer === "type") return l.i.typeLib;
@@ -3003,7 +3005,7 @@
     var leg = $("#legende");
     // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
     if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = null; }
-    if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
+    if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; catsMasquees.clear(); leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
     lignes.forEach(function(l){
@@ -3022,11 +3024,13 @@
     var MAX = 14;
     leg.innerHTML = '<div class="legende-titre"><span>' + esc(NOMS_COLORER[colorer]) + '</span><button type="button" data-leg-fermer title="Revenir aux couleurs des maquettes" aria-label="Fermer la légende">×</button></div><ul>' +
       catsLegende.slice(0, MAX).map(function(c, k){
-        return '<li><button type="button" data-cat="' + k + '" title="Sélectionner ces éléments"><i style="--t:' + (teinte.has(c) ? pastille(teinte.get(c)) : "var(--texte-faible)") + '"></i><span>' + esc(c) + "</span><b>" + fmtN(compte.get(c)) + "</b></button></li>";
+        return '<li><input type="checkbox" data-cat-voir="' + k + '"' + (catsMasquees.has(c) ? "" : " checked") + ' title="Afficher ou masquer ces éléments dans la vue 3D" aria-label="Afficher ' + esc(c) + '">' +
+          '<button type="button" data-cat="' + k + '" title="Sélectionner ces éléments"><i style="--t:' + (teinte.has(c) ? pastille(teinte.get(c)) : "var(--texte-faible)") + '"></i><span>' + esc(c) + "</span><b>" + fmtN(compte.get(c)) + "</b></button></li>";
       }).join("") + "</ul>" + (catsLegende.length > MAX ? '<div class="autres">+ ' + pluriel(catsLegende.length - MAX, "autre catégorie", "autres catégories") + "</div>" : "");
     leg.hidden = false;
   }
   function poserColorer(v){
+    if ((v || "") !== colorer) catsMasquees.clear();      // autre découpage : toutes les catégories reviennent
     colorer = v || "";
     if (colorer !== "diff") garder("ifc.colorer", colorer);
     calculerCouleurs();
@@ -3034,6 +3038,16 @@
     if (colorer === "fichier") etat("Couleurs du fichier : styles de surface et matériaux de l'IFC. Les éléments sans couleur gardent celle de leur maquette ; la transparence n'est pas rendue.");
     else if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
   }
+  // case d'une ligne de la légende : la catégorie disparaît de la vue 3D ou y revient (la liste ne change pas)
+  $("#legende").addEventListener("change", function(e){
+    var t = e.target;
+    if (!t.hasAttribute || !t.hasAttribute("data-cat-voir")) return;
+    var c = catsLegende[+t.getAttribute("data-cat-voir")];
+    if (c === undefined) return;
+    if (t.checked) catsMasquees.delete(c); else catsMasquees.add(c);
+    majVue();
+    etat("« " + c + " » " + (t.checked ? "affiché" : "masqué") + " dans la vue 3D." + (catsMasquees.size ? " " + pluriel(catsMasquees.size, "catégorie masquée", "catégories masquées") + "." : ""));
+  });
   $("#legende").addEventListener("click", function(e){
     if (e.target.closest("[data-leg-fermer]")){ poserColorer(""); etat("Couleurs des maquettes rétablies."); return; }
     var b = e.target.closest("[data-cat]");
@@ -3239,6 +3253,7 @@
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
       parGid.forEach(function(x, gid){ if (!vusB.has(gid)){ de.set(x.l.cle, ETATS_DIFF.supprime); n.supprime++; } });
       diffDe = de; diffQuoi = quoi;
+      catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
       var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m);

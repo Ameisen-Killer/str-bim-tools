@@ -521,7 +521,9 @@ body.mode-ed .p-props .p-titre::after{content:" · modifiables";font-weight:400;
 .legende-titre{display:flex;justify-content:space-between;gap:12px;font-weight:600;margin-bottom:4px}
 .legende-titre button{background:none;border:0;padding:0 2px;cursor:pointer;color:var(--texte-faible);font-size:15px;line-height:1}
 .legende ul{list-style:none;margin:0;padding:0}
-.legende li button{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;background:none;border:0;padding:2px 2px;border-radius:4px;cursor:pointer;color:var(--texte);font:inherit;text-align:left}
+.legende li{display:flex;align-items:center;gap:6px}
+.legende li input{flex:none;width:14px;height:14px;margin:0;accent-color:var(--or);cursor:pointer}
+.legende li button{flex:1;min-width:0;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;background:none;border:0;padding:2px 2px;border-radius:4px;cursor:pointer;color:var(--texte);font:inherit;text-align:left}
 .legende li button:hover{background:rgba(var(--or-rvb),.13)}
 .legende li i{width:12px;height:12px;border-radius:3px;background:var(--t)}
 .legende li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1301,7 +1303,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=66"></script>
+<script src="/ifc/ifc-app.js?v=67"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
