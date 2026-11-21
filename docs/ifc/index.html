@@ -381,6 +381,11 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .fic{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px 9px 12px;margin-top:6px;border-top:1px solid var(--ligne);border-bottom:1px solid var(--ligne);background:var(--noir-2);cursor:pointer}
 .fic:first-child{margin-top:0;border-top:0}
 .fic .el-nom{font-weight:400}
+.fic[draggable="true"]{cursor:grab}
+.fic.glisse{opacity:.45}
+.fic.cible-avant{box-shadow:inset 0 2px 0 var(--or)}
+.fic.cible-apres{box-shadow:inset 0 -2px 0 var(--or)}
+.fic-ab{display:inline-block;min-width:1.5em;margin-right:6px;padding:1px 5px;border-radius:4px;background:rgba(var(--or-rvb),.18);color:var(--or);font-family:var(--mono);font-size:11px;font-weight:600;text-align:center;vertical-align:1px}
 .fic.masque .el-nom,.fic.masque .el-info{opacity:.45}
 .fic-oeil,.fic-act button{background:none;border:0;padding:4px;cursor:pointer;color:var(--texte-doux);font-family:var(--mono);font-size:11px;letter-spacing:.06em;line-height:1}
 .fic-oeil{font-size:14px;width:22px;text-align:center}
@@ -1192,7 +1197,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <dialog id="comparer" class="prefs sim">
   <form method="dialog">
     <h2>Comparer les deux maquettes</h2>
-    <label><span>Ancienne</span><select class="champ" id="cmp-ancien"></select></label>
+    <label><span>Ancienne (A)</span><select class="champ" id="cmp-ancien"></select></label>
     <fieldset>
       <legend>Comparer</legend>
       <div class="cmp-grille">
@@ -1350,7 +1355,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=75"></script>
+<script src="/ifc/ifc-app.js?v=76"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
