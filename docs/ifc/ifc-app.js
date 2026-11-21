@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.16.0";
+  var VERSION = "1.17.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -512,7 +512,8 @@
   // Ajoute un ou plusieurs fichiers à ceux déjà ouverts
   // aLaPlace : les fichiers ouverts sont fermés une fois les nouveaux lus (commande Ouvrir) ; décidé à l'appel,
   // pour qu'un « Ouvrir » abandonné ne fasse pas remplacer le dépôt de fichiers suivant
-  function charger(liste, aLaPlace){
+  // aLaPlaceDe : maquette ouverte que le (seul) fichier lu remplace, à son rang (« Recharger depuis… »)
+  function charger(liste, aLaPlace, aLaPlaceDe){
     liste = [].slice.call(liste || []);
     if (!liste.length || occupe()) return;
     erreur("");
@@ -549,8 +550,19 @@
       $("#chargement").hidden = true;
       if (ajoutes.length && aLaPlace) vider();
       if (ajoutes.length){
+        var rang = aLaPlaceDe ? fichiers.indexOf(aLaPlaceDe) : -1;
+        if (rang >= 0) retirerFichier(aLaPlaceDe);
         var aCalculer = ajoutes.filter(function(m){ return !!m.idsGeo; }), vide = !fichiers.length;
         ouvrir(ajoutes, performance.now() - t0, refus);
+        if (rang >= 0){
+          // la nouvelle maquette, ouverte en fin de liste, reprend le rang, la couleur et le pli de l'ancienne
+          var nf = fichiers[fichiers.length - 1];
+          nf.teinte = aLaPlaceDe.teinte; nf.plie = aLaPlaceDe.plie;
+          fichiers.splice(fichiers.length - 1, 1);
+          fichiers.splice(Math.min(rang, fichiers.length), 0, nf);
+          reconstruire();
+          etat("« " + aLaPlaceDe.m.nom + " » remplacée par « " + nf.m.nom + " »" + (fichiers.length === 2 ? " (" + (rang ? "B" : "A") + ")" : "") + ". Relance la comparaison si elle était affichée.");
+        }
         if (aCalculer.length) geometrieFond(aCalculer, vide);
       }
       else if (fichiers.length) etat("Fichier refusé. " + refus.join(" "));
@@ -752,9 +764,8 @@
     });
   }
 
-  function fermer(f){
-    if (occupe()) return;
-    if (modifie(f) && !confirm("Les modifications non exportées de « " + f.m.nom + " » seront perdues. Fermer quand même ?")) return;
+  // Sort une maquette de la session (liste, historique, vue), sans rien demander ni redessiner
+  function retirerFichier(f){
     fichiers = fichiers.filter(function(x){ return x !== f; });
     parUid.delete(f.uid);
     // l'historique oublie ce fichier
@@ -764,7 +775,23 @@
         if (!pile[i].parts.length) pile.splice(i, 1);
       }
     });
+    // une comparaison qui portait sur elle ne vaut plus
+    diffDe = null; diffFocus = null;
     vue.modeles(fichiers.map(function(x){ return x.m; }));
+  }
+  // « Recharger depuis… » (clic droit sur une maquette) : un autre fichier prend sa place dans la liste, au même
+  // rang (A ou B), avec sa couleur. L'ancienne n'est retirée qu'une fois le nouveau fichier lu.
+  var rechargeCible = null;
+  function rechargerDepuis(f){
+    if (occupe()) return;
+    if (modifie(f) && !confirm("Les modifications non exportées de « " + f.m.nom + " » seront perdues. Recharger quand même ?")) return;
+    rechargeCible = f; remplacer = false;
+    choisir();
+  }
+  function fermer(f){
+    if (occupe()) return;
+    if (modifie(f) && !confirm("Les modifications non exportées de « " + f.m.nom + " » seront perdues. Fermer quand même ?")) return;
+    retirerFichier(f);
     if (!fichiers.length){
       choix = new Set(); caches = new Set(); plies = new Set(); actif = ""; lignes = [];
       modeEditeur(false);
@@ -1436,6 +1463,7 @@
       if (rf > 0) h.push(bouton("monter", fichiers.length === 2 ? "Placer en premier (A, ancienne version)" : "Monter dans la liste"));
       if (rf < fichiers.length - 1) h.push(bouton("descendre", fichiers.length === 2 ? "Placer en second (B, nouvelle version)" : "Descendre dans la liste"));
     }
+    if (!noeud) h.push("<hr>", bouton("recharger", "Recharger depuis…"));
     if (!noeud) h.push("<hr>", bouton("voir", f.visible ? "Masquer dans la vue 3D" : "Afficher dans la vue 3D"), bouton("export", "Exporter ce fichier"), bouton("fermer", "Fermer ce fichier", "danger"));
     h.push("<hr>", bouton("tout-reduire", "Tout réduire"), bouton("tout-developper", "Tout développer"));
     montrerCtx(x, y, h, c);
@@ -1627,6 +1655,7 @@
     else if (a === "teinte") teinter(f, b.getAttribute("data-h") === "" ? null : +b.getAttribute("data-h"));
     else if (a === "teinte-phase") teinterPhase(f, b.getAttribute("data-q"), b.getAttribute("data-h") === "m" ? undefined : +b.getAttribute("data-h"));
     else if (a === "monter" || a === "descendre"){ var rk = fichiers.indexOf(f); deplacerFichier(f, a === "monter" ? rk - 1 : rk + 1); }
+    else if (a === "recharger") rechargerDepuis(f);
     else if (a === "voir") basculerVisible(f);
     else if (a === "export") exporter(f);
     else if (a === "fermer") fermer(f);
@@ -4274,11 +4303,13 @@
   function choisir(){ entree.value = ""; entree.click(); }
   $("#choisir").addEventListener("click", choisir);
   entree.addEventListener("change", function(){
-    var aLaPlace = remplacer;
-    remplacer = false;
-    if (entree.files && entree.files.length) charger(entree.files, aLaPlace);
+    var aLaPlace = remplacer, cible = rechargeCible;
+    remplacer = false; rechargeCible = null;
+    if (!entree.files || !entree.files.length) return;
+    if (cible && fichiers.indexOf(cible) >= 0) charger([entree.files[0]], false, cible);
+    else charger(entree.files, aLaPlace);
   });
-  entree.addEventListener("cancel", function(){ remplacer = false; });
+  entree.addEventListener("cancel", function(){ remplacer = false; rechargeCible = null; });
 
   function deposeFichiers(e){ var t = e.dataTransfer && e.dataTransfer.types; return !!t && [].indexOf.call(t, "Files") >= 0; }
   var profondeur = 0;
