@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.12.2";
+  var VERSION = "1.13.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -900,9 +900,13 @@
 
   function enteteFichier(f){
     var m = f.m;
-    return '<div class="fic' + (f.visible ? "" : " masque") + (f.plie ? " plie" : "") + (modifie(f) ? " modifie" : "") + '" data-fic="' + f.uid + '">' +
+    // deux maquettes ouvertes : la première de la liste est l'ancienne (A), la seconde la nouvelle (B) pour la
+    // comparaison ; l'ordre se change en glissant un en-tête sur l'autre
+    var rang = fichiers.length === 2 ? fichiers.indexOf(f) : -1;
+    var ab = rang < 0 ? "" : '<span class="fic-ab" title="' + (rang ? "B : nouvelle version" : "A : ancienne version") + ' pour la comparaison. Glisse cette ligne pour changer l\'ordre.">' + (rang ? "B" : "A") + "</span>";
+    return '<div class="fic' + (f.visible ? "" : " masque") + (f.plie ? " plie" : "") + (modifie(f) ? " modifie" : "") + '" data-fic="' + f.uid + '"' + (fichiers.length > 1 ? ' draggable="true"' : "") + ">" +
       '<button type="button" class="fic-oeil" data-act="voir" aria-pressed="' + f.visible + '" title="' + (f.visible ? "Masquer" : "Afficher") + ' dans la vue 3D">' + (f.visible ? "◉" : "○") + "</button>" +
-      '<div><div class="el-nom"><span class="pli" aria-hidden="true">▾</span> ' + (f.teinte != null ? '<span class="fic-teinte" style="--t:' + pastille(f.teinte) + '"></span>' : "") + esc(m.nom) + '</div><div class="el-info">' +
+      '<div><div class="el-nom"><span class="pli" aria-hidden="true">▾</span> ' + ab + (f.teinte != null ? '<span class="fic-teinte" style="--t:' + pastille(f.teinte) + '"></span>' : "") + esc(m.nom) + '</div><div class="el-info">' +
       esc(m.schema + " · " + fmtN(m.nbOrigine) + (m.ent.size !== m.nbOrigine ? " → " + fmtN(m.ent.size) : "") + " entités · " + fmtTaille(tailleDe(f))) + "</div></div>" +
       '<span class="fic-act"><button type="button" data-act="export" title="Exporter ce fichier">Exporter</button>' +
       '<button type="button" class="fermer" data-act="fermer" title="Fermer ce fichier" aria-label="Fermer ' + esc(m.nom) + '">×</button></span></div>';
@@ -1426,6 +1430,12 @@
         }).join("") +
         '<button type="button" role="menuitem" class="autre" data-ctx="autre-phase" data-q="' + q + '" title="Autre couleur…" aria-label="Autre couleur"></button></div>');
     });
+    if (!noeud && fichiers.length > 1){
+      var rf = fichiers.indexOf(f);
+      h.push("<hr>");
+      if (rf > 0) h.push(bouton("monter", fichiers.length === 2 ? "Placer en premier (A, ancienne version)" : "Monter dans la liste"));
+      if (rf < fichiers.length - 1) h.push(bouton("descendre", fichiers.length === 2 ? "Placer en second (B, nouvelle version)" : "Descendre dans la liste"));
+    }
     if (!noeud) h.push("<hr>", bouton("voir", f.visible ? "Masquer dans la vue 3D" : "Afficher dans la vue 3D"), bouton("export", "Exporter ce fichier"), bouton("fermer", "Fermer ce fichier", "danger"));
     h.push("<hr>", bouton("tout-reduire", "Tout réduire"), bouton("tout-developper", "Tout développer"));
     montrerCtx(x, y, h, c);
@@ -1487,6 +1497,55 @@
     if (b) b.focus({ preventScroll: true });
   }
   function fermerCtx(){ if (!ctx.hidden){ ctx.hidden = true; cible = null; } }
+  // Ordre des maquettes : glisser l'en-tête d'une maquette sur une autre (avant ou après, selon la moitié visée),
+  // ou clic droit sur l'en-tête. À deux maquettes, la première est l'ancienne (A) et la seconde la nouvelle (B)
+  // de la comparaison.
+  function deplacerFichier(f, rang){
+    var k = fichiers.indexOf(f);
+    rang = Math.max(0, Math.min(fichiers.length - 1, rang));
+    if (k < 0 || rang === k) return;
+    fichiers.splice(k, 1);
+    fichiers.splice(rang, 0, f);
+    reconstruire();
+    etat(fichiers.length === 2 ? "Ordre pour la comparaison : A (ancienne) « " + fichiers[0].m.nom + " », B (nouvelle) « " + fichiers[1].m.nom + " »."
+      : "« " + f.m.nom + " » : " + (rang + 1) + "e de la liste.");
+  }
+  var ficGlisse = null;
+  function ficSous(e){ var x = e.target.closest && e.target.closest(".fic"); return x ? parUid.get(+x.getAttribute("data-fic")) : null; }
+  function finGlisse(){
+    ficGlisse = null;
+    [].forEach.call(document.querySelectorAll("#liste .fic.glisse, #liste .fic.cible-avant, #liste .fic.cible-apres"), function(x){ x.classList.remove("glisse", "cible-avant", "cible-apres"); });
+  }
+  $("#liste").addEventListener("dragstart", function(e){
+    var f = ficSous(e);
+    if (!f || fichiers.length < 2 || occupe()){ e.preventDefault(); return; }
+    ficGlisse = f;
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", f.m.nom); } catch (x){}
+    e.target.closest(".fic").classList.add("glisse");
+  });
+  $("#liste").addEventListener("dragover", function(e){
+    var f = ficGlisse ? ficSous(e) : null;
+    if (!ficGlisse) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = f && f !== ficGlisse ? "move" : "none";
+    [].forEach.call(document.querySelectorAll("#liste .fic.cible-avant, #liste .fic.cible-apres"), function(x){ x.classList.remove("cible-avant", "cible-apres"); });
+    if (!f || f === ficGlisse) return;
+    var el = e.target.closest(".fic"), r = el.getBoundingClientRect();
+    el.classList.add(e.clientY < r.top + r.height/2 ? "cible-avant" : "cible-apres");
+  });
+  $("#liste").addEventListener("drop", function(e){
+    var f = ficGlisse, cible = f ? ficSous(e) : null;
+    if (!f) return;
+    e.preventDefault();
+    var el = cible && e.target.closest(".fic"), avant = el ? e.clientY < el.getBoundingClientRect().top + el.getBoundingClientRect().height/2 : false;
+    finGlisse();
+    if (!cible || cible === f) return;
+    // rang visé dans la liste une fois la maquette glissée retirée
+    var reste = fichiers.filter(function(x){ return x !== f; }), k = reste.indexOf(cible);
+    deplacerFichier(f, avant ? k : k + 1);
+  });
+  $("#liste").addEventListener("dragend", finGlisse);
   // Clavier dans la liste (une fois cliquée ou atteinte par Tab) : flèches pour passer d'un élément à l'autre,
   // Début et Fin, Espace pour cocher ou décocher l'élément affiché (Maj + flèche : coche en avançant)
   $("#liste").addEventListener("keydown", function(e){
@@ -1566,6 +1625,7 @@
     else if (a === "similaires") similaires(l.cle);
     else if (a === "teinte") teinter(f, b.getAttribute("data-h") === "" ? null : +b.getAttribute("data-h"));
     else if (a === "teinte-phase") teinterPhase(f, b.getAttribute("data-q"), b.getAttribute("data-h") === "m" ? undefined : +b.getAttribute("data-h"));
+    else if (a === "monter" || a === "descendre"){ var rk = fichiers.indexOf(f); deplacerFichier(f, a === "monter" ? rk - 1 : rk + 1); }
     else if (a === "voir") basculerVisible(f);
     else if (a === "export") exporter(f);
     else if (a === "fermer") fermer(f);
@@ -3446,7 +3506,7 @@
       etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version et la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
       return;
     }
-    var anc = diffBilan && parUid.has(diffBilan.ancien) ? diffBilan.ancien : fichiers[0].uid;
+    var anc = fichiers[0].uid;         // l'ordre de la liste fait foi : A en premier, B en second
     $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
     ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
     $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
