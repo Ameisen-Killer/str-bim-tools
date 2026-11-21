@@ -370,6 +370,7 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 .el-nom{font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el-info{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .el.spatial .el-nom{color:var(--texte-doux);font-weight:400}
+.liste:focus-visible{outline:1px solid var(--or);outline-offset:-1px}
 .el.groupe{cursor:pointer}
 .el.groupe .el-nom{font-weight:600}
 .el.ouverture{opacity:.62}
@@ -832,6 +833,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <hr data-ed>
             <button type="button" role="menuitem" data-ed data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
             <button type="button" role="menuitem" data-ed data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="exporter-selection"><span>Exporter la sélection en IFC</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="tableau-xlsx"><span>Exporter le tableau des éléments (Excel)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="tableau-csv"><span>Exporter le tableau des éléments (CSV)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="capture"><span>Enregistrer l'image de la vue (PNG)</span><kbd></kbd></button>
@@ -1050,7 +1052,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <span class="compte" id="compte"></span>
           </div>
         </div>
-        <div class="liste" id="liste" role="list"></div>
+        <div class="liste" id="liste" role="list" tabindex="0" aria-label="Éléments : flèches pour parcourir, Espace pour cocher"></div>
         <div class="bord-panneau g" id="poi-g" role="separator" aria-orientation="vertical" aria-label="Largeur du panneau Éléments" title="Tirer pour élargir · double-clic : largeur de départ"></div>
       </aside>
 
@@ -1330,7 +1332,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=69"></script>
+<script src="/ifc/ifc-app.js?v=70"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

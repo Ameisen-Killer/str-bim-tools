@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.9.1";
+  var VERSION = "1.10.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -1485,6 +1485,29 @@
     if (b) b.focus({ preventScroll: true });
   }
   function fermerCtx(){ if (!ctx.hidden){ ctx.hidden = true; cible = null; } }
+  // Clavier dans la liste (une fois cliquée ou atteinte par Tab) : flèches pour passer d'un élément à l'autre,
+  // Début et Fin, Espace pour cocher ou décocher l'élément affiché (Maj + flèche : coche en avançant)
+  $("#liste").addEventListener("keydown", function(e){
+    if (e.target !== this || e.ctrlKey || e.metaKey || e.altKey) return;
+    var haut = e.key === "ArrowUp", bas = e.key === "ArrowDown";
+    if (e.key === " " || e.key === "Spacebar"){
+      e.preventDefault();
+      if (!actif || !existe(actif) || !supprimable(actif)) return;
+      cocher(actif, !choix.has(actif));
+      dernierCoche = actif;
+      majLignes(); afficherProps(); maj();
+      return;
+    }
+    if (!haut && !bas && e.key !== "Home" && e.key !== "End") return;
+    var els = [];
+    rangs.forEach(function(r){ if (r.l) els.push(r.l.cle); });
+    if (!els.length) return;
+    e.preventDefault();
+    var k = els.indexOf(actif);
+    k = e.key === "Home" ? 0 : e.key === "End" ? els.length - 1 : k < 0 ? (bas ? 0 : els.length - 1) : Math.max(0, Math.min(els.length - 1, k + (bas ? 1 : -1)));
+    if (e.shiftKey && (haut || bas) && supprimable(els[k])){ cocher(els[k], true); dernierCoche = els[k]; }
+    activer(els[k], true);
+  });
   $("#liste").addEventListener("contextmenu", function(e){
     var fic = e.target.closest(".fic"), r = e.target.closest(".el"), k = -1;
     if (fic){ var f = parUid.get(+fic.getAttribute("data-fic")); if (f) k = indexFichier(f); }
@@ -1696,6 +1719,7 @@
       return '<button type="button" role="menuitem" data-cmd="vue-rappel" data-k="' + k + '"><span>' + esc(v.nom) + "</span><kbd></kbd></button>";
     }).join("") + (lv.length ? '<button type="button" role="menuitem" data-cmd="vues-oublier"><span>Supprimer les vues enregistrées…</span><kbd></kbd></button>' : "");
     activerCmd("vue-enregistrer", fichiers.length > 0);
+    activerCmd("exporter-selection", choix.size > 0);
     activerCmd("rapport-comparaison", !!diffPaires && colorer === "diff");
     var dyn = $('[data-dyn="exports"]');
     dyn.innerHTML = fichiers.length > 1 ? fichiers.map(function(f){
@@ -1908,6 +1932,56 @@
         ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length) + (zip ? ", compressé " + fmtTaille(blob.size) : "");
     });
   }
+  // ================= Export de la sélection seule =================
+  // Un IFC qui ne contient que les éléments cochés (avec leurs enfants d'assemblage, leurs ouvertures, leurs
+  // assemblages parents et, pour une ouverture, son hôte), la structure spatiale et ce dont ils dépendent. Le
+  // reste est retiré comme par une suppression, le fichier est écrit, puis tout est remis : la maquette ouverte
+  // et son historique ne changent pas.
+  function exporterSelection(){
+    if (occupe()) return;
+    var parF = groupesFichiers(Array.from(choix).filter(existe));
+    if (!parF.size){ etat("Export de la sélection : coche d'abord les éléments à garder."); return; }
+    var bilans = [], suite = Promise.resolve(), rang = 0;
+    parF.forEach(function(ids, f){
+      var k = rang++;
+      suite = suite.then(function(){ return k ? pause(400) : null; }).then(function(){
+        var m = f.m, I = IFC.index(m), garde = new Set(), faits = [];
+        ids.forEach(function(id){
+          garde.add(id);
+          IFC.descendants(m, id).forEach(function(x){ garde.add(x); });
+          for (var x = id, n = 0; n < 64; n++){ x = I.parent.get(x) || I.perce.get(x); if (!x) break; garde.add(x); }
+        });
+        Array.from(garde).forEach(function(id){ (I.ouvertures.get(id) || []).forEach(function(o){ garde.add(o); }); });
+        var autres = [];
+        I.produits.forEach(function(id){
+          if (garde.has(id)) return;
+          var i = IFC.infos(m, id);
+          if (i && i.supprimable && (i.genre === "element" || i.genre === "ouverture")) autres.push(id);
+        });
+        var oct, nbGardes = 0;
+        try {
+          var p = IFC.planifier(m, autres);
+          if (p.nbElements){ IFC.appliquer(m, p.changement); faits.push(p.changement); }
+          var t = IFC.planPurge(m, { types: true });         // types que plus aucun élément gardé n'utilise
+          if (t.nbEntites || t.nbModifiees){ IFC.appliquer(m, t.changement); faits.push(t.changement); }
+          IFC.index(m).produits.forEach(function(id){ var i = IFC.infos(m, id); if (i && i.genre === "element") nbGardes++; });
+          oct = IFC.versOctets(IFC.ecrire(m));
+        } finally {
+          while (faits.length) IFC.appliquer(m, faits.pop(), true);
+        }
+        var nom = IFC.nomExport(m.nom).replace(/\.ifc$/i, "") + "_selection.ifc";
+        enregistrer(new Blob([oct], { type: "application/x-step" }), nom);
+        bilans.push("« " + nom + " » : " + pluriel(nbGardes, "élément") + ", " + fmtTaille(oct.length));
+      });
+    });
+    suite.then(function(){
+      etat("Sélection exportée : " + bilans.join(" ; ") + ". La maquette ouverte n'a pas changé.");
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Sélection non exportée : " + (err && err.message || err));
+    });
+  }
+
   // ================= Tableau des éléments (Excel, CSV) et totaux =================
   // Archive ZIP de plusieurs fichiers [{ nom, u (octets) }] : promesse d'un Blob. Compressée si le navigateur
   // le sait, sinon simplement rangée. Sert au classeur .xlsx, qui est un ZIP de fichiers XML.
@@ -3539,6 +3613,7 @@
     preferences: preferences,
     exporter: function(){ exporter(null); },
     "exporter-zip": function(){ exporter(null, true); },
+    "exporter-selection": exporterSelection,
     "tableau-xlsx": function(){ exporterTableau("xlsx"); },
     "tableau-csv": function(){ exporterTableau("csv"); },
     capture: function(){
@@ -3643,6 +3718,7 @@
         ["E", "Basculer Viewer / Éditeur"],
         ["D · Maj+D", "Déplacer (valeurs, ou deux points accrochés)"], ["K · Maj+K", "Copier (valeurs, ou deux points accrochés)"],
         ["R", "Rotation autour de la verticale"], ["A", "Aligner : face de référence, puis faces à amener dessus"], ["L", "Changer d'étage"],
+        ["↑ ↓ · Espace (liste)", "Passer d'un élément à l'autre, cocher ou décocher (Maj + flèche : cocher en avançant)"],
         ["Clic droit (liste)", "Réduire, développer, couleur de la maquette"],
         ["Clic droit (3D)", "Masquer, isoler, zoomer, boîte de coupe, sélectionner similaires ; en Éditeur : modifier"]
       ].map(function(x){ return "<kbd>" + esc(x[0]) + "</kbd><span>" + esc(x[1]) + "</span>"; }).join("") + "</div>");
