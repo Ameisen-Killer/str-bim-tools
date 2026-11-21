@@ -3209,6 +3209,49 @@
       if (!p) return;
       centre = p; px = x - W/2; py = y - H/2;
     }
+    // Rectangle de sélection (Ctrl + glisser), comme dans Revit : tracé de gauche à droite (trait plein), il prend
+    // les éléments entièrement dedans ; de droite à gauche (pointillé), ceux qu'il touche. Le test porte sur la
+    // boîte englobante de chaque élément affiché, projetée à l'écran ; les éléments cachés derrière d'autres
+    // sont pris aussi.
+    var rect = null, cadreRect = null;
+    function tracerRect(n){
+      if (!cadreRect){
+        cadreRect = document.createElement("div");
+        cadreRect.style.cssText = "position:absolute;z-index:2;pointer-events:none;box-sizing:border-box;background:rgba(214,168,92,.12)";
+        cv.parentNode.appendChild(cadreRect);
+      }
+      var st = cadreRect.style;
+      st.left = (cv.offsetLeft + Math.min(rect.x, n.x)) + "px"; st.top = (cv.offsetTop + Math.min(rect.y, n.y)) + "px";
+      st.width = Math.abs(n.x - rect.x) + "px"; st.height = Math.abs(n.y - rect.y) + "px";
+      st.border = "1px " + (n.x >= rect.x ? "solid" : "dashed") + " rgb(214,168,92)";
+    }
+    function finRect(){
+      rect = null;
+      if (cadreRect){ cadreRect.remove(); cadreRect = null; }
+    }
+    function choisirRect(a, b, e){
+      var x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y), dedans = b.x >= a.x;
+      var c = camera(), ids = [];
+      liste.forEach(function(it){
+        var g = it.geo, mn = g && g.min, mx = g && g.max;
+        if (!mn || !mx || !isFinite(mn[0]) || !isFinite(mx[0])) return;
+        if (coupe){      // hors de la boîte de coupe : pas à l'écran, donc pas pris
+          var lx0 = Infinity, lx1 = -Infinity, ly0 = Infinity, ly1 = -Infinity;
+          for (var q = 0; q < 4; q++){
+            var l = versBoite(coupe, q & 1 ? mx[0] : mn[0], q & 2 ? mx[1] : mn[1]);
+            if (l[0] < lx0) lx0 = l[0]; if (l[0] > lx1) lx1 = l[0]; if (l[1] < ly0) ly0 = l[1]; if (l[1] > ly1) ly1 = l[1];
+          }
+          if (lx0 > coupe.max[0] || lx1 < coupe.min[0] || ly0 > coupe.max[1] || ly1 < coupe.min[1] || mn[2] > coupe.max[2] || mx[2] < coupe.min[2]) return;
+        }
+        var u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+        for (var k = 0; k < 8; k++){
+          var s = ecran(c, [k & 1 ? mx[0] : mn[0], k & 2 ? mx[1] : mn[1], k & 4 ? mx[2] : mn[2]]);
+          if (s[0] < u0) u0 = s[0]; if (s[0] > u1) u1 = s[0]; if (s[1] < v0) v0 = s[1]; if (s[1] > v1) v1 = s[1];
+        }
+        if (dedans ? u0 >= x0 && u1 <= x1 && v0 >= y0 && v1 <= y1 : u1 >= x0 && u0 <= x1 && v1 >= y0 && v0 <= y1) ids.push(it.id);
+      });
+      rappels.surRectangle(ids, e, dedans);
+    }
     // Pas de recherche de l'objet sous la souris au survol : sur de grosses maquettes, ce rendu de
     // sélection à chaque pause de la souris freinait tout. L'objet n'est cherché qu'au clic.
     function brancher(){
@@ -3216,8 +3259,13 @@
         anim = null;
         try { cv.setPointerCapture(e.pointerId); } catch (x){}
         ptrs.set(e.pointerId, local(e));
-        if (ptrs.size === 1){ depart = local(e); bouge = false; multi = false; doigt = e.pointerType !== "mouse"; }
-        else multi = true;
+        if (ptrs.size === 1){
+          depart = local(e); bouge = false; multi = false; doigt = e.pointerType !== "mouse";
+          // Ctrl + glisser (souris, bouton gauche) : rectangle de sélection au lieu de la rotation
+          rect = (e.ctrlKey || e.metaKey) && e.pointerType === "mouse" && e.button === 0 && !mesure.actif && !saisie && rappels.surRectangle ?
+            { x: depart.x, y: depart.y } : null;
+        }
+        else { multi = true; finRect(); }
         cv.classList.add("tire");
       });
       cv.addEventListener("pointermove", function(e){
@@ -3225,6 +3273,12 @@
         var p = ptrs.get(e.pointerId);
         if (!p){ if (e.pointerType === "mouse"){ if (mesure.actif) survolMesure(e); } return; }
         var n = local(e);
+        if (rect && ptrs.size === 1){
+          if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5) bouge = true;
+          if (bouge) tracerRect(n);
+          p.x = n.x; p.y = n.y;
+          return;
+        }
         if (ptrs.size === 1){
           if (!bouge && Math.hypot(n.x - depart.x, n.y - depart.y) > 5){
           bouge = true;
@@ -3255,6 +3309,11 @@
         cv.classList.remove("tire");
         if (enRotation){ enRotation = false; demander(); }
         if (vite){ vite = false; demander(); }
+        if (rect){
+          var r0 = rect;
+          finRect();
+          if (e.type === "pointerup" && bouge && !multi){ choisirRect(r0, local(e), e); return; }
+        }
         if (e.type === "pointerup" && !bouge && !multi && mesure.actif && (e.button === 0 || e.pointerType !== "mouse")){
           var pm = local(e);
           if (W && H) cliqueMesure(pm.x, pm.y);
@@ -3384,6 +3443,19 @@
       // cube de navigation : orientation actuelle, vue animée vers une orientation, rotation libre au glisser
       // (dl, dp en radians, image allégée jusqu'à finTourner), lissage des bords
       angles: function(){ return { lacet: yaw, plongee: pitch }; },
+      // Image de la vue telle qu'affichée, sur le fond de la page : un canvas 2D, ou null si la vue est vide.
+      // Le dessin et la copie se font dans la foulée (le tampon WebGL n'est pas gardé d'une image à l'autre).
+      image: function(){
+        if (!W || !H || !cv.width || !cv.height) return null;
+        rendre();
+        var c2 = document.createElement("canvas"), x = c2.getContext("2d");
+        c2.width = cv.width; c2.height = cv.height;
+        var fond = getComputedStyle(cv.parentNode).backgroundColor || "";
+        x.fillStyle = /rgba?\(/.test(fond) && !/,\s*0\s*\)$/.test(fond) ? fond : getComputedStyle(document.body).backgroundColor || "#fff";
+        x.fillRect(0, 0, c2.width, c2.height);
+        x.drawImage(cv, 0, 0);
+        return c2;
+      },
       allerVers: allerVers,
       lissage: function(oui){ if (oui !== undefined){ lisse = !!oui; demander(); } return lisse; },
       // affichage filaire (arêtes vives seules, cachées en transparence) ou solide
@@ -3583,6 +3655,12 @@
       enSaisie: function(){ return !!saisie; },
       // boîte englobante d'éléments affichés (clés) : { min, max } ou null
       boite: function(cles){ return boiteDe(cles); },
+      // boîte englobante [min, max] de chaque élément affiché, par clé (comparaison de maquettes)
+      boitesElements: function(){
+        var o = new Map();
+        liste.forEach(function(it){ if (it.geo && it.geo.min && isFinite(it.geo.min[0])) o.set(it.id, [it.geo.min, it.geo.max]); });
+        return o;
+      },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
       effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
       // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }

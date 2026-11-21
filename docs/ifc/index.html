@@ -831,6 +831,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <button type="button" role="menuitem" data-ed data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="tableau-xlsx"><span>Exporter le tableau des éléments (Excel)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="tableau-csv"><span>Exporter le tableau des éléments (CSV)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="capture"><span>Enregistrer l'image de la vue (PNG)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-axes"><span>Exporter le plan des axes en DXF</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-3d"><span>Exporter le modèle analytique en DXF 3D</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-studio"><span>Ouvrir le modèle analytique dans DXF Studio</span><kbd></kbd></button>
@@ -986,6 +987,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
         <div class="mb-gr">
           <button type="button" class="mb-titre" role="menuitem" aria-haspopup="true" aria-expanded="false">Outils</button>
           <div class="mb-liste" role="menu" hidden>
+            <button type="button" role="menuitem" data-cmd="comparer"><span>Comparer les deux maquettes ouvertes</span><kbd></kbd></button>
+            <hr>
             <button type="button" role="menuitem" data-cmd="mesurer"><span id="cmd-mesurer">Mesurer</span><kbd>M</kbd></button>
             <button type="button" role="menuitem" data-cmd="coordonnees"><span id="cmd-coord">Coordonnées d'un point</span><kbd>C</kbd></button>
             <button type="button" role="menuitem" data-cmd="effacer-mesures"><span>Effacer les mesures et coordonnées</span><kbd></kbd></button>
@@ -1289,12 +1292,12 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
 <script src="/ifc/ifc-core.js?v=14"></script>
-<script src="/ifc/ifc-vue.js?v=47"></script>
+<script src="/ifc/ifc-vue.js?v=48"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=63"></script>
+<script src="/ifc/ifc-app.js?v=64"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

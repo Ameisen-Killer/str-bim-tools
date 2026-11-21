@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.6.1";
+  var VERSION = "1.7.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -36,6 +36,19 @@
   var cube = null;
   var vue = IFCVue.creer($("#vue"), { surClic: cliqueVue, surMenu: menuVue, moteur: moteurVoulu, surMesure: function(t){ etat(t); },
     surCamera: function(l, p){ if (cube) cube.camera(l, p); },
+    surRectangle: function(cles, e, dedans){
+      var oter = e.shiftKey, n = 0, premier = "";
+      cles.forEach(function(c){
+        if (!supprimable(c) || choix.has(c) === !oter) return;
+        if (oter) choix.delete(c); else { choix.add(c); if (!premier) premier = c; }
+        n++;
+      });
+      if (!oter && premier && (!actif || !choix.has(actif))) actif = premier;
+      if (oter && actif && !choix.has(actif)) actif = "";
+      majLignes(); afficherProps(); maj();
+      etat("Rectangle (" + (dedans ? "éléments entièrement dedans" : "éléments touchés") + ") : " +
+        pluriel(n, oter ? "élément retiré" : "élément ajouté", oter ? "éléments retirés" : "éléments ajoutés") + (oter ? " de" : " à") + " la sélection.");
+    },
     surMoteurPerdu: function(nom){
       if (fichiers.length) majVue();
       maj();
@@ -547,7 +560,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=5";
+  var URL_GEO = "/ifc/ifc-geo.js?v=6";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1012,6 +1025,7 @@
     etat(v ? "Arborescence regroupée par " + { classe: "classe IFC", type: "famille : type", materiau: "matériau" }[v] + " : coche un groupe pour sélectionner tous ses éléments."
       : "Arborescence : structure du projet.");
   }
+  var dernierCoche = "";        // dernière case cliquée dans la liste, départ d'une plage (Maj + clic)
   var visibles = [], rangs = [], VIRTUEL = 1500, MARGE = 800, hauts = { el: 46, fic: 62 }, fenetre = null, totalH = 0;
   function rendreListe(){
     var q = $("#recherche").value.trim(), t = $("#filtre-type").value, filtre = !!(q || t), crit = q ? lireRequete(q) : [];
@@ -1203,7 +1217,16 @@
     }
     var c = r.getAttribute("data-cle");
     if (e.target.closest("[data-pli]")){ if (plies.has(c)) plies.delete(c); else plies.add(c); rendreListe(); return; }
-    if (e.target.tagName === "INPUT"){ cocher(c, e.target.checked); if (e.target.checked) activer(c, false); else oublierActif(); return; }
+    if (e.target.tagName === "INPUT"){
+      // Maj + clic : toutes les lignes affichées entre la dernière case cliquée et celle-ci prennent son état
+      var etatCase = e.target.checked, ka = -1, kb = -1;
+      if (e.shiftKey && dernierCoche && dernierCoche !== c) rangs.forEach(function(x, k){ if (x.l){ if (x.l.cle === dernierCoche) ka = k; if (x.l.cle === c) kb = k; } });
+      if (ka >= 0 && kb >= 0){ for (var kk = Math.min(ka, kb); kk <= Math.max(ka, kb); kk++) if (rangs[kk].l) cocher(rangs[kk].l.cle, etatCase); }
+      else cocher(c, etatCase);
+      dernierCoche = c;
+      if (etatCase) activer(c, false); else oublierActif();
+      return;
+    }
     activer(c, false);
   });
   var delaiRech = 0;
@@ -1598,6 +1621,7 @@
       ligne("Ouvertures", ouv ? fmtN(ouv) : "") +
       ligne("Sélection", !i.supprimable ? "Structure spatiale, non supprimable" : choix.has(actif) ? "Cochée" : "") +
       "</dl>";
+    h += htmlComparaison(actif);
     var modif = new Map();
     if (ed) IFCEdition.proprietesEditables(m, id).forEach(function(p){ modif.set(p.jeu + "\u0000" + p.nom, p.texte); });
     IFC.proprietes(m, id).forEach(function(p){
@@ -2954,17 +2978,20 @@
 
   // ================= Couleurs selon un critère (légende cliquable) =================
   var colorer = lire("ifc.colorer", ["", "type", "famille", "etage", "materiau", "maquette"]), teintesCat = null, catsLegende = [], catDe = null;
-  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier" };
+  var NOMS_COLORER = { type: "Type IFC", famille: "Famille : type", etage: "Étage", materiau: "Matériau", maquette: "Fichier", diff: "Comparaison" };
   function categorie(l){
     if (colorer === "type") return l.i.typeLib;
     if (colorer === "famille") return l.i.objectType || "(sans famille : type)";
     if (colorer === "etage") return etageDe(l.f.m, l.id) || "(sans étage)";
     if (colorer === "materiau") return l.i.materiau || "(sans matériau)";
     if (colorer === "maquette") return l.f.m.nom;
+    if (colorer === "diff") return (diffDe && diffDe.get(l.cle)) || "Hors comparaison";
     return "";
   }
   function calculerCouleurs(){
     var leg = $("#legende");
+    // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
+    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = null; }
     if (!colorer || !fichiers.length){ teintesCat = null; catDe = null; leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
@@ -2977,6 +3004,8 @@
     catsLegende = Array.from(compte.keys()).sort(function(a, b){ return compte.get(b) - compte.get(a) || a.localeCompare(b); });
     // teintes réparties à l'angle d'or : voisines bien distinctes ; au-delà de 36 catégories, couleur par défaut
     catsLegende.forEach(function(c, k){ if (k < 36) teinte.set(c, Math.round((k*137.508 + 210) % 360)); });
+    // comparaison : vert, rouge, orange ; l'inchangé garde la couleur par défaut
+    if (colorer === "diff"){ teinte = new Map(); catsLegende.forEach(function(c){ if (TEINTES_DIFF[c] !== undefined) teinte.set(c, TEINTES_DIFF[c]); }); }
     teintesCat = new Map();
     catDe.forEach(function(c, k){ teintesCat.set(k, teinte.has(c) ? teinte.get(c) : null); });
     var MAX = 14;
@@ -2988,7 +3017,7 @@
   }
   function poserColorer(v){
     colorer = v || "";
-    garder("ifc.colorer", colorer);
+    if (colorer !== "diff") garder("ifc.colorer", colorer);
     calculerCouleurs();
     majVue();
     if (colorer) etat("Couleurs par " + NOMS_COLORER[colorer].toLowerCase() + " : " + pluriel(catsLegende.length, "catégorie") + ". Clique une ligne de la légende pour sélectionner ses éléments.");
@@ -3006,6 +3035,81 @@
   });
 
   poserMode(modeEd);
+
+  // ================= Comparaison de deux maquettes =================
+  // Deux versions du même projet, ouvertes ensemble : la première ouverte est l'ancienne, la seconde la nouvelle.
+  // Les éléments sont appariés par leur GlobalId, puis comparés : attributs, étage, matériau, propriétés et
+  // quantités, et boîte englobante de la forme (un élément déplacé ou redimensionné est « modifié »).
+  // Résultat dans diffDe (clé → état) et diffQuoi (clé → ce qui diffère), montré par les couleurs « Comparaison ».
+  var diffDe = null, diffQuoi = null, comparaisonEnCours = false;
+  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", modifie: "Modifié", pareil: "Inchangé" }, TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Modifié": 35 };
+  function ficheComparaison(l, boites){
+    var m = l.f.m, i = l.i, o = new Map();
+    o.set("Classe IFC", i.type); o.set("Nom", i.nom); o.set("Famille : type", i.objectType); o.set("Repère", i.tag);
+    o.set("Description", i.description); o.set("Matériau", i.materiau); o.set("Étage", etageDe(m, l.id));
+    IFC.donnees(m, l.id).forEach(function(d){
+      var k = d.jeu + " · " + d.nom;
+      if (!o.has(k)) o.set(k, typeof d.v === "number" ? String(Number(d.v.toPrecision(9))) : String(d.v));
+    });
+    return { o: o, b: boites.get(l.cle) || null };
+  }
+  function differences(a, b){
+    var quoi = [];
+    if (a.b && b.b){
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = 1e-6*d + 1e-9, geo = false;
+      for (var k = 0; k < 3; k++) if (Math.abs(a.b[0][k] - b.b[0][k]) > tol || Math.abs(a.b[1][k] - b.b[1][k]) > tol) geo = true;
+      if (geo) quoi.push("Géométrie (position ou dimensions)");
+    }
+    a.o.forEach(function(v, k){ if (!b.o.has(k)) quoi.push(k + " (retiré)"); else if (b.o.get(k) !== v) quoi.push(k); });
+    b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push(k + " (ajouté)"); });
+    return quoi;
+  }
+  function comparerMaquettes(){
+    if (comparaisonEnCours || occupe()) return;
+    if (fichiers.length !== 2){
+      etat("Comparaison : ouvre exactement deux maquettes, l'ancienne version puis la nouvelle (Fichier › Ajouter un IFC). " + pluriel(fichiers.length, "maquette ouverte", "maquettes ouvertes") + ".");
+      return;
+    }
+    var A = fichiers[0], B = fichiers[1], boites = vue.boitesElements(), parGid = new Map(), ls = [];
+    lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) ls.push(l); });
+    var de = new Map(), quoi = new Map(), n = { ajoute: 0, supprime: 0, modifie: 0, pareil: 0 }, vusB = new Set();
+    comparaisonEnCours = true;
+    etat("Comparaison en cours…");
+    // l'ancienne maquette d'abord (lignes dans l'ordre des fichiers), puis la nouvelle face à elle
+    parTranches(ls.length, function(k){
+      var l = ls[k], gid = l.i.globalId;
+      if (l.f === A){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites) }); return; }
+      if (l.f !== B || vusB.has(gid)) return;
+      vusB.add(gid);
+      var x = parGid.get(gid);
+      if (!x){ de.set(l.cle, ETATS_DIFF.ajoute); n.ajoute++; return; }
+      var d = differences(x.f, ficheComparaison(l, boites));
+      if (d.length){
+        de.set(l.cle, ETATS_DIFF.modifie); de.set(x.l.cle, ETATS_DIFF.modifie); quoi.set(l.cle, d); quoi.set(x.l.cle, d); n.modifie++;
+      } else { de.set(l.cle, ETATS_DIFF.pareil); de.set(x.l.cle, ETATS_DIFF.pareil); n.pareil++; }
+    }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
+      parGid.forEach(function(x, gid){ if (!vusB.has(gid)){ de.set(x.l.cle, ETATS_DIFF.supprime); n.supprime++; } });
+      diffDe = de; diffQuoi = quoi;
+      colorer = "diff";
+      calculerCouleurs(); majVue(); afficherProps(); maj();
+      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m);
+      etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
+        pluriel(n.modifie, "modifié") + ", " + pluriel(n.pareil, "inchangé") + ". Clique une ligne de la légende pour sélectionner ses éléments." +
+        (ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
+        (A.enCalcul || B.enCalcul ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Comparaison interrompue : " + (err && err.message || err));
+    }).then(function(){ comparaisonEnCours = false; });
+  }
+  // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché
+  function htmlComparaison(c){
+    var e = colorer === "diff" && diffDe ? diffDe.get(c) : null;
+    if (!e) return "";
+    var q = diffQuoi.get(c) || [], MAX = 40;
+    return '<div class="pset"><div class="pset-nom">Comparaison</div><dl><dt>État</dt><dd>' + esc(e) + "</dd>" +
+      (q.length ? "<dt>Différences</dt><dd>" + q.slice(0, MAX).map(esc).join("<br>") + (q.length > MAX ? "<br>… et " + fmtN(q.length - MAX) + " autres" : "") + "</dd>" : "") + "</dl></div>";
+  }
 
   // ================= Sélectionner similaires =================
   // Fenêtre de critères (tous ceux cochés doivent correspondre), ouverte depuis un élément de référence.
@@ -3159,6 +3263,17 @@
     "exporter-zip": function(){ exporter(null, true); },
     "tableau-xlsx": function(){ exporterTableau("xlsx"); },
     "tableau-csv": function(){ exporterTableau("csv"); },
+    capture: function(){
+      var c = fichiers.length ? vue.image() : null;
+      if (!c){ etat("Rien à enregistrer : la vue 3D est vide."); return; }
+      var nom = (fichiers.length === 1 ? fichiers[0].m.nom.replace(/\.ifc$/i, "") : "maquettes") + "_vue.png";
+      c.toBlob(function(b){
+        if (!b){ etat("Image non enregistrée : le navigateur n'a pas pu la produire."); return; }
+        enregistrer(b, nom);
+        etat("« " + nom + " » : " + c.width + " × " + c.height + " px, " + fmtTaille(b.size) + ". Les cotes et étiquettes de mesure n'y figurent pas.");
+      }, "image/png");
+    },
+    comparer: comparerMaquettes,
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
       if (occupe()) return;
@@ -3239,7 +3354,9 @@
         ["Z", "Zoomer sur la sélection"], ["B · Maj+B", "Boîte de coupe autour de la sélection, la retirer"],
         ["M", "Mesurer (deux clics ; Échap : annuler le point, puis quitter)"],
         ["C", "Coordonnées d'un point (X Y Z ; sur une face : Z seul)"],
-        ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
+        ["Glisser", "Tourner autour du point visé (Maj ou clic droit : déplacer)"],
+        ["Ctrl + glisser", "Rectangle de sélection : vers la droite, éléments entièrement dedans ; vers la gauche, éléments touchés (avec Maj : retirer)"],
+        ["Maj + clic (liste)", "Cocher toutes les lignes depuis la dernière case cliquée"], ["Molette, pincement", "Zoom"], ["Double-clic", "Recadrer"],
         ["E", "Basculer Viewer / Éditeur"],
         ["D · Maj+D", "Déplacer (valeurs, ou deux points accrochés)"], ["K · Maj+K", "Copier (valeurs, ou deux points accrochés)"],
         ["R", "Rotation autour de la verticale"], ["A", "Aligner : face de référence, puis faces à amener dessus"], ["L", "Changer d'étage"],
