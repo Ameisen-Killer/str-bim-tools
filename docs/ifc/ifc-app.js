@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.15.1";
+  var VERSION = "1.15.2";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -3545,32 +3545,39 @@
     }
     return v ? "v\u0000" + v : "g\u0000" + l.i.globalId;
   }
-  // Paramètres (noms de propriétés, sans leur jeu) renseignés dans les deux maquettes, d'après un échantillon de
-  // 1000 éléments de chacune
-  function proprietesCommunes(){
-    var jeux = fichiers.map(function(f){
-      var ls = lignes.filter(function(l){ return l.i && l.f === f && l.i.genre === "element"; }), pas = Math.max(1, Math.floor(ls.length/1000)), vus = new Set();
-      for (var k = 0; k < ls.length; k += pas) IFC.donnees(f.m, ls[k].id).forEach(function(d){ if (d.v !== "" && !d.quantite && d.nom) vus.add(d.nom); });
+  // Paramètres des deux maquettes (noms de propriétés, sans leur jeu), lus sur 3000 éléments au plus de chacune :
+  // { communs, a (dans la première seulement), b (dans la seconde seulement) }, triés
+  function parametresMaquettes(){
+    var jeux = fichiers.slice(0, 2).map(function(f){
+      var ls = lignes.filter(function(l){ return !!l.i && l.f === f && l.i.genre !== "spatial"; }), pas = Math.max(1, Math.floor(ls.length/3000)), vus = new Set();
+      for (var k = 0; k < ls.length; k += pas) IFC.donnees(f.m, ls[k].id).forEach(function(d){ if (d.v !== "" && !d.quantite && d.nom && d.nom.indexOf(" › ") < 0) vus.add(d.nom); });
       return vus;
     });
-    var out = [];
-    jeux[0].forEach(function(k){ if (jeux[1].has(k)) out.push(k); });
-    return out.sort(function(a, b){ return a.localeCompare(b, "fr", { numeric: true }); });
+    function tri(l){ return l.sort(function(x, y){ return x.localeCompare(y, "fr", { numeric: true }); }); }
+    var c = [], a = [], b = [];
+    jeux[0].forEach(function(k){ (jeux[1].has(k) ? c : a).push(k); });
+    jeux[1].forEach(function(k){ if (!jeux[0].has(k)) b.push(k); });
+    return { communs: tri(c), a: tri(a), b: tri(b) };
   }
-  // liste « Identité » : GlobalId, Nom, Repère, les paramètres communs, puis « Autre paramètre… » pour en saisir un
-  function remplirIdentites(idents, choisi){
-    if (idents.indexOf(choisi) < 0) idents.push(choisi);       // choix gardé ou saisi, absent de l'échantillon
-    $("#cmp-identite").innerHTML = idents.map(function(v){
-      return '<option value="' + esc(v) + '"' + (v === choisi ? " selected" : "") + ">" + esc(nomIdentite(v) + (v ? "" : " (par défaut)")) + "</option>";
-    }).join("") + '<option value="__autre__">Autre paramètre…</option>';
+  // liste « Identité » : GlobalId, Nom, Repère, puis tous les paramètres lus, ceux des deux maquettes d'abord,
+  // et « Autre paramètre… » pour en saisir un
+  var paramsIdentite = { communs: [], a: [], b: [] };
+  function remplirIdentites(choisi){
+    var P = paramsIdentite, connus = ["", "attr:nom", "attr:tag"];
+    function option(v){ connus.push(v); return '<option value="' + esc(v) + '"' + (v === choisi ? " selected" : "") + ">" + esc(nomIdentite(v) + (v ? "" : " (par défaut)")) + "</option>"; }
+    function groupe(titre, noms){ return noms.length ? '<optgroup label="' + esc(titre + " (" + fmtN(noms.length) + ")") + '">' + noms.map(function(k){ return option("prop:" + k); }).join("") + "</optgroup>" : ""; }
+    var h = ["", "attr:nom", "attr:tag"].map(option).join("") +
+      groupe("Paramètres des deux maquettes", P.communs) + groupe("Dans A seulement", P.a) + groupe("Dans B seulement", P.b);
+    if (connus.indexOf(choisi) < 0) h += option(choisi);       // choix gardé ou saisi, absent de la lecture
+    $("#cmp-identite").innerHTML = h + '<option value="__autre__">Autre paramètre (saisir son nom)…</option>';
+    $("#cmp-identite").value = choisi;
     $("#cmp-identite").setAttribute("data-choisi", choisi);
   }
   $("#cmp-identite").addEventListener("change", function(){
     if (this.value !== "__autre__"){ this.setAttribute("data-choisi", this.value); return; }
     var avant = this.getAttribute("data-choisi") || "", nom = prompt("Nom du paramètre qui identifie un élément dans les deux maquettes (tel qu'il s'affiche dans le panneau Propriétés) :", avant.indexOf("prop:") === 0 ? avant.slice(5) : "");
     nom = nom === null ? "" : nom.trim().slice(0, 200);
-    var idents = [].map.call(this.options, function(o){ return o.value; }).filter(function(v){ return v !== "__autre__"; });
-    remplirIdentites(idents, nom ? "prop:" + nom : avant);
+    remplirIdentites(nom ? "prop:" + nom : avant);
   });
   function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
@@ -3582,8 +3589,10 @@
     $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
     ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
     $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
-    var idents = ["", "attr:nom", "attr:tag"].concat(proprietesCommunes().map(function(k){ return "prop:" + k; }));
-    remplirIdentites(idents, optsDiff.identite);
+    paramsIdentite = parametresMaquettes();
+    remplirIdentites(optsDiff.identite);
+    $("#cmp-identite-note").textContent = pluriel(paramsIdentite.communs.length, "paramètre commun", "paramètres communs") + " aux deux maquettes, " +
+      fmtN(paramsIdentite.a.length) + " dans A seulement, " + fmtN(paramsIdentite.b.length) + " dans B seulement.";
     // différences les plus fréquentes de la dernière comparaison : à cocher pour ne plus en tenir compte
     var fr = diffBilan ? diffBilan.frequents : [], z = $("#cmp-frequents");
     z.hidden = !fr.length;
