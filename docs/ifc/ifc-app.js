@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.10.0";
+  var VERSION = "1.10.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -3289,8 +3289,8 @@
   // Résultat : diffDe (clé → état), diffQuoi (clé → [{ k, a, b }] : quoi, ancienne et nouvelle valeur),
   // diffBilan (comptes, différences les plus fréquentes), montrés par les couleurs « Comparaison ».
   var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, comparaisonEnCours = false;
-  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
-  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Modifié": 35, "Recréé": 280 };
+  var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
+  var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Recréé": 280 };
   var optsDiff = (function(){
     var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [] }, v = null;
     try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
@@ -3300,7 +3300,7 @@
     }
     return d;
   })();
-  var GEO_DIFF = "Géométrie";
+  var GEO_DIFF = "Géométrie (encombrement X × Y × Z)", DEP_DIFF = "Déplacement";
   function ficheComparaison(l, boites, O, ignores){
     var m = l.f.m, i = l.i, o = new Map();
     function garde(k){ var s = sansAccent(k); return !ignores.some(function(x){ return s.indexOf(x) >= 0; }); }
@@ -3316,21 +3316,29 @@
     return { o: o, b: O.geo ? boites.get(l.cle) || null : null };
   }
   // [{ k, a, b }] : ce qui diffère de la fiche a (ancienne) à la fiche b (nouvelle)
-  function differences(a, b){
+  // U : { nom : unité de longueur du fichier, seuil : déplacement en dessous duquel l'élément n'a pas bougé }
+  function differences(a, b, U){
     var quoi = [];
     if (a.b && b.b){
-      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = 1e-6*d + 1e-9, boite = false;
-      for (var k = 0; k < 3; k++) if (Math.abs(a.b[0][k] - b.b[0][k]) > tol || Math.abs(a.b[1][k] - b.b[1][k]) > tol) boite = true;
-      if (boite) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b), b: texteBoite(b.b) });
+      var d = Math.hypot(a.b[1][0] - a.b[0][0], a.b[1][1] - a.b[0][1], a.b[1][2] - a.b[0][2]), tol = Math.max(1e-6*d + 1e-9, U.seuil);
+      // encombrement (côtés de la boîte englobante) et centre : même encombrement ailleurs = élément déplacé
+      var taille = false, dep = [0, 0, 0];
+      for (var k = 0; k < 3; k++){
+        if (Math.abs((a.b[1][k] - a.b[0][k]) - (b.b[1][k] - b.b[0][k])) > tol) taille = true;
+        dep[k] = (b.b[0][k] + b.b[1][k])/2 - (a.b[0][k] + a.b[1][k])/2;
+      }
+      var dist = Math.hypot(dep[0], dep[1], dep[2]), un = U.nom ? " " + U.nom : "";
+      if (dist > tol && !taille) quoi.push({ k: DEP_DIFF, a: "", b: NB3.format(dist) + un + " (ΔX " + NB3.format(dep[0]) + " ; ΔY " + NB3.format(dep[1]) + " ; ΔZ " + NB3.format(dep[2]) + ")" });
+      else if (taille) quoi.push({ k: GEO_DIFF, a: texteBoite(a.b, un), b: texteBoite(b.b, un) + (dist > tol ? ", centre déplacé de " + NB3.format(dist) + un : "") });
       else if (a.b[2] !== b.b[2]) quoi.push({ k: GEO_DIFF, a: fmtN(a.b[2]) + " faces", b: fmtN(b.b[2]) + " faces" });
     }
     a.o.forEach(function(v, k){ var w = b.o.has(k) ? b.o.get(k) : null; if (w !== v) quoi.push({ k: k, a: v, b: w === null ? "(absent)" : w }); });
     b.o.forEach(function(v, k){ if (!a.o.has(k)) quoi.push({ k: k, a: "(absent)", b: v }); });
     return quoi;
   }
-  function texteBoite(b){
-    function n(v){ return NB3.format(v); }
-    return "de " + [n(b[0][0]), n(b[0][1]), n(b[0][2])].join(" ; ") + " à " + [n(b[1][0]), n(b[1][1]), n(b[1][2])].join(" ; ");
+  // encombrement d'un élément : côtés de sa boîte englobante selon X, Y, Z
+  function texteBoite(b, un){
+    return [0, 1, 2].map(function(k){ return NB3.format(b[1][k] - b[0][k]); }).join(" × ") + (un || "");
   }
   // rapprochement d'un supprimé et d'un ajouté : même classe, même boîte englobante (à 7 chiffres près)
   function empreinteForme(l, boites){
@@ -3363,7 +3371,7 @@
     [].forEach.call(document.querySelectorAll("#cmp-frequents input:checked"), function(x){
       var f = diffBilan && diffBilan.frequents[+x.getAttribute("data-cmp-ign")];
       if (!f) return;
-      if (f[0] === GEO_DIFF) optsDiff.geo = false;        // la géométrie s'ignore par sa case, pas par un mot
+      if (f[0] === GEO_DIFF || f[0] === DEP_DIFF) optsDiff.geo = false;        // la géométrie s'ignore par sa case, pas par un mot
       else if (ign.indexOf(f[0]) < 0) ign.push(f[0]);
     });
     optsDiff.ignorer = ign.slice(0, 200);
@@ -3376,9 +3384,15 @@
     var O = optsDiff, ignores = O.ignorer.map(sansAccent), boites = O.geo ? vue.boitesElements() : new Map(), parGid = new Map(), lsA = [], lsB = [];
     lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) (l.f === A ? lsA : lsB).push(l); });
     var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
-    var n = { ajoute: 0, supprime: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map();
+    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map();
+    // un élément a bougé à partir d'un demi-millimètre (dans l'unité du fichier)
+    var U = { nom: A.unite && A.unite.nom || "", seuil: A.unite && A.unite.f > 0 ? .0005/A.unite.f : 0 };
     function compare(la, fa, lb, etatSi){
-      var d = differences(fa, ficheComparaison(lb, boites, O, ignores)), e = etatSi || (d.length ? ETATS_DIFF.modifie : ETATS_DIFF.pareil);
+      var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
+      // « Déplacé » passe avant « Modifié » : l'élément a bougé, qu'il ait changé par ailleurs ou non
+      var bouge = d.some(function(x){ return x.k === DEP_DIFF; });
+      var e = etatSi || (bouge ? ETATS_DIFF.deplace : d.length ? ETATS_DIFF.modifie : ETATS_DIFF.pareil);
+      if (!etatSi && bouge) n.deplace++;
       de.set(la.cle, e); de.set(lb.cle, e);
       if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
       paires.push({ e: e, a: la, b: lb, d: d });
@@ -3394,7 +3408,8 @@
       vusB.add(gid);
       var x = parGid.get(gid);
       if (!x){ ajoutes.push(l); return; }
-      if (compare(x.l, x.f, l)) n.modifie++; else n.pareil++;
+      var avant = n.deplace, nd = compare(x.l, x.f, l);
+      if (n.deplace === avant){ if (nd) n.modifie++; else n.pareil++; }
     }, function(p){ etat("Comparaison en cours : " + Math.floor(100*p) + " %"); }).then(function(){
       // supprimés et ajoutés de même classe et de même encombrement : un élément redessiné
       var orphelins = new Map();
@@ -3417,9 +3432,9 @@
       catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
-      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.pareil;
+      var ua = IFC.uniteLongueur(A.m), ub = IFC.uniteLongueur(B.m), paires2 = n.modifie + n.pareil + n.deplace;
       etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
-        pluriel(n.modifie, "modifié") + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
+        pluriel(n.deplace, "déplacé") + ", " + pluriel(n.modifie, "modifié") + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
         (paires2 > 20 && n.modifie > .8*paires2 && frequents.length ? " Presque tout est modifié, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
         (O.geo && ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
         (O.geo && (A.enCalcul || B.enCalcul) ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
@@ -3435,6 +3450,7 @@
     var q = diffQuoi.get(c) || [], MAX = 40;
     return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div><dl>" +
       (q.length ? q.slice(0, MAX).map(function(x){
+        if (x.k === DEP_DIFF) return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.b) + "</dd>";      // une seule valeur : la distance
         return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
       }).join("") + (q.length > MAX ? "<dt>…</dt><dd>" + fmtN(q.length - MAX) + " autres différences (voir le rapport)</dd>" : "")
         : "<dt>État</dt><dd>" + esc(e === ETATS_DIFF.pareil ? "Aucune différence sur ce qui est comparé" : e === ETATS_DIFF.recree ? "Même forme au même endroit, GlobalId différent" : e) + "</dd>") + "</dl></div>";
@@ -3443,7 +3459,7 @@
   function exporterRapportComparaison(){
     if (!diffPaires || !diffBilan || !parUid.has(diffBilan.ancien) || !parUid.has(diffBilan.nouveau)){ etat("Rapport : lance d'abord une comparaison (Outils › Comparer les deux maquettes)."); return; }
     var titres = ["État", "GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"], rangs = [];
-    var ordre = [ETATS_DIFF.modifie, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
+    var ordre = [ETATS_DIFF.deplace, ETATS_DIFF.modifie, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
     diffPaires.forEach(function(p){
       if (p.e === ETATS_DIFF.pareil) return;
       var l = p.b || p.a, i = l.i, tete = [p.e, p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)];
