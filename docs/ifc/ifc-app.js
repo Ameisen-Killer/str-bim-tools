@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.14.0";
+  var VERSION = "1.15.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -3447,11 +3447,12 @@
   // tolérances en millimètres (fenêtre Configuration) : déplacement du centre, changement d'un côté de l'encombrement
   var TOL_DIFF = .5, RAPPR_DIFF = 2000;      // RAPPR_DIFF : distance maximale entre un supprimé et un ajouté rapprochés
   var optsDiff = (function(){
-    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF, tolRappr: RAPPR_DIFF }, v = null;
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF, tolRappr: RAPPR_DIFF, identite: "" }, v = null;
     try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
     if (v && typeof v === "object"){
       ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
       ["tolDep", "tolDim", "tolRappr"].forEach(function(k){ if (typeof v[k] === "number" && isFinite(v[k]) && v[k] >= 0 && v[k] <= 100000) d[k] = v[k]; });
+      if (typeof v.identite === "string" && /^($|attr:(nom|tag)$|prop:.)/.test(v.identite)) d.identite = v.identite.slice(0, 300);
       if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
     }
     return d;
@@ -3527,6 +3528,32 @@
     if (!b || !(b[3] > 0)) return "";
     return l.i.type + "|" + Number(b[3].toPrecision(5));
   }
+  // Identité d'un élément pour l'appariement : son GlobalId, ou la valeur d'un paramètre commun aux deux
+  // maquettes (ident : "" GlobalId, "attr:nom", "attr:tag", ou "prop:Jeu · Propriété"). Un élément qui n'a pas
+  // ce paramètre garde son GlobalId.
+  function nomIdentite(ident){ return !ident ? "GlobalId" : ident === "attr:nom" ? "Nom" : ident === "attr:tag" ? "Repère" : ident.slice(5); }
+  function cleIdentite(l, ident){
+    if (!ident) return l.i.globalId;
+    var v = "";
+    if (ident === "attr:nom") v = l.i.nom;
+    else if (ident === "attr:tag") v = l.i.tag;
+    else {
+      var nom = ident.slice(5);
+      IFC.donnees(l.f.m, l.id).some(function(d){ if (d.jeu + " · " + d.nom !== nom || d.v === "") return false; v = String(d.v); return true; });
+    }
+    return v ? "v\u0000" + v : "g\u0000" + l.i.globalId;
+  }
+  // Propriétés renseignées dans les deux maquettes, d'après un échantillon de 300 éléments de chacune
+  function proprietesCommunes(){
+    var jeux = fichiers.map(function(f){
+      var ls = lignes.filter(function(l){ return l.i && l.f === f && l.i.genre === "element"; }), pas = Math.max(1, Math.floor(ls.length/300)), vus = new Set();
+      for (var k = 0; k < ls.length; k += pas) IFC.donnees(f.m, ls[k].id).forEach(function(d){ if (d.v !== "" && !d.quantite) vus.add(d.jeu + " · " + d.nom); });
+      return vus;
+    });
+    var out = [];
+    jeux[0].forEach(function(k){ if (jeux[1].has(k)) out.push(k); });
+    return out.sort(function(a, b){ return a.localeCompare(b, "fr", { numeric: true }); });
+  }
   function ouvrirComparer(){
     if (comparaisonEnCours || occupe()) return;
     if (fichiers.length !== 2){
@@ -3537,6 +3564,11 @@
     $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
     ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
     $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
+    var idents = ["", "attr:nom", "attr:tag"].concat(proprietesCommunes().map(function(k){ return "prop:" + k; }));
+    if (idents.indexOf(optsDiff.identite) < 0) idents.push(optsDiff.identite);       // choix gardé, absent de l'échantillon
+    $("#cmp-identite").innerHTML = idents.map(function(v){
+      return '<option value="' + esc(v) + '"' + (v === optsDiff.identite ? " selected" : "") + ">" + esc(nomIdentite(v) + (v ? "" : " (par défaut)")) + "</option>";
+    }).join("");
     // différences les plus fréquentes de la dernière comparaison : à cocher pour ne plus en tenir compte
     var fr = diffBilan ? diffBilan.frequents : [], z = $("#cmp-frequents");
     z.hidden = !fr.length;
@@ -3556,6 +3588,7 @@
       else if (ign.indexOf(f[0]) < 0) ign.push(f[0]);
     });
     optsDiff.ignorer = ign.slice(0, 200);
+    optsDiff.identite = $("#cmp-identite").value || "";
     garder("ifc.diff", JSON.stringify(optsDiff));
     comparerMaquettes(+$("#cmp-ancien").value);
   });
@@ -3587,10 +3620,11 @@
     comparaisonEnCours = true;
     etat("Comparaison en cours…");
     // l'ancienne maquette d'abord (ses fiches), puis la nouvelle face à elle
+    var doublons = 0;
     parTranches(ls.length, function(k){
-      var l = ls[k], gid = l.i.globalId;
-      if (k < lsA.length){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites, O, ignores) }); return; }
-      if (vusB.has(gid)) return;
+      var l = ls[k], gid = cleIdentite(l, O.identite);
+      if (k < lsA.length){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites, O, ignores) }); else doublons++; return; }
+      if (vusB.has(gid)){ doublons++; return; }
       vusB.add(gid);
       var x = parGid.get(gid);
       if (!x){ ajoutes.push(l); return; }
@@ -3632,6 +3666,8 @@
       etat("De « " + A.m.nom + " » (ancienne) à « " + B.m.nom + " » (nouvelle) : " + pluriel(n.ajoute, "ajouté") + ", " + pluriel(n.supprime, "supprimé") + ", " +
         pluriel(n.deplace, "déplacé") + ", " + pluriel(n.modifie, "modifié") + " (géométrie), " + fmtN(n.donnees) + " aux données modifiées" + (n.recree ? ", " + pluriel(n.recree, "recréé") : "") + ", " + pluriel(n.pareil, "inchangé") + "." +
         (paires2 > 20 && n.donnees > .5*paires2 && frequents.length ? " Beaucoup de données modifiées, surtout par « " + frequents[0][0] + " » (" + fmtN(frequents[0][1]) + ") : rouvre Outils › Comparer pour l'ignorer." : "") +
+        (O.identite ? " Identité : « " + nomIdentite(O.identite) + " » (GlobalId pour les éléments qui ne l'ont pas)." : "") +
+        (doublons ? " " + pluriel(doublons, "élément laissé", "éléments laissés") + " hors comparaison : même identité qu'un autre dans sa maquette." : "") +
         (O.geo && ua !== ub ? " Attention : unités de longueur différentes (" + (ua || "?") + ", " + (ub || "?") + "), la géométrie paraît modifiée partout." : "") +
         (O.geo && (A.enCalcul || B.enCalcul) ? " Géométrie encore en calcul : elle n'a pas été comparée partout." : ""));
     }).catch(function(err){
