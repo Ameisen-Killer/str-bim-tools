@@ -1,5 +1,5 @@
 Bibliothèques tierces de l'éditeur IFC, hébergées ici pour que la page ne dépende d'aucun autre site.
-Elles ne se chargent que si l'utilisateur les choisit dans le menu Affichage.
+Elles ne se chargent que si l'utilisateur les choisit dans Outils › Configuration (catégorie Moteurs).
 
 three/    Three.js 0.186.1 (paquet npm « three », fichiers build/three.module.js et build/three.core.js)
           Licence MIT, voir three/LICENSE.

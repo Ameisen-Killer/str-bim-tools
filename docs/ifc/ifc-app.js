@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.12.0";
+  var VERSION = "1.12.1";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -2576,7 +2576,7 @@
   }
   // Fenêtre Configuration : catégories dans le bandeau de gauche, une page par catégorie. Tout s'applique dès
   // qu'on change une valeur ; les réglages d'affichage passent par les mêmes fonctions que les menus et boutons.
-  var PAGES_CONFIG = ["affichage", "comparaison", "mesures"], pageConfig = lire("ifc.config.page", PAGES_CONFIG);
+  var PAGES_CONFIG = ["affichage", "moteurs", "comparaison", "mesures"], pageConfig = lire("ifc.config.page", PAGES_CONFIG);
   function montrerConfig(p){
     pageConfig = PAGES_CONFIG.indexOf(p) >= 0 ? p : PAGES_CONFIG[0];
     garder("ifc.config.page", pageConfig);
@@ -2587,7 +2587,7 @@
   function remplirConfig(){
     $("#cfg-rendu").value = vue.filaire() ? "filaire" : "solide";
     $("#cfg-couleurs").value = colorer === "diff" ? "" : colorer;
-    $("#cfg-moteur").value = vue.moteur();
+    Object.keys(CHOIX_MOTEURS).forEach(function(q){ $("#" + CHOIX_MOTEURS[q].id).value = CHOIX_MOTEURS[q].actuel(); noteMoteur(q); });
     $("#cfg-lissage").checked = !!vue.lissage();
     $("#cfg-theme").value = lire("ifc.theme", ["sombre", "clair", "systeme"]);
     $("#cfg-grouper").value = grouper;
@@ -2603,12 +2603,32 @@
   $("#cfg-lissage").addEventListener("change", function(){ if (this.checked !== !!vue.lissage()) $("#b-lissage").click(); });
   $("#cfg-theme").addEventListener("change", function(){ if (choisirTheme) choisirTheme(this.value); maj(); });
   $("#cfg-grouper").addEventListener("change", function(){ poserGrouper(this.value); });
-  $("#cfg-moteur").addEventListener("change", function(){
-    var sel = this, b = document.querySelector('#mb [data-cmd="moteur"][data-moteur="' + sel.value + '"]');
-    if (b) COMMANDES.moteur(b);
-    // le moteur démarre en différé et peut être refusé (indisponible sur ce poste) : la liste redit celui en service
-    setTimeout(function(){ sel.value = vue.moteur(); }, 3000);
-    if (!b || INDISPO[sel.value]) sel.value = vue.moteur();
+  // Moteurs : les trois listes reprennent les boutons cachés de #choix-moteurs (libellé, description, avertissements)
+  // et lancent la même commande qu'eux. ATTR : attribut du bouton qui porte la valeur.
+  var CHOIX_MOTEURS = { moteur: { attr: "data-moteur", id: "cfg-moteur", actuel: function(){ return vue.moteur(); } },
+    lecteur: { attr: "data-lecteur", id: "cfg-lecteur", actuel: function(){ return lecteurVoulu; } },
+    geo: { attr: "data-geo", id: "cfg-geo", cmd: "geometrie", actuel: function(){ return geoVoulue; } } };
+  function boutonMoteur(q, v){ return document.querySelector("#choix-moteurs [" + CHOIX_MOTEURS[q].attr + '="' + v + '"]'); }
+  function noteMoteur(q){
+    var C = CHOIX_MOTEURS[q], sel = $("#" + C.id), b = boutonMoteur(q, sel.value), z = $("#" + C.id + "-note");
+    if (!b){ z.textContent = ""; return; }
+    var al = (b.getAttribute("data-alerte") || "").split("|").filter(Boolean);
+    if (INDISPO[sel.value]) al.unshift("Indisponible ici : " + INDISPO[sel.value]);
+    z.textContent = (b.getAttribute("data-aide") || "") + (al.length ? " " + al.join(" ") : "");
+  }
+  Object.keys(CHOIX_MOTEURS).forEach(function(q){
+    var C = CHOIX_MOTEURS[q], sel = $("#" + C.id);
+    sel.innerHTML = [].map.call(document.querySelectorAll("#choix-moteurs [" + C.attr + "]"), function(b){
+      return '<option value="' + esc(b.getAttribute(C.attr)) + '">' + esc(b.querySelector("span").textContent) + "</option>";
+    }).join("");
+    sel.addEventListener("change", function(){
+      var b = boutonMoteur(q, sel.value);
+      if (b) COMMANDES[C.cmd || q](b);
+      noteMoteur(q);
+      // un moteur démarre en différé et peut être refusé (indisponible sur ce poste) : la liste redit celui en service
+      if (!b || INDISPO[sel.value]) sel.value = C.actuel();
+      setTimeout(function(){ sel.value = C.actuel(); noteMoteur(q); }, 3000);
+    });
   });
   // tolérances de la comparaison, en millimètres (virgule ou point) ; une saisie illisible remet la valeur gardée
   [["cfg-tol-dep", "tolDep"], ["cfg-tol-dim", "tolDim"]].forEach(function(x){
@@ -2639,6 +2659,15 @@
       if (!vue.lissage()) $("#b-lissage").click();
       if (choisirTheme) choisirTheme("sombre");
       maj(); remplirConfig();
+      return;
+    }
+    if (pageConfig === "moteurs"){
+      [["moteur", "webgl"], ["lecteur", "rust"], ["geo", "maison"]].forEach(function(x){
+        var C = CHOIX_MOTEURS[x[0]], b = boutonMoteur(x[0], x[1]);
+        if (b && C.actuel() !== x[1]) COMMANDES[C.cmd || x[0]](b);
+      });
+      setTimeout(remplirConfig, 3000);
+      remplirConfig();
       return;
     }
     if (pageConfig === "comparaison"){
@@ -3850,7 +3879,7 @@
       aide("IFC Studio v" + VERSION, "<p>Ouvre des maquettes IFC2X3, IFC4 ou IFC4X3, sélectionne des éléments, supprime-les proprement (relations, géométrie et propriétés devenues orphelines partent avec eux) et réécris le fichier.</p>" +
         "<p>Deux modes (bouton en haut, touche E). Viewer : naviguer, sélectionner, mesurer, couper, colorier par type, étage ou matériau. Éditeur : en plus déplacer, copier, tourner, aligner sur une face, changer d'étage, modifier les dimensions des extrusions, les attributs, les propriétés et la classe IFC, supprimer ; tout s'annule par Ctrl+Z.</p>" +
         "<p>Tout se passe dans ton navigateur : aucun fichier n'est envoyé, l'outil ne contacte aucun autre site.</p>" +
-        "<p>Moteurs optionnels (menu Affichage), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +
+        "<p>Moteurs optionnels (Outils › Configuration › Moteurs), hébergés sur ce site et téléchargés au premier choix : Three.js (licence MIT) et web-ifc de That Open Company (licence MPL-2.0).</p>" +
         tempsOuverture());
     },
     "vider-cache": function(){
@@ -3861,7 +3890,7 @@
   function tempsOuverture(){
     var rust = IFCVue.rustActif(), panne = IFCVue.rustErreur();
     var h = "<h3 class=\"apropos-t\">Module Rust</h3><p>" + (rust ? "En service : découpe du fichier, faces triangulées et polygonales, triangles et arêtes."
-      : lecteurVoulu === "js" ? "Mis de côté : lecture JavaScript choisie dans Affichage > Lecture des fichiers."
+      : lecteurVoulu === "js" ? "Mis de côté : lecture JavaScript choisie dans Outils › Configuration › Moteurs."
       : panne ? "Arrêté après une erreur (" + esc(panne) + ") : le JavaScript fait le travail jusqu'au rechargement de la page."
       : "Pas encore chargé : le JavaScript fait le travail.") + "</p>";
     if (!derniere) return h + "<p>Ouvre un fichier pour voir le temps de chaque étape.</p>";
@@ -4080,7 +4109,7 @@
       var m = document.querySelector("meta[name=theme-color]"); if (m) m.setAttribute("content", FOND[eff]);
       [].forEach.call(document.querySelectorAll("[data-choix-theme]"), function(b){ b.setAttribute("aria-checked", String(b.getAttribute("data-choix-theme") === c)); });
     }
-    // aussi dans le menu Affichage de l'éditeur
+    // aussi dans la fenêtre Configuration de l'éditeur
     choisirTheme = function(c){
       try { localStorage.setItem("ifc.theme", c); } catch (e){}
       applique(c);

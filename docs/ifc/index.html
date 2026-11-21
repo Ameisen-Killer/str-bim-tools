@@ -269,7 +269,7 @@ body.glisse:not(.edition) .voile-depot{opacity:1}
 @media (max-width:560px){.ouvrir-note{display:none}}
 
 /* ---------- Éditeur ---------- */
-/* l'éditeur prend tout l'écran : le bandeau du site disparaît (thème et moteur sont dans Affichage) */
+/* l'éditeur prend tout l'écran : le bandeau du site disparaît (thème et moteur sont dans Outils › Configuration) */
 body.edition .barre,body.edition footer{display:none}
 body.edition{overflow:hidden}
 /* ascenseurs des panneaux : fins et discrets */
@@ -957,55 +957,6 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
                 <button type="button" role="menuitem" data-cmd="tout-developper"><span>Tout développer</span><kbd></kbd></button>
               </div>
             </div>
-            <hr>
-            <div class="mb-sm">
-              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Thème</span><kbd>▸</kbd></button>
-              <div class="mb-liste mb-sl" role="menu">
-                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="sombre" aria-checked="false"><span>Sombre</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="clair" aria-checked="false"><span>Clair</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="theme" data-choix-theme="systeme" aria-checked="false"><span>Comme le système</span><kbd></kbd></button>
-              </div>
-            </div>
-            <div class="mb-sm">
-              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Moteur 3D</span><kbd>▸</kbd></button>
-              <div class="mb-liste mb-sl" role="menu">
-                <!-- data-aide : description dans l'infobulle ; data-alerte : avertissements séparés par | -->
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false"
-                  data-aide="Moteur écrit pour l'outil, dessiné par la carte graphique. Rapide, sélection au pixel près, sections remplies en rouge dans la boîte de coupe."
-                  data-alerte=""><span>WebGL (recommandé)</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgpu" aria-checked="false"
-                  data-aide="La nouvelle interface graphique des navigateurs, successeur de WebGL. Même rendu que WebGL, sections rouges comprises, avec lissage des arêtes ×4."
-                  data-alerte="Récent : Chrome ou Edge à jour, Safari et Firefox selon la version.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>WebGPU</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="three" aria-checked="false"
-                  data-aide="Three.js, la bibliothèque 3D de référence du web (licence MIT), hébergée sur ce site. Éclairage physique, faces plus modelées, sections rouges comprises."
-                  data-alerte="Environ 2 Mo téléchargés depuis ce site au premier choix.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>Three.js</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false"
-                  data-aide="Dessin à plat, face par face, sans carte graphique. Marche partout, même sur un vieil appareil."
-                  data-alerte="Lent dès quelques milliers de faces.|Des faces peuvent passer devant d'autres par erreur (pas de tampon de profondeur)."><span>Canvas 2D (secours)</span><kbd></kbd></button>
-              </div>
-            </div>
-            <div class="mb-sm">
-              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Lecture des fichiers</span><kbd>▸</kbd></button>
-              <div class="mb-liste mb-sl" role="menu">
-                <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="rust" aria-checked="true"
-                  data-aide="Découpe du fichier par un module écrit en Rust et compilé en WebAssembly, hébergé sur ce site (34 Ko). Plusieurs fois plus rapide et plus sobre en mémoire que le lecteur JavaScript, même résultat."
-                  data-alerte="Nouveau : si le module manque ou échoue, le lecteur JavaScript prend le relais tout seul."><span>Rust · WebAssembly (recommandé)</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="js" aria-checked="false"
-                  data-aide="Lecteur d'origine, écrit en JavaScript. Sert de référence et de secours."
-                  data-alerte=""><span>JavaScript</span><kbd></kbd></button>
-              </div>
-            </div>
-            <div class="mb-sm">
-              <button type="button" class="mb-sm-titre" role="menuitem" aria-haspopup="true"><span>Géométrie</span><kbd>▸</kbd></button>
-              <div class="mb-liste mb-sl" role="menu">
-                <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="maison" aria-checked="false"
-                  data-aide="Lecteur écrit pour l'outil : extrusions, maillages et représentations courantes, calculés à l'ouverture. Léger et rapide."
-                  data-alerte="Les ouvertures (portes, fenêtres, réservations) ne sont pas découpées dans les murs et les dalles.|Les opérations booléennes et certaines formes (balayages, surfaces NURBS) ne sont pas lues."><span>Lecteur de l'outil</span><kbd></kbd></button>
-                <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="webifc" aria-checked="false"
-                  data-aide="web-ifc (That Open Company, licence MPL-2.0), hébergé sur ce site. Moteur géométrique complet en WebAssembly : ouvertures découpées, booléens, balayages, et vraies couleurs des matériaux du fichier (une couleur choisie pour la maquette reste prioritaire)."
-                  data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace.|Les vitrages gardent leur couleur mais restent opaques."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
-              </div>
-            </div>
           </div>
         </div>
         <div class="mb-gr">
@@ -1294,12 +1245,27 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
   </form>
 </dialog>
 
+<!-- Choix des moteurs : réglés dans Outils › Configuration (catégorie Moteurs). Ces boutons, hors de tout menu et
+     jamais affichés, portent les libellés, descriptions (data-aide) et avertissements (data-alerte) que la fenêtre
+     reprend, et servent de cible aux commandes moteur, lecteur et geometrie d'ifc-app.js. -->
+<div id="choix-moteurs" hidden>
+  <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgl" aria-checked="false" data-aide="Moteur écrit pour l'outil, dessiné par la carte graphique. Rapide, sélection au pixel près, sections remplies en rouge dans la boîte de coupe." data-alerte=""><span>WebGL (recommandé)</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="webgpu" aria-checked="false" data-aide="La nouvelle interface graphique des navigateurs, successeur de WebGL. Même rendu que WebGL, sections rouges comprises, avec lissage des arêtes ×4." data-alerte="Récent : Chrome ou Edge à jour, Safari et Firefox selon la version.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>WebGPU</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="three" aria-checked="false" data-aide="Three.js, la bibliothèque 3D de référence du web (licence MIT), hébergée sur ce site. Éclairage physique, faces plus modelées, sections rouges comprises." data-alerte="Environ 2 Mo téléchargés depuis ce site au premier choix.|La sélection au clic est calculée par le processeur : plus lente sur les grosses maquettes."><span>Three.js</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="moteur" data-moteur="canvas" aria-checked="false" data-aide="Dessin à plat, face par face, sans carte graphique. Marche partout, même sur un vieil appareil." data-alerte="Lent dès quelques milliers de faces.|Des faces peuvent passer devant d'autres par erreur (pas de tampon de profondeur)."><span>Canvas 2D (secours)</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="rust" aria-checked="true" data-aide="Découpe du fichier par un module écrit en Rust et compilé en WebAssembly, hébergé sur ce site (34 Ko). Plusieurs fois plus rapide et plus sobre en mémoire que le lecteur JavaScript, même résultat." data-alerte="Nouveau : si le module manque ou échoue, le lecteur JavaScript prend le relais tout seul."><span>Rust · WebAssembly (recommandé)</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="lecteur" data-lecteur="js" aria-checked="false" data-aide="Lecteur d'origine, écrit en JavaScript. Sert de référence et de secours." data-alerte=""><span>JavaScript</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="maison" aria-checked="false" data-aide="Lecteur écrit pour l'outil : extrusions, maillages et représentations courantes, calculés à l'ouverture. Léger et rapide." data-alerte="Les ouvertures (portes, fenêtres, réservations) ne sont pas découpées dans les murs et les dalles.|Les opérations booléennes et certaines formes (balayages, surfaces NURBS) ne sont pas lues."><span>Lecteur de l'outil</span><kbd></kbd></button>
+  <button type="button" role="menuitemradio" data-cmd="geometrie" data-geo="webifc" aria-checked="false" data-aide="web-ifc (That Open Company, licence MPL-2.0), hébergé sur ce site. Moteur géométrique complet en WebAssembly : ouvertures découpées, booléens, balayages, et vraies couleurs des matériaux du fichier (une couleur choisie pour la maquette reste prioritaire)." data-alerte="Environ 8 Mo téléchargés depuis ce site au premier choix.|Calcul en plus de la lecture : lent et gourmand en mémoire sur les gros fichiers (plusieurs minutes, plusieurs Go pour 150 Mo).|Si un élément n'est pas rendu par web-ifc, la géométrie de l'outil le remplace.|Les vitrages gardent leur couleur mais restent opaques."><span>web-ifc (ouvertures réelles)</span><kbd></kbd></button>
+</div>
+
 <dialog id="preferences" class="prefs config">
   <form method="dialog">
     <h2>Configuration</h2>
     <div class="config-corps">
       <nav class="config-nav" role="tablist" aria-label="Catégories">
         <button type="button" role="tab" data-config="affichage" aria-selected="true">Affichage</button>
+        <button type="button" role="tab" data-config="moteurs" aria-selected="false">Moteurs</button>
         <button type="button" role="tab" data-config="comparaison" aria-selected="false">Comparaison</button>
         <button type="button" role="tab" data-config="mesures" aria-selected="false">Mesures</button>
       </nav>
@@ -1315,9 +1281,6 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
               <option value="type">Par type IFC</option><option value="famille">Par famille : type</option>
               <option value="etage">Par étage</option><option value="materiau">Par matériau</option><option value="maquette">Par fichier</option>
             </select></label>
-            <label><span>Moteur 3D</span><select class="champ" id="cfg-moteur">
-              <option value="webgl">WebGL</option><option value="webgpu">WebGPU</option><option value="three">Three.js</option><option value="canvas">Canvas 2D (secours)</option>
-            </select></label>
             <label class="coche"><input type="checkbox" id="cfg-lissage"><span>Lisser les bords des pièces (plus lent sur un gros modèle)</span></label>
           </fieldset>
           <fieldset>
@@ -1329,6 +1292,17 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
               <option value="">Structure du projet</option><option value="classe">Par classe IFC</option>
               <option value="type">Par famille : type</option><option value="materiau">Par matériau</option>
             </select></label>
+          </fieldset>
+        </section>
+        <section data-page="moteurs" hidden>
+          <fieldset>
+            <legend>Moteurs</legend>
+            <label><span>Moteur 3D</span><select class="champ" id="cfg-moteur" data-choix="moteur"></select></label>
+            <p class="pref-note" id="cfg-moteur-note"></p>
+            <label><span>Lecture</span><select class="champ" id="cfg-lecteur" data-choix="lecteur"></select></label>
+            <p class="pref-note" id="cfg-lecteur-note"></p>
+            <label><span>Géométrie</span><select class="champ" id="cfg-geo" data-choix="geo"></select></label>
+            <p class="pref-note" id="cfg-geo-note"></p>
           </fieldset>
         </section>
         <section data-page="comparaison" hidden>
@@ -1394,7 +1368,7 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=73"></script>
+<script src="/ifc/ifc-app.js?v=74"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>
