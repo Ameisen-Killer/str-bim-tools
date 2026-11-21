@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.15.2";
+  var VERSION = "1.16.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -1507,7 +1507,8 @@
     fichiers.splice(k, 1);
     fichiers.splice(rang, 0, f);
     reconstruire();
-    etat(fichiers.length === 2 ? "Ordre pour la comparaison : A (ancienne) « " + fichiers[0].m.nom + " », B (nouvelle) « " + fichiers[1].m.nom + " »."
+    etat(fichiers.length === 2 ? "Ordre pour la comparaison : A (ancienne) « " + fichiers[0].m.nom + " », B (nouvelle) « " + fichiers[1].m.nom + " »." +
+        (colorer === "diff" ? " Les couleurs affichées datent de l'ordre précédent : relance Outils › Comparer." : "")
       : "« " + f.m.nom + " » : " + (rang + 1) + "e de la liste.");
   }
   var ficGlisse = null;
@@ -3447,11 +3448,12 @@
   // tolérances en millimètres (fenêtre Configuration) : déplacement du centre, changement d'un côté de l'encombrement
   var TOL_DIFF = .5, RAPPR_DIFF = 2000;      // RAPPR_DIFF : distance maximale entre un supprimé et un ajouté rapprochés
   var optsDiff = (function(){
-    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF, tolRappr: RAPPR_DIFF, identite: "" }, v = null;
+    var d = { attrs: true, etage: true, materiau: true, props: true, quantites: true, geo: true, ignorer: [], tolDep: TOL_DIFF, tolDim: TOL_DIFF, tolRappr: RAPPR_DIFF, identite: "", identiteDebut: false }, v = null;
     try { v = JSON.parse(localStorage.getItem("ifc.diff") || "null"); } catch (e){}
     if (v && typeof v === "object"){
       ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ if (typeof v[k] === "boolean") d[k] = v[k]; });
       ["tolDep", "tolDim", "tolRappr"].forEach(function(k){ if (typeof v[k] === "number" && isFinite(v[k]) && v[k] >= 0 && v[k] <= 100000) d[k] = v[k]; });
+      d.identiteDebut = v.identiteDebut === true;
       if (typeof v.identite === "string" && /^($|attr:(nom|tag)$|prop:.)/.test(v.identite)) d.identite = v.identite.slice(0, 300);
       if (Array.isArray(v.ignorer)) d.ignorer = v.ignorer.filter(function(x){ return typeof x === "string" && x.trim(); }).slice(0, 200);
     }
@@ -3532,7 +3534,12 @@
   // maquettes (ident : "" GlobalId, "attr:nom", "attr:tag", ou "prop:Jeu · Propriété"). Un élément qui n'a pas
   // ce paramètre garde son GlobalId.
   function nomIdentite(ident){ return !ident ? "GlobalId" : ident === "attr:nom" ? "Nom" : ident === "attr:tag" ? "Repère" : ident.slice(5); }
-  function cleIdentite(l, ident){
+  // debut : seul le début de la valeur compte, jusqu'au premier « _ » (un numéro suivi de dates, d'un statut…)
+  function valeurIdentite(l, O){
+    var c = cleIdentite(l, O.identite, O.identiteDebut);
+    return O.identite ? c.slice(2) : c;
+  }
+  function cleIdentite(l, ident, debut){
     if (!ident) return l.i.globalId;
     var v = "";
     if (ident === "attr:nom") v = l.i.nom;
@@ -3543,6 +3550,7 @@
       var nom = ident.slice(5);
       IFC.donnees(l.f.m, l.id).some(function(d){ if ((d.nom !== nom && d.jeu + " · " + d.nom !== nom) || d.v === "") return false; v = String(d.v).trim(); return !!v; });
     }
+    if (v && debut){ var q = v.indexOf("_"); if (q > 0) v = v.slice(0, q); }
     return v ? "v\u0000" + v : "g\u0000" + l.i.globalId;
   }
   // Paramètres des deux maquettes (noms de propriétés, sans leur jeu), lus sur 3000 éléments au plus de chacune :
@@ -3589,6 +3597,7 @@
     $("#cmp-ancien").innerHTML = fichiers.map(function(f){ return '<option value="' + f.uid + '"' + (f.uid === anc ? " selected" : "") + ">" + esc(f.m.nom) + "</option>"; }).join("");
     ["attrs", "etage", "materiau", "props", "quantites", "geo"].forEach(function(k){ $("#cmp-" + k).checked = !!optsDiff[k]; });
     $("#cmp-ignorer").value = optsDiff.ignorer.join(" ; ");
+    $("#cmp-identite-debut").checked = !!optsDiff.identiteDebut;
     paramsIdentite = parametresMaquettes();
     remplirIdentites(optsDiff.identite);
     $("#cmp-identite-note").textContent = pluriel(paramsIdentite.communs.length, "paramètre commun", "paramètres communs") + " aux deux maquettes, " +
@@ -3613,6 +3622,7 @@
     });
     optsDiff.ignorer = ign.slice(0, 200);
     var ident = $("#cmp-identite").value || "";
+    optsDiff.identiteDebut = $("#cmp-identite-debut").checked;
     optsDiff.identite = ident === "__autre__" ? $("#cmp-identite").getAttribute("data-choisi") || "" : ident;
     garder("ifc.diff", JSON.stringify(optsDiff));
     comparerMaquettes(+$("#cmp-ancien").value);
@@ -3629,6 +3639,11 @@
     var parMm = A.unite && A.unite.f > 0 ? .001/A.unite.f : 0;
     var U = { nom: A.unite && A.unite.nom || "", seuilDep: O.tolDep*parMm, seuilDim: O.tolDim*parMm, seuilRappr: O.tolRappr*parMm, seuilRot: .05 };
     // recree : paire rapprochée sans GlobalId commun (élément redessiné)
+    // élément sans vis-à-vis : supprimé (dans l'ancienne seulement) ou ajouté (dans la nouvelle seulement)
+    function seul(genre, l){
+      var paire = { e: ETATS_DIFF[genre], a: genre === "supprime" ? l : null, b: genre === "ajoute" ? l : null, d: [], id: valeurIdentite(l, O) };
+      de.set(l.cle, paire.e); paires.push(paire); paireDe.set(l.cle, paire); n[genre]++;
+    }
     function compare(la, fa, lb, recree){
       var d = differences(fa, ficheComparaison(lb, boites, O, ignores), U);
       if (recree) d.push({ k: "GlobalId", a: la.i.globalId, b: lb.i.globalId });
@@ -3638,7 +3653,7 @@
       n[genreDiff]++;
       de.set(la.cle, e); de.set(lb.cle, e);
       if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ if (x.k !== "GlobalId") freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
-      var paire = { e: e, a: la, b: lb, d: d };
+      var paire = { e: e, a: la, b: lb, d: d, id: valeurIdentite(lb, O) };
       paires.push(paire); paireDe.set(la.cle, paire); paireDe.set(lb.cle, paire);
       return d.length;
     }
@@ -3647,7 +3662,7 @@
     // l'ancienne maquette d'abord (ses fiches), puis la nouvelle face à elle
     var doublons = 0;
     parTranches(ls.length, function(k){
-      var l = ls[k], gid = cleIdentite(l, O.identite);
+      var l = ls[k], gid = cleIdentite(l, O.identite, O.identiteDebut);
       if (k < lsA.length){ if (!parGid.has(gid)) parGid.set(gid, { l: l, f: ficheComparaison(l, boites, O, ignores) }); else doublons++; return; }
       if (vusB.has(gid)){ doublons++; return; }
       vusB.add(gid);
@@ -3660,7 +3675,7 @@
       parGid.forEach(function(x, gid){
         if (vusB.has(gid)) return;
         var k = O.geo ? empreinteForme(x.l, boites) : "";
-        if (!k){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; return; }
+        if (!k){ seul("supprime", x.l); return; }
         var t = orphelins.get(k); if (!t) orphelins.set(k, t = []); t.push(x);
       });
       ajoutes.forEach(function(l){
@@ -3677,13 +3692,13 @@
           if (mieux >= 0) x = t.splice(mieux, 1)[0];
         }
         if (x) compare(x.l, x.f, l, true);
-        else { de.set(l.cle, ETATS_DIFF.ajoute); paires.push({ e: ETATS_DIFF.ajoute, a: null, b: l, d: [] }); n.ajoute++; }
+        else seul("ajoute", l);
       });
-      orphelins.forEach(function(t){ t.forEach(function(x){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; }); });
+      orphelins.forEach(function(t){ t.forEach(function(x){ seul("supprime", x.l); }); });
       var frequents = []; freq.forEach(function(nb, k){ frequents.push([k, nb]); });
       frequents.sort(function(a, b){ return b[1] - a[1]; });
       diffDe = de; diffQuoi = quoi; diffPaires = paires; diffPaireDe = paireDe;
-      diffBilan = { ancien: A.uid, nouveau: B.uid, n: n, frequents: frequents.slice(0, 6) };
+      diffBilan = { ancien: A.uid, nouveau: B.uid, n: n, frequents: frequents.slice(0, 6), identite: O.identite };
       catsMasquees.clear();
       colorer = "diff";
       calculerCouleurs(); majVue(); afficherProps(); maj();
@@ -3707,36 +3722,55 @@
   function finEvidence(){ if (diffFocus){ diffFocus = null; return true; } return false; }
   function voirEvidence(c){
     var p = diffPaireDe && diffPaireDe.get(c);
-    if (!p || !p.a || !p.b || !existe(p.a.cle) || !existe(p.b.cle)) return;
+    if (!p) return;
+    var la = p.a && existe(p.a.cle) ? p.a : null, lb = p.b && existe(p.b.cle) ? p.b : null, l0 = lb || la;
+    if (!l0) return;
     // tout réafficher d'abord : les boîtes ne sont connues que pour ce qui est dessiné
     diffFocus = null; caches = new Set();
     infoVue(vue.afficher(itemsVue()));
-    var boites = vue.boitesElements(), ba = boites.get(p.a.cle), bb = boites.get(p.b.cle);
-    if (!ba || !bb){ majVue(); etat("Mise en évidence impossible : un des deux états n'est pas dessiné (catégorie décochée dans la légende, maquette masquée ou géométrie non lue)."); return; }
-    var mn = [0, 1, 2].map(function(k){ return Math.min(ba[0][k], bb[0][k]); }), mx = [0, 1, 2].map(function(k){ return Math.max(ba[1][k], bb[1][k]); });
-    var marge = Math.max(Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])*.75, p.b.f.unite && p.b.f.unite.f > 0 ? 1/p.b.f.unite.f : 0);
-    var garde = new Set([p.a.cle, p.b.cle]);
+    var boites = vue.boitesElements(), ba = la ? boites.get(la.cle) : null, bb = lb ? boites.get(lb.cle) : null, bs = [ba, bb].filter(Boolean);
+    if ((la && !ba) || (lb && !bb)){ majVue(); etat("Mise en évidence impossible : l'élément n'est pas dessiné (catégorie décochée dans la légende, maquette masquée ou géométrie non lue)."); return; }
+    var mn = [0, 1, 2].map(function(k){ return Math.min.apply(null, bs.map(function(b){ return b[0][k]; })); });
+    var mx = [0, 1, 2].map(function(k){ return Math.max.apply(null, bs.map(function(b){ return b[1][k]; })); });
+    var marge = Math.max(Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])*.75, l0.f.unite && l0.f.unite.f > 0 ? 1/l0.f.unite.f : 0);
+    // voisinage : les éléments de la nouvelle maquette autour (ceux de l'ancienne pour un élément supprimé seul)
+    var fv = diffBilan && parUid.get(diffBilan.nouveau) || l0.f, garde = new Set();
+    if (la) garde.add(la.cle);
+    if (lb) garde.add(lb.cle);
     lignes.forEach(function(l){
-      if (!l.i || !l.i.vue3D || l.f !== p.b.f) return;
+      if (!l.i || !l.i.vue3D || l.f !== fv) return;
       var b = boites.get(l.cle);
       if (!b) return;
       for (var k = 0; k < 3; k++) if (b[0][k] > mx[k] + marge || b[1][k] < mn[k] - marge) return;
       garde.add(l.cle);
     });
     lignes.forEach(function(l){ if (l.i && l.i.vue3D && !garde.has(l.cle)) caches.add(l.cle); });
-    diffFocus = { a: p.a.cle, b: p.b.cle };
-    choix = new Set(); actif = p.b.cle;
+    diffFocus = { a: la ? la.cle : null, b: lb ? lb.cle : null };
+    choix = new Set(); actif = l0.cle;
     majVue(); afficherProps();
     function centre(b){ return [(b[0][0] + b[1][0])/2, (b[0][1] + b[1][1])/2, (b[0][2] + b[1][2])/2]; }
-    var ca = centre(ba), cb = centre(bb);
-    if (Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2]) > 0) vue.cote(ca, cb);
-    vue.cadrer([p.a.cle, p.b.cle]);
-    etat("« " + nomAff(p.b.i) + " » : ancien état en rouge, nouvel état en vert" + (garde.size > 2 ? ", " + pluriel(garde.size - 2, "élément voisin", "éléments voisins") + " en neutre" : "") +
-      ". Maj+H pour tout réafficher ; menu Outils pour effacer la cote.");
+    if (ba && bb){
+      var ca = centre(ba), cb = centre(bb);
+      if (Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2]) > 0) vue.cote(ca, cb);
+    }
+    vue.cadrer([la, lb].filter(Boolean).map(function(l){ return l.cle; }));
+    var nv = garde.size - (la ? 1 : 0) - (lb ? 1 : 0);
+    etat("« " + nomAff(l0.i) + " » (" + p.e + ") : " + (la && lb ? "ancien état en rouge, nouvel état en vert" : la ? "élément de l'ancienne maquette, en rouge" : "élément de la nouvelle maquette, en vert") +
+      (nv > 0 ? ", " + pluriel(nv, "élément voisin", "éléments voisins") + " en neutre" : "") + ". Maj+H pour tout réafficher.");
   }
+  // éléments du même état que p, dans l'ordre de la comparaison (parcours ◀ ▶ du panneau)
+  function memeEtat(p){ return diffPaires ? diffPaires.filter(function(x){ return x.e === p.e; }) : []; }
   $("#props").addEventListener("click", function(e){
     var b = e.target.closest && e.target.closest("[data-evidence]");
-    if (b) voirEvidence(b.getAttribute("data-evidence"));
+    if (!b) return;
+    var c = b.getAttribute("data-evidence"), pas = +b.getAttribute("data-pas") || 0, p = diffPaireDe && diffPaireDe.get(c);
+    if (pas && p){
+      var l = memeEtat(p), k = l.indexOf(p);
+      if (k < 0 || l.length < 2) return;
+      var q = l[(k + pas + l.length) % l.length];
+      c = (q.b || q.a).cle;
+    }
+    voirEvidence(c);
   });
   // Clic droit sur une propriété du panneau, deux maquettes ouvertes : la prendre comme identité de la comparaison
   $("#props").addEventListener("contextmenu", function(e){
@@ -3757,7 +3791,13 @@
     if (!e) return "";
     var q = diffQuoi.get(c) || [], MAX = 40, paire = diffPaireDe && diffPaireDe.get(c);
     return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div>" +
-      (paire && paire.a && paire.b ? '<button type="button" class="btn petit" data-evidence="' + esc(c) + '" title="Isoler les deux états avec leur voisinage : ancien en rouge, nouveau en vert, cote entre les centres">Mettre en évidence (ancien → nouveau)</button>' : "") + "<dl>" +
+      (paire ? (function(){
+        var l = memeEtat(paire), k = l.indexOf(paire), ce = esc(c);
+        return '<div class="evidence"><button type="button" class="btn petit" data-evidence="' + ce + '" data-pas="-1" title="Élément précédent du même état, mis en évidence" aria-label="Précédent">◀</button>' +
+          '<button type="button" class="btn petit" data-evidence="' + ce + '" title="Isoler l\'élément avec son voisinage : ancien état en rouge, nouvel état en vert, cote entre les deux">Mettre en évidence</button>' +
+          '<button type="button" class="btn petit" data-evidence="' + ce + '" data-pas="1" title="Élément suivant du même état, mis en évidence" aria-label="Suivant">▶</button>' +
+          '<span class="props-nb">' + fmtN(k + 1) + " / " + fmtN(l.length) + "</span></div>";
+      })() : "") + "<dl>" +
       (q.length ? q.slice(0, MAX).map(function(x){
         if (x.k === DEP_DIFF) return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.b) + "</dd>";      // une seule valeur : la distance
         return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
@@ -3767,11 +3807,12 @@
   // Rapport Excel : une ligne par différence (une seule pour un élément ajouté, supprimé ou recréé sans écart)
   function exporterRapportComparaison(){
     if (!diffPaires || !diffBilan || !parUid.has(diffBilan.ancien) || !parUid.has(diffBilan.nouveau)){ etat("Rapport : lance d'abord une comparaison (Outils › Comparer les deux maquettes)."); return; }
-    var titres = ["État", "GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"], rangs = [];
+    var avecId = !!diffBilan.identite;
+    var titres = ["État"].concat(avecId ? ["Identité (" + nomIdentite(diffBilan.identite) + ")"] : [], ["GlobalId (ancien)", "GlobalId (nouveau)", "Classe IFC", "Nom", "Famille : type", "Étage", "Différence", "Ancienne valeur", "Nouvelle valeur"]), rangs = [];
     var ordre = [ETATS_DIFF.deplace, ETATS_DIFF.modifie, ETATS_DIFF.donnees, ETATS_DIFF.recree, ETATS_DIFF.ajoute, ETATS_DIFF.supprime];
     diffPaires.forEach(function(p){
       if (p.e === ETATS_DIFF.pareil) return;
-      var l = p.b || p.a, i = l.i, tete = [p.e, p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)];
+      var l = p.b || p.a, i = l.i, tete = [p.e].concat(avecId ? [p.id || ""] : [], [p.a ? p.a.i.globalId : "", p.b ? p.b.i.globalId : "", i.typeLib, i.nom, i.objectType, etageDe(l.f.m, l.id)]);
       if (!p.d.length) rangs.push(tete.concat(["", "", ""]));
       else p.d.forEach(function(x){ rangs.push(tete.concat([x.k, x.a, x.b])); });
     });
