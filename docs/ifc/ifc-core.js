@@ -689,6 +689,99 @@
     return out;
   }
 
+  // ================= Valeurs brutes et unités (tableaux, totaux) =================
+  var PREFIXES_SI = { EXA: "E", PETA: "P", TERA: "T", GIGA: "G", MEGA: "M", KILO: "k", HECTO: "h", DECA: "da",
+    DECI: "d", CENTI: "c", MILLI: "m", MICRO: "µ", NANO: "n", PICO: "p" };
+  var NOMS_SI = { METRE: "m", SQUARE_METRE: "m²", CUBIC_METRE: "m³", GRAM: "g", SECOND: "s", NEWTON: "N", PASCAL: "Pa",
+    JOULE: "J", WATT: "W", KELVIN: "K", DEGREE_CELSIUS: "°C", RADIAN: "rad", HERTZ: "Hz", VOLT: "V", AMPERE: "A" };
+  // Symbole d'une unité nommée (IFCSIUNIT, IFCCONVERSIONBASEDUNIT) ; "" si on ne sait pas la lire
+  function symboleUnite(e){
+    if (!e) return "";
+    var a = champs(e);
+    if (e.type === "IFCSIUNIT"){
+      var n = a[3] && a[3].enu || "", b = NOMS_SI[n];
+      return b ? (a[2] && a[2].enu ? PREFIXES_SI[a[2].enu] || "" : "") + b : n.toLowerCase();
+    }
+    if (e.type.lastIndexOf("IFCCONVERSIONBASEDUNIT", 0) === 0) return chaine(a[2]).toLowerCase();
+    return "";
+  }
+  // Unités du projet par genre : { LENGTHUNIT: "mm", AREAUNIT: "m²", VOLUMEUNIT: "m³", MASSUNIT: "kg"… }
+  // (celles de l'IFCUNITASSIGNMENT du projet ; à défaut, de la première assignation du fichier)
+  function unites(m){
+    if (m._uni && m._uni.v === m.version) return m._uni.u;
+    var I = index(m), ua = null, u = {};
+    I.projets.forEach(function(p){
+      var e = m.ent.get(p), x = e ? m.ent.get(idRef(champs(e)[8])) : null;
+      if (!ua && x && x.type === "IFCUNITASSIGNMENT") ua = x;
+    });
+    if (!ua) m.ent.forEach(function(e){ if (!ua && e.type === "IFCUNITASSIGNMENT") ua = e; });
+    if (ua) refsListe(champs(ua)[0]).forEach(function(r){
+      var e = m.ent.get(r), g = e ? champs(e)[1] : null, sym = symboleUnite(e);
+      if (g && g.enu && sym && !u[g.enu]) u[g.enu] = sym;
+    });
+    m._uni = { v: m.version, u: u };
+    return u;
+  }
+  // genre d'unité d'une quantité ou d'une mesure ("" : sans unité, un nombre de pièces)
+  var UNITE_QUANTITE = { IFCQUANTITYLENGTH: "LENGTHUNIT", IFCQUANTITYAREA: "AREAUNIT", IFCQUANTITYVOLUME: "VOLUMEUNIT",
+    IFCQUANTITYWEIGHT: "MASSUNIT", IFCQUANTITYCOUNT: "", IFCQUANTITYTIME: "TIMEUNIT" };
+  var UNITE_MESURE = { IFCLENGTHMEASURE: "LENGTHUNIT", IFCPOSITIVELENGTHMEASURE: "LENGTHUNIT", IFCAREAMEASURE: "AREAUNIT",
+    IFCVOLUMEMEASURE: "VOLUMEUNIT", IFCMASSMEASURE: "MASSUNIT", IFCCOUNTMEASURE: "" };
+  // nombre gardé nombre, le reste en texte ; "" pour une valeur absente
+  function valeurBrute(m, v){
+    if (v === null || v === undefined) return "";
+    if (typeof v === "number") return v;
+    if (v.type) return valeurBrute(m, v.v);
+    return texteValeur(m, v);
+  }
+  function donneesProps(m, liste, prefixe, jeu, origine, U, out, prof){
+    liste.forEach(function(r){
+      var e = m.ent.get(r);
+      if (!e) return;
+      var a = champs(e), nom = prefixe + chaine(a[0]), v = "", un = "", g;
+      function mettre(quantite){
+        out.push({ jeu: jeu, nom: nom, v: v, unite: un, quantite: !!quantite, somme: g !== undefined && typeof v === "number", origine: origine });
+      }
+      function uniteDe(ref){ var x = idRef(ref) ? symboleUnite(m.ent.get(idRef(ref))) : ""; return x || (g !== undefined && U[g]) || ""; }
+      switch (e.type){
+        case "IFCPROPERTYSINGLEVALUE":
+          g = a[2] && a[2].type ? UNITE_MESURE[a[2].type] : undefined;
+          v = valeurBrute(m, a[2]); un = typeof v === "number" ? uniteDe(a[3]) : ""; mettre(); break;
+        case "IFCPROPERTYENUMERATEDVALUE": case "IFCPROPERTYLISTVALUE": v = texteValeur(m, a[2]); mettre(); break;
+        case "IFCPROPERTYBOUNDEDVALUE": v = texteValeur(m, a[3]) + " … " + texteValeur(m, a[2]); mettre(); break;
+        case "IFCPROPERTYREFERENCEVALUE": v = texteValeur(m, a[3]); mettre(); break;
+        case "IFCPROPERTYTABLEVALUE": v = "(tableau)"; mettre(); break;
+        case "IFCCOMPLEXPROPERTY": if (prof < 4) donneesProps(m, refsListe(a[3]), nom + " › ", jeu, origine, U, out, prof + 1); break;
+        case "IFCPHYSICALCOMPLEXQUANTITY": if (prof < 4) donneesProps(m, refsListe(a[2]), nom + " › ", jeu, origine, U, out, prof + 1); break;
+        default:
+          if (e.type.lastIndexOf("IFCQUANTITY", 0) !== 0) return;
+          g = UNITE_QUANTITE[e.type];
+          v = valeurBrute(m, a[3]); un = uniteDe(a[2]); mettre(true);
+      }
+    });
+  }
+  // Propriétés et quantités d'un objet, valeurs brutes : [{ jeu, nom, v (nombre ou texte), unite, quantite,
+  // somme (grandeur qui s'additionne : longueur, surface, volume, masse, nombre), origine ("" ou "Type …") }].
+  // Celles de l'objet d'abord, puis celles de son type.
+  function donnees(m, id){
+    var I = index(m), U = unites(m), out = [];
+    function jeu(d, origine){
+      var e = m.ent.get(d);
+      if (!e) return;
+      var a = champs(e), nom = chaine(a[2]) || nomType(e.type);
+      if (e.type === "IFCPROPERTYSET") donneesProps(m, refsListe(a[4]), "", nom, origine, U, out, 0);
+      else if (e.type === "IFCELEMENTQUANTITY") donneesProps(m, refsListe(a[5]), "", nom, origine, U, out, 0);
+    }
+    (I.psets.get(id) || []).forEach(function(d){ jeu(d, ""); });
+    var t = I.typeObjet.get(id), te = t && m.ent.get(t);
+    if (te){
+      var nomT = chaine(champs(te)[2]) || nomType(te.type);
+      refsListe(champs(te)[5]).forEach(function(d){ jeu(d, "Type " + nomT); });
+      (I.psets.get(t) || []).forEach(function(d){ jeu(d, "Type " + nomT); });
+    }
+    return out;
+  }
+
   // ================= Suppression propre =================
   // Références « faibles » : elles ne gardent pas en vie ce qu'elles désignent, et sont nettoyées après coup.
   var FAIBLES = { IFCSTYLEDITEM: [0], IFCPRESENTATIONLAYERASSIGNMENT: [2], IFCPRESENTATIONLAYERWITHSTYLE: [2], IFCMATERIALDEFINITIONREPRESENTATION: [3] };
@@ -1166,6 +1259,8 @@
     champs: champs, idRef: idRef, refsListe: refsListe, nombre: nombre, chaine: chaine, decoder: decoder, nomType: nomType,
     fusionner: fusionner,
     // pour écrire de nouvelles entités ailleurs (retaille selon la boîte de coupe, dans ifc-vue.js)
-    lireEntite: lireEntite, refaire: refaire, bruts: bruts, uniteLongueur: uniteLongueur
+    lireEntite: lireEntite, refaire: refaire, bruts: bruts, uniteLongueur: uniteLongueur,
+    // valeurs brutes et unités, pour les tableaux et les totaux de l'interface
+    donnees: donnees, unites: unites
   };
 })(typeof window !== "undefined" ? window : self);

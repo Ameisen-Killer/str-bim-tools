@@ -454,6 +454,7 @@ select.champ{appearance:none;-webkit-appearance:none;background-image:linear-gra
 /* propriétés */
 .props{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 16px 28px}
 .props-vide{color:var(--texte-faible);font-size:13px;padding-top:6px}
+.props-nb{color:var(--texte-faible);font-size:12px}
 .props h3{margin:2px 0 4px;font-weight:300;font-size:20px;line-height:1.2;word-break:break-word}
 .props .type{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--or)}
 .props dl{margin:12px 0 0;display:grid;grid-template-columns:minmax(90px,auto) minmax(0,1fr);gap:4px 12px;font-size:13px}
@@ -825,6 +826,8 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
             <hr data-ed>
             <button type="button" role="menuitem" data-ed data-cmd="exporter"><span id="cmd-exporter">Exporter l'IFC</span><kbd>Ctrl+S</kbd></button>
             <button type="button" role="menuitem" data-ed data-cmd="exporter-zip"><span>Exporter en .ifczip (compressé)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="tableau-xlsx"><span>Exporter le tableau des éléments (Excel)</span><kbd></kbd></button>
+            <button type="button" role="menuitem" data-cmd="tableau-csv"><span>Exporter le tableau des éléments (CSV)</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-axes"><span>Exporter le plan des axes en DXF</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-3d"><span>Exporter le modèle analytique en DXF 3D</span><kbd></kbd></button>
             <button type="button" role="menuitem" data-cmd="dxf-studio"><span>Ouvrir le modèle analytique dans DXF Studio</span><kbd></kbd></button>
@@ -1277,13 +1280,13 @@ body.edition .aide-table kbd{font-family:var(--sans);font-size:12px;padding:1px 
 </footer>
 
 <script src="/ifc/ifc-accueil.js?v=10"></script>
-<script src="/ifc/ifc-core.js?v=13"></script>
+<script src="/ifc/ifc-core.js?v=14"></script>
 <script src="/ifc/ifc-vue.js?v=47"></script>
 <script src="/dxf/dxf-3d.js?v=2"></script>
 <script src="/ifc/ifc-cube.js?v=2"></script>
 <script src="/ifc/ifc-moteurs.js?v=6"></script>
 <script src="/ifc/ifc-edition.js?v=2"></script>
-<script src="/ifc/ifc-app.js?v=60"></script>
+<script src="/ifc/ifc-app.js?v=61"></script>
 <script src="/assets/menu.js?v=34"></script>
 </body>
 </html>

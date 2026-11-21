@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.4.1";
+  var VERSION = "1.5.0";
   (function(){ var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION; })();
   function pluriel(n, mot, mots){ return fmtN(n) + " " + (n > 1 ? (mots || mot + "s") : mot); }
 
@@ -259,7 +259,7 @@
   }
   // Worker de lecture gardé chaud : créé au chargement de la page (scripts et module Rust prêts d'avance),
   // repris d'un fichier à l'autre ; un worker tombé n'est jamais réutilisé.
-  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=9", chaud = null;
+  var URL_LECTEUR = "/ifc/ifc-lecteur.js?v=10", chaud = null;
   function prendreWorker(){ var w = chaud; chaud = null; return w || new Worker(URL_LECTEUR); }
   function rendreWorker(w){ w.onmessage = w.onerror = null; if (chaud) w.terminate(); else chaud = w; }
   if (avecWorker) setTimeout(function(){
@@ -543,7 +543,7 @@
   // ================= Géométrie avant l'ouverture =================
   // Gros fichier : plusieurs workers en parallèle (ifc-geo.js), chacun relit le fichier et calcule sa part ;
   // sinon (ou si un worker échoue) la page calcule elle-même, par tranches.
-  var URL_GEO = "/ifc/ifc-geo.js?v=4";
+  var URL_GEO = "/ifc/ifc-geo.js?v=5";
   function nbWorkersGeo(m, n){
     if (typeof Worker === "undefined" || !m.octets || n < 400) return 0;
     var coeurs = Math.max(1, (navigator.hardwareConcurrency || 2) - 1), memoire = Math.floor(2e9/Math.max(1, m.octets.byteLength*6));
@@ -1488,16 +1488,24 @@
   function ligne(dt, dd, mono){ return dd ? "<dt>" + esc(dt) + "</dt><dd" + (mono ? ' class="mono"' : "") + ">" + esc(dd) + "</dd>" : ""; }
   // ce que montre le panneau : rien, « plusieurs éléments », ou l'élément actif (et sa version)
   var dernierProps = null;
-  function cleProps(){ return choix.size > 1 ? "n" + choix.size : actif && existe(actif) ? actif + "@" + lireCle(actif).f.m.version : ""; }
+  // plusieurs éléments : empreinte de la sélection (nombre, sommes des numéros) et versions des fichiers, pour
+  // que les totaux suivent une sélection qui change sans changer de taille
+  function empreinteChoix(){
+    var a = 0, b = 0;
+    choix.forEach(function(c){ var p = c.indexOf(":"), u = +c.slice(0, p), id = +c.slice(p + 1); a = (a + id*31 + u) % 4294967291; b = (b + (id % 65521)*(id % 65521) + u*7) % 4294967291; });
+    return "n" + choix.size + ":" + a + ":" + b + ":" + fichiers.map(function(f){ return f.m.version; }).join(",");
+  }
+  function cleProps(){ return choix.size > 1 ? empreinteChoix() : actif && existe(actif) ? actif + "@" + lireCle(actif).f.m.version : ""; }
   function afficherProps(){
     dernierProps = cleProps();
     var z = $("#props");
-    if (!actif || !existe(actif)){
+    if (choix.size <= 1 && (!actif || !existe(actif))){
       z.innerHTML = '<p class="props-vide">Clique un élément dans la liste ou dans la vue 3D.</p>';
       return;
     }
     if (choix.size > 1){
-      z.innerHTML = '<p class="props-vide">' + esc(pluriel(choix.size, "élément sélectionné", "éléments sélectionnés")) + " : les propriétés s'affichent pour un seul élément à la fois.</p>";
+      z.innerHTML = htmlTotaux();
+      z.scrollTop = 0;
       return;
     }
     var d = lireCle(actif), m = d.f.m, id = d.id, i = IFC.infos(m, id), I = IFC.index(m);
@@ -1795,6 +1803,233 @@
         ", après " + fmtN(m.ent.size) + " entités · " + fmtTaille(oct.length) + (zip ? ", compressé " + fmtTaille(blob.size) : "");
     });
   }
+  // ================= Tableau des éléments (Excel, CSV) et totaux =================
+  // Archive ZIP de plusieurs fichiers [{ nom, u (octets) }] : promesse d'un Blob. Compressée si le navigateur
+  // le sait, sinon simplement rangée. Sert au classeur .xlsx, qui est un ZIP de fichiers XML.
+  function archive(entrees, mime){
+    var d = new Date(), enc = new TextEncoder();
+    var heure = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    var jour = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    return Promise.all(entrees.map(function(x){
+      var comp = zipPossible ? flux(x.u, new CompressionStream("deflate-raw")).then(function(cb){ return new Uint8Array(cb); }) : Promise.resolve(null);
+      return comp.then(function(c){ return { n: enc.encode(x.nom), u: x.u, c: c || x.u, methode: c ? 8 : 0, crc: crc32(x.u) }; });
+    })).then(function(liste){
+      var morceaux = [], centre = [], pos = 0, tailleCentre = 0;
+      liste.forEach(function(x){
+        function entete(central){
+          var b = new ArrayBuffer((central ? 46 : 30) + x.n.length), v = new DataView(b), k = 0;
+          function m16(y){ v.setUint16(k, y, true); k += 2; }
+          function m32(y){ v.setUint32(k, y >>> 0, true); k += 4; }
+          m32(central ? 0x02014b50 : 0x04034b50);
+          if (central) m16(20);                                        // version qui a écrit l'archive
+          m16(20); m16(0x0800); m16(x.methode); m16(heure); m16(jour); // version requise, noms en UTF-8, méthode, date
+          m32(x.crc); m32(x.c.length); m32(x.u.length); m16(x.n.length); m16(0);
+          if (central){ m16(0); m16(0); m16(0); m32(0); m32(pos); }    // commentaire, disque, attributs, position de l'entrée
+          new Uint8Array(b, k).set(x.n);
+          return new Uint8Array(b);
+        }
+        var loc = entete(false), cen = entete(true);
+        morceaux.push(loc, x.c); centre.push(cen);
+        pos += loc.length + x.c.length; tailleCentre += cen.length;
+      });
+      var fin = new DataView(new ArrayBuffer(22));
+      fin.setUint32(0, 0x06054b50, true); fin.setUint16(8, liste.length, true); fin.setUint16(10, liste.length, true);
+      fin.setUint32(12, tailleCentre, true); fin.setUint32(16, pos, true);
+      return new Blob(morceaux.concat(centre, [fin.buffer]), { type: mime || "application/zip" });
+    });
+  }
+  function enregistrer(blob, nom){
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nom;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  }
+  // Lignes de la liste concernées : la sélection ; sans sélection, le résultat de la recherche ; sinon tout
+  function lignesTableau(){
+    var filtre = !!($("#recherche").value.trim() || $("#filtre-type").value);
+    var garde = choix.size ? choix : filtre ? new Set(visibles) : null;
+    return {
+      lignes: lignes.filter(function(l){ return !l.fichier && l.i.supprimable && (garde ? garde.has(l.cle) : true); }),
+      quoi: choix.size ? "sélection" : filtre ? "résultat de la recherche" : "tous les éléments"
+    };
+  }
+  // Tableau : une ligne par élément, colonnes fixes puis une colonne par quantité et par propriété rencontrée.
+  // Promesse de { cols: [{ titre, somme }], rangs: [[valeurs]], nbFixes }
+  function construireTableau(ls, progres){
+    var plusieurs = fichiers.length > 1;
+    var fixes = (plusieurs ? ["Fichier"] : []).concat(["GlobalId", "Classe IFC", "Nom", "Famille : type", "Type", "Étage", "Matériau", "Repère", "Description"]);
+    var cols = fixes.map(function(t){ return { titre: t, somme: false }; }), parCle = new Map(), rangs = [];
+    return parTranches(ls.length, function(k){
+      var l = ls[k], m = l.f.m, i = l.i;
+      var r = (plusieurs ? [m.nom] : []).concat([i.globalId, i.typeLib, i.nom, i.objectType, typeRelie(m, l.id), etageDe(m, l.id), i.materiau, i.tag, i.description]);
+      IFC.donnees(m, l.id).forEach(function(d){
+        if (d.v === "") return;
+        var c = (d.quantite ? "Q" : "P") + "\u0000" + d.jeu + "\u0000" + d.nom + "\u0000" + d.unite, n = parCle.get(c);
+        if (n === undefined){
+          n = cols.length; parCle.set(c, n);
+          cols.push({ titre: d.jeu + " · " + d.nom + (d.unite ? " [" + d.unite + "]" : ""), somme: d.somme, quantite: d.quantite });
+        }
+        else if (!d.somme) cols[n].somme = false;
+        if (r[n] === undefined) r[n] = d.v;           // la valeur de l'objet passe avant celle de son type
+      });
+      rangs.push(r);
+    }, progres || function(){}).then(function(){
+      // quantités d'abord, puis propriétés, chacune dans l'ordre où elle est apparue
+      var ordre = cols.map(function(c, n){ return n; }), nf = fixes.length;
+      ordre.sort(function(a, b){
+        var ga = a < nf ? 0 : cols[a].quantite ? 1 : 2, gb = b < nf ? 0 : cols[b].quantite ? 1 : 2;
+        return ga - gb || a - b;
+      });
+      return {
+        cols: ordre.map(function(n){ return cols[n]; }), nbFixes: nf,
+        rangs: rangs.map(function(r){ return ordre.map(function(n){ return r[n] === undefined ? "" : r[n]; }); })
+      };
+    });
+  }
+  function sommeColonne(T, n){
+    var s = 0, vu = false;
+    T.rangs.forEach(function(r){ if (typeof r[n] === "number" && isFinite(r[n])){ s += r[n]; vu = true; } });
+    return vu ? s : null;
+  }
+  // CSV : séparateur point-virgule, UTF-8 avec marque d'ordre (accents lus par Excel), nombres avec un point
+  function tableauCsv(T){
+    function champ(v){
+      if (typeof v === "number") return isFinite(v) ? String(v) : "";
+      v = String(v);
+      return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    var out = [T.cols.map(function(c){ return champ(c.titre); }).join(";")];
+    T.rangs.forEach(function(r){ out.push(r.map(champ).join(";")); });
+    out.push(T.cols.map(function(c, n){
+      if (!n) return champ("Total (" + pluriel(T.rangs.length, "élément") + ")");
+      var s = c.somme ? sommeColonne(T, n) : null;
+      return s === null ? "" : champ(s);
+    }).join(";"));
+    return new Blob(["﻿" + out.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+  }
+  // Classeur .xlsx écrit à la main : une feuille, en-tête en gras et figé, filtre automatique, puis une ligne de
+  // totaux en SOUS.TOTAL (elle suit le filtre d'Excel). Les nombres restent des nombres, quels que soient les
+  // réglages régionaux du poste.
+  function tableauXlsx(T){
+    function x(t){ return String(t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function lettre(n){ var s = ""; for (n++; n > 0; n = Math.floor((n - 1)/26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; }
+    function cellule(v, n, rang, style){
+      var ref = ' r="' + lettre(n) + rang + '"' + (style ? ' s="1"' : "");
+      if (typeof v === "number") return isFinite(v) ? "<c" + ref + "><v>" + v + "</v></c>" : "";
+      if (v === "" || v === null || v === undefined) return "";
+      return "<c" + ref + ' t="inlineStr"><is><t xml:space="preserve">' + x(String(v).slice(0, 32000)) + "</t></is></c>";
+    }
+    var nc = T.cols.length, nr = T.rangs.length, fin = lettre(nc - 1), dernier = nr + 1, rTotal = nr + 3;
+    var L = ['<row r="1">' + T.cols.map(function(c, n){ return cellule(c.titre, n, 1, true); }).join("") + "</row>"];
+    T.rangs.forEach(function(r, k){ L.push('<row r="' + (k + 2) + '">' + r.map(function(v, n){ return cellule(v, n, k + 2, false); }).join("") + "</row>"); });
+    if (nr){
+      var tot = cellule("Total (éléments affichés)", 0, rTotal, true);
+      T.cols.forEach(function(c, n){
+        var s = n && c.somme ? sommeColonne(T, n) : null;
+        if (s !== null) tot += '<c r="' + lettre(n) + rTotal + '" s="1"><f>SUBTOTAL(109,' + lettre(n) + "2:" + lettre(n) + dernier + ")</f><v>" + s + "</v></c>";
+      });
+      L.push('<row r="' + rTotal + '">' + tot + "</row>");
+    }
+    var XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', NS = "http://schemas.openxmlformats.org/";
+    var feuille = XML + '<worksheet xmlns="' + NS + 'spreadsheetml/2006/main">' +
+      '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+      '<cols><col min="1" max="' + T.nbFixes + '" width="24" customWidth="1"/>' +
+      (nc > T.nbFixes ? '<col min="' + (T.nbFixes + 1) + '" max="' + nc + '" width="18" customWidth="1"/>' : "") + "</cols>" +
+      "<sheetData>" + L.join("") + "</sheetData>" +
+      '<autoFilter ref="A1:' + fin + dernier + '"/></worksheet>';
+    var classeur = XML + '<workbook xmlns="' + NS + 'spreadsheetml/2006/main" xmlns:r="' + NS + 'officeDocument/2006/relationships">' +
+      '<sheets><sheet name="Elements" sheetId="1" r:id="rId1"/></sheets>' +
+      '<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Elements!$A$1:$' + fin + "$" + dernier + "</definedName></definedNames>" +
+      '<calcPr fullCalcOnLoad="1"/></workbook>';
+    var styles = XML + '<styleSheet xmlns="' + NS + 'spreadsheetml/2006/main">' +
+      '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    var types = XML + '<Types xmlns="' + NS + 'package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>';
+    var REL = NS + "officeDocument/2006/relationships/";
+    var rels = XML + '<Relationships xmlns="' + NS + 'package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="' + REL + 'officeDocument" Target="xl/workbook.xml"/></Relationships>';
+    var relsClasseur = XML + '<Relationships xmlns="' + NS + 'package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="' + REL + 'worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="' + REL + 'styles" Target="styles.xml"/></Relationships>';
+    var enc = new TextEncoder();
+    return archive([
+      { nom: "[Content_Types].xml", u: enc.encode(types) }, { nom: "_rels/.rels", u: enc.encode(rels) },
+      { nom: "xl/workbook.xml", u: enc.encode(classeur) }, { nom: "xl/_rels/workbook.xml.rels", u: enc.encode(relsClasseur) },
+      { nom: "xl/styles.xml", u: enc.encode(styles) }, { nom: "xl/worksheets/sheet1.xml", u: enc.encode(feuille) }
+    ], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+  var tableauEnCours = false;
+  function exporterTableau(format){
+    if (tableauEnCours) return;
+    var x = lignesTableau(), ls = x.lignes;
+    if (!ls.length){ etat("Aucun élément à mettre dans le tableau."); return; }
+    tableauEnCours = true;
+    var base = (fichiers.length === 1 ? fichiers[0].m.nom.replace(/\.ifc$/i, "") : "maquettes") + "_elements";
+    etat("Préparation du tableau…");
+    construireTableau(ls, function(p){ etat("Préparation du tableau : " + Math.floor(100*p) + " %"); }).then(function(T){
+      var pret = format === "csv" ? Promise.resolve(tableauCsv(T)) : tableauXlsx(T);
+      return pret.then(function(blob){
+        var nom = base + (format === "csv" ? ".csv" : ".xlsx");
+        enregistrer(blob, nom);
+        etat("« " + nom + " » : " + pluriel(T.rangs.length, "élément") + " (" + x.quoi + "), " + pluriel(T.cols.length, "colonne") + ", " + fmtTaille(blob.size) + ".");
+      });
+    }).catch(function(err){
+      if (window.console) console.error(err);
+      etat("Tableau non exporté : " + (err && err.message || err));
+    }).then(function(){ tableauEnCours = false; });
+  }
+  // Totaux des grandeurs qui s'additionnent sur les éléments cochés : [{ titre, unite, s, nb }], quantités d'abord
+  var MAX_TOTAUX = 3000, NB3 = new Intl.NumberFormat("fr-CH", { maximumFractionDigits: 3 });
+  function totauxSelection(){
+    var par = new Map(), classes = new Map();
+    choix.forEach(function(c){
+      var d = lireCle(c);
+      if (!d.f || !d.f.m.ent.has(d.id)) return;
+      var i = IFC.infos(d.f.m, d.id), vus = new Set();
+      classes.set(i.typeLib, (classes.get(i.typeLib) || 0) + 1);
+      IFC.donnees(d.f.m, d.id).forEach(function(p){
+        if (!p.somme) return;
+        var k = (p.quantite ? "0" : "1") + "\u0000" + p.jeu + "\u0000" + p.nom + "\u0000" + p.unite;
+        if (vus.has(k)) return;                       // la valeur de l'objet passe avant celle de son type
+        vus.add(k);
+        var t = par.get(k);
+        if (!t) par.set(k, t = { titre: p.jeu + " · " + p.nom, unite: p.unite, s: 0, nb: 0, q: p.quantite });
+        t.s += p.v; t.nb++;
+      });
+    });
+    var tot = []; par.forEach(function(t){ tot.push(t); });
+    tot.sort(function(a, b){ return (a.q ? 0 : 1) - (b.q ? 0 : 1); });
+    var cl = []; classes.forEach(function(n, t){ cl.push([t, n]); });
+    cl.sort(function(a, b){ return b[1] - a[1]; });
+    return { totaux: tot, classes: cl };
+  }
+  function htmlTotaux(){
+    var n = choix.size, h = '<p class="props-vide">' + esc(pluriel(n, "élément sélectionné", "éléments sélectionnés")) + ".</p>";
+    if (n > MAX_TOTAUX)
+      return h + '<p class="props-vide">Au-delà de ' + fmtN(MAX_TOTAUX) + " éléments, les totaux ne sont pas calculés ici : exporte le tableau (menu Fichier), il les contient.</p>";
+    var t = totauxSelection();
+    h += '<div class="pset"><div class="pset-nom">Par classe</div><dl>' +
+      t.classes.map(function(c){ return "<dt>" + esc(c[0]) + "</dt><dd>" + fmtN(c[1]) + "</dd>"; }).join("") + "</dl></div>";
+    h += '<div class="pset"><div class="pset-nom">Totaux de la sélection</div><dl>' +
+      (t.totaux.length ? t.totaux.map(function(q){
+        return "<dt>" + esc(q.titre) + "</dt><dd>" + esc(NB3.format(q.s) + (q.unite ? " " + q.unite : "")) +
+          (q.nb < n ? ' <span class="props-nb">(' + fmtN(q.nb) + " él.)</span>" : "") + "</dd>";
+      }).join("") : "<dt>—</dt><dd>Aucune quantité dans ces éléments</dd>") + "</dl></div>";
+    return h + '<p class="ed-note">Longueurs, surfaces, volumes, masses et nombres lus dans l\'IFC, additionnés tels quels. Détail par élément : menu Fichier, « Exporter le tableau ».</p>';
+  }
+
   // Sans argument : le fichier ouvert s'il est seul, sinon tous les fichiers modifiés
   function exporter(f, zip){
     var cibles = f ? [f] : zip ? fichiers.slice() : fichiers.length === 1 ? fichiers.slice() : fichiers.filter(modifie);
@@ -2777,6 +3012,8 @@
     preferences: preferences,
     exporter: function(){ exporter(null); },
     "exporter-zip": function(){ exporter(null, true); },
+    "tableau-xlsx": function(){ exporterTableau("xlsx"); },
+    "tableau-csv": function(){ exporterTableau("csv"); },
     "exporter-fichier": function(b){ var f = parUid.get(+b.getAttribute("data-uid")); if (f) exporter(f); },
     "fermer-tout": function(){
       if (occupe()) return;
