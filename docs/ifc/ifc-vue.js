@@ -3731,6 +3731,11 @@
         return o;
       },
       nbMesures: function(){ return mesure.liste.length + mesure.points.length; },
+      // cote posée par la page entre deux points du modèle (déplacement d'un élément entre deux maquettes)
+      cote: function(pa, pb){
+        mesure.liste.push({ a: { p: pa.slice(), type: "sommet" }, b: { p: pb.slice(), type: "sommet" } });
+        demander();
+      },
       effacerMesures: function(){ mesure.liste = []; mesure.points = []; mesure.a = null; demander(); },
       // mise en forme des longueurs et des coordonnées : { longueur(v), point(p, zSeul) }
       formats: function(f){ formats = f; demander(); },

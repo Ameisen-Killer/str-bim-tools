@@ -17,7 +17,7 @@
     return (o/1048576).toFixed(2).replace(".", ",") + " Mo";
   }
   // version de la page, montrée dans le bandeau (à monter à chaque mise en ligne)
-  var VERSION = "1.10.1";
+  var VERSION = "1.11.0";
   // … et aussi à côté du titre de l'accueil ([data-version]) et dans la fenêtre « À propos »
   (function(){
     var v = document.getElementById("version"); if (v) v.textContent = "v" + VERSION;
@@ -1325,6 +1325,8 @@
   function neufs(f){ if (!f.neufs) f.neufs = neufsDe(f.m); return f.neufs; }
   // teinte d'un élément : celle de sa phase si elle est choisie, sinon celle de la maquette
   function teinteElement(f, id){
+    // mise en évidence d'un élément comparé : ancien état en rouge, nouvel état en vert, voisinage neutre
+    if (diffFocus){ var cf = cle(f, id); return cf === diffFocus.a ? 0 : cf === diffFocus.b ? 130 : null; }
     if (teintesCat){ var hc = teintesCat.get(cle(f, id)); return hc === undefined ? null : hc; }
     var p = f.phases;
     if (p){ var t = neufs(f).has(id) ? p.neuf : p.existant; if (t !== undefined) return t; }
@@ -1693,7 +1695,7 @@
     activerCmd("similaires", a && supprimable(actif) && IFC.infos(lireCle(actif).f.m, lireCle(actif).id).genre !== "spatial");
     activerCmd("masquer", n > 0 || a);
     activerCmd("isoler", n > 0 || a);
-    activerCmd("tout-afficher", caches.size > 0);
+    activerCmd("tout-afficher", caches.size > 0 || !!diffFocus);
     activerCmd("zoomer", n > 0 || a);
     activerCmd("coupe", n > 0 || a);
     activerCmd("sans-coupe", vue.aCoupe());
@@ -3086,7 +3088,7 @@
   function calculerCouleurs(){
     var leg = $("#legende");
     // la comparaison ne vaut que pour les deux maquettes comparées, tant qu'elles sont ouvertes
-    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = diffPaires = diffBilan = null; }
+    if (colorer === "diff" && (!diffDe || fichiers.length !== 2)){ colorer = ""; diffDe = diffQuoi = diffPaires = diffPaireDe = diffBilan = null; diffFocus = null; }
     if (!colorer || colorer === "fichier" || !fichiers.length){ teintesCat = null; catDe = null; catsMasquees.clear(); leg.hidden = true; leg.innerHTML = ""; return; }
     var compte = new Map(), teinte = new Map();
     catDe = new Map();
@@ -3112,7 +3114,7 @@
     leg.hidden = false;
   }
   function poserColorer(v){
-    if ((v || "") !== colorer) catsMasquees.clear();      // autre découpage : toutes les catégories reviennent
+    if ((v || "") !== colorer){ catsMasquees.clear(); finEvidence(); }      // autre découpage : toutes les catégories reviennent
     colorer = v || "";
     if (colorer !== "diff") garder("ifc.colorer", colorer);
     calculerCouleurs();
@@ -3288,7 +3290,7 @@
   // même endroit et de même encombrement sont rapprochés (« Recréé » : redessiné, son GlobalId a changé).
   // Résultat : diffDe (clé → état), diffQuoi (clé → [{ k, a, b }] : quoi, ancienne et nouvelle valeur),
   // diffBilan (comptes, différences les plus fréquentes), montrés par les couleurs « Comparaison ».
-  var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, comparaisonEnCours = false;
+  var diffDe = null, diffQuoi = null, diffBilan = null, diffPaires = null, diffPaireDe = null, comparaisonEnCours = false;
   var ETATS_DIFF = { ajoute: "Ajouté", supprime: "Supprimé", deplace: "Déplacé", modifie: "Modifié", recree: "Recréé", pareil: "Inchangé" };
   var TEINTES_DIFF = { "Ajouté": 130, "Supprimé": 0, "Déplacé": 210, "Modifié": 35, "Recréé": 280 };
   var optsDiff = (function(){
@@ -3384,7 +3386,8 @@
     var O = optsDiff, ignores = O.ignorer.map(sansAccent), boites = O.geo ? vue.boitesElements() : new Map(), parGid = new Map(), lsA = [], lsB = [];
     lignes.forEach(function(l){ if (l.i && l.i.genre === "element" && l.i.globalId) (l.f === A ? lsA : lsB).push(l); });
     var ls = lsA.concat(lsB), de = new Map(), quoi = new Map(), paires = [], vusB = new Set(), ajoutes = [];
-    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map();
+    var n = { ajoute: 0, supprime: 0, deplace: 0, modifie: 0, recree: 0, pareil: 0 }, freq = new Map(), paireDe = new Map();
+    finEvidence();
     // un élément a bougé à partir d'un demi-millimètre (dans l'unité du fichier)
     var U = { nom: A.unite && A.unite.nom || "", seuil: A.unite && A.unite.f > 0 ? .0005/A.unite.f : 0 };
     function compare(la, fa, lb, etatSi){
@@ -3395,7 +3398,8 @@
       if (!etatSi && bouge) n.deplace++;
       de.set(la.cle, e); de.set(lb.cle, e);
       if (d.length){ quoi.set(la.cle, d); quoi.set(lb.cle, d); d.forEach(function(x){ freq.set(x.k, (freq.get(x.k) || 0) + 1); }); }
-      paires.push({ e: e, a: la, b: lb, d: d });
+      var paire = { e: e, a: la, b: lb, d: d };
+      paires.push(paire); paireDe.set(la.cle, paire); paireDe.set(lb.cle, paire);
       return d.length;
     }
     comparaisonEnCours = true;
@@ -3427,7 +3431,7 @@
       orphelins.forEach(function(t){ t.forEach(function(x){ de.set(x.l.cle, ETATS_DIFF.supprime); paires.push({ e: ETATS_DIFF.supprime, a: x.l, b: null, d: [] }); n.supprime++; }); });
       var frequents = []; freq.forEach(function(nb, k){ frequents.push([k, nb]); });
       frequents.sort(function(a, b){ return b[1] - a[1]; });
-      diffDe = de; diffQuoi = quoi; diffPaires = paires;
+      diffDe = de; diffQuoi = quoi; diffPaires = paires; diffPaireDe = paireDe;
       diffBilan = { ancien: A.uid, nouveau: B.uid, n: n, frequents: frequents.slice(0, 6) };
       catsMasquees.clear();
       colorer = "diff";
@@ -3443,12 +3447,51 @@
       etat("Comparaison interrompue : " + (err && err.message || err));
     }).then(function(){ comparaisonEnCours = false; });
   }
+  // Mise en évidence d'un élément apparié : ses deux états seuls à l'écran avec leur voisinage (éléments de la
+  // nouvelle maquette autour d'eux), l'ancien en rouge, le nouveau en vert, une cote entre leurs centres.
+  // « Tout afficher » (Maj+H) y met fin.
+  var diffFocus = null;
+  function finEvidence(){ if (diffFocus){ diffFocus = null; return true; } return false; }
+  function voirEvidence(c){
+    var p = diffPaireDe && diffPaireDe.get(c);
+    if (!p || !p.a || !p.b || !existe(p.a.cle) || !existe(p.b.cle)) return;
+    // tout réafficher d'abord : les boîtes ne sont connues que pour ce qui est dessiné
+    diffFocus = null; caches = new Set();
+    infoVue(vue.afficher(itemsVue()));
+    var boites = vue.boitesElements(), ba = boites.get(p.a.cle), bb = boites.get(p.b.cle);
+    if (!ba || !bb){ majVue(); etat("Mise en évidence impossible : un des deux états n'est pas dessiné (catégorie décochée dans la légende, maquette masquée ou géométrie non lue)."); return; }
+    var mn = [0, 1, 2].map(function(k){ return Math.min(ba[0][k], bb[0][k]); }), mx = [0, 1, 2].map(function(k){ return Math.max(ba[1][k], bb[1][k]); });
+    var marge = Math.max(Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2])*.75, p.b.f.unite && p.b.f.unite.f > 0 ? 1/p.b.f.unite.f : 0);
+    var garde = new Set([p.a.cle, p.b.cle]);
+    lignes.forEach(function(l){
+      if (!l.i || !l.i.vue3D || l.f !== p.b.f) return;
+      var b = boites.get(l.cle);
+      if (!b) return;
+      for (var k = 0; k < 3; k++) if (b[0][k] > mx[k] + marge || b[1][k] < mn[k] - marge) return;
+      garde.add(l.cle);
+    });
+    lignes.forEach(function(l){ if (l.i && l.i.vue3D && !garde.has(l.cle)) caches.add(l.cle); });
+    diffFocus = { a: p.a.cle, b: p.b.cle };
+    choix = new Set(); actif = p.b.cle;
+    majVue(); afficherProps();
+    function centre(b){ return [(b[0][0] + b[1][0])/2, (b[0][1] + b[1][1])/2, (b[0][2] + b[1][2])/2]; }
+    var ca = centre(ba), cb = centre(bb);
+    if (Math.hypot(cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2]) > 0) vue.cote(ca, cb);
+    vue.cadrer([p.a.cle, p.b.cle]);
+    etat("« " + nomAff(p.b.i) + " » : ancien état en rouge, nouvel état en vert" + (garde.size > 2 ? ", " + pluriel(garde.size - 2, "élément voisin", "éléments voisins") + " en neutre" : "") +
+      ". Maj+H pour tout réafficher ; menu Outils pour effacer la cote.");
+  }
+  $("#props").addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("[data-evidence]");
+    if (b) voirEvidence(b.getAttribute("data-evidence"));
+  });
   // bloc « Comparaison » du panneau Propriétés, pour l'élément affiché : état, puis ancienne → nouvelle valeur
   function htmlComparaison(c){
     var e = colorer === "diff" && diffDe ? diffDe.get(c) : null;
     if (!e) return "";
-    var q = diffQuoi.get(c) || [], MAX = 40;
-    return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div><dl>" +
+    var q = diffQuoi.get(c) || [], MAX = 40, paire = diffPaireDe && diffPaireDe.get(c);
+    return '<div class="pset"><div class="pset-nom">Comparaison · ' + esc(e) + "</div>" +
+      (paire && paire.a && paire.b ? '<button type="button" class="btn petit" data-evidence="' + esc(c) + '" title="Isoler les deux états avec leur voisinage : ancien en rouge, nouveau en vert, cote entre les centres">Mettre en évidence (ancien → nouveau)</button>' : "") + "<dl>" +
       (q.length ? q.slice(0, MAX).map(function(x){
         if (x.k === DEP_DIFF) return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.b) + "</dd>";      // une seule valeur : la distance
         return "<dt>" + esc(x.k) + "</dt><dd>" + esc(x.a === "" ? "(vide)" : x.a) + ' <span class="props-nb">→</span> ' + esc(x.b === "" ? "(vide)" : x.b) + "</dd>";
@@ -3719,7 +3762,7 @@
       else etat("Géométrie : lecteur de l'outil.");
     },
     site: function(){ location.href = "/"; },
-    "tout-afficher": function(){ var n = caches.size; caches = new Set(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
+    "tout-afficher": function(){ var n = caches.size; caches = new Set(); finEvidence(); majVue(); if (n) etat(pluriel(n, "élément de nouveau affiché", "éléments de nouveau affichés") + "."); },
     raccourcis: function(){
       aide("Raccourcis clavier", '<div class="aide-table">' + [
         ["Ctrl+O", "Ouvrir des fichiers (remplace ceux ouverts)"], ["Ctrl+Maj+O", "Ajouter des fichiers"], ["Ctrl+S", "Exporter"],
